@@ -59,6 +59,7 @@ public:
 	 * Default implementation returns "(no answer required)".
 	 */
 	virtual Common::String debugGetAnswer() const { return "(no answer required)"; }
+	virtual Common::String debugGetAnswerWithArgs(int, const char **) const { return debugGetAnswer(); }
 
 protected:
 	void onSnoidDragStarted(ZmbSnoid *snoid) override;

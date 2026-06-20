@@ -2480,7 +2480,7 @@ bool ZoombiniConsole::Cmd_PrintAnswer(int argc, const char **argv) {
 		return true;
 	}
 
-	Common::String answer = interactive->debugGetAnswer();
+	Common::String answer = interactive->debugGetAnswerWithArgs(argc, argv);
 	debugPrintf("%s\n", answer.c_str());
 	return true;
 }

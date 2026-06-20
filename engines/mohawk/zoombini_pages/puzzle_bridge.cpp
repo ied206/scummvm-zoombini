@@ -406,6 +406,8 @@ void ZoombiniPuzzleBridge::onGoButtonActivated() {	// IDA: bridge_funcOnClick_41
 	if (_anyZmbCrossed) {
 		_departXferSrcSiPage = ZMB_SI_BRIDGE_02;
 
+		markAcceptedSnoidsForDeparture();
+
 		// IDA: zmbMoveAnimation_45479D(45, 316, 680) — walk to (680, 316), stagger 45
 		startDepartWalkAnimation(Common::Point(680, 316));
 		ZoombiniInteractive::onGoButtonActivated();
@@ -970,6 +972,63 @@ int16 ZoombiniPuzzleBridge::getDropTargetLane(const Common::Point &pos) const {
 	return 0; // No valid drop zone
 }
 
+bool ZoombiniPuzzleBridge::canAcceptDropOnLane(int16 lane) const {
+	if (lane < 1 || 2 < lane)
+		return false;
+	if (_pendingGoDepart)
+		return false;
+	if (6 <= _successCount)
+		return false;
+	if (2 <= _trailLength)
+		return false;
+	if (_trailLength != 0)
+		return true;
+	if (_lastFrameSnapshot != 0 && getCurrentFrameCounter() - _lastFrameSnapshot < 0x2D)
+		return false;
+	return true;
+}
+
+void ZoombiniPuzzleBridge::markAcceptedSnoidsForDeparture() {
+	for (auto it = _snoidMap.begin(); it != _snoidMap.end(); ++it) {
+		ZmbSnoid *snoid = *it;
+		if (!snoid || snoid->getId() < 10000)
+			continue;
+		snoid->_packIsOccupied = false;
+	}
+
+	for (int16 i = 0; i < _lane1Count; i++) {
+		ZmbSnoid *snoid = getSnoid(_lane1ZmbIds[i]);
+		if (snoid)
+			snoid->_packIsOccupied = true;
+	}
+	for (int16 i = 0; i < _lane2Count; i++) {
+		ZmbSnoid *snoid = getSnoid(_lane2ZmbIds[i]);
+		if (snoid)
+			snoid->_packIsOccupied = true;
+	}
+}
+
+void ZoombiniPuzzleBridge::hideStaleBridgeRunnerForCollapse() {
+	if (_currentDropLane < 1 || 2 < _currentDropLane)
+		return;
+
+	// The rejected lane runner is replaced with SCRB 1214/1222. The final
+	// cliff animation also draws the collapsed span across the other lane, so
+	// its untouched 1200/1201 runner must stop drawing the intact bridge.
+	const uint16 staleRunnerId = (_currentDropLane == 1) ? _scrbCliffLane1Idx : _scrbCliffLane2Idx;
+	ZmbFeature *bridge = _scrbFeatures.find(staleRunnerId);
+	if (!bridge)
+		return;
+
+	Common::Rect dirtyRect = bridge->getSortRect();
+	if (dirtyRect.isEmpty())
+		dirtyRect = bridge->getClickRect();
+	if (!dirtyRect.isEmpty())
+		addExternalDirtyRect(dirtyRect);
+	bridge->deactivateAnimate();
+	bridge->deactivateRender();
+}
+
 // ---------------------------------------------------------------------------
 // Helper: Find a snoid whose drawn area contains the given point.
 // ---------------------------------------------------------------------------
@@ -1046,7 +1105,7 @@ void ZoombiniPuzzleBridge::onEveryFrame() {
 
 		// Guard: skip if too many crossed, or reject in transit, or not enough time
 		bool skip = false;
-		if (_successCount >= _totalZmbCount)
+		if (6 <= _successCount)
 			skip = true;
 
 		if (_trailRejectResult[0] && _bridgeTransitCount > 4)
@@ -1339,16 +1398,19 @@ void ZoombiniPuzzleBridge::processLaneStepEvent(ZmbFeature *snoidFeature, int16 
 		// IDA: *(linkDirection+47) = 0; animateZoombini(0, 7, core); flags |= 0x4008000
 		// IDA starts depart from the current SCRS-driven bridge root; restoring
 		// origPointLoc first makes the snoid blip back to the left bank.
+		// This callback runs after preRenderFeature() prepared the terminal SCRS
+		// frame. Keep that exact frame for the current draw pass; clearing it here
+		// makes blitShapes() render the new walking pose one frame too early.
+		const Common::Array<ZmbPreparedRenderHotspot> arrivalFrame = snoid->getPreparedRenderHotspots();
 		snoid->finishScrsPlayback(false);
 		// IDA bridge_laneWalkStepCallback @ 0x415EC1: bitmask |= 0x04008000
 		// (LOOP_ANIM | OVERLAY) on arrival — the overlay flag drives the correct
 		// z-sort/compositing for zoombinis that have crossed.
 		snoid->addFlag(static_cast<ZmbFeature::Flag>(ZmbFeature::FLAG_00008000_LOOP_ANIM | ZmbFeature::FLAG_04000000_OVERLAY));
 
-		// IDA: set walk target (pos2) at offset 278, then animateZoombini(0, 7, ...).
-		// The original sets the TARGET first and then starts kSnoidAnimDepart which
-		// walks toward _animTargetPos.  Do NOT pass destPos to setAnimState — that
-		// would teleport the snoid instead of walking.
+		// IDA calls animateZoombini(0, 7, ...) before storing the destination at
+		// offset 278. Do not pass destPos to setAnimState: it is a walk target, not
+		// an immediate position update.
 		Common::Point destPos;
 		if (stepCode == 6) {
 			// Arrived at lane 1 (top) — IDA: lane2ArrivedRunnerIds table
@@ -1366,10 +1428,10 @@ void ZoombiniPuzzleBridge::processLaneStepEvent(ZmbFeature *snoidFeature, int16 
 			}
 		}
 
-		snoid->setAnimTargetPos(destPos);
 		snoid->setAnimState(kSnoidAnimDepart);
-		if (snoid->onSnoidAnimTick(this))
-			snoid->setNeedsRedraw(true);
+		snoid->setAnimTargetPos(destPos);
+		if (!arrivalFrame.empty())
+			snoid->setPreparedRenderHotspots(arrivalFrame);
 
 		// IDA bridge_laneWalkStepCallback @ 0x41604c: *(byte+295) = 2 — mark
 		// snoid as arrived. Drag attempts are refused on arrived snoids.
@@ -1421,8 +1483,11 @@ void ZoombiniPuzzleBridge::processLaneStepEvent(ZmbFeature *snoidFeature, int16 
 		// IDA: --bridge_nZmbCurrentlyWalking before success/retry state.
 		if (0 < _bridgeTransitCount)
 			_bridgeTransitCount--;
-		if (_successCount < 6)
+		if (_successCount < 6) {
 			_successCount++;
+			if (6 <= _successCount)
+				hideStaleBridgeRunnerForCollapse();
+		}
 		// IDA: bridge_bRetryAllowed = 1 at case 20
 		_bRetryAllowed = 1;
 		break;
@@ -1540,7 +1605,7 @@ ZmbEventHandleResult ZoombiniPuzzleBridge::onLButtonDown(const Common::Point &ab
 	// IDA original also checked (ui_bDragLockActive <= 0 || bridge_bFirstInteraction)
 	// to prevent re-entering drag-start while a drag was in progress. In ScummVM this
 	// is already covered by isDragging() above.
-	if (_successCount >= _totalZmbCount || isDragging())
+	if (6 <= _successCount || isDragging())
 		return ZmbEventHandleResult::kPassthrough;
 
 
@@ -1588,6 +1653,29 @@ ZmbEventHandleResult ZoombiniPuzzleBridge::onLButtonDown(const Common::Point &ab
 	return ZmbEventHandleResult::kConsumed;
 }
 
+ZmbEventHandleResult ZoombiniPuzzleBridge::onMouseMove(const Common::Point &absPos, const Common::Point &relPos) {
+	ZmbEventHandleResult result = ZoombiniInteractive::onMouseMove(absPos, relPos);
+
+	if (isDragging() && 0 <= _dragHighlightSlot) {
+		if (!canAcceptDropOnLane(_dragHighlightSlot + 1)) {
+			clearDrawOnRegHighlight();
+		} else {
+			// IDA beginDragFeatureRunner_45360F sets group frame 0 and the
+			// in-group cursor to 1. For these two five-group bridge SCRBs that
+			// resolves to visible frame 1 (shape 2/4). Do not run through the
+			// empty groups 2 and 3 while the pointer remains over the lane.
+			ZmbFeature *highlight = _scrbFeatures.find(_drawOnRegRunnerIds[_dragHighlightSlot]);
+			if (highlight) {
+				highlight->deactivateAnimate();
+				highlight->setLastFrameIdx(1);
+				highlight->setNeedsRedraw(true);
+			}
+		}
+	}
+
+	return result;
+}
+
 void ZoombiniPuzzleBridge::endDrag(const Common::Point &dropPos) {
 	ZmbSnoid *snoid = finishSnoidDrag();
 	_isDragging = 0;
@@ -1596,7 +1684,7 @@ void ZoombiniPuzzleBridge::endDrag(const Common::Point &dropPos) {
 	Common::Point snoidPos = snoid->getPointLoc();
 	int16 dropLane = getDropTargetLane(snoidPos);
 
-	if (dropLane > 0 && static_cast<uint16>(_trailLength) < 2) {
+	if (canAcceptDropOnLane(dropLane)) {
 		// Valid drop: add to trail
 		bool dropRejected = testAttrMatch(snoid->_trait, dropLane);
 		_trailDropZone[_trailLength] = dropLane;

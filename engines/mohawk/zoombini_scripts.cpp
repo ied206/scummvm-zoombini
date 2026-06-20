@@ -840,6 +840,9 @@ void ZmbSnoid::startScrsPlayback(Common::SeekableReadStream *scrsStream, bool hi
 	_animState = rejectState ? kSnoidAnimScriptReject : kSnoidAnimScriptNormal;
 	_scrsAnimCycleCount = 0;
 	_scrsJustStarted = true;
+	// IDA snoidScript_initAndPlay_455C0D sets wBoolDoRender before the first
+	// frame. SCRS events may have hidden the snoid during the previous script.
+	activateRender();
 
 	// Start at frame 0. activateAnimate enables voice/sound event processing.
 	setLastFrameIdx(0);
@@ -1593,8 +1596,8 @@ int16 ZmbSnoid::getBodyLayerBaseOffset(uint8 layer, uint8 layerShift) const {
 	static const int16 kSmallEyeTable[6] = {0, 91, 95, 99, 103, 107};
 	static const int16 kSmallHeadTable[6] = {0, 11, 27, 43, 59, 75};
 
-	// Apply IDA p_wUnk00C2 shift: for NORMAL scripts when first shape > 18,
-	// the trait offset array is shifted by 1 (layer 0 = no offset).
+	// Apply the IDA p_wUnk00C2 shift when a NORMAL frame's first raw shape
+	// exceeds 18. The original condition is independent of visible layer count.
 	int effectiveLayer = static_cast<int>(layer) - static_cast<int>(layerShift);
 	if (effectiveLayer < 0 || effectiveLayer > 4)
 		return 0;

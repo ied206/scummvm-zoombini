@@ -50,6 +50,7 @@ public:
 
 	ZmbEventHandleResult onLButtonDown(const Common::Point &absPos, const Common::Point &relPos) override;
 	ZmbEventHandleResult onLButtonUp(const Common::Point &absPos, const Common::Point &relPos) override;
+	ZmbEventHandleResult onMouseMove(const Common::Point &absPos, const Common::Point &relPos) override;
 	void endDrag(const Common::Point &dropPos);
 
 protected:
@@ -148,6 +149,25 @@ protected:
 	 * @return 1 = lane 1 (top), 2 = lane 2 (bottom), 0 = no valid drop.
 	 */
 	int16 getDropTargetLane(const Common::Point &pos) const;
+
+	/**
+	 * Return true if a lane can accept another queued Zoombini now.
+	 * Mirrors bridge hover queue gating: no more drops after 6 failures and
+	 * no new queue entry until the original 45-frame bridge reuse delay ends.
+	 */
+	bool canAcceptDropOnLane(int16 lane) const;
+
+	/**
+	 * Before Go departure, mark only accepted/right-bank Zoombinis as occupied.
+	 * Shared cleanup then routes the non-occupied left-bank Zoombinis back to
+	 * the route's resting pack.
+	 */
+	void markAcceptedSnoidsForDeparture();
+
+	/**
+	 * Hide the intact bridge runner left behind by the final collapse animation.
+	 */
+	void hideStaleBridgeRunnerForCollapse();
 
 	/**
 	 * Find a snoid whose draw record contains the given point.
@@ -262,7 +282,7 @@ protected:
 	/** Page is initialized and running. IDA: word_4AAE10 */
 	int16 _isActive = 0;
 
-	/** Number of successfully crossed Zoombinis (0-16 max). IDA: word_4AAE62 */
+	/** Failed crossing/peg-drop stage (0-6 max). IDA: word_4AAE62 */
 	int16 _successCount = 0;
 
 	/** Number of failed crossing attempts (pegs dropped). */

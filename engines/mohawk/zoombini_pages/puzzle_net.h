@@ -78,6 +78,8 @@ private:
 	void processSnoidAnimEvent(ZmbFeature *feature, int16 eventCode);
 	/** Events from SCRB features. IDA: net_zmbAnimCallback (0x438EA1) routed via SCRB */
 	void processZmbScrbAnimEvent(ZmbFeature *feature, int16 eventCode);
+	/** Start a NET NORMAL SCRS, optionally ending at the requested anchor. */
+	bool startVisibleNormalScrs(ZmbSnoid *snoid, uint16 scrsId, const Common::Point *endPos = nullptr);
 
 	// --- Render callbacks ---
 

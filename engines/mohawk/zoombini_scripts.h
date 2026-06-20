@@ -1194,9 +1194,9 @@ public:
 	 * (IDA: wArrZmbBody*_4A47A0-4A47C4) instead of the general tables (4A4770-4A4794).
 	 *
 	 * @param layer      0-based body-part layer index (matches hs._hsId)
-	 * @param layerShift IDA p_wUnk00C2 shift: when the first SCRS frame shape > 18 in
-	 *                   a NORMAL script, the trait array is shifted by 1, so layer 0 gets
-	 *                   no trait offset and layers 1-5 map to the original slots 0-4.
+	 * @param layerShift IDA p_wUnk00C2 shift when a NORMAL frame's first raw shape
+	 *                   exceeds 18, so layer 0 gets no trait offset and layers 1-5
+	 *                   map to the original slots 0-4.
 	 */
 	int16 getBodyLayerBaseOffset(uint8 layer, uint8 layerShift = 0) const;
 

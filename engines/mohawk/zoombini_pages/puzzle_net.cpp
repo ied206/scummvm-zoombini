@@ -461,7 +461,7 @@ void ZoombiniPuzzleNet::registerColumnRunners() {
 	// alongside tBMP 7000 for per-shape registration-point offsets.
 	loadREGS(ZmbArchiveKind::kPage, 7000);
 	// IDA: scrb_useFeatureGroup(TRUE, groupId, 9000) — loads REGS 9000/9001
-	// for slot feature shapes (indicator shapes 151-156 have non-zero offsets).
+	// for slot feature shapes (indicator shape IDs 151-156 have non-zero offsets).
 	loadREGS(ZmbArchiveKind::kPage, 9000);
 	
 	// 5 column SCRB runners at 8000-8004
@@ -905,7 +905,7 @@ void ZoombiniPuzzleNet::generateAttrRules() {
 				_slotScrbFeatures[i]->setPreRenderShapeFunc(
 					reinterpret_cast<ZmbFeature::OnPreRenderShapeFunc>(&ZoombiniPuzzleNet::slotPreRenderShape));
 				// IDA: scrb_useFeatureGroup(1, 2, 9000) — REGS 9000/9001 provides
-				// registration-point offsets for indicator shapes (151-156).
+				// registration-point offsets for indicator shape IDs (151-156).
 				_slotScrbFeatures[i]->setShapeRegs(_regsMap[9000]);
 				// Freeze animation on frame 0: slot shows its static indicator permanently.
 				// LOOP_ANIM activateAnimate() sets _frameTimingReady = true;
@@ -1328,6 +1328,22 @@ void ZoombiniPuzzleNet::onFeatureAnimEvent(ZmbFeature *feature, int16 eventCode)
 	}
 }
 
+bool ZoombiniPuzzleNet::startVisibleNormalScrs(ZmbSnoid *snoid, uint16 scrsId, const Common::Point *endPos) {
+	if (!snoid)
+		return false;
+
+	Common::SeekableReadStream *scrsStream =
+		_vm->getResource(MKTAG('S', 'C', 'R', 'S'),
+			ZmbResource(ZmbArchiveKind::kPage, scrsId));
+	if (!scrsStream)
+		return false;
+
+	// IDA passes these coordinates as pInitPos to snoidScript_initAndPlay:
+	// anchor the last visible SCRS frame there instead of teleporting frame 0.
+	snoid->startScrsPlayback(scrsStream, false, false, endPos);
+	return true;
+}
+
 void ZoombiniPuzzleNet::processSnoidAnimEvent(ZmbFeature *feature, int16 eventCode) {
 	// IDA: net_zmbAnimCallback (0x438EA1) — snoid-specific events
 	ZmbSnoid *snoid = static_cast<ZmbSnoid *>(feature);
@@ -1343,10 +1359,12 @@ void ZoombiniPuzzleNet::processSnoidAnimEvent(ZmbFeature *feature, int16 eventCo
 					// IDA: animateZoombini(0, 7u, ...) then *(int*)(v8+278) = exitPos
 					// initWalkToTarget sets _animTargetPos AND calls setAnimState(kSnoidAnimDepart)
 					activeSnoid->initWalkToTarget(exitPos);
+					activeSnoid->activateRender();
 					activeSnoid->_packIsOccupied = true;
 				}
 				_exitingZmbSnoidId = _activeZmbSnoidId;
 				_bAdvanceReady = true;
+				setGoButtonsEnabled(true);
 				_zmbsAtColumns = 0;
 
 				if (_sortedZmbCount >= _loadedZmbCount || _allColumnsExhausted) {
@@ -1385,6 +1403,7 @@ void ZoombiniPuzzleNet::processSnoidAnimEvent(ZmbFeature *feature, int16 eventCo
 					_walkSlotSnoidIds[i] = 0;
 					if (walkSnoid) {
 						walkSnoid->setAnimState(kSnoidAnimTurnLeft);
+						walkSnoid->activateRender();
 						if (!_walkSlotSnoidIds[0] && !_walkSlotSnoidIds[1] && !_walkSlotSnoidIds[2]) {
 							loadScrbOntoFeature(_feedbackScrbFeature, 10018);
 							_submitCount = 0;
@@ -1433,13 +1452,7 @@ void ZoombiniPuzzleNet::processSnoidAnimEvent(ZmbFeature *feature, int16 eventCo
 		if (activeSnoid) {
 			Common::Point entryPos = kEntryStartPositions[_activeColumnIdx];
 			uint16 scrsId = _activeColumnIdx + 14000;
-			Common::SeekableReadStream *scrsStream =
-				_vm->getResource(MKTAG('S', 'C', 'R', 'S'),
-					ZmbResource(ZmbArchiveKind::kPage, scrsId));
-			if (scrsStream) {
-				activeSnoid->setPointLoc(entryPos);
-				activeSnoid->startScrsPlayback(scrsStream, false, false);
-			}
+			startVisibleNormalScrs(activeSnoid, scrsId, &entryPos);
 		}
 		// IDA: 4x runner_linkRelativeToParent chain (not implemented)
 		break;
@@ -1452,13 +1465,7 @@ void ZoombiniPuzzleNet::processSnoidAnimEvent(ZmbFeature *feature, int16 eventCo
 			ZmbSnoid *activeSnoid = getSnoid(_activeZmbSnoidId);
 			if (activeSnoid) {
 				uint16 scrsId = _activeColumnIdx + 3 * (activeSnoid->_trait._foot - 1) + 13031;
-				Common::SeekableReadStream *scrsStream =
-					_vm->getResource(MKTAG('S', 'C', 'R', 'S'),
-						ZmbResource(ZmbArchiveKind::kPage, scrsId));
-				if (scrsStream) {
-					activeSnoid->setPointLoc(exitPos);
-					activeSnoid->startScrsPlayback(scrsStream, false, false);
-				}
+				startVisibleNormalScrs(activeSnoid, scrsId, &exitPos);
 			}
 			_zmbsAtColumns++;
 			_lastLinkedSnoidId = _activeZmbSnoidId;
@@ -1502,13 +1509,7 @@ void ZoombiniPuzzleNet::processZmbScrbAnimEvent(ZmbFeature *feature, int16 event
 		if (activeSnoid) {
 			Common::Point entryPos = kEntryStartPositions[_activeColumnIdx];
 			uint16 scrsId = _activeColumnIdx + 14000;
-			Common::SeekableReadStream *scrsStream =
-				_vm->getResource(MKTAG('S', 'C', 'R', 'S'),
-					ZmbResource(ZmbArchiveKind::kPage, scrsId));
-			if (scrsStream) {
-				activeSnoid->setPointLoc(entryPos);
-				activeSnoid->startScrsPlayback(scrsStream, false, false);
-			}
+			startVisibleNormalScrs(activeSnoid, scrsId, &entryPos);
 		}
 		break;
 	}
@@ -1519,13 +1520,8 @@ void ZoombiniPuzzleNet::processZmbScrbAnimEvent(ZmbFeature *feature, int16 event
 		ZmbSnoid *colSnoid = getSnoid(_activeZmbSnoidId);
 		if (colSnoid) {
 			uint16 scrsId = 3 * (colSnoid->_trait._foot - 1) + 2 - _activeColumnIdx + 13016;
-			Common::SeekableReadStream *scrsStream =
-				_vm->getResource(MKTAG('S', 'C', 'R', 'S'),
-					ZmbResource(ZmbArchiveKind::kPage, scrsId));
-			if (scrsStream) {
-				colSnoid->_packIsOccupied = true;
-				colSnoid->startScrsPlayback(scrsStream, false, false);
-			}
+			colSnoid->_packIsOccupied = true;
+			startVisibleNormalScrs(colSnoid, scrsId);
 			_pendingZmbIndex = _nextZmbToAssign;
 			_activeZmbSnoidId = _columnSlotSnoidIds[_activeColumnIdx];
 			_columnSlotSnoidIds[_activeColumnIdx] = 0;
@@ -1542,13 +1538,7 @@ void ZoombiniPuzzleNet::processZmbScrbAnimEvent(ZmbFeature *feature, int16 event
 			ZmbSnoid *activeSnoid = getSnoid(_activeZmbSnoidId);
 			if (activeSnoid) {
 				uint16 scrsId = _activeColumnIdx + 3 * (activeSnoid->_trait._foot - 1) + 13031;
-				Common::SeekableReadStream *scrsStream =
-					_vm->getResource(MKTAG('S', 'C', 'R', 'S'),
-						ZmbResource(ZmbArchiveKind::kPage, scrsId));
-				if (scrsStream) {
-					activeSnoid->setPointLoc(exitPos);
-					activeSnoid->startScrsPlayback(scrsStream, false, false);
-				}
+				startVisibleNormalScrs(activeSnoid, scrsId, &exitPos);
 			}
 			_zmbsAtColumns++;
 			_lastLinkedSnoidId = _activeZmbSnoidId;
@@ -1873,11 +1863,7 @@ label_postColumn:
 		ZmbSnoid *snoid = getSnoid(snoidId);
 		if (snoid) {
 			uint16 scrsId = 5 * (2 - _activeColumnIdx) + snoid->_trait._foot - 1 + 13001;
-			Common::SeekableReadStream *scrsStream =
-				_vm->getResource(MKTAG('S', 'C', 'R', 'S'),
-					ZmbResource(ZmbArchiveKind::kPage, scrsId));
-			if (scrsStream) {
-				snoid->startScrsPlayback(scrsStream, false, false);
+			if (startVisibleNormalScrs(snoid, scrsId)) {
 				_activeWalkCount++;
 				_walkSlotSnoidIds[_activeColumnIdx] = _columnSlotSnoidIds[_activeColumnIdx];
 				_pendingZmbIndex = -1;

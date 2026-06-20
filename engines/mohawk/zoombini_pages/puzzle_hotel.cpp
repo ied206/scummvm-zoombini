@@ -337,6 +337,36 @@ Common::String ZoombiniPuzzleHotel::debugGetAnswer() const {
 			s += Common::String::format("%d(%s) ", _attrGrid3[i], ZmbTrait::debugTraitValueName(axis3Category, _attrGrid3[i]));
 	}
 	s += "\n";
+
+	if (_difficultyLevel == kPuzzleDiffLevel3) {
+		s += "  Level 3 temporary generation mapping (used to choose forbidden rooms):\n";
+		if (_level3TempMappingValid) {
+			s += "    Columns (dim1):";
+			for (int16 col = 0; col < 5; col++) {
+				int16 value = _level3TempAttrGrid1[col];
+				s += Common::String::format(" c%d=%d(%s)",
+					col, value, ZmbTrait::debugTraitValueName(axis1Category, value));
+			}
+			s += "\n    Rows (dim2):";
+			for (int16 row = 0; row < 5; row++) {
+				int16 value = _level3TempAttrGrid2[row * 5];
+				s += Common::String::format(" r%d=%d(%s)",
+					row, value, ZmbTrait::debugTraitValueName(axis2Category, value));
+			}
+			s += "\n    Cells: slot=count, * means forbidden\n";
+			for (int16 row = 0; row < 5; row++) {
+				s += Common::String::format("      row %d:", row);
+				for (int16 col = 0; col < 5; col++) {
+					int16 slot = row * 5 + col;
+					s += Common::String::format(" %2d=%d%s",
+						slot, _level3TempMatchCounts[slot], _roomGrid[slot] == -1 ? "*" : "");
+				}
+				s += "\n";
+			}
+		} else {
+			s += "    (not available; room rules have not been generated)\n";
+		}
+	}
 	return s;
 }
 
@@ -412,6 +442,11 @@ void ZoombiniPuzzleHotel::computeTraitVariantCounts() {
 // IDA: sub_4209AA (0x4209AA)
 // ---------------------------------------------------------------------------
 void ZoombiniPuzzleHotel::generateRoomRules() {
+	_level3TempMappingValid = false;
+	memset(_level3TempAttrGrid1, 0, sizeof(_level3TempAttrGrid1));
+	memset(_level3TempAttrGrid2, 0, sizeof(_level3TempAttrGrid2));
+	memset(_level3TempMatchCounts, 0, sizeof(_level3TempMatchCounts));
+
 	// Count how many axes have <X variants for axis-selection validation
 	auto countLimitedAxes = [&](int threshold) -> int {
 		int count = 0;
@@ -479,11 +514,14 @@ void ZoombiniPuzzleHotel::generateRoomRules() {
 
 			// IDA: ferry_fillCellRow_4216BC(6*i, rowVal+1, colVal+1)
 			// This fills the constraint grids for a full row and column
-			for (int k = 0; k < 5; k++) {
-				_attrGrid1[5 * k + (5 * i) % 5] = colVal + 1;
-				_attrGrid2[k + (5 * i - (5 * i) % 5)] = rowVal + 1;
-			}
+			fillCellRow(6 * i, rowVal + 1, colVal + 1);
 		}
+
+		for (int16 i = 0; i < 25; i++) {
+			_level3TempAttrGrid1[i] = _attrGrid1[i];
+			_level3TempAttrGrid2[i] = _attrGrid2[i];
+		}
+		_level3TempMappingValid = true;
 
 		// IDA 0x420C0E-0x420CAA: Count how many zmbs match each cell
 		const ZmbStateFile &f = _vm->_state->_f;
@@ -515,6 +553,7 @@ void ZoombiniPuzzleHotel::generateRoomRules() {
 		int16 emptyCells[25];
 		int16 emptyCount = 0;
 		for (int16 n = 0; n < 25; n++) {
+			_level3TempMatchCounts[n] = tempGrid[n];
 			if (!tempGrid[n])
 				emptyCells[emptyCount++] = n;
 		}

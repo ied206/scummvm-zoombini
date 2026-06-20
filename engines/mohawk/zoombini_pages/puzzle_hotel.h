@@ -172,6 +172,12 @@ private:
 	/** When true, all attribute validators return valid immediately. IDA: word_4AB54C */
 	bool _attrBypass = false;
 
+	/** Debug snapshot of the level-3 temporary mapping used to choose forbidden rooms. */
+	bool _level3TempMappingValid = false;
+	int16 _level3TempAttrGrid1[25] = {};
+	int16 _level3TempAttrGrid2[25] = {};
+	int16 _level3TempMatchCounts[25] = {};
+
 	// -----------------------------------------------------------------------
 	// Puzzle axis selection
 	// -----------------------------------------------------------------------
