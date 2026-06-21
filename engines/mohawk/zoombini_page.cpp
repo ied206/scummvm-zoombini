@@ -916,18 +916,6 @@ void ZoombiniPage::prepareSnoidVisualCoverage(ZmbSnoid *snoid, bool cacheFrame) 
 
 	Common::Array<ZmbHotspot> hotspots = hsGroup->copyHotspots();
 
-	ZmbRegs *shapeRegs = snoid->getShapeRegs();
-	if (shapeRegs) {
-		for (uint32 i = 0; i < hotspots.size(); i++) {
-			ZmbHotspot &hs = hotspots[i];
-			if (hs._shapeIdx != ZmbHotspot::kShapeNone) {
-				const Common::Point delta = shapeRegs->getShapeDelta(hs._shapeIdx);
-				hs._x -= delta.x;
-				hs._y -= delta.y;
-			}
-		}
-	}
-
 	uint8 snoidLayerShift = 0;
 	if (!snoid->hasCombinedShapeIndices() &&
 	    snoid->getAnimState() == kSnoidAnimScriptNormal) {
@@ -1313,13 +1301,26 @@ void ZoombiniPage::preRenderFeature(ZmbFeature *feature) {
 				feature->deactivateRender();
 				// IDA 0x461846: postRenderStandard draws shapes even when
 				// wBoolDoRender=0, unless FLAG_01000000_DEFER_RENDER is set.
-				// The original's LABEL_70 for empty frames returns without
-				// overwriting hsArr, so hsArr retains the PREVIOUS frame's
-				// shapes.  ScummVM's getHotspotGroup() fallback models this:
-				// empty frames fall back to the previous frame with shapes.
-				// Reset _lastFrameIdx to getLastShapeFrameIdx() so the
-				// frozen feature renders its last visible shapes.
-				feature->setLastFrameIdx(feature->getLastShapeFrameIdx());
+				// The frozen frame must match the original's hsArr contents
+				// after end-of-cycle:
+				//  - If the SCRB's final frame is an explicit hotspot group
+				//    (count > 0), the original loads it into hsArr verbatim and
+				//    freezes there, even when its shape index is 0.  Such an
+				//    explicit "clear" frame hides the feature (e.g. NET column
+				//    SCRB 8000-8004, whose last frame retires the ejected stone
+				//    after it leaves the screen).  postRenderStandard then draws
+				//    nothing.
+				//  - If the final frame is a pure terminator (no hotspots), the
+				//    original's LABEL_70 returns without overwriting hsArr, so it
+				//    retains the previous frame's shapes.  Freeze on the last
+				//    frame that actually has visible shapes (e.g. the reject-
+				//    flight captain settling pose) to avoid a stale-anchor or
+				//    blank freeze.
+				ZmbHotspotGroup *finalGroup = feature->getHotspotGroupExact(feature->getMaxFrameIdx());
+				if (finalGroup && finalGroup->getHotspotCount() > 0)
+					feature->setLastFrameIdx(feature->getMaxFrameIdx());
+				else
+					feature->setLastFrameIdx(feature->getLastShapeFrameIdx());
 				// IDA 0x461CE9–0x461D06: callback fires and RETURNS EARLY
 				// only if CHAIN_SCRIPT did NOT run (v5=1).
 				// One-shot: onHotspotShapeOrFrameFunc cleared to 0 after firing.
@@ -1513,7 +1514,7 @@ ZmbRenderResult ZoombiniPage::blitShapes(ZmbFeature *feature) {
 	// IDA: runner_preRenderStandard 0x461F86 — apply per-tBMP REGS offsets.
 	// Subtracts REGS[shapeId].x/y from each hotspot position AFTER
 	// onPreRenderShapeFunc (which may have remapped shapeIdx).
-	ZmbRegs *shapeRegs = feature->getShapeRegs();
+	ZmbRegs *shapeRegs = feature->hasFlag(ZmbFeature::FLAG_00000001_TYPE_SNOID) ? nullptr : feature->getShapeRegs();
 	if (shapeRegs) {
 		for (uint32 i = 0; i < hotspots.size(); i++) {
 			ZmbHotspot &hs = hotspots[i];
@@ -2058,6 +2059,45 @@ const ZmbWalkAnim &ZoombiniPage::getWalkAnim(uint8 footType, int dirBucket) {
 	int ft = CLIP<int>(static_cast<int>(footType), 1, 5) - 1;
 	int dir = CLIP<int>(dirBucket, 0, 4);
 	return _walkAnims[ft][dir];
+}
+
+void ZoombiniPage::registerScrsGroup(uint16 baseId, uint16 count) {
+	// IDA scrs_registerGroup0_4524AF / scrs_registerGroup1_45258E: the pool is
+	// filled in call order. The first registered group becomes group 0 (NORMAL,
+	// state 9); the second becomes group 1 (REJECT, state 8). At most two.
+	if (_scrsGroupNum >= 2)
+		return;
+	_scrsGroupBase[_scrsGroupNum] = baseId;
+	_scrsGroupCount[_scrsGroupNum] = count;
+	_scrsGroupNum++;
+}
+
+bool ZoombiniPage::resolveScrsRejectState(uint16 scrsId) const {
+	// IDA snoidScript_lookupSCRSIndex_45266B + snoidScript_initAndPlay: the SCRS
+	// id's owning group selects the render state. Group 1 -> pOutGroupIdx==1 ->
+	// SNOID_ANIMATE_STATE_008_REJECT_SCRIPT (state 8). Group 0 (or unregistered)
+	// -> SNOID_ANIMATE_STATE_009_NORMAL_SCRIPT (state 9).
+	for (int g = 0; g < _scrsGroupNum; g++) {
+		if (_scrsGroupBase[g] <= scrsId &&
+			scrsId < static_cast<int>(_scrsGroupBase[g]) + _scrsGroupCount[g])
+			return g == 1;
+	}
+	return false;
+}
+
+bool ZoombiniPage::startSnoidScrs(ZmbSnoid *snoid, uint16 scrsId, bool hideOnComplete,
+								  const Common::Point *endPos, ZmbArchiveKind archive) {
+	if (!snoid)
+		return false;
+
+	Common::SeekableReadStream *scrsStream =
+		_vm->getResource(ID_SCRS, ZmbResource(archive, scrsId));
+	if (!scrsStream)
+		return false;
+
+	// State 8 vs 9 comes from the registered SCRS group, never a hardcoded flag.
+	snoid->startScrsPlayback(scrsStream, hideOnComplete, resolveScrsRejectState(scrsId), endPos);
+	return true;
 }
 
 void ZoombiniPage::loadFidgetAnims() {

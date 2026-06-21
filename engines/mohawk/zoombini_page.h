@@ -618,6 +618,35 @@ public:
 	 */
 	const ZmbWalkAnim &getHoldingAnim(uint8 footType);
 
+	/**
+	 * Register a snoid SCRS pool group. Mirrors the original
+	 * `scrs_registerGroup0_4524AF` / `scrs_registerGroup1_45258E`: call order is
+	 * significant. The FIRST registered group is "group 0" (NORMAL pool, snoid
+	 * render state 9, tBMP 3100 + NORMAL body-layer tables); the SECOND is
+	 * "group 1" (REJECT pool, state 8, tBMP 3000 + general body-layer tables).
+	 * At most two groups are tracked.
+	 */
+	void registerScrsGroup(uint16 baseId, uint16 count);
+
+	/**
+	 * Resolve whether a snoid SCRS id should play in REJECT state (state 8).
+	 * Returns true when the id falls in registered group 1, false otherwise
+	 * (group 0 or unregistered → NORMAL state 9). Mirrors the original's
+	 * `snoidScript_lookupSCRSIndex_45266B`-driven state selection inside
+	 * `snoidScript_initAndPlay`, so pages never hardcode the render state.
+	 */
+	bool resolveScrsRejectState(uint16 scrsId) const;
+
+	/**
+	 * Load a page/system SCRS and start snoid playback, auto-selecting REJECT
+	 * (state 8) vs NORMAL (state 9) from the registered SCRS groups. Shared
+	 * entry point that removes per-call hardcoding of the render state.
+	 * @return true on success (resource found and playback started).
+	 */
+	bool startSnoidScrs(ZmbSnoid *snoid, uint16 scrsId, bool hideOnComplete = false,
+						const Common::Point *endPos = nullptr,
+						ZmbArchiveKind archive = ZmbArchiveKind::kPage);
+
 protected:
 	virtual void onSnoidDragStarted(ZmbSnoid *) {}
 	virtual void onSnoidDragEnded(ZmbSnoid *) {}
@@ -649,6 +678,15 @@ protected:
 	ZmbWalkAnim _walkAnims[5][5];
 	bool _walkAnimsLoaded = false;
 	void loadWalkAnims();
+
+	/**
+	 * Snoid SCRS pool group registry (IDA `scrs_registerGroup0/1` + lookup
+	 * `snoidScript_lookupSCRSIndex_45266B`). Index 0 = NORMAL pool (state 9),
+	 * index 1 = REJECT pool (state 8). `_scrsGroupNum` is how many are set.
+	 */
+	uint16 _scrsGroupBase[2] = {0, 0};
+	uint16 _scrsGroupCount[2] = {0, 0};
+	int _scrsGroupNum = 0;
 
 	/**
 	 * Fidget animation cache: _fidgetAnims[set][variant].

@@ -213,7 +213,8 @@ void ZoombiniPuzzleCaves::loadFeatures() {
 	}
 
 	// Load reject pool: 14 reject scripts at SCRS 12000
-	// IDA: scrs_loadRejectPool(0, 14, 12000)
+	// IDA: scrs_loadRejectPool(0, 14, 12000) -- group 0 -> state 9 (NORMAL).
+	registerScrsGroup(12000, 14);
 	for (uint16 i = 0; i < 14; i++) {
 		loadSnoid(ZmbResource(ZmbArchiveKind::kPage, 11000),
 				  12000 + i,
@@ -221,7 +222,8 @@ void ZoombiniPuzzleCaves::loadFeatures() {
 	}
 
 	// Load normal pool: 5 normal scripts at SCRS 13000
-	// IDA: scrs_loadNormalPool(0, 5, 13000)
+	// IDA: scrs_loadNormalPool(0, 5, 13000) -- group 1 -> state 8 (REJECT).
+	registerScrsGroup(13000, 5);
 	for (uint16 i = 0; i < 5; i++) {
 		loadSnoid(ZmbResource(ZmbArchiveKind::kPage, 11000),
 				  13000 + i,
@@ -1311,7 +1313,7 @@ void ZoombiniPuzzleCaves::onEveryFrame() {
 			_vm->getResource(MKTAG('S', 'C', 'R', 'S'),
 							 ZmbResource(ZmbArchiveKind::kPage, static_cast<uint16>(walkScrsId)));
 		if (scrsStream)
-			walkSnoid->startScrsPlayback(scrsStream, true, false);
+			walkSnoid->startScrsPlayback(scrsStream, true, resolveScrsRejectState(static_cast<uint16>(walkScrsId)));
 	}
 
 	// IDA caves_funcOnHover @ 0x4176f8: mass walk-in driver. After Go (or all
@@ -1343,7 +1345,7 @@ void ZoombiniPuzzleCaves::onEveryFrame() {
 						_vm->getResource(MKTAG('S', 'C', 'R', 'S'),
 							ZmbResource(ZmbArchiveKind::kPage, scrsId));
 					if (st) {
-						cand->startScrsPlayback(st, true, false);
+						cand->startScrsPlayback(st, true, resolveScrsRejectState(scrsId));
 						_massWalkInProgress++;
 						fired = true;
 					}
@@ -1456,9 +1458,9 @@ void ZoombiniPuzzleCaves::playEntranceScript(bool isReject, int16 scrsResId) {
 		_vm->getResource(MKTAG('S', 'C', 'R', 'S'), ZmbResource(ZmbArchiveKind::kPage, static_cast<uint16>(scrsResId)));
 	if (scrsStream) {
 		// IDA: snoidScript_initAndPlay(scriptType, dword_4AAF6C, scrsResId, &runner->core188)
-		// scriptType=1 → reject (hideOnComplete=false, rejectState=true)
-		// scriptType=0 → normal (hideOnComplete=true, rejectState=false)
-		_activeDropSnoid->startScrsPlayback(scrsStream, !isReject, isReject);
+		// scriptType (1=reject/0=normal) only sets hideOnComplete; the render
+		// state comes from the SCRS pool group (resolveScrsRejectState).
+		_activeDropSnoid->startScrsPlayback(scrsStream, !isReject, resolveScrsRejectState(static_cast<uint16>(scrsResId)));
 	}
 }
 
@@ -1609,10 +1611,11 @@ void ZoombiniPuzzleCaves::setupDoorAnimation(int16 doorIdx) {
 
 		// IDA: snoidScript_initAndPlay(1, dword_4AAF6C=0, 12012, &doorData->core188)
 		// Play SCRS 12012 (door close / walk-back script) on the active snoid.
+		// SCRS 12012 is in pool 0 -> state 9; the leading '1' arg is hideOnComplete.
 		Common::SeekableReadStream *scrsStream =
 			_vm->getResource(MKTAG('S', 'C', 'R', 'S'), ZmbResource(ZmbArchiveKind::kPage, 12012));
 		if (scrsStream)
-			_activeDropSnoid->startScrsPlayback(scrsStream, false, true);
+			_activeDropSnoid->startScrsPlayback(scrsStream, false, resolveScrsRejectState(12012));
 
 		// IDA: scrb_registerHotspotGroup(0, 0, 0, 0, doorData->idx, doorData->idx)
 		// IDA: runner_linkRelativeToParent(caves_buttonOverlayRunner, 0, doorData->idx)

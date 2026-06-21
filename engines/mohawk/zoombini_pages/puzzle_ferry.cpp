@@ -776,7 +776,8 @@ void ZoombiniPuzzleFerry::loadFeatures() {
 	}
 
 	// Load reject pool: 8 reject scripts at SCRS 1900
-	// IDA: scrs_loadRejectPool(0, 8, 1900)
+	// IDA: scrs_loadRejectPool(0, 8, 1900) -- group 0 -> state 9 (NORMAL).
+	registerScrsGroup(1900, 8);
 	for (uint16 i = 0; i < 8; i++) {
 		loadSnoid(ZmbResource(ZmbArchiveKind::kPage, 1400),
 				  1900 + i,
@@ -784,7 +785,8 @@ void ZoombiniPuzzleFerry::loadFeatures() {
 	}
 
 	// Load normal pool: 10 normal scripts at SCRS 1000
-	// IDA: scrs_loadNormalPool(1, 10, 1000)
+	// IDA: scrs_loadNormalPool(1, 10, 1000) -- group 1 -> state 8 (REJECT).
+	registerScrsGroup(1000, 10);
 	for (uint16 i = 0; i < 10; i++) {
 		loadSnoid(ZmbResource(ZmbArchiveKind::kPage, 1400),
 				  1000 + i,
@@ -2172,7 +2174,7 @@ void ZoombiniPuzzleFerry::processBoatFlightEvent(int16 callbackCode) {
 			//                       e.g. init_x=16/init_y=235 for SCRS 1900)
 			//   - SCRS 1900-1906 belong to pool 0 -> NORMAL state 9
 			_rejectingSnoid->startScrsPlayback(scrsStream, true /* hideOnComplete */,
-			                                   false /* rejectState=NORMAL */);
+			                                   resolveScrsRejectState(scrsA));
 		} else {
 			warning("Ferry: primary flight SCRS %u not found", scrsA);
 		}
@@ -2207,7 +2209,7 @@ void ZoombiniPuzzleFerry::processBoatFlightEvent(int16 callbackCode) {
 			//     the destination point (dock = 122,164; rowboat = saved origin).
 			//   - SCRS 1901-1907 are in pool 0 -> NORMAL state 9.
 			_rejectingSnoid->startScrsPlayback(scrsStream, false /* hideOnComplete */,
-			                                   false /* rejectState=NORMAL */,
+			                                   resolveScrsRejectState(scrsB),
 			                                   &_rejectWalkDest);
 			_rejectingSnoid->activateRender();  // case 1 may have hidden the snoid
 			_rejectFlightLandingScrsActive = true;
@@ -2229,7 +2231,7 @@ void ZoombiniPuzzleFerry::processBoatFlightEvent(int16 callbackCode) {
 			ZmbResource(ZmbArchiveKind::kPage, scrsB));
 		if (scrsStream) {
 			_rejectingSnoid->startScrsPlayback(scrsStream, true /* hideOnComplete */,
-			                                   false /* rejectState=NORMAL */,
+			                                   resolveScrsRejectState(scrsB),
 			                                   &_rejectWalkDest);
 			_rejectingSnoid->activateRender();  // ensure visible during landing arc
 			// Case 3 hides on complete (matches its IDA chIsFacingLeft=1 arg)

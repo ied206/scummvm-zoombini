@@ -78,6 +78,8 @@ private:
 	void processSnoidAnimEvent(ZmbFeature *feature, int16 eventCode);
 	/** Events from SCRB features. IDA: net_zmbAnimCallback (0x438EA1) routed via SCRB */
 	void processZmbScrbAnimEvent(ZmbFeature *feature, int16 eventCode);
+	/** Flip snoid facing for NET callback event 0. IDA: net_zmbAnimCallback (0x438F5E) */
+	void flipEventFacing(ZmbFeature *feature);
 	/** Start a NET NORMAL SCRS, optionally ending at the requested anchor. */
 	bool startVisibleNormalScrs(ZmbSnoid *snoid, uint16 scrsId, const Common::Point *endPos = nullptr);
 
@@ -157,6 +159,9 @@ private:
 
 	ZmbFeature *_slotScrbFeatures[125] = {};       ///< IDA: net_slotScrbRunners
 	ZmbFeature *_activeSlotFeatures[16] = {};      ///< IDA: net_activeSlotRunners
+	Common::Point _activeSlotPositions[16] = {};   ///< Fixed dirty-rect stamp positions for completed shots
+	int16 _activeSlotCurrentOffsets[16][3] = {};   ///< Selector state captured when each shot was fired
+	int16 _activeSlotPreviousOffsets[16][3] = {};  ///< Previous selector state captured with each shot
 	int16 _slotRunnerCount = 0;                    ///< IDA: net_slotRunnerCount
 
 

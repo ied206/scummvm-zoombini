@@ -199,6 +199,7 @@ void ZoombiniPuzzleBridge::loadFeatures() {
 
 	// [*] SCRS group 0: 20 throw scripts (SCRS 1000-1019, state 9 renderer)
 	// IDA: scrs_registerGroup0_4524AF(20, 20, 1000)
+	registerScrsGroup(kResScrs1000_RejectBase, kBridgeRejectScrsCount);
 	for (uint16 i = 0; i < kBridgeRejectScrsCount; i++) {
 		loadSnoid(ZmbResource(ZmbArchiveKind::kPage, kResBitmapShape1100),
 				  kResScrs1000_RejectBase + i,
@@ -207,6 +208,7 @@ void ZoombiniPuzzleBridge::loadFeatures() {
 
 	// [*] SCRS group 1: 25 crossing/celebration scripts (SCRS 2000-2024, state 8 renderer)
 	// IDA: scrs_registerGroup1_45258E(5, 25, 2000)
+	registerScrsGroup(kResScrs2000_NormalBase, kBridgeNormalScrsCount);
 	for (uint16 i = 0; i < kBridgeNormalScrsCount; i++) {
 		loadSnoid(ZmbResource(ZmbArchiveKind::kPage, kResBitmapShape1100),
 				  kResScrs2000_NormalBase + i,
@@ -1190,7 +1192,7 @@ void ZoombiniPuzzleBridge::onEveryFrame() {
 				const Common::Point &segPos = kSegmentPositions[_currentDropLane - 1];
 				snoid->setPointLoc(segPos);
 				snoid->setSortRect(Common::Rect(segPos.x, segPos.y, segPos.x + 1, segPos.y + 1));
-				snoid->startScrsPlayback(scrsStream, false /* hideOnComplete */, true /* rejectState=state8+tBMP3000 */);
+				snoid->startScrsPlayback(scrsStream, false /* hideOnComplete */, resolveScrsRejectState(scrsId));
 			}
 		}
 	}
@@ -1296,7 +1298,7 @@ void ZoombiniPuzzleBridge::onEveryFrame() {
 					_vm->getResource(MKTAG('S', 'C', 'R', 'S'),
 						ZmbResource(ZmbArchiveKind::kPage, scrsId));
 				if (scrsStream) {
-					snoid->startScrsPlayback(scrsStream, false, true);
+					snoid->startScrsPlayback(scrsStream, false, resolveScrsRejectState(scrsId));
 					_celebrationsPlayed++;
 					triggered = true;
 				}
@@ -1365,7 +1367,7 @@ void ZoombiniPuzzleBridge::processLaneStepEvent(ZmbFeature *snoidFeature, int16 
 
 		// IDA: snoidScript_initAndPlay(0, &pInitPos, scrsBase, core). SCRS
 		// 1000-1019 are registered in pool 0, which selects state 9.
-		snoid->startScrsPlayback(scrsStream, false, false, &initPos);
+		snoid->startScrsPlayback(scrsStream, false, resolveScrsRejectState(scrsBase), &initPos);
 		// Case 10 is dispatched during pre-render, after the old bridge-walk
 		// frame may already have been prepared. Replace it immediately so the
 		// sneeze frame owns the same draw pass, matching IDA's handoff.

@@ -139,7 +139,8 @@ void ZoombiniPuzzleFleens::loadFeatures() {
 	}
 
 	// Load reject pool: 5 reject scripts at SCRS 6000
-	// IDA: scrs_loadRejectPool(0, 5, 6000)
+	// IDA: scrs_loadRejectPool(0, 5, 6000) -- group 0 -> state 9 (NORMAL).
+	registerScrsGroup(6000, 5);
 	for (uint16 i = 0; i < 5; i++) {
 		loadSnoid(ZmbResource(ZmbArchiveKind::kPage, 4000),
 				  6000 + i,
@@ -147,7 +148,8 @@ void ZoombiniPuzzleFleens::loadFeatures() {
 	}
 
 	// Load normal pool: 46 normal scripts at SCRS 7000
-	// IDA: scrs_loadNormalPool(26, 46, 7000)
+	// IDA: scrs_loadNormalPool(26, 46, 7000) -- group 1 -> state 8 (REJECT).
+	registerScrsGroup(7000, 46);
 	for (uint16 i = 0; i < 46; i++) {
 		loadSnoid(ZmbResource(ZmbArchiveKind::kPage, 4000),
 				  7000 + i,
@@ -461,7 +463,7 @@ void ZoombiniPuzzleFleens::onEveryFrame() {
 							_vm->getResource(MKTAG('S', 'C', 'R', 'S'),
 								ZmbResource(ZmbArchiveKind::kPage, scrsId));
 						if (scrsStream) {
-							snoid->startScrsPlayback(scrsStream, false, true);
+							snoid->startScrsPlayback(scrsStream, false, resolveScrsRejectState(scrsId));
 							_idleAnimCount++;
 							triggered = true;
 						}
@@ -642,7 +644,7 @@ void ZoombiniPuzzleFleens::processRaftDeparture() {
 					_vm->getResource(MKTAG('S', 'C', 'R', 'S'),
 						ZmbResource(ZmbArchiveKind::kPage, scrsId));
 				if (scrsStream) {
-					snoid->startScrsPlayback(scrsStream, false, true);
+					snoid->startScrsPlayback(scrsStream, false, resolveScrsRejectState(scrsId));
 				}
 			}
 		} else {
@@ -653,7 +655,7 @@ void ZoombiniPuzzleFleens::processRaftDeparture() {
 					_vm->getResource(MKTAG('S', 'C', 'R', 'S'),
 						ZmbResource(ZmbArchiveKind::kPage, scrsId));
 				if (scrsStream) {
-					snoid->startScrsPlayback(scrsStream, false, true);
+					snoid->startScrsPlayback(scrsStream, false, resolveScrsRejectState(scrsId));
 				}
 			}
 		}
@@ -687,7 +689,7 @@ void ZoombiniPuzzleFleens::startInitialRaftAnim() {
 			ZmbResource(ZmbArchiveKind::kPage, scrsId));
 	if (scrsStream) {
 		_bRaftAnimPlaying = true;
-		firstSnoid->startScrsPlayback(scrsStream, false, true);
+		firstSnoid->startScrsPlayback(scrsStream, false, resolveScrsRejectState(scrsId));
 	}
 }
 
@@ -719,7 +721,7 @@ void ZoombiniPuzzleFleens::startBoardingAnimation() {
 	if (scrsStream) {
 		_bBoardingInProgress = true;
 		_activeRaftAnimSnoidId = _pendingBoardSnoidId;
-		snoid->startScrsPlayback(scrsStream, false, true);
+		snoid->startScrsPlayback(scrsStream, false, resolveScrsRejectState(scrsId));
 	}
 	_pendingBoardSnoidId = 0;
 }
@@ -1378,7 +1380,7 @@ void ZoombiniPuzzleFleens::onFeatureAnimEvent(ZmbFeature *feature, int16 eventCo
 					MKTAG('S', 'C', 'R', 'S'),
 					ZmbResource(ZmbArchiveKind::kPage, captureScrs));
 				if (st)
-					mSnoid->startScrsPlayback(st, false, true);
+					mSnoid->startScrsPlayback(st, false, resolveScrsRejectState(captureScrs));
 			}
 		}
 
@@ -1452,7 +1454,7 @@ void ZoombiniPuzzleFleens::onFeatureAnimEvent(ZmbFeature *feature, int16 eventCo
 					_vm->getResource(MKTAG('S', 'C', 'R', 'S'),
 						ZmbResource(ZmbArchiveKind::kPage, scrsId));
 				if (scrsStream) {
-					snoid->startScrsPlayback(scrsStream, false, true);
+					snoid->startScrsPlayback(scrsStream, false, resolveScrsRejectState(scrsId));
 				}
 			}
 		}
@@ -1483,7 +1485,7 @@ void ZoombiniPuzzleFleens::onFeatureAnimEvent(ZmbFeature *feature, int16 eventCo
 							_vm->getResource(MKTAG('S', 'C', 'R', 'S'),
 								ZmbResource(ZmbArchiveKind::kPage, scrsId));
 						if (scrsStream) {
-							snoid->startScrsPlayback(scrsStream, false, true);
+							snoid->startScrsPlayback(scrsStream, false, resolveScrsRejectState(scrsId));
 						}
 					}
 

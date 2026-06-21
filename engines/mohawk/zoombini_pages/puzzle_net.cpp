@@ -223,16 +223,22 @@ void ZoombiniPuzzleNet::loadFeatures() {
 		}
 	}
 
-	// Load reject pool: 3 at SCRS 14000
-	// IDA: scrs_loadRejectPool(0, 3, 14000)
+	// Group 0 (NORMAL pool, snoid state 9): 3 scripts at SCRS 14000.
+	// IDA: scrs_registerGroup0_4524AF(0, 3, 14000). Despite the legacy IDA name
+	// 'RejectPool', group 0 selects the NORMAL render state. Entry SCRS only.
+	registerScrsGroup(14000, 3);
 	for (uint16 i = 0; i < 3; i++) {
 		loadSnoid(ZmbResource(ZmbArchiveKind::kPage, 6000),
 				  14000 + i,
 				  ZmbFeature::FLAG_00000001_TYPE_SNOID | ZmbFeature::FLAG_00020000_SKIP_RENDER);
 	}
 
-	// Load normal pool: 51 at SCRS 13000
-	// IDA: scrs_loadNormalPool(0, 51, 13000)
+	// Group 1 (REJECT pool, snoid state 8): 51 scripts at SCRS 13000.
+	// IDA: scrs_registerGroup1_45258E(0, 51, 13000). Despite the legacy IDA name
+	// 'NormalPool', group 1 selects the REJECT render state (tBMP 3000 + general
+	// body tables). The walk (13001-15), seating (13016-30), launch (13031-45)
+	// and idle (13046+) SCRS all live here and therefore play in state 8.
+	registerScrsGroup(13000, 51);
 	for (uint16 i = 0; i < 51; i++) {
 		loadSnoid(ZmbResource(ZmbArchiveKind::kPage, 6000),
 				  13000 + i,
@@ -465,7 +471,7 @@ void ZoombiniPuzzleNet::registerColumnRunners() {
 	loadREGS(ZmbArchiveKind::kPage, 9000);
 	
 	// 5 column SCRB runners at 8000-8004
-	// IDA: for i=0..4: net_columnScrbRunners[i] = registerSCRB(..., 6, i+8000, ..., 0x4180000)
+	// IDA: for i=0..4: net_columnScrbRunners[i] = registerSCRB(..., 6, i+8000, ..., 0x4188000)
 	for (int16 i = 0; i < 5; i++) {
 		_columnScrbFeatures[i] = loadScrbFeature(
 			ZmbResource(ZmbArchiveKind::kPage, 8000), 8000 + i, 6,
@@ -538,29 +544,18 @@ void ZoombiniPuzzleNet::registerColumnRunners() {
 
 bool ZoombiniPuzzleNet::attrSlots_preRender(ZmbFeature *feature) {
 	// IDA: net_invalidateVisualRects2 (0x4367A4)
-	// Toggles dirty flags based on puzzle state and marks rects for redraw.
-	//
-	// The original function manages dirty rect invalidation:
-	// - If net_advanceReady changes, toggle _advanceButtonDirty and invalidate rect
-	// - Always set _columnLabelDirty and invalidate that rect
-	//
-	// In ScummVM we use simpler per-feature dirty tracking, so this just
-	// manages our internal flags.
-
-	// Check if advance button state changed
-	if (_bAdvanceReady) {
-		if (!_advanceButtonDirty) {
-			_advanceButtonDirty = true;
-		}
-	} else {
-		if (_advanceButtonDirty) {
-			_advanceButtonDirty = false;
-		}
+	// The callback owns two fixed visual rectangles outside the virtual
+	// runner's empty click rect. Merge them explicitly, as the original does.
+	if (_advanceButtonDirty != _bAdvanceReady) {
+		_advanceButtonDirty = _bAdvanceReady;
+		addExternalDirtyRect(Common::Rect(600, 441, 639, 478));
 	}
 
-	// Column label is always marked dirty (feature always renders)
-	_columnLabelDirty = true;
-	
+	if (!_columnLabelDirty) {
+		_columnLabelDirty = true;
+		addExternalDirtyRect(Common::Rect(600, 403, 639, 440));
+	}
+
 	// Return true to continue with rendering
 	return true;
 }
@@ -588,8 +583,8 @@ ZmbRenderResult ZoombiniPuzzleNet::attrSlots_render(ZmbFeature *feature) {
 	_vm->_gfx->drawShape(ZoombiniGraphics::kShapeScreen, shapeRes, goShapeIdx,
 						  Common::Point(600, 441));
 
-	// Clear dirty flags after render
-	_advanceButtonDirty = false;
+	// The advance flag tracks the last rendered state. The label flag is a
+	// one-frame invalidation latch reset by the original render callback.
 	_columnLabelDirty = false;
 
 	return ZmbRenderResult::kRendered;
@@ -601,6 +596,21 @@ void ZoombiniPuzzleNet::remapHotspotFramesByAttr(ZmbFeature *feature, ZmbHotspot
 	// Uses kColOffsets1 (unk_4A28D4) and kColOffsets2 (unk_4A28DE) lookup tables.
 	// Also adjusts hotspot x/y positions when _hotspotPositionFlag is set (bounce animation).
 
+	int16 activeSlotIdx = -1;
+	for (int16 i = 0; i <= _slotRunnerCount; i++) {
+		if (_activeSlotFeatures[i] == feature) {
+			activeSlotIdx = i;
+			break;
+		}
+	}
+
+	const int16 *currentOffsets = _randAttrColOffset;
+	const int16 *previousOffsets = _prevAttrColOffset;
+	if (0 <= activeSlotIdx) {
+		currentOffsets = _activeSlotCurrentOffsets[activeSlotIdx];
+		previousOffsets = _activeSlotPreviousOffsets[activeSlotIdx];
+	}
+
 	// Map current and previous column offsets through lookup tables
 	int16 mappedCurCol1 = -1;  // v2: kColOffsets1[randAttrColOffset[1]]
 	int16 mappedCurCol2 = -1;  // mappedOffset2: kColOffsets2[randAttrColOffset[2]]
@@ -609,18 +619,31 @@ void ZoombiniPuzzleNet::remapHotspotFramesByAttr(ZmbFeature *feature, ZmbHotspot
 	int16 mappedPrevCol2 = -1; // mappedOffsetB: kColOffsets2[prevAttrColOffset[2]]
 	int16 mappedPrevCol0 = -1; // mappedOffset0: kColOffsets2[prevAttrColOffset[0]]
 
-	if (_randAttrColOffset[1] != -1)
-		mappedCurCol1 = kColOffsets1[_randAttrColOffset[1]];
-	if (_randAttrColOffset[2] != -1)
-		mappedCurCol2 = kColOffsets2[_randAttrColOffset[2]];
-	if (_randAttrColOffset[0] != -1)
-		mappedCurCol0 = kColOffsets2[_randAttrColOffset[0]];
-	if (_prevAttrColOffset[1] != -1)
-		mappedPrevCol1 = kColOffsets1[_prevAttrColOffset[1]];
-	if (_prevAttrColOffset[2] != -1)
-		mappedPrevCol2 = kColOffsets2[_prevAttrColOffset[2]];
-	if (_prevAttrColOffset[0] != -1)
-		mappedPrevCol0 = kColOffsets2[_prevAttrColOffset[0]];
+	if (currentOffsets[1] != -1)
+		mappedCurCol1 = kColOffsets1[currentOffsets[1]];
+	if (currentOffsets[2] != -1)
+		mappedCurCol2 = kColOffsets2[currentOffsets[2]];
+	if (currentOffsets[0] != -1)
+		mappedCurCol0 = kColOffsets2[currentOffsets[0]];
+	if (previousOffsets[1] != -1)
+		mappedPrevCol1 = kColOffsets1[previousOffsets[1]];
+	if (previousOffsets[2] != -1)
+		mappedPrevCol2 = kColOffsets2[previousOffsets[2]];
+	if (previousOffsets[0] != -1)
+		mappedPrevCol0 = kColOffsets2[previousOffsets[0]];
+
+	bool positionHotspots = _hotspotPositionFlag != 0;
+	bool useBounceOffsets = _bounceCounter != 0;
+	int16 positionX = _bounceX;
+	int16 positionY = _bounceY;
+	if (0 <= activeSlotIdx) {
+		positionHotspots = true;
+		useBounceOffsets = activeSlotIdx == _slotRunnerCount && _bounceCounter != 0;
+		if (activeSlotIdx != _slotRunnerCount || !_bounceCounter) {
+			positionX = _activeSlotPositions[activeSlotIdx].x;
+			positionY = _activeSlotPositions[activeSlotIdx].y;
+		}
+	}
 
 	for (uint i = 0; i < hotspots.size(); i++) {
 		int16 shapeIdx = hotspots[i]._shapeIdx;
@@ -660,22 +683,22 @@ void ZoombiniPuzzleNet::remapHotspotFramesByAttr(ZmbFeature *feature, ZmbHotspot
 			// Position adjustment when bouncing or placing at slot. IDA keeps
 			// this inside the 1..184 shape range branch; terminators and out-of-
 			// range helper slots are not moved.
-			if (_hotspotPositionFlag) {
+			if (positionHotspots) {
 				if (i == 0) {
 					// First hotspot: base position
-					hotspots[i]._x = _bounceX;
-					hotspots[i]._y = _bounceY;
-				} else if (_bounceCounter) {
+					hotspots[i]._x = positionX;
+					hotspots[i]._y = positionY;
+				} else if (useBounceOffsets) {
 					// During bounce animation
-					hotspots[i]._x = _bounceX + 4;
-					hotspots[i]._y = _bounceY + 3;
+					hotspots[i]._x = positionX + 4;
+					hotspots[i]._y = positionY + 3;
 				} else {
 					// At rest in slot
 					if (kPuzzleDiffLevel3 <= _difficultyLevel)
-						hotspots[i]._x = _bounceX + 3;
+						hotspots[i]._x = positionX + 3;
 					else
-						hotspots[i]._x = _bounceX + 21;
-					hotspots[i]._y = _bounceY + 7;
+						hotspots[i]._x = positionX + 21;
+					hotspots[i]._y = positionY + 7;
 				}
 			}
 		}
@@ -1155,7 +1178,12 @@ void ZoombiniPuzzleNet::assignNextZmbToColumn() {
 		uint16 snoidId = 10000 + _nextZmbToAssign;
 		ZmbSnoid *snoid = getSnoid(snoidId);
 		if (snoid) {
-			snoid->setAnimState(kSnoidAnimArrivalMotion);
+			// IDA net_assignNextZmbToColumn (0x438017): animateZoombini(0, 10, ..)
+			// sets the snoid's animDestPos to the fixed staging point (233,392)
+			// and walks it there. The walk-to-column SCRS 13001 must start from
+			// this single staging point so every snoid converges to the same
+			// plank slot; otherwise each one lands at crowdPos + SCRS-delta.
+			snoid->initWalkToTarget(Common::Point(233, 392));
 			_pendingZmbIndex = _nextZmbToAssign;
 			_columnSlotSnoidIds[i] = snoidId;
 			_nextZmbToAssign++;
@@ -1186,6 +1214,7 @@ void ZoombiniPuzzleNet::registerZmbAtSlot(int16 slotIndex) {
 	}
 
 	_hotspotPositionFlag++;
+	_activeSlotPositions[_slotRunnerCount] = Common::Point(_bounceX, _bounceY);
 
 	// Load slot display SCRB
 	uint16 scrbId = (_difficultyLevel >= kPuzzleDiffLevel3) ? 7024 : 7023;
@@ -1198,6 +1227,10 @@ void ZoombiniPuzzleNet::registerZmbAtSlot(int16 slotIndex) {
 			ZmbFeature::FLAG_04000000_OVERLAY);
 		if (_activeSlotFeatures[_slotRunnerCount])
 			_activeSlotFeatures[_slotRunnerCount]->setShapeRegs(_regsMap[7000]);
+	}
+	if (_activeSlotFeatures[_slotRunnerCount]) {
+		_activeSlotFeatures[_slotRunnerCount]->setPreRenderShapeFunc(
+			reinterpret_cast<ZmbFeature::OnPreRenderShapeFunc>(&ZoombiniPuzzleNet::remapHotspotFramesByAttr));
 	}
 
 	// Score tracking
@@ -1240,6 +1273,12 @@ void ZoombiniPuzzleNet::spawnZmbAtSlot(int16 slotIndex) {
 	_bounceY = 318;
 
 	_slotRunnerCount++;
+	_activeSlotPositions[_slotRunnerCount] = (_difficultyLevel >= kPuzzleDiffLevel3) ?
+		kSlotPositionsHigh[slotIndex] : kSlotPositionsLow[slotIndex];
+	for (int16 i = 0; i < 3; i++) {
+		_activeSlotCurrentOffsets[_slotRunnerCount][i] = _randAttrColOffset[i];
+		_activeSlotPreviousOffsets[_slotRunnerCount][i] = _prevAttrColOffset[i];
+	}
 
 	// Load sort display SCRB with bounce pre-render
 	static const int16 kSortScrbLookup[3] = {1, 0, 2};
@@ -1332,16 +1371,12 @@ bool ZoombiniPuzzleNet::startVisibleNormalScrs(ZmbSnoid *snoid, uint16 scrsId, c
 	if (!snoid)
 		return false;
 
-	Common::SeekableReadStream *scrsStream =
-		_vm->getResource(MKTAG('S', 'C', 'R', 'S'),
-			ZmbResource(ZmbArchiveKind::kPage, scrsId));
-	if (!scrsStream)
-		return false;
-
-	// IDA passes these coordinates as pInitPos to snoidScript_initAndPlay:
-	// anchor the last visible SCRS frame there instead of teleporting frame 0.
-	snoid->startScrsPlayback(scrsStream, false, false, endPos);
-	return true;
+	// IDA snoidScript_initAndPlay selects state 8 (REJECT) vs state 9 (NORMAL)
+	// from the SCRS's registered group, NOT a hardcoded flag. NET group 1
+	// (SCRS 13000-13050: walk/seat/launch/idle) -> state 8; group 0 (entry
+	// SCRS 14000-14002) -> state 9. The end position is the pInitPos anchor:
+	// the last visible SCRS frame lands there instead of teleporting frame 0.
+	return startSnoidScrs(snoid, scrsId, false, endPos, ZmbArchiveKind::kPage);
 }
 
 void ZoombiniPuzzleNet::processSnoidAnimEvent(ZmbFeature *feature, int16 eventCode) {
@@ -1424,11 +1459,11 @@ void ZoombiniPuzzleNet::processSnoidAnimEvent(ZmbFeature *feature, int16 eventCo
 
 	switch (eventCode) {
 	case 0:
-		// Toggle render visibility
-		if (feature->isRenderActivated())
-			feature->deactivateRender();
-		else
-			feature->activateRender();
+		// IDA 0x438F5E flips FeatureCore259.chIsFacingLeft (core offset 0xF2),
+		// turning the snoid around. It does NOT change wBoolDoRender and does
+		// NOT touch any visible body layer. Toggling a hotspot shape here would
+		// garble the snoid's traits.
+		flipEventFacing(feature);
 		// Apply pending body arrangement
 		if (_pendingBodyArrangement) {
 			snoid->setBodyArrangement(_pendingBodyArrangement - 1);
@@ -1484,6 +1519,28 @@ void ZoombiniPuzzleNet::processSnoidAnimEvent(ZmbFeature *feature, int16 eventCo
 	}
 }
 
+void ZoombiniPuzzleNet::flipEventFacing(ZmbFeature *feature) {
+	// IDA: net_zmbAnimCallback (0x438F5E) event 0 performs
+	//   lea eax, [pEventRunner + 0x30]   ; eax = &FeatureCore259
+	//   movzx edx, word [eax + 0xF2]     ; chIsFacingLeft
+	//   mov   [eax + 0xF2], (edx == 0)   ; flip facing direction
+	// The decompiler mislabels [eax+0xF2] as hsArr[1].shapeid because it uses
+	// the 236-byte CFeatureRunner236 stride, but the real core is 259 bytes and
+	// offset 0xF2 is chIsFacingLeft. Event 0 only turns the snoid around; it
+	// never changes wBoolDoRender or any visible body layer.
+	//
+	// SCRB callers (the thrown mudball, SCRB 7020-7022) never read chIsFacingLeft
+	// when rendering, so event 0 is a harmless no-op for them. Mutating a visible
+	// hotspot here left a phantom mudball shape stranded at the top of the wall.
+	if (!feature || !feature->hasFlag(ZmbFeature::FLAG_00000001_TYPE_SNOID))
+		return;
+
+	ZmbSnoid *snoid = static_cast<ZmbSnoid *>(feature);
+	snoid->setFacingLeft(!snoid->isFacingLeft());
+	snoid->setNeedsRedraw(true);
+	snoid->clearPreparedRenderHotspots();
+}
+
 void ZoombiniPuzzleNet::processZmbScrbAnimEvent(ZmbFeature *feature, int16 eventCode) {
 	// IDA: net_zmbAnimCallback (0x438EA1) — events from SCRB features with zmb routing
 	// These events operate on global state (activeZmbSnoidId, columnSlotSnoidIds)
@@ -1491,11 +1548,8 @@ void ZoombiniPuzzleNet::processZmbScrbAnimEvent(ZmbFeature *feature, int16 event
 
 	switch (eventCode) {
 	case 0:
-		// Toggle visibility on the calling SCRB feature
-		if (feature->isRenderActivated())
-			feature->deactivateRender();
-		else
-			feature->activateRender();
+		// IDA event 0 flips chIsFacingLeft; SCRB callers ignore it (no-op).
+		flipEventFacing(feature);
 		break;
 
 	case 2:
@@ -1858,10 +1912,16 @@ label_postColumn:
 			}
 		}
 	} else if (_pendingZmbIndex >= 0 && !_rejectedCount && _pendingZmbIndex < _loadedZmbCount) {
-		// Phase 13: Walk pending zoombini to column
+		// Phase 13: Walk pending zoombini to column.
+		// IDA net_onFrameTick (0x4371DC): the runner is fetched via
+		// zmb_findIdleFeatureRunner, so SCRS 13001 only starts once the snoid
+		// has finished walking to the staging point and gone idle. Until then
+		// the snoid is still in its kSnoidAnimDepart/Path walk. Without this
+		// gate the walk SCRS would start from the snoid's mid-walk position and
+		// each one would land at a different plank slot.
 		uint16 snoidId = 10000 + _pendingZmbIndex;
 		ZmbSnoid *snoid = getSnoid(snoidId);
-		if (snoid) {
+		if (snoid && snoid->getAnimState() == kSnoidAnimIdle) {
 			uint16 scrsId = 5 * (2 - _activeColumnIdx) + snoid->_trait._foot - 1 + 13001;
 			if (startVisibleNormalScrs(snoid, scrsId)) {
 				_activeWalkCount++;
@@ -1908,11 +1968,9 @@ label_postColumn:
 						}
 
 						uint16 scrsId = snoid->_trait._foot - 1 + 13046;
-						Common::SeekableReadStream *scrsStream =
-							_vm->getResource(MKTAG('S', 'C', 'R', 'S'),
-								ZmbResource(ZmbArchiveKind::kPage, scrsId));
-						if (scrsStream) {
-							snoid->startScrsPlayback(scrsStream, false, true);
+						// Idle fidget SCRS 13046-13050 are NET group 1 -> state 8.
+						// Route through the shared resolver instead of hardcoding.
+						if (startSnoidScrs(snoid, scrsId, false)) {
 							_idleAnimCount++;
 							triggered = true;
 						}
