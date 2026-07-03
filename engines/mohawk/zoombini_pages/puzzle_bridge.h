@@ -217,7 +217,7 @@ protected:
 
 		// SCRS snoid scripts - normal pool
 		kResScrs2000_NormalBase = 2000,
-		kBridgeNormalScrsCount = 5,
+		kBridgeNormalScrsCount = 25,
 
 		// Sound resources
 		kResSound997_MoveSFX = 997,

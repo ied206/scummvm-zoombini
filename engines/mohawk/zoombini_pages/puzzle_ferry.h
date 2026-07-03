@@ -54,15 +54,12 @@ public:
 protected:
 	void onGoButtonActivated() override;
 	Common::String debugGetAnswer() const override;
-	Common::String debugGetAnswerWithArgs(int argc, const char **argv) const override;
 
 private:
 	void loadZoombinisFromPack();
 	void loadSeatLayout();
 	void buildAdjacencyMatrix();
 	void buildAdjacencyMatrix(byte adjacencyMatrix[20][8]) const;
-	Common::String formatDebugAnswer(uint32 capMultiplier) const;
-	Common::String debugGetPerfectClearReport(uint32 capMultiplier, const byte adjacencyMatrix[20][8]) const;
 	void endDrag(const Common::Point &mousePos);
 	int16 getDropTargetSeat(const Common::Point &pos) const;
 	bool testAdjacentMatch(int16 seatIdx, ZmbSnoid *droppedSnoid);

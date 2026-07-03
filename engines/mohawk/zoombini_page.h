@@ -250,6 +250,12 @@ public:
 	ZmbFeature *loadScrbFeature(ZmbResource imgResource, uint16 scrbId, uint32 frameInterval, uint32 flags, const ZmbFeature::EventHooks &eventHooks = ZmbFeature::EventHooks());
 	ZmbFeature *loadScrbFeature(ZmbResource imgResource, uint16 scrbId, uint32 frameInterval, const Common::Point &point, uint32 flags, const ZmbFeature::EventHooks &eventHooks = ZmbFeature::EventHooks());
 	/**
+	 * Register a SCRB runner whose identity is not an initial SCRB resource id.
+	 * Used for original runners that are allocated first and receive their
+	 * actual SCRB data later through loadScrbOntoFeature().
+	 */
+	ZmbFeature *loadVirtualFeature(ZmbResource imgResource, uint16 runnerId, uint32 frameInterval, uint32 flags, const ZmbFeature::EventHooks &eventHooks = ZmbFeature::EventHooks());
+	/**
 	 * Load a callback-only SCRB feature with virtual hotspots.
 	 * IDA: runner_registerAndAllocate (0x45F60C) with wResId=0 creates a
 	 * callback-only runner that never loads SCRB data.  This overload

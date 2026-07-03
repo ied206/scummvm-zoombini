@@ -249,6 +249,10 @@ ZmbFeature *ZoombiniPage::loadScrbFeature(ZmbResource imgResource, uint16 scrbId
 	return registerFeature(this, _scrbFeatures, imgResource, scrbId, frameInterval, Common::Point(0, 0), flags, true, &hotspots, eventHooks);
 }
 
+ZmbFeature *ZoombiniPage::loadVirtualFeature(ZmbResource imgResource, uint16 runnerId, uint32 frameInterval, uint32 flags, const ZmbFeature::EventHooks &eventHooks) {
+	return registerFeature(this, _scrbFeatures, imgResource, runnerId, frameInterval, Common::Point(0, 0), flags, false, nullptr, eventHooks);
+}
+
 ZmbFeature *ZoombiniPage::registerFeature(ZoombiniPage *page, ZmbFeatureList<ZmbFeature> &featureList, ZmbResource imgResource, uint16 scrbId, uint32 frameInterval, const Common::Point &pointRef, uint32 flags, bool isPhysicalScrb, const Common::Array<ZmbHotspot> *virtualHotspots, const ZmbFeature::EventHooks &eventHooks) {
 	// IDA: runner_registerAndAllocate (0x45F60C) — auto-generates a unique
 	// wFeatureRunnerIdx per runner; multiple runners may share the same wResId.

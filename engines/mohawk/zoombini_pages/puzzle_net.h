@@ -130,6 +130,7 @@ private:
 	int16 _ruleGridB[125] = {};  ///< IDA: net_ruleGridB (0x4B0642)
 	int16 _ruleGridC[125] = {};  ///< IDA: net_ruleGridC (0x4B073C)
 	int16 _slotColumnAssign[125] = {};  ///< IDA: net_slotColumnAssign (0x4B087A)
+	int16 _answerSlotColumnAssign[125] = {};  ///< Initial target values retained for printAnswer
 	int16 _columnSizes[12] = {};  ///< IDA: net_columnSizes (0x4B0852)
 	int16 _columnCount = 2;  ///< IDA: net_columnCount (0x4B0546)
 

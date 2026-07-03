@@ -407,12 +407,13 @@ Common::String ZoombiniPuzzleNet::debugGetAnswer() const {
 		s += Common::String::format("  Inner color  (sub-column):   %s attribute\n", innerAxisName);
 	s += "  Button positions are 0-4 (0 = leftmost button).\n";
 
-	// Each active slot (one per game column) has unique required offsets in ruleGridA/B.
-	// Iterate all slot positions; nonzero slotColumnAssign = one game column's target.
+	// Each initial target slot has unique required offsets in ruleGridA/B. The live
+	// assignment becomes -1 after any attempted cell, so use the retained answer
+	// values to keep printAnswer stable throughout the round.
 	s += "  [Required Mudballs]\n";
 	int16 targetIdx = 0;
 	for (int16 pos = 0; pos < _totalSlotCount; pos++) {
-		if (_slotColumnAssign[pos] == 0)
+		if (_answerSlotColumnAssign[pos] < 1)
 			continue;
 
 		int16 rga = _ruleGridA[pos];
@@ -422,13 +423,13 @@ Common::String ZoombiniPuzzleNet::debugGetAnswer() const {
 		// Map grid values to color/shape offsets
 		int16 colorOffset = useGridAForColor ? rga : rgb;
 		int16 shapeOffset = useGridAForColor ? rgb : rga;
-		int16 colSize = _slotColumnAssign[pos];
+		int16 colSize = _answerSlotColumnAssign[pos];
 
 		s += Common::String::format("  (%d) Color %d + Shape %d",
 			++targetIdx, colorOffset, shapeOffset);
 		if (rgc >= 0)
 			s += Common::String::format(" + Inner %d", rgc);
-		s += Common::String::format("  \u2192 fires %d snoid(s) in sequence\n", colSize);
+		s += Common::String::format("  -> fires %d snoid(s) in sequence\n", colSize);
 	}
 	return s;
 }
@@ -794,6 +795,7 @@ void ZoombiniPuzzleNet::generateAttrRules() {
 
 	// Clear slot column assignments
 	memset(_slotColumnAssign, 0, sizeof(_slotColumnAssign));
+	memset(_answerSlotColumnAssign, 0, sizeof(_answerSlotColumnAssign));
 
 	// Track used attribute values for uniqueness
 	int16 usedA[5] = {0, 0, 0, 0, 0};
@@ -901,6 +903,7 @@ void ZoombiniPuzzleNet::generateAttrRules() {
 				: _vm->_rnd->getRandomNumber(0, 24);
 		} while (_slotColumnAssign[pos] != 0);
 		_slotColumnAssign[pos] = _columnSizes[i];
+		_answerSlotColumnAssign[pos] = _columnSizes[i];
 	}
 
 	// Register slot SCRB runners for non-empty slots

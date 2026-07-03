@@ -60,7 +60,7 @@ private:
 	enum FeaturePhase {
 		kPhaseNone = 0,
 		kPhaseIntro,
-		kPhasePostIntroAmbient, // IDA: wUnk002C[40] — troll ambient anim after intro
+		kPhasePostIntroAmbient, // IDA: wUnk002C[35-37] troll ambient after intro
 		kPhaseServeReaction,
 		kPhaseDeliveryEval,
 		kPhaseDeliveryResult, // IDA: slot 38 — delivery result SCRBs (8020/9026/10030)
@@ -282,6 +282,9 @@ private:
 	ZmbFeature *_toppingRunnerOrder1Slots[3] = {};
 	ZmbFeature *_toppingRunnerOrder2Slots[3] = {};
 	uint16 _nextDynamicFeatureId = 30000;
+
+	ZmbFeature *createToppingRunnerFeature(uint16 scrbId, uint32 frameInterval);
+	uint8 getToppingRunnerMask(const ZmbFeature *feature) const;
 
 	// -----------------------------------------------------------------------
 	// Resource IDs
