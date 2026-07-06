@@ -169,11 +169,18 @@ void ZoombiniPuzzleBridge::loadFeatures() {
 	loadTerrainBitmap(kResBitmapTerrain1600);
 
 	// [*] SCRB 1100: Main bridge feature
-	// IDA: loadMainFeatureSCRB_45FD3F(7, 1100)
+	// IDA: scrb_preloadMainFeatureSet(7, 1100) at 0x414E8C is a pure DATA
+	// preload — it creates NO runner and never renders SCRB 1100's own frame.
+	// ScummVM models it as this chain-parent feature for the 49+2 sub-features,
+	// so FLAG_01000000_DEFER_RENDER is added to keep the parent from blitting
+	// its frozen first frame (the small left-bank tree) into the render list.
+	// The VISIBLE static overlay for SCRB 1100 is the flags-0 runner registered
+	// in the 1100-1105 loop below, exactly like the binary.
 	ZmbFeature *mainFeature = loadScrbFeature(
 		ZmbResource(ZmbArchiveKind::kPage, kResBitmapShape1100), kResScrb1100_Main, 0,
 		ZmbFeature::FLAG_00004000_NO_DIRTY_MERGE | ZmbFeature::FLAG_00008000_LOOP_ANIM |
-		ZmbFeature::FLAG_00020000_SKIP_RENDER | ZmbFeature::FLAG_04000000_OVERLAY);
+		ZmbFeature::FLAG_00020000_SKIP_RENDER | ZmbFeature::FLAG_01000000_DEFER_RENDER |
+		ZmbFeature::FLAG_04000000_OVERLAY);
 
 	// [*] SCRB 1200-1248: Cliff/bridge animation sub-features (49 chained from main)
 	// IDA: loadSubFeatureSCRB_45FE2C(10, 49, 0x4B0)
@@ -256,7 +263,14 @@ void ZoombiniPuzzleBridge::loadFeatures() {
 		ZmbFeature::FLAG_08000000_REGION_TRACK);
 
 	// [*] Overlay SCRBs (1100-1105, except 1103 handled specially)
-	// IDA: for i=1100..1105
+	// IDA bridge_initAndSetupPuzzle @ 0x414FD7-0x415027: for i=1100..1105,
+	// register a runner with flags = 0 (1103: PLAY_ONCE). This INCLUDES 1100
+	// and 1105 — the binary registers a SECOND, flags-0 static runner for both
+	// on top of the data-preload/gate runners above. The flags-0 runners are
+	// position-sorted on their first frame and then promoted to the
+	// order-stable OVERLAY bucket, which is what puts the small left-bank tree
+	// (SCRB 1100 static frame, rect bottom ~442) IN FRONT of the seated pack
+	// snoids (bottoms ~426-436) at the lower-left pedestals.
 	for (uint16 i = kResScrb1100_Main; i <= kResScrb1105_Overlay; i++) {
 		if (i == kResScrb1103_Overlay) {
 			// Water overlay with PLAY_ONCE flag
@@ -264,16 +278,15 @@ void ZoombiniPuzzleBridge::loadFeatures() {
 				ZmbResource(ZmbArchiveKind::kPage, kResBitmapShape1100),
 				i, 0,
 				ZmbFeature::FLAG_00100000_PLAY_ONCE);
-		} else if (i != kResScrb1100_Main && i != kResScrb1105_Overlay) {
-			// Decorative overlays (1101 = left-bank thin tree, 1102 = right-bank oak tree,
-			// 1104 = right-bank cup decoration).
-			// IDA bridge_initAndSetupPuzzle @ 0x41501c: registered with flags = 0.
+		} else {
+			// Static overlays (1100 = left-bank small tree + cliff props,
+			// 1101 = left-bank thin tree, 1102 = right-bank oak tree,
+			// 1104 = right-bank cup decoration, 1105 = cliff gate statics).
 			loadScrbFeature(
 				ZmbResource(ZmbArchiveKind::kPage, kResBitmapShape1100),
 				i, 0,
 				ZmbFeature::FLAG_00000000_TYPE_SHAPES);
 		}
-		// 1100 and 1105 already loaded above
 	}
 
 	// [*] Water animation SCRB 1106 (0x452)

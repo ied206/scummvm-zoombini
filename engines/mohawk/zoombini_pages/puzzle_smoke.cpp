@@ -1845,11 +1845,15 @@ void ZoombiniPuzzleSmoke::processAnimDispatchEvent(ZmbFeature *feature, int16 ev
 
 	switch (eventCode) {
 	case 0:
-		if (feature && feature->hasFlag(ZmbFeature::FLAG_00000001_TYPE_SNOID)) {
-			if (feature->isRenderActivated())
-				feature->deactivateRender();
-			else
-				feature->activateRender();
+		// IDA smoke_scrbAnimDispatch @ 0x44CC47: if (runner->bitmask == 1)
+		// toggle runner+290 = FeatureCore259+0xF2 = chIsFacingLeft — NOT
+		// wBoolDoRender. The bitmask==1 gate means the flip only applies to
+		// plain snoid runners (flags exactly FLAG_SNOID; a dragged snoid has
+		// TOPMOST|OVERLAY added and is skipped). Toggling render here instead
+		// deadlocks SCRS playback (hidden snoids skip the anim state machine).
+		if (feature && feature->getFlags() == ZmbFeature::FLAG_00000001_TYPE_SNOID) {
+			ZmbSnoid *evSnoid = static_cast<ZmbSnoid *>(feature);
+			evSnoid->setFacingLeft(!evSnoid->isFacingLeft());
 		}
 		break;
 

@@ -923,12 +923,45 @@ protected:
 	ZmbEventHandleResult genericToggleButton_onLButtonDown(ZmbFeature *feature, const Common::Point &absPos, Common::StableMap<uint32, ToggleButtonState> &buttonStateMap, const Common::HashMap<uint32, Common::Rect> &buttonRectMap);
 	ZmbEventHandleResult genericToggleButton_onLButtonDown(ZmbFeature *feature, const Common::Point &absPos, Common::StableMap<uint32, ToggleButtonState> &buttonStateMap, ToggleButtonGetRectFunc getRectFunc);
 
+protected:
+	/**
+	 * Manual z-order mode (IDA: unk_4A7998 == 0, set via setInteractionLock_460C54(0)).
+	 *
+	 * gfx_renderFrame (0x45F070) only calls runner_zsortPartitionAndSort when
+	 * `unk_4A7998 && !MEMORY[0x4B950C]`. Pages that disable it (e.g. the XFER
+	 * transition at 0x46601F) render their runners in pure REGISTRATION order,
+	 * and `runner_linkRelativeToParent` (0x460C8D) re-links become PERSISTENT
+	 * z-order changes instead of being discarded by the next frame's re-sort.
+	 *
+	 * When `_manualZOrder` is true, buildSortedRenderList() bypasses all
+	 * positional sorting and returns `_manualOrder`, which is kept in
+	 * registration order except where manualLinkBefore()/manualLinkAfter()
+	 * moved an entry.
+	 */
+	bool _manualZOrder = false;
+
+	/** Re-link `feature` immediately BEFORE `target` (drawn earlier = behind).
+	 *  IDA: runner_linkRelativeToParent(target, 0, feature). */
+	void manualLinkBefore(ZmbFeature *feature, ZmbFeature *target);
+	/** Re-link `feature` immediately AFTER `target` (drawn later = in front).
+	 *  IDA: runner_linkRelativeToParent(target, 1, feature). */
+	void manualLinkAfter(ZmbFeature *feature, ZmbFeature *target);
+
 private:
 	static void categorizeFeature(ZmbFeature *feature, Common::Array<ZmbFeature *> &loopAnimList, Common::Array<ZmbFeature *> &overlayList, Common::Array<ZmbFeature *> &normalList, Common::Array<ZmbFeature *> &entityList);
 	static void insertionSortFeatures(Common::Array<ZmbFeature *> &list);
 	static void mergeSortedListInto(Common::Array<ZmbFeature *> &existingList, const Common::Array<ZmbFeature *> &incomingList);
 	void buildSortedRenderList(Common::Array<ZmbFeature *> &outList);
 	void buildSortedEventList(Common::Array<ZmbFeature *> &outList);
+	void syncManualOrder();
+	void manualOrderErase(ZmbFeature *feature);
+
+	/**
+	 * Current manual render order (valid while _manualZOrder is set).
+	 * Holds every registered feature/snoid, initially by registration index;
+	 * mutated only by manualLinkBefore()/manualLinkAfter().
+	 */
+	Common::Array<ZmbFeature *> _manualOrder;
 
 	/**
 	 * Cached render order from the previous frame for the OVERLAY optimisation.

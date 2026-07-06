@@ -567,6 +567,19 @@ void ZoombiniTransitionXfer::setBackgroundBitmap() {
 }
 
 void ZoombiniTransitionXfer::loadFeatures() {
+	// IDA xfer_initAndRunTransition @ 0x46601F: setInteractionLock_460C54(0)
+	// clears unk_4A7998, and gfx_renderFrame (0x45F070) only runs
+	// runner_zsortPartitionAndSort when that flag is set — so the ENTIRE XFER
+	// page renders its runners in REGISTRATION ORDER, and the
+	// runner_linkRelativeToParent calls made by xfer_scrbAnimCallback are
+	// PERSISTENT z-order changes (nothing re-sorts them away).
+	//
+	// This is what hides the idle snoid stack behind the dock rock 5100
+	// (registered before it) and pops each walker IN FRONT of 5100 at its
+	// second SCRS event-0 (cycle 2), independent of the walker's position.
+	// Positional (bottom,left) z-sorting does NOT apply on this page.
+	_manualZOrder = true;
+
 	// IDA: xfer_initGlobalState (0x465EE4) sets word_4A4764 = 0 to disable
 	// fidget/idle animations during the transition.
 	_vm->_fidgetThreshold = 0;
@@ -646,7 +659,7 @@ void ZoombiniTransitionXfer::loadFeatures() {
 		// IDA: word_4B97E6 = runner for 6108 (activated when completionCounter > 4).
 		_finalEnvScrbId = _xferShapesId + 8; // 6108
 
-		// IDA: word_4B97E2 = runner for 6104 (linked to snoids on callback event 26).
+		// IDA: word_4B97E2 = runner for 6104 (event-26 z-link target).
 		_linkTargetScrbId = _xferShapesId + 4; // 6104
 
 		// IDA: word_4B9802 = runner for 6105 (activated by event 50).
@@ -688,6 +701,10 @@ void ZoombiniTransitionXfer::loadFeatures() {
 		_routePathFeature = loadScrbFeature(
 			ZmbResource(ZmbArchiveKind::kPage, subId), subId, 4,
 			ZmbFeature::FLAG_04000000_OVERLAY, routePathHooks);
+		// IDA registers this runner with a timed pre-render callback, so it
+		// remains render-active while routePath_onPostRender mutates pixels.
+		if (_routePathFeature)
+			_routePathFeature->activateRender();
 	}
 
 	// -----------------------------------------------------------------------
@@ -697,8 +714,18 @@ void ZoombiniTransitionXfer::loadFeatures() {
 	// -----------------------------------------------------------------------
 	ZmbStateActivePack &pack = _vm->_state->_f._zmbPackActive;
 
-	// Snoid feature flags: SNOID | OVERLAY (one-shot walk, not a looping feature).
-	const uint32 snoidFlags = ZmbFeature::FLAG_00000001_TYPE_SNOID | ZmbFeature::FLAG_04000000_OVERLAY;
+	// Snoid feature flags: bare TYPE_SNOID, matching IDA
+	// zmb_registerSnoidFeatureRunner (0x452A64) which registers with bitmask
+	// exactly 0x1. Flags play no z-role here: the page renders in manual
+	// (registration + link) order — see the _manualZOrder note above.
+	//
+	// Porting history: an earlier port ORed FLAG_04000000_OVERLAY here and
+	// toggled it from the SCRS callbacks; a later revision used the positional
+	// entity sort. Both mis-modelled the page: with the binary's z-sort
+	// disabled, only registration order and the persistent
+	// runner_linkRelativeToParent calls determine layering, so walkers were
+	// left stuck behind the dock rock 5100 while materializing.
+	const uint32 snoidFlags = ZmbFeature::FLAG_00000001_TYPE_SNOID;
 
 	// IDA: zmbMoveAnimation_45479D resets ui_bDragLockActive = 0 at the start.
 	_vm->_walkersInProgress = 0;
@@ -768,12 +795,14 @@ void ZoombiniTransitionXfer::loadFeatures() {
 	// Phase 2: post-snoid features (rendered in front of snoids)
 	// -----------------------------------------------------------------------
 	if (isFromIsle) {
-		// XFER_0: static SCRBs 5100-5101 loaded AFTER snoids — foreground overlays.
+		// XFER_0: static SCRBs 5100-5101 loaded AFTER snoids. With the page's
+		// z-sort disabled (see _manualZOrder above), registration order alone
+		// places them in front of the idle snoid stack, exactly like the binary.
 		// IDA: these are the last loadSCRB calls at 0x466FC8/466FDE with flags=0.
-		// IDA: word_4B97E2 = runner for 5100 (linked to snoids on callback event 26 / cycle 2).
 		loadScrbFeature(xferShapes, _xferShapesId + 0, 0, ZmbFeature::FLAG_00000000_TYPE_SHAPES);
 		loadScrbFeature(xferShapes, _xferShapesId + 1, 0, ZmbFeature::FLAG_00000000_TYPE_SHAPES);
 
+		// IDA: word_4B97E2 = runner for 5100 (z-link target for events 26 / 0-cycle-2).
 		_linkTargetScrbId = _xferShapesId + 0; // 5100
 	} else if (isToTown) {
 		// 6100-6103 static foreground, 6106-6107 animated foreground — above snoid walkers.
@@ -936,14 +965,18 @@ void ZoombiniTransitionXfer::onEveryFrame() {
 				// IDA: nextRand(4, 0) → 0-3 = random env SCRB, 4 = one-shot.
 				int16 envIdx = _vm->_rnd->getRandomNumber(0, 4);
 				if (envIdx < 4) {
-					// Activate one of the 4 env SCRBs (5102-5105).
+					// Activate one of the 4 env SCRBs (5102-5105) — transient:
+					// IDA 0x467720 reloads the runner without touching its
+					// bitmask, so DEFER_RENDER stays and it hides after playing.
 					if (_envScrbIds[envIdx] != 0)
-						activateEnvScrb(_envScrbIds[envIdx]);
+						activateEnvScrb(_envScrbIds[envIdx], false);
 				} else {
-					// envIdx == 4: one-shot env SCRB 5108 (only once).
+					// envIdx == 4: one-shot env SCRB 5108 (only once) — the
+					// dirt-collapse. IDA 0x46776A rewrites bitmask = 0x188000
+					// so the collapsed-cliff aftermath persists on screen.
 					if (_envOneShotAvailable && _envOneShotScrbId != 0) {
 						_envOneShotAvailable = false;
-						activateEnvScrb(_envOneShotScrbId);
+						activateEnvScrb(_envOneShotScrbId, true);
 					}
 				}
 			} else {
@@ -1032,10 +1065,29 @@ ZmbEventHandleResult ZoombiniTransitionXfer::onKeyDown(const Common::KeyState &k
 // IDA: loadSCRB_460384(1, 0, runner) / scrb_initRunnerWithScript(0, 0, 0, runner).
 // For features with DEFER_ANIM | DEFER_RENDER, this starts their animation.
 // ---------------------------------------------------------------------------
-void ZoombiniTransitionXfer::activateEnvScrb(uint16 scrbId) {
+void ZoombiniTransitionXfer::activateEnvScrb(uint16 scrbId, bool persistAfterPlay) {
 	ZmbFeature *feature = _scrbFeatures.find(scrbId);
 	if (!feature)
 		return;
+
+	// IDA xfer_onHoverFrame 0x467712: the random re-trigger of 5102-5105 only
+	// fires when the runner is not currently animating ([runner+0xE0] == 0).
+	if (!persistAfterPlay && feature->isAnimateActivated())
+		return;
+
+	if (persistAfterPlay) {
+		// IDA 0x46776A (one-shot 5108) and xfer_scrbAnimCallback 0x467F1B
+		// (events 10/11 → 5102/5103): the activation REWRITES the runner's
+		// bitmask to 0x188000 = LOOP_ANIM | DEFER_ANIM | PLAY_ONCE — dropping
+		// the registration-time DEFER_RENDER bit. After the PLAY_ONCE cycle
+		// ends (wBoolDoRender = 0), runner_postRenderStandard keeps drawing the
+		// FROZEN LAST FRAME because the skip only applies to DEFER_RENDER
+		// runners — this is how the dirt-collapse aftermath stays on the cliff
+		// permanently. Without this, the collapsed-dirt shape vanishes the next
+		// time its area is repainted.
+		feature->removeFlag(ZmbFeature::FLAG_01000000_DEFER_RENDER);
+	}
+
 	feature->initValues();
 	feature->activateAnimate();
 	feature->activateRender();
@@ -1119,16 +1171,19 @@ void ZoombiniTransitionXfer::onFeatureAnimEvent(ZmbFeature *feature, int16 event
 		// ---------------------------------------------------------------
 		// Event 26: Animation complete — reset body arrangement, link, count.
 		// IDA: zmbRunner_setAnimShape(0, pZmb) — reset to front arrangement.
-		// IDA: linkFeatureRunner(word_4B97E2, 0, runnerIdx) — link before env overlay.
+		// IDA: runner_linkRelativeToParent(word_4B97E2, 0, runnerIdx) — re-link
+		//      the snoid BEFORE the 5100 (XFER_0) / 6104 (XFER_5) runner.
+		//      Persistent, because the page's z-sort is disabled (0x46601F).
 		// IDA: if (word_4B97E4 >= 0) ++word_4B97E4.
 		// ---------------------------------------------------------------
 		if (snoid) {
 			snoid->setBodyArrangement(0);
 
-			// IDA: linkFeatureRunner(word_4B97E2, 0, runnerIdx) — link snoid before env overlay.
-			// In ScummVM, adding OVERLAY moves the snoid into overlayList (rendered before
-			// normalList where the env overlay 5100/6104 resides), achieving the "behind" effect.
-			snoid->addFlag(ZmbFeature::FLAG_04000000_OVERLAY);
+			if (_linkTargetScrbId != 0) {
+				ZmbFeature *linkTarget = _scrbFeatures.find(_linkTargetScrbId);
+				if (linkTarget)
+					manualLinkBefore(snoid, linkTarget);
+			}
 		}
 
 		if (_completionCounter >= 0)
@@ -1137,18 +1192,27 @@ void ZoombiniTransitionXfer::onFeatureAnimEvent(ZmbFeature *feature, int16 event
 		// End-of-animation (PLAY_ONCE completion). No special handling needed.
 	} else if (eventCode == 0) {
 		// ---------------------------------------------------------------
-		// Event 0: Toggle visibility, apply pending arrangement, inc cycle.
-		// IDA: *(callbackData+290) = *(callbackData+290) == 0 — toggle render.
+		// Event 0: Toggle facing, apply pending arrangement, inc cycle.
+		// IDA 0x467E92: *(callbackData+290) = *(callbackData+290) == 0 —
+		// offset 290 from the runner is chIsFacingLeft (FeatureCore259+0xF2),
+		// NOT wBoolDoRender. The SCRS walk zig-zags down the cliff ledges and
+		// flips the sprite direction at these keyframes. Toggling render here
+		// instead deadlocks the walk: a hidden snoid skips the whole anim
+		// state machine (IDA 0x452BBC / onSnoidAnimTick early-return), so the
+		// SCRS never advances past frame 0 and no snoid ever appears.
 		// IDA: if word_4B97E0: setAnimShape(word_4B97E0 - 1), clear override.
 		// IDA: ++*(callbackData+288) — increment cycle counter.
-		// IDA: if XFER_0 && cycleCount == 2: linkFeatureRunner(word_4B97E2, 1, idx).
+		// IDA: if XFER_0 && cycleCount == 2:
+		//      runner_linkRelativeToParent(word_4B97E2, 1, idx) — re-link the
+		//      walker AFTER the 5100 dock rock (in front of it). Persistent,
+		//      because the page's z-sort is disabled (0x46601F). For the walk
+		//      SCRS 5200-5204 the 2nd event-0 lands on the first switchback
+		//      (e.g. 5203 frame 13), which is exactly when the walker emerges
+		//      from behind the dock rock in the retail game.
 		// ---------------------------------------------------------------
 		if (snoid) {
-			// Toggle render visibility.
-			if (snoid->isRenderActivated())
-				snoid->deactivateRender();
-			else
-				snoid->activateRender();
+			// Toggle facing direction (walk turns at ledge switchbacks).
+			snoid->setFacingLeft(!snoid->isFacingLeft());
 
 			// Apply pending body arrangement override (set by events 240-243).
 			if (_bodyArrangementOverride != 0) {
@@ -1156,15 +1220,19 @@ void ZoombiniTransitionXfer::onFeatureAnimEvent(ZmbFeature *feature, int16 event
 				_bodyArrangementOverride = 0;
 			}
 
-			// Increment per-snoid SCRS cycle counter.
+			// Increment per-snoid SCRS cycle counter (IDA: callbackData+288).
 			snoid->_scrsAnimCycleCount++;
 
-			// XFER_0: after 2 visibility cycles, link snoid after the env overlay.
-			// IDA: linkFeatureRunner(word_4B97E2, 1, runnerIdx) — link snoid after env overlay.
-			// In ScummVM, removing OVERLAY moves the snoid from overlayList into entityList
-			// (merged after normalList where env overlay 5100 resides), achieving the "in front" effect.
-			if (_xferView == XFER_ROUTE0_FROM_ISLE && snoid->_scrsAnimCycleCount == 2)
-				snoid->removeFlag(ZmbFeature::FLAG_04000000_OVERLAY);
+			if (_xferView == XFER_ROUTE0_FROM_ISLE && snoid->_scrsAnimCycleCount == 2 &&
+				_linkTargetScrbId != 0) {
+				ZmbFeature *linkTarget = _scrbFeatures.find(_linkTargetScrbId);
+				if (linkTarget) {
+					manualLinkAfter(snoid, linkTarget);
+					// The promotion changes which pixels win in the overlap
+					// area without moving either feature — repaint it.
+					addExternalDirtyRect(snoid->getZSortRect());
+				}
+			}
 		}
 	} else if (eventCode >= 10 && eventCode <= 11) {
 		// ---------------------------------------------------------------
@@ -1178,8 +1246,10 @@ void ZoombiniTransitionXfer::onFeatureAnimEvent(ZmbFeature *feature, int16 event
 			if (flagIdx < 2 && _envEventTriggerFlags[flagIdx]) {
 				_envEventTriggerFlags[flagIdx] = false;
 				// Activate the corresponding env SCRB (5102 for event 10, 5103 for event 11).
+				// IDA rewrites the runner bitmask to 0x188000 here — the played
+				// animation's final frame persists (see activateEnvScrb).
 				uint16 envScrbId = _xferShapesId + 2 + flagIdx; // 5102 or 5103
-				activateEnvScrb(envScrbId);
+				activateEnvScrb(envScrbId, true);
 			}
 		}
 	}
@@ -1867,7 +1937,12 @@ ZmbRenderResult ZoombiniTransitionXfer::routePath_onPostRender(ZmbFeature *featu
 	}
 
 	// Standard blit renders the (now modified) shape pixels.
-	return blitShapes(feature);
+	ZmbRenderResult result = blitShapes(feature);
+
+	if (0 < _routePathRemainingPixels)
+		addExternalDirtyRect(feature->getZSortRect());
+
+	return result;
 }
 
 // IDA: xfer_initRoutePathGrid (0x468078).

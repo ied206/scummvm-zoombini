@@ -1273,7 +1273,7 @@ public:
 
 	/**
 	 * Per-snoid SCRS animation cycle counter. Incremented by the page's
-	 * onFeatureAnimEvent when event code 0 fires (visibility toggle).
+	 * onFeatureAnimEvent when event code 0 fires (facing toggle).
 	 * IDA: *(callbackData + 288) — reuses chPathWalkDir byte during SCRS playback.
 	 */
 	uint8 _scrsAnimCycleCount = 0;

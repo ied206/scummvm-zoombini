@@ -2556,14 +2556,15 @@ void ZoombiniPuzzleLilly::onFeatureAnimEvent(ZmbFeature *feature, int16 eventCod
 		return;
 	}
 
-	// --- Event 0: Toggle render visibility ---
-	if (eventCode == 0) {
-		if (feature->isRenderActivated())
-			feature->deactivateRender();
-		else
-			feature->activateRender();
+	// --- Event 0: no-op ---
+	// None of Lilly's original callbacks handle event 0:
+	// maze_runnerExitCallback_425CCA (cases 1-3), maze_runnerArriveOrDepartCallback
+	// 0x424D3E (events 70/80), maze_scriptEventHandler_425D55 (3/4/5) — so a raw
+	// event-0 byte in a Lilly SCRS falls through unhandled in the binary.
+	// (An earlier port toggled render visibility here; that misread the shared
+	// +290 chIsFacingLeft toggle other pages perform, which Lilly doesn't have.)
+	if (eventCode == 0)
 		return;
-	}
 
 	// --- Frog/script events ---
 	if (feature == _frogScrbFeature || feature == _frogRunnerFeature) {

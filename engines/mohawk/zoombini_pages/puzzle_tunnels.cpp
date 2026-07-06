@@ -1886,11 +1886,13 @@ void ZoombiniPuzzleTunnels::processSnoidAnimEvent(ZmbSnoid *snoid, int16 eventCo
 	}
 
 	if (eventCode == 0) {
-		// === Toggle render + pending body arrangement ===
-		if (snoid->isRenderActivated())
-			snoid->deactivateRender();
-		else
-			snoid->activateRender();
+		// === Toggle facing + pending body arrangement ===
+		// IDA tunnels_scrbAnimCallback @ 0x45B5E7: the event-0 toggle writes
+		// runner+290 = FeatureCore259+0xF2 = chIsFacingLeft, NOT wBoolDoRender.
+		// Toggling render here instead deadlocks the SCRS playback: a hidden
+		// snoid skips the whole anim state machine, so the script never
+		// advances past frame 0 and no un-hide toggle can ever arrive.
+		snoid->setFacingLeft(!snoid->isFacingLeft());
 
 		if (_pendingBodyArrangement > 0) {
 			snoid->setBodyArrangement(_pendingBodyArrangement - 1);

@@ -111,6 +111,14 @@ void ZoombiniPuzzlePizza::setDifficultyParams() {
 
 void ZoombiniPuzzlePizza::loadFeatures() {
 	// IDA: puzzlePizza_43B394
+
+	// IDA pizza_init @ 0x43C13E: setInteractionLock_460C54(0) clears
+	// unk_4A7998, and no PIZZA function re-enables it — the whole Pizza Pass
+	// page renders its runners in pure REGISTRATION order (gfx_renderFrame's
+	// z-sort is gated on that flag). PIZZA uses no runner_linkRelativeToParent
+	// calls, so registration order alone defines the layering.
+	_manualZOrder = true;
+
 	_difficultyLevel = static_cast<ZmbPuzzleDifficultyLevel>(_vm->_state->readActivePageRouteLevel() + 1);
 
 	// Apply per-level constants
@@ -280,7 +288,7 @@ void ZoombiniPuzzlePizza::loadFeatures() {
 	_toppingOverlayFeature = loadScrbFeature(
 		ZmbResource(ZmbArchiveKind::kPage, 12000), 12000, 6,
 		ZmbFeature::FLAG_00008000_LOOP_ANIM | ZmbFeature::FLAG_00080000_DEFER_ANIM |
-			ZmbFeature::FLAG_00100000_PLAY_ONCE);
+			ZmbFeature::FLAG_00100000_PLAY_ONCE | ZmbFeature::FLAG_01000000_DEFER_RENDER);
 
 	// Load Zoombinis from active pack at 16 pedestal positions
 	loadZoombinisFromPack();
@@ -1067,7 +1075,29 @@ void ZoombiniPuzzlePizza::onFeatureAnimEvent(ZmbFeature *feature, int16 eventCod
 	// --- Snoid events ---
 	if (feature->hasFlag(ZmbFeature::FLAG_00000001_TYPE_SNOID)) {
 		ZmbSnoid *snoid = static_cast<ZmbSnoid *>(feature);
-		if (eventCode == kZmbAnimEventM1_End) {
+		if (kZmbAnimEvent240_BodyArrangePendFirst <= eventCode &&
+			eventCode <= kZmbAnimEvent243_BodyArrangePendLast) {
+			_pendingBodyArrangement = eventCode - (kZmbAnimEvent240_BodyArrangePendFirst - 1);
+		} else if (kZmbAnimEvent250_BodyArrangeDirectFirst <= eventCode &&
+				   eventCode <= kZmbAnimEvent253_BodyArrangeDirectLast) {
+			snoid->setBodyArrangement(eventCode - kZmbAnimEvent250_BodyArrangeDirectFirst);
+			snoid->setNeedsRedraw(true);
+			snoid->clearPreparedRenderHotspots();
+		} else if (eventCode == 0) {
+			// IDA pizza_zmbDeliveryCallback @ 0x4400C6: event 0 toggles
+			// runner+290 = FeatureCore259+0xF2 = chIsFacingLeft (NOT
+			// wBoolDoRender). The delivery callback is re-installed on the
+			// answer snoid's runner at 0x440219 when its reaction SCRS
+			// (14000-14005) starts, so these flips steer the answer snoid's
+			// mirror direction during the reaction animation.
+			snoid->setFacingLeft(!snoid->isFacingLeft());
+			if (_pendingBodyArrangement != 0) {
+				snoid->setBodyArrangement(_pendingBodyArrangement - 1);
+				_pendingBodyArrangement = 0;
+			}
+			snoid->setNeedsRedraw(true);
+			snoid->clearPreparedRenderHotspots();
+		} else if (eventCode == kZmbAnimEventM1_End) {
 			SnoidAnimState state = snoid->getAnimState();
 			if (state == kSnoidAnimScriptNormal || state == kSnoidAnimScriptReject) {
 				snoid->setAnimState(kSnoidAnimIdle);
@@ -1256,8 +1286,15 @@ void ZoombiniPuzzlePizza::handleIngredientToggle(int16 ingredientIdx) {
 	// XOR toggle the flag
 	_ingredientFlags[ingredientIdx] ^= 1;
 
-	// Mirror into the meal array
-	_currentMeal[ingredientIdx] = _ingredientFlags[ingredientIdx];
+	// IDA pizza_handleIngredientToggle @ 0x43D79E: the toggle writes ONLY the
+	// live selection (word_4B0D9C, = _ingredientFlags here). It must NOT touch
+	// the submit snapshot word_4B0DAC (= _currentMeal), which the in-flight
+	// delivery classifies against (pizza_classifyOrderType/packToppingBitmask
+	// both read word_4B0DAC). Mirroring the toggle into _currentMeal corrupted
+	// that snapshot when the combination was changed mid-delivery, re-classifying
+	// the running delivery with the new combo and dead-locking the produce chain
+	// (isDeliveryInProgress never cleared). _currentMeal is (re)filled from the
+	// live selection at submit time in handleSubmit().
 
 	// Swap topping SCRB to on/off visual
 	// IDA: Each topping has 2 SCRBs: base+0 = off, base+1 = on
@@ -1690,6 +1727,7 @@ void ZoombiniPuzzlePizza::advanceToNextDeliverySlot() {
 	_pendingOrderCount = 0;
 	_currentToppingType = 0;
 	_currentOrderType = 0;
+	_pendingBodyArrangement = 0;
 	_pendingDeliverySlot = 0;
 
 	// Reset ingredient flags
@@ -1940,10 +1978,7 @@ void ZoombiniPuzzlePizza::handleZmbExitEvent(ZmbFeature *feature, int16 eventCod
 		// Determine active order line for this delivery
 		_questionRunnerPhase = kPhaseNone;
 
-		int16 traitIdx = 0;
-		if (_answerSnoid) {
-			traitIdx = (_answerSnoid->_trait._head) % 5;
-		}
+		int16 traitIdx = getTraitIndexForOrder(0);
 
 		// IDA: SCRS and overlay SCRB depend on which order is active
 		uint16 scrsId = 0;
@@ -1997,7 +2032,7 @@ void ZoombiniPuzzlePizza::handleZmbExitEvent(ZmbFeature *feature, int16 eventCod
 // Event 61: play SCRS on snoid + SFX 8040
 // Event -1: if wrong → clear snoid render, increment punishment;
 //           if correct → walk animation, advance flag
-// Event 0: toggle frame visibility, handle pending anim shape
+// Event 0: toggle facing, handle pending body arrangement
 // ---------------------------------------------------------------------------
 void ZoombiniPuzzlePizza::handleZmbDeliveryEvent(ZmbFeature *feature, int16 eventCode) {
 	if (eventCode == 61) {
@@ -2009,12 +2044,19 @@ void ZoombiniPuzzlePizza::handleZmbDeliveryEvent(ZmbFeature *feature, int16 even
 
 		// Determine SCRS ID and initial position based on active order
 		uint16 scrsId = 0;
+		Common::Point initPos(180, 327);
 		if (_orderState[0] == 1) {
 			scrsId = 14000 + _wasDeliveryCorrect;
+			if (!_wasDeliveryCorrect)
+				initPos = Common::Point(34, 59);
 		} else if (_orderState[1] == 1) {
 			scrsId = 14002 + _wasDeliveryCorrect;
+			if (!_wasDeliveryCorrect)
+				initPos = Common::Point(46, 46);
 		} else {
 			scrsId = 14004 + _wasDeliveryCorrect;
+			if (!_wasDeliveryCorrect)
+				initPos = Common::Point(95, 27);
 		}
 
 		// Play SCRS on answer snoid
@@ -2023,8 +2065,8 @@ void ZoombiniPuzzlePizza::handleZmbDeliveryEvent(ZmbFeature *feature, int16 even
 				_vm->getResource(MKTAG('S', 'C', 'R', 'S'),
 								 ZmbResource(ZmbArchiveKind::kPage, scrsId));
 			if (scrsStream) {
-				bool isReject = (_wasDeliveryCorrect == 0);
-				_answerSnoid->startScrsPlayback(scrsStream, false, isReject);
+				bool hideOnComplete = (_wasDeliveryCorrect == 0);
+				_answerSnoid->startScrsPlayback(scrsStream, hideOnComplete, false, &initPos);
 			}
 		}
 
@@ -2749,9 +2791,11 @@ int16 ZoombiniPuzzlePizza::getTraitIndexForOrder(int16 orderSlot) const {
 	if (!_answerSnoid)
 		return 0;
 
-	// IDA: Uses zoombini trait fields to determine topping type
-	// The trait index is modulo 5 of a trait field
-	return (_answerSnoid->_trait._head) % 5;
+	(void)orderSlot;
+
+	// IDA pizza_zmbExitCallback reads SHIBYTE(v5[1].pFirst.p602) - 1,
+	// the same foot-based selector used by the other Pizza Snoid SCRS ids.
+	return CLIP<int16>(static_cast<int16>(_answerSnoid->_trait._foot), 1, 5) - 1;
 }
 
 } // End of namespace Mohawk

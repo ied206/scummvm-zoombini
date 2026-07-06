@@ -180,7 +180,7 @@ private:
 	int16 _currentOrderType = 0;
 	int16 _skipDeliveryFlag = 0;
 	int16 _pendingReplayFlag = 0;
-	int16 _pendingAnimShape = 0;
+	int16 _pendingBodyArrangement = 0;
 	int16 _pendingDeliverySlot = 0;
 	int16 _punishmentCount = 0;
 	bool _needsSlotAdvance = false;

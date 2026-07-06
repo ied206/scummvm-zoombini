@@ -340,6 +340,7 @@ void ZoombiniPage::unloadScrbFeature(ZmbFeature *feature) {
 	const Common::Rect &oldRect = feature->getZSortRect();
 	if (!oldRect.isEmpty())
 		addExternalDirtyRect(oldRect);
+	manualOrderErase(feature);
 	deregisterFeature(_scrbFeatures, feature);
 }
 
@@ -358,6 +359,11 @@ void ZoombiniPage::loadScrbOntoFeature(ZmbFeature *feature, uint16 newScrbId, bo
 	if (!stream) {
 		warning("loadScrbOntoFeature: cannot load SCRB %u", scrbId);
 		return;
+	}
+
+	if (!feature->getZSortRect().isEmpty()) {
+		markFeatureVisualCoverageDirty(feature, false);
+		addExternalDirtyRect(feature->getZSortRect());
 	}
 
 	feature->loadScrbData(stream, scheduleRender);
@@ -636,7 +642,107 @@ void ZoombiniPage::mergeSortedListInto(Common::Array<ZmbFeature *> &existingList
  * flags on existing entries. This means normal entries can be interleaved
  * with overlay entries (not kept strictly separate).
  */
+void ZoombiniPage::syncManualOrder() {
+	// Drop entries whose features were deregistered (paranoia — the delete
+	// paths call manualOrderErase(), but a stale pointer here would be fatal).
+	// Then append, in registration-index order, any live feature not yet in
+	// the manual list (mirrors runner_registerAndAllocate appending new
+	// runners at the list tail in registration order).
+	Common::Array<ZmbFeature *> live;
+	for (ZmbFeature *f : _scrbFeatures)
+		live.push_back(f);
+	for (ZmbFeature *f : _subFeatures)
+		live.push_back(f);
+	for (ZmbSnoid *s : _snoidMap)
+		live.push_back(s);
+
+	uint32 writeIdx = 0;
+	for (uint32 i = 0; i < _manualOrder.size(); i++) {
+		if (Common::find(live.begin(), live.end(), _manualOrder[i]) != live.end())
+			_manualOrder[writeIdx++] = _manualOrder[i];
+	}
+	_manualOrder.resize(writeIdx);
+
+	Common::Array<ZmbFeature *> missing;
+	for (ZmbFeature *f : live) {
+		if (Common::find(_manualOrder.begin(), _manualOrder.end(), f) == _manualOrder.end())
+			missing.push_back(f);
+	}
+	// Insertion sort the additions by registration index (small N).
+	for (uint32 i = 1; i < missing.size(); i++) {
+		ZmbFeature *key = missing[i];
+		int32 j = static_cast<int32>(i) - 1;
+		while (j >= 0 && missing[j]->getRegistrationIndex() > key->getRegistrationIndex()) {
+			missing[j + 1] = missing[j];
+			j--;
+		}
+		missing[j + 1] = key;
+	}
+	for (ZmbFeature *f : missing)
+		_manualOrder.push_back(f);
+}
+
+void ZoombiniPage::manualOrderErase(ZmbFeature *feature) {
+	for (uint32 i = 0; i < _manualOrder.size(); i++) {
+		if (_manualOrder[i] == feature) {
+			_manualOrder.remove_at(i);
+			return;
+		}
+	}
+}
+
+void ZoombiniPage::manualLinkBefore(ZmbFeature *feature, ZmbFeature *target) {
+	// IDA runner_linkRelativeToParent (0x460C8D): detach, insert before parent.
+	if (!feature || !target || feature == target)
+		return;
+	manualOrderErase(feature);
+	for (uint32 i = 0; i < _manualOrder.size(); i++) {
+		if (_manualOrder[i] == target) {
+			_manualOrder.insert_at(i, feature);
+			return;
+		}
+	}
+	_manualOrder.push_back(feature);
+}
+
+void ZoombiniPage::manualLinkAfter(ZmbFeature *feature, ZmbFeature *target) {
+	// IDA runner_linkRelativeToParent (0x460C8D): detach, insert after parent.
+	if (!feature || !target || feature == target)
+		return;
+	manualOrderErase(feature);
+	for (uint32 i = 0; i < _manualOrder.size(); i++) {
+		if (_manualOrder[i] == target) {
+			_manualOrder.insert_at(i + 1, feature);
+			return;
+		}
+	}
+	_manualOrder.push_back(feature);
+}
+
 void ZoombiniPage::buildSortedRenderList(Common::Array<ZmbFeature *> &outList) {
+	// Manual z-order mode (IDA unk_4A7998 == 0): no positional sorting at all —
+	// render in registration order as adjusted by manualLinkBefore/After.
+	//
+	// TOPMOST features are still moved to the tail: the binary's drag system
+	// (beginDragFeatureRunner 0x45360F) DETACHES the dragged runner from the
+	// list and paints it manually on top inside its modal loop, and the
+	// go-map/help buttons render above everything likewise. Keeping them in
+	// the list but drawing them last reproduces that.
+	if (_manualZOrder) {
+		syncManualOrder();
+		outList.clear();
+		Common::Array<ZmbFeature *> topmost;
+		for (ZmbFeature *f : _manualOrder) {
+			if (f->hasFlag(ZmbFeature::FLAG_00001000_TOPMOST))
+				topmost.push_back(f);
+			else
+				outList.push_back(f);
+		}
+		for (ZmbFeature *f : topmost)
+			outList.push_back(f);
+		return;
+	}
+
 	Common::Array<ZmbFeature *> loopAnimList, overlayList, normalList, entityList;
 
 	// Step 1: Categorize features into render buckets.
@@ -1192,6 +1298,7 @@ void ZoombiniPage::checkCloseFeatures() {
 			const Common::Rect &oldRect = f->getZSortRect();
 			if (!oldRect.isEmpty())
 				addExternalDirtyRect(oldRect);
+			manualOrderErase(f);
 			deregisterFeature(*listPtr, f);
 		}
 	}
@@ -1674,6 +1781,7 @@ void ZoombiniPage::clear() {
 	clearTerrainBitmap();
 	resetDrawOnRegSlots();
 	_cachedOverlayOrder.clear();
+	_manualOrder.clear();
 }
 
 void ZoombiniPage::clearScrbFeatures() {
@@ -1702,6 +1810,7 @@ void ZoombiniPage::clearSubFeatures() {
 
 void ZoombiniPage::clearSnoids() {
 	for (ZmbSnoid *s : _snoidMap) {
+		manualOrderErase(s);
 		delete s;
 	}
 	_snoidMap.clear();
@@ -1793,6 +1902,7 @@ void ZoombiniPage::unloadSnoid(uint16 scrsId) {
 	ZmbSnoid *snoid = _snoidMap.erase(scrsId);
 	if (!snoid)
 		return;
+	manualOrderErase(snoid);
 	delete snoid;
 }
 

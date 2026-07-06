@@ -123,7 +123,7 @@ protected:
 	/**
 	 * Pending body arrangement override (IDA: word_4B97E0).
 	 * Set by event codes 240-243 (value = eventCode - 239, so 1-4).
-	 * Applied on the next event code 0 (visibility toggle) as arrangement (value - 1).
+	 * Applied on the next event code 0 (facing toggle) as arrangement (value - 1).
 	 * 0 = no pending override.
 	 */
 	uint16 _bodyArrangementOverride = 0;
@@ -145,16 +145,20 @@ protected:
 	bool _envOneShotAvailable = false;
 
 	/**
-	 * Feature linking SCRB ID (IDA: word_4B97E2).
-	 * XFER_0: SCRB 5100 (foreground overlay, linked to snoids on event 26/cycle 2).
-	 * XFER_5: SCRB 6104 (mid-background, linked to snoids on event 26).
+	 * Z-link target SCRB ID (IDA: word_4B97E2).
+	 * XFER_0: 5100 (dock rock overlay), XFER_5: 6104 (mid-background), else 0.
+	 *
+	 * The XFER page runs with the global z-sort DISABLED (IDA 0x46601F:
+	 * setInteractionLock_460C54(0) → unk_4A7998 = 0), so render order is pure
+	 * registration order and runner_linkRelativeToParent re-links persist.
+	 * Event 0 cycle 2 (XFER_0) links the walking snoid AFTER this runner
+	 * (in front of the rock); event 26 links it back BEFORE (behind).
 	 */
 	uint16 _linkTargetScrbId = 0;
 
 	/**
 	 * Final env SCRB ID (IDA: word_4B97E6, XFER_5 only: 6108).
 	 * Activated when _completionCounter > 4.
-	 * XFER_0 uses _linkTargetScrbId (5100) instead for the final link.
 	 */
 	uint16 _finalEnvScrbId = 0;
 
@@ -293,8 +297,19 @@ protected:
 	void routePath_expandFloodFill(uint32 counter);
 	void routePath_reserveSlot(int16 y, int16 x, byte *pixel);
 
-	// Helper: activate a deferred env SCRB feature by ID.
-	void activateEnvScrb(uint16 scrbId);
+	/**
+	 * Helper: activate a deferred env SCRB feature by ID.
+	 *
+	 * @param persistAfterPlay Mirror of IDA rewriting the runner bitmask to
+	 *        0x188000 (LOOP|DEFER_ANIM|PLAY_ONCE, no DEFER_RENDER) on
+	 *        activation: the feature keeps drawing its frozen last frame after
+	 *        the PLAY_ONCE cycle ends (dirt-collapse aftermath 5108, event-10/11
+	 *        activations). When false (random 5102-5105 re-triggers), the
+	 *        registration flags stay and the feature hides again after playing;
+	 *        the re-trigger is also skipped while the runner is still animating
+	 *        (IDA [runner+0xE0] == 0 gate).
+	 */
+	void activateEnvScrb(uint16 scrbId, bool persistAfterPlay = false);
 };
 
 } // End of namespace Mohawk

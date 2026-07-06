@@ -1287,12 +1287,18 @@ void ZoombiniPuzzleFleens::onFeatureAnimEvent(ZmbFeature *feature, int16 eventCo
 		break;
 
 	case 0:
-		// Toggle render visibility.
-		// IDA: *(a4+290) = *(a4+290)==0
-		if (feature->isRenderActivated())
-			feature->deactivateRender();
-		else
-			feature->activateRender();
+		// Toggle facing direction.
+		// IDA fleens_scriptEventHandlerA-E / raftMovementCallback / raftAnimStateMachine
+		// (0x41EA96, 0x41EC18, 0x41ECCC, 0x41E964, 0x41E9F3, 0x41E0FB, 0x41E2AF):
+		// *(a4+290) = *(a4+290)==0 — runner+290 = FeatureCore259+0xF2 =
+		// chIsFacingLeft, NOT wBoolDoRender. Toggling render here instead
+		// deadlocks SCRS playback (hidden snoids skip the anim state machine).
+		// Non-snoid runners have no mirrored rendering, so skipping them
+		// matches the original's inert field write.
+		if (feature->hasFlag(ZmbFeature::FLAG_00000001_TYPE_SNOID)) {
+			ZmbSnoid *snoid = static_cast<ZmbSnoid *>(feature);
+			snoid->setFacingLeft(!snoid->isFacingLeft());
+		}
 
 		// Apply pending body arrangement
 		// IDA: if (word_4AB1A0) { zmb_setBodyLayerShapes(word_4AB1A0-1, a4+48); word_4AB1A0=0; }

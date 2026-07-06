@@ -157,6 +157,15 @@ void ZoombiniPuzzleNet::setBackgroundBitmap() {
 
 void ZoombiniPuzzleNet::loadFeatures() {
 	// IDA: puzzleNet_4361D4 (0x4361d4)
+
+	// IDA net_puzzleInit @ 0x4366A9: setInteractionLock_460C54(0) clears
+	// unk_4A7998, and no NET function re-enables it — so the whole Mudball
+	// Wall page renders its runners in pure REGISTRATION order (the z-sort in
+	// gfx_renderFrame is gated on that flag). NET uses no
+	// runner_linkRelativeToParent calls either, so registration order alone
+	// defines the layering.
+	_manualZOrder = true;
+
 	_difficultyLevel = static_cast<ZmbPuzzleDifficultyLevel>(_vm->_state->readActivePageRouteLevel() + 1);
 
 	// Initialize puzzle state

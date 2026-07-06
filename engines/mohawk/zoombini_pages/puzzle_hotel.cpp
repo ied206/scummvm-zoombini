@@ -1223,6 +1223,20 @@ void ZoombiniPuzzleHotel::registerWinCheckpoints() {
 // onFeatureAnimEvent: Called when a feature's animation cycle ends.
 // ---------------------------------------------------------------------------
 void ZoombiniPuzzleHotel::onFeatureAnimEvent(ZmbFeature *feature, int16 eventCode) {
+	if (eventCode == 0) {
+		// IDA hotel room-slot SCRS callback (labelled maze_obstacleAnimCallback,
+		// 0x4222FA) @ 0x422364: event 0 toggles runner+290 = FeatureCore259+0xF2
+		// = chIsFacingLeft (NOT wBoolDoRender). It is installed on the placed
+		// snoid's runner by hotel_setupRoomSlotScrb (0x422534), so these flips
+		// steer the snoid's mirror direction during the room-entry SCRS
+		// (14000+room / 14025+ on diff 4).
+		if (feature && feature->hasFlag(ZmbFeature::FLAG_00000001_TYPE_SNOID)) {
+			ZmbSnoid *evSnoid = static_cast<ZmbSnoid *>(feature);
+			evSnoid->setFacingLeft(!evSnoid->isFacingLeft());
+		}
+		return;
+	}
+
 	if (eventCode != kZmbAnimEventM1_End)
 		return; // Only handle end-of-animation
 

@@ -2026,11 +2026,15 @@ void ZoombiniPuzzleMaze::onFeatureAnimEvent(ZmbFeature *feature, int16 eventCode
 		break;
 
 	case 0:
-		// Toggle render + handle pending body arrangement
-		if (feature->isRenderActivated())
-			feature->deactivateRender();
-		else
-			feature->activateRender();
+		// Toggle facing + handle pending body arrangement.
+		// IDA net_scriptEventHandler (MAZE2 page) @ 0x430BB3: event 0 toggles
+		// runnerPtr[145] (= runner+290 = FeatureCore259+0xF2 = chIsFacingLeft),
+		// NOT wBoolDoRender. Toggling render here instead deadlocks SCRS
+		// playback (hidden snoids skip the anim state machine).
+		if (feature->hasFlag(ZmbFeature::FLAG_00000001_TYPE_SNOID)) {
+			ZmbSnoid *evSnoid = static_cast<ZmbSnoid *>(feature);
+			evSnoid->setFacingLeft(!evSnoid->isFacingLeft());
+		}
 		if (_pendingBodyArrangement && feature->hasFlag(ZmbFeature::FLAG_00000001_TYPE_SNOID)) {
 			static_cast<ZmbSnoid *>(feature)->setBodyArrangement(_pendingBodyArrangement - 1);
 			_pendingBodyArrangement = 0;

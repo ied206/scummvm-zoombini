@@ -1322,12 +1322,12 @@ void ZoombiniPuzzleSlides::onFeatureAnimEvent(ZmbFeature *feature, int16 eventCo
 	ZmbSnoid *snoid = static_cast<ZmbSnoid *>(feature);
 
 	if (eventCode == 0) {
-		// Toggle render visibility + apply pending body arrangement.
-		// IDA: *(runnerData+290) = *(runnerData+290)==0; if word_4B110E: apply & clear.
-		if (snoid->isRenderActivated())
-			snoid->deactivateRender();
-		else
-			snoid->activateRender();
+		// Toggle facing + apply pending body arrangement.
+		// IDA slides_snoidTravelCallback @ 0x446365: the event-0 toggle writes
+		// runner+290 = FeatureCore259+0xF2 = chIsFacingLeft, NOT wBoolDoRender;
+		// if word_4B110E: apply & clear. Toggling render here instead deadlocks
+		// the SCRS playback (hidden snoids skip the anim state machine).
+		snoid->setFacingLeft(!snoid->isFacingLeft());
 
 		if (_pendingBodyArrangement != 0) {
 			snoid->setBodyArrangement(_pendingBodyArrangement - 1);
