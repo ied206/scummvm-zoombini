@@ -285,10 +285,27 @@ void ZoombiniPuzzlePizza::loadFeatures() {
 	// The original creates this lazily in the exit callback (event 32); we
 	// register it up front as a dormant runner.  Its completion drives
 	// onToppingDelivered(), so it must exist for the delivery chain to advance.
-	_toppingOverlayFeature = loadScrbFeature(
-		ZmbResource(ZmbArchiveKind::kPage, 12000), 12000, 6,
-		ZmbFeature::FLAG_00008000_LOOP_ANIM | ZmbFeature::FLAG_00080000_DEFER_ANIM |
-			ZmbFeature::FLAG_00100000_PLAY_ONCE | ZmbFeature::FLAG_01000000_DEFER_RENDER);
+	//
+	// IDA pizza_zmbExitCallback (0x43F3E6) sets onPreRenderShapeFunc =
+	// pizza_filterHotspotsByActiveIngredients (0x43DCDD) on this overlay at BOTH
+	// event 32 (SCRB 12000) and event -1 (SCRB 12001+). That filter hides the
+	// topping shapes whose ingredient snapshot flag is 0. Without it the delivery
+	// overlay rendered ALL toppings on the produced/delivered pizza regardless of
+	// selection. It is the same filter our topping-runner overlays use; for this
+	// feature (not in _toppingRunnerSlots) getToppingRunnerMask() falls back to
+	// packToppingBitmask() = the current submit snapshot, which is exactly what
+	// the original reads (word_4B0DAC..DBA).
+	{
+		ZmbFeature::EventHooks overlayHooks;
+		overlayHooks.setPreRenderShapeFunc(
+			reinterpret_cast<ZmbFeature::OnPreRenderShapeFunc>(
+				&ZoombiniPuzzlePizza::toppingRunner_preRenderShape));
+		_toppingOverlayFeature = loadScrbFeature(
+			ZmbResource(ZmbArchiveKind::kPage, 12000), 12000, 6,
+			ZmbFeature::FLAG_00008000_LOOP_ANIM | ZmbFeature::FLAG_00080000_DEFER_ANIM |
+				ZmbFeature::FLAG_00100000_PLAY_ONCE | ZmbFeature::FLAG_01000000_DEFER_RENDER,
+			overlayHooks);
+	}
 
 	// Load Zoombinis from active pack at 16 pedestal positions
 	loadZoombinisFromPack();
@@ -1744,23 +1761,30 @@ void ZoombiniPuzzlePizza::advanceToNextDeliverySlot() {
 		}
 	}
 
-	// Handle the answer snoid
+	// Handle the answer (deliverer) snoid.
+	// IDA pizza_zmbDeliveryCallback (0x44005D) event -1 + picker (0x4409DA):
+	// the deliverer is shot back to the isle and REPLACED only when all chances
+	// are used up (!_wasDeliveryCorrect, i.e. remainingDeliveries < 0 -> the
+	// wrong-path that sets unk_4B0CAA). While chances remain, the SAME deliverer
+	// walks back to the answer seat (animateZoombini anim 7 -> seat) and stays for
+	// the next produce; the picker (unk_4B0CAA-gated) does NOT advance. ScummVM
+	// previously nulled the deliverer after EVERY delivery, so a different snoid
+	// appeared on every produce.
 	if (_answerSnoid) {
-		if (_wasDeliveryCorrect) {
-			// Correct: snoid departs happily
+		if (!_wasDeliveryCorrect) {
+			// All chances used: the troll shoots the deliverer back to the isle.
+			// The next produce click picks a fresh deliverer via
+			// autoPickAnswerSnoid(), which owns the _deliveryIndex advance.
 			_answerSnoid->setAnimState(kSnoidAnimDepart);
 			_answerSnoid->_packIsOccupied = false;
+			_answerSnoid = nullptr;
+			_answerZmbPackIdx = -1;
 		} else {
-			// Wrong: return snoid to pedestal
-			_answerSnoid->setPointLoc(kSnoidPositions[_answerZmbPackIdx]);
-			_answerSnoid->setAnimState(kSnoidAnimIdle);
-			_answerSnoid->setupIdleHotspots();
+			// Chances remain: same deliverer walks back to the answer seat.
+			_answerSnoid->initWalkToTarget(kAnswerDisplayPosition);
 		}
-		_answerSnoid = nullptr;
-		_answerZmbPackIdx = -1;
 	}
 
-	_deliveryIndex++;
 	_celebrationActive = false;
 
 	// Reset phase tracking
@@ -1966,7 +1990,12 @@ void ZoombiniPuzzlePizza::handleZmbExitEvent(ZmbFeature *feature, int16 eventCod
 				_vm->getResource(MKTAG('S', 'C', 'R', 'S'),
 								 ZmbResource(ZmbArchiveKind::kPage, scrsId));
 			if (scrsStream) {
-				_answerSnoid->startScrsPlayback(scrsStream, false, false);
+				// IDA pizza_init: scrs_registerGroup1(0, 40, 13000) puts SCRS
+				// 13000-13039 in the REJECT pool (groupIdx 1 -> snoidAnimateState 8,
+				// tBMP 3000 round 3D snoid). snoidScript_initAndPlay derives the
+				// state from the pool, NOT a caller flag. Playing it as NORMAL
+				// (state 9, flat tBMP 3100) garbles the carrying snoid.
+				_answerSnoid->startScrsPlayback(scrsStream, false, true);
 			}
 		}
 		debugC(kZmbDebugPage, "Pizza: Exit callback event 60 — snoid SCRS");
@@ -2003,7 +2032,11 @@ void ZoombiniPuzzlePizza::handleZmbExitEvent(ZmbFeature *feature, int16 eventCod
 				_vm->getResource(MKTAG('S', 'C', 'R', 'S'),
 								 ZmbResource(ZmbArchiveKind::kPage, scrsId));
 			if (scrsStream) {
-				_answerSnoid->startScrsPlayback(scrsStream, false, false);
+				// IDA: delivery walk SCRS 13005/13010/13015 are in the REJECT
+				// pool (scrs_registerGroup1, 13000-13039) -> state 8, round tBMP
+				// 3000. rejectState=true keeps the carrying snoid from rendering
+				// as the flat NORMAL (state 9) garble.
+				_answerSnoid->startScrsPlayback(scrsStream, false, true);
 			}
 		}
 
@@ -2125,6 +2158,16 @@ void ZoombiniPuzzlePizza::handleOrderLineComplete(int16 orderLine) {
 	// IDA: if orderState == 3 (already accepted) → spawnAnswerZmb
 	if (_orderState[orderLine] == 3) {
 		spawnAnswerZmb();
+
+		// The answer-zmb spawn (7067/7068) is a DRAW_ON_REG runner that never
+		// emits animation events in our engine, so the drawOnReg M1_End reset
+		// path is dead code for it. The intro and celebration spawn paths clear
+		// the delivery lock DIRECTLY after spawnAnswerZmb(); this accept path
+		// must do the same, otherwise accepting one troll's exact combo while
+		// other trolls still wait leaves _isDeliveryInProgress stuck and the
+		// produce button dead-locked.
+		_drawOnRegPhase = kPhaseNone;
+		_isDeliveryInProgress = 0;
 		return;
 	}
 
@@ -2160,6 +2203,12 @@ void ZoombiniPuzzlePizza::handleOrderLineComplete(int16 orderLine) {
 		loadScrbOntoFeature(orderFeature, acceptScrbId);
 		_orderState[orderLine] = 3;
 
+		// IDA pizza_onFrameUpdate accept path (0x43c6f0 / 0x43c933 / 0x43cac3):
+		// once the held-pizza SCRB is loaded onto the order runner, the original
+		// sets runner->onPreRenderShapeFunc to the matching topping filter so the
+		// held pizza renders only the troll's requested combo (not every topping).
+		attachOrderFilter(orderFeature);
+
 		// IDA: register topping overlay for the accepted order
 		registerToppingRunner();
 
@@ -2170,7 +2219,19 @@ void ZoombiniPuzzlePizza::handleOrderLineComplete(int16 orderLine) {
 
 		_questionsAnswered++;
 		animateAnswerZmb();
-		_pendingOrderCount++;
+
+		// IDA pizza_onFrameUpdate accept paths (0x43c71f / 0x43c93a / 0x43caf2):
+		// after accepting an order the original increments pendingOrderCount to
+		// block chaining another serve WITHIN this handler, tries (and skips) the
+		// other order lines, then RESETS pendingOrderCount to 0 at the end
+		// (0x43c7a3 / 0x43c9a7 / 0x43cb3d). ScummVM does no in-handler chaining
+		// here (it returns), so the net faithful effect is simply to clear the
+		// count. Leaving it incremented dead-locked the NEXT produce: onToppingDelivered
+		// gates serving the still-waiting orders on `!_pendingOrderCount`, so with a
+		// stale count of 1 nothing was served, the delivery chain never completed,
+		// and _isDeliveryInProgress was never cleared (produce button softlock when
+		// one troll's exact combo is accepted while others still wait).
+		_pendingOrderCount = 0;
 		_pendingDeliverySlot = 0;
 
 		debugC(kZmbDebugPage, "Pizza: Order %d accepted (SCRB %d, questions=%d)",
@@ -2417,14 +2478,22 @@ bool has1 = (_difficultyLevel >= kPuzzleDiffLevel2) && (_orderState[1] >= 2);
 		loadScrbOntoFeature(_orderBaseFeature, 8030 + _vm->_rnd->getRandomNumber(0, 1));
 		loadScrbOntoFeature(_order1Feature, 9032 + _vm->_rnd->getRandomNumber(0, 1));
 		loadScrbOntoFeature(_order2Feature, 10036 + _vm->_rnd->getRandomNumber(0, 1));
+		attachOrderFilter(_orderBaseFeature);
+		attachOrderFilter(_order1Feature);
+		attachOrderFilter(_order2Feature);
 	} else if (has0 && has1) {
 		loadScrbOntoFeature(_orderBaseFeature, 8026 + _vm->_rnd->getRandomNumber(0, 1));
 		loadScrbOntoFeature(_order1Feature, 9030 + _vm->_rnd->getRandomNumber(0, 1));
+		attachOrderFilter(_orderBaseFeature);
+		attachOrderFilter(_order1Feature);
 	} else if (has0 && has2) {
 		loadScrbOntoFeature(_orderBaseFeature, 8028 + _vm->_rnd->getRandomNumber(0, 1));
 		loadScrbOntoFeature(_order2Feature, 10035);
+		attachOrderFilter(_orderBaseFeature);
+		attachOrderFilter(_order2Feature);
 	} else if (has0) {
 		loadScrbOntoFeature(_orderBaseFeature, 8024 + _vm->_rnd->getRandomNumber(0, 1));
+		attachOrderFilter(_orderBaseFeature);
 	}
 
 	debugC(kZmbDebugPage, "Pizza: Question runners setup");
@@ -2775,8 +2844,79 @@ void ZoombiniPuzzlePizza::toppingRunner_preRenderShape(ZmbFeature *feature, ZmbH
 }
 
 // ---------------------------------------------------------------------------
-// reloadScrbAnimation: Helper to swap SCRB on a feature
+// attachOrderFilter: Attach the topping filter to a troll order feature, as
+// the original does via `runner->onPreRenderShapeFunc = pizza_filterBy...`.
+// Called when the held-pizza / question-display SCRB is loaded onto the
+// feature (IDA pizza_onFrameUpdate 0x43c6f0/933/ac3 and
+// pizza_setupQuestionRunners 0x43f5cf). The single filter selects the combo
+// array by feature identity, so one hook serves all three orders.
 // ---------------------------------------------------------------------------
+void ZoombiniPuzzlePizza::attachOrderFilter(ZmbFeature *feature) {
+	if (feature)
+		feature->setPreRenderShapeFunc(
+			reinterpret_cast<ZmbFeature::OnPreRenderShapeFunc>(
+				&ZoombiniPuzzlePizza::orderFeature_preRenderShape));
+}
+
+// ---------------------------------------------------------------------------
+// orderFeature_preRenderShape: IDA 0x43F8CC / 0x43FA9B / 0x43FCD1
+//   (pizza_filterByCorrectToppings / WrongToppingsA / WrongToppingsB)
+// Pre-render callback for the troll-held pizza order features. Filters the
+// topping shapes (0x9C-0xBF) so only the toppings belonging to that troll's
+// requested combo are drawn. The combo array is selected by feature identity:
+//   _orderBaseFeature -> _correctToppings (Arno/order0, 0x43F8CC)
+//   _order1Feature    -> _wrongToppingsA  (Willa/order1, 0x43FA9B)
+//   _order2Feature    -> _wrongToppingsB  (Shyler/order2, 0x43FCD1)
+// Shape groups of 4 map to combo slots:
+//   0x9C-0x9F -> combo[4]   0xB0-0xB3 -> diff>=2
+//   0xA0-0xA3 -> combo[3]   0xB4-0xB7 -> combo[7] && diff>=2
+//   0xA4-0xA7 -> combo[2]   0xB8-0xBB -> combo[6] && diff>=2
+//   0xA8-0xAB -> combo[1]   0xBC-0xBF -> combo[5] && diff>=2
+//   0xAC-0xAF -> combo[0]
+// ---------------------------------------------------------------------------
+void ZoombiniPuzzlePizza::orderFeature_preRenderShape(ZmbFeature *feature, ZmbHotspotGroup *hsGroup, Common::Array<ZmbHotspot> &hotspots) {
+	const uint8 *combo;
+	if (feature == _order1Feature)
+		combo = _wrongToppingsA;
+	else if (feature == _order2Feature)
+		combo = _wrongToppingsB;
+	else
+		combo = _correctToppings;
+
+	const bool diffEnabled = _difficultyLevel >= kPuzzleDiffLevel2;
+
+	for (int i = (int)hotspots.size() - 1; i >= 0; --i) {
+		int16 shapeIdx = hotspots[i]._shapeIdx;
+		if (shapeIdx < 0x9C || shapeIdx > 0xBF)
+			continue;
+
+		bool keep = true;
+		if (shapeIdx <= 0x9F) {
+			keep = combo[4] != 0;
+		} else if (shapeIdx <= 0xA3) {
+			keep = combo[3] != 0;
+		} else if (shapeIdx <= 0xA7) {
+			keep = combo[2] != 0;
+		} else if (shapeIdx <= 0xAB) {
+			keep = combo[1] != 0;
+		} else if (shapeIdx <= 0xAF) {
+			keep = combo[0] != 0;
+		} else if (shapeIdx <= 0xB3) {
+			keep = diffEnabled;
+		} else if (shapeIdx <= 0xB7) {
+			keep = combo[7] != 0 && diffEnabled;
+		} else if (shapeIdx <= 0xBB) {
+			keep = combo[6] != 0 && diffEnabled;
+		} else { // 0xBC-0xBF
+			keep = combo[5] != 0 && diffEnabled;
+		}
+
+		if (!keep)
+			hotspots.remove_at(i);
+	}
+}
+
+
 void ZoombiniPuzzlePizza::reloadScrbAnimation(ZmbFeature *feature, uint16 scrbId) {
 	if (feature) {
 		loadScrbOntoFeature(feature, scrbId);

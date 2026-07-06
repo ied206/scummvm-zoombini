@@ -108,6 +108,8 @@ private:
 	void playL3DemoSequence(int16 seqIdx, int16 animData, int16 frameCount, int16 animFlags);
 	void linkToppingRunners();
 	void toppingRunner_preRenderShape(ZmbFeature *feature, ZmbHotspotGroup *hsGroup, Common::Array<ZmbHotspot> &hotspots);
+	void orderFeature_preRenderShape(ZmbFeature *feature, ZmbHotspotGroup *hsGroup, Common::Array<ZmbHotspot> &hotspots);
+	void attachOrderFilter(ZmbFeature *feature);
 
 	// --- Callback event handlers ---
 	void handleZmbExitEvent(ZmbFeature *feature, int16 eventCode);
