@@ -27,12 +27,13 @@
 #include "gui/EventRecorder.h"
 
 #include "mohawk/zoombini.h"
+#include "mohawk/zoombini_metaengine.h"
 #include "mohawk/zoombini_random.h"
 
 namespace Mohawk {
 
 ZoombiniRandom::ZoombiniRandom(const Common::String &name) : _scummRnd(name) {
-	_useOriginal = ConfMan.getBool("original_prng");
+	_useOriginal = ConfMan.getBool(MohawkMetaEngine_Zoombini::kOptionOriginalPRNG);
 
 #ifdef ENABLE_EVENTRECORDER
 	assert(g_system);
@@ -42,14 +43,22 @@ ZoombiniRandom::ZoombiniRandom(const Common::String &name) : _scummRnd(name) {
 #endif
 }
 
-void ZoombiniRandom::setSeed(uint16 seed) {	
+void ZoombiniRandom::setSeed(uint32 seed) {
 	if (seed == 0)
 		seed++;
 	_randSeed = seed;
 }
 
-uint16 ZoombiniRandom::generateNewSeed() {
+uint32 ZoombiniRandom::generateNewSeed() {
 	return Common::RandomSource::generateNewSeed();
+}
+
+uint16 ZoombiniRandom::getOriginalRandomNumber(uint32 max) {
+	if (max == 0)
+		return 0;
+
+	_randSeed = 214013u * _randSeed + 2531011u;
+	return static_cast<uint16>((_randSeed >> 16) % (max + 1));
 }
 
 int16 ZoombiniRandom::getRandomNumber(int16 max) {
@@ -58,10 +67,9 @@ int16 ZoombiniRandom::getRandomNumber(int16 max) {
 		return getRandomNumber(max, 0);
 	}
 
-	if (_useOriginal) {
-		_randSeed = 214013u * _randSeed + 2531011u;
-		return static_cast<int16>(static_cast<uint16>(_randSeed) % (max + 1));
-	}
+	if (_useOriginal)
+		return static_cast<int16>(getOriginalRandomNumber(static_cast<uint32>(max)));
+
 	return static_cast<int16>(_scummRnd.getRandomNumber(max));
 }
 
@@ -75,12 +83,11 @@ int16 ZoombiniRandom::getRandomNumber(int16 min, int16 max) {
 
 	uint32 span = static_cast<uint32>(static_cast<int32>(max) - static_cast<int32>(min));
 	uint16 offset;
-	if (_useOriginal) {
-		_randSeed = 214013u * _randSeed + 2531011u;
-		offset = static_cast<uint16>(static_cast<uint16>(_randSeed) % (span + 1));
-	} else {
+	if (_useOriginal)
+		offset = getOriginalRandomNumber(span);
+	else
 		offset = static_cast<uint16>(_scummRnd.getRandomNumber(span));
-	}
+
 	return static_cast<int16>(static_cast<int32>(min) + offset);
 }
 

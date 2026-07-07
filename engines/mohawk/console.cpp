@@ -2344,8 +2344,17 @@ bool ZoombiniConsole::Cmd_GoXfer(int argc, const char **argv) {
 		uint8 srcBitmask = static_cast<uint8>(1 << (srcRouteLevel & 3));
 		// Match IDA save_updateZmbPacksOnPuzzleComplete: set both low (played)
 		// and high (perfect) nibble — the simulated jump assumes a perfect run.
-		f._levelFlagPageArr[srcDi - 4] |= srcBitmask;
-		f._levelFlagPageArr[srcDi - 4] |= static_cast<uint8>(srcBitmask << 4);
+		// A natural play-through reaching this xfer completed EVERY earlier
+		// puzzle of the route at the current route level on this trip, not just
+		// the immediate source — the route map draws each traveled leg from its
+		// own puzzle's flag byte, so backfill all of them (e.g. `goXfer pizza`
+		// at route level 4 must leave the isle→bridge leg dark red, which needs
+		// Bridge's bit 3, not only Tunnels').
+		int16 firstDi = static_cast<int16>(ZMB_DI_BRIDGE_07 + (srcRouteIdx - 1) * 3);
+		for (int16 di = firstDi; di <= srcDi; di++) {
+			f._levelFlagPageArr[di - 4] |= srcBitmask;
+			f._levelFlagPageArr[di - 4] |= static_cast<uint8>(srcBitmask << 4);
+		}
 	}
 
 	// Close the current page and queue the xfer transition

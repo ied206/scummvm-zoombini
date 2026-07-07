@@ -45,6 +45,11 @@
 #include "mohawk/riven_metaengine.h"
 #endif
 
+#ifdef ENABLE_ZOOMBINI
+#include "mohawk/zoombini.h"
+#include "mohawk/zoombini_metaengine.h"
+#endif
+
 namespace Mohawk {
 
 // This used to have GUI::Dialog("MohawkDummyDialog"), but that doesn't work with the gui branch merge :P (Sorry, Tanoku!)
@@ -498,6 +503,10 @@ ZoombiniOptionsWidget::ZoombiniOptionsWidget(GuiObject *boss, const Common::Stri
 	_fixHotelMidiBgmCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "ZoombiniEngineOptionsDialog.FixHotelMidiBGM",
 		_("Fix hotel MIDI background music halt (v1.x only)"),
 		_("Prevents hotel MIDI music from stopping when sound effects play (original engine bug). Only affects Broderbund v1.x releases."));
+
+	_enhancedKbdShortcutsCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "ZoombiniEngineOptionsDialog.EnhancedKbdShortcuts",
+		_("Enable enhanced keyboard shortcuts"),
+		_("Enables some ScummVM-only keyboard shortcuts for quality of life improvements."));
 }
 
 ZoombiniOptionsWidget::~ZoombiniOptionsWidget() {
@@ -511,22 +520,25 @@ void ZoombiniOptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common::
 			.addWidget("BrightenPalette", "Checkbox")
 			.addWidget("OriginalPRNG", "Checkbox")
 			.addWidget("FixHotelMidiBGM", "Checkbox")
+			.addWidget("EnhancedKbdShortcuts", "Checkbox")
 		.closeLayout()
 	.closeDialog();
 }
 
 void ZoombiniOptionsWidget::load() {
 	_audioPopFixCheckbox->setState(ConfMan.getBool("fix_audio_pops", _domain));
-	_brightenPaletteCheckbox->setState(ConfMan.getBool("brighten_palette", _domain));
-	_originalPrngCheckbox->setState(ConfMan.getBool("original_prng", _domain));
-	_fixHotelMidiBgmCheckbox->setState(ConfMan.getBool("fix_hotel_midi_bgm", _domain));
+	_brightenPaletteCheckbox->setState(ConfMan.getBool(Mohawk::MohawkMetaEngine_Zoombini::kOptionBrightenPalette, _domain));
+	_originalPrngCheckbox->setState(ConfMan.getBool(Mohawk::MohawkMetaEngine_Zoombini::kOptionOriginalPRNG, _domain));
+	_fixHotelMidiBgmCheckbox->setState(ConfMan.getBool(Mohawk::MohawkMetaEngine_Zoombini::kOptionFixHotelMidiBGM, _domain));
+	_enhancedKbdShortcutsCheckbox->setState(ConfMan.getBool(Mohawk::MohawkMetaEngine_Zoombini::kOptionEnhancedKbdShortcuts, _domain));
 }
 
 bool ZoombiniOptionsWidget::save() {
-	ConfMan.setBool("fix_audio_pops", _audioPopFixCheckbox->getState(), _domain);
-	ConfMan.setBool("brighten_palette", _brightenPaletteCheckbox->getState(), _domain);
-	ConfMan.setBool("original_prng", _originalPrngCheckbox->getState(), _domain);
-	ConfMan.setBool("fix_hotel_midi_bgm", _fixHotelMidiBgmCheckbox->getState(), _domain);
+	ConfMan.setBool(Mohawk::MohawkMetaEngine_Zoombini::kOptionFixAudioPops, _audioPopFixCheckbox->getState(), _domain);
+	ConfMan.setBool(Mohawk::MohawkMetaEngine_Zoombini::kOptionBrightenPalette, _brightenPaletteCheckbox->getState(), _domain);
+	ConfMan.setBool(Mohawk::MohawkMetaEngine_Zoombini::kOptionOriginalPRNG, _originalPrngCheckbox->getState(), _domain);
+	ConfMan.setBool(Mohawk::MohawkMetaEngine_Zoombini::kOptionFixHotelMidiBGM, _fixHotelMidiBgmCheckbox->getState(), _domain);
+	ConfMan.setBool(Mohawk::MohawkMetaEngine_Zoombini::kOptionEnhancedKbdShortcuts, _enhancedKbdShortcutsCheckbox->getState(), _domain);
 	return true;
 }
 

@@ -33,9 +33,11 @@ namespace Mohawk {
  */
 class ZoombiniRandom {
 private:
-	uint16 _randSeed;
+	uint32 _randSeed;
 	Common::RandomSource _scummRnd;
 	bool _useOriginal;
+
+	uint16 getOriginalRandomNumber(uint32 max);
 
 public:
 	/**
@@ -52,11 +54,11 @@ public:
 	/**
 	 * Generates new seed based on the current date/time
 	 */
-	static uint16 generateNewSeed();
+	static uint32 generateNewSeed();
 
-	void setSeed(uint16 seed); /*!< Set the seed used to initialize the RNG. */
+	void setSeed(uint32 seed); /*!< Set the seed used to initialize the RNG. */
 
-	uint16 getSeed() const { /*!< Get a random seed that can be used to initialize the RNG. */
+	uint32 getSeed() const { /*!< Get a random seed that can be used to initialize the RNG. */
 		return _randSeed;
 	}
 

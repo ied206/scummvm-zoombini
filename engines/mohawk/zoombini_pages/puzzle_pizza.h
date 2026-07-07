@@ -85,7 +85,6 @@ private:
 	// --- Answer display ---
 	void registerAnswerDisplay();
 	void answerDisplay_preRenderShape(ZmbFeature *feature, ZmbHotspotGroup *hsGroup, Common::Array<ZmbHotspot> &hotspots);
-	void autoPickAnswerSnoid();
 
 	// --- Order classification & delivery ---
 	int16 classifyOrderType(int16 orderLine) const;
@@ -100,7 +99,12 @@ private:
 	void animateAnswerZmb();
 	void setupQuestionRunners();
 	void onToppingDelivered();
+
+	// --- Synchronous load chant (IDA pizza_init 0x43bfe3-0x43c063) ---
+	void playLoadChant(int16 chantDiffId);
 	void playSFXForOrder(int16 sfxVariant);
+	void playChantSoundSync(uint16 sndId);
+	void pumpLoadWait(uint32 durationMs);
 
 	// --- Topping runner management ---
 	void registerToppingRunner();
@@ -110,6 +114,9 @@ private:
 	void toppingRunner_preRenderShape(ZmbFeature *feature, ZmbHotspotGroup *hsGroup, Common::Array<ZmbHotspot> &hotspots);
 	void orderFeature_preRenderShape(ZmbFeature *feature, ZmbHotspotGroup *hsGroup, Common::Array<ZmbHotspot> &hotspots);
 	void attachOrderFilter(ZmbFeature *feature);
+	void mealFilter_preRenderShape(ZmbFeature *feature, ZmbHotspotGroup *hsGroup, Common::Array<ZmbHotspot> &hotspots);
+	void attachMealFilter(ZmbFeature *feature);
+	void hideToppingOverlay();
 
 	// --- Callback event handlers ---
 	void handleZmbExitEvent(ZmbFeature *feature, int16 eventCode);
@@ -187,6 +194,14 @@ private:
 	int16 _punishmentCount = 0;
 	bool _needsSlotAdvance = false;
 	bool _deliveryCallbackActive = false;
+
+	// -----------------------------------------------------------------------
+	// Deliverer walk / delivery chain watchers (polled in onEveryFrame,
+	// mirroring the original's per-frame hotspot-group liveness slots)
+	// -----------------------------------------------------------------------
+	bool _answerReturnPending = false;   // IDA slot 31: after reaction turn, walk back to seat
+	bool _answerWalkInPending = false;   // IDA slot 32: fresh deliverer walk-in arrival
+	bool _pendingToppingDelivered = false; // IDA slot 30: overlay done, wait for carry SCRS
 
 	// -----------------------------------------------------------------------
 	// Topping bitmask history
@@ -272,6 +287,10 @@ private:
 		uint8 mask = 0;
 		int16 orderType = 0;
 		uint16 scrbId = 0;
+		// IDA 0x440933: runners created by registerToppingRunner get
+		// pizza_spawnAnswerZmb as their completion callback; the L4 demo
+		// runners (pizza_animateToppingSequence) do not.
+		bool spawnOnComplete = false;
 	};
 	ToppingRunnerSlot _toppingRunnerSlots[28] = {};
 	int16 _toppingRunnerSlotIdx = -1;

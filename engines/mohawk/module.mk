@@ -81,6 +81,7 @@ endif
 ifdef ENABLE_ZOOMBINI
 MODULE_OBJS += \
 	zoombini.o \
+	zoombini_metaengine.o \
 	zoombini_resource.o \
 	zoombini_random.o \
 	zoombini_graphics.o \

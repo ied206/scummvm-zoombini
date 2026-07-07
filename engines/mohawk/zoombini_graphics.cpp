@@ -33,6 +33,7 @@
 #include "mohawk/cursors.h"
 #include "mohawk/resource.h"
 #include "mohawk/zoombini.h"
+#include "mohawk/zoombini_metaengine.h"
 #include "mohawk/zoombini_graphics.h"
 #include "mohawk/zoombini_page.h"
 #include "mohawk/zoombini_scripts.h"
@@ -947,7 +948,7 @@ bool ZoombiniGraphics::readPalette(uint16 id, byte *destBuf, size_t destBufSize)
 	delete shplStream;
 
 	// Apply brightness adjustment if enabled (matches original readSHPLbody_4512A5 behavior)
-	if (ConfMan.getBool("brighten_palette")) {
+	if (ConfMan.getBool(MohawkMetaEngine_Zoombini::kOptionBrightenPalette)) {
 		for (uint16 i = paletteColorStart; i < paletteColorStart + paletteColorCount; i++) {
 			for (int ch = 0; ch < 3; ch++) {
 				byte &v = destBuf[i * 3 + ch];

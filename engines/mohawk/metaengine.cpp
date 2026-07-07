@@ -56,6 +56,7 @@
 
 #ifdef ENABLE_ZOOMBINI
 #include "mohawk/zoombini.h"
+#include "mohawk/zoombini_metaengine.h"
 #endif
 
 #include "mohawk/detection.h"
@@ -355,9 +356,7 @@ void MohawkMetaEngine::registerDefaultSettings(const Common::String &target) con
 
 #ifdef ENABLE_ZOOMBINI
 	if (gameId == "zoombini") {
-		ConfMan.registerDefault("brighten_palette", false);
-		ConfMan.registerDefault("original_prng", true);
-		ConfMan.registerDefault("fix_hotel_midi_bgm", true);
+		Mohawk::MohawkMetaEngine_Zoombini::registerDefaultSettings();
 	}
 #endif
 

@@ -22,6 +22,7 @@
 #include "common/config-manager.h"
 
 #include "mohawk/zoombini.h"
+#include "mohawk/zoombini_metaengine.h"
 #include "mohawk/zoombini_graphics.h"
 #include "mohawk/zoombini_pages/puzzle_hotel.h"
 #include "mohawk/zoombini_random.h"
@@ -60,7 +61,7 @@ void ZoombiniPuzzleHotel::open() {
 	// When "fix_hotel_midi_bgm" is enabled (default), MIDI persists during SFX.
 	// When disabled, we replicate the original bug via _stopMidiOnSfx.
 	if (!_vm->isGameVariant(GF_ZMB_TLC))
-		_vm->_sound->setStopMidiOnSfx(!ConfMan.getBool("fix_hotel_midi_bgm"));
+		_vm->_sound->setStopMidiOnSfx(!ConfMan.getBool(MohawkMetaEngine_Zoombini::kOptionFixHotelMidiBGM));
 }
 
 void ZoombiniPuzzleHotel::setBackgroundMusic() {
