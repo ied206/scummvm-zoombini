@@ -20,7 +20,6 @@
  */
 #include "mohawk/zoombini_resource.h"
 
-#include "common/config-manager.h"
 #include "common/substream.h"
 #include "common/system.h"
 #include "common/textconsole.h"
@@ -33,7 +32,6 @@
 #include "mohawk/cursors.h"
 #include "mohawk/resource.h"
 #include "mohawk/zoombini.h"
-#include "mohawk/zoombini_metaengine.h"
 #include "mohawk/zoombini_graphics.h"
 #include "mohawk/zoombini_page.h"
 #include "mohawk/zoombini_scripts.h"
@@ -118,7 +116,7 @@ void ZoombiniGraphics::captureComposedScreen(Graphics::Surface *destScreen) {
 
 // [*] Screen updates
 void ZoombiniGraphics::flushScreens() {
-	// IDA loadPort_410C39: copies blitter port (composite) → device context.
+	// IDA loadPort_410C39: copies blitter port (composite) -> device context.
 	// _shapeScreen is the composite buffer (background + shapes already drawn on it).
 	if (_isScreenDirty) {
 		Graphics::Surface *systemScreen = _vm->_system->lockScreen();
@@ -139,7 +137,7 @@ void ZoombiniGraphics::clearScreens() {
 
 void ZoombiniGraphics::copyBackToShapeScreen() {
 	// IDA gfx_renderFrame 0x45F352: gfx_blitPortToPort copies background port
-	// (pScreenPort_4A79A8) → blitter port (pPortToBlitter_4B9D9C) before shape
+	// (pScreenPort_4A79A8) -> blitter port (pPortToBlitter_4B9D9C) before shape
 	// rendering. Shapes are then drawn directly on top of the background.
 	_shapeScreen->copyRectToSurface(*_backScreen, 0, 0, _screenRect);
 	recordDirtyRect(kShapeScreen, _screenRect);
@@ -431,13 +429,13 @@ Common::Rect ZoombiniGraphics::drawImageSectionToScreen(ScreenKind screenKind, M
 	// We emulate this by capturing the screen-clipped destination rect as the
 	// "logical rect" BEFORE applying the render clip rect.  blitShapes() uses
 	// the returned rect for sortRect/clickRect, making it independent of the
-	// current dirty region — just like the original's metadata-based clickRect.
+	// current dirty region - just like the original's metadata-based clickRect.
 	Common::Rect logicalRect(clipDstRect.left, clipDstRect.top,
 							 clipDstRect.left + clipSrcRect.width(),
 							 clipDstRect.top + clipSrcRect.height());
 	recordDirtyRect(screenKind, logicalRect);
 
-	// IDA: port_selectActiveRegion (0x48F40C) — confine drawing to dirty region.
+	// IDA: port_selectActiveRegion (0x48F40C) - confine drawing to dirty region.
 	// The original engine uses GDI clip regions (union of rectangles) set on the
 	// port's HDC.  We replicate this by iterating individual dirty rects and
 	// drawing only the intersection of the sprite with each dirty rect.
@@ -948,7 +946,7 @@ bool ZoombiniGraphics::readPalette(uint16 id, byte *destBuf, size_t destBufSize)
 	delete shplStream;
 
 	// Apply brightness adjustment if enabled (matches original readSHPLbody_4512A5 behavior)
-	if (ConfMan.getBool(MohawkMetaEngine_Zoombini::kOptionBrightenPalette)) {
+	if (_vm->useBrightenPalette()) {
 		for (uint16 i = paletteColorStart; i < paletteColorStart + paletteColorCount; i++) {
 			for (int ch = 0; ch < 3; ch++) {
 				byte &v = destBuf[i * 3 + ch];

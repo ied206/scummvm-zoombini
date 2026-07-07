@@ -183,6 +183,9 @@ ZmbEventHandleResult ZoombiniDialogHelp::helpDialog_onKeyDown(ZmbFeature *featur
 	ZmbEventHandleResult result = ZmbEventHandleResult::kPassthrough;
 
 	// ScummVM implementation only shortcuts
+	if (!_vm->useEnhancedKbdShortcuts())
+		return result;
+
 	switch (kbd.keycode) {
 	case Common::KEYCODE_RETURN:
 	case Common::KEYCODE_KP_ENTER:
@@ -190,36 +193,23 @@ ZmbEventHandleResult ZoombiniDialogHelp::helpDialog_onKeyDown(ZmbFeature *featur
 		_helpDialogButtonStateMap[kHelpDialogButton_Okay].press(_vm, _currentFrameCounter);
 		result = ZmbEventHandleResult::kConsumed;
 		break;
-	case Common::KEYCODE_LEFT:
-	case Common::KEYCODE_UP:
-	case Common::KEYCODE_PAGEUP:
-		_helpDialogButtonStateMap[kHelpDialogButton_Prev].press(_vm, _currentFrameCounter);
-		result = ZmbEventHandleResult::kConsumed;
-		break;
-	case Common::KEYCODE_KP4:
-	case Common::KEYCODE_KP8:
-	case Common::KEYCODE_KP9:
-		if ((kbd.flags & Common::KBD_NUM) == 0) {
+	default:
+		switch (getKeyboardNavDirection(kbd)) {
+		case KBD_NAV_LEFT:
+		case KBD_NAV_UP:
+		case KBD_NAV_PAGEUP:
 			_helpDialogButtonStateMap[kHelpDialogButton_Prev].press(_vm, _currentFrameCounter);
 			result = ZmbEventHandleResult::kConsumed;
-		}
-		break;
-
-	case Common::KEYCODE_RIGHT:
-	case Common::KEYCODE_DOWN:
-	case Common::KEYCODE_PAGEDOWN:
-		_helpDialogButtonStateMap[kHelpDialogButton_Next].press(_vm, _currentFrameCounter);
-		result = ZmbEventHandleResult::kConsumed;
-		break;
-	case Common::KEYCODE_KP6:
-	case Common::KEYCODE_KP2:
-	case Common::KEYCODE_KP3:
-		if ((kbd.flags & Common::KBD_NUM) == 0) {
+			break;
+		case KBD_NAV_RIGHT:
+		case KBD_NAV_DOWN:
+		case KBD_NAV_PAGEDOWN:
 			_helpDialogButtonStateMap[kHelpDialogButton_Next].press(_vm, _currentFrameCounter);
 			result = ZmbEventHandleResult::kConsumed;
+			break;
+		default:
+			break;
 		}
-		break;
-	default:
 		break;
 	}
 	return result;

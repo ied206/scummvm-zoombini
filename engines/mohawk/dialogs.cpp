@@ -494,11 +494,11 @@ ZoombiniOptionsWidget::ZoombiniOptionsWidget(GuiObject *boss, const Common::Stri
 
 	_brightenPaletteCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "ZoombiniEngineOptionsDialog.BrightenPalette",
 		_("Brighten palette (original behavior)"),
-		_("Applies the brightness adjustment to SHPL palettes as the original engine does."));
+		_("Applies the brightness adjustment to palettes as the original engine does."));
 
 	_originalPrngCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "ZoombiniEngineOptionsDialog.OriginalPRNG",
-		_("Use original PRNG"),
-		_("Uses the original engine's pseudo-random number generator instead of ScummVM's default."));
+		_("Use original PRNG (requires restart)"),
+		_("Uses the original engine's pseudo-random number generator instead of ScummVM's default. Changes take effect after restarting the game."));
 
 	_fixHotelMidiBgmCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "ZoombiniEngineOptionsDialog.FixHotelMidiBGM",
 		_("Fix hotel MIDI background music halt (v1.x only)"),
@@ -534,11 +534,17 @@ void ZoombiniOptionsWidget::load() {
 }
 
 bool ZoombiniOptionsWidget::save() {
+	bool originalPrngChanged = ConfMan.getBool(Mohawk::MohawkMetaEngine_Zoombini::kOptionOriginalPRNG, _domain) != _originalPrngCheckbox->getState();
+
 	ConfMan.setBool(Mohawk::MohawkMetaEngine_Zoombini::kOptionFixAudioPops, _audioPopFixCheckbox->getState(), _domain);
 	ConfMan.setBool(Mohawk::MohawkMetaEngine_Zoombini::kOptionBrightenPalette, _brightenPaletteCheckbox->getState(), _domain);
 	ConfMan.setBool(Mohawk::MohawkMetaEngine_Zoombini::kOptionOriginalPRNG, _originalPrngCheckbox->getState(), _domain);
 	ConfMan.setBool(Mohawk::MohawkMetaEngine_Zoombini::kOptionFixHotelMidiBGM, _fixHotelMidiBgmCheckbox->getState(), _domain);
 	ConfMan.setBool(Mohawk::MohawkMetaEngine_Zoombini::kOptionEnhancedKbdShortcuts, _enhancedKbdShortcutsCheckbox->getState(), _domain);
+	if (originalPrngChanged && g_engine) {
+		GUI::MessageDialog dialog(_("The PRNG option change will take effect after restarting the game."));
+		dialog.runModal();
+	}
 	return true;
 }
 

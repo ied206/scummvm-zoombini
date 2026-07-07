@@ -2206,10 +2206,17 @@ bool ZoombiniConsole::Cmd_Shortcuts(int argc, const char **argv) {
 	debugPrintf("  Ctrl+P      Toggle Practice Mode on the map\n");
 	debugPrintf("  1-4         Select practice difficulty while Practice Mode is active on the map\n");
 
-	debugPrintf("\nDialog navigation:\n");
-	debugPrintf("  Enter       Activate the selected dialog button\n");
-	debugPrintf("  Esc         Cancel or close supported dialogs\n");
-	debugPrintf("  Arrow keys  Navigate supported help, save/load, credits, and debug dialogs\n");
+	debugPrintf("\nEnhanced ScummVM-only shortcuts [%s]]:\n", _vm->useEnhancedKbdShortcuts() ? "enabled" : "disabled");
+	if (_vm->useEnhancedKbdShortcuts()) {
+		debugPrintf("  Help dialog: Enter/Esc closes, arrows/PageUp/PageDown change page\n");
+		debugPrintf("  Save dialog: Delete/Home/End edits the save-name text box\n");
+		debugPrintf("  Load dialog: Up/Down changes selected save slot, PageUp/PageDown scrolls by one page\n");
+		debugPrintf("  Save dialog: PageUp/PageDown scrolls by one page\n");
+		debugPrintf("  Credits: [ rewinds and ] fast-forwards while held\n");
+		debugPrintf("  Town: Left/Right scrolls the town view\n");
+	} else {
+		debugPrintf("  Load dialog: Up/Down scrolls by one page\n");
+	}
 
 	return true;
 }
@@ -2311,7 +2318,7 @@ bool ZoombiniConsole::Cmd_GoXfer(int argc, const char **argv) {
 	// ORs the current routeLevel bit (and the perfect-clear high-nibble bit) into
 	// _levelFlagPageArr[srcDi - 4]. goXfer skips the puzzle entirely, so without
 	// this fix-up the destination xfer's previous-segment color reflects the
-	// stale pre-source-puzzle state — e.g. for `goXfer lilly`, the BC1→Ferry
+	// stale pre-source-puzzle state - e.g. for `goXfer lilly`, the BC1->Ferry
 	// segment band reads Ferry's flag *before* this run's Ferry completion and
 	// shows the lower level color. Mirroring the IDA `[DI - 4]` write here
 	// makes goXfer match a natural play-through that reaches the same xfer.
@@ -2343,12 +2350,12 @@ bool ZoombiniConsole::Cmd_GoXfer(int argc, const char **argv) {
 		uint16 srcRouteLevel = f._routeLevels[srcRouteIdx - 1];
 		uint8 srcBitmask = static_cast<uint8>(1 << (srcRouteLevel & 3));
 		// Match IDA save_updateZmbPacksOnPuzzleComplete: set both low (played)
-		// and high (perfect) nibble — the simulated jump assumes a perfect run.
+		// and high (perfect) nibble - the simulated jump assumes a perfect run.
 		// A natural play-through reaching this xfer completed EVERY earlier
 		// puzzle of the route at the current route level on this trip, not just
-		// the immediate source — the route map draws each traveled leg from its
+		// the immediate source - the route map draws each traveled leg from its
 		// own puzzle's flag byte, so backfill all of them (e.g. `goXfer pizza`
-		// at route level 4 must leave the isle→bridge leg dark red, which needs
+		// at route level 4 must leave the isle->bridge leg dark red, which needs
 		// Bridge's bit 3, not only Tunnels').
 		int16 firstDi = static_cast<int16>(ZMB_DI_BRIDGE_07 + (srcRouteIdx - 1) * 3);
 		for (int16 di = firstDi; di <= srcDi; di++) {

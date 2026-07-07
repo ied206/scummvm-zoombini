@@ -92,7 +92,7 @@ public:
 	 * @ 0x4522BA-0x4522CB). Selected by `snoidScript_renderFrame_4562B2` for
 	 * snoids in `SNOID_ANIMATE_STATE_009_NORMAL_SCRIPT` (= ScummVM's
 	 * `kSnoidAnimScriptNormal`). Pairs with shape archive tBMP 3100 instead of
-	 * the idle/state-8/state-9-15-layer tBMP 3000 — required for Ferry's
+	 * the idle/state-8/state-9-15-layer tBMP 3000 - required for Ferry's
 	 * reject-flight visual where the snoid plays SCRS 1900-1906 with
 	 * body-part shapes drawn from a different sprite pool.
 	 */
@@ -156,7 +156,7 @@ public:
 	ZMB_SI_PAGE _xferSrcPage = ZMB_SI_MINUS1;
 
 	/**
-	 * Bridge → Tunnels pattern-exclusion globals (IDA bridge_prevExcludePattern
+	 * Bridge -> Tunnels pattern-exclusion globals (IDA bridge_prevExcludePattern
 	 * @ 0x416668 and bridge_prevExcludeCount @ 0x41665D). Bridge writes its
 	 * selected sorting-pattern here after rule generation; Tunnels level 0
 	 * reads these to avoid picking a split with the same count as the
@@ -209,8 +209,8 @@ public:
 
 	/**
 	 * IDA: setZmbMovementDirection_45621A. Sets _arrivalTurnState from a
-	 * movement direction value: -1 → kSnoidAnimTurnRight(1),
-	 * 0 → kSnoidAnimIdle(0), 1 → kSnoidAnimTurnLeft(2).
+	 * movement direction value: -1 -> kSnoidAnimTurnRight(1),
+	 * 0 -> kSnoidAnimIdle(0), 1 -> kSnoidAnimTurnLeft(2).
 	 */
 	void setArrivalTurnDirection(int dir);
 
@@ -244,6 +244,10 @@ public:
 	Archive *getArchive(ZmbArchiveKind kind, uint archiveIdx) const;
 
 	Common::Language getLanguage() const override;
+	bool hasFeature(EngineFeature f) const override;
+	void applyGameSettings() override;
+	bool useBrightenPalette() const { return _brightenPalette; }
+	bool useEnhancedKbdShortcuts() const;
 
 	enum QuitEventState {
 		kQuitEventNone = 0,
@@ -265,6 +269,8 @@ private:
 	
 	ZoombiniPage *_activePage = nullptr;
 	ZmbArchiveKind _activeResourceKind = ZmbArchiveKind::kPage;
+	bool _brightenPalette = true;
+	bool _enhancedKbdShortcuts = true;
 
 	Common::Queue<ZoombiniPageType> _pageQueue;
 	Common::Stack<ZoombiniDialog *> _dialogPageStack;

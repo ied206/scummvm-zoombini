@@ -84,13 +84,13 @@ public:
 	void reinitGraphics(bool trueColor);
 	void clearScreen(ScreenKind screenKind);
 	/**
-	 * Copy background port → composite buffer (blitter port).
-	 * IDA gfx_renderFrame 0x45F352: gfx_blitPortToPort(pScreenPort → pPortToBlitter)
+	 * Copy background port -> composite buffer (blitter port).
+	 * IDA gfx_renderFrame 0x45F352: gfx_blitPortToPort(pScreenPort -> pPortToBlitter)
 	 * Called at the start of each render frame, before shapes are drawn.
 	 */
 	void copyBackToShapeScreen();
 	/**
-	 * Copy background port → composite buffer, clipped to the given rect.
+	 * Copy background port -> composite buffer, clipped to the given rect.
 	 * Only pixels within clipRect are overwritten on the shapeScreen.
 	 * Used by the dirty-rect render pipeline to restore background in changed areas only.
 	 */
@@ -98,7 +98,7 @@ public:
 
 	// [*] Render clip region
 	/**
-	 * IDA: port_selectActiveRegion (0x48F40C) — confine all drawing to
+	 * IDA: port_selectActiveRegion (0x48F40C) - confine all drawing to
 	 * the accumulated dirty region (list of rectangles).  The original engine
 	 * uses Windows GDI clip regions (union of rectangles) set on the port's HDC.
 	 * We replicate this by maintaining a list of individual dirty rects and
@@ -478,7 +478,7 @@ public:
 	 * Scale a range of palette entries by a percentage and apply to the screen.
 	 * Does NOT modify the stored _paletteBytes reference. Entries outside [startEntry,
 	 * startEntry+count) keep their original values.
-	 * IDA: picker_applyBrightnessDim_42185D — scales entries 10..245 by 88/90/92%.
+	 * IDA: picker_applyBrightnessDim_42185D - scales entries 10..245 by 88/90/92%.
 	 *
 	 * @param startEntry First palette entry index to scale (0-based).
 	 * @param count      Number of entries to scale.
@@ -517,7 +517,7 @@ private:
 	Graphics::Surface *_shapeScreen = nullptr;
 	bool _isScreenDirty = false;
 
-	// IDA: port_selectActiveRegion — render clip region (list of rects).
+	// IDA: port_selectActiveRegion - render clip region (list of rects).
 	// The original engine uses GDI clip regions (union of rectangles) on the
 	// port's HDC.  We store the individual rects and their bounding box.
 	Common::Array<Common::Rect> _renderClipRects;

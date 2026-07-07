@@ -23,8 +23,8 @@
 
 void Mohawk::MohawkMetaEngine_Zoombini::registerDefaultSettings() {
 	ConfMan.registerDefault(kOptionBrightenPalette, true);
-    ConfMan.registerDefault(kOptionOriginalPRNG, true);
-    ConfMan.registerDefault(kOptionFixHotelMidiBGM, true);
-    ConfMan.registerDefault(kOptionFixAudioPops, true);
-    ConfMan.registerDefault(kOptionEnhancedKbdShortcuts, true);
+	ConfMan.registerDefault(kOptionOriginalPRNG, true);
+	ConfMan.registerDefault(kOptionFixHotelMidiBGM, true);
+	ConfMan.registerDefault(kOptionFixAudioPops, true);
+	ConfMan.registerDefault(kOptionEnhancedKbdShortcuts, true);
 }

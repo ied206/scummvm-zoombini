@@ -513,7 +513,7 @@ struct ZmbStateFile { // Size: 44559 (0xAE0F) for v1.x, 48440 (0xBD38) for TLC/v
 
 	/**
 	 * v1.x 0xAE05 / TLC 0xBD2E: Per-route perfect completion counters (4 x int16).
-	 * IDA: twinGenStatus[2*routeIdx+623] (routes 1-4 → indices 625,627,629,631).
+	 * IDA: twinGenStatus[2*routeIdx+623] (routes 1-4 -> indices 625,627,629,631).
 	 * Incremented each time a route is completed with all snoids surviving
 	 * (perfect streak). When a counter reaches 3, it resets to 0 and the
 	 * corresponding _routeLevels[] entry advances by 1 (max 3).
@@ -617,7 +617,7 @@ public:
 	bool inPracticeMode() { return _practiceLevel != 0; }
 
 	/**
-	 * IDA: *(_WORD *)&pbPuzzleLevelFlagArr[1] — "perfect streak" flag.
+	 * IDA: *(_WORD *)&pbPuzzleLevelFlagArr[1] - "perfect streak" flag.
 	 * Set to true when entering the first puzzle of a route (Bridge/Ferry/Fleens/Caves).
 	 * Cleared to false when any snoid is lost (non-occupied) at a puzzle.
 	 * Checked at container puzzles for route level advancement.
@@ -627,7 +627,7 @@ public:
 	bool _perfectStreakFlag = false;
 
 	/**
-	 * IDA: wMemorialLevelUpdated — set when a route level advances.
+	 * IDA: wMemorialLevelUpdated - set when a route level advances.
 	 * Used by route completion flag setting to record the PREVIOUS level's
 	 * completion rather than the newly advanced level.
 	 * Runtime only, reset each departure cycle.
@@ -713,7 +713,7 @@ public:
 	 * Practice-mode state snapshot. IDA: rodmap_onLeave @ 0x42A9D6 saves the
 	 * active game state to disk as "ZBtemp" before launching a practice puzzle,
 	 * then restores it on rodmap re-entry (rodmap_exitAndRestoreScreen @ 0x42B531).
-	 * In ScummVM we keep an in-memory snapshot instead — it serves the same
+	 * In ScummVM we keep an in-memory snapshot instead - it serves the same
 	 * purpose (the user's pack/flags are not clobbered by practice play).
 	 *
 	 * `_practiceStateBackupActive` mirrors IDA's g_bPracticeModeInited: set

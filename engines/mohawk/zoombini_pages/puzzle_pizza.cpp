@@ -217,25 +217,19 @@ void ZoombiniPuzzlePizza::loadFeatures() {
 		ZmbFeature::FLAG_00008000_LOOP_ANIM | ZmbFeature::FLAG_00080000_DEFER_ANIM |
 			ZmbFeature::FLAG_00100000_PLAY_ONCE);
 
-	// IDA: answer display DRAW_ON_REG — SCRB 7063, interval=7
-	// The original runner carries DEFER_ANIM|DEFER_RENDER (0x108A000), which
-	// only suppress the initial registration state; every scrb_loadOnRunner
-	// re-arms it and the SCRB plays through ONCE (the ready-flash 7067/7068
-	// visibly plays a single cycle in the original capture).  In ScummVM the
-	// per-cycle stop and the end-of-cycle callback both come from PLAY_ONCE,
-	// so model the original single-pass behavior with PLAY_ONCE and drop
-	// DEFER_RENDER so the frozen final frame keeps rendering (the plate art
-	// must stay visible between presses).  Without PLAY_ONCE the ready-flash
-	// looped forever and never emitted the completion that maps the
-	// original's slot-40 (produce unlock + deliverer advance).
+	// IDA: answer display runner — SCRB 7063, interval=7.
+	// pizza_registerAnswerDisplay creates this runner with flags 0x108000:
+	// LOOP_ANIM|PLAY_ONCE only. It is not a DRAW_ON_REG runner; the original
+	// click case uses the rendered SCRB hotspot/click data plus the page's
+	// broad answer area, not draw-on-reg slot occupancy. Adding DRAW_ON_REG
+	// routes registration through an immediate blit path that does not match
+	// the original and corrupts the generate-button flash coverage.
 	{
 		ZmbFeature::EventHooks hooks;
 		hooks.setPreRenderShapeFunc(reinterpret_cast<ZmbFeature::OnPreRenderShapeFunc>(&ZoombiniPuzzlePizza::answerDisplay_preRenderShape));
 		_drawOnRegFeature = loadScrbFeature(
 			ZmbResource(ZmbArchiveKind::kPage, 7000), 7063, 7,
-			kAnswerDisplayPosition,
-			ZmbFeature::FLAG_00002000_DRAW_ON_REG | ZmbFeature::FLAG_00008000_LOOP_ANIM |
-				ZmbFeature::FLAG_00080000_DEFER_ANIM | ZmbFeature::FLAG_00100000_PLAY_ONCE,
+			ZmbFeature::FLAG_00008000_LOOP_ANIM | ZmbFeature::FLAG_00100000_PLAY_ONCE,
 			hooks);
 	}
 
@@ -346,10 +340,10 @@ void ZoombiniPuzzlePizza::loadFeatures() {
 
 	// IDA 0x43c01a-0x43c05e: the troll load chant plays SYNCHRONOUSLY here,
 	// between resource setup and the intro sequence — this is the singing
-	// heard "between the xfer map and the pizza page" with the animated eye
-	// cursor. Show the freshly loaded background while it plays (the original
-	// renders during the blocking play).
-	_vm->_gfx->copyBackToShapeScreen();
+	// heard between the xfer map and the pizza page with the animated eye
+	// cursor. The Pizza background has only been drawn to the back screen at
+	// this point; do not copy it to the shape screen yet. The original keeps
+	// the display black during the voice SFX, then reveals the page afterward.
 	playLoadChant(chantDiffId);
 
 	// IDA 0x43bdd5: Register answer display at init — makes button visible from start.
@@ -2735,8 +2729,9 @@ void ZoombiniPuzzlePizza::playLoadChant(int16 chantDiffId) {
 // Called from pizza_init only — the troll chant played synchronously during
 // the puzzle load. pizza_playSoundLoadTopping (0x44123C) plays each SND with
 // snd_findEntryAndPlay under xfer_xchgRenderFlag(1) — i.e. it BLOCKS until
-// the sound finishes while the engine keeps rendering (the animated eye
-// cursor spins over the freshly drawn scene). setNextRenderFrameWithDebug
+// the sound finishes while the engine keeps pumping the wait cursor. At this
+// point the Pizza background is still only in the back screen, so the visible
+// display remains black. setNextRenderFrameWithDebug
 // (0x46EB56) inserts additional blocking waits (ticks of ~17ms) between the
 // chant parts.
 //
@@ -2801,7 +2796,7 @@ void ZoombiniPuzzlePizza::playChantSoundSync(uint16 sndId) {
 // ---------------------------------------------------------------------------
 // pumpLoadWait: minimal frame pump for the synchronous load chant —
 // keeps the OS event queue drained, animates the wait (eye) cursor and
-// refreshes the screen. durationMs 0 = single pump iteration.
+// refreshes the currently visible screen. durationMs 0 = single pump iteration.
 // ---------------------------------------------------------------------------
 void ZoombiniPuzzlePizza::pumpLoadWait(uint32 durationMs) {
 	const uint32 endTime = _vm->_system->getMillis() + durationMs;

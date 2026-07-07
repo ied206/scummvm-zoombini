@@ -145,7 +145,7 @@ class MohawkSurface;
  *
  * Framework-level codes (handled by the engine before/during dispatch):
  *   -1        End-of-animation (PLAY_ONCE / CHAIN_SCRIPT completion).
- *   200-239   Voice SFX — intercepted by the framework, never reaches
+ *   200-239   Voice SFX - intercepted by the framework, never reaches
  *             onFeatureAnimEvent().  Maps to kVoiceGroupMap[] for snoid
  *             voice samples.
  *
@@ -158,7 +158,7 @@ class MohawkSurface;
  *             Arrangement index = eventCode - 250 (range 0-3).
  *             Used by: xfer, tunnels, smoke.
  *
- * All other values (0-199) are page-specific — each puzzle defines its
+ * All other values (0-199) are page-specific - each puzzle defines its
  * own meaning in its onFeatureAnimEvent() override.
  */
 enum ZmbAnimEvent : int16 {
@@ -228,7 +228,7 @@ public:
 	 *
 	 * For SCRS event codes (non-negative), dispatched every frame that carries one.
 	 * For kZmbAnimEventM1_End (-1), dispatched at most once per activateAnimate()
-	 * cycle — one-shot semantics matching the original where the function pointer
+ * cycle - one-shot semantics matching the original where the function pointer
 	 * is cleared to 0 after the first -1 fire (0x461F67 / 0x461D03).
 	 *
 	 * @param feature   The feature that fired the event.
@@ -270,13 +270,13 @@ public:
 	 * IDA: scrb_loadMainFeatureSet just pre-loads SCRB data into flat arrays;
 	 * it does NOT create a feature runner. This method creates a bare ZmbFeature
 	 * (not registered in _scrbFeatureMap) that serves only as a parent for
-	 * loadSubFeature() chains — providing inherited flags and frame interval.
+	 * loadSubFeature() chains - providing inherited flags and frame interval.
 	 */
 	ZmbFeature *createMainFeatureHead(uint32 flags);
 	void unloadScrbFeature(ZmbFeature *feature);
 	/**
 	 * Swap the SCRB data on an already-registered feature.
-	 * IDA: scrb_loadOnRunner (0x460384) — loads/reloads SCRB resource data
+	 * IDA: scrb_loadOnRunner (0x460384) - loads/reloads SCRB resource data
 	 * onto an existing feature runner without destroying or recreating it.
 	 *
 	 * Preserves the feature's identity (map key), flags, event hooks, and
@@ -303,7 +303,7 @@ public:
 
 	/**
 	 * Pre-render pass for a single feature: animation logic.
-	 * IDA: runner_preRenderStandard (0x4619A1) — called for ALL features
+	 * IDA: runner_preRenderStandard (0x4619A1) - called for ALL features
 	 * BEFORE Z-sorting. Handles frame selection, end-of-cycle events
 	 * (CHAIN_SCRIPT, PLAY_ONCE), per-frame flag checks (SKIP_RENDER,
 	 * SKIP_ONCE), and sound dispatch.
@@ -312,7 +312,7 @@ public:
 
 	/**
 	 * Post-render pass for a single feature: shape blitting.
-	 * IDA: runner_postRenderStandard (0x46182F) — called in Z-sorted order
+	 * IDA: runner_postRenderStandard (0x46182F) - called in Z-sorted order
 	 * AFTER pre-render pass. Only blits shapes and computes sort rects.
 	 */
 	ZmbRenderResult blitShapes(ZmbFeature *feature);
@@ -358,7 +358,7 @@ public:
 	 * the same animation scripts as the SCRB sub-features but are registered as
 	 * independent snoids. @p snoidId is used as the map key (must be unique);
 	 * @p scrbId is the SCRB resource to parse.
-	 * IDA: puzzleTown_457C7E — inhabitants use registerSCRB_45F60C with SNOID flag.
+	 * IDA: puzzleTown_457C7E - inhabitants use registerSCRB_45F60C with SNOID flag.
 	 */
 	ZmbSnoid *loadSnoidFromScrb(ZmbResource imgResource, uint16 snoidId, uint16 scrbId, const Common::Point &point, uint32 flags, const ZmbFeature::EventHooks &eventHooks = ZmbFeature::EventHooks());
 	void unloadSnoid(uint16 scrsId);
@@ -367,7 +367,7 @@ public:
 	/**
 	 * Return true if any stationary snoid (idle/flip/fidget) other than @p self
 	 * is within @p distSquared squared-pixel distance of @p pt.
-	 * IDA: snoid_collectIdlePositions (0x456ACA) — threshold is the
+	 * IDA: snoid_collectIdlePositions (0x456ACA) - threshold is the
 	 * raw squared distance; comparison is strict less-than, and only
 	 * states 0/3/6 (idle/flip/fidget) are checked.
 	 */
@@ -376,7 +376,7 @@ public:
 	// [*] Snoid Drag Helpers
 	/**
 	 * Begin dragging a snoid: set drag animation and hide mouse cursor.
-	 * IDA: beginDragFeatureRunner_45360F entry — animateZoombini(0, 5, pZmb)
+	 * IDA: beginDragFeatureRunner_45360F entry - animateZoombini(0, 5, pZmb)
 	 * sets kSnoidAnimDrag; cursor is hidden so the snoid sprite acts as cursor.
 	 * Called by all interactive pages when starting a drag operation.
 	 */
@@ -384,7 +384,7 @@ public:
 
 	/**
 	 * End dragging a snoid: restore flags and mouse cursor visibility.
-	 * IDA: beginDragFeatureRunner_45360F 0x453CCF — bitmask restored from saved
+	 * IDA: beginDragFeatureRunner_45360F 0x453CCF - bitmask restored from saved
 	 * value; cursor restored after drag loop.
 	 * The caller is responsible for setting the final animation state
 	 * (idle, arrive, etc.) and position.
@@ -415,21 +415,21 @@ public:
 	 *
 	 * Flow:
 	 *  1. If no terrain loaded, returns false (drop invalid).
-	 *  2. Checks pixel at (snoidX/4, snoidY/4); pixel != 1 → returns false.
-	 *  3. Checks collision with idle snoids (threshold 36 sq dist ≈ 6px).
+	 *  2. Checks pixel at (snoidX/4, snoidY/4); pixel != 1 -> returns false.
+	 *  3. Checks collision with idle snoids (threshold 36 sq dist approx 6px).
 	 *  4. If colliding, finds a non-colliding position via random offset scan.
 	 *  5. Updates snoid position and returns true.
 	 *
 	 * Pages with terrain: BC2(100), Bridge(1600), Caves(100), Ferry(100),
 	 * Fleens(500), Hotel(100), Maze2(100), Pizza(100), Slides(100),
 	 * Smoke(100), Tunnels(100).
-	 * Pages WITHOUT terrain: BC1, Picker, Town — always returns false.
+	 * Pages WITHOUT terrain: BC1, Picker, Town - always returns false.
 	 */
 	bool validateTerrainDrop(ZmbSnoid *snoid);
 
 	/**
 	 * Find a non-colliding position for a snoid by scanning random x-offsets.
-	 * IDA: snoid_findNonCollidingPos (0x456C95) — when called from
+	 * IDA: snoid_findNonCollidingPos (0x456C95) - when called from
 	 * terrain_validateAndPlaceSnoid with (threshold=36, randSeed=0,
 	 * gridParam=NULL): tries up to 20 random x-offset positions
 	 * (4 * random(-5,5) pixels) at the same y. Keeps first non-colliding.
@@ -637,7 +637,7 @@ public:
 	/**
 	 * Resolve whether a snoid SCRS id should play in REJECT state (state 8).
 	 * Returns true when the id falls in registered group 1, false otherwise
-	 * (group 0 or unregistered → NORMAL state 9). Mirrors the original's
+	 * (group 0 or unregistered -> NORMAL state 9). Mirrors the original's
 	 * `snoidScript_lookupSCRSIndex_45266B`-driven state selection inside
 	 * `snoidScript_initAndPlay`, so pages never hardcode the render state.
 	 */
@@ -654,6 +654,18 @@ public:
 						ZmbArchiveKind archive = ZmbArchiveKind::kPage);
 
 protected:
+	enum KeyboardNavDirection {
+		KBD_NAV_NONE,
+		KBD_NAV_LEFT,
+		KBD_NAV_RIGHT,
+		KBD_NAV_UP,
+		KBD_NAV_DOWN,
+		KBD_NAV_PAGEUP,
+		KBD_NAV_PAGEDOWN
+	};
+
+	static KeyboardNavDirection getKeyboardNavDirection(const Common::KeyState &kbd);
+
 	virtual void onSnoidDragStarted(ZmbSnoid *) {}
 	virtual void onSnoidDragEnded(ZmbSnoid *) {}
 
@@ -696,8 +708,8 @@ protected:
 
 	/**
 	 * Fidget animation cache: _fidgetAnims[set][variant].
-	 * set 0 = SCRS 130–136 (chZmbAnimShapeCommonImageIdx=1).
-	 * set 1 = SCRS 138–144 (chZmbAnimShapeCommonImageIdx=2, played with SFX).
+	 * set 0 = SCRS 130-136 (chZmbAnimShapeCommonImageIdx=1).
+	 * set 1 = SCRS 138-144 (chZmbAnimShapeCommonImageIdx=2, played with SFX).
 	 */
 	ZmbWalkAnim _fidgetAnims[2][7];
 	bool _fidgetAnimsLoaded = false;
@@ -705,8 +717,8 @@ protected:
 
 	/**
 	 * Holding (drag) animation cache: _holdingAnims[footType-1].
-	 * Holds SCRS 146–150 (one per foot type 1–5).
-	 * IDA: index = footTrait + 45 → SCRS 146–150.
+	 * Holds SCRS 146-150 (one per foot type 1-5).
+	 * IDA: index = footTrait + 45 -> SCRS 146-150.
 	 */
 	ZmbWalkAnim _holdingAnims[5];
 	bool _holdingAnimsLoaded = false;

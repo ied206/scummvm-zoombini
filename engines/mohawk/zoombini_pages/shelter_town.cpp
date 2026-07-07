@@ -874,27 +874,16 @@ bool ZoombiniShelterTown::isTownButtonRect(const Common::Point &pos) const {
 }
 
 ZmbEventHandleResult ZoombiniShelterTown::onKeyDown(const Common::KeyState &kbd, bool kbdRepeat) {
-	if (!kbdRepeat && !kbd.hasFlags(Common::KBD_CTRL) && !_memorialCardActive && !isDragging()) {
+	if (_vm->useEnhancedKbdShortcuts() && !kbdRepeat && !kbd.hasFlags(Common::KBD_CTRL) &&
+		!_memorialCardActive && !isDragging()) {
 		// This feature is ScummVM-only; not available in original engine.
-		switch (kbd.keycode) {
-		case Common::KEYCODE_LEFT:
+		switch (getKeyboardNavDirection(kbd)) {
+		case KBD_NAV_LEFT:
 			scrollTownLeft();
 			return ZmbEventHandleResult::kConsumed;
-		case Common::KEYCODE_KP4:
-			if ((kbd.flags & Common::KBD_NUM) == 0) {
-				scrollTownLeft();
-				return ZmbEventHandleResult::kConsumed;
-			}
-			break;
-		case Common::KEYCODE_RIGHT:
+		case KBD_NAV_RIGHT:
 			scrollTownRight();
 			return ZmbEventHandleResult::kConsumed;
-		case Common::KEYCODE_KP6:
-			if ((kbd.flags & Common::KBD_NUM) == 0) {
-				scrollTownRight();
-				return ZmbEventHandleResult::kConsumed;
-			}
-			break;
 		default:
 			break;
 		}

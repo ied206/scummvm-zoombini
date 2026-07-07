@@ -266,6 +266,8 @@ ZmbEventHandleResult ZoombiniDialogSaveLoad::dialogFrame_onKeyDown(ZmbFeature *f
 			}
 			break;
 		case Common::KEYCODE_DELETE:
+			if (!_vm->useEnhancedKbdShortcuts())
+				break;
 			if (_saveInputCursorPos < _saveInputText.size()) {
 				_saveInputText.deleteChar(_saveInputCursorPos);
 				result = ZmbEventHandleResult::kConsumed;
@@ -284,10 +286,14 @@ ZmbEventHandleResult ZoombiniDialogSaveLoad::dialogFrame_onKeyDown(ZmbFeature *f
 			}
 			break;
 		case Common::KEYCODE_HOME:
+			if (!_vm->useEnhancedKbdShortcuts())
+				break;
 			_saveInputCursorPos = 0;
 			result = ZmbEventHandleResult::kConsumed;
 			break;
 		case Common::KEYCODE_END:
+			if (!_vm->useEnhancedKbdShortcuts())
+				break;
 			_saveInputCursorPos = _saveInputText.size();
 			result = ZmbEventHandleResult::kConsumed;
 			break;
@@ -295,7 +301,7 @@ ZmbEventHandleResult ZoombiniDialogSaveLoad::dialogFrame_onKeyDown(ZmbFeature *f
 			// When Windows IME is compositing characters, no keyboard event is produced.
 			// When Windows IME has finished compositing characters, keyboard event with KEYCODE_INVALID is produced.
 			// Common::KEYCODE_DELETE passes this check, but it has been handled above
-			if ((Common::KEYCODE_EXCLAIM <= kbd.keycode && kbd.keycode <= Common::KEYCODE_TILDE) || 
+			if ((Common::KEYCODE_EXCLAIM <= kbd.keycode && kbd.keycode <= Common::KEYCODE_TILDE) ||
 				kbd.keycode == Common::KEYCODE_INVALID ||
 				(Common::KEYCODE_KP0 <= kbd.keycode && kbd.keycode <= Common::KEYCODE_KP9 && (kbd.flags & Common::KBD_NUM)) ||
 				(Common::KEYCODE_KP_PERIOD <= kbd.keycode && kbd.keycode <= Common::KEYCODE_KP_EQUALS && kbd.keycode != Common::KEYCODE_KP_ENTER)) {
@@ -306,7 +312,9 @@ ZmbEventHandleResult ZoombiniDialogSaveLoad::dialogFrame_onKeyDown(ZmbFeature *f
 	} else {
 		// [LoadDialog]
 		// - Delete opens the original remove-game confirmation overlay.
-		// - Left/Right key selection is ScummVM-only.
+		// - Up/Down Arrow
+		//   * Enhanced shortcut mode enabled: Select previous/next save entry
+		//   * Enhanced shortcut mode disabled: Scroll one page up/down
 		switch (kbd.keycode) {
 		case Common::KEYCODE_DELETE:
 			if (0 < _vm->_state->_r._saveCount1) {
@@ -317,16 +325,23 @@ ZmbEventHandleResult ZoombiniDialogSaveLoad::dialogFrame_onKeyDown(ZmbFeature *f
 			}
 			result = ZmbEventHandleResult::kConsumed;
 			break;
-		case Common::KEYCODE_LEFT:
-			_saveEntrySelectedIdx = MAX<int32>(0, _saveEntrySelectedIdx - 1);
-			result = ZmbEventHandleResult::kConsumed;
-			break;
-		case Common::KEYCODE_RIGHT:
-			_saveEntrySelectedIdx = MIN<int32>(_saveEntrySelectedIdx + 1, MAX<int32>(_vm->_state->_r._saveCount1 - 1, 0));
-			result = ZmbEventHandleResult::kConsumed;
-			break;
 		default:
-			return result;
+			if (!_vm->useEnhancedKbdShortcuts())
+				return result;
+
+			switch (getKeyboardNavDirection(kbd)) {
+			case KBD_NAV_UP:
+				_saveEntrySelectedIdx = MAX<int32>(0, _saveEntrySelectedIdx - 1);
+				result = ZmbEventHandleResult::kConsumed;
+				break;
+			case KBD_NAV_DOWN:
+				_saveEntrySelectedIdx = MIN<int32>(_saveEntrySelectedIdx + 1, MAX<int32>(_vm->_state->_r._saveCount1 - 1, 0));
+				result = ZmbEventHandleResult::kConsumed;
+				break;
+			default:
+				return result;
+			}
+			break;
 		}
 
 		clampLoadSelection();
@@ -404,30 +419,34 @@ ZmbEventHandleResult ZoombiniDialogSaveLoad::scrollButtons_onLButtonDown(ZmbFeat
 ZmbEventHandleResult ZoombiniDialogSaveLoad::scrollButtons_onKeyDown(ZmbFeature *feature, const Common::KeyState &kbd, bool kbdRepeat) {
 	ZmbEventHandleResult result = ZmbEventHandleResult::kPassthrough;
 	if (kbd.hasFlags(0)) {
-		switch (kbd.keycode) {
-		case Common::KEYCODE_PAGEUP: // PgUp - ScummVM implementation only
-		case Common::KEYCODE_UP:
+		switch (getKeyboardNavDirection(kbd)) {
+		case KBD_NAV_PAGEUP: // PgUp - ScummVM implementation only: Scroll one page up
+			if (!_vm->useEnhancedKbdShortcuts())
+				return result;
 			_scrollButtonStateMap[kSaveLoadDialogButton_ScrollUp].press(_vm, _currentFrameCounter);
 			result = ZmbEventHandleResult::kConsumed;
 			break;
-		case Common::KEYCODE_KP9:
-		case Common::KEYCODE_KP8:
-			if ((kbd.flags & Common::KBD_NUM) == 0) {
-				_scrollButtonStateMap[kSaveLoadDialogButton_ScrollUp].press(_vm, _currentFrameCounter);
-				result = ZmbEventHandleResult::kConsumed;
-			}
+		case KBD_NAV_UP: // Up Arrow
+			// Enhanced shortcut mode enabled: Select previous save entry
+			// Enhanced shortcut mode disabled: Scroll one page up
+			if (isLoadDialog() && _vm->useEnhancedKbdShortcuts())
+				return result;
+			_scrollButtonStateMap[kSaveLoadDialogButton_ScrollUp].press(_vm, _currentFrameCounter);
+			result = ZmbEventHandleResult::kConsumed;
 			break;
-		case Common::KEYCODE_PAGEDOWN: // PgDn - ScummVM implementation only
-		case Common::KEYCODE_DOWN:
+		case KBD_NAV_PAGEDOWN: // PgDn - ScummVM implementation only: Scroll one page down
+			if (!_vm->useEnhancedKbdShortcuts())
+				return result;
 			_scrollButtonStateMap[kSaveLoadDialogButton_ScrollDown].press(_vm, _currentFrameCounter);
 			result = ZmbEventHandleResult::kConsumed;
 			break;
-		case Common::KEYCODE_KP3:
-		case Common::KEYCODE_KP2:
-			if ((kbd.flags & Common::KBD_NUM) == 0) {
-				_scrollButtonStateMap[kSaveLoadDialogButton_ScrollDown].press(_vm, _currentFrameCounter);
-				result = ZmbEventHandleResult::kConsumed;
-			}
+		case KBD_NAV_DOWN: // Down Arrow
+			// Enhanced shortcut mode enabled: Select next save entry
+			// Enhanced shortcut mode disabled: Scroll one page down
+			if (isLoadDialog() && _vm->useEnhancedKbdShortcuts())
+				return result;
+			_scrollButtonStateMap[kSaveLoadDialogButton_ScrollDown].press(_vm, _currentFrameCounter);
+			result = ZmbEventHandleResult::kConsumed;
 			break;
 		default:
 			break;

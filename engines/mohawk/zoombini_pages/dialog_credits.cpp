@@ -147,16 +147,18 @@ ZmbEventHandleResult ZoombiniDialogCredits::creditScreen_onMouseLButtonDown(ZmbF
 }
 
 ZmbEventHandleResult ZoombiniDialogCredits::creditScreen_onKeyDown(ZmbFeature *feature, const Common::KeyState &kbd, bool kbdRepeat) {
-	// ScummVM only debug controls: fast forward with `]`, rewind with `[`
-	switch (kbd.keycode) {
-	case Common::KEYCODE_RIGHTBRACKET:
-		_creditScrollFramesPerFrame = 15;
-		return ZmbEventHandleResult::kConsumed;
-	case Common::KEYCODE_LEFTBRACKET:
-		_creditScrollFramesPerFrame = -5;
-		return ZmbEventHandleResult::kConsumed;
-	default:
-		break;
+	// ScummVM only debug controls: rewind with `[`, fast forward with `]`
+	if (_vm->useEnhancedKbdShortcuts()) {
+		switch (kbd.keycode) {
+		case Common::KEYCODE_LEFTBRACKET:
+			_creditScrollFramesPerFrame = -5;
+			return ZmbEventHandleResult::kConsumed;
+		case Common::KEYCODE_RIGHTBRACKET:
+			_creditScrollFramesPerFrame = 15;
+			return ZmbEventHandleResult::kConsumed;
+		default:
+			break;
+		}
 	}
 
 	close();
@@ -164,7 +166,8 @@ ZmbEventHandleResult ZoombiniDialogCredits::creditScreen_onKeyDown(ZmbFeature *f
 }
 
 ZmbEventHandleResult ZoombiniDialogCredits::creditScreen_onKeyUp(ZmbFeature *feature, const Common::KeyState &kbd, bool kbdRepeat) {
-	if (kbd.keycode == Common::KEYCODE_RIGHTBRACKET || kbd.keycode == Common::KEYCODE_LEFTBRACKET) {
+	if (_vm->useEnhancedKbdShortcuts() &&
+		(kbd.keycode == Common::KEYCODE_LEFTBRACKET || kbd.keycode == Common::KEYCODE_RIGHTBRACKET)) {
 		_creditScrollFramesPerFrame = 1;
 		return ZmbEventHandleResult::kConsumed;
 	}

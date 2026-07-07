@@ -166,7 +166,7 @@ void ZmbFeature::initValues() {
 	// runner_preRenderStandard. It only fires at end-of-animation-cycle (0x461CA3).
 	// The feature renders normally from the start; animation advancement is controlled
 	// by other flags (LOOP_ANIM activates it, DEFER_ANIM defers it).
-	// Must NOT deactivateAnimate here — that would break the common
+	// Must NOT deactivateAnimate here - that would break the common
 	// LOOP_ANIM | PLAY_ONCE combo (bridge, xfer, rodmap, basecamp2).
 	if (hasFlag(ZmbFeature::FLAG_00100000_PLAY_ONCE)) {
 		activateRender();
@@ -219,7 +219,7 @@ void ZmbFeature::onPreRender(ZoombiniPage *page) {
 	if (!page)
 		return;
 
-	// IDA: runner_preRenderStandard (0x4619A1) — pre-render pass.
+	// IDA: runner_preRenderStandard (0x4619A1) - pre-render pass.
 	// Calls custom preRender callback (e.g., scroll SM, state machine tick),
 	// then runs standard animation logic via page->preRenderFeature().
 	if (_eventHooks._preRenderFunc) {
@@ -234,7 +234,7 @@ ZmbRenderResult ZmbFeature::onPostRender(ZoombiniPage *page) {
 	if (!page)
 		return ZmbRenderResult::kSkipped;
 
-	// IDA: runner_postRenderStandard (0x46182F) — post-render pass.
+	// IDA: runner_postRenderStandard (0x46182F) - post-render pass.
 	// Blits shapes to screen, then calls custom postRender callback.
 	// Default renderFunc is blitShapes (runner_postRenderStandard equivalent).
 	OnRenderFunc renderFunc = _eventHooks._renderFunc;
@@ -381,7 +381,7 @@ void ZmbFeature::setVirtualHotspots(const Common::Array<ZmbHotspot> &hotspots) {
 }
 
 void ZmbFeature::loadScrbData(Common::SeekableReadStream *stream, bool scheduleRender) {
-	// IDA: scrb_loadOnRunner (0x460384) — swap SCRB data on an existing runner.
+	// IDA: scrb_loadOnRunner (0x460384) - swap SCRB data on an existing runner.
 	// Clears existing hotspot data & draw records, parses new SCRB stream,
 	// resets animation state, and re-runs initValues().
 	// Preserves: identity (_id), flags, callbacks, _pointRef (immutable position).
@@ -521,7 +521,7 @@ int32 ZmbFeature::defaultSelectRenderFrame(uint32 currentFrameCounter) {
 			// (when _lastFrameIdx < _frameIdxMax).  When at/past max, always
 			// increment to signal end-of-cycle to preRenderFeature.
 			if (_lastFrameIdx < _frameIdxMax) {
-				// IDA 0x461D60: _skipFirstAdvance — skip first frame advance after SCRB load
+				// IDA 0x461D60: _skipFirstAdvance - skip first frame advance after SCRB load
 				if (_skipFirstAdvance) {
 					_skipFirstAdvance = false;
 				} else {
@@ -705,7 +705,7 @@ bool ZmbFeature::isAnimateActivated() const {
 }
 
 void ZmbFeature::scheduleAnimateForFrames(uint16 frames) {
-	// IDA: wGroupFrameIdx = 0 after SCRB load — start at first frame.
+	// IDA: wGroupFrameIdx = 0 after SCRB load - start at first frame.
 	_lastFrameIdx = 0;
 	_frameIdxMax = frames;
 }
@@ -881,7 +881,7 @@ void ZmbSnoid::finishScrsPlayback(bool restorePosition) {
 }
 
 void ZmbSnoid::setAnimState(SnoidAnimState state, const Common::Point *pos) {
-	// Clamp unknown states to idle (IDA: wAnimKind > 0x0A → 0)
+	// Clamp unknown states to idle (IDA: wAnimKind > 0x0A -> 0)
 	if (state > kSnoidAnimArrivalMotion && state != kSnoidAnimPath)
 		state = kSnoidAnimIdle;
 
@@ -900,7 +900,7 @@ void ZmbSnoid::setAnimState(SnoidAnimState state, const Common::Point *pos) {
 	// Restore idle pose when returning to idle.
 	// Use the correct (normal or small) idle hotspot table.
 	// IDA: animateZoombini_455E76(0, 0, pZmb) rebuilds idle hotspots unconditionally.
-	// IDA wBool_0x122=0 on every idle transition — all snoids face right when settling.
+	// IDA wBool_0x122=0 on every idle transition - all snoids face right when settling.
 	if (state == kSnoidAnimIdle) {
 		_isFacingLeft = false;
 		_needsIdleRedraw = true;
@@ -928,14 +928,14 @@ void ZmbSnoid::setAnimState(SnoidAnimState state, const Common::Point *pos) {
 	_animState = state;
 	_flipCounter = 0;
 
-	// IDA: animateZoombini_455E76 flip (state 3) initialisation — compute
-	// shadow shapes from trait-specific categories (425–445 range) and store
+	// IDA: animateZoombini_455E76 flip (state 3) initialisation - compute
+	// shadow shapes from trait-specific categories (425-445 range) and store
 	// in _flipShadowShapes[]. Each tick onSnoidAnimTick swaps the main
 	// hotspot shapes with these shadows for 6 ticks.
 	if (state == kSnoidAnimFlip) {
 		_shapeImageIdx = 1;
 		// Layer order: 0=foot, 1=body, 2=nose, 3=eye, 4=head.
-		// IDA: iLayer 0 → cFoot+435, 2 → cNose+440, 3 → cEye+430, 4 → cHead+425
+		// IDA: iLayer 0 -> cFoot+435, 2 -> cNose+440, 3 -> cEye+430, 4 -> cHead+425
 		// Layer 1 (body) always copies from main.
 		ZmbHotspotGroup *hsGroup = getHotspotGroup(0);
 		if (hsGroup && hsGroup->getHotspotCount() >= 5) {
@@ -1030,7 +1030,7 @@ static void calcPathSpeed(int16 dx, int16 dy, int16 &speedX, int16 &speedY) {
 }
 
 void ZmbSnoid::initWalkToTarget(const Common::Point &target) {
-	// IDA: animateZoombini(0, 7, core) — sets DEPARTING state which will
+	// IDA: animateZoombini(0, 7, core) - sets DEPARTING state which will
 	// initialise waypoint routing (or straight-line walk if no NODE data)
 	// and compute dynamic speed in the kSnoidAnimDepart tick handler.
 	_animTargetPos = target;
@@ -1125,7 +1125,7 @@ bool ZmbSnoid::onSnoidAnimTick(ZoombiniPage *page) {
 		// IDA LABEL_80: on first tick after re-entering idle, clear leftover
 		// wAnimBaseFlag00F5 (set to 1 by animateZoombini on idle entry) and
 		// mark redraw.  Note: chZmbAnimShapeCommonImageIdx (_shapeImageIdx) is
-		// intentionally NOT cleared here — the original preserves it across
+		// intentionally NOT cleared here - the original preserves it across
 		// idle ticks so the fidget set selection (A vs B) depends on walk history.
 		if (_needsIdleRedraw) {
 			_needsIdleRedraw = false;
@@ -1140,7 +1140,7 @@ bool ZmbSnoid::onSnoidAnimTick(ZoombiniPage *page) {
 				_idleTickCounter = 0;
 				if (_vm->_rnd->getRandomNumber(99) < 10) {
 					// IDA animateZoombini(kind=6): chZmbAnimShapeCommonImageIdx
-					// cycle: 0→set to 1 (Set A), 1→Set A, 2→Set B.
+					// cycle: 0->set to 1 (Set A), 1->Set A, 2->Set B.
 					if (_shapeImageIdx == 0)
 						_shapeImageIdx = 1;
 					_fidgetValue = _vm->_rnd->getRandomNumber(6);
@@ -1148,11 +1148,11 @@ bool ZmbSnoid::onSnoidAnimTick(ZoombiniPage *page) {
 					// IDA LABEL_52: play voice group 4 or 5 (50/50 random),
 					// matching the original "happy idle" sound trigger.
 					int16 voiceGroup = (_vm->_rnd->getRandomNumber(1) == 0) ? 4 : 5;
-					// IDA word_4B762C: preload SND 100–424 every 32 triggers.
+					// IDA word_4B762C: preload SND 100-424 every 32 triggers.
 					// Original engine cached sound data in memory for faster
 					// playback on 486-era hardware. ScummVM's archive system
 					// handles on-demand loading efficiently, so no actual
-					// preload I/O is needed — just maintain the counter state.
+					// preload I/O is needed - just maintain the counter state.
 					_vm->_fidgetSoundPreloadCounter = (_vm->_fidgetSoundPreloadCounter + 1) % 32;
 					int16 sndResId = getVoiceResId(voiceGroup);
 					if (sndResId > 0)
@@ -1203,12 +1203,12 @@ bool ZmbSnoid::onSnoidAnimTick(ZoombiniPage *page) {
 			}
 		}
 
-		// IDA: falls through to LABEL_80 (idle tick) — run fidget check in same tick.
+		// IDA: falls through to LABEL_80 (idle tick) - run fidget check in same tick.
 		// ScummVM fix: the original's render callback (snoidScript_renderFrame_4562B2)
 		// dynamically computes sprite shapes from wAnimHotspotSetIdx + chZmbAnimShapeCommonImageIdx,
 		// so the direct _animState = kSnoidAnimIdle above works transparently.
 		// ScummVM pre-bakes shapes into _hsFrameMap[0] via setupIdleHotspots(), so we must
-		// explicitly rebuild idle hotspots here — otherwise the walk-frame shapes remain
+		// explicitly rebuild idle hotspots here - otherwise the walk-frame shapes remain
 		// in _hsFrameMap[0] and the snoid appears stuck in the last walk frame.
 		if (_animState == kSnoidAnimIdle) {
 			_needsIdleRedraw = true;
@@ -1224,7 +1224,7 @@ bool ZmbSnoid::onSnoidAnimTick(ZoombiniPage *page) {
 
 	case kSnoidAnimFlip: {
 		// IDA case 3 (0x4531F8): swap the 5 shape-layer slots with the shadow
-		// slots each tick. After 6 swaps → idle. Does NOT fall through to redraw.
+		// slots each tick. After 6 swaps -> idle. Does NOT fall through to redraw.
 		if (_flipCounter >= 6) {
 			setAnimState(kSnoidAnimIdle);
 			_idleTickCounter = 0;
@@ -1246,16 +1246,16 @@ bool ZmbSnoid::onSnoidAnimTick(ZoombiniPage *page) {
 
 	case kSnoidAnimArrive: {
 		// IDA case 4 (0x45317E): teleport snoid to target, then enter arrivalTurnState.
-		// The original does NOT animate a walk; it just copies pos2→pos1 immediately.
+		// The original does NOT animate a walk; it just copies pos2->pos1 immediately.
 		needsRedraw = true;
 		Common::Point pos = getPointLoc();
 		if (pos == _animTargetPos) {
 			_idleTickCounter = 0;
-			// IDA: animateZoombini(0, word_4B6D4A, pZmb) — enter the global
+			// IDA: animateZoombini(0, word_4B6D4A, pZmb) - enter the global
 			// post-arrival turn-around state (0=idle, 1=turnRight, 2=turnLeft).
 			setAnimState(static_cast<SnoidAnimState>(_vm->_arrivalTurnState));
 		} else {
-			// IDA: *(a2+289)=1 (step-phase reset), *(a2+290)=0 (wBool_0x122=0 → facing RIGHT)
+			// IDA: *(a2+289)=1 (step-phase reset), *(a2+290)=0 (wBool_0x122=0 -> facing RIGHT)
 			// then copy target coordinates to current position (teleport)
 			_isFacingLeft = false;
 			setPointLoc(_animTargetPos);
@@ -1265,7 +1265,7 @@ bool ZmbSnoid::onSnoidAnimTick(ZoombiniPage *page) {
 
 	case kSnoidAnimDrag: {
 		// IDA case 5: Position is set externally by mouse handler.
-		// Use holding animation (SCRS 146–150) based on foot type.
+		// Use holding animation (SCRS 146-150) based on foot type.
 		// IDA: wGroupFrameIdx0098 advances each tick in snoidScript_renderFrame.
 		// When phase >= wScriptFrameCount, reset to frame 2 and loop (0 for small snoid).
 		// This cycles through all holding animation frames for feet animation.
@@ -1287,8 +1287,8 @@ bool ZmbSnoid::onSnoidAnimTick(ZoombiniPage *page) {
 
 	case kSnoidAnimFidget: {
 		// IDA case 6: play SCRS fidget frames (wGroupFrameIdx0098 advances each tick),
-		// then animateZoombini(0,0,...) → idle when wGroupFrameIdx0098 >= wScriptFrameCount.
-		// _shapeImageIdx=1 → set A (SCRS 130–136); _shapeImageIdx=2 → set B (SCRS 138–144).
+		// then animateZoombini(0,0,...) -> idle when wGroupFrameIdx0098 >= wScriptFrameCount.
+		// _shapeImageIdx=1 -> set A (SCRS 130-136); _shapeImageIdx=2 -> set B (SCRS 138-144).
 		needsRedraw = true;
 		if (page) {
 			int fidgetSet = (_shapeImageIdx >= 2) ? 1 : 0;
@@ -1416,9 +1416,9 @@ bool ZmbSnoid::onSnoidAnimTick(ZoombiniPage *page) {
 
 		if (dx == 0 && dy == 0) {
 			if (!advancePathSubTarget(page)) {
-				// Reached the final destination — enter arrivalTurnState, face right.
+				// Reached the final destination - enter arrivalTurnState, face right.
 				// IDA: wBool_0x122=0 on arrival (same as kSnoidAnimArrive teleport path).
-				// IDA: animateZoombini(0, word_4B6D4A, pZmb) — enter global turn-around state.
+				// IDA: animateZoombini(0, word_4B6D4A, pZmb) - enter global turn-around state.
 				_isFacingLeft = false;
 				_idleTickCounter = 0;
 				setAnimState(static_cast<SnoidAnimState>(_vm->_arrivalTurnState));
@@ -1428,7 +1428,7 @@ bool ZmbSnoid::onSnoidAnimTick(ZoombiniPage *page) {
 			}
 		} else {
 			// Speed (_animSpeedX/_animSpeedY) and direction (_walkDirBucket) are fixed for
-			// the current segment — set in kSnoidAnimDepart and when a waypoint is reached,
+			// the current segment - set in kSnoidAnimDepart and when a waypoint is reached,
 			// matching IDA's dVelocityXY / wAnimBaseFlag00F5 which are written only by
 			// snoidPath_stepAndComputeVelocity_4548DF and held constant mid-segment.
 			// Recomputing from the shrinking dx/dy each tick caused the slope to drift toward
@@ -1439,7 +1439,7 @@ bool ZmbSnoid::onSnoidAnimTick(ZoombiniPage *page) {
 				pos.x += (dx > 0) ? step : -step;
 				_isFacingLeft = (dx < 0);
 			}
-			// IDA: dy>=0 → curY--, dy<0 → curY++
+			// IDA: dy>=0 -> curY--, dy<0 -> curY++
 			if (dy != 0) {
 				int16 step = MIN<int16>(ABS(dy), ABS(_animSpeedY));
 				pos.y += (dy > 0) ? -step : step;
@@ -1504,7 +1504,7 @@ bool ZmbSnoid::onSnoidAnimTick(ZoombiniPage *page) {
 	}
 
 	case kSnoidAnimArrivalMotion:
-		// IDA case 10 (0x453255): calls animateZoombini_455E76(0, 7, ...) → kSnoidAnimDepart,
+		// IDA case 10 (0x453255): calls animateZoombini_455E76(0, 7, ...) -> kSnoidAnimDepart,
 		// increments the global "walkers in progress" counter, then returns.
 		// No redraw is set; the depart state picks up on the next tick.
 		setAnimState(kSnoidAnimDepart);
@@ -1564,7 +1564,7 @@ void ZmbSnoid::setupCurrentCommonImageHotspots() {
 void ZmbSnoid::setupIdleHotspots() {
 	// rawShapeFromData = 2: corresponds to SCRS_101 (index 1 in zmbAnimHotspotArr_4B7094),
 	// which is the idle/seated pose selected by animateZoombini_455E76 for wAnimKind==3.
-	// IDA forces chZmbAnimShapeCommonImageIdx=1 → SCRS_101 → shapeId=2 for all layers.
+	// IDA forces chZmbAnimShapeCommonImageIdx=1 -> SCRS_101 -> shapeId=2 for all layers.
 	// (rawShapeFromData=1 / SCRS_100 is a front/center-facing pose, not the seated idle.)
 	static constexpr uint16 kRawShapeIdle = 2;
 	setupCommonImageHotspots(kRawShapeIdle, false);
@@ -1713,9 +1713,9 @@ int16 ZmbSnoid::getVoiceResId(int16 voiceGroup) const {
 		return 0;
 
 	if (applyTraitOffset) {
-		// IDA disasm 0x4570b7: movsx edx, byte ptr [ebx+0BCh] → switch on traits._head (offset 0xBC).
+		// IDA disasm 0x4570b7: movsx edx, byte ptr [ebx+0BCh] -> switch on traits._head (offset 0xBC).
 		// ZmbTrait is at offset 0xBC in FeatureCore259: head(0xBC), eye(0xBD), nose(0xBE), foot(0xBF).
-		// Head encodes gender: heads 1–3 = male, 4–5 = female → distinct SND block offsets.
+		// Head encodes gender: heads 1-3 = male, 4-5 = female -> distinct SND block offsets.
 		uint8 head = _trait._head;
 		switch (head) {
 		case 2:
@@ -1733,14 +1733,14 @@ int16 ZmbSnoid::getVoiceResId(int16 voiceGroup) const {
 		default:
 			break; // head 0, 1: no additional offset
 		}
-		// IDA disasm 0x4570fa: movsx edx, byte ptr [ebx+0BEh] → add traits._nose (offset 0xBE).
+		// IDA disasm 0x4570fa: movsx edx, byte ptr [ebx+0BEh] -> add traits._nose (offset 0xBE).
 		base += static_cast<int16>(_trait._nose) - 1;
 	}
 
 	return base;
 }
 
-/** Compute IDA snoidPath_stepAndComputeVelocity_4548DF direction bucket (0–4) from a movement vector.
+/** Compute IDA snoidPath_stepAndComputeVelocity_4548DF direction bucket (0-4) from a movement vector.
  *  dy = curY - targetY (positive = target is above on screen).
  *  Slope thresholds are the IDA fixed-point values (<<10 scale).
  */
@@ -1805,9 +1805,9 @@ void ZmbSnoid::updateWalkHotspots(ZoombiniPage *page, int dirBucket, int phase) 
 	// IDA: zmb_setBodyLayerShapes: variant (wAnimKind from SCRS) determines slot layout.
 	// On direction change, the original calls zmb_setBodyLayerShapes(pNewDirHotspots->hsArr[0].shapeid, pZmb)
 	// which rearranges wArrBodyLayerShapeId[] based on the variant from the walk SCRS.
-	//   variant 0: [foot, body(0), nose, eye, head]  — dirs 0,1,2 (down/horizontal)
-	//   variant 1: [foot, nose, body(0), eye, head]  — dirs 3,4 (upward)
-	//   variant 2: [body(0), eye, nose, foot, head]  — (unused in walk anims)
+	//   variant 0: [foot, body(0), nose, eye, head] - dirs 0,1,2 (down/horizontal)
+	//   variant 1: [foot, nose, body(0), eye, head] - dirs 3,4 (upward)
+	//   variant 2: [body(0), eye, nose, foot, head] - (unused in walk anims)
 	int16 traitBase[5];
 	if (anim.variant == 1) {
 		traitBase[0] = static_cast<int16>(footTbl[foot]);
@@ -1883,8 +1883,8 @@ void ZmbSnoid::updateHoldingHotspots(ZoombiniPage *page) {
 	if (!page)
 		return;
 
-	// IDA: Holding (drag) uses SCRS 146–150, selected by foot type.
-	// wAnimHotspotSetIdx = pZmb->footTrait + 45 → foot 1 → index 46 → SCRS 146
+	// IDA: Holding (drag) uses SCRS 146-150, selected by foot type.
+	// wAnimHotspotSetIdx = pZmb->footTrait + 45 -> foot 1 -> index 46 -> SCRS 146
 	// Frame cycling: _holdingAnimPhase advances each tick in onSnoidAnimTick.
 	// IDA: wGroupFrameIdx0098 cycles through all frames, loops from 2 when >= frameCount.
 	static const uint16 kFootTable[6] = {0, 191, 246, 335, 360, 411};

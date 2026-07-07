@@ -124,6 +124,16 @@ bool MohawkEngine_Riven::hasFeature(EngineFeature f) const {
 
 #endif
 
+#ifdef ENABLE_ZOOMBINI
+
+bool MohawkEngine_Zoombini::hasFeature(EngineFeature f) const {
+	return
+		MohawkEngine::hasFeature(f)
+	        || (f == kSupportsChangingOptionsDuringRuntime);
+}
+
+#endif
+
 } // End of Namespace Mohawk
 
 class MohawkMetaEngine : public AdvancedMetaEngine<Mohawk::MohawkGameDescription> {
@@ -356,7 +366,7 @@ void MohawkMetaEngine::registerDefaultSettings(const Common::String &target) con
 
 #ifdef ENABLE_ZOOMBINI
 	if (gameId == "zoombini") {
-		Mohawk::MohawkMetaEngine_Zoombini::registerDefaultSettings();
+		return Mohawk::MohawkMetaEngine_Zoombini::registerDefaultSettings();
 	}
 #endif
 

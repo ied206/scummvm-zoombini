@@ -443,25 +443,25 @@ public:
 	// CFeatureRunnerBase structure (see runner_registerAndAllocate 0x45F60C):
 	//
 	//   Original pPreRenderFunc (+0x0C)
-	//     → _preRenderFunc: boolean gate hook that runs BEFORE the standard
+	//     -> _preRenderFunc: boolean gate hook that runs BEFORE the standard
 	//       pre-render logic (preRenderFeature). Return false to skip standard
 	//       logic entirely, modelling the original's "custom pre-render replaces
 	//       runner_preRenderStandard" pattern.
-	//     → _selectRenderFrameFunc: frame selection extracted from the standard
+	//     -> _selectRenderFrameFunc: frame selection extracted from the standard
 	//       pre-render logic. No separate original callback; the default
 	//       selectRenderFrame() mirrors the original's integrated frame advance.
 	//
 	//   Original onPreRenderShapeFunc (+0x14)
-	//     → _preRenderShapeFunc: called per-frame after hotspot data is parsed,
+	//     -> _preRenderShapeFunc: called per-frame after hotspot data is parsed,
 	//       before shape rendering. Direct equivalent.
 	//
 	//   Original pPostRenderFunc (+0x08)
-	//     → _renderFunc: shape blitting (default: blitShapes). Direct equivalent
+	//     -> _renderFunc: shape blitting (default: blitShapes). Direct equivalent
 	//       of runner_postRenderStandard.
-	//     → _postRenderFunc: additional processing after blit (ScummVM split).
+	//     -> _postRenderFunc: additional processing after blit (ScummVM split).
 	//
 	//   Original onHotspotShapeOrFrameFunc (+0x10)
-	//     → Modelled as the virtual method onFeatureAnimEvent() on ZoombiniPage,
+	//     -> Modelled as the virtual method onFeatureAnimEvent() on ZoombiniPage,
 	//       NOT as an EventHook. One-shot semantics (cleared after -1 fires)
 	//       are tracked by _animEndCallbackFired.
 	//
@@ -490,17 +490,17 @@ public:
 	 *
 	 * Render hooks map to the original engine's CFeatureRunnerBase callbacks
 	 * (runner_registerAndAllocate 0x45F60C). Input event hooks are ScummVM
-	 * extensions — the original dispatches input centrally via CPuzzleFuncTable.
+	 * extensions - the original dispatches input centrally via CPuzzleFuncTable.
 	 */
 	struct EventHooks {
-		// ── Render hooks (original engine equivalents) ────────────────
-		OnPreRenderFunc _preRenderFunc = nullptr;             ///< IDA: pPreRenderFunc (+0x0C) — boolean gate
+		// -- Render hooks (original engine equivalents) ----------------
+		OnPreRenderFunc _preRenderFunc = nullptr;             ///< IDA: pPreRenderFunc (+0x0C) - boolean gate
 		OnSelectRenderFrameFunc _selectRenderFrameFunc = nullptr; ///< Extracted from runner_preRenderStandard
 		OnPreRenderShapeFunc _preRenderShapeFunc = nullptr;   ///< IDA: onPreRenderShapeFunc (+0x14)
-		OnRenderFunc _renderFunc = nullptr;                   ///< IDA: pPostRenderFunc (+0x08) — shape blitting
+		OnRenderFunc _renderFunc = nullptr;                   ///< IDA: pPostRenderFunc (+0x08) - shape blitting
 		OnPostRenderFunc _postRenderFunc = nullptr;           ///< ScummVM split of pPostRenderFunc
 
-		// ── Input event hooks (ScummVM extensions) ────────────────────
+		// -- Input event hooks (ScummVM extensions) --------------------
 		OnMouseMoveFunc _mouseMoveFunc = nullptr;
 		OnLButtonDownFunc _lButtonDownFunc = nullptr;
 		OnLButtonUpFunc _lButtonUpFunc = nullptr;
@@ -528,7 +528,7 @@ public:
 		 */
 		void setPreRenderShapeFunc(OnPreRenderShapeFunc preRenderShapeFunc) { _preRenderShapeFunc = preRenderShapeFunc; }
 		/**
-		 * IDA: pPostRenderFunc (+0x08) — shape blitting.
+		 * IDA: pPostRenderFunc (+0x08) - shape blitting.
 		 * Default is blitShapes (runner_postRenderStandard equivalent).
 		 */
 		void setRenderFunc(OnRenderFunc renderFunc) { _renderFunc = renderFunc; }
@@ -538,7 +538,7 @@ public:
 		 */
 		void setPostRenderFunc(OnPostRenderFunc postRenderFunc) { _postRenderFunc = postRenderFunc; }
 
-		// ── Input event hook setters (ScummVM extensions) ─────────────
+		// -- Input event hook setters (ScummVM extensions) -------------
 
 		void setMouseMoveFunc(OnMouseMoveFunc mouseMoveFunc) { _mouseMoveFunc = mouseMoveFunc; }
 		void setLButtonDownFunc(OnLButtonDownFunc lButtonDownFunc) { _lButtonDownFunc = lButtonDownFunc; }
@@ -565,7 +565,7 @@ public:
 
 	/**
 	 * Pre-render pass: animation logic.
-	 * IDA: runner_preRenderStandard (0x4619A1) — runs BEFORE Z-sort.
+	 * IDA: runner_preRenderStandard (0x4619A1) - runs BEFORE Z-sort.
 	 * Calls custom preRender callback, advances frame selection, handles
 	 * end-of-cycle (CHAIN_SCRIPT, PLAY_ONCE), per-frame flag checks
 	 * (SKIP_RENDER, SKIP_ONCE), and sound dispatch.
@@ -575,7 +575,7 @@ public:
 
 	/**
 	 * Post-render pass: shape blitting + custom postRender callback.
-	 * IDA: runner_postRenderStandard (0x46182F) — runs AFTER Z-sort.
+	 * IDA: runner_postRenderStandard (0x46182F) - runs AFTER Z-sort.
 	 * Blits shapes to screen and calls custom postRender callback.
 	 * @param page The page to render to
 	 * @return kRendered if shapes were drawn, kSkipped if render is deactivated
@@ -731,7 +731,7 @@ public:
 	void deactivateAnimate();
 	void setSelectRenderFrameFunc(OnSelectRenderFrameFunc func);
 
-	// IDA: chGetDrawnRect — dirty-rect tracking for the render pipeline.
+	// IDA: chGetDrawnRect - dirty-rect tracking for the render pipeline.
 	bool needsRedraw() const { return _needsRedraw; }
 	void setNeedsRedraw(bool v) { _needsRedraw = v; }
 
@@ -750,7 +750,7 @@ public:
 	 * defaultSelectRenderFrame(), used by preRenderFeature() to gate all
 	 * animation processing (matching the original where the timing gate wraps
 	 * the entire function body).  Custom selectRenderFrame hooks leave this
-	 * as true (no timing gate — the hook drives frame advancement directly).
+	 * as true (no timing gate - the hook drives frame advancement directly).
 	 */
 	bool isFrameTimingReady() const { return _frameTimingReady; }
 	/** Reset dNextRenderFrame to 0 so the timing gate passes on the next tick. */
@@ -932,7 +932,7 @@ private:
 	int32 _lastShapeFrameIdx = 0;
 	int32 _lastSoundedFrameIdx = -1;
 	/**
-	 * IDA: dNextRenderFrame — absolute frame counter at which the next
+	 * IDA: dNextRenderFrame - absolute frame counter at which the next
 	 * animation advance is allowed.  Compared as _nextRenderFrame <= currentFrameCounter.
 	 */
 	uint32 _nextRenderFrame = 0;
@@ -993,7 +993,7 @@ private:
 uint16BE  numFrames       // Number of animation frames (1–203)
 uint16BE  variant         // Snoid script variant (see below)
 
-// Repeated numFrames times — identical to SCRB entry format:
+// Repeated numFrames times - identical to SCRB entry format:
 Frame[] {
     Entry[] {
         sint16BE  shapeId   // If >= 0: shape index. If < 0: frame terminator.
@@ -1018,9 +1018,9 @@ Frame[] {
 | 3 | (variant 3) | 59 | FLEENS only |
 | 65535 | (special) | 2 | NET (1), SMOKE (1) |
 
-1. **Variant is not just NORMAL/REJECT** — there are 5 distinct values `{0, 1, 2, 3, 0xFFFF}`, not just 2 as originally stated.
+1. **Variant is not just NORMAL/REJECT** - there are 5 distinct values `{0, 1, 2, 3, 0xFFFF}`, not just 2 as originally stated.
 
-2. **Frame terminators go beyond `FF00`/`FE00`** — many `0xFFxx` terminators carry non-zero low bytes (e.g., `0xFF15`, `0xFFD6`, `0xFFC9`). These are puzzle/page-specific and likely encode additional frame metadata. The `0xFExx` terminators still follow the SCRB convention of reading an extra sint16 sound resource ID.
+2. **Frame terminators go beyond `FF00`/`FE00`** - many `0xFFxx` terminators carry non-zero low bytes (e.g., `0xFF15`, `0xFFD6`, `0xFFC9`). These are puzzle/page-specific and likely encode additional frame metadata. The `0xFExx` terminators still follow the SCRB convention of reading an extra sint16 sound resource ID.
 
 3. **Entries per frame vary**: 0, 1, 5, 6, 7, 9, 10, 13, or 20 entries per frame
 */
@@ -1031,8 +1031,8 @@ Frame[] {
  */
 enum SnoidAnimState : uint8 {
 	kSnoidAnimIdle = 0,           ///< Idle: periodically rolls fidget chance (10%)
-	kSnoidAnimTurnRight = 1,      ///< Turn-around right: post-arrival facing flip (right→left), then idle
-	kSnoidAnimTurnLeft = 2,       ///< Turn-around left: post-arrival facing flip (left→right), then idle
+	kSnoidAnimTurnRight = 1,      ///< Turn-around right: post-arrival facing flip (right->left), then idle
+	kSnoidAnimTurnLeft = 2,       ///< Turn-around left: post-arrival facing flip (left->right), then idle
 	kSnoidAnimFlip = 3,           ///< Flipping: swaps shape layers for 6 frames
 	kSnoidAnimArrive = 4,         ///< Arriving: moves to target, then transitions to idle
 	kSnoidAnimDrag = 5,           ///< Being dragged by cursor
@@ -1274,7 +1274,7 @@ public:
 	/**
 	 * Per-snoid SCRS animation cycle counter. Incremented by the page's
 	 * onFeatureAnimEvent when event code 0 fires (facing toggle).
-	 * IDA: *(callbackData + 288) — reuses chPathWalkDir byte during SCRS playback.
+	 * IDA: *(callbackData + 288) - reuses chPathWalkDir byte during SCRS playback.
 	 */
 	uint8 _scrsAnimCycleCount = 0;
 
@@ -1295,7 +1295,7 @@ public:
 	 *   1 = reject-walk (snoid is animating a reject return; cannot be re-grabbed)
 	 *   2 = arrived (snoid finished crossing; cannot be re-dragged on Bridge)
 	 *   3-4 = puzzle-specific transient states
-	 *   8 = reserved (Bridge `pcStr1[8] != 8` guard — used as "not yet engaged")
+	 *   8 = reserved (Bridge `pcStr1[8] != 8` guard - used as "not yet engaged")
 	 *
 	 * The byte gates drag operations: onLButtonDown checks this to refuse
 	 * drag attempts on snoids in transient/non-idle states.
@@ -1342,19 +1342,19 @@ private:
 	 * on flip entry, then swapped with main hotspot shapes each tick for 6 ticks.
 	 */
 	int16 _flipShadowShapes[5] = {0, 0, 0, 0, 0};
-	/** Random fidget variant value (0–6, maps to wAnimBaseFlag00F5; selects SCRS 130–136 or 138–144). */
+	/** Random fidget variant value (0-6, maps to wAnimBaseFlag00F5; selects SCRS 130-136 or 138-144). */
 	uint16 _fidgetValue = 0;
 	/**
 	 * IDA chZmbAnimShapeCommonImageIdx (*(a2+293)): tracks animation image state.
 	 * 0 = freshly-entered idle (cleared each idle tick), 1 = normal animated state,
 	 * 2 = flipped/variant state (set by kSnoidAnimFlip when implemented).
-	 * Determines which fidget set is used: 1→set A (SCRS 130–136), 2→set B (SCRS 138–144).
+	 * Determines which fidget set is used: 1->set A (SCRS 130-136), 2->set B (SCRS 138-144).
 	 */
 	uint8 _shapeImageIdx = 0;
 	/**
 	 * Holding animation frame index during drag: 0=middle, 1=left, 2=right.
 	 * Updated by onMouseMove based on movement direction.
-	 * IDA: Frame selection in drag state uses chZmbAnimShapeCommonImageIdx (0→0, 1→1, 2→2).
+	 * IDA: Frame selection in drag state uses chZmbAnimShapeCommonImageIdx (0->0, 1->1, 2->2).
 	 */
 	uint8 _holdingFrameIdx = 0;
 	/**

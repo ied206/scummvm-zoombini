@@ -264,7 +264,7 @@ void ZoombiniGameState::buildNameGeneratedTable() {
 	memset(_zoombiniNameGeneratedTable, 0, sizeof(_zoombiniNameGeneratedTable));
 
 	// v1.1 English ZOOMBINI.MHK does not contain STRL 30000-30006 (the name pool).
-	// The original engine never rebuilt this table from save data anyway — it is
+	// The original engine never rebuilt this table from save data anyway - it is
 	// session-only.  Skip the reverse-lookup rebuild and leave the table zeroed.
 	if (!_vm->hasResource(ID_STRL, ZmbResource(ZmbArchiveKind::kSystem, ZoombiniPage::kResStrl30000_ZoombiniNames)))
 		return;
@@ -293,7 +293,7 @@ void ZoombiniGameState::buildNameGeneratedTable() {
 	}
 
 	// Scan stored chunks (BC1, BC2, Town).
-	// Entries at arbitrary positions — check for any non-zero name byte.
+	// Entries at arbitrary positions - check for any non-zero name byte.
 	ZmbStateStoredChunk *chunks[] = {&_f._storedChunkBC1, &_f._storedChunkBC2, &_f._storedChunkTown};
 	for (uint32 c = 0; c < ARRAYSIZE(chunks); c++) {
 		for (int i = 0; i < ARRAYSIZE(chunks[c]->_entries); i++) {
@@ -1062,7 +1062,7 @@ void ZoombiniGameState::setCursorVisible(bool val) {
 
 int16 ZoombiniGameState::generateRandomPack() {
 	// Generate 16 snoids with random traits (1-5 each).
-	// IDA: puzzleRodMap_maybeOnClickPuzzleIcon_42A9D6 — practice mode Zoombini generation.
+	// IDA: puzzleRodMap_maybeOnClickPuzzleIcon_42A9D6 - practice mode Zoombini generation.
 	ZmbStateActivePack &pack = _f._zmbPackActive;
 	const int16 previousOccupiedCount = countOccupiedSnoidsInPack(pack);
 	pack._wPackZmbCount = 16;

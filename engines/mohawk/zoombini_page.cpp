@@ -47,6 +47,37 @@ ZoombiniPage::~ZoombiniPage() {
 	clear();
 }
 
+ZoombiniPage::KeyboardNavDirection ZoombiniPage::getKeyboardNavDirection(const Common::KeyState &kbd) {
+	switch (kbd.keycode) {
+	case Common::KEYCODE_LEFT:
+		return KBD_NAV_LEFT;
+	case Common::KEYCODE_KP4:
+		return (kbd.flags & Common::KBD_NUM) == 0 ? KBD_NAV_LEFT : KBD_NAV_NONE;
+	case Common::KEYCODE_RIGHT:
+		return KBD_NAV_RIGHT;
+	case Common::KEYCODE_KP6:
+		return (kbd.flags & Common::KBD_NUM) == 0 ? KBD_NAV_RIGHT : KBD_NAV_NONE;
+	case Common::KEYCODE_UP:
+		return KBD_NAV_UP;
+	case Common::KEYCODE_KP8:
+		return (kbd.flags & Common::KBD_NUM) == 0 ? KBD_NAV_UP : KBD_NAV_NONE;
+	case Common::KEYCODE_DOWN:
+		return KBD_NAV_DOWN;
+	case Common::KEYCODE_KP2:
+		return (kbd.flags & Common::KBD_NUM) == 0 ? KBD_NAV_DOWN : KBD_NAV_NONE;
+	case Common::KEYCODE_PAGEUP:
+		return KBD_NAV_PAGEUP;
+	case Common::KEYCODE_KP9:
+		return (kbd.flags & Common::KBD_NUM) == 0 ? KBD_NAV_PAGEUP : KBD_NAV_NONE;
+	case Common::KEYCODE_PAGEDOWN:
+		return KBD_NAV_PAGEDOWN;
+	case Common::KEYCODE_KP3:
+		return (kbd.flags & Common::KBD_NUM) == 0 ? KBD_NAV_PAGEDOWN : KBD_NAV_NONE;
+	default:
+		return KBD_NAV_NONE;
+	}
+}
+
 void ZoombiniPage::onAnimFrame() {
 	// Tick every snoid's animation state machine before rendering.
 	// IDA: onRender_ZoombiniAnimation_452B9C is invoked once per animation frame per snoid.
@@ -232,7 +263,7 @@ ZmbEventHandleResult ZoombiniPage::onKeyUp(const Common::KeyState &kbd, bool kbd
 }
 
 ZmbEventHandleResult ZoombiniPage::onQuit() {
-	// No per-feature quit dispatch — the original engine has no per-feature
+	// No per-feature quit dispatch - the original engine has no per-feature
 	// quit callback. Page subclasses can override this for custom cleanup.
 	return ZmbEventHandleResult::kPassthrough;
 }
@@ -254,7 +285,7 @@ ZmbFeature *ZoombiniPage::loadVirtualFeature(ZmbResource imgResource, uint16 run
 }
 
 ZmbFeature *ZoombiniPage::registerFeature(ZoombiniPage *page, ZmbFeatureList<ZmbFeature> &featureList, ZmbResource imgResource, uint16 scrbId, uint32 frameInterval, const Common::Point &pointRef, uint32 flags, bool isPhysicalScrb, const Common::Array<ZmbHotspot> *virtualHotspots, const ZmbFeature::EventHooks &eventHooks) {
-	// IDA: runner_registerAndAllocate (0x45F60C) — auto-generates a unique
+	// IDA: runner_registerAndAllocate (0x45F60C) - auto-generates a unique
 	// wFeatureRunnerIdx per runner; multiple runners may share the same wResId.
 	// We allow duplicate scrbId keys in the feature list to match that behavior.
 
@@ -262,7 +293,7 @@ ZmbFeature *ZoombiniPage::registerFeature(ZoombiniPage *page, ZmbFeatureList<Zmb
 	featureList.insert(scrbId, feature);
 	feature->setRegistrationIndex(page->_nextRegistrationIndex++);
 
-	// IDA: runner_registerAndAllocate (0x45F60C) — when wResId (scrbId) is
+	// IDA: runner_registerAndAllocate (0x45F60C) - when wResId (scrbId) is
 	// non-zero the SCRB resource is loaded onto the runner.  When wResId == 0
 	// the runner is a callback-only runner (no SCRB data) that relies entirely
 	// on its preRender/postRender callbacks for drawing.
@@ -281,7 +312,7 @@ ZmbFeature *ZoombiniPage::registerFeature(ZoombiniPage *page, ZmbFeatureList<Zmb
 	feature->setEventHooks(eventHooks);
 
 	// Binary: registerSCRB_45F60C calls onPreRenderSRCB_standard immediately for
-	// FLAG_00002000_DRAW_ON_REG features, which invokes loadSCRB_460384 → updates
+	// FLAG_00002000_DRAW_ON_REG features, which invokes loadSCRB_460384 -> updates
 	// clickRect from the drawn output. This gives the feature a valid sort rect
 	// for the very first frame's Z-sort, before the regular render loop runs.
 	if (feature->hasFlag(ZmbFeature::FLAG_00002000_DRAW_ON_REG)) {
@@ -290,7 +321,7 @@ ZmbFeature *ZoombiniPage::registerFeature(ZoombiniPage *page, ZmbFeatureList<Zmb
 			renderFunc = &ZoombiniPage::blitShapes;
 		(page->*renderFunc)(feature);
 
-		// IDA: runner_registerAndAllocate (0x45F7A1) — auto-populate draw-on-reg
+		// IDA: runner_registerAndAllocate (0x45F7A1) - auto-populate draw-on-reg
 		// slot when FLAG_DRAW_ON_REG is set. Stores runner ID and registration
 		// position as snap position. Pages with custom snap offsets (e.g. ferry)
 		// call setDrawOnRegSnapPosition() afterwards to override.
@@ -345,7 +376,7 @@ void ZoombiniPage::unloadScrbFeature(ZmbFeature *feature) {
 }
 
 void ZoombiniPage::loadScrbOntoFeature(ZmbFeature *feature, uint16 newScrbId, bool scheduleRender) {
-	// IDA: scrb_loadOnRunner (0x460384) — page-level convenience wrapper.
+	// IDA: scrb_loadOnRunner (0x460384) - page-level convenience wrapper.
 	// Resolves the SCRB resource and delegates to ZmbFeature::loadScrbData().
 	if (!feature)
 		return;
@@ -412,10 +443,10 @@ void ZoombiniPage::loadREGS(ZmbArchiveKind archiveKind, uint16 baseResId) {
 
 /**
  * Categorize the feature into one of the 4 render groups based on its flags.
- * IDA: runner_zsortPartitionAndSort (0x4608AF) — check order matters.
+ * IDA: runner_zsortPartitionAndSort (0x4608AF) - check order matters.
  *
- * Priority: LOOP_ANIM → pre-existing OVERLAY → entity type → normalList.
- * LOOP_ANIM is checked FIRST — SCRB features with LOOP_ANIM go to loopAnimList
+ * Priority: LOOP_ANIM -> pre-existing OVERLAY -> entity type -> normalList.
+ * LOOP_ANIM is checked FIRST - SCRB features with LOOP_ANIM go to loopAnimList
  * (unsorted, rendered behind sorted entries). Snoids must NOT have LOOP_ANIM;
  * they should have bare TYPE_SNOID (0x1) so the exact-match check routes them
  * to entityList for proper depth sorting by (bottom, left).
@@ -423,17 +454,17 @@ void ZoombiniPage::loadREGS(ZmbArchiveKind archiveKind, uint16 baseResId) {
 void ZoombiniPage::categorizeFeature(ZmbFeature *feature, Common::Array<ZmbFeature *> &loopAnimList, Common::Array<ZmbFeature *> &overlayList, Common::Array<ZmbFeature *> &normalList, Common::Array<ZmbFeature *> &entityList) {
 	// IDA runner_zsortPartitionAndSort 0x4608AF: check order matters.
 	// LOOP_ANIM is for SCRB features only. Snoids use bare TYPE_SNOID (0x1)
-	// → entityList (sorted by depth). See zmb_registerSnoidFeatureRunner 0x452A64.
+	// -> entityList (sorted by depth). See zmb_registerSnoidFeatureRunner 0x452A64.
 	if (feature->hasFlag(ZmbFeature::FLAG_00008000_LOOP_ANIM)) {
 		loopAnimList.push_back(feature);
 	} else if (feature->hasFlag(ZmbFeature::FLAG_04000000_OVERLAY)) {
-		// IDA 0x460902: pre-existing OVERLAY flag → overlayList.
+		// IDA 0x460902: pre-existing OVERLAY flag -> overlayList.
 		// The original engine adds these to the overlay linked list which
 		// preserves the previous frame's Z-sort order. In ScummVM we
 		// collect them here and reorder via _cachedOverlayOrder later.
 		overlayList.push_back(feature);
 	} else if (feature->getFlags() == ZmbFeature::FLAG_00000001_TYPE_SNOID || feature->getFlags() == ZmbFeature::FLAG_00000002_TYPE_TOWN_ENTITY) {
-		// IDA 0x46092C: entity type → entityList.
+		// IDA 0x46092C: entity type -> entityList.
 		// Binary uses exact 32-bit match: `cmp dword ptr [eax+20h], 1` / `cmp dword ptr [eax+20h], 2`.
 		// Only bare TYPE_SNOID (0x1) or TYPE_TOWN_ENTITY (0x2) with NO other flags.
 		// Snoids with additional flags (e.g., POS_DELTA 0x800001) go to normalList.
@@ -466,7 +497,7 @@ void ZoombiniPage::insertionSortFeatures(Common::Array<ZmbFeature *> &list) {
 		return;
 
 	// IDA zsort_insertionSortByDepthAndX (0x4609F7):
-	// 1. Extract TOPMOST items — they are always appended at the tail.
+	// 1. Extract TOPMOST items - they are always appended at the tail.
 	// 2. Insertion-sort the remaining items ascending by (bottom, left).
 	// Non-TOPMOST incoming walks past ALL existing nodes (including TOPMOST ones
 	// in the IDA implementation) without barrier behavior.  Since we extracted
@@ -514,10 +545,10 @@ void ZoombiniPage::insertionSortFeatures(Common::Array<ZmbFeature *> &list) {
  *
  * Binary behavior:
  * - Skips past LOOP_ANIM entries in existing list (scan starts after them)
- * - TOPMOST incoming → append at tail
- * - TOPMOST existing → insert incoming before it
- * - Sort key match → check ZSORT constraints on existing entry:
- *   - No vertical overlap (incoming.bottom < existing.top) → always allow
+ * - TOPMOST incoming -> append at tail
+ * - TOPMOST existing -> insert incoming before it
+ * - Sort key match -> check ZSORT constraints on existing entry:
+ *   - No vertical overlap (incoming.bottom < existing.top) -> always allow
  *   - ZSORT_LEFT:   block if incoming.left < existing.left
  *   - ZSORT_RIGHT:  block if incoming.right > existing.right
  *   - ZSORT_BOTTOM: block if incoming.top < existing.top
@@ -533,12 +564,12 @@ void ZoombiniPage::mergeSortedListInto(Common::Array<ZmbFeature *> &existingList
 		return;
 
 	// Find scan start: skip past LOOP_ANIM entries in existing list.
-	// IDA 0x460AE7: while ([eax+21h] & 0x80) skip — LOOP_ANIM only.
+	// IDA 0x460AE7: while ([eax+21h] & 0x80) skip - LOOP_ANIM only.
 	//
 	// The Z-sort interleaving between overlay items and entities is correct:
 	// overlay items with higher sort keys (e.g. bottom shapes at Y=480) draw
 	// AFTER entities with lower sort keys (snoids at Y≈375), making foreground
-	// foliage cover snoid feet — matching the original engine.  The render clip
+	// foliage cover snoid feet - matching the original engine.  The render clip
 	// rect (dirty bounding box) confines all drawing to the dirty region, so
 	// non-dirty features' previous-frame pixels persist on the shape-screen.
 	uint32 scanStart = 0;
@@ -553,7 +584,7 @@ void ZoombiniPage::mergeSortedListInto(Common::Array<ZmbFeature *> &existingList
 	for (uint32 k = 0; k < incomingList.size(); k++) {
 		ZmbFeature *incoming = incomingList[k];
 
-		// TOPMOST incoming: append at tail (IDA 0x460B3D–0x460B5C).
+		// TOPMOST incoming: append at tail (IDA 0x460B3D-0x460B5C).
 		if (incoming->hasFlag(ZmbFeature::FLAG_00001000_TOPMOST)) {
 			existingList.push_back(incoming);
 			continue;
@@ -566,7 +597,7 @@ void ZoombiniPage::mergeSortedListInto(Common::Array<ZmbFeature *> &existingList
 		for (uint32 i = scanPos; i < existingList.size(); i++) {
 			ZmbFeature *existing = existingList[i];
 
-			// TOPMOST existing: insert incoming before it (IDA 0x460B69–0x460B7F).
+			// TOPMOST existing: insert incoming before it (IDA 0x460B69-0x460B7F).
 			if (existing->hasFlag(ZmbFeature::FLAG_00001000_TOPMOST)) {
 				insertPos = i;
 				found = true;
@@ -575,7 +606,7 @@ void ZoombiniPage::mergeSortedListInto(Common::Array<ZmbFeature *> &existingList
 
 			// IDA 0x460B84: the original linked-list merge checks `v4->pNext`
 			// BEFORE comparing sort keys. When v4 is the LAST entry (pNext==NULL),
-			// it unconditionally appends the incoming entity after it — no sort key
+			// it unconditionally appends the incoming entity after it - no sort key
 			// or ZSORT constraint check. This is critical for ferry seats: a snoid
 			// whose bounding box fits inside the seat would otherwise pass all
 			// ZSORT constraints and be inserted BEFORE (behind) the seat.
@@ -596,10 +627,10 @@ void ZoombiniPage::mergeSortedListInto(Common::Array<ZmbFeature *> &existingList
 			if (!candidatePosition)
 				continue;
 
-			// ZSORT constraint check on existing entry (IDA 0x460BCE–0x460C0F).
+			// ZSORT constraint check on existing entry (IDA 0x460BCE-0x460C0F).
 			uint32 exFlags = existing->getFlags();
 
-			// No vertical overlap → always allow (IDA 0x460BD5: jl → 0x460C11).
+			// No vertical overlap -> always allow (IDA 0x460BD5: jl -> 0x460C11).
 			bool noVerticalOverlap = inRect.bottom < exRect.top;
 
 			if (!noVerticalOverlap) {
@@ -634,8 +665,8 @@ void ZoombiniPage::mergeSortedListInto(Common::Array<ZmbFeature *> &existingList
  * Build the final render list matching the binary's exact merge order:
  *   1. Partition into loopAnimList, overlayList, normalList, entityList
  *   2. Assemble combined = loopAnimList + overlayList (unsorted)
- *   3. Sort normalList → merge into combined (with ZSORT constraints)
- *   4. Sort entityList → merge into combined (with ZSORT constraints)
+ *   3. Sort normalList -> merge into combined (with ZSORT constraints)
+ *   4. Sort entityList -> merge into combined (with ZSORT constraints)
  *
  * Both merge passes use zsort_mergeEntityListIntoSortedList (0x460AD5),
  * which interleaves entries by sort key while respecting ZSORT protection
@@ -643,7 +674,7 @@ void ZoombiniPage::mergeSortedListInto(Common::Array<ZmbFeature *> &existingList
  * with overlay entries (not kept strictly separate).
  */
 void ZoombiniPage::syncManualOrder() {
-	// Drop entries whose features were deregistered (paranoia — the delete
+	// Drop entries whose features were deregistered (paranoia - the delete
 	// paths call manualOrderErase(), but a stale pointer here would be fatal).
 	// Then append, in registration-index order, any live feature not yet in
 	// the manual list (mirrors runner_registerAndAllocate appending new
@@ -720,7 +751,7 @@ void ZoombiniPage::manualLinkAfter(ZmbFeature *feature, ZmbFeature *target) {
 }
 
 void ZoombiniPage::buildSortedRenderList(Common::Array<ZmbFeature *> &outList) {
-	// Manual z-order mode (IDA unk_4A7998 == 0): no positional sorting at all —
+	// Manual z-order mode (IDA unk_4A7998 == 0): no positional sorting at all -
 	// render in registration order as adjusted by manualLinkBefore/After.
 	//
 	// TOPMOST features are still moved to the tail: the binary's drag system
@@ -746,7 +777,7 @@ void ZoombiniPage::buildSortedRenderList(Common::Array<ZmbFeature *> &outList) {
 	Common::Array<ZmbFeature *> loopAnimList, overlayList, normalList, entityList;
 
 	// Step 1: Categorize features into render buckets.
-	// IDA check order: LOOP_ANIM → pre-existing OVERLAY → entity type → normalList.
+	// IDA check order: LOOP_ANIM -> pre-existing OVERLAY -> entity type -> normalList.
 	for (ZmbFeature *f : _scrbFeatures)
 		categorizeFeature(f, loopAnimList, overlayList, normalList, entityList);
 	for (ZmbFeature *f : _subFeatures)
@@ -770,7 +801,7 @@ void ZoombiniPage::buildSortedRenderList(Common::Array<ZmbFeature *> &outList) {
 	// We replicate this by:
 	//   1. Keeping non-snoid LOOP_ANIM features in their collected order.
 	//   2. Sorting arrived snoids by their SEAT (_animTargetPos) ascending by
-	//      (y, x).  Using the stable seat — not the live drawn rect — keeps the
+	//      (y, x).  Using the stable seat - not the live drawn rect - keeps the
 	//      order fixed while a snoid plays its celebration jump SCRS (whose
 	//      frames temporarily move the drawn rect upward).
 	if (!loopAnimList.empty()) {
@@ -836,12 +867,12 @@ void ZoombiniPage::buildSortedRenderList(Common::Array<ZmbFeature *> &outList) {
 		outList.push_back(feature);
 
 	// Step 4: Sort normalList (newly categorized features), merge into combined.
-	// IDA 0x4609BE–0x4609D2: insertionSort(normalList) → merge(sorted, combined)
+	// IDA 0x4609BE-0x4609D2: insertionSort(normalList) -> merge(sorted, combined)
 	insertionSortFeatures(normalList);
 	mergeSortedListInto(outList, normalList);
 
 	// Step 5: Sort entityList, merge into combined.
-	// IDA 0x4609D7–0x4609EB: insertionSort(entityList) → merge(sorted, combined)
+	// IDA 0x4609D7-0x4609EB: insertionSort(entityList) -> merge(sorted, combined)
 	insertionSortFeatures(entityList);
 	mergeSortedListInto(outList, entityList);
 
@@ -1277,7 +1308,7 @@ void ZoombiniPage::renderFeatures() {
 		feature->setNeedsRedraw(false);
 	}
 
-	// IDA 0x45F3D3: port_selectActiveRegion(0) — release clip region.
+	// IDA 0x45F3D3: port_selectActiveRegion(0) - release clip region.
 	_vm->_gfx->clearRenderClipRect();
 }
 
@@ -1318,13 +1349,13 @@ void ZoombiniPage::checkCloseFeatures() {
 
 /**
  * Pre-render pass for a single feature: animation logic.
- * IDA: runner_preRenderStandard (0x4619A1) — called for ALL features
+ * IDA: runner_preRenderStandard (0x4619A1) - called for ALL features
  * BEFORE Z-sorting in gfx_renderFrame (0x45F070).
  *
  * Order of operations matches the binary:
  *   1. Frame selection (advance animation via incremental ++)
  *   2. End-of-cycle handling (CHAIN_SCRIPT, PLAY_ONCE)
- *      — end-of-cycle and frame advance are MUTUALLY EXCLUSIVE in the
+ *      - end-of-cycle and frame advance are MUTUALLY EXCLUSIVE in the
  *      original.  Here, defaultSelectRenderFrame increments past _frameIdxMax
  *      to signal end-of-cycle, and the handler resets _lastFrameIdx to 0.
  *   3. Sound dispatch (using the final _lastFrameIdx after any reset)
@@ -1337,21 +1368,21 @@ void ZoombiniPage::preRenderFeature(ZmbFeature *feature) {
 	if (!feature->isRenderActivated())
 		return;
 
-	// 1. Frame selection — advance animation state
-	// IDA 0x461D60–0x461D6F: frame advancement (wGroupFrameIdx++)
+	// 1. Frame selection - advance animation state
+	// IDA 0x461D60-0x461D6F: frame advancement (wGroupFrameIdx++)
 	// defaultSelectRenderFrame increments _lastFrameIdx.  When _lastFrameIdx
 	// goes past _frameIdxMax, isEndOfAnimationCycle() returns true below.
 	// It also sets _frameTimingReady (IDA: wBoolDoRender[0] local at 0x461B0C).
 	int32 frameIdx = feature->onSelectRenderFrame(this);
-	// Store result — custom selectRenderFrame hooks may not call setLastFrameIdx themselves.
+	// Store result - custom selectRenderFrame hooks may not call setLastFrameIdx themselves.
 	feature->setLastFrameIdx(frameIdx);
 
-	// IDA 0x4619F5–0x461B12: timing gate.
+	// IDA 0x4619F5-0x461B12: timing gate.
 	// In the original, wBoolDoRender[0] (local) is computed from the
 	// dNextRenderFrame timing check, optionally modulated by the paired
 	// hotspot slot system (wHotspotIdxToDraw / hotspot_renderPhaseArr).
 	// Without paired slots, it reduces to dNextRenderFrame <= currentTime.
-	// When timing is not ready, the original returns here — no end-of-cycle,
+	// When timing is not ready, the original returns here - no end-of-cycle,
 	// no dirty rect merge, no sound dispatch, no flag checks.
 	if (!feature->isFrameTimingReady())
 		return;
@@ -1381,7 +1412,7 @@ void ZoombiniPage::preRenderFeature(ZmbFeature *feature) {
 
 		if (feature->isEndOfAnimationCycle()) {
 
-			// IDA 0x461C13: CHAIN_SCRIPT — swap SCRB data on the same feature
+			// IDA 0x461C13: CHAIN_SCRIPT - swap SCRB data on the same feature
 			if (feature->hasFlag(ZmbFeature::FLAG_00040000_CHAIN_SCRIPT)) {
 				int16 chainedId = feature->getChainedScrbId();
 				if (chainedId != 0) {
@@ -1393,11 +1424,11 @@ void ZoombiniPage::preRenderFeature(ZmbFeature *feature) {
 						loadScrbOntoFeature(feature, static_cast<uint16>(-chainedId));
 						feature->addFlag(ZmbFeature::FLAG_02000000_RANDOM_FRAME);
 					}
-					// IDA 0x461C6C: DRAW_ON_REG → disable render after chain
+					// IDA 0x461C6C: DRAW_ON_REG -> disable render after chain
 					if (feature->hasFlag(ZmbFeature::FLAG_00002000_DRAW_ON_REG))
 						feature->deactivateRender();
 				}
-				// IDA 0x461C7F: if frame count < 2 → disable render
+				// IDA 0x461C7F: if frame count < 2 -> disable render
 				if (feature->getMaxFrameIdx() < 1)
 					feature->deactivateRender();
 				// IDA 0x461C8A–0x461C93: wGroupFrameIdx=0, dwHotspotIdx=1
@@ -1406,7 +1437,7 @@ void ZoombiniPage::preRenderFeature(ZmbFeature *feature) {
 				didChainScript = true;
 			}
 
-			// IDA 0x461CA3: PLAY_ONCE — stop rendering at end of cycle
+			// IDA 0x461CA3: PLAY_ONCE - stop rendering at end of cycle
 			if (feature->hasFlag(ZmbFeature::FLAG_00100000_PLAY_ONCE)) {
 				// IDA 0x461CDD: pFeatureRunner->core188.wBoolDoRender = 0
 				feature->deactivateRender();
@@ -1439,7 +1470,7 @@ void ZoombiniPage::preRenderFeature(ZmbFeature *feature) {
 					if (!feature->hasAnimEndCallbackFired()) {
 						// Save the SCRB load generation before firing the callback.
 						// If the callback loads a new SCRB on this feature (e.g.
-						// intro → ambient transition), loadScrbData increments the
+						// intro -> ambient transition), loadScrbData increments the
 						// generation and resets _animEndCallbackFired to false.
 						// We must NOT mark the fresh SCRB's callback as fired.
 						uint32 genBefore = feature->getScrbLoadGeneration();
@@ -1450,8 +1481,8 @@ void ZoombiniPage::preRenderFeature(ZmbFeature *feature) {
 					return;
 				}
 			} else if (!didChainScript) {
-				// IDA 0x461D0B: neither CHAIN_SCRIPT nor PLAY_ONCE → loop from beginning.
-				// EXCEPT for snoids in SCRS playback states 8/9 — those manage
+				// IDA 0x461D0B: neither CHAIN_SCRIPT nor PLAY_ONCE -> loop from beginning.
+				// EXCEPT for snoids in SCRS playback states 8/9 - those manage
 				// their own frame lifecycle in `ZmbSnoid::onSnoidAnimTick`
 				// (zoombini_scripts.cpp), which advances through `getFrameCount() - 1`
 				// (matching IDA `wScriptFrameCount`) and dispatches the end-of-script
@@ -1480,8 +1511,8 @@ void ZoombiniPage::preRenderFeature(ZmbFeature *feature) {
 				feature->scheduleDetach();
 		}
 
-		// 3. Sound dispatch — fire sounds/events for newly reached frames
-		// IDA 0x461EB6–0x461EDA: sound enqueue + event code dispatch
+		// 3. Sound dispatch - fire sounds/events for newly reached frames
+		// IDA 0x461EB6-0x461EDA: sound enqueue + event code dispatch
 		// Re-read _lastFrameIdx: end-of-cycle may have reset it to 0.
 		frameIdx = feature->getLastFrameIdx();
 		if (feature->isAnimationCycleRunning()) {
@@ -1538,7 +1569,7 @@ void ZoombiniPage::preRenderFeature(ZmbFeature *feature) {
 		}
 	}
 
-	// 4. Per-frame flag checks (IDA 0x461D73–0x461DAB)
+	// 4. Per-frame flag checks (IDA 0x461D73-0x461DAB)
 	// These run AFTER end-of-cycle, BEFORE hotspot/shape processing.
 	if (feature->hasFlag(ZmbFeature::FLAG_00020000_SKIP_RENDER))
 		feature->deactivateRender();
@@ -1552,7 +1583,7 @@ void ZoombiniPage::preRenderFeature(ZmbFeature *feature) {
 
 /**
  * Post-render pass for a single feature: shape blitting only.
- * IDA: runner_postRenderStandard (0x46182F) — called in Z-sorted order
+ * IDA: runner_postRenderStandard (0x46182F) - called in Z-sorted order
  * AFTER pre-render pass. Reads the frame index computed during preRender,
  * processes hotspot positions, blits shapes to screen, and updates sort rect.
  */
@@ -1622,7 +1653,7 @@ ZmbRenderResult ZoombiniPage::blitShapes(ZmbFeature *feature) {
 	Common::Array<ZmbHotspot> hotspots = hsGroup->copyHotspots();
 	feature->onPreRenderShape(this, hsGroup, hotspots);
 
-	// IDA: runner_preRenderStandard 0x461F86 — apply per-tBMP REGS offsets.
+	// IDA: runner_preRenderStandard 0x461F86 - apply per-tBMP REGS offsets.
 	// Subtracts REGS[shapeId].x/y from each hotspot position AFTER
 	// onPreRenderShapeFunc (which may have remapped shapeIdx).
 	ZmbRegs *shapeRegs = feature->hasFlag(ZmbFeature::FLAG_00000001_TYPE_SNOID) ? nullptr : feature->getShapeRegs();
@@ -1686,7 +1717,7 @@ ZmbRenderResult ZoombiniPage::blitShapes(ZmbFeature *feature) {
 	if (hasSortRect) {
 		feature->setSortRect(sortRect);
 		// Snoids: IDA snoidScript_renderFrame_4562B2 clears pZmb->clickRect to (0,0,0,0) and
-		// rebuilds it via rect_mergeUnion each frame — clickRect always reflects the current
+		// rebuilds it via rect_mergeUnion each frame - clickRect always reflects the current
 		// rendered bounding box for z-sorting and hit-testing as the snoid moves.
 		// Non-snoids: keep manual ScummVM click zones in _clickRect; _sortRect
 		// is the current visual rect used for dirty invalidation and Z-sort.
@@ -1704,7 +1735,7 @@ int32 ZoombiniPage::selectRenderFrame(ZmbFeature *feature) {
 int32 ZoombiniPage::selectScrsRenderFrame(ZmbFeature *feature) {
 	// For SCRS script playback, return the frame index set by onSnoidAnimTick.
 	// Unlike defaultSelectRenderFrame, this does NOT overwrite _lastFrameIdx
-	// with time-based cycling — the tick function drives frame advancement.
+	// with time-based cycling - the tick function drives frame advancement.
 	return feature->getLastFrameIdx();
 }
 
@@ -1865,7 +1896,7 @@ ZmbSnoid *ZoombiniPage::loadSnoidFromPack(uint16 snoidId, const Common::Point &p
 	// Hotspot data is built programmatically from traits via setupIdleHotspots().
 	snoid->setResource(ZmbResource(ZmbArchiveKind::kSystem, 3000));
 
-	// No SCRS resource parsing — traits/name are set by the caller from pack data
+	// No SCRS resource parsing - traits/name are set by the caller from pack data
 
 	snoid->initValues();
 	snoid->setEventHooks(eventHooks);
@@ -1911,7 +1942,7 @@ ZmbSnoid *ZoombiniPage::getSnoid(uint16 scrsId) const {
 }
 
 bool ZoombiniPage::isPointOccupiedByOtherSnoid(const ZmbSnoid *self, const Common::Point &pt, int32 distSquared) const {
-	// IDA: zmbRunner_setPosAndIdx_mesaureDistance_456ACA — only considers snoids in
+	// IDA: zmbRunner_setPosAndIdx_mesaureDistance_456ACA - only considers snoids in
 	// states 0 (idle), 3 (flip), or 6 (fidget); all three are stationary.
 	// Threshold is a direct squared distance (original: 500); comparison is strict <.
 	for (auto it = _snoidMap.begin(); it != _snoidMap.end(); ++it) {
@@ -1961,7 +1992,7 @@ void ZoombiniPage::endSnoidDrag(ZmbSnoid *snoid) {
 void ZoombiniPage::loadTerrainBitmap(uint16 resId) {
 	clearTerrainBitmap();
 
-	// IDA: rmap_loadTerrainArchive (0x46001A) — loads tBMP "Terrain" resource.
+	// IDA: rmap_loadTerrainArchive (0x46001A) - loads tBMP "Terrain" resource.
 	// The bitmap is 160x120 (screen / 4), 8bpp. Pixel value 1 = walkable.
 	// The surface is cached by GraphicsManager; we just store a pointer.
 	_terrainBitmap = _vm->_gfx->findImage(ZmbResource(ZmbArchiveKind::kPage, resId));
@@ -2002,9 +2033,9 @@ bool ZoombiniPage::validateTerrainDrop(ZmbSnoid *snoid) {
 	if (!isTerrainWalkable(pos.x, pos.y))
 		return false;
 
-	// Terrain is walkable — check collision with idle snoids
+	// Terrain is walkable - check collision with idle snoids
 	if (isPointOccupiedByOtherSnoid(snoid, pos, kTerrainCollisionThreshold)) {
-		// Collision found — find a non-colliding position
+		// Collision found - find a non-colliding position
 		Common::Point adjusted = findNonCollidingPosition(snoid, pos, kTerrainCollisionThreshold);
 		snoid->setPointLoc(adjusted);
 	}
@@ -2039,12 +2070,12 @@ Common::Point ZoombiniPage::findNonCollidingPosition(const ZmbSnoid *self, const
 		}
 	}
 
-	// Grid exhausted — return last candidate
+	// Grid exhausted - return last candidate
 	return best;
 }
 
 void ZoombiniPage::clearTerrainBitmap() {
-	// Not owned by us — cached by GraphicsManager, freed on archive clear.
+	// Not owned by us - cached by GraphicsManager, freed on archive clear.
 	_terrainBitmap = nullptr;
 }
 
@@ -2124,7 +2155,7 @@ void ZoombiniPage::loadWalkAnims() {
 	_walkAnimsLoaded = true;
 
 	// SCRS resource IDs: 100 + dirBucket + 5*footType
-	//   footType 1–5, dirBucket 0–4  →  SCRS 105–129 (in ZOOMBINI.MHK = kSystem)
+	//   footType 1-5, dirBucket 0-4  ->  SCRS 105-129 (in ZOOMBINI.MHK = kSystem)
 	for (int ft = 1; ft <= 5; ft++) {
 		for (int dir = 0; dir < 5; dir++) {
 			uint16 scrsId = static_cast<uint16>(100 + dir + 5 * ft);
@@ -2220,8 +2251,8 @@ void ZoombiniPage::loadFidgetAnims() {
 	_fidgetAnimsLoaded = true;
 
 	// Fidget SCRS IDs (from sub_452455 loading zmbAnimHotspotArr[i] = SCRS(100+i)):
-	//   Set A (chZmbAnimShapeCommonImageIdx=1): indices 30-36 → SCRS 130-136
-	//   Set B (chZmbAnimShapeCommonImageIdx=2): indices 38-44 → SCRS 138-144
+	//   Set A (chZmbAnimShapeCommonImageIdx=1): indices 30-36 -> SCRS 130-136
+	//   Set B (chZmbAnimShapeCommonImageIdx=2): indices 38-44 -> SCRS 138-144
 	// Same binary format as walk SCRS (parsed by snoidScript_renderFrame_4562B2).
 	for (int setIdx = 0; setIdx < 2; setIdx++) {
 		for (int variant = 0; variant < 7; variant++) {
@@ -2278,9 +2309,9 @@ void ZoombiniPage::loadHoldingAnims() {
 
 	// Holding (drag) SCRS IDs (from IDA animateZoombini_455E76 case 5):
 	//   wAnimHotspotSetIdx = pZmb->footTrait + 45
-	//   Foot type 1 → index 46 → SCRS 146
-	//   Foot type 2 → index 47 → SCRS 147
-	//   ... through foot type 5 → index 50 → SCRS 150
+	//   Foot type 1 -> index 46 -> SCRS 146
+	//   Foot type 2 -> index 47 -> SCRS 147
+	//   ... through foot type 5 -> index 50 -> SCRS 150
 	// Same binary format as walk/fidget SCRS.
 	for (int footIdx = 0; footIdx < 5; footIdx++) {
 		uint16 scrsId = static_cast<uint16>(146 + footIdx);

@@ -40,6 +40,7 @@
 #include "mohawk/zoombini.h"
 #include "mohawk/zoombini_debug.h"
 #include "mohawk/zoombini_graphics.h"
+#include "mohawk/zoombini_metaengine.h"
 #include "mohawk/zoombini_page.h"
 #include "mohawk/zoombini_pages/shelter_basecamp1.h"
 #include "mohawk/zoombini_pages/shelter_basecamp2.h"
@@ -178,6 +179,7 @@ Common::Error MohawkEngine_Zoombini::run() {
 	_rnd = new ZoombiniRandom("zoombini");
 	_state = new ZoombiniGameState(this, _saveFileMan);
 	_text = new ZoombiniText(this, _language);
+	applyGameSettings();
 
 	_cursor = new ZoombiniCursorManager(this);
 	_cursor->setDefaultCursor();
@@ -243,7 +245,7 @@ Common::Error MohawkEngine_Zoombini::run() {
 }
 
 void MohawkEngine_Zoombini::resetFidgetActivity() {
-	// IDA: currentFrameCounter_46084A — reset threshold to default and
+	// IDA: currentFrameCounter_46084A - reset threshold to default and
 	// restart the idle timer so the halving logic in doFrame() begins fresh.
 	_lastActivityFrame = _system->getMillis() / static_cast<uint32>(kAnimateFrameTimeMs);
 	if (_fidgetThreshold)
@@ -251,8 +253,8 @@ void MohawkEngine_Zoombini::resetFidgetActivity() {
 }
 
 void MohawkEngine_Zoombini::setArrivalTurnDirection(int dir) {
-	// IDA: setZmbMovementDirection_45621A — maps movement direction to
-	// post-arrival turn-around state: -1→1 (TurnRight), 0→0 (Idle), 1→2 (TurnLeft).
+	// IDA: setZmbMovementDirection_45621A - maps movement direction to
+	// post-arrival turn-around state: -1->1 (TurnRight), 0->0 (Idle), 1->2 (TurnLeft).
 	if (dir == -1)
 		_arrivalTurnState = 1; // kSnoidAnimTurnRight
 	else if (dir == 1)
@@ -358,7 +360,7 @@ void MohawkEngine_Zoombini::doFrame() {
 
 	_sound->updateSoundQueue();
 
-	// IDA: gameMainLoop_45DDD4 — when idle > 3600 ticks (~60s at 60fps),
+	// IDA: gameMainLoop_45DDD4 - when idle > 3600 ticks (~60s at 60fps),
 	// halve the fidget threshold (minimum 1) to increase fidget frequency.
 	if (_fidgetThreshold) {
 		uint32 curFrame = frameStartTime / static_cast<uint32>(kAnimateFrameTimeMs);
@@ -449,6 +451,24 @@ ZoombiniPage *MohawkEngine_Zoombini::getCurrentPage() const {
 	return _activePage;
 }
 
+void MohawkEngine_Zoombini::applyGameSettings() {
+	// original_prng is intentionally not refreshed here. ZoombiniRandom
+	// samples it once at engine startup because changing PRNG mid-run can
+	// alter puzzle algorithms.
+	if (_sound) {
+		bool stopMidiOnSfx = false;
+		if (!isGameVariant(GF_ZMB_TLC) && _activePage && _activePage->getPageType() == ZoombiniPageType::kHotel)
+			stopMidiOnSfx = !ConfMan.getBool(MohawkMetaEngine_Zoombini::kOptionFixHotelMidiBGM);
+		_sound->setStopMidiOnSfx(stopMidiOnSfx);
+	}
+
+	_enhancedKbdShortcuts = ConfMan.getBool(MohawkMetaEngine_Zoombini::kOptionEnhancedKbdShortcuts);
+}
+
+bool MohawkEngine_Zoombini::useEnhancedKbdShortcuts() const {
+	return _enhancedKbdShortcuts;
+}
+
 MohawkArchive *MohawkEngine_Zoombini::loadSystemArchive() {
 	MohawkArchive *mhkArchive = new MohawkArchive();
 	if (!mhkArchive->openFile(Common::Path(ZMB_MHK_ZOOMBINI))) {
@@ -486,6 +506,10 @@ void MohawkEngine_Zoombini::loadNextPage() {
 		_quitEventState = kQuitEventDone;
 		return;
 	}
+
+	// Cache palette manipulation per active page. Applying it mid-page can
+	// mix palettes from different settings and corrupt the composed screen.
+	_brightenPalette = ConfMan.getBool(MohawkMetaEngine_Zoombini::kOptionBrightenPalette);
 
 	assert(!_pageQueue.empty());
 	ZoombiniPageType nextPageType = _pageQueue.pop();
@@ -558,7 +582,7 @@ void MohawkEngine_Zoombini::loadNextPage() {
 	if (page->getPageCategory() == ZoombiniPageCategory::kInteractive)
 		_state->_f.setCurrentPageType(nextPageType);
 
-	// IDA: execActivePuzzle_435BE8 (0x435E27-60) — perfect streak flag.
+	// IDA: execActivePuzzle_435BE8 (0x435E27-60) - perfect streak flag.
 	// Set to true when entering the first puzzle of a route.
 	// In practice mode, always clear.
 	if (_state->inPracticeMode()) {

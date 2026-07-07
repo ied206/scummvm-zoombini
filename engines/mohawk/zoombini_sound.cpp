@@ -93,7 +93,7 @@ void ZoombiniSound::queueZmbSound(ZmbSoundQueueHandle handle, ZmbResource resour
 
 void ZoombiniSound::updateChannel(SoundQueueChannel &ch) {
 	if (ch.playing) {
-		// Still playing — nothing to do.
+		// Still playing - nothing to do.
 		if (_vm->_system->getMixer()->isSoundHandleActive(ch.currentHandle))
 			return;
 		ch.playing = false;

@@ -330,27 +330,19 @@ ZmbEventHandleResult ZoombiniDialogDebug::drawShapes_onKeyDown(ZmbFeature *featu
 		close();
 		result = ZmbEventHandleResult::kConsumed;
 		break;
-	case Common::KEYCODE_LEFT:
-		_multiScreenNextOp = kMultiScreenOpPrev;
-		result = ZmbEventHandleResult::kConsumed;
-		break;
-	case Common::KEYCODE_KP4:
-		if ((kbd.flags & Common::KBD_NUM) == 0) {
+	default:
+		switch (getKeyboardNavDirection(kbd)) {
+		case KBD_NAV_LEFT:
 			_multiScreenNextOp = kMultiScreenOpPrev;
 			result = ZmbEventHandleResult::kConsumed;
-		}
-		break;
-	case Common::KEYCODE_RIGHT:
-		_multiScreenNextOp = kMultiScreenOpNext;
-		result = ZmbEventHandleResult::kConsumed;
-		break;
-	case Common::KEYCODE_KP6:
-		if ((kbd.flags & Common::KBD_NUM) == 0) {
+			break;
+		case KBD_NAV_RIGHT:
 			_multiScreenNextOp = kMultiScreenOpNext;
 			result = ZmbEventHandleResult::kConsumed;
+			break;
+		default:
+			break;
 		}
-		break;
-	default:
 		break;
 	}
 
@@ -475,47 +467,27 @@ ZmbEventHandleResult ZoombiniDialogDebug::drawFeature_onKeyDown(ZmbFeature *feat
 		close();
 		result = ZmbEventHandleResult::kConsumed;
 		break;
-	case Common::KEYCODE_LEFT:
-		_multiScreenNextOp = kMultiScreenOpPrev;
-		result = ZmbEventHandleResult::kConsumed;
-		break;
-	case Common::KEYCODE_KP4:
-		if ((kbd.flags & Common::KBD_NUM) == 0) {
+	default:
+		switch (getKeyboardNavDirection(kbd)) {
+		case KBD_NAV_LEFT:
 			_multiScreenNextOp = kMultiScreenOpPrev;
 			result = ZmbEventHandleResult::kConsumed;
-		}
-		break;
-	case Common::KEYCODE_RIGHT:
-		_multiScreenNextOp = kMultiScreenOpNext;
-		result = ZmbEventHandleResult::kConsumed;
-		break;
-	case Common::KEYCODE_KP6:
-		if ((kbd.flags & Common::KBD_NUM) == 0) {
+			break;
+		case KBD_NAV_RIGHT:
 			_multiScreenNextOp = kMultiScreenOpNext;
 			result = ZmbEventHandleResult::kConsumed;
-		}
-		break;
-	case Common::KEYCODE_UP:
-		_multiScreenNextOp = kMultiScreenOpUp;
-		result = ZmbEventHandleResult::kConsumed;
-		break;
-	case Common::KEYCODE_KP8:
-		if ((kbd.flags & Common::KBD_NUM) == 0) {
+			break;
+		case KBD_NAV_UP:
 			_multiScreenNextOp = kMultiScreenOpUp;
 			result = ZmbEventHandleResult::kConsumed;
-		}
-		break;
-	case Common::KEYCODE_DOWN:
-		_multiScreenNextOp = kMultiScreenOpDown;
-		result = ZmbEventHandleResult::kConsumed;
-		break;
-	case Common::KEYCODE_KP2:
-		if ((kbd.flags & Common::KBD_NUM) == 0) {
+			break;
+		case KBD_NAV_DOWN:
 			_multiScreenNextOp = kMultiScreenOpDown;
 			result = ZmbEventHandleResult::kConsumed;
+			break;
+		default:
+			break;
 		}
-		break;
-	default:
 		break;
 	}
 
