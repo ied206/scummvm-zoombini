@@ -59,6 +59,19 @@ const uint16 ZoombiniPuzzlePizza::kToppingScrbBase[4] = {7005, 7015, 7027, 7041}
 // IDA: click rect for answer/submit area (derived from onClick case 4 / case 13)
 const Common::Rect ZoombiniPuzzlePizza::kAnswerClickRect = Common::Rect(290, 260, 600, 440);
 
+static bool isLoadChantSkipEvent(const Common::Event &event) {
+	switch (event.type) {
+	case Common::EVENT_KEYDOWN:
+	case Common::EVENT_KEYUP:
+	case Common::EVENT_LBUTTONDOWN:
+	case Common::EVENT_RBUTTONDOWN:
+	case Common::EVENT_MBUTTONDOWN:
+		return true;
+	default:
+		return false;
+	}
+}
+
 ZoombiniPuzzlePizza::ZoombiniPuzzlePizza(MohawkEngine_Zoombini *vm) : ZoombiniPuzzle(vm, ZoombiniPageType::kPizza) {
 }
 
@@ -85,10 +98,10 @@ void ZoombiniPuzzlePizza::setBackgroundBitmap() {
 // ---------------------------------------------------------------------------
 void ZoombiniPuzzlePizza::setDifficultyParams() {
 	// IDA: pizza_init sets these per-level parameters
-	// Level 1: slots=5, target=2, threshold=500, min=1, extra=0, deliveries=6
-	// Level 2: slots=7, target=3, threshold=800, min=2, extra=0, deliveries=7
-	// Level 3: slots=7, target=3, threshold=1000, min=2, extra=1, deliveries=7
-	// Level 4: slots=8, target=4, threshold=1000, min=3, extra=2, deliveries=7
+	// Level 1: slots=5, minTarget=2, threshold=500, min=1, extra=0, deliveries=6
+	// Level 2: slots=7, minTarget=3, threshold=800, min=2, extra=0, deliveries=7
+	// Level 3: slots=7, minTarget=3, threshold=1000, min=2, extra=1, deliveries=7
+	// Level 4: slots=8, minTarget=4, threshold=1000, min=3, extra=2, deliveries=7
 	static const int16 kSlots[4] = {5, 7, 7, 8};
 	static const int16 kTarget[4] = {2, 3, 3, 4};
 	static const int16 kThreshold[4] = {500, 800, 1000, 1000};
@@ -115,9 +128,10 @@ void ZoombiniPuzzlePizza::loadFeatures() {
 
 	// IDA pizza_init @ 0x43C13E: setInteractionLock_460C54(0) clears
 	// unk_4A7998, and no PIZZA function re-enables it — the whole Pizza Pass
-	// page renders its runners in pure REGISTRATION order (gfx_renderFrame's
-	// z-sort is gated on that flag). PIZZA uses no runner_linkRelativeToParent
-	// calls, so registration order alone defines the layering.
+	// page renders its runners in linked-list order (gfx_renderFrame's z-sort
+	// is gated on that flag). Initial registration establishes the base
+	// layering; Pizza later calls runner_linkRelativeToParent for delivery
+	// overlays.
 	_manualZOrder = true;
 
 	_difficultyLevel = static_cast<ZmbPuzzleDifficultyLevel>(_vm->_state->readActivePageRouteLevel() + 1);
@@ -125,9 +139,9 @@ void ZoombiniPuzzlePizza::loadFeatures() {
 	// Apply per-level constants
 	setDifficultyParams();
 
-	// Generate and distribute toppings
-	// IDA: pizza_generateToppingSet (0x43F349) and pizza_toppingDistribution (0x43E0E0)
-	generateToppingSet();
+	// Generate and distribute toppings.
+	// IDA: pizza_toppingDistribution (0x43E0E0) calls pizza_generateToppingSet
+	// (0x43F349) internally.
 	distributeToppings();
 
 	// Load NODE and PATH for walk network
@@ -533,32 +547,26 @@ void ZoombiniPuzzlePizza::generateToppingSet() {
 	int16 forbiddenSlot = (_difficultyLevel == kPuzzleDiffLevel2) ? 4 : -1;
 
 	int16 remaining = _targetToppingCount;
+	bool nonePlaced = true;
 
 	do {
-		for (int16 i = 0; i < _totalToppingSlots && remaining > 0; i++) {
-			if (_vm->_rnd->getRandomNumber(0, 999) < _toppingPlaceThreshold) {
+		for (int16 i = 0; i < _totalToppingSlots; i++) {
+			if (_vm->_rnd->getRandomNumber(1000) < _toppingPlaceThreshold) {
 				if (_toppingSet[i] == 0 && i != forbiddenSlot) {
 					_toppingSet[i] = 1;
 					remaining--;
+					nonePlaced = false;
 				}
 			}
 		}
 	} while (remaining > 0);
 
-	// Safety: ensure at least one topping placed
-	bool anyPlaced = false;
-	for (int16 i = 0; i < _totalToppingSlots; i++) {
-		if (_toppingSet[i]) {
-			anyPlaced = true;
-			break;
-		}
-	}
-	if (!anyPlaced) {
-		int16 slot = _vm->_rnd->getRandomNumber(0, 3);
+	if (nonePlaced) {
+		int16 slot = _vm->_rnd->getRandomNumber(3);
 		_toppingSet[slot] = 1;
 	}
 
-	debugC(kZmbDebugPage, "Pizza: Generated topping set for %d slots (target %d)",
+	debugC(kZmbDebugPage, "Pizza: Generated topping set for %d slots (minTarget %d)",
 		   _totalToppingSlots, _targetToppingCount);
 }
 
@@ -569,6 +577,8 @@ void ZoombiniPuzzlePizza::distributeToppings() {
 	memset(_correctToppings, 0, sizeof(_correctToppings));
 	memset(_wrongToppingsA, 0, sizeof(_wrongToppingsA));
 	memset(_wrongToppingsB, 0, sizeof(_wrongToppingsB));
+
+	generateToppingSet();
 
 	if (_difficultyLevel == kPuzzleDiffLevel1) {
 		// Level 1: All toppings are correct
@@ -991,6 +1001,15 @@ void ZoombiniPuzzlePizza::onFeatureAnimEvent(ZmbFeature *feature, int16 eventCod
 	if (feature == _questionRunnerFeature) {
 		if (_questionRunnerPhase == kPhaseExitCallback) {
 			handleZmbExitEvent(feature, eventCode);
+		}
+		if (eventCode == kZmbAnimEventM1_End && _questionRunnerPhase == kPhaseNone) {
+			if (!feature->getZSortRect().isEmpty())
+				addExternalDirtyRect(feature->getZSortRect());
+			Common::Array<ZmbHotspot> emptyHotspots;
+			feature->setVirtualHotspots(emptyHotspots);
+			feature->deactivateRender();
+			feature->deactivateAnimate();
+			feature->setSortRect(Common::Rect());
 		}
 		return;
 	}
@@ -2053,6 +2072,11 @@ void ZoombiniPuzzlePizza::handleSubmit() {
 	// Load SCRB 7066 on the question runner to start the exit callback chain
 	loadScrbOntoFeature(_questionRunnerFeature, 7066);
 	_questionRunnerPhase = kPhaseExitCallback;
+	// IDA pizza_init registers unk_4B0CC0 (the 7066 callback runner) before
+	// pizza_registerAnswerDisplay creates the 7001+ answer-display runner. Keep
+	// that order when 7066 is active so the machine-front frames cannot stamp
+	// over the pressed generate button.
+	manualLinkBefore(_questionRunnerFeature, _drawOnRegFeature);
 
 	debugC(kZmbDebugPage, "Pizza: Submit — starting delivery cycle");
 }
@@ -2077,6 +2101,7 @@ void ZoombiniPuzzlePizza::handleZmbExitEvent(ZmbFeature *feature, int16 eventCod
 			_toppingOverlayFeature->removeFlag(ZmbFeature::FLAG_01000000_DEFER_RENDER);
 			loadScrbOntoFeature(_toppingOverlayFeature, 12000);
 			_overlayPhase = kPhaseToppingOverlay;
+			linkToppingRunners();
 		}
 		// IDA 0x43f4ac: pizza_registerAnswerDisplay() — the generate button
 		// pops back out (unpressed) as soon as the machine starts producing.
@@ -2148,6 +2173,7 @@ void ZoombiniPuzzlePizza::handleZmbExitEvent(ZmbFeature *feature, int16 eventCod
 		if (_toppingOverlayFeature) {
 			loadScrbOntoFeature(_toppingOverlayFeature, overlayScrbId);
 			_overlayPhase = kPhaseToppingDelivery;
+			linkToppingRunners();
 		}
 
 		// IDA: calls registerAnswerDisplay() to refresh the preview
@@ -2705,6 +2731,7 @@ void ZoombiniPuzzlePizza::placeTopping(int16 mode, int16 hintSlot) {
 //   otherwise: rand(0..100): >75→3, >50→2, >25→1, else 0
 // ---------------------------------------------------------------------------
 void ZoombiniPuzzlePizza::playLoadChant(int16 chantDiffId) {
+	_loadChantSkipPending = false;
 	int16 variant;
 	if (chantDiffId == 1) {
 		variant = 0;
@@ -2748,33 +2775,36 @@ void ZoombiniPuzzlePizza::playSFXForOrder(int16 sfxVariant) {
 
 	switch (sfxVariant) {
 	case 0:
-		playChantSoundSync(15005);
-		pumpLoadWait(60 * 17);
-		playChantSoundSync(15006);
+		if (!playChantSoundSync(15005)) {
+			pumpLoadWait(60 * 17, false);
+			playChantSoundSync(15006);
+		}
 		break;
 	case 1:
-		playChantSoundSync(15000);
-		playChantSoundSync(15001);
+		if (!playChantSoundSync(15000))
+			playChantSoundSync(15001);
 		break;
 	case 2:
 		playChantSoundSync(15002);
 		break;
 	case 3:
-		playChantSoundSync(15003);
-		playChantSoundSync(15004);
+		if (!playChantSoundSync(15003))
+			playChantSoundSync(15004);
 		break;
 	case 4:
-		playChantSoundSync(15003);
-		playChantSoundSync(15004);
-		pumpLoadWait(20 * 17);
-		playChantSoundSync(15005);
-		pumpLoadWait(60 * 17);
-		playChantSoundSync(15006);
+		if (!playChantSoundSync(15003) && !playChantSoundSync(15004)) {
+			pumpLoadWait(20 * 17, false);
+			if (!playChantSoundSync(15005)) {
+				pumpLoadWait(60 * 17, false);
+				playChantSoundSync(15006);
+			}
+		}
 		break;
 	default:
 		break;
 	}
 
+	_loadChantSkipPending = false;
 	_vm->_gfx->stopMouseCursorEyeAnimation();
 }
 
@@ -2783,14 +2813,26 @@ void ZoombiniPuzzlePizza::playSFXForOrder(int16 sfxVariant) {
 // pumping screen updates and the animated eye cursor (the original plays
 // these through snd_findEntryAndPlay with the render flag raised).
 // ---------------------------------------------------------------------------
-void ZoombiniPuzzlePizza::playChantSoundSync(uint16 sndId) {
+bool ZoombiniPuzzlePizza::playChantSoundSync(uint16 sndId) {
 	Audio::SoundHandle *handle = _vm->_sound->playZmbSound(
 		ZmbResource(ZmbArchiveKind::kPage, sndId), Audio::Mixer::kSFXSoundType);
 	if (!handle)
-		return;
+		return false;
 
-	while (_vm->_mixer->isSoundHandleActive(*handle) && !_vm->shouldQuit())
-		pumpLoadWait(0);
+	if (_loadChantSkipPending) {
+		_loadChantSkipPending = false;
+		_vm->_mixer->stopHandle(*handle);
+		return true;
+	}
+
+	while (_vm->_mixer->isSoundHandleActive(*handle) && !_vm->shouldQuit()) {
+		if (pumpLoadWait(0, true)) {
+			_vm->_mixer->stopHandle(*handle);
+			return true;
+		}
+	}
+
+	return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -2798,13 +2840,23 @@ void ZoombiniPuzzlePizza::playChantSoundSync(uint16 sndId) {
 // keeps the OS event queue drained, animates the wait (eye) cursor and
 // refreshes the currently visible screen. durationMs 0 = single pump iteration.
 // ---------------------------------------------------------------------------
-void ZoombiniPuzzlePizza::pumpLoadWait(uint32 durationMs) {
+bool ZoombiniPuzzlePizza::pumpLoadWait(uint32 durationMs, bool allowSkip) {
+	if (allowSkip && _loadChantSkipPending) {
+		_loadChantSkipPending = false;
+		return true;
+	}
+
 	const uint32 endTime = _vm->_system->getMillis() + durationMs;
 	do {
+		bool skipped = false;
 		Common::Event event;
 		while (_vm->_system->getEventManager()->pollEvent(event)) {
-			// Swallow input during the load chant (the original's wait loop
-			// only honors skip events, which we don't need here).
+			if (isLoadChantSkipEvent(event)) {
+				if (allowSkip)
+					skipped = true;
+				else
+					_loadChantSkipPending = true;
+			}
 		}
 
 		uint32 now = _vm->_system->getMillis();
@@ -2815,21 +2867,30 @@ void ZoombiniPuzzlePizza::pumpLoadWait(uint32 durationMs) {
 		_vm->_gfx->flushScreens();
 		_vm->_system->updateScreen();
 		_vm->_system->delayMillis(10);
+
+		if (skipped)
+			return true;
 	} while (_vm->_system->getMillis() < endTime && !_vm->shouldQuit());
+
+	return false;
 }
 
 // ---------------------------------------------------------------------------
 // linkToppingRunners: IDA 0x441286
-// Original engine re-orders the feature runner linked list for Z-ordering:
-//   overlayBase → toppingOverlay (if exists)
-//   toppingOverlay → orderBase (if order0 accepted)
-//   overlayBase → answerRunner → active orders (chained)
-// ScummVM uses registration-order for LOOP_ANIM features in the render list,
-// so explicit Z-order linking is not needed. See caves.cpp for precedent.
+// Original engine re-orders the feature runner linked list for Z-ordering.
+// For the active delivery path, pizza_zmbExitCallback links:
+//   answer runner before overlay base, and topping overlay after overlay base.
+// This keeps the carried pizza in front of the deliverer snoid.
 // ---------------------------------------------------------------------------
 void ZoombiniPuzzlePizza::linkToppingRunners() {
-	// NOTE: Original engine called runner_linkRelativeToParent for Z-order.
-	// ScummVM uses registration order for LOOP_ANIM overlay features.
+	if (!_overlayFeature)
+		return;
+
+	if (_answerSnoid)
+		manualLinkBefore(_answerSnoid, _overlayFeature);
+
+	if (_toppingOverlayFeature)
+		manualLinkAfter(_toppingOverlayFeature, _overlayFeature);
 }
 
 // ---------------------------------------------------------------------------

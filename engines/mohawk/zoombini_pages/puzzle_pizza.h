@@ -103,8 +103,8 @@ private:
 	// --- Synchronous load chant (IDA pizza_init 0x43bfe3-0x43c063) ---
 	void playLoadChant(int16 chantDiffId);
 	void playSFXForOrder(int16 sfxVariant);
-	void playChantSoundSync(uint16 sndId);
-	void pumpLoadWait(uint32 durationMs);
+	bool playChantSoundSync(uint16 sndId);
+	bool pumpLoadWait(uint32 durationMs, bool allowSkip);
 
 	// --- Topping runner management ---
 	void registerToppingRunner();
@@ -251,6 +251,7 @@ private:
 	bool _puzzleActive = false;
 	bool _processingFrame = false;
 	bool _drawOnRegEnabled = false; // IDA: scrb_drawOnRegFlagArr[0] — gates submit clicks
+	bool _loadChantSkipPending = false;
 
 	// -----------------------------------------------------------------------
 	// Celebration animation (hoorah fidget)
