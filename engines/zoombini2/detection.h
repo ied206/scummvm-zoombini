@@ -1,0 +1,53 @@
+/* ScummVM - Graphic Adventure Engine
+ *
+ * ScummVM is the legal property of its developers, whose names
+ * are too numerous to list here. Please refer to the COPYRIGHT
+ * file distributed with this source distribution.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+#ifndef ZOOMBINI2_DETECTION_H
+#define ZOOMBINI2_DETECTION_H
+
+#include "engines/advancedDetector.h"
+
+namespace Zoombini2 {
+
+enum GameFeatures {
+	GF_NONE = 0,
+	/**
+	 * Z2-10 base family: v1.0US and v1.0NL.
+	 * The ArisuMedia English package shares the v1.0US game files.
+	 */
+	GF_Z2_V10 = (1 << 0),
+	/**
+	 * Z2-11 extended family: v1.1US, v1.1KR, v1.1SE and v1.1PL.
+	 * The Adventure Workshop package shares the v1.1US game files.
+	 * These codes identify engine generations; the Korean installer is labeled 1.0.
+	 */
+	GF_Z2_V11 = (1 << 1),
+};
+
+struct Zoombini2GameDescription {
+	ADGameDescription desc;
+	uint32 features;
+
+	AD_GAME_DESCRIPTION_HELPERS(desc);
+};
+
+} // End of namespace Zoombini2
+
+#endif // ZOOMBINI2_DETECTION_H
