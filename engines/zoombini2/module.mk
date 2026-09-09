@@ -2,14 +2,13 @@ MODULE := engines/zoombini2
 
 MODULE_OBJS := \
 	dialogs.o \
-	game_state.o \
-	gfx.o \
+	graphics.o \
 	pages/dialog_help.o \
 	metaengine.o \
 	path.o \
-	saveload.o \
 	sidebar.o \
 	sound.o \
+	state.o \
 	ui.o \
 	pages/page_base.o \
 	pages/transition_video.o \
@@ -20,6 +19,7 @@ MODULE_OBJS := \
 	pages/puzzle_base.o \
 	pages/puzzle_aquacube.o \
 	pages/shelter_booliewood.o \
+	pages/shelter_booliewood_final.o \
 	pages/puzzle_boolies.o \
 	pages/puzzle_cheznorf.o \
 	pages/puzzle_crazyturtle.o \
@@ -33,8 +33,6 @@ MODULE_OBJS := \
 	pages/interactive_menuscreen.o \
 	pages/shelter_rescue.o \
 	pages/transition_credits.o \
-	pages/transition_final.o \
-	zoombini.o \
 	zoombini2.o
 
 MODULE_DIRS += \

@@ -28,7 +28,7 @@
 #include "gui/widgets/list.h"
 
 #include "zoombini2/dialogs.h"
-#include "zoombini2/saveload.h"
+#include "zoombini2/state.h"
 
 namespace Zoombini2 {
 
@@ -104,7 +104,7 @@ void Zoombini2SaveManagementDialog::deleteSelectedProfile() {
 		return;
 
 	GUI::MessageDialog confirmation(Common::U32String("Do you really want to delete this saved game?"), Common::U32String("Delete"),
-			Common::U32String("Cancel"));
+									Common::U32String("Cancel"));
 	if (confirmation.runModal() != GUI::kMessageOK)
 		return;
 
@@ -148,7 +148,7 @@ void Zoombini2SaveManagementDialog::handleCommand(GUI::CommandSender *sender, ui
 Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Common::String &name, const Common::String &domain)
 	: GUI::OptionsContainerWidget(boss, name, "Zoombini2EngineOptionsDialog", domain) {
 	GUI::ButtonWidget *manageProfilesButton = new GUI::ButtonWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ManageProfiles", Common::U32String("Saved games"),
-			Common::U32String(), kManageProfilesCommand);
+																	Common::U32String(), kManageProfilesCommand);
 	manageProfilesButton->setTarget(this);
 }
 

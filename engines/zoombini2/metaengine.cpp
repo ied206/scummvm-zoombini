@@ -22,9 +22,9 @@
 #include "base/plugins.h"
 #include "engines/advancedDetector.h"
 
-#include "zoombini2/zoombini2.h"
 #include "zoombini2/detection.h"
 #include "zoombini2/dialogs.h"
+#include "zoombini2/zoombini2.h"
 
 class Zoombini2MetaEngine : public AdvancedMetaEngine<Zoombini2::Zoombini2GameDescription> {
 public:
@@ -48,7 +48,7 @@ bool Zoombini2MetaEngine::hasFeature(MetaEngineFeature f) const {
 }
 
 GUI::OptionsContainerWidget *Zoombini2MetaEngine::buildEngineOptionsWidget(GUI::GuiObject *boss, const Common::String &name,
-		const Common::String &target) const {
+																		   const Common::String &target) const {
 	return new Zoombini2::Zoombini2OptionsWidget(boss, name, target);
 }
 

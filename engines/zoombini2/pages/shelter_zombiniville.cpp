@@ -24,13 +24,12 @@
 #include "common/debug.h"
 #include "common/random.h"
 
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/shelter_zombiniville.h"
-#include "zoombini2/game_state.h"
-#include "zoombini2/gfx.h"
 #include "zoombini2/path.h"
 #include "zoombini2/sound.h"
+#include "zoombini2/state.h"
 #include "zoombini2/ui.h"
-#include "zoombini2/zoombini.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
@@ -137,8 +136,7 @@ Common::Point Zombiniville::getSlotPosition(uint index) {
 		Common::Point(490, 524), Common::Point(500, 485), Common::Point(452, 526), Common::Point(455, 485),
 		Common::Point(410, 527), Common::Point(408, 484), Common::Point(370, 527), Common::Point(366, 485),
 		Common::Point(327, 528), Common::Point(327, 482), Common::Point(286, 528), Common::Point(285, 482),
-		Common::Point(246, 528), Common::Point(248, 483), Common::Point(209, 488), Common::Point(177, 465)
-	};
+		Common::Point(246, 528), Common::Point(248, 483), Common::Point(209, 488), Common::Point(177, 465)};
 	return index < static_cast<uint>(kMaxPackSize) ? kSlotPositions[index] : kSlotPositions[kMaxPackSize - 1];
 }
 
@@ -151,12 +149,10 @@ void Zombiniville::init() {
 	if (_engine->_isSavedGame)
 		GameState::transferSavedRoster(gameState->_zoombinis, _engine->_globalZoombinis);
 	for (uint i = 0; i < _engine->_globalZoombinis.size(); i++) {
-		Zoombini *zoombini = _engine->_globalZoombinis[i];
+		ZoombiniState *zoombini = _engine->_globalZoombinis[i];
 		const Common::Point slot = getSlotPosition(i);
-		zoombini->_posX = slot.x;
-		zoombini->_posY = slot.y;
-		zoombini->_targetX = slot.x;
-		zoombini->_targetY = slot.y;
+		zoombini->_position = Common::Point32(slot);
+		zoombini->_targetPosition = zoombini->_position;
 		zoombini->_activeFlag = 1;
 		zoombini->_zoombiniIndex = 33;
 		_boardingZoombinis.push_back(zoombini);
@@ -185,10 +181,10 @@ void Zombiniville::init() {
 	_goButton = new Animation();
 	_goButton->loadFromFile(Common::Path("bmp/zombiniville/bumper-Valid.an"));
 
-	_bigZombGfx = new ZoombiniGfx();
+	_bigZombGfx = new ZoombiniGraphics();
 	if (!_bigZombGfx->loadFromFile(Common::Path("bmp/zombiniville/BigZomb/BigZomb.anm")))
 		warning("Zombiniville: Failed to load BigZomb.anm");
-	_littleZombGfx = new ZoombiniGfx();
+	_littleZombGfx = new ZoombiniGraphics();
 	if (!_littleZombGfx->loadFromFile(Common::Path("bmp/zombis/littleZomb.anm")))
 		warning("Zombiniville: Failed to load littleZomb.anm");
 
@@ -214,7 +210,7 @@ void Zombiniville::init() {
 void Zombiniville::refreshFeatureCounts() {
 	memset(_featureCounts, 0, sizeof(_featureCounts));
 	for (uint i = 0; i < _boardingZoombinis.size(); i++) {
-		const Zoombini *zoombini = _boardingZoombinis[i];
+		const ZoombiniState *zoombini = _boardingZoombinis[i];
 		const byte features[kNumFeatures] = {zoombini->_featureA, zoombini->_featureB, zoombini->_featureC, zoombini->_featureD};
 		for (int feature = 0; feature < kNumFeatures; feature++) {
 			if (1 <= features[feature] && features[feature] <= kNumFeatureValues)
@@ -270,10 +266,10 @@ bool Zombiniville::passesPackFeatureLimits(byte featureA, byte featureB, byte fe
 		counts[feature][candidateFeatures[feature]] += 1;
 	}
 
-	const uint16 candidateHash = Zoombini::calculateFeatureHash(featureA, featureB, featureC, featureD);
+	const uint16 candidateHash = ZoombiniState::calculateFeatureHash(featureA, featureB, featureC, featureD);
 	int matchingCombinations = 0;
 	for (uint i = 0; i < _boardingZoombinis.size(); i++) {
-		const Zoombini *zoombini = _boardingZoombinis[i];
+		const ZoombiniState *zoombini = _boardingZoombinis[i];
 		const byte features[kNumFeatures] = {zoombini->_featureA, zoombini->_featureB, zoombini->_featureC, zoombini->_featureD};
 		for (int feature = 0; feature < kNumFeatures; feature++) {
 			if (features[feature] < 1 || kNumFeatureValues < features[feature])
@@ -296,14 +292,12 @@ bool Zombiniville::passesPackFeatureLimits(byte featureA, byte featureB, byte fe
 Common::String Zombiniville::generateName() {
 	static const char *const kVowelPairs[30] = {
 		"a ", "a ", "a ", "e ", "e ", "e ", "e ", "i ", "i ", "i ", "o ", "o ", "o ", "u ", "u ",
-		"y ", "ee", "oo", "yo", "ya", "ye", "ei", "ie", "ai", "ia", "au", "ua", "uo", "ou", "ae"
-	};
+		"y ", "ee", "oo", "yo", "ya", "ye", "ei", "ie", "ai", "ia", "au", "ua", "uo", "ou", "ae"};
 	static const char kSingleConsonants[] = "bbccdddfghjkkllmmnnprrssssttvwx";
 	static const char kEndings[] = "aeiou";
 	static const char *const kConsonantPairs[39] = {
 		"bl", "br", "ch", "cl", "cr", "dr", "dw", "fl", "fr", "gh", "gl", "gr", "kl", "kn", "kr", "kw", "ld", "mp", "nd", "nh",
-		"nn", "ph", "pl", "pr", "qu", "qu", "rh", "rn", "sc", "sl", "sm", "sn", "sp", "sr", "st", "sw", "th", "tr", "tw"
-	};
+		"nn", "ph", "pl", "pr", "qu", "qu", "rh", "rn", "sc", "sl", "sm", "sn", "sp", "sr", "st", "sw", "th", "tr", "tw"};
 
 	Common::RandomSource *randomSource = _engine->getRandom();
 	char name[8] = {};
@@ -349,10 +343,11 @@ Common::String Zombiniville::generateName() {
 PathObject *Zombiniville::createEntrancePath(const Common::Point &destination) const {
 	PathObject *path = new PathObject();
 	CurveSegment *segment = new CurveSegment();
-	segment->init(-70, 400, destination.x / 3, 420, 2 * (destination.x / 3), 450, destination.x, destination.y, 2, 0);
+	segment->init(
+		Common::Point32(-70, 400), Common::Point32(destination.x / 3, 420),
+		Common::Point32(2 * (destination.x / 3), 450), Common::Point32(destination), 2, 0);
 	path->segments.push_back(segment);
-	path->endX = destination.x;
-	path->endY = destination.y;
+	path->endPosition = Common::Point32(destination);
 	path->start(_engine->getGameTickCount());
 	return path;
 }
@@ -377,14 +372,12 @@ bool Zombiniville::createZoombini(bool allowConcurrentEntrances) {
 		return false;
 
 	const Common::Point destination = getSlotPosition(_boardingZoombinis.size());
-	Zoombini *zoombini = new Zoombini();
+	ZoombiniState *zoombini = new ZoombiniState();
 	zoombini->setFeatures(features[0], features[1], features[2], features[3]);
 	_currentName = generateName();
 	memcpy(zoombini->_extraState, _currentName.c_str(), _currentName.size() + 1);
-	zoombini->_posX = -70;
-	zoombini->_posY = 400;
-	zoombini->_targetX = destination.x;
-	zoombini->_targetY = destination.y;
+	zoombini->_position = Common::Point32(-70, 400);
+	zoombini->_targetPosition = Common::Point32(destination);
 	zoombini->_activeFlag = 0;
 	zoombini->_zoombiniIndex = 33;
 	_engine->_globalZoombinis.push_back(zoombini);
@@ -394,7 +387,7 @@ bool Zombiniville::createZoombini(bool allowConcurrentEntrances) {
 		_featureCounts[feature][features[feature]] += 1;
 
 	debug(2, "Zombiniville: Created '%s' with features %d/%d/%d/%d in slot %u", _currentName.c_str(), features[0], features[1], features[2],
-			features[3], _boardingZoombinis.size() - 1);
+		  features[3], _boardingZoombinis.size() - 1);
 	return true;
 }
 
@@ -405,14 +398,11 @@ void Zombiniville::update() {
 		PathObject *path = _entrancePaths[i];
 		if (!path)
 			continue;
-		int x = 0;
-		int y = 0;
-		if (path->advance(tick, x, y)) {
-			_boardingZoombinis[i]->_posX = x;
-			_boardingZoombinis[i]->_posY = y;
+		Common::Point32 position;
+		if (path->advance(tick, position)) {
+			_boardingZoombinis[i]->_position = position;
 		} else {
-			_boardingZoombinis[i]->_posX = path->endX;
-			_boardingZoombinis[i]->_posY = path->endY;
+			_boardingZoombinis[i]->_position = path->endPosition;
 			_boardingZoombinis[i]->_activeFlag = 1;
 			delete path;
 			_entrancePaths[i] = nullptr;
@@ -424,7 +414,7 @@ void Zombiniville::update() {
 }
 
 void Zombiniville::drawAnimationFrame(Graphics::ManagedSurface *screen, const Animation *animation, int frameIndex, int x, int y,
-		const byte alphaLUT[256][256]) {
+									  const byte alphaLUT[256][256]) {
 	if (!animation || animation->getFrameCount() == 0)
 		return;
 	frameIndex = MIN(frameIndex, animation->getFrameCount() - 1);
@@ -433,19 +423,19 @@ void Zombiniville::drawAnimationFrame(Graphics::ManagedSurface *screen, const An
 		frame->drawToScreen(screen, x, y, alphaLUT);
 }
 
-void Zombiniville::drawZoombini(Graphics::ManagedSurface *screen, const Zoombini &zoombini, int cellIndex) const {
+void Zombiniville::drawZoombini(Graphics::ManagedSurface *screen, const ZoombiniState &zoombini, int cellIndex) const {
 	if (!_littleZombGfx)
 		return;
-	const byte (*alphaLUT)[256] = _engine->getAlphaLUT();
-	const int baseIndex = cellIndex * ZoombiniGfx::kDim1 * ZoombiniGfx::kDim2;
+	const byte(*alphaLUT)[256] = _engine->getAlphaLUT();
+	const int baseIndex = cellIndex * ZoombiniGraphics::kDim1 * ZoombiniGraphics::kDim2;
 	const RleBlock *frame = _littleZombGfx->getFrame(baseIndex, 0);
 	if (frame)
-		frame->drawToScreen(screen, zoombini._posX, zoombini._posY, alphaLUT);
+		frame->drawToScreen(screen, zoombini._position.x, zoombini._position.y, alphaLUT);
 	const byte features[kNumFeatures] = {zoombini._featureA, zoombini._featureB, zoombini._featureC, zoombini._featureD};
 	for (int layer = 1; layer <= kNumFeatures; layer++) {
-		frame = _littleZombGfx->getFrame(baseIndex + layer * ZoombiniGfx::kDim2 + features[layer - 1], 0);
+		frame = _littleZombGfx->getFrame(baseIndex + layer * ZoombiniGraphics::kDim2 + features[layer - 1], 0);
 		if (frame)
-			frame->drawToScreen(screen, zoombini._posX, zoombini._posY, alphaLUT);
+			frame->drawToScreen(screen, zoombini._position.x, zoombini._position.y, alphaLUT);
 	}
 }
 
@@ -455,7 +445,7 @@ void Zombiniville::drawBoardingZoombinis(Graphics::ManagedSurface *screen) const
 		order.push_back(i);
 	for (uint i = 0; i < order.size(); i++) {
 		for (uint j = i + 1; j < order.size(); j++) {
-			if (_boardingZoombinis[order[j]]->_posY < _boardingZoombinis[order[i]]->_posY)
+			if (_boardingZoombinis[order[j]]->_position.y < _boardingZoombinis[order[i]]->_position.y)
 				SWAP(order[i], order[j]);
 		}
 	}
@@ -466,7 +456,7 @@ void Zombiniville::drawBoardingZoombinis(Graphics::ManagedSurface *screen) const
 void Zombiniville::draw(Graphics::ManagedSurface *screen) {
 	if (_background)
 		_background->drawToSurface(screen, 0, 0);
-	const byte (*alphaLUT)[256] = _engine->getAlphaLUT();
+	const byte(*alphaLUT)[256] = _engine->getAlphaLUT();
 
 	for (int feature = 0; feature < kNumFeatures; feature++) {
 		for (int value = 0; value < kNumFeatureValues; value++) {
@@ -557,7 +547,7 @@ void Zombiniville::handleClick(const Common::Point &pos) {
 			} while (!createZoombini(true));
 		}
 		if (!_boardingZoombinis.empty()) {
-			const Zoombini *last = _boardingZoombinis.back();
+			const ZoombiniState *last = _boardingZoombinis.back();
 			const byte features[kNumFeatures] = {last->_featureA, last->_featureB, last->_featureC, last->_featureD};
 			for (int feature = 0; feature < kNumFeatures; feature++) {
 				_stations[feature].selectedValue = features[feature];

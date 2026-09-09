@@ -38,127 +38,181 @@ class Animation;
  */
 class BooliesPuzzle : public PuzzlePage {
 public:
+	/** Construct Boolie Boggle for @p engine. */
 	BooliesPuzzle(Zoombini2Engine *engine);
+	/** Release all bowling and boat resources. */
 	~BooliesPuzzle() override;
 
+	/** Load the lane and assign the active Zoombinis. */
 	void init() override;
+	/** Advance the ball, pins, released Zoombini, and boat phases. */
 	void update() override;
+	/** Draw the launch spots, obstacles, pins, actors, and boat. */
 	void draw(Graphics::ManagedSurface *screen) override;
+	/** Launch the current ball from the selected active spot. */
 	void handleClick(const Common::Point &pos) override;
 
 private:
-	/**
-	 * Ball type (positive or negative).
-	 */
+	/** Polarity assigned to a rolling Zoombini. */
 	enum BallType {
+		/** No ball is currently assigned. */
 		kBallNone = 0,
+		/** Use the positive ball path and visual. */
 		kBallPositive,
+		/** Use the negative ball path and visual. */
 		kBallNegative
 	};
 
-	/**
-	 * Puzzle state machine.
-	 */
+	/** Runtime phase of the Boolie Boggle interaction. */
 	enum State {
+		/** Complete initial placement before accepting input. */
 		kStateInit,
-		kStateIdle,               // Waiting for player to select spot
-		kStateBallRolling,        // Ball is rolling toward pins
-		kStatePinsKnocked,        // Pins knocked down animation
-		kStateZoombiniFreed,      // Zoombini freed, moving to boat
-		kStateBoatLeaving,        // Boat departing
-		kStateDone                // Puzzle complete
+		/** Wait for the player to select a launch spot. */
+		kStateIdle,
+		/** Move the current ball toward the pins. */
+		kStateBallRolling,
+		/** Hold while knocked pins settle. */
+		kStatePinsKnocked,
+		/** Move a successfully released Zoombini toward the boat. */
+		kStateZoombiniFreed,
+		/** Move the completed party away by boat. */
+		kStateBoatLeaving,
+		/** Stop accepting input after completion. */
+		kStateDone
 	};
 
-	/**
-	 * Bowling pin state and position.
-	 */
+	/** One bowling pin's position and feedback state. */
 	struct Pin {
-		int x, y;                 // Screen position
-		bool knocked;             // True if knocked down
-		bool lighted;             // True if pin is lit (active target)
+		/** Screen position. */
+		Common::Point32 position;
+		/** Whether the pin has been knocked down. */
+		bool knocked;
+		/** Whether the pin is shown as an active target. */
+		bool lighted;
 	};
 
-	/**
-	 * Launch spot for rolling the ball.
-	 */
+	/** One selectable ball launch position. */
 	struct Spot {
-		int x, y;                 // Screen position
-		Common::Rect hitbox;      // Clickable region
-		bool active;              // Available for launch
+		/** Screen position. */
+		Common::Point32 position;
+		/** Clickable area. */
+		Common::Rect hitbox;
+		/** Whether this spot can launch the current ball. */
+		bool active;
 	};
 
-	/**
-	 * Rolling ball state.
-	 */
+	/** Position and timing for the currently rolling Zoombini. */
 	struct Ball {
-		BallType type;            // Positive or negative
-		int zoombiniIdx;          // Which zoombini is the ball
-		int x, y;                 // Current position
-		int startX, startY;       // Start position
-		int endX, endY;           // Target position
-		uint32 rollStart;         // Animation start time
+		/** Positive or negative path selection. */
+		BallType type;
+		/** Puzzle-roster index represented by this ball. */
+		int zoombiniIdx;
+		/** Current screen position. */
+		Common::Point32 position;
+		/** Screen position at the start of the roll. */
+		Common::Point32 startPosition;
+		/** Target screen position. */
+		Common::Point32 endPosition;
+		/** Time at which the roll began. */
+		uint32 rollStart;
 	};
 
-	// Setup
+	/** Load all puzzle graphics and animations. */
 	void loadResources();
+	/** Initialize launch positions and their hit-test areas. */
 	void setupSpots();
+	/** Initialize the active pin layout. */
 	void setupPins();
+	/** Leave the puzzle roster in base-page order for sequential ball selection. */
 	void assignZoombinis();
 
-	// Game logic
+	/** Launch the current Zoombini from spot @p spotIdx. */
 	void launchBall(int spotIdx);
+	/** Advance the current roll and resolve its endpoint. */
 	void advanceBallRoll();
+	/** Return whether the current ball intersects an active pin. */
 	bool checkPinCollision();
+	/** Mark all pins reached by the current ball as knocked down. */
 	void knockDownPins();
+	/** Release puzzle-roster entry @p zoombiniIdx. */
 	void freeZoombini(int zoombiniIdx);
+	/** Return the number of puzzle-roster entries already released. */
 	int countFreeZoombinis() const;
 
-	// Drawing
+	/** Draw the five launch spots. */
 	void drawSpots(Graphics::ManagedSurface *screen);
+	/** Draw standing and knocked pins. */
 	void drawPins(Graphics::ManagedSurface *screen);
+	/** Draw the currently rolling ball. */
 	void drawBall(Graphics::ManagedSurface *screen);
+	/** Draw the escape boat when visible. */
 	void drawBoat(Graphics::ManagedSurface *screen);
+	/** Draw lane blockers. */
 	void drawBlockers(Graphics::ManagedSurface *screen);
+	/** Draw waiting and released Zoombinis. */
 	void drawZoombinis(Graphics::ManagedSurface *screen);
 
-	// State
+	/** Current interaction phase. */
 	State _state;
-	int _currentSpot;             // Selected launch spot (-1 = none)
-	int _freedCount;              // Zoombinis freed
-	int _pinsKnocked;             // Total pins knocked
-	int _maxAttempts;             // Max attempts per zoombini (difficulty-based)
+	/** Selected launch spot, or `-1` when none is selected. */
+	int _currentSpot;
+	/** Number of Zoombinis already released. */
+	int _freedCount;
+	/** Total number of pins already knocked down. */
+	int _pinsKnocked;
+	/** Difficulty-dependent attempt allowance per Zoombini. */
+	int _maxAttempts;
 
-	// Spots and pins
+	/** Launch positions. */
 	Spot _spots[5];
+	/** Active bowling pin layout. */
 	Common::Array<Pin> _pins;
+	/** Currently rolling Zoombini state. */
 	Ball _activeBall;
 
-	// Boat position (for escape)
-	int _boatX, _boatY;
+	/** Current escape-boat position. */
+	Common::Point32 _boatPosition;
+	/** Whether the escape boat is currently drawn. */
 	bool _boatVisible;
 
-	// Blocker positions
+	/** Screen positions of lane blockers. */
 	Common::Array<Common::Point> _blockers;
 
-	// Graphics
-	RleBlock *_ballPosGfx;        // Positive ball
-	RleBlock *_ballNegGfx;        // Negative ball
-	RleBlock *_pinGfx;            // Normal pin
-	RleBlock *_pinLightedGfx;     // Lighted pin
-	RleBlock *_boatGfx;           // Escape boat
-	RleBlock *_spotGfx[5];        // Launch spots (spot01-05)
-	RleBlock *_blockerGfx;        // Blocker sprite
-	RleBlock *_fixeGfx;           // Fixed position sprite
-	RleBlock *_fixe2Gfx;          // Fixed position sprite 2
-	Animation *_marcheAnim;       // Walking animation
-	Animation *_marche2Anim;      // Walking animation 2
-	Animation *_attendAnim;       // Waiting animation
-	Animation *_attend2Anim;      // Waiting animation 2
-	Animation *_rollAnim;         // Rolling animation
-	Animation *_roll2Anim;        // Rolling animation 2
-	Animation *_blockerAnim;      // Blocker animation
+	/** Positive ball visual. */
+	RleBlock *_ballPosGfx;
+	/** Negative ball visual. */
+	RleBlock *_ballNegGfx;
+	/** Normal pin visual. */
+	RleBlock *_pinGfx;
+	/** Highlighted active-pin visual. */
+	RleBlock *_pinLightedGfx;
+	/** Escape-boat visual. */
+	RleBlock *_boatGfx;
+	/** Launch-spot visuals. */
+	RleBlock *_spotGfx[5];
+	/** Static blocker visual. */
+	RleBlock *_blockerGfx;
+	/** First fixed lane overlay. */
+	RleBlock *_fixeGfx;
+	/** Second fixed lane overlay. */
+	RleBlock *_fixe2Gfx;
+	/** First walking animation. */
+	Animation *_marcheAnim;
+	/** Second walking animation. */
+	Animation *_marche2Anim;
+	/** First waiting animation. */
+	Animation *_attendAnim;
+	/** Second waiting animation. */
+	Animation *_attend2Anim;
+	/** Positive rolling animation. */
+	Animation *_rollAnim;
+	/** Negative rolling animation. */
+	Animation *_roll2Anim;
+	/** Animated blocker effect. */
+	Animation *_blockerAnim;
 
-	int _musicId;  // BGM: sounds/music/09-BB01.wav
+	/** Music handle used while Boolie Boggle is active. */
+	int _musicId;
 };
 
 } // End of namespace Zoombini2
