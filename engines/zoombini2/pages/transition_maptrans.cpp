@@ -23,11 +23,10 @@
 #include "common/file.h"
 #include "common/tokenizer.h"
 
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/transition_maptrans.h"
-#include "zoombini2/game_state.h"
-#include "zoombini2/gfx.h"
 #include "zoombini2/sound.h"
-#include "zoombini2/zoombini.h"
+#include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
@@ -35,8 +34,7 @@ namespace Zoombini2 {
 static const int kRescue1MovieMinimumZoombinis = 8;
 
 // ============================================================================
-// MapTransition — overworld map transition (page ID 22).
-// Original: CL_maptrans__Init_4224A0 (0x4224A0), object size 0x110 (272 bytes).
+// MapTransition - overworld map transition.
 // ============================================================================
 
 MapTransition::MapTransition(Zoombini2Engine *engine)
@@ -63,21 +61,17 @@ void MapTransition::cleanupPaths() {
 	_zoombiniPaths.clear();
 }
 
-/**
- * Draw an overlay sprite (segment or icon) onto a surface.
- * Original: CL_maptrans__DrawOverlaySprite_422290.
- * Loads bmp/maptrans/<name>.bmp + <name>_a.bmp, draws, and frees.
- */
+/** Load, draw, and release one map overlay and its alpha mask. */
 void MapTransition::drawOverlaySprite(Graphics::ManagedSurface *dst,
-                                      const Common::String &name, int x, int y) {
+							  const Common::String &name, const Common::Point32 &position) {
 	Common::Path colorPath(Common::String::format("bmp/maptrans/%s.bmp", name.c_str()));
 	Common::Path alphaPath(Common::String::format("bmp/maptrans/%s_a.bmp", name.c_str()));
 
 	BitBlock bit;
 	if (bit.loadFromBMPPair(colorPath, alphaPath)) {
-		bit.drawAlphaBlend(dst, x, y, _engine->getAlphaLUT());
+		bit.drawAlphaBlend(dst, position.x, position.y, _engine->getAlphaLUT());
 	} else if (bit.load(Common::Path(Common::String::format("bmp/maptrans/%s", name.c_str())))) {
-		bit.drawToSurface(dst, x, y);
+		bit.drawToSurface(dst, position.x, position.y);
 	} else {
 		debug(2, "MapTransition: overlay '%s' not found", name.c_str());
 	}
@@ -85,7 +79,6 @@ void MapTransition::drawOverlaySprite(Graphics::ManagedSurface *dst,
 
 /**
  * Draw map overlay segments and icons based on visited-world state.
- * Original: conditional overlay logic in CL_maptrans__Init_4224A0.
  *
  * Key pattern for each overlay:
  *   Draw if destWorld was already visited (past game),
@@ -104,192 +97,186 @@ void MapTransition::drawMapOverlays(Graphics::ManagedSurface *dst, int source, i
 	// "Show this path piece if destination was previously visited,
 	// OR if we're currently transitioning and haven't arrived yet."
 	auto visible = [&](int srcWorld, int dstWorld) -> bool {
-		return gs->isWorldVisited(dstWorld)
-			|| (source == srcWorld && gs->isWorldVisited(srcWorld)
-			    && !gs->isWorldVisitedAtDiff(dstWorld, 1));
+		return gs->isWorldVisited(dstWorld) || (source == srcWorld && gs->isWorldVisited(srcWorld) && !gs->isWorldVisitedAtDiff(dstWorld, 1));
 	};
 
 	switch (mapRegion) {
 	case 1: {
-		// Map region 1: Zombiniville → Rescue1 (transitions 0-3)
+		// Map region one covers Zombiniville through Rescue Site I.
 		bool seg01vis = visible(0, 1);
 		bool seg02vis = visible(1, 2);
 		bool seg03vis = visible(2, 3);
 		bool seg04vis = visible(3, 4);
 
 		if (seg01vis) {
-			drawOverlaySprite(dst, "bigmap_segment_01", 264, 206);
+			drawOverlaySprite(dst, "bigmap_segment_01", Common::Point32(264, 206));
 		}
 		if (seg02vis) {
-			drawOverlaySprite(dst, "bigmap_segment_02", 369, 94);
+			drawOverlaySprite(dst, "bigmap_segment_02", Common::Point32(369, 94));
 		}
 		if (seg03vis) {
-			drawOverlaySprite(dst, "bigmap_segment_03", 520, 74);
+			drawOverlaySprite(dst, "bigmap_segment_03", Common::Point32(520, 74));
 		}
 		if (seg04vis) {
-			drawOverlaySprite(dst, "bigmap_segment_03", 632, 156);
+			drawOverlaySprite(dst, "bigmap_segment_03", Common::Point32(632, 156));
 		}
 
 		// Icons
 		if (seg01vis) {
-			drawOverlaySprite(dst, "bigmap_icon_01", 259, 302);
-			drawOverlaySprite(dst, "bigmap_icon_02", 281, 131);
+			drawOverlaySprite(dst, "bigmap_icon_01", Common::Point32(259, 302));
+			drawOverlaySprite(dst, "bigmap_icon_02", Common::Point32(281, 131));
 		}
 		if (seg02vis) {
-			drawOverlaySprite(dst, "bigmap_icon_03", 421, 26);
+			drawOverlaySprite(dst, "bigmap_icon_03", Common::Point32(421, 26));
 		}
 		if (seg03vis) {
-			drawOverlaySprite(dst, "bigmap_icon_04", 564, 99);
+			drawOverlaySprite(dst, "bigmap_icon_04", Common::Point32(564, 99));
 		}
 		if (seg04vis) {
-			drawOverlaySprite(dst, "bigmap_icon_05", 653, 191);
+			drawOverlaySprite(dst, "bigmap_icon_05", Common::Point32(653, 191));
 		}
 		break;
 	}
 
 	case 2: {
-		// Map region 2: Rescue1 → Rescue2 (transitions 4-8, with fork)
+		// Map region two covers both routes between the rescue sites.
 		bool topRoute = gs->isWorldVisitedAtDiff(6, 1) || route == 1;
 		bool botRoute = gs->isWorldVisitedAtDiff(5, 1) || route == 2;
 
 		// Unconditional: start of route from Rescue1
-		drawOverlaySprite(dst, "bigmap_segment_03", -18, 198);
-		drawOverlaySprite(dst, "bigmap_segment_04", 99, 280);
+		drawOverlaySprite(dst, "bigmap_segment_03", Common::Point32(-18, 198));
+		drawOverlaySprite(dst, "bigmap_segment_04", Common::Point32(99, 280));
 
-		// Top path: fork → MagicWall → ChezNorf → Rescue2
+		// Top path: fork, Magic Wall, Chez Norf, then Rescue Site II.
 		if (topRoute && visible(4, 6)) {
-			drawOverlaySprite(dst, "bigmap_segment_05a", 201, 260);
+			drawOverlaySprite(dst, "bigmap_segment_05a", Common::Point32(201, 260));
 		}
 
-		// MagicWall → ChezNorf segment
-		bool czNorfSeg = gs->isWorldVisited(8)
-			|| (source == 6 && gs->isWorldVisited(6) && !gs->isWorldVisitedAtDiff(8, 1));
+		// Magic Wall to Chez Norf segment.
+		bool czNorfSeg = gs->isWorldVisited(8) || (source == 6 && gs->isWorldVisited(6) && !gs->isWorldVisitedAtDiff(8, 1));
 		if (czNorfSeg) {
-			drawOverlaySprite(dst, "bigmap_segment_06a", 310, 230);
+			drawOverlaySprite(dst, "bigmap_segment_06a", Common::Point32(310, 230));
 		}
 
-		// ChezNorf → Rescue2 segment (requires ChezNorf reached)
+		// Chez Norf to Rescue Site II segment.
 		if (gs->isWorldVisitedAtDiff(8, 1)) {
-			if (gs->isWorldVisited(9)
-			    || (source == 8 && gs->isWorldVisited(8) && !gs->isWorldVisitedAtDiff(9, 1))) {
-				drawOverlaySprite(dst, "bigmap_segment_07a", 480, 233);
+			if (gs->isWorldVisited(9) || (source == 8 && gs->isWorldVisited(8) && !gs->isWorldVisitedAtDiff(9, 1))) {
+				drawOverlaySprite(dst, "bigmap_segment_07a", Common::Point32(480, 233));
 			}
 		}
 
-		// Bottom path: fork → MysticMarsh → WallOfFleens → Rescue2
+		// Bottom path: fork, Mystic Marsh, Wall of Fleens, then Rescue Site II.
 		if (botRoute && visible(4, 5)) {
-			drawOverlaySprite(dst, "bigmap_segment_05b", 164, 376);
+			drawOverlaySprite(dst, "bigmap_segment_05b", Common::Point32(164, 376));
 		}
 
-		// MysticMarsh → WallOfFleens segment
-		bool wofSeg = gs->isWorldVisited(7)
-			|| (source == 5 && gs->isWorldVisited(5) && !gs->isWorldVisitedAtDiff(7, 1));
+		// Mystic Marsh to Wall of Fleens segment.
+		bool wofSeg = gs->isWorldVisited(7) || (source == 5 && gs->isWorldVisited(5) && !gs->isWorldVisitedAtDiff(7, 1));
 		if (wofSeg) {
-			drawOverlaySprite(dst, "bigmap_segment_06b", 339, 476);
+			drawOverlaySprite(dst, "bigmap_segment_06b", Common::Point32(339, 476));
 		}
 
-		// WallOfFleens → Rescue2 segment (requires WallOfFleens reached)
+		// Wall of Fleens to Rescue Site II segment.
 		if (gs->isWorldVisitedAtDiff(7, 1)) {
-			if (gs->isWorldVisited(9)
-			    || (source == 7 && gs->isWorldVisited(7) && !gs->isWorldVisitedAtDiff(9, 1))) {
-				drawOverlaySprite(dst, "bigmap_segment_07b", 512, 360);
+			if (gs->isWorldVisited(9) || (source == 7 && gs->isWorldVisited(7) && !gs->isWorldVisitedAtDiff(9, 1))) {
+				drawOverlaySprite(dst, "bigmap_segment_07b", Common::Point32(512, 360));
 			}
 		}
 
-		// Icons — unconditional
-		drawOverlaySprite(dst, "bigmap_icon_04", 27, 223);
-		drawOverlaySprite(dst, "bigmap_icon_05", 116, 315);
+		// These route icons are always visible in region two.
+		drawOverlaySprite(dst, "bigmap_icon_04", Common::Point32(27, 223));
+		drawOverlaySprite(dst, "bigmap_icon_05", Common::Point32(116, 315));
 
 		// Top route icons
 		if (topRoute && visible(4, 6)) {
-			drawOverlaySprite(dst, "bigmap_icon_06a", 259, 210);
+			drawOverlaySprite(dst, "bigmap_icon_06a", Common::Point32(259, 210));
 		}
 		if (czNorfSeg) {
-			drawOverlaySprite(dst, "bigmap_icon_07a", 440, 170);
+			drawOverlaySprite(dst, "bigmap_icon_07a", Common::Point32(440, 170));
 		}
 
 		// Rescue2 icon (reachable from either path)
-		if (gs->isWorldVisited(9)
-		    || (source == 8 && gs->isWorldVisited(8) && !gs->isWorldVisitedAtDiff(9, 1))
-		    || (source == 7 && gs->isWorldVisited(7) && !gs->isWorldVisitedAtDiff(9, 1))) {
-			drawOverlaySprite(dst, "bigmap_icon_08", 476, 271);
+		if (gs->isWorldVisited(9) ||
+			(source == 8 && gs->isWorldVisited(8) && !gs->isWorldVisitedAtDiff(9, 1)) ||
+			(source == 7 && gs->isWorldVisited(7) && !gs->isWorldVisitedAtDiff(9, 1))) {
+			drawOverlaySprite(dst, "bigmap_icon_08", Common::Point32(476, 271));
 		}
 
 		// Bottom route icons
 		if (botRoute && visible(4, 5)) {
-			drawOverlaySprite(dst, "bigmap_icon_06b", 290, 418);
+			drawOverlaySprite(dst, "bigmap_icon_06b", Common::Point32(290, 418));
 		}
 		if (visible(5, 7)) {
-			drawOverlaySprite(dst, "bigmap_icon_07b", 443, 430);
+			drawOverlaySprite(dst, "bigmap_icon_07b", Common::Point32(443, 430));
 		}
 		break;
 	}
 
 	case 3: {
-		// Map region 3: Rescue2 → Final (transitions 9-12)
+		// Map region three covers Rescue Site II through the finale.
 		bool topRouteFlag = gs->isWorldVisitedAtDiff(6, 1);
 		bool czNorfFlag = gs->isWorldVisitedAtDiff(8, 1);
 		bool wofFlag = gs->isWorldVisitedAtDiff(7, 1);
 
 		// Previous route segments (show which path was taken)
 		if (topRouteFlag) {
-			drawOverlaySprite(dst, "bigmap_segment_05a", -27, 418);
-			drawOverlaySprite(dst, "bigmap_segment_06a", 87, 386);
+			drawOverlaySprite(dst, "bigmap_segment_05a", Common::Point32(-27, 418));
+			drawOverlaySprite(dst, "bigmap_segment_06a", Common::Point32(87, 386));
 		}
 		if (czNorfFlag) {
-			drawOverlaySprite(dst, "bigmap_segment_07a", 251, 383);
+			drawOverlaySprite(dst, "bigmap_segment_07a", Common::Point32(251, 383));
 		}
 		if (wofFlag) {
-			drawOverlaySprite(dst, "bigmap_segment_07b", 293, 515);
+			drawOverlaySprite(dst, "bigmap_segment_07b", Common::Point32(293, 515));
 		}
 
-		// Unconditional: Rescue2 → Snowboard start
-		drawOverlaySprite(dst, "bigmap_segment_08", 313, 407);
+		// Rescue Site II to Snowboard Gulch is always visible.
+		drawOverlaySprite(dst, "bigmap_segment_08", Common::Point32(313, 407));
 
-		// Snowboard → Boolies
+		// Snowboard Gulch to Boolie Boggle.
 		if (visible(10, 11)) {
-			drawOverlaySprite(dst, "bigmap_segment_09", 434, 328);
+			drawOverlaySprite(dst, "bigmap_segment_09", Common::Point32(434, 328));
 		}
-		// Boolies → Final
+		// Boolie Boggle to the finale.
 		if (visible(11, 12)) {
-			drawOverlaySprite(dst, "bigmap_segment_10", 527, 111);
+			drawOverlaySprite(dst, "bigmap_segment_10", Common::Point32(527, 111));
 		}
 
-		// Icons — conditional on route flags
+		// Prior-route icons remain conditional on saved progress.
 		if (topRouteFlag) {
-			drawOverlaySprite(dst, "bigmap_icon_06a", 33, 366);
+			drawOverlaySprite(dst, "bigmap_icon_06a", Common::Point32(33, 366));
 		}
 		if (czNorfFlag) {
-			drawOverlaySprite(dst, "bigmap_icon_07a", 214, 326);
+			drawOverlaySprite(dst, "bigmap_icon_07a", Common::Point32(214, 326));
 		}
 
 		// Unconditional icons
-		drawOverlaySprite(dst, "bigmap_icon_08", 252, 426);
-		drawOverlaySprite(dst, "bigmap_icon_07b", 66, 574);
-		drawOverlaySprite(dst, "bigmap_icon_09", 367, 367);
+		drawOverlaySprite(dst, "bigmap_icon_08", Common::Point32(252, 426));
+		drawOverlaySprite(dst, "bigmap_icon_07b", Common::Point32(66, 574));
+		drawOverlaySprite(dst, "bigmap_icon_09", Common::Point32(367, 367));
 
 		// Conditional icons
 		if (visible(10, 11)) {
-			drawOverlaySprite(dst, "bigmap_icon_10", 469, 273);
+			drawOverlaySprite(dst, "bigmap_icon_10", Common::Point32(469, 273));
 		}
 		if (visible(11, 12)) {
-			drawOverlaySprite(dst, "bigmap_icon_11", 608, -12);
+			drawOverlaySprite(dst, "bigmap_icon_11", Common::Point32(608, -12));
 		}
 		break;
 	}
 
 	default:
-		// Fallback (default case from IDA)
-		drawOverlaySprite(dst, "bigmap_segment_01", 264, 206);
-		drawOverlaySprite(dst, "bigmap_icon_01", 259, 302);
-		drawOverlaySprite(dst, "bigmap_icon_02", 281, 131);
+		// Use the first map region as a safe fallback.
+		drawOverlaySprite(dst, "bigmap_segment_01", Common::Point32(264, 206));
+		drawOverlaySprite(dst, "bigmap_icon_01", Common::Point32(259, 302));
+		drawOverlaySprite(dst, "bigmap_icon_02", Common::Point32(281, 131));
 		break;
 	}
 }
 
 void MapTransition::init() {
 	debug(1, "MapTransition::init (source=%d, route=%d)",
-		_engine->_maptransSourceWorld, _engine->_routeDirection);
+		  _engine->_maptransSourceWorld, _engine->_routeDirection);
 
 	int source = _engine->_maptransSourceWorld;
 	int route = _engine->_routeDirection;
@@ -305,25 +292,48 @@ void MapTransition::init() {
 	else
 		mapRegion = 3;
 
-	// Select PAT file based on source world
-	// Original: CL_maptrans__Init_4224A0 switch on a2
+	// Select the walking path from the source world.
 	Common::String patName;
 	switch (source) {
-	case 0:  patName = "tr1 - map1.pat"; break;
-	case 1:  patName = "tr2 - map1.pat"; break;
-	case 2:  patName = "tr3 - map1.pat"; break;
-	case 3:  patName = "tr4 - map1.pat"; break;
+	case 0:
+		patName = "tr1 - map1.pat";
+		break;
+	case 1:
+		patName = "tr2 - map1.pat";
+		break;
+	case 2:
+		patName = "tr3 - map1.pat";
+		break;
+	case 3:
+		patName = "tr4 - map1.pat";
+		break;
 	case 4:
 		patName = (route == 1) ? "tr5 - map2.pat" : "tr8 - map2.pat";
 		break;
-	case 5:  patName = "tr9 - map2.pat"; break;
-	case 6:  patName = "tr6 - map2.pat"; break;
-	case 7:  patName = "tr10 - map2.pat"; break;
-	case 8:  patName = "tr7 - map2.pat"; break;
-	case 9:  patName = "tr11 - map3.pat"; break;
-	case 10: patName = "tr12 - map3.pat"; break;
-	case 11: patName = "tr13 - map3.pat"; break;
-	default: patName = "Transition02.pat"; break;
+	case 5:
+		patName = "tr9 - map2.pat";
+		break;
+	case 6:
+		patName = "tr6 - map2.pat";
+		break;
+	case 7:
+		patName = "tr10 - map2.pat";
+		break;
+	case 8:
+		patName = "tr7 - map2.pat";
+		break;
+	case 9:
+		patName = "tr11 - map3.pat";
+		break;
+	case 10:
+		patName = "tr12 - map3.pat";
+		break;
+	case 11:
+		patName = "tr13 - map3.pat";
+		break;
+	default:
+		patName = "Transition02.pat";
+		break;
 	}
 	_patPath = Common::Path(Common::String::format("bmp/maptrans/%s", patName.c_str()));
 
@@ -335,7 +345,7 @@ void MapTransition::init() {
 
 	delete _compositedBg;
 	_compositedBg = new Graphics::ManagedSurface(kScreenWidth, kScreenHeight,
-	                    Graphics::PixelFormat(4, 8, 8, 8, 8, 16, 8, 0, 24));
+												 Graphics::PixelFormat(4, 8, 8, 8, 8, 16, 8, 0, 24));
 
 	if (bg.load(Common::Path(bgPath))) {
 		bg.drawToSurface(_compositedBg, 0, 0);
@@ -349,14 +359,12 @@ void MapTransition::init() {
 
 	// Initialize zoombini walk state
 	cleanupPaths();
-	int numZoombinis = (int)_engine->_globalZoombinis.size();
+	int numZoombinis = static_cast<int>(_engine->_globalZoombinis.size());
 	_zoombiniPaths.resize(numZoombinis, nullptr);
 	_walkStates.resize(numZoombinis);
 	for (int i = 0; i < numZoombinis; i++) {
-		_walkStates[i].screenX = 0;
-		_walkStates[i].screenY = 0;
-		_walkStates[i].prevX = 0;
-		_walkStates[i].prevY = 0;
+		_walkStates[i].screenPosition = Common::Point32();
+		_walkStates[i].previousScreenPosition = Common::Point32();
 		_walkStates[i].cellIndex = 88; // default: facing down
 		_walkStates[i].active = false;
 	}
@@ -364,37 +372,29 @@ void MapTransition::init() {
 	_nextWalkTime = 0;
 	_completedCount = 0;
 
-	// Load zoombini walking sprites (littleZomb.anm)
-	// Original: g_worldData at 0x50FB50, loaded by CompressGfxZomb_Read_45C4D0
+	// Load the little-Zoombini animation cells used by every walker.
 	delete _zoombiniGfx;
-	_zoombiniGfx = new ZoombiniGfx();
+	_zoombiniGfx = new ZoombiniGraphics();
 	if (!_zoombiniGfx->loadFromFile(Common::Path("bmp/zombis/littleZomb.anm"))) {
 		warning("MapTransition: Failed to load littleZomb.anm");
 		delete _zoombiniGfx;
 		_zoombiniGfx = nullptr;
 	}
 
-	debug(1, "MapTransition: source=%d → target=%d (region %d, path=%s, zoombinis=%d)",
-		source, _targetWorld, mapRegion, _patPath.toString().c_str(), numZoombinis);
+	debug(1, "MapTransition: source=%d -> target=%d (region %d, path=%s, zoombinis=%d)",
+		  source, _targetWorld, mapRegion, _patPath.toString().c_str(), numZoombinis);
 
 	// Play transition music
 	_musicId = _engine->getSoundManager()->load(true,
-		Common::Path("sounds/music/ZMR-Transition.wav"), true);
+												Common::Path("sounds/music/ZMR-Transition.wav"), true);
 	if (_musicId >= 0)
 		_engine->getSoundManager()->play(_musicId);
 }
 
-/**
- * Walk zoombinis one-by-one along bezier paths.
- * Original: CL_maptrans__WalkZoombinis_421E80.
- *
- * 800ms delay between starting each zoombini.
- * Each zoombini gets its own PathObject loaded from the same PAT file.
- * When all zoombinis complete their path, sets skipMode=1.
- */
+/** Start and advance one independent path per Zoombini with an 800-millisecond stagger. */
 void MapTransition::walkZoombinis() {
 	uint32 now = _engine->getGameTickCount();
-	int numZoombinis = (int)_engine->_globalZoombinis.size();
+	int numZoombinis = static_cast<int>(_engine->_globalZoombinis.size());
 
 	// Start the next zoombini walking if it's time
 	if (_nextWalkIndex < numZoombinis && now > _nextWalkTime) {
@@ -407,16 +407,14 @@ void MapTransition::walkZoombinis() {
 
 			// Initialize walk state with path start position
 			CurveSegment *seg = path->segments[0];
-			int sx = seg->posX >> 10;
-			int sy = seg->posY >> 10;
-			_walkStates[_nextWalkIndex].screenX = sx - 13;
-			_walkStates[_nextWalkIndex].screenY = sy - 13;
-			_walkStates[_nextWalkIndex].prevX = sx - 13;
-			_walkStates[_nextWalkIndex].prevY = sy - 13;
+			const Common::Point32 pathPosition(seg->position.x >> 10, seg->position.y >> 10);
+			const Common::Point32 spritePosition(pathPosition.x - 13, pathPosition.y - 13);
+			_walkStates[_nextWalkIndex].screenPosition = spritePosition;
+			_walkStates[_nextWalkIndex].previousScreenPosition = spritePosition;
 			_walkStates[_nextWalkIndex].cellIndex = 88;
 			_walkStates[_nextWalkIndex].active = true;
 		}
-		_nextWalkIndex++;
+		_nextWalkIndex += 1;
 	}
 
 	// Update all walking zoombinis
@@ -425,26 +423,22 @@ void MapTransition::walkZoombinis() {
 		if (!path)
 			continue;
 
-		int screenX, screenY;
-		if (!path->advance(now, screenX, screenY)) {
-			// Path complete — zoombini finished walking
+		Common::Point32 pathPosition;
+		if (!path->advance(now, pathPosition)) {
+			// Release the path after this Zoombini reaches its endpoint.
 			_walkStates[i].active = false;
 			delete path;
 			_zoombiniPaths[i] = nullptr;
-			_completedCount++;
+			_completedCount += 1;
 		} else {
-			// Update position and compute direction
-			// Original: CompressGfxZomb__LoadSprites_45C230(bezierX - 13, bezierY - 13)
-			int newX = screenX - 13;
-			int newY = screenY - 13;
+			// Update position and select a direction cell from the movement delta.
+			const Common::Point32 newScreenPosition(pathPosition.x - 13, pathPosition.y - 13);
 
-			_walkStates[i].prevX = _walkStates[i].screenX;
-			_walkStates[i].prevY = _walkStates[i].screenY;
-			_walkStates[i].screenX = newX;
-			_walkStates[i].screenY = newY;
+			_walkStates[i].previousScreenPosition = _walkStates[i].screenPosition;
+			_walkStates[i].screenPosition = newScreenPosition;
 
-			int dx = newX - _walkStates[i].prevX;
-			int dy = newY - _walkStates[i].prevY;
+			int dx = newScreenPosition.x - _walkStates[i].previousScreenPosition.x;
+			int dy = newScreenPosition.y - _walkStates[i].previousScreenPosition.y;
 			if (dx != 0 || dy != 0)
 				_walkStates[i].cellIndex = computeDirectionCell(dx, dy);
 		}
@@ -477,8 +471,7 @@ int MapTransition::getPostTransitionPage() const {
 			return kPageStoryBmp;
 	}
 
-	if ((source == kPageWallOfFleens || source == kPageChezNorf)
-	    && !gameState->hasPlayedRescue2Movie()) {
+	if ((source == kPageWallOfFleens || source == kPageChezNorf) && !gameState->hasPlayedRescue2Movie()) {
 		return kPageStoryAnim;
 	}
 
@@ -495,30 +488,22 @@ void MapTransition::finishTransition() {
 	_engine->requestPageChange(nextPage);
 }
 
-/**
- * Compute direction cell index from movement delta.
- * Original: CompressGfxZomb__LoadSprites_45C230 angle→direction mapping.
- *
- * Uses acos of the normalized X component, divided by 22° to get one
- * of 16 compass directions, each mapped to a ZoombiniGfx cell index.
- */
+/** Convert a movement vector into one of the sixteen directional animation cells. */
 int MapTransition::computeDirectionCell(int dx, int dy) const {
-	// Direction → cell index table (indexed by direction + 8)
-	// Original values from IDA: 0→66, 1→69, 2→99, 3→98, 4→88, 5→87,
-	// 6→77, 7→74, ±8→44, -7→41, -6→11, -5→12, -4→22, -3→23, -2→33, -1→36
-	static const int kDirTable[17] = {
-		44, 41, 11, 12, 22, 23, 33, 36,  // directions -8..-1
-		66,                                // direction 0 (right)
-		69, 99, 98, 88, 87, 77, 74, 44    // directions 1..8
+	// Animation cells indexed by signed direction plus eight.
+	static constexpr int kDirTable[17] = {
+		44, 41, 11, 12, 22, 23, 33, 36, // directions -8..-1
+		66,                             // direction 0 (right)
+		69, 99, 98, 88, 87, 77, 74, 44  // directions 1..8
 	};
 
-	double dist = sqrt((double)(dx * dx + dy * dy));
+	double dist = sqrt(static_cast<double>(dx * dx + dy * dy));
 	if (dist < 0.001)
 		return 88; // no movement: default down
 
-	double cosAngle = CLIP((double)dx / dist, -1.0, 1.0);
+	double cosAngle = CLIP(static_cast<double>(dx) / dist, -1.0, 1.0);
 	double angleDeg = acos(cosAngle) * 180.0 / M_PI;
-	int direction = (int)(angleDeg / 22.0);
+	int direction = static_cast<int>(angleDeg / 22.0);
 	if (direction > 8)
 		direction = 8;
 	if (dy < 0)
@@ -527,39 +512,32 @@ int MapTransition::computeDirectionCell(int dx, int dy) const {
 	return kDirTable[direction + 8];
 }
 
-/**
- * Draw a single zoombini at given position with 5 layered sprites.
- * Original: Zoombini__RenderAndAnimate_45D540.
- *
- * Layers: body [cellIndex][0][0], then features A..D at:
- *   [cellIndex][1..4][featureValue].
- * Each layer is an RleBlock from the ZoombiniGfx 3D cell array.
- */
+/** Draw one Zoombini as a body layer followed by its four feature layers. */
 void MapTransition::drawZoombiniSprite(Graphics::ManagedSurface *dst,
-                                       int zoombiniIdx, int cellIndex,
-                                       int x, int y) const {
+									   int zoombiniIdx, int cellIndex,
+									   const Common::Point32 &position) const {
 	if (!_zoombiniGfx || zoombiniIdx < 0 ||
-	    zoombiniIdx >= (int)_engine->_globalZoombinis.size())
+		zoombiniIdx >= static_cast<int>(_engine->_globalZoombinis.size()))
 		return;
 
-	const Zoombini *z = _engine->_globalZoombinis[zoombiniIdx];
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const ZoombiniState *z = _engine->_globalZoombinis[zoombiniIdx];
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 
 	// Base flat index for this direction: cellIndex * kDim1 * kDim2
-	int baseIdx = cellIndex * ZoombiniGfx::kDim1 * ZoombiniGfx::kDim2;
+	int baseIdx = cellIndex * ZoombiniGraphics::kDim1 * ZoombiniGraphics::kDim2;
 
 	// Body: [cellIndex][0][0]
 	const RleBlock *frame = _zoombiniGfx->getFrame(baseIdx, 0);
 	if (frame)
-		frame->drawToScreen(dst, x, y, lut);
+		frame->drawToScreen(dst, position.x, position.y, lut);
 
 	// Features 1..4 (Hair, Eyes, Nose, Feet)
-	const byte features[4] = { z->_featureA, z->_featureB, z->_featureC, z->_featureD };
+	const byte features[4] = {z->_featureA, z->_featureB, z->_featureC, z->_featureD};
 	for (int slot = 1; slot <= 4; slot++) {
-		int featIdx = baseIdx + slot * ZoombiniGfx::kDim2 + features[slot - 1];
+		int featIdx = baseIdx + slot * ZoombiniGraphics::kDim2 + features[slot - 1];
 		frame = _zoombiniGfx->getFrame(featIdx, 0);
 		if (frame)
-			frame->drawToScreen(dst, x, y, lut);
+			frame->drawToScreen(dst, position.x, position.y, lut);
 	}
 }
 
@@ -568,10 +546,8 @@ void MapTransition::draw(Graphics::ManagedSurface *screen) {
 	if (_compositedBg)
 		screen->blitFrom(*_compositedBg, Common::Point(0, 0));
 
-	// Draw zoombini sprites sorted by Y position for proper overlap.
-	// Original: Zoombini__SortByYAndDraw_45DB40 — bubble sort by Y,
-	// then Zoombini__RenderAndAnimate_45D540 per zoombini.
-	int numZoombinis = (int)_engine->_globalZoombinis.size();
+	// Sort walkers by vertical position so lower sprites overlap higher ones.
+	int numZoombinis = static_cast<int>(_engine->_globalZoombinis.size());
 
 	// Build sort order by Y
 	Common::Array<int> drawOrder;
@@ -580,10 +556,10 @@ void MapTransition::draw(Graphics::ManagedSurface *screen) {
 			drawOrder.push_back(i);
 	}
 
-	// Bubble sort by Y (matches original sort at 0x45DB40)
+	// The party is small enough for a direct pairwise sort.
 	for (uint i = 0; i < drawOrder.size(); i++) {
 		for (uint j = i + 1; j < drawOrder.size(); j++) {
-			if (_walkStates[drawOrder[j]].screenY < _walkStates[drawOrder[i]].screenY)
+			if (_walkStates[drawOrder[j]].screenPosition.y < _walkStates[drawOrder[i]].screenPosition.y)
 				SWAP(drawOrder[i], drawOrder[j]);
 		}
 	}
@@ -591,8 +567,7 @@ void MapTransition::draw(Graphics::ManagedSurface *screen) {
 	// Draw each zoombini in Y-sorted order
 	for (uint i = 0; i < drawOrder.size(); i++) {
 		int idx = drawOrder[i];
-		drawZoombiniSprite(screen, idx, _walkStates[idx].cellIndex,
-		                   _walkStates[idx].screenX, _walkStates[idx].screenY);
+		drawZoombiniSprite(screen, idx, _walkStates[idx].cellIndex, _walkStates[idx].screenPosition);
 	}
 }
 

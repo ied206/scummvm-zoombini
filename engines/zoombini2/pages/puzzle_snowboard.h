@@ -22,6 +22,8 @@
 #ifndef ZOOMBINI2_PAGES_PUZZLE_SNOWBOARD_H
 #define ZOOMBINI2_PAGES_PUZZLE_SNOWBOARD_H
 
+#include "common/rect.h"
+
 #include "zoombini2/pages/puzzle_base.h"
 
 namespace Zoombini2 {
@@ -30,83 +32,95 @@ class RleBlock;
 class Animation;
 
 /**
- * SnowboardPuzzle - Snowboard Gulch: Binary decision tree classifier puzzle.
+ * Snowboard Gulch routes Zoombinis to lanes through a generated decision tree.
  *
- * Original: Snowboard__Init_42D620, object size 0x1E0, vtable 0x480400.
- *
- * Mechanics: Routes zoombinis to snowboard lanes via a binary decision tree.
- * Each tree node checks zoombini feature[node.featureIdx] against node.matchVal.
- * Match → left child (2i+1), No match → right child (2i+2).
- * Leaf index determines the snowboard lane assignment.
- *
- * Difficulty scaling:
- *   - Diff 1-2: Single match value per node
- *   - Diff 3: Two match values per node (accept either)
+ * Each internal node tests a visible feature. Matching values take one branch,
+ * nonmatching values take the other, and the reached leaf selects a lane.
  */
 class SnowboardPuzzle : public PuzzlePage {
 public:
+	/** Construct Snowboard Gulch for @p engine. */
 	SnowboardPuzzle(Zoombini2Engine *engine);
+	/** Release lane, trait, board, and scenery resources. */
 	~SnowboardPuzzle() override;
 
+	/** Generate the decision tree and assign the current puzzle roster to lanes. */
 	void init() override;
+	/** Advance the current snowboarder and completion state. */
 	void update() override;
+	/** Draw the board, scenery, decision hints, and current snowboarder. */
 	void draw(Graphics::ManagedSurface *screen) override;
+	/** Ignore clicks because lane traversal advances automatically. */
 	void handleClick(const Common::Point &pos) override;
 
 private:
-	/**
-	 * Decision tree node structure (5 bytes in original).
-	 * Original: tree stored at this+264, stride 5 bytes.
-	 */
+	/** One generated feature test in the lane-classification tree. */
 	struct TreeNode {
-		byte featureIdx;   // Which feature to check (0-3: hair, eyes, nose, feet)
-		byte matchVal1;    // Value to match for left branch
-		byte matchVal2;    // Second match value (difficulty 3 only)
+		/** Feature index tested by this node. */
+		byte featureIdx;
+		/** Primary value that selects the matching branch. */
+		byte matchVal1;
+		/** Optional second matching value used at higher difficulty. */
+		byte matchVal2;
 	};
 
-	// Generate the decision tree for current difficulty
+	/** Generate the decision tree for the current difficulty. */
 	void generateTree();
 
-	// Traverse tree for a zoombini, returns lane index (0 to numLanes-1)
-	int classifyZoombini(const Zoombini *z) const;
+	/** Classify @p z and return its destination lane. */
+	int classifyZoombini(const ZoombiniState *z) const;
 
-	// Assign all zoombinis to lanes
+	/** Classify every puzzle-roster entry and store its lane. */
 	void assignZoombinisToLanes();
 
-	// Load lane graphics
+	/** Load the lane, board, trait, and scenery resources. */
 	void loadLaneGraphics();
 
-	// Draw trail icon for feature match
-	void drawTraitIcon(Graphics::ManagedSurface *screen, int feature, int value, int x, int y);
+	/** Draw a feature-value hint at @p position. */
+	void drawTraitIcon(Graphics::ManagedSurface *screen, int feature, int value, const Common::Point32 &position);
 
-	// Decision tree data
+	/** Generated internal decision-tree nodes. */
 	Common::Array<TreeNode> _tree;
-	int _treeDepth;           // Number of internal nodes (leaf count = depth + 1)
-	int _numLanes;            // Number of destination lanes
+	/** Number of internal nodes, with one more destination leaf than this value. */
+	int _treeDepth;
+	/** Number of destination lanes. */
+	int _numLanes;
 
-	// Lane assignments: which zoombinis go to which lane
-	Common::Array<int> _laneAssignments;  // Index by zoombini, value is lane
+	/** Destination lane indexed by puzzle-roster entry. */
+	Common::Array<int> _laneAssignments;
 
-	// Graphics
-	RleBlock *_traitIcons[4][5];   // Feature icons [feature 0-3][value 0-4]
-	BitBlock *_boardGfx;            // Static board sprite (BOARD01.RB)
-	Animation *_boardAnim;          // Animated board (BOARD.AN)
-	Animation *_engineAnim;         // Engine/lift animation (ENGINE.AN)
-	Animation *_decorAnims[5];      // Background/scenery animations (N1So-1,3,4,5,6)
+	/** Feature-value hint visuals. */
+	RleBlock *_traitIcons[4][5];
+	/** Static board visual. */
+	BitBlock *_boardGfx;
+	/** Animated board sequence. */
+	Animation *_boardAnim;
+	/** Lift engine animation. */
+	Animation *_engineAnim;
+	/** Background scenery animations. */
+	Animation *_decorAnims[5];
 
-	// Puzzle state
-	int _currentZoombini;     // Which zoombini is currently sliding
-	int _animFrame;           // Current animation frame
-	uint32 _lastFrameTime;    // For animation timing
+	/** Puzzle-roster index currently sliding. */
+	int _currentZoombini;
+	/** Current frame of the active board animation. */
+	int _animFrame;
+	/** Time at which the animation last advanced. */
+	uint32 _lastFrameTime;
 
+	/** Runtime phase of the automatic snowboard sequence. */
 	enum State {
+		/** Complete initial assignment before starting the sequence. */
 		kStateInit,
+		/** Animate Zoombinis through their assigned lanes. */
 		kStateSliding,
+		/** Stop after every assigned Zoombini has completed. */
 		kStateDone
 	};
+	/** Current automatic sequence phase. */
 	State _state;
 
-	int _musicId;  // BGM: sounds/music/01-BS06.wav
+	/** Music handle used while Snowboard Gulch is active. */
+	int _musicId;
 };
 
 } // End of namespace Zoombini2

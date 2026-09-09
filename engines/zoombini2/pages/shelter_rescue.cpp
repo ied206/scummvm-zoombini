@@ -21,20 +21,16 @@
 
 #include "common/debug.h"
 
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/shelter_rescue.h"
-#include "zoombini2/gfx.h"
-#include "zoombini2/game_state.h"
 #include "zoombini2/sound.h"
-#include "zoombini2/zoombini.h"
+#include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
 // ============================================================================
 // RescuePage - party storage shelters (page IDs 4 and 9).
-// Rescue1: Original: Rescue1__Init_428A00, object size 0x88.
-// Rescue2: Original: Rescue2__Init_42ADC0, object size 0x54.
-//
 // Splits the zoombini pack into groups, shows scrollable grid,
 // portal animation, route direction selection, then transitions to map.
 //
@@ -51,8 +47,7 @@ RescuePage::RescuePage(Zoombini2Engine *engine, int rescueNum)
 	  _cramure(nullptr), _porteSelect(nullptr),
 	  _arrowLeftOff(nullptr), _arrowLeftOn(nullptr),
 	  _arrowRightOff(nullptr), _arrowRightOn(nullptr),
-	  _buttonUp(nullptr), _buttonDown(nullptr),
-	  _gridBaseX(0), _gridBaseY(0),
+	  _buttonUp(nullptr), _buttonDown(nullptr), _gridBasePosition(),
 	  _scrollOffset(0), _selectedZoombini(-1), _readyToDepart(false),
 	  _phase(0), _phaseTimer(0), _musicId(-1), _zoombiniGfx(nullptr) {
 	_pageId = (rescueNum == 1) ? kPageRescue1 : kPageRescue2;
@@ -78,7 +73,7 @@ RescuePage::~RescuePage() {
 }
 
 void RescuePage::init() {
-	debug(1, "RescuePage::init — Rescue%d", _rescueNum);
+	debug(1, "RescuePage::init - Rescue%d", _rescueNum);
 
 	Common::String basePath = Common::String::format("bmp/rescue%d/", _rescueNum);
 
@@ -89,13 +84,11 @@ void RescuePage::init() {
 		bg.drawToSurface(_engine->getScreen(), 0, 0);
 
 	// ------------------------------------------------------------------
-	// Rescue1: positions from Rescue1__Init_428A00
-	// Rescue2: positions from Rescue2__Init_42ADC0
+	// Each rescue site uses its own resource set and layout.
 	// ------------------------------------------------------------------
 	if (_rescueNum == 1) {
-		// Grid base: this+40=68, this+44=95
-		_gridBaseX = 68;
-		_gridBaseY = 95;
+		// Rescue Site I roster origin.
+		_gridBasePosition = Common::Point32(68, 95);
 
 		// Scroll buttons
 		// button_left.an (63x86) at (26,240), rect (26,240,89,326)
@@ -155,9 +148,8 @@ void RescuePage::init() {
 	} else {
 		// Rescue2
 
-		// Grid base: this+16=75, this+20=193
-		_gridBaseX = 75;
-		_gridBaseY = 193;
+		// Rescue Site II roster origin.
+		_gridBasePosition = Common::Point32(75, 193);
 
 		// Scroll buttons
 		// button_left.an (53x52) at (20,332), rect (20,332,83,418)
@@ -185,14 +177,12 @@ void RescuePage::init() {
 			_engine->getSoundManager()->play(_musicId);
 	}
 
-	// Build slot grid: 4 columns x 5 rows
-	// Original: col spacing = 40px, row spacing = 57px
-	// Slot rect: (baseX+col*40+18, baseY+row*57+30) to (baseX+col*40+58, baseY+row*57+87)
+	// Build the four-column, five-row visible roster grid.
 	for (int col = 0; col < kGridCols; col++) {
 		for (int row = 0; row < kGridRows; row++) {
 			int idx = col * kGridRows + row;
-			int x = _gridBaseX + col * kSlotWidth;
-			int y = _gridBaseY + row * kSlotHeight;
+			int x = _gridBasePosition.x + col * kSlotWidth;
+			int y = _gridBasePosition.y + row * kSlotHeight;
 			_slotRects[idx] = Common::Rect(x + 18, y + 30, x + 58, y + 87);
 		}
 	}
@@ -204,10 +194,9 @@ void RescuePage::init() {
 	_readyToDepart = false;
 	initRescueRoster();
 
-	// Load zoombini sprites (littleZomb.anm) for grid rendering
-	// Original: Zoombini__Zoombini_45BEE0 creates temp with &g_worldData, cellIndex=33
+	// Load the little-Zoombini animation cells used by the roster grid.
 	delete _zoombiniGfx;
-	_zoombiniGfx = new ZoombiniGfx();
+	_zoombiniGfx = new ZoombiniGraphics();
 	if (!_zoombiniGfx->loadFromFile(Common::Path("bmp/zombis/littleZomb.anm"))) {
 		warning("RescuePage: Failed to load littleZomb.anm");
 		delete _zoombiniGfx;
@@ -235,7 +224,7 @@ void RescuePage::initRescueRoster() {
 	GameState::refillFromBoard(board, _engine->_globalZoombinis, 8);
 	_departureRoster.clear();
 	for (uint i = 0; i < _engine->_globalZoombinis.size(); i++) {
-		Zoombini *zoombini = _engine->_globalZoombinis[i];
+		ZoombiniState *zoombini = _engine->_globalZoombinis[i];
 		zoombini->_freeStatus = 0;
 		zoombini->_activeFlag = 1;
 		zoombini->_flagByte39 = 0;
@@ -250,9 +239,9 @@ void RescuePage::initRescueRoster() {
 void RescuePage::saveRescueRoster() {
 	GameState *state = _engine->getGameState();
 	BoardRecord **board = _rescueNum == 1 ? state->_boardA : state->_boardB;
-	Common::Array<Zoombini *> &roster = _engine->_globalZoombinis;
+	Common::Array<ZoombiniState *> &roster = _engine->_globalZoombinis;
 	for (uint i = 0; i < roster.size();) {
-		Zoombini *zoombini = roster[i];
+		ZoombiniState *zoombini = roster[i];
 		bool departing = false;
 		if (_engine->isAdvancingWorld()) {
 			for (uint slot = 0; slot < _departureRoster.size(); slot++)
@@ -272,10 +261,9 @@ void RescuePage::saveRescueRoster() {
 
 void RescuePage::update() {
 	if (_phase == 0) {
-		// Selecting phase — wait for player to choose route direction
+		// Wait for the player to choose a route direction.
 	} else if (_phase == 1) {
-		// Departing — auto-transition after brief delay (1.5s)
-		// Original: g_zoombiniWalkingFlag=1 → g_skipMode=1 in FrameTick
+		// Advance to the map after a brief departure delay.
 		uint32 elapsed = _engine->getGameTickCount() - _phaseTimer;
 		if (elapsed > 1500) {
 			_engine->_maptransSourceWorld = _pageId;
@@ -285,7 +273,7 @@ void RescuePage::update() {
 }
 
 void RescuePage::draw(Graphics::ManagedSurface *screen) {
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 
 	if (_rescueNum == 1) {
 		// Draw portal at (520, 84) or hidden at (520, -130) when departing
@@ -302,7 +290,7 @@ void RescuePage::draw(Graphics::ManagedSurface *screen) {
 		if (_cramure && _cramure->isValid())
 			_cramure->drawToScreen(screen, _cramurePos.x, _cramurePos.y, lut);
 
-		// Draw inside arrows — show direction selection state
+		// Draw the route arrows using the current selection state.
 		// Left arrow at (525, 248): on if routeDirection==1, off otherwise
 		// Right arrow at (641, 253): on if routeDirection==2, off otherwise
 		if (_engine->_routeDirection == 1) {
@@ -323,7 +311,7 @@ void RescuePage::draw(Graphics::ManagedSurface *screen) {
 		}
 	}
 
-	// Draw scroll buttons at IDA positions
+	// Draw the site-specific roster scroll buttons.
 	// Rescue1: button_left at (26,240), button_right at (276,240)
 	// Rescue2: button_left at (20,332), button_right at (289,332)
 	if (_buttonUp && _buttonUp->getFrameCount() > 0) {
@@ -349,8 +337,8 @@ void RescuePage::draw(Graphics::ManagedSurface *screen) {
 	// Draw the saved waiting board in standing poses, clipped to the grid area.
 	if (_zoombiniGfx) {
 		static constexpr int kStandingCell = 33;
-		int baseIdx = kStandingCell * ZoombiniGfx::kDim1 * ZoombiniGfx::kDim2;
-		int clipRight = _gridBaseX + 223;
+		int baseIdx = kStandingCell * ZoombiniGraphics::kDim1 * ZoombiniGraphics::kDim2;
+		int clipRight = _gridBasePosition.x + 223;
 		BoardRecord *const *board = _rescueNum == 1 ? _engine->getGameState()->_boardA : _engine->getGameState()->_boardB;
 
 		for (int col = 0; col < kGridCols; col++) {
@@ -364,25 +352,24 @@ void RescuePage::draw(Graphics::ManagedSurface *screen) {
 				if (!record)
 					continue;
 
-				int px = _gridBaseX + col * kSlotWidth + 18;
-				int py = _gridBaseY + row * kSlotHeight + 30;
+				int px = _gridBasePosition.x + col * kSlotWidth + 18;
+				int py = _gridBasePosition.y + row * kSlotHeight + 30;
 
 				// Body: [33][0][0]
 				const RleBlock *frame = _zoombiniGfx->getFrame(baseIdx, 0);
 				if (frame)
 					frame->drawToScreenClipped(screen, px, py,
-						_gridBaseX, 0, clipRight, kScreenHeight, lut);
+										   _gridBasePosition.x, 0, clipRight, kScreenHeight, lut);
 
 				// Features 1..4 (Hair, Eyes, Nose, Feet)
 				const byte features[4] = {
-					record->data[16], record->data[17], record->data[18], record->data[19]
-				};
+					record->data[16], record->data[17], record->data[18], record->data[19]};
 				for (int slot = 1; slot <= 4; slot++) {
-					int featIdx = baseIdx + slot * ZoombiniGfx::kDim2 + features[slot - 1];
+					int featIdx = baseIdx + slot * ZoombiniGraphics::kDim2 + features[slot - 1];
 					frame = _zoombiniGfx->getFrame(featIdx, 0);
 					if (frame)
 						frame->drawToScreenClipped(screen, px, py,
-						_gridBaseX, 0, clipRight, kScreenHeight, lut);
+											   _gridBasePosition.x, 0, clipRight, kScreenHeight, lut);
 				}
 
 				// Draw selector if this zoombini is selected
@@ -416,9 +403,8 @@ void RescuePage::handleClick(const Common::Point &pos) {
 	}
 
 	if (_rescueNum == 1) {
-		// Direction selection — Rescue1 arrow click areas from IDA
+		// Handle Rescue Site I route-arrow clicks.
 		// Left direction: x in (519..617), y in (139..313)
-		// Original: Rescue1__HandleInputAndAnimate_427CE0 at 0x427E2B
 		if (_readyToDepart && 519 < pos.x && pos.x < 617 && 139 < pos.y && pos.y < 313) {
 			debug(1, "RescuePage: Route left (Rescue1)");
 			_engine->_zoombiniWalkingFlag = true;
@@ -429,7 +415,6 @@ void RescuePage::handleClick(const Common::Point &pos) {
 		}
 
 		// Right direction: x in (624..723), y in (139..313)
-		// Original at 0x427E9F
 		if (_readyToDepart && 624 < pos.x && pos.x < 723 && 139 < pos.y && pos.y < 313) {
 			debug(1, "RescuePage: Route right (Rescue1)");
 			_engine->_zoombiniWalkingFlag = true;
@@ -440,11 +425,11 @@ void RescuePage::handleClick(const Common::Point &pos) {
 		}
 	}
 
-	// Grid slot click — select a zoombini from the grid
+	// Select a Zoombini from the visible roster grid.
 	for (int col = 0; col < kGridCols; col++) {
 		for (int row = 0; row < kGridRows; row++) {
-			int x = _gridBaseX + col * kSlotWidth;
-			int y = _gridBaseY + row * kSlotHeight;
+			int x = _gridBasePosition.x + col * kSlotWidth;
+			int y = _gridBasePosition.y + row * kSlotHeight;
 			Common::Rect slotHit(x + 24, y + 30, x + 64, y + 87);
 			if (slotHit.contains(pos)) {
 				int slotIdx = (col + _scrollOffset) * kGridRows + row;

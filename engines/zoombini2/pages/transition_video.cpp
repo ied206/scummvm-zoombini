@@ -33,7 +33,7 @@ namespace Zoombini2 {
 VideoPage::VideoPage(Zoombini2Engine *engine, const Common::Path &videoPath, int nextPageId)
 	: TransitionPage(engine), _videoPath(videoPath), _nextPageId(nextPageId),
 	  _decoder(nullptr), _started(false),
-	  _lastFrame(nullptr), _frameX(0), _frameY(0) {
+	  _lastFrame(nullptr), _framePosition() {
 }
 
 VideoPage::~VideoPage() {
@@ -45,7 +45,7 @@ VideoPage::~VideoPage() {
 }
 
 void VideoPage::init() {
-	debug(1, "VideoPage::init — %s", _videoPath.toString('/').c_str());
+	debug(1, "VideoPage::init - %s", _videoPath.toString('/').c_str());
 
 	_decoder = new Video::BinkDecoder();
 	_decoder->setSoundType(Audio::Mixer::kMusicSoundType);
@@ -84,8 +84,7 @@ void VideoPage::draw(Graphics::ManagedSurface *screen) {
 	if (_decoder->needsUpdate()) {
 		const Graphics::Surface *frame = _decoder->decodeNextFrame();
 		if (frame) {
-			_frameX = (kScreenWidth - frame->w) / 2;
-			_frameY = (kScreenHeight - frame->h) / 2;
+			_framePosition = Common::Point32((kScreenWidth - frame->w) / 2, (kScreenHeight - frame->h) / 2);
 
 			// Cache the decoded frame in screen format
 			if (!_lastFrame || _lastFrame->w != frame->w || _lastFrame->h != frame->h) {
@@ -97,7 +96,7 @@ void VideoPage::draw(Graphics::ManagedSurface *screen) {
 	}
 
 	if (_lastFrame)
-		screen->blitFrom(*_lastFrame, Common::Point(_frameX, _frameY));
+		screen->blitFrom(*_lastFrame, Common::Point(static_cast<int16>(_framePosition.x), static_cast<int16>(_framePosition.y)));
 }
 
 } // End of namespace Zoombini2

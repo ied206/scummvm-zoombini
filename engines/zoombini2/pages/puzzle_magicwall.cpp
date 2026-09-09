@@ -22,20 +22,16 @@
 #include "common/debug.h"
 #include "common/random.h"
 
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/puzzle_magicwall.h"
-#include "zoombini2/game_state.h"
-#include "zoombini2/gfx.h"
-#include "zoombini2/zoombini.h"
-#include "zoombini2/zoombini2.h"
 #include "zoombini2/sound.h"
+#include "zoombini2/state.h"
+#include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
 // ============================================================================
-// MagicWallPuzzle — Color-coded maze navigation puzzle.
-//
-// Original: MagicWall__Init_41D9B0, MagicWall__MoveZoombiniOnPath_41C6C0,
-//           MagicWall__AdvanceZoombiniPath_41CAD0, MagicWall__CheckAllPathsDone_41CB80.
+// MagicWallPuzzle - color-coded maze navigation puzzle.
 //
 // Core mechanics:
 //   - 4 zoombini slots corresponding to 4 directional paths
@@ -51,11 +47,6 @@ namespace Zoombini2 {
 //   - Slot 4-7: Uses EXIT(slot-3).PAT (exit only, no movement)
 //   - Path files contain CurveSegment bezier data for smooth animation
 //
-// Original object layout (0x1B4 bytes):
-//   - +72 to +91: PathObject pointers for exit paths
-//   - +92 to +111: PathObject pointers for bouge (movement) paths
-//   - +268: animating flag
-//   - +78 to +82: Zoombini slot indices
 // ============================================================================
 
 // Color names matching resource file naming convention
@@ -69,8 +60,7 @@ const char *MagicWallPuzzle::kColorNames[kColorCount] = {
 	"rose",
 	"turquoise",
 	"violet",
-	"yellow"
-};
+	"yellow"};
 
 // Path animation duration (ms)
 static const uint32 kPathAnimDuration = 2000;
@@ -79,20 +69,19 @@ static const uint32 kPathAnimDuration = 2000;
 static const uint32 kGateAnimDuration = 500;
 
 // Minimap position
-static const int kMinimapX = 620;
-static const int kMinimapY = 40;
+static const Common::Point32 kMinimapPosition(620, 40);
 
 // Maze clickable regions for directing zoombinis
 static const Common::Rect kPathButtons[4] = {
-	Common::Rect(50, 200, 200, 350),    // Path 0 (top-left)
-	Common::Rect(250, 200, 400, 350),   // Path 1 (top-right)
-	Common::Rect(50, 400, 200, 550),    // Path 2 (bottom-left)
-	Common::Rect(250, 400, 400, 550)    // Path 3 (bottom-right)
+	Common::Rect(50, 200, 200, 350),  // Path 0 (top-left)
+	Common::Rect(250, 200, 400, 350), // Path 1 (top-right)
+	Common::Rect(50, 400, 200, 550),  // Path 2 (bottom-left)
+	Common::Rect(250, 400, 400, 550)  // Path 3 (bottom-right)
 };
 
 MagicWallPuzzle::MagicWallPuzzle(Zoombini2Engine *engine)
 	: PuzzlePage(engine, kPageMagicWall),
-	_state(kStateInit),
+	  _state(kStateInit),
 	  _currentLevel(0),
 	  _activeSlot(-1),
 	  _destSlot(-1),
@@ -101,7 +90,7 @@ MagicWallPuzzle::MagicWallPuzzle(Zoombini2Engine *engine)
 	  _miniMapDotGfx(nullptr),
 	  _glowwormGfx(nullptr),
 	  _glowwormAnim(nullptr),
-	_musicId(-1),
+	  _musicId(-1),
 	  _sndGateOpen(-1),
 	  _sndZoombiniMove(-1),
 	  _nextApprovalIdx(0),
@@ -128,8 +117,7 @@ MagicWallPuzzle::MagicWallPuzzle(Zoombini2Engine *engine)
 		_slots[i].pathProgress = 0;
 		_slots[i].targetColor = -1;
 		_slots[i].captured = false;
-		_slots[i].x = 0;
-		_slots[i].y = 0;
+		_slots[i].position = Common::Point32();
 		_slots[i].path = nullptr;
 		_slots[i].pathStartTime = 0;
 		_gates[i].gateIdx = i;
@@ -152,14 +140,19 @@ MagicWallPuzzle::~MagicWallPuzzle() {
 
 	// Unload sound effects
 	for (int i = 0; i < 4; i++) {
-		if (_sndApproval[i] >= 0) snd->unload(_sndApproval[i]);
-		if (_sndHint[i] >= 0) snd->unload(_sndHint[i]);
+		if (_sndApproval[i] >= 0)
+			snd->unload(_sndApproval[i]);
+		if (_sndHint[i] >= 0)
+			snd->unload(_sndHint[i]);
 	}
 	for (int i = 0; i < 2; i++) {
-		if (_sndError[i] >= 0) snd->unload(_sndError[i]);
+		if (_sndError[i] >= 0)
+			snd->unload(_sndError[i]);
 	}
-	if (_sndGateOpen >= 0) snd->unload(_sndGateOpen);
-	if (_sndZoombiniMove >= 0) snd->unload(_sndZoombiniMove);
+	if (_sndGateOpen >= 0)
+		snd->unload(_sndGateOpen);
+	if (_sndZoombiniMove >= 0)
+		snd->unload(_sndZoombiniMove);
 
 	for (int i = 0; i < kColorCount; i++) {
 		delete _dotGfx[i];
@@ -184,10 +177,13 @@ void MagicWallPuzzle::init() {
 	// Call base init for background and zoombini loading
 	PuzzlePage::init();
 
-	// BGM: 06-BB01.wav (IDA: MagicWall__Init_41D9B0)
+	// Start the Beetle Bug Alley music.
 	if (SoundManager *snd = _engine->getSoundManager()) {
 		_musicId = snd->load(true, Common::Path("sounds/music/06-BB01.wav"), true);
-		if (_musicId >= 0) { snd->playLoop(_musicId); snd->setVolume(_musicId, snd->_volumeMusic); }
+		if (_musicId >= 0) {
+			snd->playLoop(_musicId);
+			snd->setVolume(_musicId, snd->_volumeMusic);
+		}
 
 		// Load sound effects
 		// Approval sounds (success): 6-A1.wav through 6-A4.wav
@@ -215,7 +211,7 @@ void MagicWallPuzzle::init() {
 
 	int diff = CLIP(_engine->getGameState()->_gameMode, 1, 3);
 
-	debug(1, "MagicWallPuzzle::init — difficulty %d", diff);
+	debug(1, "MagicWallPuzzle::init - difficulty %d", diff);
 
 	// Load resources
 	loadResources();
@@ -306,7 +302,7 @@ void MagicWallPuzzle::loadResources() {
 	}
 
 	// Load gate animations (porte-A/B/C/D.an)
-	const char *gateNames[] = { "porte-A", "porte-B", "porte-C", "porte-D" };
+	const char *gateNames[] = {"porte-A", "porte-B", "porte-C", "porte-D"};
 	for (int i = 0; i < 4; i++) {
 		Common::Path gatePath(Common::String::format("bmp/magic_wall/%s", gateNames[i]));
 		_gateAnims[i] = new Animation();
@@ -326,8 +322,7 @@ void MagicWallPuzzle::loadResources() {
 		}
 	}
 
-	// Load PAT bezier path files (EXIT1-4.PAT, BOUGE1-4.PAT)
-	// Original: MagicWall__Init_41D9B0 loads these at offsets +72 to +111
+	// Load exit and internal movement paths.
 	for (int i = 0; i < 4; i++) {
 		Common::Path exitPath(Common::String::format("bmp/magic_wall/PAT/EXIT%d.PAT", i + 1));
 		_exitPaths[i] = PathObject::loadFromPAT(exitPath);
@@ -346,24 +341,19 @@ void MagicWallPuzzle::loadResources() {
 }
 
 void MagicWallPuzzle::setupMaze() {
-	// Setup gate positions based on difficulty level
-	// Original: MagicWall__DrawMazeLevel_41B530 positions gates in maze
+	// Set up gate positions for the selected maze level.
 
 	// Gate positions (approximate, based on typical maze layout)
-	_gates[0].x = 150;
-	_gates[0].y = 280;
+	_gates[0].position = Common::Point32(150, 280);
 	_gates[0].open = false;
 
-	_gates[1].x = 350;
-	_gates[1].y = 280;
+	_gates[1].position = Common::Point32(350, 280);
 	_gates[1].open = false;
 
-	_gates[2].x = 150;
-	_gates[2].y = 420;
+	_gates[2].position = Common::Point32(150, 420);
 	_gates[2].open = false;
 
-	_gates[3].x = 350;
-	_gates[3].y = 420;
+	_gates[3].position = Common::Point32(350, 420);
 	_gates[3].open = false;
 
 	debug(2, "MagicWallPuzzle: Maze setup for level %d", _currentLevel);
@@ -373,15 +363,14 @@ void MagicWallPuzzle::placeColorDots() {
 	_colorDots.clear();
 
 	// Fixed marker positions for the beetles
-	int posX[] = { 150, 350, 150, 350 };
-	int posY[] = { 200, 200, 400, 400 };
-	int colors[] = { kColorBlue, kColorGreen, kColorRed, kColorYellow };
+	static const Common::Point32 kColorDotPositions[] = {
+		Common::Point32(150, 200), Common::Point32(350, 200), Common::Point32(150, 400), Common::Point32(350, 400)};
+	int colors[] = {kColorBlue, kColorGreen, kColorRed, kColorYellow};
 
 	for (int i = 0; i < 4; i++) {
 		ColorDot dot;
 		dot.colorIdx = colors[i];
-		dot.x = posX[i];
-		dot.y = posY[i];
+		dot.position = kColorDotPositions[i];
 		dot.lightOn = false;
 		_colorDots.push_back(dot);
 	}
@@ -402,8 +391,8 @@ void MagicWallPuzzle::placeColorBugs() {
 		ColorBug bug;
 		bug.colorIdx = _colorDots[i].colorIdx;
 		// Place bug near but not on top of dot
-		bug.x = _colorDots[i].x + rnd.getRandomNumberRng(-50, 50);
-		bug.y = _colorDots[i].y + rnd.getRandomNumberRng(-30, 30);
+		bug.position = Common::Point32(
+			_colorDots[i].position.x + rnd.getRandomNumberRng(-50, 50), _colorDots[i].position.y + rnd.getRandomNumberRng(-30, 30));
 		bug.active = true;
 		_colorBugs.push_back(bug);
 	}
@@ -418,8 +407,7 @@ void MagicWallPuzzle::assignZoombiniSlots() {
 		if (zoomIdx < (int)_puzzleZoombinis.size()) {
 			_slots[slot].zoombiniIdx = zoomIdx;
 			_slots[slot].pathProgress = 100;
-			_slots[slot].x = _colorDots[slot].x;
-			_slots[slot].y = _colorDots[slot].y;
+			_slots[slot].position = _colorDots[slot].position;
 			_slots[slot].path = nullptr;
 
 			// Assign a color to this zoombini
@@ -442,11 +430,10 @@ void MagicWallPuzzle::setupTablets() {
 	};
 
 	TabletDef defs[] = {
-		{ Common::Rect(120, 150, 180, 200), 0, 1, 0 },
-		{ Common::Rect(320, 150, 380, 200), 1, 2, 1 },
-		{ Common::Rect(120, 350, 180, 400), 2, 3, 2 },
-		{ Common::Rect(320, 350, 380, 400), 3, 0, 3 }
-	};
+		{Common::Rect(120, 150, 180, 200), 0, 1, 0},
+		{Common::Rect(320, 150, 380, 200), 1, 2, 1},
+		{Common::Rect(120, 350, 180, 400), 2, 3, 2},
+		{Common::Rect(320, 350, 380, 400), 3, 0, 3}};
 
 	for (const auto &d : defs) {
 		Tablet t;
@@ -487,8 +474,7 @@ void MagicWallPuzzle::startZoombiniPath(int slotIdx) {
 }
 
 void MagicWallPuzzle::advanceZoombiniPath(int slotIdx) {
-	// Advance zoombini along the path
-	// Original: MagicWall__AdvanceZoombiniPath_41CAD0
+	// Advance the selected Zoombini along its active path.
 
 	if (slotIdx < 0 || slotIdx >= 8)
 		return;
@@ -501,10 +487,9 @@ void MagicWallPuzzle::advanceZoombiniPath(int slotIdx) {
 
 	// Use PathObject for bezier path evaluation if available
 	if (slot.path) {
-		int outX, outY;
-		bool stillMoving = slot.path->advance(now, outX, outY);
-		slot.x = outX;
-		slot.y = outY;
+		Common::Point32 position;
+		bool stillMoving = slot.path->advance(now, position);
+		slot.position = position;
 
 		if (!stillMoving) {
 			slot.pathProgress = 100;
@@ -525,13 +510,11 @@ void MagicWallPuzzle::advanceZoombiniPath(int slotIdx) {
 		}
 
 		// Linear interpolation as fallback
-		int startX = 50 + slotIdx * 100;
-		int startY = 550;
-		int endX = 50 + slotIdx * 100;
-		int endY = 50;  // Exit at top
-
-		slot.x = startX + (int)((endX - startX) * progress);
-		slot.y = startY + (int)((endY - startY) * progress);
+		const Common::Point32 startPosition(50 + slotIdx * 100, 550);
+		const Common::Point32 endPosition(50 + slotIdx * 100, 50);
+		slot.position = Common::Point32(
+			startPosition.x + static_cast<int32>((endPosition.x - startPosition.x) * progress),
+			startPosition.y + static_cast<int32>((endPosition.y - startPosition.y) * progress));
 	}
 }
 
@@ -563,9 +546,12 @@ void MagicWallPuzzle::completeSlot(int slotIdx) {
 		if (_destSlot >= 0 && _destSlot < 8) {
 			_slots[_destSlot].zoombiniIdx = zoomIdx;
 			_slots[_destSlot].pathProgress = 100;
-			_slots[_destSlot].x = _slots[_destSlot].path ? 0 : _colorDots[_destSlot % 4].x; // simplified
-			_slots[_destSlot].y = _slots[_destSlot].path ? 0 : _colorDots[_destSlot % 4].y;
-			
+			if (_slots[_destSlot].path) {
+				_slots[_destSlot].position = Common::Point32();
+			} else {
+				_slots[_destSlot].position = _colorDots[_destSlot % 4].position;
+			}
+
 			// Clear current slot
 			slot.zoombiniIdx = -1;
 			slot.pathProgress = 0;
@@ -693,14 +679,11 @@ void MagicWallPuzzle::draw(Graphics::ManagedSurface *screen) {
 }
 
 void MagicWallPuzzle::drawMazeLevel(Graphics::ManagedSurface *screen, int level) {
-	// Original: MagicWall__DrawMazeLevel_41B530
-	// Draws background, overlay, edges (white ripple lines), and dots
-
-	// Background already drawn above
+	// The page background is already drawn before the maze overlays.
 
 	// Draw some maze structure indicators (stub)
 	// Real implementation would use maze graph data
-	uint32 wallColor = 0x404040;  // Dark grey
+	uint32 wallColor = 0x404040; // Dark grey
 
 	// Simple maze walls (horizontal)
 	screen->hLine(100, 200, 500, wallColor);
@@ -714,14 +697,14 @@ void MagicWallPuzzle::drawMazeLevel(Graphics::ManagedSurface *screen, int level)
 }
 
 void MagicWallPuzzle::drawColorDots(Graphics::ManagedSurface *screen) {
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 
 	for (uint i = 0; i < _colorDots.size(); i++) {
 		const ColorDot &dot = _colorDots[i];
 		RleBlock *gfx = _dotGfx[dot.colorIdx];
 
 		if (gfx) {
-			gfx->drawToScreen(screen, dot.x, dot.y, lut);
+			gfx->drawToScreen(screen, dot.position.x, dot.position.y, lut);
 		} else {
 			// Fallback: draw colored circle
 			uint32 colors[] = {
@@ -736,19 +719,26 @@ void MagicWallPuzzle::drawColorDots(Graphics::ManagedSurface *screen) {
 				0x8000FF, // violet
 				0xFFFF00  // yellow
 			};
-			screen->fillRect(Common::Rect(dot.x - 8, dot.y - 8, dot.x + 8, dot.y + 8),
-							 colors[dot.colorIdx % 10]);
+			screen->fillRect(
+				Common::Rect(
+					static_cast<int16>(dot.position.x - 8), static_cast<int16>(dot.position.y - 8),
+					static_cast<int16>(dot.position.x + 8), static_cast<int16>(dot.position.y + 8)),
+				colors[dot.colorIdx % 10]);
 		}
 
 		if (dot.lightOn) {
 			// Draw light above dot
-			screen->fillRect(Common::Rect(dot.x - 4, dot.y - 20, dot.x + 4, dot.y - 12), 0x00FFFF);
+			screen->fillRect(
+				Common::Rect(
+					static_cast<int16>(dot.position.x - 4), static_cast<int16>(dot.position.y - 20),
+					static_cast<int16>(dot.position.x + 4), static_cast<int16>(dot.position.y - 12)),
+				0x00FFFF);
 		}
 	}
 }
 
 void MagicWallPuzzle::drawColorBugs(Graphics::ManagedSurface *screen) {
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 
 	for (uint i = 0; i < _colorBugs.size(); i++) {
 		const ColorBug &bug = _colorBugs[i];
@@ -757,7 +747,7 @@ void MagicWallPuzzle::drawColorBugs(Graphics::ManagedSurface *screen) {
 
 		RleBlock *gfx = _bugGfx[bug.colorIdx];
 		if (gfx) {
-			gfx->drawToScreen(screen, bug.x, bug.y, lut);
+			gfx->drawToScreen(screen, bug.position.x, bug.position.y, lut);
 		}
 	}
 }
@@ -776,11 +766,11 @@ void MagicWallPuzzle::drawWallLever(Graphics::ManagedSurface *screen) {
 }
 
 void MagicWallPuzzle::drawMinimap(Graphics::ManagedSurface *screen) {
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 
 	// Draw minimap background
 	if (_miniMapGfx) {
-		_miniMapGfx->drawToScreen(screen, kMinimapX, kMinimapY, lut);
+		_miniMapGfx->drawToScreen(screen, kMinimapPosition.x, kMinimapPosition.y, lut);
 	}
 
 	// Draw dots on minimap showing zoombini positions
@@ -790,16 +780,17 @@ void MagicWallPuzzle::drawMinimap(Graphics::ManagedSurface *screen) {
 			int dotColor = slot.targetColor;
 			if (dotColor >= 0 && dotColor < kColorCount && _miniLightGfx[dotColor]) {
 				// Scale slot position to minimap
-				int miniX = kMinimapX + 10 + (slot.x * 80 / 640);
-				int miniY = kMinimapY + 10 + (slot.y * 60 / 480);
-				_miniLightGfx[dotColor]->drawToScreen(screen, miniX, miniY, lut);
+				const Common::Point32 miniPosition(
+					kMinimapPosition.x + 10 + (slot.position.x * 80 / 640),
+					kMinimapPosition.y + 10 + (slot.position.y * 60 / 480));
+				_miniLightGfx[dotColor]->drawToScreen(screen, miniPosition.x, miniPosition.y, lut);
 			}
 		}
 	}
 }
 
 void MagicWallPuzzle::drawGates(Graphics::ManagedSurface *screen) {
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 
 	for (int i = 0; i < 4; i++) {
 		const Gate &gate = _gates[i];
@@ -811,18 +802,22 @@ void MagicWallPuzzle::drawGates(Graphics::ManagedSurface *screen) {
 			int frameIdx = gate.open ? 1 : 0;
 			const RleBlock *frame = anim->getFrame(frameIdx);
 			if (frame) {
-				frame->drawToScreen(screen, gate.x, gate.y, lut);
+				frame->drawToScreen(screen, gate.position.x, gate.position.y, lut);
 			}
 		} else {
 			// Fallback: draw simple rectangle
 			uint32 color = gate.open ? 0x00FF00 : 0xFF0000;
-			screen->fillRect(Common::Rect(gate.x - 10, gate.y - 20, gate.x + 10, gate.y + 20), color);
+			screen->fillRect(
+				Common::Rect(
+					static_cast<int16>(gate.position.x - 10), static_cast<int16>(gate.position.y - 20),
+					static_cast<int16>(gate.position.x + 10), static_cast<int16>(gate.position.y + 20)),
+				color);
 		}
 	}
 }
 
 void MagicWallPuzzle::drawZoombinis(Graphics::ManagedSurface *screen) {
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 
 	// Draw zoombinis in their slots
 	for (int i = 0; i < 8; i++) {
@@ -830,24 +825,24 @@ void MagicWallPuzzle::drawZoombinis(Graphics::ManagedSurface *screen) {
 		if (slot.zoombiniIdx < 0 || (i >= 4 && slot.captured))
 			continue;
 
-		const Zoombini *z = _puzzleZoombinis[slot.zoombiniIdx];
+		const ZoombiniState *z = _puzzleZoombinis[slot.zoombiniIdx];
 
 		// Draw zoombini at current position
 		if (_zoombiniGfx) {
-			int baseIdx = 0;  // Standing still
+			int baseIdx = 0; // Standing still
 
 			// Body
 			const RleBlock *frame = _zoombiniGfx->getFrame(baseIdx, 0);
 			if (frame)
-				frame->drawToScreen(screen, slot.x, slot.y, lut);
+				frame->drawToScreen(screen, slot.position.x, slot.position.y, lut);
 
 			// Features
-			const byte features[4] = { z->_featureA, z->_featureB, z->_featureC, z->_featureD };
+			const byte features[4] = {z->_featureA, z->_featureB, z->_featureC, z->_featureD};
 			for (int feat = 1; feat <= 4; feat++) {
-				int featIdx = baseIdx + feat * ZoombiniGfx::kDim2 + features[feat - 1];
+				int featIdx = baseIdx + feat * ZoombiniGraphics::kDim2 + features[feat - 1];
 				frame = _zoombiniGfx->getFrame(featIdx, 0);
 				if (frame)
-					frame->drawToScreen(screen, slot.x, slot.y, lut);
+					frame->drawToScreen(screen, slot.position.x, slot.position.y, lut);
 			}
 		}
 	}
@@ -863,9 +858,9 @@ void MagicWallPuzzle::handleClick(const Common::Point &pos) {
 		if (t.rect.contains(pos)) {
 			// Check if there is a beetle in the source slot
 			if (_slots[t.sourceSlot].zoombiniIdx >= 0) {
-				debug(2, "MagicWallPuzzle: Tablet %d clicked, moving beetle from %d to %d", 
+				debug(2, "MagicWallPuzzle: Tablet %d clicked, moving beetle from %d to %d",
 					  i, t.sourceSlot, t.destSlot);
-				
+
 				_destSlot = t.destSlot;
 				_slots[t.sourceSlot].path = t.path;
 				startZoombiniPath(t.sourceSlot);
@@ -895,7 +890,7 @@ void MagicWallPuzzle::handleClick(const Common::Point &pos) {
 					startZoombiniPath(i);
 					// Note: This will only move one at a time in current update loop
 					// A better implementation would handle multiple simultaneous movements
-					break; 
+					break;
 				}
 			}
 		} else {

@@ -21,14 +21,14 @@
 
 #include "common/algorithm.h"
 
-#include "zoombini2/gfx.h"
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/save_file_list.h"
 #include "zoombini2/ui.h"
 
 namespace Zoombini2 {
 
-SaveFileList::SaveFileList(int x, int y, RleBlock *selectionBar)
-	: _x(x), _y(y), _selectionBar(selectionBar), _defaultFont(nullptr),
+SaveFileList::SaveFileList(const Common::Point32 &position, RleBlock *selectionBar)
+	: _position(position), _selectionBar(selectionBar), _defaultFont(nullptr),
 	  _matchFont(nullptr), _editFont(nullptr), _editState(kEditIdle00),
 	  _selectedIndex(0), _scrollOffset(0), _validSelection(false) {
 }
@@ -46,8 +46,8 @@ bool SaveFileList::init() {
 
 	const Common::Path fontPath("bmp/typo");
 	return _defaultFont->load(fontPath, 16, 16, 16) &&
-	       _matchFont->load(fontPath, 0, 0, 255) &&
-	       _editFont->load(fontPath, 0, 255, 0);
+		   _matchFont->load(fontPath, 0, 0, 255) &&
+		   _editFont->load(fontPath, 0, 255, 0);
 }
 
 void SaveFileList::clear() {
@@ -61,7 +61,7 @@ void SaveFileList::clear() {
 
 bool SaveFileList::addItemSorted(const Common::String &name) {
 	if (kMaximumItems <= static_cast<int>(_items.size()) || name.empty() ||
-	    kMaximumNameLength < static_cast<int>(name.size()))
+		kMaximumNameLength < static_cast<int>(name.size()))
 		return false;
 
 	insertItem(findInsertionPoint(name), name);
@@ -79,9 +79,9 @@ void SaveFileList::draw(Graphics::ManagedSurface *screen, const byte alphaLUT[25
 
 		const bool selected = itemIndex == _selectedIndex;
 		if (selected && _selectionBar && _selectionBar->isValid()) {
-			_selectionBar->drawToScreen(screen, _x + kSelectionOffsetX,
-			                            _y + kSelectionOffsetY + row * kRowStride,
-			                            alphaLUT);
+			_selectionBar->drawToScreen(screen, _position.x + kSelectionOffsetX,
+										_position.y + kSelectionOffsetY + row * kRowStride,
+										alphaLUT);
 		}
 
 		BitmapFont *font = _defaultFont;
@@ -91,9 +91,9 @@ void SaveFileList::draw(Graphics::ManagedSurface *screen, const byte alphaLUT[25
 			font = _editFont;
 
 		if (font && font->isLoaded()) {
-			font->drawString(screen, _x + kSelectionOffsetX + kTextOffsetX,
-			                 _y + kSelectionOffsetY + kTextOffsetY + row * kRowStride,
-			                 _items[itemIndex], alphaLUT);
+			font->drawString(screen, _position.x + kSelectionOffsetX + kTextOffsetX,
+							 _position.y + kSelectionOffsetY + kTextOffsetY + row * kRowStride,
+							 _items[itemIndex], alphaLUT);
 		}
 	}
 }
@@ -102,8 +102,8 @@ bool SaveFileList::handleClick(const Common::Point &pos) {
 	if (kEditPrefixMatch01 < _editState || !_selectionBar || !_selectionBar->isValid())
 		return false;
 
-	const int left = _x + kSelectionOffsetX;
-	const int top = _y + kSelectionOffsetY;
+	const int left = _position.x + kSelectionOffsetX;
+	const int top = _position.y + kSelectionOffsetY;
 	const int width = _selectionBar->getWidth();
 	const int height = _selectionBar->getHeight() * kVisibleRows;
 	if (pos.x < left || left + width <= pos.x || pos.y < top || top + height <= pos.y)
@@ -268,7 +268,7 @@ void SaveFileList::scrollPageDown() {
 	if (!canPageDown())
 		return;
 	_scrollOffset = MIN(static_cast<int>(_items.size()) - kVisibleRows,
-	                    _scrollOffset + kVisibleRows);
+						_scrollOffset + kVisibleRows);
 	if (_selectedIndex < _scrollOffset)
 		_selectedIndex = _scrollOffset;
 }

@@ -32,8 +32,8 @@ namespace Zoombini2 {
 class BitBlock;
 class RleBlock;
 class Animation;
-class ZoombiniGfx;
-class Zoombini;
+class ZoombiniGraphics;
+class ZoombiniState;
 
 /**
  * Rescue Sites I and II store waiting Zoombinis and assemble parties of eight.
@@ -42,68 +42,102 @@ class Zoombini;
  */
 class RescuePage : public ShelterPage {
 public:
+	/** Construct rescue site @p rescueNum for @p engine. */
 	RescuePage(Zoombini2Engine *engine, int rescueNum);
+	/** Release the site resources and temporary departure roster. */
 	~RescuePage() override;
 
+	/** Load the selected rescue site and restore its waiting roster. */
 	void init() override;
+	/** Advance the selection or departure phase. */
 	void update() override;
+	/** Draw the waiting roster, site controls, and departure effect. */
 	void draw(Graphics::ManagedSurface *screen) override;
+	/** Select a visible Zoombini or activate the site's route controls. */
 	void handleClick(const Common::Point &pos) override;
+	/** Return whether the site has assembled the required party of eight. */
 	bool hasFullDepartureParty() const { return _readyToDepart; }
 
 private:
-	int _rescueNum;          // 1 or 2
+	/** Rescue site variant, either one or two. */
+	int _rescueNum;
 
-	// Sprite resources — Rescue1 loads all; Rescue2 loads a subset
+	/** Selection marker for a visible Zoombini slot. */
 	RleBlock *_selector;
-	RleBlock *_portal;        // Rescue1 only: PORTE.RB
-	RleBlock *_portalTop;     // Rescue1 only: portal_top.rb
-	RleBlock *_cramure;       // Rescue1 only: CRAMURE.RB
-	RleBlock *_porteSelect;   // porte_select.rb
-	BitBlock *_arrowLeftOff;  // Rescue1 only: inside_arrow_left_off.bb
-	BitBlock *_arrowLeftOn;   // Rescue1 only: inside_arrow_left_on.bb
-	BitBlock *_arrowRightOff; // Rescue1 only: inside_arrow_right_off.bb
-	BitBlock *_arrowRightOn;  // Rescue1 only: inside_arrow_right_on.bb
-	Animation *_buttonUp;     // button_left.an (scroll up / scroll left)
-	Animation *_buttonDown;   // button_right.an (scroll down / scroll right)
+	/** Portal body used by rescue site one. */
+	RleBlock *_portal;
+	/** Portal foreground used by rescue site one. */
+	RleBlock *_portalTop;
+	/** Rescue-site-one foreground overlay. */
+	RleBlock *_cramure;
+	/** Route selector used by rescue site one. */
+	RleBlock *_porteSelect;
+	/** Inactive left route arrow used by rescue site one. */
+	BitBlock *_arrowLeftOff;
+	/** Highlighted left route arrow used by rescue site one. */
+	BitBlock *_arrowLeftOn;
+	/** Inactive right route arrow used by rescue site one. */
+	BitBlock *_arrowRightOff;
+	/** Highlighted right route arrow used by rescue site one. */
+	BitBlock *_arrowRightOn;
+	/** Upward roster scroll animation. */
+	Animation *_buttonUp;
+	/** Downward roster scroll animation. */
+	Animation *_buttonDown;
 
-	// Grid layout from IDA: Rescue1 base (68,95), Rescue2 base (75,193)
-	int _gridBaseX;
-	int _gridBaseY;
+	/** Signed screen origin of the visible roster grid. */
+	Common::Point32 _gridBasePosition;
 
-	// Zoombini slot grid: 4 columns × 5 rows = 20 slots
+	/** Number of columns in the visible roster grid. */
 	static const int kGridCols = 4;
+	/** Number of rows in the visible roster grid. */
 	static const int kGridRows = 5;
+	/** Width of one visible roster slot. */
 	static const int kSlotWidth = 40;
+	/** Height of one visible roster slot. */
 	static const int kSlotHeight = 57;
+	/** Hit-test rectangles for the visible roster page. */
 	Common::Rect _slotRects[kGridCols * kGridRows];
 
-	// Scroll button rects from IDA
-	Common::Rect _scrollUpRect;   // Rescue1: (26,240,89,326)  Rescue2: (20,332,83,418)
-	Common::Rect _scrollDownRect; // Rescue1: (276,240,339,319) Rescue2: (289,332,352,411)
+	/** Hit-test rectangle for scrolling toward earlier roster entries. */
+	Common::Rect _scrollUpRect;
+	/** Hit-test rectangle for scrolling toward later roster entries. */
+	Common::Rect _scrollDownRect;
 
-	// Arrow positions from IDA (Rescue1 only)
-	Common::Point _arrowLeftPos;  // (525, 248)
-	Common::Point _arrowRightPos; // (641, 253)
+	/** Left route-arrow draw position at rescue site one. */
+	Common::Point _arrowLeftPos;
+	/** Right route-arrow draw position at rescue site one. */
+	Common::Point _arrowRightPos;
 
-	// Portal positions from IDA (Rescue1 only)
-	Common::Point _portalPos;     // (520, 84) normal / (520, -130) departing
-	Common::Point _portalTopPos;  // (518, 99)
-	Common::Point _cramurePos;    // (311, 99)
+	/** Portal-body draw position at rescue site one. */
+	Common::Point _portalPos;
+	/** Portal-foreground draw position at rescue site one. */
+	Common::Point _portalTopPos;
+	/** Foreground-overlay draw position at rescue site one. */
+	Common::Point _cramurePos;
 
+	/** First waiting-roster entry shown in the visible grid. */
 	int _scrollOffset;
+	/** Selected waiting-roster entry, or `-1` when none is selected. */
 	int _selectedZoombini;
-	bool _readyToDepart;     // true when 8+ zoombinis collected
+	/** Whether the departure roster contains at least eight Zoombinis. */
+	bool _readyToDepart;
 
-	int _phase;              // 0=selecting, 1=departing
+	/** Current site phase, with zero selecting and one departing. */
+	int _phase;
+	/** Time at which the current phase began. */
 	uint32 _phaseTimer;
 
+	/** Music handle used while the rescue site is active. */
 	int _musicId;
 
-	// Zoombini sprite graphics (littleZomb.anm) for grid rendering
-	ZoombiniGfx *_zoombiniGfx;
-	Common::Array<Zoombini *> _departureRoster;
+	/** Little-Zoombini animation cells used in the roster grid. */
+	ZoombiniGraphics *_zoombiniGfx;
+	/** Runtime party chosen to leave this rescue site. */
+	Common::Array<ZoombiniState *> _departureRoster;
+	/** Restore the waiting roster and populate the departure party. */
 	void initRescueRoster();
+	/** Persist the waiting roster and selected departure party. */
 	void saveRescueRoster();
 };
 

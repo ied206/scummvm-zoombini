@@ -33,151 +33,192 @@ class Animation;
 class RleBlock;
 
 /**
- * WaterslidePuzzle - Pipes of Paloo: Trait pair matching puzzle (ID 2).
+ * Pipes of Paloo pairs Zoombinis that share a selected visible feature.
  *
- * Original: Waterslide__Init_43B490. Object size 0xBE58 (48728 bytes).
- *
- * Mechanics:
- *   - Match pairs of zoombinis that share the same trait value
- *   - Feature axis chosen randomly (hair, eyes, nose, feet)
- *   - Click slots to position zoombinis
- *   - Correct pairs slide down the waterslide together
- *   - Incorrect matches get rejected
- *
- * Resources (bmp/waterslide/):
- *   - TRAITS/1-4.rb: Feature icons for matching indicators
- *   - pipes - blue/grey/red/: Pipe graphics (different colors for state)
- *   - blue fountain.an, little tree.an: Decorative animations
- *   - Mr Valve Master.an: Character animation
- *   - Pastilles*.rb: Match indicators
- *   - Area.bmt: Clickable region definitions
- *
- * Difficulty variants:
- *   - Diff 1 (0x438790): Simple random pairing
- *   - Diff 2 (0x4399D0): Different pairing variant
- *   - Diff 3+ (0x435BA0): Complex bipartite graph matching
- *
- * vtable at 0x480418:
- *   +0: CheckFreeZoombinis (0x43B8E0)
- *   +4: nullsub (blocking model)
- *   +8: Destructor (0x43B350)
+ * The generated pairs and matching strategy depend on difficulty. Correctly
+ * paired Zoombinis slide away together, while incorrect placements are returned.
  */
 class WaterslidePuzzle : public PuzzlePage {
 public:
+	/** Construct Pipes of Paloo for @p engine. */
 	WaterslidePuzzle(Zoombini2Engine *engine);
+	/** Release pipe, indicator, and decoration resources. */
 	~WaterslidePuzzle() override;
 
+	/** Load the pipe layout, build slots, and generate trait pairs. */
 	void init() override;
+	/** Advance movement, match feedback, sliding, and rejection phases. */
 	void update() override;
+	/** Draw pipes, slots, trait indicators, decorations, and Zoombinis. */
 	void draw(Graphics::ManagedSurface *screen) override;
+	/** Move the selected Zoombini into the clicked slot. */
 	void handleClick(const Common::Point &pos) override;
 
 private:
-	// --- Slot Types ---
+	/** Occupancy and feedback state of one pipe slot. */
 	enum SlotState {
+		/** No Zoombini occupies this slot. */
 		kSlotEmpty,
+		/** A Zoombini is waiting for a partner. */
 		kSlotOccupied,
+		/** The occupants formed a correct pair. */
 		kSlotMatched,
+		/** The occupants formed an incorrect pair. */
 		kSlotRejected
 	};
 
-	// --- Puzzle States ---
+	/** Runtime phase of the Pipes of Paloo interaction. */
 	enum PuzzleState {
+		/** Complete initial pair and slot setup. */
 		kStateInit,
+		/** Wait for a Zoombini or slot selection. */
 		kStateIdle,
+		/** Move a selected Zoombini into a slot. */
 		kStateZoombiniMoving,
+		/** Compare both occupants of a pair of slots. */
 		kStateCheckingMatch,
+		/** Move a correct pair down the waterslide. */
 		kStateSliding,
+		/** Return an incorrect pair from its slots. */
 		kStateRejecting,
+		/** Stop accepting input after completion. */
 		kStateDone
 	};
 
-	// --- Slot Info ---
+	/** One clickable pipe slot and its current occupant. */
 	struct Slot {
-		int x, y;                  // Position
-		Common::Rect hitbox;       // Clickable region
-		SlotState state;           // Current state
-		int zoombiniIdx;           // Zoombini in this slot (-1 if empty)
-		int pairSlot;              // Paired slot index (-1 if none)
+		/** Screen position. */
+		Common::Point32 position;
+		/** Clickable area. */
+		Common::Rect hitbox;
+		/** Current occupancy or feedback state. */
+		SlotState state;
+		/** Puzzle-roster index in this slot, or `-1` when empty. */
+		int zoombiniIdx;
+		/** Partner slot index, or `-1` when unpaired. */
+		int pairSlot;
 	};
 
-	// --- Trait Pair ---
+	/** Correct pairing and its shared feature value. */
 	struct TraitPair {
-		int zoombiniA;             // First zoombini index
-		int zoombiniB;             // Second zoombini index
-		int featureAxis;           // Which feature they match on (0-3)
-		int sharedValue;           // The shared trait value
-		bool matched;              // Have they been correctly placed
+		/** First puzzle-roster index. */
+		int zoombiniA;
+		/** Second puzzle-roster index. */
+		int zoombiniB;
+		/** Visible feature index shared by the pair. */
+		int featureAxis;
+		/** Feature value shared by the pair. */
+		int sharedValue;
+		/** Whether this pair has been placed correctly. */
+		bool matched;
 	};
 
-	// --- Internal Methods ---
+	/** Load pipe, indicator, and decoration resources. */
 	void loadResources();
+	/** Return visible feature @p axis from @p zoombini. */
+	static byte getFeature(const ZoombiniState *zoombini, int axis);
+	/** Initialize slot geometry and partner relationships. */
 	void setupSlots();
+	/** Select the difficulty-specific pairing algorithm. */
 	void computePairs();
+	/** Generate the difficulty-one pair layout. */
 	void computePairsDiff1();
+	/** Generate the difficulty-two pair layout. */
 	void computePairsDiff2();
+	/** Generate the upper-difficulty pair layout. */
 	void computePairsDiff3();
 
+	/** Dispatch a click on slot @p slotIdx. */
 	void clickSlot(int slotIdx);
+	/** Place puzzle-roster entry @p zoombiniIdx into slot @p slotIdx. */
 	void moveZoombiniToSlot(int zoombiniIdx, int slotIdx);
+	/** Return whether the occupants of @p slotA and @p slotB form a generated pair. */
 	bool checkPairMatch(int slotA, int slotB);
+	/** Release and animate the correct pair in @p slotA and @p slotB. */
 	void slideDownPair(int slotA, int slotB);
+	/** Reject the incorrect pair in @p slotA and @p slotB. */
 	void rejectPair(int slotA, int slotB);
 
+	/** Release puzzle-roster entry @p zoombiniIdx. */
 	void freeZoombini(int zoombiniIdx);
+	/** Return the number of puzzle-roster entries already released. */
 	int countFreeZoombinis() const;
 
+	/** Draw pipe segments using their current feedback colors. */
 	void drawPipes(Graphics::ManagedSurface *screen);
+	/** Draw every active slot and occupant marker. */
 	void drawSlots(Graphics::ManagedSurface *screen);
+	/** Draw the feature icons for generated pairs. */
 	void drawTraitIndicators(Graphics::ManagedSurface *screen);
+	/** Draw the fountain, tree, valve, and cascades. */
 	void drawDecorations(Graphics::ManagedSurface *screen);
+	/** Draw waiting and placed Zoombinis. */
 	void drawZoombinis(Graphics::ManagedSurface *screen);
 
-	// --- State ---
+	/** Current interaction phase. */
 	PuzzleState _state;
+	/** Number of Zoombinis already released. */
 	int _freedCount;
+	/** Selected puzzle-roster index, or `-1` when none is selected. */
 	int _selectedZoombini;
+	/** Selected slot index, or `-1` when none is selected. */
 	int _selectedSlot;
+	/** Time at which the current phase began. */
 	uint32 _stateTimer;
 
-	// --- Slots (8 pair positions = 16 slots) ---
+	/** Maximum number of pipe slots. */
 	static const int kMaxSlots = 16;
+	/** Maximum number of generated pairs. */
 	static const int kMaxPairs = 8;
+	/** Pipe-slot runtime state. */
 	Slot _slots[kMaxSlots];
+	/** Number of active entries in @ref WaterslidePuzzle::_slots. */
 	int _numSlots;
 
-	// --- Trait Pairs ---
+	/** Generated correct pair definitions. */
 	TraitPair _pairs[kMaxPairs];
+	/** Number of active entries in @ref WaterslidePuzzle::_pairs. */
 	int _numPairs;
+	/** Number of generated pairs already matched. */
 	int _matchedPairs;
 
-	// --- Graphics Resources ---
-	// Trait icons (4 features)
+	/** Trait indicators indexed by visible feature. */
 	RleBlock *_traitGfx[4];
 
-	// Pipes (3 colors: blue, grey, red)
+	/** Blue horizontal pipe segment. */
 	RleBlock *_pipeBlueHoriz;
+	/** Gray horizontal pipe segment. */
 	RleBlock *_pipeGreyHoriz;
+	/** Red horizontal pipe segment. */
 	RleBlock *_pipeRedHoriz;
+	/** Blue large pipe segment. */
 	RleBlock *_pipeBlueBigone;
+	/** Gray large pipe segment. */
 	RleBlock *_pipeGreyBigone;
+	/** Red large pipe segment. */
 	RleBlock *_pipeRedBigone;
 
-	// Pastilles (match indicators)
+	/** Blue match indicator. */
 	RleBlock *_pastilleBlue;
+	/** Gray inactive match indicator. */
 	RleBlock *_pastilleGrey;
 
-	// Edge graphics
+	/** Neutral edge visual. */
 	RleBlock *_edgeNeutre;
 
-	// Decorative animations
+	/** Fountain decoration animation. */
 	Animation *_blueFountainAnim;
+	/** Tree decoration animation. */
 	Animation *_littleTreeAnim;
+	/** Valve Master animation. */
 	Animation *_valveAnim;
+	/** First cascade animation. */
 	Animation *_cascade1Anim;
+	/** Second cascade animation. */
 	Animation *_cascade2Anim;
 
-	int _musicId;  // BGM: sounds/music/02-BS01.wav
+	/** Music handle used while Pipes of Paloo is active. */
+	int _musicId;
 };
 
 } // End of namespace Zoombini2

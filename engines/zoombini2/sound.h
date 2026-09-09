@@ -11,117 +11,130 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #ifndef ZOOMBINI2_SOUND_H
 #define ZOOMBINI2_SOUND_H
 
+#include "common/array.h"
+#include "common/path.h"
 #include "common/scummsys.h"
 #include "common/str.h"
-#include "common/path.h"
-#include "common/array.h"
 
 #include "audio/mixer.h"
 
 namespace Audio {
 class AudioStream;
 class RewindableAudioStream;
-}
+} // namespace Audio
 
 namespace Zoombini2 {
 
-/**
- * Volume range constants.
- * Original MSS range: 0-127.
- * Original percent mode: 0-100.
- */
-const int kMaxVolumeMSS = 127;
+/** Maximum volume accepted by the game-facing sound API. */
 const int kMaxVolumePercent = 100;
 
-/**
- * Maximum simultaneous sample playback slots per buffer.
- * Original: CSaianSoundBuffer supports 5 sample handles.
- */
+/** Number of sample handles reserved for one logical sound. */
 const int kMaxSampleSlots = 5;
 
-/**
- * Sound buffer — wraps a single sound resource.
- *
- * Corresponds to CSaianSoundBuffer (0x30 = 48 bytes).
- * Supports both in-memory samples (SFX) and disk streams (music/speech).
- */
+/** Retains the path, playback policy, volume, and mixer handles for one sound. */
 struct SoundBuffer {
+	/** Manager-assigned sound identifier. */
 	int id;
+	/** Resolved loose-file path. */
 	Common::Path path;
+	/** Whether the caller requested streaming playback. */
 	bool isStream;
+	/** Whether playback should restart after the final sample. */
 	bool loop;
+	/** Game-facing volume in the inclusive range 0 through 100. */
 	int volume;
+	/** Mixer handles reserved for overlapping sample playback. */
 	Audio::SoundHandle handles[kMaxSampleSlots];
+	/** Mixer handle reserved for streamed playback. */
 	Audio::SoundHandle streamHandle;
 };
 
 /**
- * SoundManager — high-level sound manager.
+ * Owns logical sound records and routes WAV playback through Audio::Mixer.
  *
- * Corresponds to CSaianSound (~2068 bytes, global at 0x571DE8).
- * Wraps Miles Sound System AIL API via ScummVM Audio::Mixer.
- *
- * Sound path convention:
- *   '#' prefix  -> CD-ROM path (streamed)
- *   no prefix   -> install directory (RAM)
- *   './' prefix -> relative path
+ * Loading records a path and playback policy but does not decode audio.
+ * Playback opens and decodes the WAV on demand. A leading `#` is removed from
+ * disc-style paths, and numbered music paths may resolve to the extracted FX
+ * directory when that resource exists.
  */
 class SoundManager {
 public:
-	SoundManager(Audio::Mixer *mixer);
+	/** Bind sound playback to the borrowed @p mixer. */
+	explicit SoundManager(Audio::Mixer *mixer);
+	/** Stop playback and release every owned @ref SoundBuffer. */
 	~SoundManager();
 
+	/** Record a sound path and return its manager-assigned identifier. */
 	int load(bool isStream, const Common::Path &filename, bool loop);
+	/** Stop and release the sound identified by @p id. */
 	void unload(int id);
+	/** Stop and release every loaded sound. */
 	void unloadAll();
 
+	/** Start the sound identified by @p id with its stored volume and loop policy. */
 	void play(int id);
+	/** Store @p volume and start the sound identified by @p id. */
 	void playWithVolume(int id, int volume);
+	/** Enable looping and start the sound identified by @p id. */
 	void playLoop(int id);
+	/** Stop every active handle belonging to @p id. */
 	void stop(int id);
+	/** Pause every active handle belonging to @p id. */
 	void pause(int id);
+	/** Resume every paused handle belonging to @p id. */
 	void resume(int id);
 
+	/** Return whether any mixer handle belonging to @p id is active. */
 	bool isPlaying(int id) const;
 
+	/** Store and apply @p volume to every active handle belonging to @p id. */
 	void setVolume(int id, int volume);
+	/** Apply @p volume to every loaded sound. */
 	void setVolumeAll(int volume);
 
+	/** Increment the nested mute count and mute mixer sound categories on the first request. */
 	void mute();
+	/** Decrement the nested mute count and unmute mixer sound categories when it reaches zero. */
 	void unmute();
 
+	/** Pause all mixer channels. */
 	void pauseAll();
+	/** Resume all mixer channels. */
 	void resumeAll();
 
-	// Volume globals
-	int _volumeSFX;     // 0x571DF0: SFX volume
-	int _volumeMusic;   // 0x571DF4: Music volume
-	int _volumeSpeech;  // 0x571DF8: Speech volume
+	/** Global sound-effect volume in the inclusive range 0 through 100. */
+	int _volumeSFX;
+	/** Global music volume in the inclusive range 0 through 100. */
+	int _volumeMusic;
+	/** Global speech volume in the inclusive range 0 through 100. */
+	int _volumeSpeech;
 
 private:
+	/** Borrowed mixer used by every sound record. */
 	Audio::Mixer *_mixer;
+	/** Loaded sound records owned by this manager. */
 	Common::Array<SoundBuffer *> _buffers;
+	/** Identifier assigned to the next loaded sound. */
 	int _nextId;
-	int _muteRefCount; // >0 = muted
+	/** Nested mute-request count. */
+	int _muteRefCount;
 
+	/** Return the borrowed sound record for @p id, or nullptr. */
 	SoundBuffer *findBuffer(int id) const;
+	/** Normalize a game resource name into a SearchMan-relative path. */
 	Common::Path resolvePath(const Common::Path &filename) const;
-
-	/**
-	 * Normalize volume to mixer range.
-	 * Original: NormalizeVolume at 0x46C463
-	 */
+	/** Clamp a percentage and convert it to the Audio::Mixer volume range. */
 	byte normalizeVolume(int volume) const;
 };
 

@@ -27,39 +27,30 @@
 namespace Zoombini2 {
 
 // ============================================================================
-// CurveSegment — cubic Bezier segment (10-bit fixed-point math).
-// Original: CurveSegment__Init_405EA0,
-//           CurveSegment__ComputeCoeffs_405F10,
-//           CurveSegment__Evaluate_406000.
+// CurveSegment - cubic Bezier segment using 10-bit fixed-point math.
 // ============================================================================
 
-void CurveSegment::init(int x0, int y0, int cx0, int cy0,
-                        int cx1, int cy1, int x1, int y1,
-                        int stepVal, int waitVal) {
-	p0x = x0 << 10;
-	p0y = y0 << 10;
-	cp0x = cx0 << 10;
-	cp0y = cy0 << 10;
-	cp1x = cx1 << 10;
-	cp1y = cy1 << 10;
-	p1x = x1 << 10;
-	p1y = y1 << 10;
+void CurveSegment::init(const Common::Point32 &start, const Common::Point32 &control0, const Common::Point32 &control1,
+						const Common::Point32 &end, int stepVal, int waitVal) {
+	p0 = Common::Point32(start.x << 10, start.y << 10);
+	cp0 = Common::Point32(control0.x << 10, control0.y << 10);
+	cp1 = Common::Point32(control1.x << 10, control1.y << 10);
+	p1 = Common::Point32(end.x << 10, end.y << 10);
 
 	step = stepVal;
 	waitInit = waitVal;
 	waitRemain = waitVal;
 
-	c2x = c1x = c0x = 0;
-	c2y = c1y = c0y = 0;
+	c2 = Common::Point32();
+	c1 = Common::Point32();
+	c0 = Common::Point32();
 	paramT = 0;
-	posX = p0x;
-	posY = p0y;
+	position = p0;
 	startTime = 0;
 }
 
 /**
- * Compute cubic Bezier polynomial coefficients from 4 control points.
- * Original: CurveSegment__ComputeCoeffs_405F10.
+ * Compute cubic Bezier polynomial coefficients from four control points.
  *
  * Standard cubic Bezier: B(t) = (1-t)^3*P0 + 3*(1-t)^2*t*CP0 + 3*(1-t)*t^2*CP1 + t^3*P1
  * Rearranged: B(t) = P0 + C0*t + C1*t^2 + C2*t^3
@@ -74,75 +65,67 @@ void CurveSegment::computeCoeffs() {
 	paramT = 0;
 
 	// X coefficients
-	int32 dxC0 = cp0x - p0x;
-	int32 dxC1 = cp1x - cp0x;
-	c0x = (int32)((3072LL * dxC0) >> 10);
-	c1x = (int32)((3072LL * dxC1) >> 10) - c0x;
-	c2x = (p1x - p0x) - c0x - c1x;
+	int32 dxC0 = cp0.x - p0.x;
+	int32 dxC1 = cp1.x - cp0.x;
+	c0.x = static_cast<int32>((3072LL * dxC0) >> 10);
+	c1.x = static_cast<int32>((3072LL * dxC1) >> 10) - c0.x;
+	c2.x = (p1.x - p0.x) - c0.x - c1.x;
 
 	// Y coefficients
-	int32 dyC0 = cp0y - p0y;
-	int32 dyC1 = cp1y - cp0y;
-	c0y = (int32)((3072LL * dyC0) >> 10);
-	c1y = (int32)((3072LL * dyC1) >> 10) - c0y;
-	c2y = (p1y - p0y) - c0y - c1y;
+	int32 dyC0 = cp0.y - p0.y;
+	int32 dyC1 = cp1.y - cp0.y;
+	c0.y = static_cast<int32>((3072LL * dyC0) >> 10);
+	c1.y = static_cast<int32>((3072LL * dyC1) >> 10) - c0.y;
+	c2.y = (p1.y - p0.y) - c0.y - c1.y;
 
 	waitRemain = waitInit;
 }
 
 /**
  * Evaluate the Bezier curve at the current time.
- * Original: CurveSegment__Evaluate_406000.
- *
  * paramT = step * ((tickCount - startTime) / 5)
  * When paramT > 950: segment near-complete, start wait countdown.
  * Returns false when segment fully complete (wait expired).
  */
-bool CurveSegment::evaluate(uint32 tickCount, int &outX, int &outY) {
+bool CurveSegment::evaluate(uint32 tickCount, Common::Point32 &outPosition) {
 	if (paramT <= 950) {
 		// Advance parameter based on elapsed time
 		uint32 elapsed = tickCount - startTime;
-		int32 ticks = (int32)(elapsed / 5u);
-		paramT = (int32)(((int64)step * ((int64)ticks << 10)) >> 10);
+		int32 ticks = static_cast<int32>(elapsed / 5u);
+		paramT = static_cast<int32>(((static_cast<int64>(step) * (static_cast<int64>(ticks) << 10)) >> 10));
 
 		int32 t = paramT;
-		int32 t2 = (int32)(((int64)t * t) >> 10);        // t^2
-		int32 t3 = (int32)(((int64)t2 * t) >> 10);       // t^3
+		int32 t2 = static_cast<int32>((static_cast<int64>(t) * t) >> 10);  // t^2
+		int32 t3 = static_cast<int32>((static_cast<int64>(t2) * t) >> 10); // t^3
 
 		// B(t) = P0 + C0*t + C1*t^2 + C2*t^3
-		posX = p0x
-			+ (int32)(((int64)c0x * t) >> 10)
-			+ (int32)(((int64)c1x * t2) >> 10)
-			+ (int32)(((int64)c2x * t3) >> 10);
+		position.x = p0.x + static_cast<int32>((static_cast<int64>(c0.x) * t) >> 10) +
+			static_cast<int32>((static_cast<int64>(c1.x) * t2) >> 10) + static_cast<int32>((static_cast<int64>(c2.x) * t3) >> 10);
 
-		posY = p0y
-			+ (int32)(((int64)c0y * t) >> 10)
-			+ (int32)(((int64)c1y * t2) >> 10)
-			+ (int32)(((int64)c2y * t3) >> 10);
+		position.y = p0.y + static_cast<int32>((static_cast<int64>(c0.y) * t) >> 10) +
+			static_cast<int32>((static_cast<int64>(c1.y) * t2) >> 10) + static_cast<int32>((static_cast<int64>(c2.y) * t3) >> 10);
 
-		outX = posX >> 10;
-		outY = posY >> 10;
+		outPosition = Common::Point32(position.x >> 10, position.y >> 10);
 		return true;
 	}
 
 	// paramT > 950: segment near-complete
 	if (waitRemain > 0) {
-		waitRemain--;
+		waitRemain -= 1;
 		return true;
 	}
 
-	// Wait expired — segment fully complete
+	// The configured endpoint wait has expired.
 	return false;
 }
 
 // ============================================================================
-// PathObject — bezier path composed of chained CurveSegments.
-// Original: PathObject__LoadFromPAT_45BA80.
+// PathObject - Bezier path composed of chained CurveSegments.
 // ============================================================================
 
 PathObject::PathObject()
 	: currentSegment(0), looping(false), finished(false),
-	  endX(0), endY(0), startTime(0) {
+	  endPosition(), startTime(0) {
 }
 
 PathObject::~PathObject() {
@@ -151,16 +134,14 @@ PathObject::~PathObject() {
 }
 
 /**
- * Load a .PAT bezier path file.
- * Original: PathObject__LoadFromPAT_45BA80.
+ * Load a `.PAT` Bezier path file.
  *
  * Format:
  *   FIRST=coord:x0,y0,cx0,cy0,cx1,cy1,x1,y1 step:S wait:W
  *   NEXT_N=coord:cx0,cy0,cx1,cy1,x1,y1 step:S wait:W
  *
  * NEXT segments chain from the previous segment's endpoint.
- * The step/wait values in NEXT lines are not parsed by the original
- * (sscanf format mismatch); values from the FIRST line are reused.
+ * Compatibility requires `NEXT` segments to reuse the `FIRST` line's step and wait values.
  */
 PathObject *PathObject::loadFromPAT(const Common::Path &path) {
 	Common::File f;
@@ -177,11 +158,12 @@ PathObject *PathObject::loadFromPAT(const Common::Path &path) {
 	if (line.hasPrefix("FIRST=coord:")) {
 		int x0, y0, cx0, cy0, cx1, cy1, x1, y1, stepVal, waitVal;
 		if (sscanf(line.c_str(),
-		           "FIRST=coord:%d,%d,%d,%d,%d,%d,%d,%d step:%d wait:%d",
-		           &x0, &y0, &cx0, &cy0, &cx1, &cy1, &x1, &y1,
-		           &stepVal, &waitVal) >= 10) {
+				   "FIRST=coord:%d,%d,%d,%d,%d,%d,%d,%d step:%d wait:%d",
+				   &x0, &y0, &cx0, &cy0, &cx1, &cy1, &x1, &y1,
+				   &stepVal, &waitVal) >= 10) {
 			CurveSegment *seg = new CurveSegment();
-			seg->init(x0, y0, cx0, cy0, cx1, cy1, x1, y1, stepVal, waitVal);
+			seg->init(
+				Common::Point32(x0, y0), Common::Point32(cx0, cy0), Common::Point32(cx1, cy1), Common::Point32(x1, y1), stepVal, waitVal);
 			obj->segments.push_back(seg);
 			firstStep = stepVal;
 			firstWait = waitVal;
@@ -196,16 +178,16 @@ PathObject *PathObject::loadFromPAT(const Common::Path &path) {
 
 		// Parse 6 coordinate values after skipping "NEXT_N=coord:"
 		int ext, ncx0, ncy0, ncx1, ncy1, nx1, ny1;
-		// Skip the 'N' and parse as "EXT_%d=coord:..." (matching original behavior)
+		// Skip the leading 'N' and parse the remaining `EXT` record.
 		if (sscanf(line.c_str() + 1,
-		           "EXT_%d=coord:%d,%d,%d,%d,%d,%d",
-		           &ext, &ncx0, &ncy0, &ncx1, &ncy1, &nx1, &ny1) >= 7) {
+				   "EXT_%d=coord:%d,%d,%d,%d,%d,%d",
+				   &ext, &ncx0, &ncy0, &ncx1, &ncy1, &nx1, &ny1) >= 7) {
 			CurveSegment *prev = obj->segments.back();
 			CurveSegment *seg = new CurveSegment();
 			// P0 comes from previous segment's P1
-			seg->init(prev->p1x >> 10, prev->p1y >> 10,
-			          ncx0, ncy0, ncx1, ncy1, nx1, ny1,
-			          firstStep, firstWait);
+			seg->init(
+				Common::Point32(prev->p1.x >> 10, prev->p1.y >> 10), Common::Point32(ncx0, ncy0),
+				Common::Point32(ncx1, ncy1), Common::Point32(nx1, ny1), firstStep, firstWait);
 			obj->segments.push_back(seg);
 		}
 	}
@@ -217,8 +199,7 @@ PathObject *PathObject::loadFromPAT(const Common::Path &path) {
 
 	// Set endpoint from last segment
 	CurveSegment *last = obj->segments.back();
-	obj->endX = last->p1x >> 10;
-	obj->endY = last->p1y >> 10;
+	obj->endPosition = Common::Point32(last->p1.x >> 10, last->p1.y >> 10);
 
 	return obj;
 }
@@ -242,33 +223,30 @@ void PathObject::start(uint32 tickCount) {
 /**
  * Advance the path evaluation. Returns true if still walking,
  * false if the entire path is complete.
- * outX/outY receive the current screen position.
+ * @p outPosition receives the current screen position.
  */
-bool PathObject::advance(uint32 tickCount, int &outX, int &outY) {
+bool PathObject::advance(uint32 tickCount, Common::Point32 &outPosition) {
 	if (finished) {
-		outX = endX;
-		outY = endY;
+		outPosition = endPosition;
 		return false;
 	}
 
-	if (currentSegment >= (int)segments.size()) {
+	if (currentSegment >= static_cast<int>(segments.size())) {
 		finished = true;
-		outX = endX;
-		outY = endY;
+		outPosition = endPosition;
 		return false;
 	}
 
 	CurveSegment *seg = segments[currentSegment];
-	if (seg->evaluate(tickCount, outX, outY))
+	if (seg->evaluate(tickCount, outPosition))
 		return true;
 
-	// Current segment complete — advance to next
-	currentSegment++;
-	if (currentSegment >= (int)segments.size()) {
+	// Advance after the current segment completes.
+	currentSegment += 1;
+	if (currentSegment >= static_cast<int>(segments.size())) {
 		// All segments done
 		finished = true;
-		outX = endX;
-		outY = endY;
+		outPosition = endPosition;
 		return false;
 	}
 
@@ -276,7 +254,7 @@ bool PathObject::advance(uint32 tickCount, int &outX, int &outY) {
 	CurveSegment *next = segments[currentSegment];
 	next->computeCoeffs();
 	next->startTime = tickCount;
-	next->evaluate(tickCount, outX, outY);
+	next->evaluate(tickCount, outPosition);
 	return true;
 }
 

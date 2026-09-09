@@ -24,59 +24,60 @@
 #include "common/system.h"
 #include "graphics/managed_surface.h"
 
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/puzzle_walloffleens.h"
-#include "zoombini2/game_state.h"
-#include "zoombini2/gfx.h"
-#include "zoombini2/zoombini.h"
-#include "zoombini2/zoombini2.h"
 #include "zoombini2/sound.h"
+#include "zoombini2/state.h"
+#include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
 // ============================================================================
-// Timing constants (ms) — from IDA HandleInput_42FE40
+// Interaction timing in milliseconds.
 // ============================================================================
-static const uint32 kAimStepDelay = 200;   // Cannon rotation: 200ms per step
-static const uint32 kFireDuration = 600;   // Cannonball flight time
-static const uint32 kHitDelay = 1200;      // Show hit result
-static const uint32 kMissDelay = 1200;     // Show miss result
-static const uint32 kNextDelay = 800;      // Before next zoombini
-static const uint32 kDoneDelay = 3000;     // Before page transition
+static const uint32 kAimStepDelay = 200; // Cannon rotation: 200ms per step
+static const uint32 kFireDuration = 600; // Cannonball flight time
+static const uint32 kHitDelay = 1200;    // Show hit result
+static const uint32 kMissDelay = 1200;   // Show miss result
+static const uint32 kNextDelay = 800;    // Before next zoombini
+static const uint32 kDoneDelay = 3000;   // Before page transition
 
-// Grid origin positions by difficulty (from IDA dword_48FF9C/dword_48FFA0)
-// Indexed as: kGridOrigins[difficulty][0=x, 1=y]
-static const int kGridOrigins[][2] = {
-	{  0,   0},  // unused (difficulty 0)
-	{380, 200},  // diff 1 — fallback (uses cycling panels normally)
-	{200,   7},  // diff 2 — 9×6 grid
-	{100,   7},  // diff 3 — 12×6 grid
-	{ 95,   7},  // diff 4 — 12×6 grid
+// Grid origins indexed by difficulty.
+static const Common::Point32 kGridOrigins[] = {
+	Common::Point32(0, 0),     // unused (difficulty 0)
+	Common::Point32(380, 200), // Difficulty one fallback; normal play cycles panel origins.
+	Common::Point32(200, 7),   // Difficulty two uses a 9 by 6 grid.
+	Common::Point32(100, 7),   // Difficulty three uses a 12 by 6 grid.
+	Common::Point32(95, 7),    // Difficulty four uses a 12 by 6 grid.
 };
 
-// Diff 1 cycling panel origins (from IDA dword_48FFC8/dword_48FFCC, 6 panels)
-static const int kDiff1PanelOrigins[][2] = {
-	{182,  88},  // panel 0
-	{344,  88},  // panel 1
-	{506,  87},  // panel 2
-	{183, 230},  // panel 3
-	{345, 229},  // panel 4
-	{508, 230},  // panel 5
+// Six panel origins cycled by difficulty one.
+static const Common::Point32 kDiff1PanelOrigins[] = {
+	Common::Point32(182, 88),  // panel 0
+	Common::Point32(344, 88),  // panel 1
+	Common::Point32(506, 87),  // panel 2
+	Common::Point32(183, 230), // panel 3
+	Common::Point32(345, 229), // panel 4
+	Common::Point32(508, 230), // panel 5
 };
 
-// Cannon muzzle endpoint per angle (from IDA dword_490040/dword_490044)
-static const int kCannonMuzzle[][2] = {
-	{500, 432},  // angle 0
-	{500, 432},  // angle 1
-	{480, 421},  // angle 2
-	{460, 418},  // angle 3
-	{441, 404},  // angle 4 (center — pointing up)
-	{415, 425},  // angle 5
-	{385, 428},  // angle 6
-	{379, 459},  // angle 7
-	{379, 459},  // angle 8
+// Cannon muzzle endpoint indexed by angle.
+static const Common::Point32 kCannonMuzzlePositions[] = {
+	Common::Point32(500, 432), // angle 0
+	Common::Point32(500, 432), // angle 1
+	Common::Point32(480, 421), // angle 2
+	Common::Point32(460, 418), // angle 3
+	Common::Point32(441, 404), // Angle four is centered and points upward.
+	Common::Point32(415, 425), // angle 5
+	Common::Point32(385, 428), // angle 6
+	Common::Point32(379, 459), // angle 7
+	Common::Point32(379, 459), // angle 8
 };
 
-// Mirrors per difficulty (from IDA Init_432150, offset +240228)
+static const Common::Point32 kCannonDrawPosition(385, 465);
+static const Common::Point32 kCannonCenterPosition(470, 550);
+
+// Mirror allowances indexed by difficulty.
 static const int kMirrorsPerDifficulty[] = {0, 12, 8, 6, 6};
 
 // ============================================================================
@@ -88,13 +89,13 @@ WallOfFleensPuzzle::WallOfFleensPuzzle(Zoombini2Engine *engine)
 	  _difficulty(1), _gridCols(3), _gridRows(2), _numFleens(6),
 	  _initialZoombiniCount(0), _freedCount(0),
 	  _currentZoombini(0), _selectedFleen(-1),
-	  _gameState(kStateIdle), _actionTimer(0),
-	  _gridPage(0), _gridOriginX(380), _gridOriginY(200),
+	  _gameState(kStateIdle00), _actionTimer(0),
+	  _gridPage(0), _gridOrigin(380, 200),
 	  _cannonAngle(4), _targetAngle(4),
 	  _targetCol(0), _targetRow(0),
-	  _cannonballX(0), _cannonballY(0),
-	  _cannonballStartX(0), _cannonballStartY(0),
-	  _cannonballEndX(0), _cannonballEndY(0),
+	  _cannonballPosition(0, 0),
+	  _cannonballStartPosition(0, 0),
+	  _cannonballEndPosition(0, 0),
 	  _cannonballProgress(0),
 	  _mirrorsLeft(12), _mirrorsTotal(12),
 	  _cannonCache(nullptr), _slotActiveGfx(nullptr),
@@ -150,20 +151,20 @@ void WallOfFleensPuzzle::loadResources() {
 	_cannonCache->loadFromFile(Common::Path("bmp/wall_of_fleens/canon_cache"));
 
 	// Mirror state sprites
-	_mirrorGfx[kMirrorNormal] = new RleBlock();
-	_mirrorGfx[kMirrorNormal]->loadFromFile(Common::Path("bmp/wall_of_fleens/mirror_nomal"));
+	_mirrorGfx[kMirrorNormal00] = new RleBlock();
+	_mirrorGfx[kMirrorNormal00]->loadFromFile(Common::Path("bmp/wall_of_fleens/mirror_nomal"));
 
-	_mirrorGfx[kMirrorGris] = new RleBlock();
-	_mirrorGfx[kMirrorGris]->loadFromFile(Common::Path("bmp/wall_of_fleens/mirror_GRIS"));
+	_mirrorGfx[kMirrorGris01] = new RleBlock();
+	_mirrorGfx[kMirrorGris01]->loadFromFile(Common::Path("bmp/wall_of_fleens/mirror_GRIS"));
 
-	_mirrorGfx[kMirrorNoir] = new RleBlock();
-	_mirrorGfx[kMirrorNoir]->loadFromFile(Common::Path("bmp/wall_of_fleens/mirror_NOIR"));
+	_mirrorGfx[kMirrorNoir02] = new RleBlock();
+	_mirrorGfx[kMirrorNoir02]->loadFromFile(Common::Path("bmp/wall_of_fleens/mirror_NOIR"));
 
-	_mirrorGfx[kMirrorFelure] = new RleBlock();
-	_mirrorGfx[kMirrorFelure]->loadFromFile(Common::Path("bmp/wall_of_fleens/mirror_felure"));
+	_mirrorGfx[kMirrorFelure03] = new RleBlock();
+	_mirrorGfx[kMirrorFelure03]->loadFromFile(Common::Path("bmp/wall_of_fleens/mirror_felure"));
 
-	_mirrorGfx[kMirrorEmpty] = new RleBlock();
-	_mirrorGfx[kMirrorEmpty]->loadFromFile(Common::Path("bmp/wall_of_fleens/mirror_empty_tunnel"));
+	_mirrorGfx[kMirrorEmpty05] = new RleBlock();
+	_mirrorGfx[kMirrorEmpty05]->loadFromFile(Common::Path("bmp/wall_of_fleens/mirror_empty_tunnel"));
 
 	// Nozzle sprite
 	_tuyereGfx = new RleBlock();
@@ -203,35 +204,40 @@ void WallOfFleensPuzzle::init() {
 	PuzzlePage::init();
 	debug(1, "WallOfFleensPuzzle::init");
 
-	// BGM: 05-BB01.wav (IDA: WallOfFleens__Init_432150)
+	// Start the Magic Mirrors music.
 	if (SoundManager *snd = _engine->getSoundManager()) {
 		_musicId = snd->load(true, Common::Path("sounds/music/05-BB01.wav"), true);
-		if (_musicId >= 0) { snd->playLoop(_musicId); snd->setVolume(_musicId, snd->_volumeMusic); }
+		if (_musicId >= 0) {
+			snd->playLoop(_musicId);
+			snd->setVolume(_musicId, snd->_volumeMusic);
+		}
 	}
 
 	loadResources();
 
 	// Determine difficulty from engine gameMode (1-based)
 	_difficulty = _engine->getGameState()->_gameMode;
-	if (_difficulty < 1) _difficulty = 1;
-	if (_difficulty > 4) _difficulty = 4;
+	if (_difficulty < 1)
+		_difficulty = 1;
+	if (_difficulty > 4)
+		_difficulty = 4;
 
 	_initialZoombiniCount = (int)_puzzleZoombinis.size();
 	_freedCount = 0;
 	_currentZoombini = 0;
 	_selectedFleen = -1;
 	_gridPage = 0;
-	_cannonAngle = 4;  // Center position
+	_cannonAngle = 4; // Center position
 	_targetAngle = 4;
 
-	// Set mirror count from difficulty (from IDA Init_432150)
+	// Set the mirror allowance for the selected difficulty.
 	_mirrorsTotal = kMirrorsPerDifficulty[_difficulty];
 	_mirrorsLeft = _mirrorsTotal;
 
 	buildGrid();
 	generateFleenFeatures();
 
-	_gameState = kStateIdle;
+	_gameState = kStateIdle00;
 	_actionTimer = _engine->getGameTickCount();
 }
 
@@ -262,15 +268,13 @@ void WallOfFleensPuzzle::buildGrid() {
 	if (_numFleens > kMaxFleens)
 		_numFleens = kMaxFleens;
 
-	// Set grid origin based on difficulty (from IDA dword_48FF9C/dword_48FFA0)
+	// Select the grid origin for this difficulty.
 	if (_difficulty == 1) {
-		// Diff 1 uses cycling panels — start with first panel
-		_gridOriginX = kDiff1PanelOrigins[_gridPage][0];
-		_gridOriginY = kDiff1PanelOrigins[_gridPage][1];
+		// Difficulty one begins with the first cycling panel.
+		_gridOrigin = kDiff1PanelOrigins[_gridPage];
 	} else {
 		int diffIdx = CLIP(_difficulty, 1, 4);
-		_gridOriginX = kGridOrigins[diffIdx][0];
-		_gridOriginY = kGridOrigins[diffIdx][1];
+		_gridOrigin = kGridOrigins[diffIdx];
 	}
 
 	// Initialize grid cells with positions and hitboxes
@@ -282,16 +286,16 @@ void WallOfFleensPuzzle::buildGrid() {
 			cell.gridRow = row;
 			cell.caught = false;
 
-			int x = _gridOriginX + kCellWidth * col;
-			int y = _gridOriginY + kCellHeight * row;
-			cell.hitbox = Common::Rect(x, y, x + kCellWidth, y + kCellHeight);
+			Common::Point32 cellPosition(_gridOrigin.x + kCellWidth * col, _gridOrigin.y + kCellHeight * row);
+			cell.hitbox = Common::Rect(
+				static_cast<int16>(cellPosition.x), static_cast<int16>(cellPosition.y),
+				static_cast<int16>(cellPosition.x + kCellWidth), static_cast<int16>(cellPosition.y + kCellHeight));
 		}
 	}
 }
 
 void WallOfFleensPuzzle::generateFleenFeatures() {
-	// From IDA InitGridDifficulty_455190:
-	// Each fleen gets 4 random feature values (1-5).
+	// Each Fleen gets four random feature values in the range one through five.
 	// No two fleens should have identical feature sets.
 	Common::RandomSource *rng = _engine->getRandom();
 
@@ -321,7 +325,7 @@ void WallOfFleensPuzzle::generateFleenFeatures() {
 }
 
 // ============================================================================
-// Update (per-frame non-blocking) — from IDA HandleInput_42FE40
+// Per-frame interaction update.
 // ============================================================================
 
 void WallOfFleensPuzzle::update() {
@@ -329,16 +333,16 @@ void WallOfFleensPuzzle::update() {
 	uint32 elapsed = now - _actionTimer;
 
 	switch (_gameState) {
-	case kStateIdle:
+	case kStateIdle00:
 		// Waiting for player to click a fleen cell
 		break;
 
-	case kStateAiming:
+	case kStateAiming01:
 		// Rotate cannon towards target angle, one step per kAimStepDelay
-		// From IDA: if (target >= 4) current++; else current--;
+		// Rotate one angle step toward the selected target.
 		if (elapsed >= kAimStepDelay) {
 			if (_cannonAngle == _targetAngle) {
-				// Aimed correctly — fire!
+				// Fire after the cannon reaches its target angle.
 				fireCannon();
 			} else {
 				// Rotate one step towards target
@@ -353,59 +357,60 @@ void WallOfFleensPuzzle::update() {
 		}
 		break;
 
-	case kStateFiring: {
+	case kStateFiring02: {
 		// Cannonball traveling from muzzle to target cell
 		// Linear interpolation over kFireDuration
 		if (elapsed >= kFireDuration) {
 			_cannonballProgress = 1000;
-			_cannonballX = _cannonballEndX;
-			_cannonballY = _cannonballEndY;
+			_cannonballPosition = _cannonballEndPosition;
 
 			// Check feature match
 			int fleenIdx = fleenIndexAt(_targetCol, _targetRow);
 			int matchScore = countMatchingFeatures(fleenIdx);
 
 			if (matchScore == kNumFeatures) {
-				// Perfect match — catch the fleen
+				// Capture the Fleen after a complete feature match.
 				catchFleen(fleenIdx);
 			} else {
-				// Miss — lose a mirror
+				// Consume a mirror after an incomplete feature match.
 				missFleen();
 			}
 		} else {
 			// Interpolate cannonball position
-			_cannonballProgress = (int)(elapsed * 1000 / kFireDuration);
-			_cannonballX = _cannonballStartX + (_cannonballEndX - _cannonballStartX) * _cannonballProgress / 1000;
-			_cannonballY = _cannonballStartY + (_cannonballEndY - _cannonballStartY) * _cannonballProgress / 1000;
+			_cannonballProgress = static_cast<int>(elapsed * 1000 / kFireDuration);
+			_cannonballPosition.x = _cannonballStartPosition.x
+				+ (_cannonballEndPosition.x - _cannonballStartPosition.x) * _cannonballProgress / 1000;
+			_cannonballPosition.y = _cannonballStartPosition.y
+				+ (_cannonballEndPosition.y - _cannonballStartPosition.y) * _cannonballProgress / 1000;
 		}
 		break;
 	}
 
-	case kStateHit:
+	case kStateHit03:
 		// Show catch result, then advance
 		if (elapsed >= kHitDelay) {
 			advanceToNextZoombini();
 		}
 		break;
 
-	case kStateMiss:
+	case kStateMiss04:
 		// Show miss, then reset cannon and advance
 		if (elapsed >= kMissDelay) {
-			// Reset cannon angle back to center (from IDA: this+159 flag)
+			// Return the cannon to its centered angle.
 			_cannonAngle = 4;
 			advanceToNextZoombini();
 		}
 		break;
 
-	case kStateNextZoombini:
+	case kStateNextZoombini05:
 		// Brief delay before allowing next click
 		if (elapsed >= kNextDelay) {
-			_gameState = kStateIdle;
+			_gameState = kStateIdle00;
 			_actionTimer = now;
 		}
 		break;
 
-	case kStateDone:
+	case kStateDone06:
 		// Wait then transition out
 		if (elapsed >= kDoneDelay) {
 			_engine->_returningFromPuzzle = true;
@@ -417,48 +422,45 @@ void WallOfFleensPuzzle::update() {
 }
 
 // ============================================================================
-// Game Logic — faithful to IDA analysis
+// Game logic
 // ============================================================================
 
-int WallOfFleensPuzzle::computeCannonAngle(int targetX, int targetY) const {
-	// From IDA Zoombini__LoadAppearance_45C1A0:
-	//   dx = targetX - cannonCenterX
-	//   dist = sqrt(dx^2 + dy^2)
-	//   angleDeg = acos(dx / dist) * 180 / PI
-	//   if (cannonY < targetY) angleDeg = -angleDeg
-	//   return angleDeg / (360 / totalDirections)  // totalDirections = 18
-	int dx = targetX - kCannonCenterX;
-	int dy = kCannonCenterY - targetY;
-	double dist = sqrt((double)(dx * dx + dy * dy));
+int WallOfFleensPuzzle::computeCannonAngle(const Common::Point32 &targetPosition) const {
+	// Convert the target vector to degrees, divide it into direction sectors, and clamp the result.
+	int32 dx = targetPosition.x - kCannonCenterPosition.x;
+	int32 dy = kCannonCenterPosition.y - targetPosition.y;
+	double dist = sqrt(static_cast<double>(dx * dx + dy * dy));
 	if (dist < 1.0)
-		return 4;  // Center
+		return 4; // Center
 
-	double angleDeg = acos((double)dx / dist) * 180.0 / M_PI;
-	if (kCannonCenterY < targetY)
+	double angleDeg = acos(static_cast<double>(dx) / dist) * 180.0 / M_PI;
+	if (kCannonCenterPosition.y < targetPosition.y)
 		angleDeg = -angleDeg;
 
-	int result = (int)angleDeg / 20;  // 360 / 18 = 20 degrees per step
+	int result = (int)angleDeg / 20; // 360 / 18 = 20 degrees per step
 	return CLIP(result, 0, kNumCannonAngles - 1);
 }
 
 int WallOfFleensPuzzle::countMatchingFeatures(int fleenIdx) const {
-	// From IDA ResetGridState_4552D0:
-	// Compare 4 features of fleen cell against current zoombini
-	// Returns count of matching features (0-4)
+	// Count matching visible features between the selected Fleen and current Zoombini.
 	if (fleenIdx < 0 || fleenIdx >= _numFleens)
 		return 0;
 	if (_currentZoombini < 0 || _currentZoombini >= (int)_puzzleZoombinis.size())
 		return 0;
 
 	const FleenCell &cell = _fleens[fleenIdx];
-	const Zoombini *z = _puzzleZoombinis[_currentZoombini];
+	const ZoombiniState *z = _puzzleZoombinis[_currentZoombini];
 
 	int matches = 0;
 	// Features are 1-5 in both fleen cells and zoombini struct
-	if (cell.features[0] == z->_featureA) matches++;
-	if (cell.features[1] == z->_featureB) matches++;
-	if (cell.features[2] == z->_featureC) matches++;
-	if (cell.features[3] == z->_featureD) matches++;
+	if (cell.features[0] == z->_featureA)
+		matches++;
+	if (cell.features[1] == z->_featureB)
+		matches++;
+	if (cell.features[2] == z->_featureC)
+		matches++;
+	if (cell.features[3] == z->_featureD)
+		matches++;
 
 	return matches;
 }
@@ -472,44 +474,43 @@ int WallOfFleensPuzzle::fleenIndexAt(int col, int row) const {
 void WallOfFleensPuzzle::fireCannon() {
 	// Set up cannonball trajectory from muzzle to target fleen center
 	int angle = CLIP(_cannonAngle, 0, kNumCannonAngles - 1);
-	_cannonballStartX = kCannonMuzzle[angle][0];
-	_cannonballStartY = kCannonMuzzle[angle][1];
+	_cannonballStartPosition = kCannonMuzzlePositions[angle];
 
 	// Target: center of the fleen cell
-	_cannonballEndX = _gridOriginX + kCellWidth * _targetCol + kCellWidth / 2;
-	_cannonballEndY = _gridOriginY + kCellHeight * _targetRow + kCellHeight / 2;
+	_cannonballEndPosition = Common::Point32(
+		_gridOrigin.x + kCellWidth * _targetCol + kCellWidth / 2,
+		_gridOrigin.y + kCellHeight * _targetRow + kCellHeight / 2);
 
-	_cannonballX = _cannonballStartX;
-	_cannonballY = _cannonballStartY;
+	_cannonballPosition = _cannonballStartPosition;
 	_cannonballProgress = 0;
 
-	_gameState = kStateFiring;
+	_gameState = kStateFiring02;
 	_actionTimer = _engine->getGameTickCount();
 
 	debug(2, "WallOfFleens: Firing cannon angle %d from (%d,%d) to (%d,%d)",
-	      _cannonAngle, _cannonballStartX, _cannonballStartY,
-	      _cannonballEndX, _cannonballEndY);
+		  _cannonAngle, _cannonballStartPosition.x, _cannonballStartPosition.y,
+		  _cannonballEndPosition.x, _cannonballEndPosition.y);
 }
 
 void WallOfFleensPuzzle::catchFleen(int fleenIdx) {
 	_fleens[fleenIdx].caught = true;
 	_freedCount++;
 	_selectedFleen = fleenIdx;
-	_gameState = kStateHit;
+	_gameState = kStateHit03;
 	_actionTimer = _engine->getGameTickCount();
 
 	debug(2, "WallOfFleens: Caught fleen %d (col=%d row=%d), freed %d/%d",
-	      fleenIdx, _fleens[fleenIdx].gridCol, _fleens[fleenIdx].gridRow,
-	      _freedCount, kMinFreed);
+		  fleenIdx, _fleens[fleenIdx].gridCol, _fleens[fleenIdx].gridRow,
+		  _freedCount, kMinFreed);
 }
 
 void WallOfFleensPuzzle::missFleen() {
 	_mirrorsLeft--;
-	_gameState = kStateMiss;
+	_gameState = kStateMiss04;
 	_actionTimer = _engine->getGameTickCount();
 
 	debug(2, "WallOfFleens: Miss! Mirrors remaining: %d/%d",
-	      _mirrorsLeft, _mirrorsTotal);
+		  _mirrorsLeft, _mirrorsTotal);
 }
 
 void WallOfFleensPuzzle::advanceToNextZoombini() {
@@ -522,27 +523,25 @@ void WallOfFleensPuzzle::advanceToNextZoombini() {
 	_targetAngle = 4;
 
 	checkCompletion();
-	if (_gameState != kStateDone) {
-		_gameState = kStateNextZoombini;
+	if (_gameState != kStateDone06) {
+		_gameState = kStateNextZoombini05;
 		_actionTimer = _engine->getGameTickCount();
 	}
 }
 
 void WallOfFleensPuzzle::checkCompletion() {
-	// From IDA CheckFreeZoombinis_432EB0:
-	// freed = initialCount - currentRemainingCount
-	// Complete when freed >= kMinFreed
+	// Complete when the required number of Zoombinis has been released.
 	if (_freedCount >= kMinFreed) {
 		debug(1, "WallOfFleens: Puzzle complete! Freed %d zoombinis", _freedCount);
-		_gameState = kStateDone;
+		_gameState = kStateDone06;
 		_actionTimer = _engine->getGameTickCount();
 		return;
 	}
 
-	// No mirrors left — round over (fail, but still transition)
+	// A depleted mirror allowance ends the round and advances the route.
 	if (_mirrorsLeft <= 0) {
 		debug(1, "WallOfFleens: No mirrors left, transitioning out");
-		_gameState = kStateDone;
+		_gameState = kStateDone06;
 		_actionTimer = _engine->getGameTickCount();
 		return;
 	}
@@ -550,17 +549,17 @@ void WallOfFleensPuzzle::checkCompletion() {
 	// No more zoombinis to try
 	if (_currentZoombini >= (int)_puzzleZoombinis.size()) {
 		debug(1, "WallOfFleens: No more zoombinis, transitioning out");
-		_gameState = kStateDone;
+		_gameState = kStateDone06;
 		_actionTimer = _engine->getGameTickCount();
 	}
 }
 
 // ============================================================================
-// HandleClick — from IDA HandleInput_42FE40 click section
+// Click handling
 // ============================================================================
 
 void WallOfFleensPuzzle::handleClick(const Common::Point &pos) {
-	if (_gameState != kStateIdle)
+	if (_gameState != kStateIdle00)
 		return;
 
 	if (_currentZoombini >= (int)_puzzleZoombinis.size())
@@ -576,22 +575,23 @@ void WallOfFleensPuzzle::handleClick(const Common::Point &pos) {
 			_targetRow = _fleens[i].gridRow;
 
 			// Compute what angle the cannon should aim at
-			int cellCenterX = _gridOriginX + kCellWidth * _targetCol + kCellWidth / 2;
-			int cellCenterY = _gridOriginY + kCellHeight * _targetRow + kCellHeight / 2;
-			_targetAngle = computeCannonAngle(cellCenterX, cellCenterY);
+			Common::Point32 cellCenterPosition(
+				_gridOrigin.x + kCellWidth * _targetCol + kCellWidth / 2,
+				_gridOrigin.y + kCellHeight * _targetRow + kCellHeight / 2);
+			_targetAngle = computeCannonAngle(cellCenterPosition);
 
 			if (_cannonAngle == _targetAngle) {
-				// Already aimed — fire immediately
+				// Fire immediately when the cannon is already aimed.
 				fireCannon();
 			} else {
 				// Start rotating cannon
-				_gameState = kStateAiming;
+				_gameState = kStateAiming01;
 				_actionTimer = _engine->getGameTickCount();
 			}
 
 			debug(2, "WallOfFleens: Clicked fleen %d at col=%d row=%d, "
-			      "target angle=%d, current=%d",
-			      i, _targetCol, _targetRow, _targetAngle, _cannonAngle);
+					 "target angle=%d, current=%d",
+				  i, _targetCol, _targetRow, _targetAngle, _cannonAngle);
 			return;
 		}
 	}
@@ -614,7 +614,7 @@ void WallOfFleensPuzzle::draw(Graphics::ManagedSurface *screen) {
 			int frameIdx = (now / 100) % frameCount; // ~10 fps
 			const RleBlock *frame = _lavaBubbleAnim->getFrame(frameIdx);
 			if (frame) {
-				const byte (*lut)[256] = _engine->getAlphaLUT();
+				const byte(*lut)[256] = _engine->getAlphaLUT();
 				frame->drawToScreen(screen, 100, 450, lut);
 			}
 		}
@@ -633,122 +633,121 @@ void WallOfFleensPuzzle::draw(Graphics::ManagedSurface *screen) {
 }
 
 void WallOfFleensPuzzle::drawGrid(Graphics::ManagedSurface *screen) {
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 
 	for (int i = 0; i < _numFleens; i++) {
 		const FleenCell &cell = _fleens[i];
-		int x = cell.hitbox.left;
-		int y = cell.hitbox.top;
+		Common::Point32 cellPosition(cell.hitbox.left, cell.hitbox.top);
 
 		if (cell.caught) {
 			// Draw empty/destroyed slot
-			if (_mirrorGfx[kMirrorEmpty]) {
-				_mirrorGfx[kMirrorEmpty]->drawToScreen(screen, x, y, lut);
+			if (_mirrorGfx[kMirrorEmpty05]) {
+				_mirrorGfx[kMirrorEmpty05]->drawToScreen(screen, cellPosition.x, cellPosition.y, lut);
 			}
 			continue;
 		}
 
 		// Draw active fleen cell background
-		if (_mirrorGfx[kMirrorNormal]) {
-			_mirrorGfx[kMirrorNormal]->drawToScreen(screen, x, y, lut);
+		if (_mirrorGfx[kMirrorNormal00]) {
+			_mirrorGfx[kMirrorNormal00]->drawToScreen(screen, cellPosition.x, cellPosition.y, lut);
 		}
 
 		// Draw fleen zoombini sprite on the cell
 		if (_zoombiniGfx) {
 			int baseIdx = 0;
 			const RleBlock *frame = _zoombiniGfx->getFrame(baseIdx, 0);
-			int zx = x + 4;
-			int zy = y + 4;
+			Common::Point32 zoombiniPosition(cellPosition.x + 4, cellPosition.y + 4);
 			if (frame)
-				frame->drawToScreen(screen, zx, zy, lut);
+				frame->drawToScreen(screen, zoombiniPosition.x, zoombiniPosition.y, lut);
 
 			for (int slot = 1; slot <= kNumFeatures; slot++) {
 				int featVal = cell.features[slot - 1];
-				if (featVal < 1) featVal = 1;
-				int featIdx = baseIdx + slot * ZoombiniGfx::kDim2 + featVal;
+				if (featVal < 1)
+					featVal = 1;
+				int featIdx = baseIdx + slot * ZoombiniGraphics::kDim2 + featVal;
 				frame = _zoombiniGfx->getFrame(featIdx, 0);
 				if (frame)
-					frame->drawToScreen(screen, zx, zy, lut);
+					frame->drawToScreen(screen, zoombiniPosition.x, zoombiniPosition.y, lut);
 			}
 		}
 
 		// Highlight the currently selected/targeted fleen
-		if (i == _selectedFleen && (_gameState == kStateAiming || _gameState == kStateFiring)) {
+		if (i == _selectedFleen && (_gameState == kStateAiming01 || _gameState == kStateFiring02)) {
 			if (_tuyereGfx) {
-				_tuyereGfx->drawToScreen(screen, x, y, lut);
+				_tuyereGfx->drawToScreen(screen, cellPosition.x, cellPosition.y, lut);
 			}
 		}
 
 		// Show hit result on caught fleen
-		if (i == _selectedFleen && _gameState == kStateHit) {
+		if (i == _selectedFleen && _gameState == kStateHit03) {
 			if (_highlightGfx) {
-				_highlightGfx->drawToScreen(screen, x, y, lut);
-			} else if (_mirrorGfx[kMirrorExplode]) {
-				_mirrorGfx[kMirrorExplode]->drawToScreen(screen, x, y, lut);
+				_highlightGfx->drawToScreen(screen, cellPosition.x, cellPosition.y, lut);
+			} else if (_mirrorGfx[kMirrorExplode04]) {
+				_mirrorGfx[kMirrorExplode04]->drawToScreen(screen, cellPosition.x, cellPosition.y, lut);
 			}
 		}
 	}
 }
 
 void WallOfFleensPuzzle::drawCannon(Graphics::ManagedSurface *screen) {
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 
-	// Draw cannon sprite at correct angle (from IDA: drawn at 385, 465)
+	// Draw the cannon visual for its current angle.
 	int angle = CLIP(_cannonAngle, 0, kNumCannonAngles - 1);
 	if (_cannonGfx[angle]) {
-		_cannonGfx[angle]->drawToScreen(screen, kCannonDrawX, kCannonDrawY, lut);
+		_cannonGfx[angle]->drawToScreen(screen, kCannonDrawPosition.x, kCannonDrawPosition.y, lut);
 	}
 
 	// Draw cannon cache/cover overlay
 	if (_cannonCache) {
-		_cannonCache->drawToScreen(screen, kCannonDrawX, kCannonDrawY, lut);
+		_cannonCache->drawToScreen(screen, kCannonDrawPosition.x, kCannonDrawPosition.y, lut);
 	}
 }
 
 void WallOfFleensPuzzle::drawCannonball(Graphics::ManagedSurface *screen) {
-	if (_gameState != kStateFiring || _cannonballProgress <= 0)
+	if (_gameState != kStateFiring02 || _cannonballProgress <= 0)
 		return;
 
 	// Draw a simple cannonball at current interpolated position
 	// Use tuyere sprite as cannonball placeholder if no dedicated sprite
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 	if (_tuyereGfx) {
-		_tuyereGfx->drawToScreen(screen, _cannonballX - 8, _cannonballY - 8, lut);
+		_tuyereGfx->drawToScreen(screen, _cannonballPosition.x - 8, _cannonballPosition.y - 8, lut);
 	} else {
 		// Fallback: draw a small rectangle
-		screen->fillRect(Common::Rect(_cannonballX - 4, _cannonballY - 4,
-		                              _cannonballX + 4, _cannonballY + 4), 0);
+		screen->fillRect(Common::Rect(static_cast<int16>(_cannonballPosition.x - 4), static_cast<int16>(_cannonballPosition.y - 4),
+									  static_cast<int16>(_cannonballPosition.x + 4), static_cast<int16>(_cannonballPosition.y + 4)),
+						 0);
 	}
 }
 
 void WallOfFleensPuzzle::drawMirrors(Graphics::ManagedSurface *screen) {
-	// Draw mirror/chance indicators at bottom-right (from IDA: x=690+23*i, y=424)
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	// Draw remaining-chance mirrors along the lower-right edge.
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 
 	for (int i = 0; i < _mirrorsTotal; i++) {
-		int mx = 690 + 23 * i;
-		int my = 424;
+		Common::Point32 mirrorPosition(690 + 23 * i, 424);
 
 		// Show explode animation on the most recently broken mirror
-		if (i == _mirrorsLeft && _gameState == kStateMiss && _mirrorExplodeAnim) {
+		if (i == _mirrorsLeft && _gameState == kStateMiss04 && _mirrorExplodeAnim) {
 			uint32 elapsed = _engine->getGameTickCount() - _actionTimer;
 			int frameCount = _mirrorExplodeAnim->getFrameCount();
 			if (frameCount > 0 && elapsed < (uint32)(frameCount * 60)) {
 				int frameIdx = (elapsed / 60) % frameCount; // ~16.7 fps
 				const RleBlock *frame = _mirrorExplodeAnim->getFrame(frameIdx);
 				if (frame) {
-					frame->drawToScreen(screen, mx, my, lut);
+					frame->drawToScreen(screen, mirrorPosition.x, mirrorPosition.y, lut);
 					continue; // Skip normal drawing for this mirror
 				}
 			}
 		}
 
 		if (i < _mirrorsLeft) {
-			if (_mirrorGfx[kMirrorNormal])
-				_mirrorGfx[kMirrorNormal]->drawToScreen(screen, mx, my, lut);
+			if (_mirrorGfx[kMirrorNormal00])
+				_mirrorGfx[kMirrorNormal00]->drawToScreen(screen, mirrorPosition.x, mirrorPosition.y, lut);
 		} else {
-			if (_mirrorGfx[kMirrorEmpty])
-				_mirrorGfx[kMirrorEmpty]->drawToScreen(screen, mx, my, lut);
+			if (_mirrorGfx[kMirrorEmpty05])
+				_mirrorGfx[kMirrorEmpty05]->drawToScreen(screen, mirrorPosition.x, mirrorPosition.y, lut);
 		}
 	}
 }
@@ -757,49 +756,46 @@ void WallOfFleensPuzzle::drawZoombinis(Graphics::ManagedSurface *screen) {
 	if (!_zoombiniGfx || _puzzleZoombinis.empty())
 		return;
 
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 
-	// Draw current zoombini near cannon (from IDA: cannon at 385,465)
+	// Draw the current Zoombini beside the cannon.
 	if (_currentZoombini < (int)_puzzleZoombinis.size()) {
-		const Zoombini *z = _puzzleZoombinis[_currentZoombini];
-		int x = kCannonDrawX - 60;
-		int y = kCannonDrawY + 10;
+		const ZoombiniState *z = _puzzleZoombinis[_currentZoombini];
+		Common::Point32 zoombiniPosition(kCannonDrawPosition.x - 60, kCannonDrawPosition.y + 10);
 		int baseIdx = 0;
 
 		const RleBlock *frame = _zoombiniGfx->getFrame(baseIdx, 0);
 		if (frame)
-			frame->drawToScreen(screen, x, y, lut);
+			frame->drawToScreen(screen, zoombiniPosition.x, zoombiniPosition.y, lut);
 
-		const byte features[4] = { z->_featureA, z->_featureB, z->_featureC, z->_featureD };
+		const byte features[4] = {z->_featureA, z->_featureB, z->_featureC, z->_featureD};
 		for (int slot = 1; slot <= 4; slot++) {
-			int featIdx = baseIdx + slot * ZoombiniGfx::kDim2 + features[slot - 1];
+			int featIdx = baseIdx + slot * ZoombiniGraphics::kDim2 + features[slot - 1];
 			frame = _zoombiniGfx->getFrame(featIdx, 0);
 			if (frame)
-				frame->drawToScreen(screen, x, y, lut);
+				frame->drawToScreen(screen, zoombiniPosition.x, zoombiniPosition.y, lut);
 		}
 	}
 
 	// Draw remaining zoombinis in a queue line
-	int startX = 50;
-	int startY = 550;
+	const Common::Point32 queueStartPosition(50, 550);
 	int spacing = 35;
 	int count = MIN((int)_puzzleZoombinis.size(), 16);
 	for (int i = _currentZoombini + 1; i < count; i++) {
-		const Zoombini *z = _puzzleZoombinis[i];
-		int x = startX + (i - _currentZoombini - 1) * spacing;
-		int y = startY;
+		const ZoombiniState *z = _puzzleZoombinis[i];
+		Common::Point32 zoombiniPosition(queueStartPosition.x + (i - _currentZoombini - 1) * spacing, queueStartPosition.y);
 		int baseIdx = 0;
 
 		const RleBlock *frame = _zoombiniGfx->getFrame(baseIdx, 0);
 		if (frame)
-			frame->drawToScreen(screen, x, y, lut);
+			frame->drawToScreen(screen, zoombiniPosition.x, zoombiniPosition.y, lut);
 
-		const byte features[4] = { z->_featureA, z->_featureB, z->_featureC, z->_featureD };
+		const byte features[4] = {z->_featureA, z->_featureB, z->_featureC, z->_featureD};
 		for (int slot = 1; slot <= 4; slot++) {
-			int featIdx = baseIdx + slot * ZoombiniGfx::kDim2 + features[slot - 1];
+			int featIdx = baseIdx + slot * ZoombiniGraphics::kDim2 + features[slot - 1];
 			frame = _zoombiniGfx->getFrame(featIdx, 0);
 			if (frame)
-				frame->drawToScreen(screen, x, y, lut);
+				frame->drawToScreen(screen, zoombiniPosition.x, zoombiniPosition.y, lut);
 		}
 	}
 }

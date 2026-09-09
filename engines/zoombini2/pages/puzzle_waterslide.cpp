@@ -22,19 +22,16 @@
 #include "common/debug.h"
 #include "common/random.h"
 
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/puzzle_waterslide.h"
-#include "zoombini2/game_state.h"
-#include "zoombini2/gfx.h"
-#include "zoombini2/zoombini.h"
-#include "zoombini2/zoombini2.h"
 #include "zoombini2/sound.h"
+#include "zoombini2/state.h"
+#include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
 // ============================================================================
-// WaterslidePuzzle — Trait pair matching puzzle.
-//
-// Original: Waterslide__Init_43B490. Object size 0xBE58 (48728 bytes).
+// WaterslidePuzzle - trait pair matching puzzle.
 //
 // Core mechanics:
 //   - Zoombinis must pair up based on shared traits
@@ -60,33 +57,47 @@ static const uint32 kRejectAnimDuration = 1000;
 // Slot hitbox size
 static const int kSlotHitSize = 50;
 
-// Helper to get feature by axis index (0=hair, 1=eyes, 2=nose, 3=feet)
-static byte getFeature(const Zoombini *z, int axis) {
+byte WaterslidePuzzle::getFeature(const ZoombiniState *z, int axis) {
 	switch (axis) {
-	case 0: return z->_featureA;  // Hair
-	case 1: return z->_featureB;  // Eyes
-	case 2: return z->_featureC;  // Nose
-	case 3: return z->_featureD;  // Feet
-	default: return 0;
+	case 0:
+		return z->_featureA; // Hair
+	case 1:
+		return z->_featureB; // Eyes
+	case 2:
+		return z->_featureC; // Nose
+	case 3:
+		return z->_featureD; // Feet
+	default:
+		return 0;
 	}
 }
 
 // Slot positions (8 pairs = 16 slots, arranged in 2 columns)
 // Left column (slots 0-7), Right column (slots 8-15)
-static const int kSlotPositions[16][2] = {
+static const Common::Point32 kSlotPositions[16] = {
 	// Left column
-	{ 150, 100 }, { 150, 150 }, { 150, 200 }, { 150, 250 },
-	{ 150, 300 }, { 150, 350 }, { 150, 400 }, { 150, 450 },
+	{150, 100},
+	{150, 150},
+	{150, 200},
+	{150, 250},
+	{150, 300},
+	{150, 350},
+	{150, 400},
+	{150, 450},
 	// Right column
-	{ 450, 100 }, { 450, 150 }, { 450, 200 }, { 450, 250 },
-	{ 450, 300 }, { 450, 350 }, { 450, 400 }, { 450, 450 }
-};
+	{450, 100},
+	{450, 150},
+	{450, 200},
+	{450, 250},
+	{450, 300},
+	{450, 350},
+	{450, 400},
+	{450, 450}};
 
 // Pipe connection positions (between slot pairs)
-static const int kPipePositions[8][2] = {
-	{ 250, 100 }, { 250, 150 }, { 250, 200 }, { 250, 250 },
-	{ 250, 300 }, { 250, 350 }, { 250, 400 }, { 250, 450 }
-};
+static const Common::Point32 kPipePositions[8] = {
+	Common::Point32(250, 100), Common::Point32(250, 150), Common::Point32(250, 200), Common::Point32(250, 250),
+	Common::Point32(250, 300), Common::Point32(250, 350), Common::Point32(250, 400), Common::Point32(250, 450)};
 
 WaterslidePuzzle::WaterslidePuzzle(Zoombini2Engine *engine)
 	: PuzzlePage(engine, kPageWaterslide),
@@ -118,6 +129,7 @@ WaterslidePuzzle::WaterslidePuzzle(Zoombini2Engine *engine)
 	}
 
 	for (int i = 0; i < kMaxSlots; i++) {
+		_slots[i].position = Common::Point32();
 		_slots[i].state = kSlotEmpty;
 		_slots[i].zoombiniIdx = -1;
 		_slots[i].pairSlot = -1;
@@ -166,14 +178,17 @@ void WaterslidePuzzle::init() {
 	// Call base init for background and zoombini loading
 	PuzzlePage::init();
 
-	// BGM: 02-BS01.wav (IDA: Waterslide__Init_43B490)
+	// Start the Pipes of Paloo music.
 	if (SoundManager *snd = _engine->getSoundManager()) {
 		_musicId = snd->load(true, Common::Path("sounds/music/02-BS01.wav"), true);
-		if (_musicId >= 0) { snd->playLoop(_musicId); snd->setVolume(_musicId, snd->_volumeMusic); }
+		if (_musicId >= 0) {
+			snd->playLoop(_musicId);
+			snd->setVolume(_musicId, snd->_volumeMusic);
+		}
 	}
 
 	int diff = CLIP(_engine->getGameState()->_gameMode, 1, 3);
-	debug(1, "WaterslidePuzzle::init — difficulty %d", diff);
+	debug(1, "WaterslidePuzzle::init - difficulty %d", diff);
 
 	// Load resources
 	loadResources();
@@ -301,14 +316,12 @@ void WaterslidePuzzle::setupSlots() {
 	_numSlots = 16;
 
 	for (int i = 0; i < _numSlots; i++) {
-		_slots[i].x = kSlotPositions[i][0];
-		_slots[i].y = kSlotPositions[i][1];
+		_slots[i].position = kSlotPositions[i];
 		_slots[i].hitbox = Common::Rect(
-			_slots[i].x - kSlotHitSize / 2,
-			_slots[i].y - kSlotHitSize / 2,
-			_slots[i].x + kSlotHitSize / 2,
-			_slots[i].y + kSlotHitSize / 2
-		);
+			static_cast<int16>(_slots[i].position.x - kSlotHitSize / 2),
+			static_cast<int16>(_slots[i].position.y - kSlotHitSize / 2),
+			static_cast<int16>(_slots[i].position.x + kSlotHitSize / 2),
+			static_cast<int16>(_slots[i].position.y + kSlotHitSize / 2));
 		_slots[i].state = kSlotEmpty;
 		_slots[i].zoombiniIdx = -1;
 
@@ -364,7 +377,7 @@ void WaterslidePuzzle::computePairsDiff1() {
 		if (paired[i])
 			continue;
 
-		const Zoombini *z1 = _puzzleZoombinis[i];
+		const ZoombiniState *z1 = _puzzleZoombinis[i];
 
 		// Pick a random feature axis (0-3: hair, eyes, nose, feet)
 		int axis = rnd.getRandomNumber(3);
@@ -375,7 +388,7 @@ void WaterslidePuzzle::computePairsDiff1() {
 			if (paired[j])
 				continue;
 
-			const Zoombini *z2 = _puzzleZoombinis[j];
+			const ZoombiniState *z2 = _puzzleZoombinis[j];
 			if (getFeature(z2, axis) == z1Value) {
 				// Found a match
 				_pairs[_numPairs].zoombiniA = i;
@@ -395,13 +408,11 @@ void WaterslidePuzzle::computePairsDiff1() {
 
 void WaterslidePuzzle::computePairsDiff2() {
 	// Similar to Diff1 but with different iteration order
-	computePairsDiff1();  // Placeholder - same algorithm for now
+	computePairsDiff1(); // Placeholder - same algorithm for now
 }
 
 void WaterslidePuzzle::computePairsDiff3() {
-	// Complex bipartite graph matching
-	// For now, use same algorithm (proper implementation would use
-	// linked lists and iterative refinement as in 0x435BA0)
+	// The current upper-difficulty path reuses the level-one pairing algorithm.
 	computePairsDiff1();
 }
 
@@ -477,7 +488,7 @@ bool WaterslidePuzzle::checkPairMatch(int slotA, int slotB) {
 			continue;
 
 		if ((_pairs[i].zoombiniA == zA && _pairs[i].zoombiniB == zB) ||
-		    (_pairs[i].zoombiniA == zB && _pairs[i].zoombiniB == zA)) {
+			(_pairs[i].zoombiniA == zB && _pairs[i].zoombiniB == zA)) {
 			_pairs[i].matched = true;
 			return true;
 		}
@@ -542,7 +553,7 @@ void WaterslidePuzzle::update() {
 		break;
 
 	case kStateZoombiniMoving:
-		// Zoombini animation moving to slot
+		// Wait for the selected Zoombini's slot movement to finish.
 		if (elapsed > kMoveAnimDuration) {
 			_state = kStateIdle;
 			_stateTimer = now;
@@ -627,7 +638,7 @@ void WaterslidePuzzle::draw(Graphics::ManagedSurface *screen) {
 }
 
 void WaterslidePuzzle::drawPipes(Graphics::ManagedSurface *screen) {
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 
 	// Draw pipes connecting slot pairs
 	for (int i = 0; i < 8; i++) {
@@ -638,22 +649,22 @@ void WaterslidePuzzle::drawPipes(Graphics::ManagedSurface *screen) {
 
 		// Determine pipe color based on slot states
 		if (_slots[leftSlot].state == kSlotMatched || _slots[rightSlot].state == kSlotMatched) {
-			pipeGfx = _pipeBlueHoriz;  // Blue for matched
+			pipeGfx = _pipeBlueHoriz; // Blue for matched
 		} else if (_slots[leftSlot].state == kSlotRejected || _slots[rightSlot].state == kSlotRejected) {
-			pipeGfx = _pipeRedHoriz;   // Red for rejected
+			pipeGfx = _pipeRedHoriz; // Red for rejected
 		} else {
-			pipeGfx = _pipeGreyHoriz;  // Grey for neutral
+			pipeGfx = _pipeGreyHoriz; // Grey for neutral
 		}
 
 		if (pipeGfx) {
-			pipeGfx->drawToScreen(screen, kPipePositions[i][0], kPipePositions[i][1], lut);
+			pipeGfx->drawToScreen(screen, kPipePositions[i].x, kPipePositions[i].y, lut);
 		}
 	}
 }
 
 void WaterslidePuzzle::drawSlots(Graphics::ManagedSurface *screen) {
 	// Draw slot indicators/pastilles
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 
 	for (int i = 0; i < _numSlots; i++) {
 		const Slot &slot = _slots[i];
@@ -666,18 +677,22 @@ void WaterslidePuzzle::drawSlots(Graphics::ManagedSurface *screen) {
 		}
 
 		if (gfx) {
-			gfx->drawToScreen(screen, slot.x - 15, slot.y - 15, lut);
+			gfx->drawToScreen(screen, slot.position.x - 15, slot.position.y - 15, lut);
 		} else {
 			// Fallback: draw circle
 			uint32 color = (slot.state == kSlotEmpty) ? 0x808080 : 0x0000FF;
-			screen->fillRect(Common::Rect(slot.x - 10, slot.y - 10, slot.x + 10, slot.y + 10), color);
+			screen->fillRect(
+				Common::Rect(
+					static_cast<int16>(slot.position.x - 10), static_cast<int16>(slot.position.y - 10),
+					static_cast<int16>(slot.position.x + 10), static_cast<int16>(slot.position.y + 10)),
+				color);
 		}
 	}
 }
 
 void WaterslidePuzzle::drawTraitIndicators(Graphics::ManagedSurface *screen) {
 	// Draw trait icons near pairs to show what feature they match on
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 
 	for (int i = 0; i < _numPairs; i++) {
 		if (_pairs[i].matched)
@@ -692,14 +707,13 @@ void WaterslidePuzzle::drawTraitIndicators(Graphics::ManagedSurface *screen) {
 			continue;
 
 		// Draw near the corresponding pipe
-		int pipeX = kPipePositions[i][0];
-		int pipeY = kPipePositions[i][1];
-		traitGfx->drawToScreen(screen, pipeX + 50, pipeY - 10, lut);
+		const Common::Point32 pipePosition = kPipePositions[i];
+		traitGfx->drawToScreen(screen, pipePosition.x + 50, pipePosition.y - 10, lut);
 	}
 }
 
 void WaterslidePuzzle::drawDecorations(Graphics::ManagedSurface *screen) {
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 	uint32 now = _engine->getGameTickCount();
 
 	// Draw fountain animation
@@ -728,7 +742,7 @@ void WaterslidePuzzle::drawDecorations(Graphics::ManagedSurface *screen) {
 }
 
 void WaterslidePuzzle::drawZoombinis(Graphics::ManagedSurface *screen) {
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 
 	if (!_zoombiniGfx)
 		return;
@@ -739,28 +753,26 @@ void WaterslidePuzzle::drawZoombinis(Graphics::ManagedSurface *screen) {
 		if (slot.zoombiniIdx < 0)
 			continue;
 
-		const Zoombini *z = _puzzleZoombinis[slot.zoombiniIdx];
-		int x = slot.x - 15;
-		int y = slot.y - 20;
+		const ZoombiniState *z = _puzzleZoombinis[slot.zoombiniIdx];
+		const Common::Point32 position(slot.position.x - 15, slot.position.y - 20);
 
 		// Draw zoombini
 		int baseIdx = 0;
 		const RleBlock *frame = _zoombiniGfx->getFrame(baseIdx, 0);
 		if (frame)
-			frame->drawToScreen(screen, x, y, lut);
+			frame->drawToScreen(screen, position.x, position.y, lut);
 
-		const byte features[4] = { z->_featureA, z->_featureB, z->_featureC, z->_featureD };
+		const byte features[4] = {z->_featureA, z->_featureB, z->_featureC, z->_featureD};
 		for (int feat = 1; feat <= 4; feat++) {
-			int featIdx = baseIdx + feat * ZoombiniGfx::kDim2 + features[feat - 1];
+			int featIdx = baseIdx + feat * ZoombiniGraphics::kDim2 + features[feat - 1];
 			frame = _zoombiniGfx->getFrame(featIdx, 0);
 			if (frame)
-				frame->drawToScreen(screen, x, y, lut);
+				frame->drawToScreen(screen, position.x, position.y, lut);
 		}
 	}
 
 	// Draw unplaced zoombinis in a staging area
-	int stageX = 50;
-	int stageY = 450;
+	static const Common::Point32 kStagePosition(50, 450);
 	int idx = 0;
 
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
@@ -775,26 +787,29 @@ void WaterslidePuzzle::drawZoombinis(Graphics::ManagedSurface *screen) {
 
 		if (!inSlot && _puzzleZoombinis[i]->_freeStatus != 0) {
 			// Draw in staging area
-			const Zoombini *z = _puzzleZoombinis[i];
-			int x = stageX + (idx % 8) * 25;
-			int y = stageY;
+			const ZoombiniState *z = _puzzleZoombinis[i];
+			const Common::Point32 position(kStagePosition.x + (idx % 8) * 25, kStagePosition.y);
 
 			// Highlight if selected
 			if ((int)i == _selectedZoombini) {
-				screen->fillRect(Common::Rect(x - 2, y - 2, x + 22, y + 32), 0xFFFF00);
+				screen->fillRect(
+					Common::Rect(
+						static_cast<int16>(position.x - 2), static_cast<int16>(position.y - 2),
+						static_cast<int16>(position.x + 22), static_cast<int16>(position.y + 32)),
+					0xFFFF00);
 			}
 
 			int baseIdx = 0;
 			const RleBlock *frame = _zoombiniGfx->getFrame(baseIdx, 0);
 			if (frame)
-				frame->drawToScreen(screen, x, y, lut);
+				frame->drawToScreen(screen, position.x, position.y, lut);
 
-			const byte features[4] = { z->_featureA, z->_featureB, z->_featureC, z->_featureD };
+			const byte features[4] = {z->_featureA, z->_featureB, z->_featureC, z->_featureD};
 			for (int feat = 1; feat <= 4; feat++) {
-				int featIdx = baseIdx + feat * ZoombiniGfx::kDim2 + features[feat - 1];
+				int featIdx = baseIdx + feat * ZoombiniGraphics::kDim2 + features[feat - 1];
 				frame = _zoombiniGfx->getFrame(featIdx, 0);
 				if (frame)
-					frame->drawToScreen(screen, x, y, lut);
+					frame->drawToScreen(screen, position.x, position.y, lut);
 			}
 
 			idx++;
@@ -816,8 +831,7 @@ void WaterslidePuzzle::handleClick(const Common::Point &pos) {
 	}
 
 	// Check if clicked on staging area zoombini
-	int stageX = 50;
-	int stageY = 450;
+	static const Common::Point32 kStagePosition(50, 450);
 	int idx = 0;
 
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
@@ -830,9 +844,10 @@ void WaterslidePuzzle::handleClick(const Common::Point &pos) {
 		}
 
 		if (!inSlot && _puzzleZoombinis[i]->_freeStatus != 0) {
-			int x = stageX + (idx % 8) * 25;
-			int y = stageY;
-			Common::Rect zoomRect(x, y, x + 20, y + 30);
+			const Common::Point32 position(kStagePosition.x + (idx % 8) * 25, kStagePosition.y);
+			Common::Rect zoomRect(
+				static_cast<int16>(position.x), static_cast<int16>(position.y),
+				static_cast<int16>(position.x + 20), static_cast<int16>(position.y + 30));
 
 			if (zoomRect.contains(pos)) {
 				_selectedZoombini = i;

@@ -38,154 +38,213 @@ class RleBlock;
  */
 class ChezNorfPuzzle : public PuzzlePage {
 public:
+	/** Construct Chez Norf for @p engine. */
 	ChezNorfPuzzle(Zoombini2Engine *engine);
+	/** Release food, table, and Norf resources. */
 	~ChezNorfPuzzle() override;
 
+	/** Load the restaurant and generate the difficulty-selected clue layout. */
 	void init() override;
+	/** Advance serving and answer-feedback phases. */
 	void update() override;
+	/** Draw the clue board, tables, meals, Norf, and seated Zoombinis. */
 	void draw(Graphics::ManagedSurface *screen) override;
+	/** Select food or serve the pending order to a table. */
 	void handleClick(const Common::Point &pos) override;
 
-	// === Constants ===
+	/** Maximum table capacity used by the hardest layout. */
 	static const int kMaxTables = 6;
-	static const int kNumFoodCategories = 3;  // Slurp, Miam, Glouglou
-	static const int kFoodsPerCategory = 3;   // 3 items per category
-	static const int kTotalFoods = 9;         // 3 × 3
+	/** Number of food categories. */
+	static const int kNumFoodCategories = 3;
+	/** Number of choices within each food category. */
+	static const int kFoodsPerCategory = 3;
+	/** Total number of selectable food items. */
+	static const int kTotalFoods = 9;
 
-	// Table spacing from IDA Init
-	static const int kTableStartX = 205;
+	/** Horizontal distance between adjacent tables. */
 	static const int kTableSpacing = 85;
-	static const int kTablePlateY = 500;
 
 private:
-	// === Food item IDs ===
+	/** Selectable food item IDs grouped by course. */
 	enum FoodItem {
+		/** No food item is selected. */
 		kFoodNone = -1,
-		// Slurp (dessert)
+		/** Ice cream from the dessert category. */
 		kFoodGlace = 0,
+		/** Watermelon from the dessert category. */
 		kFoodPasteque = 1,
+		/** Pie from the dessert category. */
 		kFoodTarte = 2,
-		// Miam (main dish)
+		/** Fish from the main-dish category. */
 		kFoodPoisson = 3,
+		/** Salad from the main-dish category. */
 		kFoodSalade = 4,
+		/** Sandwich from the main-dish category. */
 		kFoodSandwitch = 5,
-		// Glouglou (drink)
+		/** Coffee from the drink category. */
 		kFoodCafe = 6,
+		/** Milk from the drink category. */
 		kFoodLait = 7,
+		/** Orange drink from the drink category. */
 		kFoodOrange = 8
 	};
 
-	// === Puzzle state machine ===
+	/** Runtime phase of the Chez Norf interaction. */
 	enum State {
+		/** Complete generated table setup. */
 		kStateInit,
-		kStateIdle,          // Waiting for player input
-		kStateServing,       // Norf serving food animation
-		kStateFoodServed,    // Food placed, checking match
-		kStateMatching,      // Checking food answer
-		kStateCorrect,       // Correct match — exit animation
-		kStateWrong,         // Wrong match — reject
-		kStateDone           // All zoombinis freed
+		/** Wait for food and table selection. */
+		kStateIdle,
+		/** Play the serving animation. */
+		kStateServing,
+		/** Place the order at the selected table. */
+		kStateFoodServed,
+		/** Compare the served order with the table answer. */
+		kStateMatching,
+		/** Play correct-answer feedback and release the diner. */
+		kStateCorrect,
+		/** Play wrong-answer feedback. */
+		kStateWrong,
+		/** Stop accepting input after all diners are released. */
+		kStateDone
 	};
 
-	// === Table slot ===
+	/** One restaurant table and its current order. */
 	struct TableSlot {
-		int x, y;                  // Table position
-		Common::Rect hitbox;       // Clickable area
-		int zoombiniIdx;           // Assigned zoombini (-1 = empty)
-		int foodSlurp;             // Selected slurp item (-1 = none)
-		int foodMiam;              // Selected miam item (-1 = none)
-		int foodGlouglou;          // Selected glouglou item (-1 = none)
-		bool served;               // Food has been served
-		bool completed;            // Zoombini freed from this slot
+		/** Table position. */
+		Common::Point32 position;
+		/** Clickable table area. */
+		Common::Rect hitbox;
+		/** Assigned puzzle-roster index, or `-1` when empty. */
+		int zoombiniIdx;
+		/** Selected dessert choice, or `-1` when none is present. */
+		int foodSlurp;
+		/** Selected main-dish choice, or `-1` when none is present. */
+		int foodMiam;
+		/** Selected drink choice, or `-1` when none is present. */
+		int foodGlouglou;
+		/** Whether the pending order has been served. */
+		bool served;
+		/** Whether the assigned Zoombini has been released. */
+		bool completed;
 	};
 
-	// === Correct answer for a table ===
+	/** Required food-category values for one table. */
 	struct FoodAnswer {
-		int slurp;     // Correct slurp (0-2, 9=wildcard)
-		int miam;      // Correct miam (0-2, 9=wildcard)
-		int glouglou;  // Correct glouglou (0-2, 9=wildcard)
+		/** Required dessert, or the wildcard value. */
+		int slurp;
+		/** Required main dish, or the wildcard value. */
+		int miam;
+		/** Required drink, or the wildcard value. */
+		int glouglou;
 	};
 
-	// === Resource loading ===
+	/** Load all restaurant graphics. */
 	void loadResources();
 
-	// === Grid / clue generation ===
+	/** Generate the food-value permutation used by the current puzzle. */
 	void generateFoodVals();
+	/** Assign each table answer from the chosen clue template. */
 	void setTableAnswersByTemplate();
+	/** Build the colored-dot clue grid from the generated answers. */
 	void generateFoodGrid();
 
-	// === Gameplay ===
+	/** Return the table at @p pos, or `-1` when none is hit. */
 	int findTableAtPos(const Common::Point &pos) const;
+	/** Return the food item at @p pos, or @ref ChezNorfPuzzle::kFoodNone. */
 	int findFoodAtPos(const Common::Point &pos) const;
+	/** Serve the pending course selections to table @p tableIdx. */
 	void serveFoodToTable(int tableIdx);
+	/** Return whether table @p tableIdx matches its generated answer. */
 	bool checkFoodMatch(int tableIdx);
+	/** Release the Zoombini seated at table @p tableIdx. */
 	void freeZoombini(int tableIdx);
+	/** Return the number of table occupants already released. */
 	int countFreeZoombinis() const;
 
-	// === Drawing ===
+	/** Draw the colored-dot clue board and food selectors. */
 	void drawFoodBoard(Graphics::ManagedSurface *screen);
+	/** Draw the active table layout. */
 	void drawTables(Graphics::ManagedSurface *screen);
+	/** Draw served orders at their tables. */
 	void drawPlates(Graphics::ManagedSurface *screen);
+	/** Draw Norf and current answer feedback. */
 	void drawNorf(Graphics::ManagedSurface *screen);
+	/** Draw every seated Zoombini that has not been released. */
 	void drawZoombinis(Graphics::ManagedSurface *screen);
 
-	// === State ===
+	/** Current interaction phase. */
 	State _state;
-	int _numTables;              // 4 or 6 depending on difficulty
-	int _difficulty;             // Game difficulty (1-3)
-	int _freedCount;             // Number of freed zoombinis
-	int _currentTable;           // Currently active table (-1 = none)
-	int _selectedFood;           // Currently selected food item (legacy, replaced by pending)
-	int _wrongCount;             // Number of wrong guesses
-	int _maxAttempts;            // Max attempts (passes) per difficulty
-	int _clueAttrCount;          // Number of clue attributes shown
-	int _norfState;              // Current Norf animation state
+	/** Number of tables enabled for the selected difficulty. */
+	int _numTables;
+	/** Difficulty level consumed by this page. */
+	int _difficulty;
+	/** Number of Zoombinis already released. */
+	int _freedCount;
+	/** Currently active table, or `-1` when none is active. */
+	int _currentTable;
+	/** Most recently selected food item. */
+	int _selectedFood;
+	/** Number of incorrect orders submitted. */
+	int _wrongCount;
+	/** Difficulty-dependent incorrect-order allowance. */
+	int _maxAttempts;
+	/** Number of feature attributes represented in the clue layout. */
+	int _clueAttrCount;
+	/** Current Norf feedback visual state. */
+	int _norfState;
 
-	// === Generated food values (from GenerateClueLayout_453C80) ===
-	// Indices: [0..2]=slurp (0-2), [3..5]=miam (3-5), [6..8]=glouglou (6-8)
+	/** Generated item order, grouped into dessert, main-dish, and drink ranges. */
 	int _foodVals[9];
-	int _templateId;             // Chosen template ID (11-14, 21-24, 31-34)
+	/** Identifier of the generated clue template. */
+	int _templateId;
 
-	// === Player's pending food selection (one per category) ===
-	int _pendingSlurp;           // Selected slurp item index within slurp foods (0-2), or -1
-	int _pendingMiam;            // Selected miam item index within miam foods (0-2), or -1
-	int _pendingGlouglou;        // Selected glouglou item index within glouglou foods (0-2), or -1
+	/** Pending dessert index within its category, or `-1`. */
+	int _pendingSlurp;
+	/** Pending main-dish index within its category, or `-1`. */
+	int _pendingMiam;
+	/** Pending drink index within its category, or `-1`. */
+	int _pendingGlouglou;
 
-	// === Table data ===
+	/** Table runtime state. */
 	TableSlot _tables[kMaxTables];
+	/** Correct answer corresponding to each table. */
 	FoodAnswer _answers[kMaxTables];
 
-	// === Food board grid (3 sections of dots) ===
-	// Grid values: 0=empty, 1/2/3 = dot colors (mapped to symb types)
-	int _foodGrid[3][6][4];      // [section][col][row] — from DrawBoard analysis
+	/** Clue symbols indexed by category section, column, and row. */
+	int _foodGrid[3][6][4];
 
-	// === Graphics resources ===
-	// Food symbols (feedback)
+	/** Correct-answer feedback symbol. */
 	RleBlock *_symbOK;
+	/** Incorrect-answer feedback symbol. */
 	RleBlock *_symbNO;
+	/** Partial-match feedback symbol. */
 	RleBlock *_symbMaybe;
 
-	// Plates
-	RleBlock *_plato;            // Full platter
-	RleBlock *_platoMini;        // Mini platter
+	/** Full-size served-order platter. */
+	RleBlock *_plato;
+	/** Small served-order platter. */
+	RleBlock *_platoMini;
 
-	// Slurp category (dessert) - 3 items
-	RleBlock *_slurpGfx[3];     // glace, pasteque, tarte
+	/** Dessert item visuals. */
+	RleBlock *_slurpGfx[3];
 
-	// Miam category (main dish) - 3 items
-	RleBlock *_miamGfx[3];      // poisson, salade, sandwitch
+	/** Main-dish item visuals. */
+	RleBlock *_miamGfx[3];
 
-	// Glouglou category (drink) - 3 items
-	RleBlock *_glouglouGfx[3];  // cafe, lait, orange
+	/** Drink item visuals. */
+	RleBlock *_glouglouGfx[3];
 
-	// Command/order backgrounds
-	RleBlock *_comandeGfx[3];   // comande1, comande2, comande3
+	/** Order-panel visuals. */
+	RleBlock *_comandeGfx[3];
 
-	// Norf character
-	RleBlock *_norfDefault;      // norfDeBaz
-	RleBlock *_highlightGfx;     // highlight
+	/** Default Norf visual. */
+	RleBlock *_norfDefault;
+	/** Selection highlight visual. */
+	RleBlock *_highlightGfx;
 
-	int _musicId;  // BGM: sounds/music/07-BB02.wav
+	/** Music handle used while Chez Norf is active. */
+	int _musicId;
 };
 
 } // End of namespace Zoombini2

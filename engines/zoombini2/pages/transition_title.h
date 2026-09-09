@@ -28,24 +28,32 @@ namespace Zoombini2 {
 
 class BitBlock;
 
-/**
- * Load the title background and wait for input or the timeout.
- */
+/** Load the title background and wait for input or the timeout. */
 class TitleScreen : public TransitionPage {
 public:
+	/** Bind the title screen to @p engine. */
 	TitleScreen(Zoombini2Engine *engine);
+	/** Release the title background and music. */
 	~TitleScreen() override;
 
+	/** Load the background, start music, and establish the timeout. */
 	void init() override;
+	/** Request the sign-in page after input or timeout. */
 	void update() override;
+	/** Draw the title background. */
 	void draw(Graphics::ManagedSurface *screen) override;
+	/** Mark the title screen as dismissed by the player. */
 	void handleClick(const Common::Point &pos) override;
 
 private:
+	/** Owned title-screen bitmap. */
 	BitBlock *_background;
+	/** Whether the player clicked to dismiss the title screen. */
 	bool _clicked;
+	/** Gameplay deadline for automatic dismissal. */
 	uint32 _deadline;
-	int _musicId;            // BGM: sounds/music/Booliewood_Level1.wav
+	/** Title music sound identifier. */
+	int _musicId;
 };
 
 } // End of namespace Zoombini2

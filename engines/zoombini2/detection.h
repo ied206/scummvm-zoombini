@@ -26,8 +26,9 @@
 
 namespace Zoombini2 {
 
+/** Release-family flags attached to one detected game description. */
 enum GameFeatures {
-	GF_NONE = 0,
+	GF_NONE = 0, ///< No release-family feature flags.
 	/**
 	 * Z2-10 base family: v1.0US and v1.0NL.
 	 * The ArisuMedia English package shares the v1.0US game files.
@@ -41,8 +42,11 @@ enum GameFeatures {
 	GF_Z2_V11 = (1 << 1),
 };
 
+/** Detection record combining ScummVM metadata with Z2 release-family flags. */
 struct Zoombini2GameDescription {
+	/** Standard advanced-detector description. */
 	ADGameDescription desc;
+	/** Bitwise combination of @ref GameFeatures values. */
 	uint32 features;
 
 	AD_GAME_DESCRIPTION_HELPERS(desc);

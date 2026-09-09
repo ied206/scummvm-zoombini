@@ -11,11 +11,11 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,67 +24,89 @@
 
 #include "common/array.h"
 #include "common/path.h"
+#include "common/rect.h"
+#include "common/scummsys.h"
 
 namespace Zoombini2 {
 
 /**
- * CurveSegment — single cubic Bezier segment (10-bit fixed-point math).
- * Original: CurveSegment__Init_405EA0, 96 bytes (0x60).
+ * Runtime evaluator for one cubic Bezier segment.
  *
- * Points P0, CP0, CP1, P1 define a standard cubic Bezier curve.
- * All coordinates stored as screen_value << 10.
- * Polynomial form: B(t) = P0 + C0*t + C1*t^2 + C2*t^3
- * where t in [0, 1024] represents [0.0, 1.0].
+ * Control points, polynomial coefficients, and evaluated positions use
+ * 10-bit fixed-point coordinates. @ref CurveSegment::evaluate advances the
+ * segment from the stored start tick, step, and optional initial wait.
  */
 struct CurveSegment {
-	// Control points (<<10 fixed-point)
-	int32 p0x, p0y;     // Start point
-	int32 cp0x, cp0y;   // Control point 0
-	int32 cp1x, cp1y;   // Control point 1
-	int32 p1x, p1y;     // End point
+	/** Fixed-point start coordinate. */
+	Common::Point32 p0;
+	/** Fixed-point coordinate of the first control point. */
+	Common::Point32 cp0;
+	/** Fixed-point coordinate of the second control point. */
+	Common::Point32 cp1;
+	/** Fixed-point end coordinate. */
+	Common::Point32 p1;
 
-	// Polynomial coefficients (cubic, quadratic, linear)
-	int32 c2x, c1x, c0x;
-	int32 c2y, c1y, c0y;
+	/** Cubic coefficient pair. */
+	Common::Point32 c2;
+	/** Quadratic coefficient pair. */
+	Common::Point32 c1;
+	/** Linear coefficient pair. */
+	Common::Point32 c0;
 
-	// Evaluation state
-	int32 paramT;        // Current parameter (0..1024+)
-	int32 posX;          // Current position X (<<10)
-	int32 posY;          // Current position Y (<<10)
+	/** Current parameter in the fixed-point interval beginning at zero. */
+	int32 paramT;
+	/** Current fixed-point position. */
+	Common::Point32 position;
 
-	// Speed/timing
-	int32 step;          // Speed multiplier
-	int32 waitInit;      // Initial wait value
-	int32 waitRemain;    // Remaining wait countdown
-	uint32 startTime;    // Tick when evaluation started
+	/** Parameter advancement applied by each timing step. */
+	int32 step;
+	/** Initial wait value loaded for this segment. */
+	int32 waitInit;
+	/** Remaining wait intervals before movement begins. */
+	int32 waitRemain;
+	/** Gameplay tick at which this segment started. */
+	uint32 startTime;
 
-	void init(int x0, int y0, int cx0, int cy0,
-	          int cx1, int cy1, int x1, int y1,
-	          int stepVal, int waitVal);
+	/** Initialize control points, timing values, and polynomial coefficients. */
+	void init(const Common::Point32 &start, const Common::Point32 &control0, const Common::Point32 &control1,
+			  const Common::Point32 &end, int stepVal, int waitVal);
+	/** Derive polynomial coefficients from the four control points. */
 	void computeCoeffs();
-	bool evaluate(uint32 tickCount, int &outX, int &outY);
+	/** Evaluate the position at @p tickCount and report whether the segment remains active. */
+	bool evaluate(uint32 tickCount, Common::Point32 &outPosition);
 };
 
 /**
- * PathObject — bezier path composed of CurveSegments.
- * Original: PathObject__LoadFromPAT_45BA80, 284 bytes (0x11C).
- * Supports up to 64 chained segments.
+ * Owns and advances the chained segments loaded from one PAT path.
+ *
+ * Non-looping paths stop at their final endpoint. Looping paths return to the
+ * first segment after the last segment completes.
  */
 struct PathObject {
+	/** Ordered segments owned by this path. */
 	Common::Array<CurveSegment *> segments;
+	/** Index of the segment currently being evaluated. */
 	int currentSegment;
+	/** Whether the path restarts after the last segment. */
 	bool looping;
+	/** Whether a non-looping path has reached its final endpoint. */
 	bool finished;
-	int32 endX;          // Final endpoint X (screen coords)
-	int32 endY;          // Final endpoint Y (screen coords)
+	/** Final endpoint in screen pixels. */
+	Common::Point32 endPosition;
+	/** Gameplay tick at which the path started. */
 	uint32 startTime;
 
+	/** Construct an empty, inactive path. */
 	PathObject();
+	/** Release every owned segment. */
 	~PathObject();
 
+	/** Parse and return a newly allocated path, or nullptr on failure. */
 	static PathObject *loadFromPAT(const Common::Path &path);
+	/** Reset segment state and begin evaluation at @p tickCount. */
 	void start(uint32 tickCount);
-	bool advance(uint32 tickCount, int &outX, int &outY);
+	/** Advance to @p tickCount and write the current screen position. */
+	bool advance(uint32 tickCount, Common::Point32 &outPosition);
 };
 
 } // End of namespace Zoombini2

@@ -20,9 +20,9 @@
  */
 
 #include "zoombini2/pages/dialog_help.h"
-#include "zoombini2/zoombini2.h"
-#include "zoombini2/gfx.h"
+#include "zoombini2/graphics.h"
 #include "zoombini2/sound.h"
+#include "zoombini2/zoombini2.h"
 
 #include "common/file.h"
 #include "common/system.h"
@@ -30,7 +30,7 @@
 
 namespace Zoombini2 {
 
-HelpScreen::HelpScreen(Zoombini2Engine *engine) 
+HelpScreen::HelpScreen(Zoombini2Engine *engine)
 	: _engine(engine), _isActive(false), _currentPuzzleId(-1),
 	  _currentDifficulty(-1), _currentPage(1), _savedScreen(nullptr),
 	  _helpFrame(nullptr), _placeholder(nullptr),
@@ -41,10 +41,10 @@ HelpScreen::HelpScreen(Zoombini2Engine *engine)
 	  _leftArrowHovered(false), _rightArrowHovered(false),
 	  _pauseStartTime(0) {
 
-	// Initialize button hitboxes (from original @ 0x464760)
-	_okButtonRect = Common::Rect(597, 400, 671, 444);      // 74x44
-	_leftArrowRect = Common::Rect(135, 400, 181, 444);     // 46x44
-	_rightArrowRect = Common::Rect(209, 400, 253, 444);    // 44x44
+	// Initialize the three bottom-panel button hitboxes.
+	_okButtonRect = Common::Rect(597, 400, 671, 444);   // 74x44
+	_leftArrowRect = Common::Rect(135, 400, 181, 444);  // 46x44
+	_rightArrowRect = Common::Rect(209, 400, 253, 444); // 44x44
 
 	// Load help screen UI elements
 	_helpFrame = _engine->loadRleBlock("Bmp/MENU/help_screen_main.rb");
@@ -52,17 +52,17 @@ HelpScreen::HelpScreen(Zoombini2Engine *engine)
 
 	_okButtonNormal = _engine->loadBitBlock("Bmp/MENU/help_screen_okbutton_normal.bb");
 	_okButtonPushed = _engine->loadBitBlock("Bmp/MENU/help_screen_okbutton_pushed.bb");
-	
+
 	_leftArrowNormal = _engine->loadBitBlock("Bmp/MENU/help_screen_leftarro_norma.bb");
 	_leftArrowEmpty = _engine->loadBitBlock("Bmp/MENU/help_screen_leftarro_empty.bb");
-	
+
 	_rightArrowNormal = _engine->loadBitBlock("Bmp/MENU/help_screen_rightarro_norma.bb");
 	_rightArrowEmpty = _engine->loadBitBlock("Bmp/MENU/help_screen_rightarro_empty.bb");
 
 	// Create saved screen buffer
 	// Must match screen format to avoid assert in copyRectToSurface
-	_savedScreen = new Graphics::ManagedSurface(kScreenWidth, kScreenHeight, 
-	                                             _engine->getCurrentScreen()->format);
+	_savedScreen = new Graphics::ManagedSurface(kScreenWidth, kScreenHeight,
+												_engine->getCurrentScreen()->format);
 }
 
 HelpScreen::~HelpScreen() {
@@ -95,9 +95,9 @@ const char *HelpScreen::getDifficultyString(int difficulty) {
 bool HelpScreen::isPageValid(int puzzleId, int difficulty, int page) {
 	// Construct help page path
 	Common::String path = Common::String::format("Bmp/help/%02d_help_%s_%02d.bb",
-	                                              puzzleId,
-	                                              getDifficultyString(difficulty),
-	                                              page);
+												 puzzleId,
+												 getDifficultyString(difficulty),
+												 page);
 
 	// Check if file exists in archive
 	return _engine->hasResource(path);
@@ -172,9 +172,9 @@ bool HelpScreen::loadPage(int puzzleId, int difficulty, int page) {
 
 	// Construct help page path
 	Common::String path = Common::String::format("Bmp/help/%02d_help_%s_%02d.bb",
-	                                              puzzleId,
-	                                              getDifficultyString(difficulty),
-	                                              page);
+												 puzzleId,
+												 getDifficultyString(difficulty),
+												 page);
 
 	// Load help page
 	_helpPage = _engine->loadBitBlock(path);
@@ -193,7 +193,7 @@ void HelpScreen::draw(Graphics::ManagedSurface *screen) {
 	}
 
 	// Get alpha LUT for RleBlock rendering
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 	screen->copyFrom(*_savedScreen);
 
 	// Draw help frame overlay (darkened background)

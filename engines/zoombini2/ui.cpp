@@ -22,14 +22,13 @@
 #include "common/debug.h"
 #include "common/file.h"
 
+#include "zoombini2/graphics.h"
 #include "zoombini2/ui.h"
-#include "zoombini2/gfx.h"
 
 namespace Zoombini2 {
 
 // ============================================================================
-// UIButton — clickable button with normal/hover/disabled states.
-// Original: Button__LoadImages_418F90, Button__DrawAndHitTest_4191C0
+// UIButton - clickable button with normal, hovered, and disabled states.
 // ============================================================================
 
 UIButton::UIButton()
@@ -56,13 +55,14 @@ UIButton::~UIButton() {
 }
 
 bool UIButton::loadImages(const Common::Path &normalPath,
-                          const Common::Path &hoverPath,
-                          const Common::Path &disabledPath) {
+						  const Common::Path &hoverPath,
+						  const Common::Path &disabledPath) {
 	_hasMask = false;
 
 	// Helper lambda to try loading as BitBlock or RleBlock
 	auto tryLoadImage = [](const Common::Path &basePath, BitBlock **bb, RleBlock **rle) -> bool {
-		if (basePath.empty()) return true;  // Skip empty paths
+		if (basePath.empty())
+			return true; // Skip empty paths
 
 		// First try .bb or .bmp (BitBlock format)
 		*bb = new BitBlock();
@@ -117,8 +117,8 @@ bool UIButton::loadImages(const Common::Path &normalPath,
 }
 
 bool UIButton::loadImagesWithMask(const Common::Path &normalPath, const Common::Path &normalMask,
-                                  const Common::Path &hoverPath, const Common::Path &hoverMask,
-                                  const Common::Path &disabledPath, const Common::Path &disabledMask) {
+								  const Common::Path &hoverPath, const Common::Path &hoverMask,
+								  const Common::Path &disabledPath, const Common::Path &disabledMask) {
 	_hasMask = true;
 
 	// Load normal state with mask (required)
@@ -172,15 +172,14 @@ bool UIButton::containsPoint(int x, int y) const {
 }
 
 int UIButton::drawAndHitTest(Graphics::ManagedSurface *dst, int mouseX, int mouseY,
-                             const byte alphaLUT[256][256]) {
-	// Original: Button__DrawAndHitTest_4191C0
+							 const byte alphaLUT[256][256]) {
 	_wasHovering = _isHovering;
 	_isHovering = false;
 
 	// Hit test if enabled
 	if (_enabled) {
 		if (mouseX > _rect.left && mouseX < _rect.right &&
-		    mouseY > _rect.top && mouseY < _rect.bottom) {
+			mouseY > _rect.top && mouseY < _rect.bottom) {
 			_isHovering = true;
 		}
 	}
@@ -233,22 +232,16 @@ int UIButton::drawAndHitTest(Graphics::ManagedSurface *dst, int mouseX, int mous
 }
 
 // ============================================================================
-// BitmapFont — bitmap-based font for UI text rendering.
-// Original: BitmapFont__LoadGlyphs_464430, BitmapFont__DrawString_464B60
+// BitmapFont - bitmap-based font for UI text rendering.
 // ============================================================================
 
-// Special character mapping table (from BitmapFont__DrawString_464B60)
+// Glyph indices used for punctuation after the alphanumeric ranges.
 // Maps special characters to glyph indices 62-80
 static const struct {
 	char ch;
 	int index;
 } kSpecialChars[] = {
-	{'.', 62}, {',', 63}, {';', 64}, {':', 65}, {'/', 66},
-	{'(', 67}, {')', 68}, {'-', 69}, {'+', 70}, {'=', 71},
-	{'@', 72}, {'&', 73}, {'#', 74}, {'\'', 75}, {'?', 76},
-	{'!', 77}, {'*', 78}, {'_', 79}, {'"', 80},
-	{0, -1}
-};
+	{'.', 62}, {',', 63}, {';', 64}, {':', 65}, {'/', 66}, {'(', 67}, {')', 68}, {'-', 69}, {'+', 70}, {'=', 71}, {'@', 72}, {'&', 73}, {'#', 74}, {'\'', 75}, {'?', 76}, {'!', 77}, {'*', 78}, {'_', 79}, {'"', 80}, {0, -1}};
 
 BitmapFont::BitmapFont() : _loaded(false) {
 	for (int i = 0; i < kNumGlyphs; i++) {
@@ -263,10 +256,8 @@ BitmapFont::~BitmapFont() {
 }
 
 bool BitmapFont::load(const Common::Path &basePath, byte r, byte g, byte b) {
-	// Original: BitmapFont__LoadGlyphs_464430
 	// Loads alpha from "bmp/typo-A.bmt", fills color with (r, g, b).
-	// The color BMP is not actually used for the font pixels in the original;
-	// only the alpha channel matters. Pixels are filled with the given color.
+	// Only the alpha channel supplies glyph shapes; the requested color fills the pixels.
 
 	// BMT files are actually BMP files with a .bmt extension
 	Common::Path alphaPath = basePath.getParent().appendComponent(
@@ -313,7 +304,7 @@ bool BitmapFont::load(const Common::Path &basePath, byte r, byte g, byte b) {
 		if (col >= width)
 			break;
 
-		// Found start of glyph — advance to the next blank column
+		// Advance from the first glyph column to the next blank column.
 		int startCol = col;
 		while (col < width) {
 			bool blank = true;
@@ -328,7 +319,7 @@ bool BitmapFont::load(const Common::Path &basePath, byte r, byte g, byte b) {
 			col++;
 		}
 
-		// Original adds +2 padding to glyph width
+		// Include two columns of spacing after each glyph.
 		int glyphW = col - startCol + 2;
 
 		// Create a BitBlock for this glyph with the extracted alpha
@@ -339,10 +330,10 @@ bool BitmapFont::load(const Common::Path &basePath, byte r, byte g, byte b) {
 		// Copy alpha sub-region row by row
 		byte *dstAlpha = const_cast<byte *>(glyph->getAlpha());
 		for (int row = 0; row < height; row++) {
-			int copyW = col - startCol;  // actual data width (no padding)
+			int copyW = col - startCol; // actual data width (no padding)
 			memcpy(dstAlpha + row * glyphW,
-			       srcAlpha + row * width + startCol,
-			       copyW);
+				   srcAlpha + row * width + startCol,
+				   copyW);
 			// Padding columns stay 0 (transparent) from createEmpty
 		}
 
@@ -362,21 +353,20 @@ bool BitmapFont::load(const Common::Path &basePath, byte r, byte g, byte b) {
 
 	_loaded = true;
 	debug(1, "BitmapFont: Loaded %d glyphs from %s (color %d,%d,%d)",
-	      glyphIndex, basePath.toString().c_str(), r, g, b);
+		  glyphIndex, basePath.toString().c_str(), r, g, b);
 
 	return true;
 }
 
 int BitmapFont::charToGlyphIndex(char c) {
-	// Original: BitmapFont__DrawString_464B60 character mapping
 	if (c >= 'A' && c <= 'Z') {
-		return c - 'A';  // 0-25
+		return c - 'A'; // 0-25
 	}
 	if (c >= 'a' && c <= 'z') {
-		return c - 'a' + 26;  // 26-51
+		return c - 'a' + 26; // 26-51
 	}
 	if (c >= '0' && c <= '9') {
-		return c - '0' + 52;  // 52-61
+		return c - '0' + 52; // 52-61
 	}
 
 	// Check special characters
@@ -386,11 +376,11 @@ int BitmapFont::charToGlyphIndex(char c) {
 		}
 	}
 
-	return -1;  // Not found (treat as space)
+	return -1; // Not found (treat as space)
 }
 
 int BitmapFont::drawString(Graphics::ManagedSurface *dst, int x, int y,
-                           const Common::String &text, const byte alphaLUT[256][256]) const {
+						   const Common::String &text, const byte alphaLUT[256][256]) const {
 	if (!_loaded) {
 		return 0;
 	}
@@ -407,7 +397,7 @@ int BitmapFont::drawString(Graphics::ManagedSurface *dst, int x, int y,
 
 		int glyphIdx = charToGlyphIndex(c);
 		if (glyphIdx < 0 || glyphIdx >= kNumGlyphs || !_glyphs[glyphIdx]) {
-			curX += kSpaceWidth;  // Unknown character, treat as space
+			curX += kSpaceWidth; // Unknown character, treat as space
 			continue;
 		}
 
@@ -517,8 +507,10 @@ bool VolumePanel::init() {
 int VolumePanel::pixelToVolume(int x) {
 	// Convert the 288-pixel gauge range to a percentage.
 	int vol = (100 * (x - kSliderMinX)) / kSliderRange;
-	if (vol < 0) vol = 0;
-	if (vol > 100) vol = 100;
+	if (vol < 0)
+		vol = 0;
+	if (vol > 100)
+		vol = 100;
 	return vol;
 }
 
@@ -551,9 +543,9 @@ void VolumePanel::setInitialVolumes(int music, int sfx, int speech) {
 }
 
 VolumePanelResult VolumePanel::drawAndHandleInput(Graphics::ManagedSurface *dst,
-                                                  int mouseX, int mouseY,
-                                                  bool mouseDown, bool mouseClicked,
-                                                  const byte alphaLUT[256][256]) {
+												  int mouseX, int mouseY,
+												  bool mouseDown, bool mouseClicked,
+												  const byte alphaLUT[256][256]) {
 	bool volumeChanged = false;
 
 	// Handle slider input
@@ -562,11 +554,11 @@ VolumePanelResult VolumePanel::drawAndHandleInput(Graphics::ManagedSurface *dst,
 		if (_activeSlider < 0) {
 			// Check if clicking within slider label button areas
 			if (kMusicLabelY <= mouseY && mouseY < kMusicLabelY + kLabelH) {
-				_activeSlider = 0;  // Music
+				_activeSlider = 0; // Music
 			} else if (kSfxLabelY <= mouseY && mouseY < kSfxLabelY + kLabelH) {
-				_activeSlider = 1;  // SFX
+				_activeSlider = 1; // SFX
 			} else if (kSpeechLabelY <= mouseY && mouseY < kSpeechLabelY + kLabelH) {
-				_activeSlider = 2;  // Speech
+				_activeSlider = 2; // Speech
 			}
 		}
 
@@ -611,11 +603,11 @@ VolumePanelResult VolumePanel::drawAndHandleInput(Graphics::ManagedSurface *dst,
 	// Clip each gauge at its current slider position.
 	if (_gaugeImage) {
 		_gaugeImage->drawToScreenClipped(dst, kSliderMinX, kMusicGaugeY,
-		                                 0, 0, _musicSliderX, 600, alphaLUT);
+										 0, 0, _musicSliderX, 600, alphaLUT);
 		_gaugeImage->drawToScreenClipped(dst, kSliderMinX, kSfxGaugeY,
-		                                 0, 0, _sfxSliderX, 600, alphaLUT);
+										 0, 0, _sfxSliderX, 600, alphaLUT);
 		_gaugeImage->drawToScreenClipped(dst, kSliderMinX, kSpeechGaugeY,
-		                                 0, 0, _speechSliderX, 600, alphaLUT);
+										 0, 0, _speechSliderX, 600, alphaLUT);
 	}
 
 	// Draw OK/NO buttons (with hover state)

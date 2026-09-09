@@ -22,8 +22,6 @@
 #ifndef ZOOMBINI2_PAGES_PUZZLE_AQUACUBE_H
 #define ZOOMBINI2_PAGES_PUZZLE_AQUACUBE_H
 
-#include <vector>
-
 #include "common/array.h"
 #include "common/rect.h"
 
@@ -35,139 +33,186 @@ class RleBlock;
 class Animation;
 
 /**
- * AquacubePuzzle - Aqua Cube: Cube graph navigation puzzle (World ID 3).
+ * Cube-graph puzzle that moves a ball between nodes to release Zoombinis.
  *
- * Original: Aquacube__Init_403D20 (8200 bytes), vtable at 0x480368.
- * Object size: 0x2C4 (708) bytes.
- *
- * Core mechanics (from IDA reverse engineering):
- *   - Player controls a ball on a 3D cube graph (8 or 16 nodes)
- *   - Difficulty 1-2: 8-node cube (3 edges per vertex), 3 zoombinis
- *   - Difficulty 3-4: 16-node double cube (4 edges per vertex), 4 zoombinis
- *   - 4 direction buttons control ball movement between adjacent vertices
- *   - Zoombinis trapped at vertices; freed when ball reaches their node
- *   - Fleens are obstacles at certain vertices (diff 2+)
- *   - Step counter limits total moves (6 for diff 1-2, 11 for diff 3-4)
- *   - Warp button provides teleport moves (diff 2+)
- *   - Goal: Free at least 4 zoombinis
- *
- * Graph data: Static arrays at 0x487240 (8 nodes) and 0x487480 (16 nodes).
- * Node structure: 72 bytes (18 DWORDs) each. See Aquacube-Mechanics.md KB.
- *
- * Blocking model: All logic runs in callbacks, vtable Tick is null.
+ * The lower difficulties use an eight-node graph, while the upper difficulties
+ * use a sixteen-node graph. Higher levels add Fleens and expose the warp control.
  */
 class AquacubePuzzle : public PuzzlePage {
 public:
+	/** Construct the Aqua Cube puzzle for @p engine. */
 	AquacubePuzzle(Zoombini2Engine *engine);
+	/** Release graph sprites and animations. */
 	~AquacubePuzzle() override;
 
+	/** Load the graph selected by difficulty and place all puzzle actors. */
 	void init() override;
+	/** Advance ball, match, penalty, and warp phases. */
 	void update() override;
+	/** Draw the cube graph, actors, controls, and remaining-step display. */
 	void draw(Graphics::ManagedSurface *screen) override;
+	/** Start a direction move or toggle the warp control. */
 	void handleClick(const Common::Point &pos) override;
 
 private:
-	/**
-	 * Graph node — faithful to 72-byte original at dword_4A8070.
-	 * Fields mapped from IDA analysis of Aquacube__Init_403D20.
-	 */
+	/** One cube-graph vertex with adjacency, display, and occupant state. */
 	struct GraphNode {
-		int adj[4];           ///< DWORD 0-3: Adjacent node indices (-1 = none)
-		int x, y;             ///< DWORD 4-5: Screen position
-		int state;            ///< DWORD 6: 0=zoombini, 1=empty, 2=ballStart, 3=fleen
-		int occupantCount;    ///< DWORD 7: Number of zoombinis placed at this node
-		int occupants[3];     ///< DWORD 8-10: Zoombini indices in puzzle list
-		int dirValues[4];     ///< DWORD 13-16: Binary direction coords (0 or 1)
-		int fleenType;        ///< DWORD 17 (byte 68): Fleen variant 0=none, 1-4
+		/** Adjacent vertex indices, with `-1` marking a missing edge. */
+		int adj[4];
+		/** Signed 32-bit screen position of this vertex. */
+		Common::Point32 position;
+		/** Vertex role identifying occupants, the ball start, or a Fleen. */
+		int state;
+		/** Number of Zoombinis assigned to this vertex. */
+		int occupantCount;
+		/** Puzzle-roster indices assigned to this vertex. */
+		int occupants[3];
+		/** Binary graph coordinates used to resolve directional movement. */
+		int dirValues[4];
+		/** Fleen visual variant, or zero when no Fleen occupies the vertex. */
+		int fleenType;
 	};
 
+	/** Runtime phase of the Aqua Cube interaction. */
 	enum GameState {
-		kStateIdle,           ///< Waiting for player direction input
-		kStateBallMoving,     ///< Ball animating along graph edge
-		kStateMatchCheck,     ///< Checking zoombini match at destination
-		kStateZoombiniFreed,  ///< Zoombini freed — brief celebration
-		kStateFleenHit,       ///< Ball hit a fleen — penalty
-		kStateWarpPlanning,   ///< Planning a sequence of warp moves
-		kStateWarpExecuting,  ///< Executing a planned warp sequence
-		kStateDone            ///< Puzzle complete or failed
+		/** Wait for directional input. */
+		kStateIdle,
+		/** Animate the ball along a graph edge. */
+		kStateBallMoving,
+		/** Resolve the destination vertex. */
+		kStateMatchCheck,
+		/** Hold briefly after releasing Zoombinis. */
+		kStateZoombiniFreed,
+		/** Apply the penalty for reaching a Fleen. */
+		kStateFleenHit,
+		/** Collect a sequence of warp directions. */
+		kStateWarpPlanning,
+		/** Execute the collected warp directions. */
+		kStateWarpExecuting,
+		/** Stop accepting input after success or failure. */
+		kStateDone
 	};
 
-	// Difficulty (1-4, maps to original this+352)
+	/** Difficulty level in the range one through four. */
 	int _difficulty;
 
-	// Graph
-	int _numNodes;                    ///< 8 (diff 1-2) or 16 (diff 3-4)
-	GraphNode _nodes[16];             ///< Static graph data from IDA
-	int _ballNode;                    ///< Current ball position (node index)
-	int _targetNode;                  ///< Destination during ball movement
+	/** Number of active vertices in @ref AquacubePuzzle::_nodes. */
+	int _numNodes;
+	/** Graph storage sized for the largest difficulty. */
+	GraphNode _nodes[16];
+	/** Vertex currently occupied by the ball. */
+	int _ballNode;
+	/** Destination vertex while the ball is moving. */
+	int _targetNode;
 
-	// Ball animation
-	int _ballX, _ballY;              ///< Current ball screen position
-	int _ballStartX, _ballStartY;    ///< Start of movement
-	int _ballEndX, _ballEndY;        ///< End of movement
+	/** Current screen position of the moving ball. */
+	Common::Point32 _ballPosition;
+	/** Ball position at the start of the current move. */
+	Common::Point32 _ballStartPosition;
+	/** Ball position at the end of the current move. */
+	Common::Point32 _ballEndPosition;
+	/** Time at which the current ball movement began. */
 	uint32 _moveStartTime;
-	static const uint32 kMoveAnimDuration = 680;  ///< Original: speed=7, t_max=950 → 680ms
+	/** Duration of one graph-edge movement in milliseconds. */
+	static const uint32 kMoveAnimDuration = 680;
 
-	// Difficulty parameters (from dword_48709C table)
-	int _numZoombinisToPlace;         ///< 3 (diff 1-2) or 4 (diff 3-4)
-	int _totalSteps;                  ///< 6 (diff 1-2) or 11 (diff 3-4)
-	int _numFleens;                   ///< 0, 1, or 2
-	int _stepsUsed;                   ///< Current step counter
-	int _maxSteps;                    ///< Total allowed steps
+	/** Number of Zoombinis placed on the graph for this difficulty. */
+	int _numZoombinisToPlace;
+	/** Initial movement allowance for this difficulty. */
+	int _totalSteps;
+	/** Number of Fleen obstacles placed on the graph. */
+	int _numFleens;
+	/** Number of ball movements already consumed. */
+	int _stepsUsed;
+	/** Maximum number of ball movements allowed. */
+	int _maxSteps;
 
-	// Draw offsets (from this+596 to this+616)
-	int _zoombiniOffX, _zoombiniOffY; ///< Offset for drawing zoombinis at nodes
-	int _fleenOffX, _fleenOffY;       ///< Offset for drawing fleens at nodes
-	int _nodeOffX, _nodeOffY;         ///< Offset for drawing node circles
+	/** Offset applied when drawing Zoombinis at graph vertices. */
+	Common::Point32 _zoombiniOffset;
+	/** Offset applied when drawing Fleens at graph vertices. */
+	Common::Point32 _fleenOffset;
+	/** Offset applied when drawing graph-vertex markers. */
+	Common::Point32 _nodeOffset;
 
-	// Warp mechanics
-	bool _warpAvailable;              ///< True if warp is available (diff > 1)
-	bool _warpActive;                 ///< Warp mode toggled on
-	std::vector<int> _warpQueue;      ///< Planned sequence of directions
-	int _warpQueueIdx;                ///< Current move being executed in warp queue
+	/** Whether the selected difficulty exposes the warp control. */
+	bool _warpAvailable;
+	/** Whether direction clicks are currently building a warp sequence. */
+	bool _warpActive;
+	/** Planned sequence of direction indices. */
+	Common::Array<int> _warpQueue;
+	/** Index of the warp movement currently being executed. */
+	int _warpQueueIdx;
 
+	/** Direction cursor light. */
+	RleBlock *_lightGfx;
+	/** Three cube layers drawn behind and around the actors. */
+	RleBlock *_cubeGfx[3];
+	/** Enabled joystick visual. */
+	RleBlock *_manetteOnGfx;
+	/** Disabled joystick visual. */
+	RleBlock *_manetteOffGfx;
+	/** Normal ball visual. */
+	RleBlock *_ballGfx;
+	/** Enlarged ball visual used during movement effects. */
+	RleBlock *_ballBigGfx;
+	/** Active movement-counter mark. */
+	RleBlock *_shotsOnGfx;
+	/** Consumed movement-counter mark. */
+	RleBlock *_shotsOffGfx;
+	/** Red direction indicator. */
+	RleBlock *_lightRedGfx;
+	/** Inactive direction indicator. */
+	RleBlock *_lightGreyGfx;
+	/** Active warp-control visual. */
+	RleBlock *_warpOnGfx;
+	/** Available warp-control visual. */
+	RleBlock *_warpOffGfx;
+	/** Disabled warp-control visual. */
+	RleBlock *_warpDisableGfx;
+	/** Warp timing effect. */
+	Animation *_warpTimerAnim;
+	/** Bubble effects used at occupied graph vertices. */
+	RleBlock *_bubbleGfx[3];
+	/** Fleen visuals indexed by obstacle variant. */
+	RleBlock *_fleenGfx[4];
+	/** Flare effects used while releasing occupants. */
+	Animation *_flareAnims[2];
 
-	// Graphics
-	RleBlock *_lightGfx;              ///< this+388: cursor light
-	RleBlock *_cubeGfx[3];           ///< this+392/396/400: cube layers (3 layers)
-	RleBlock *_manetteOnGfx;          ///< this+420: joystick ON
-	RleBlock *_manetteOffGfx;         ///< this+416: joystick OFF
-	RleBlock *_ballGfx;               ///< this+424: small ball
-	RleBlock *_ballBigGfx;            ///< this+428: large ball
-	RleBlock *_shotsOnGfx;            ///< this+432: shot counter ON
-	RleBlock *_shotsOffGfx;           ///< this+436: shot counter OFF
-	RleBlock *_lightRedGfx;           ///< this+444: direction light RED
-	RleBlock *_lightGreyGfx;          ///< this+440: direction light GREY
-	RleBlock *_warpOnGfx;             ///< this+452: warp ON
-	RleBlock *_warpOffGfx;            ///< this+456: warp OFF
-	RleBlock *_warpDisableGfx;        ///< this+448: warp DISABLE
-	Animation *_warpTimerAnim;        ///< this+460: warp timer animation
-	RleBlock *_bubbleGfx[3];          ///< this+636/640/644: bubble effects
-	RleBlock *_fleenGfx[4];           ///< this+508-520: fleen fixed sprites (1-4)
-	Animation *_flareAnims[2];        ///< FLARE1.AN, FLARE2.AN visual effects
-
-	// State
+	/** Current interaction phase. */
 	GameState _gameState;
-	int _freedCount;                  ///< Number of zoombinis successfully freed
+	/** Number of Zoombinis successfully released. */
+	int _freedCount;
 
-	// Direction labels for the graph (encoded in static data at byte offset 44)
-	static const char kGraph1DirLabels[8][4];   ///< 8-node cube
-	static const char kGraph2DirLabels[16][4];  ///< 16-node double cube
+	/** Direction labels for the eight-node cube. */
+	static const char kGraph1DirLabels[8][4];
+	/** Direction labels for the sixteen-node cube. */
+	static const char kGraph2DirLabels[16][4];
 
-	// Private methods — from IDA functions
-	void loadGraph();                 ///< Load static graph data from tables
-	void placeZoombinis();            ///< Place zoombinis on graph (Init loop)
-	void placeFleens();               ///< Place fleens on graph (diff 2+)
-	void placeBallStart();            ///< Find ball start position
+	/** Populate the graph topology selected by difficulty. */
+	void loadGraph();
+	/** Assign puzzle-roster entries to graph vertices. */
+	void placeZoombinis();
+	/** Place the difficulty-selected number of Fleen obstacles. */
+	void placeFleens();
+	/** Select the graph vertex at which the ball begins. */
+	void placeBallStart();
+	/** Begin moving the ball toward @p targetNode. */
 	void startBallMove(int targetNode);
+	/** Commit the current movement and begin destination resolution. */
 	void finishBallMove();
-	int findNodeByDirValues3(int a, int b, int c) const;  ///< SmallHelper_401920
-	int findNodeByDirValues4(int a, int b, int c, int d) const;  ///< SmallHelper2_401960
+	/** Find an eight-node graph vertex by its three binary coordinates. */
+	int findNodeByDirValues3(int a, int b, int c) const;
+	/** Find a sixteen-node graph vertex by its four binary coordinates. */
+	int findNodeByDirValues4(int a, int b, int c, int d) const;
+	/** Release every Zoombini assigned to vertex @p nodeIdx. */
 	void freeZoombini(int nodeIdx);
-	int countFreeZoombinis() const;   ///< CheckFreeZoombinis_405F90
+	/** Return the number of puzzle-roster entries already released. */
+	int countFreeZoombinis() const;
+	/** Load all graphics and animations owned by the puzzle. */
 	void loadResources();
 
-	int _musicId;  // BGM: sounds/music/03-BB01.wav
+	/** Music handle used while Aqua Cube is active. */
+	int _musicId;
 };
 
 } // End of namespace Zoombini2

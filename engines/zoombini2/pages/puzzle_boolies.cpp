@@ -19,22 +19,17 @@
  *
  */
 
-#include "common/debug.h"
-#include "common/random.h"
-
 #include "zoombini2/pages/puzzle_boolies.h"
-#include "zoombini2/game_state.h"
-#include "zoombini2/gfx.h"
-#include "zoombini2/zoombini.h"
-#include "zoombini2/zoombini2.h"
+#include "common/debug.h"
+#include "zoombini2/graphics.h"
 #include "zoombini2/sound.h"
+#include "zoombini2/state.h"
+#include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
 // ============================================================================
-// BooliesPuzzle — Bowling puzzle.
-//
-// Original: Boolies__Init_406F40, Boolies__CheckFreeZoombinis_40DED0.
+// BooliesPuzzle - bowling puzzle.
 //
 // Core mechanics:
 //   - Zoombinis roll as bowling balls (positive or negative)
@@ -49,10 +44,6 @@ namespace Zoombini2 {
 //   - b_boolies1-4.pat: Main rolling paths per lane
 //   - b_boolies*_exit.pat: Exit paths after pin collision
 //   - jump0-2.pat: Jump paths for special moves
-//
-// Original object layout (0x4D8 bytes):
-//   - Uses PathObject for ball movement curves
-//   - AnimElement callbacks for pin collision detection
 // ============================================================================
 
 // Ball roll animation duration (ms)
@@ -64,33 +55,30 @@ static const uint32 kPinKnockDuration = 500;
 // Boat departure delay (ms)
 static const uint32 kBoatDepartDelay = 2000;
 
-// Spot positions (approximate, based on typical bowling layout)
-static const int kSpotPositions[5][2] = {
-	{ 100, 500 },   // spot01
-	{ 200, 500 },   // spot02
-	{ 300, 500 },   // spot03 (center)
-	{ 400, 500 },   // spot04
-	{ 500, 500 }    // spot05
+// Spot positions (approximate, based on typical bowling layout).
+static const Common::Point32 kSpotPositions[5] = {
+	Common::Point32(100, 500), // spot01
+	Common::Point32(200, 500), // spot02
+	Common::Point32(300, 500), // spot03 (center)
+	Common::Point32(400, 500), // spot04
+	Common::Point32(500, 500)  // spot05
 };
 
-// Max attempts per zoombini, indexed by difficulty (0 unused).
-// Original: Boolies__Init_406F40 — this+96 = kAttemptsPerDifficulty[diff]
-static const int kAttemptsPerDifficulty[] = { 0, 2, 3, 4 };
+// Attempt limits indexed by difficulty, with index zero unused.
+static const int kAttemptsPerDifficulty[] = {0, 2, 3, 4};
 
 // Spot hitbox size
 static const int kSpotHitSize = 50;
 
 // Pin grid layout (3 rows of pins)
 static const int kPinRows = 3;
-static const int kPinCols[] = { 3, 4, 5 };  // Pins per row
-static const int kPinBaseY = 150;
+static const int kPinCols[] = {3, 4, 5}; // Pins per row
 static const int kPinRowSpacing = 60;
 static const int kPinColSpacing = 50;
-static const int kPinBaseX = 200;
+static const Common::Point32 kPinBasePosition(200, 150);
 
-// Boat position
-static const int kBoatBaseX = 550;
-static const int kBoatBaseY = 100;
+// Boat position.
+static const Common::Point32 kBoatBasePosition(550, 100);
 
 BooliesPuzzle::BooliesPuzzle(Zoombini2Engine *engine)
 	: PuzzlePage(engine, kPageBoolies),
@@ -98,8 +86,7 @@ BooliesPuzzle::BooliesPuzzle(Zoombini2Engine *engine)
 	  _currentSpot(-1),
 	  _freedCount(0),
 	  _pinsKnocked(0),
-	  _boatX(kBoatBaseX),
-	  _boatY(kBoatBaseY),
+	  _boatPosition(kBoatBasePosition),
 	  _boatVisible(true),
 	  _ballPosGfx(nullptr),
 	  _ballNegGfx(nullptr),
@@ -158,15 +145,18 @@ void BooliesPuzzle::init() {
 	// Call base init for background and zoombini loading
 	PuzzlePage::init();
 
-	// BGM: 09-BB01.wav (IDA: Boolies__Init_406F40)
+	// Start the Boolie Boggle music.
 	if (SoundManager *snd = _engine->getSoundManager()) {
 		_musicId = snd->load(true, Common::Path("sounds/music/09-BB01.wav"), true);
-		if (_musicId >= 0) { snd->playLoop(_musicId); snd->setVolume(_musicId, snd->_volumeMusic); }
+		if (_musicId >= 0) {
+			snd->playLoop(_musicId);
+			snd->setVolume(_musicId, snd->_volumeMusic);
+		}
 	}
 
 	int diff = CLIP(_engine->getGameState()->_gameMode, 1, 3);
 
-	debug(1, "BooliesPuzzle::init — difficulty %d, maxAttempts %d", diff, _maxAttempts);
+	debug(1, "BooliesPuzzle::init - difficulty %d, maxAttempts %d", diff, _maxAttempts);
 
 	// Load resources
 	loadResources();
@@ -315,14 +305,12 @@ void BooliesPuzzle::loadResources() {
 void BooliesPuzzle::setupSpots() {
 	// Setup launch spots with hitboxes
 	for (int i = 0; i < 5; i++) {
-		_spots[i].x = kSpotPositions[i][0];
-		_spots[i].y = kSpotPositions[i][1];
+		_spots[i].position = kSpotPositions[i];
 		_spots[i].hitbox = Common::Rect(
-			_spots[i].x - kSpotHitSize / 2,
-			_spots[i].y - kSpotHitSize / 2,
-			_spots[i].x + kSpotHitSize / 2,
-			_spots[i].y + kSpotHitSize / 2
-		);
+			static_cast<int16>(_spots[i].position.x - kSpotHitSize / 2),
+			static_cast<int16>(_spots[i].position.y - kSpotHitSize / 2),
+			static_cast<int16>(_spots[i].position.x + kSpotHitSize / 2),
+			static_cast<int16>(_spots[i].position.y + kSpotHitSize / 2));
 		_spots[i].active = true;
 	}
 
@@ -335,15 +323,14 @@ void BooliesPuzzle::setupPins() {
 
 	for (int row = 0; row < kPinRows; row++) {
 		int numPins = kPinCols[row];
-		int rowY = kPinBaseY + row * kPinRowSpacing;
-
-		// Center the row
-		int rowStartX = kPinBaseX + (kPinCols[kPinRows - 1] - numPins) * kPinColSpacing / 2;
+		// Center the row.
+		Common::Point32 rowStartPosition(
+			kPinBasePosition.x + (kPinCols[kPinRows - 1] - numPins) * kPinColSpacing / 2,
+			kPinBasePosition.y + row * kPinRowSpacing);
 
 		for (int col = 0; col < numPins; col++) {
 			Pin pin;
-			pin.x = rowStartX + col * kPinColSpacing;
-			pin.y = rowY;
+			pin.position = Common::Point32(rowStartPosition.x + col * kPinColSpacing, rowStartPosition.y);
 			pin.knocked = false;
 			pin.lighted = false;
 			_pins.push_back(pin);
@@ -354,18 +341,8 @@ void BooliesPuzzle::setupPins() {
 }
 
 void BooliesPuzzle::assignZoombinis() {
-	// Assign zoombinis to be rolled as balls
-	// Each zoombini gets a ball type (positive or negative) based on features
-
-	Common::RandomSource rnd("boolies");
-
-	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
-		// Alternate ball types or use zoombini features
-		// Using simple alternation for now
-		// Original likely uses feature matching
-	}
-
-	debug(2, "BooliesPuzzle: Assigned %d zoombinis as balls", (int)_puzzleZoombinis.size());
+	// Ball selection consumes the base-page roster in its existing order.
+	debug(2, "BooliesPuzzle: Retained %d Zoombinis in roster order", static_cast<int>(_puzzleZoombinis.size()));
 }
 
 void BooliesPuzzle::launchBall(int spotIdx) {
@@ -378,7 +355,7 @@ void BooliesPuzzle::launchBall(int spotIdx) {
 	// Find next available zoombini
 	int zoomIdx = -1;
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
-		if (_puzzleZoombinis[i]->_freeStatus != 0) {  // Not yet freed
+		if (_puzzleZoombinis[i]->_freeStatus != 0) { // Not yet freed
 			zoomIdx = i;
 			break;
 		}
@@ -392,14 +369,13 @@ void BooliesPuzzle::launchBall(int spotIdx) {
 	// Setup ball
 	_activeBall.type = (zoomIdx % 2 == 0) ? kBallPositive : kBallNegative;
 	_activeBall.zoombiniIdx = zoomIdx;
-	_activeBall.startX = _spots[spotIdx].x;
-	_activeBall.startY = _spots[spotIdx].y;
-	_activeBall.x = _activeBall.startX;
-	_activeBall.y = _activeBall.startY;
+	_activeBall.startPosition = _spots[spotIdx].position;
+	_activeBall.position = _activeBall.startPosition;
 
 	// Target is first row of pins (center)
-	_activeBall.endX = kPinBaseX + kPinCols[kPinRows - 1] * kPinColSpacing / 2;
-	_activeBall.endY = kPinBaseY;
+	_activeBall.endPosition = Common::Point32(
+		kPinBasePosition.x + kPinCols[kPinRows - 1] * kPinColSpacing / 2,
+		kPinBasePosition.y);
 
 	_activeBall.rollStart = _engine->getGameTickCount();
 	_currentSpot = spotIdx;
@@ -417,8 +393,7 @@ void BooliesPuzzle::advanceBallRoll() {
 
 	if (progress >= 1.0f) {
 		// Ball reached target
-		_activeBall.x = _activeBall.endX;
-		_activeBall.y = _activeBall.endY;
+		_activeBall.position = _activeBall.endPosition;
 
 		// Check for pin collision
 		if (checkPinCollision()) {
@@ -429,8 +404,8 @@ void BooliesPuzzle::advanceBallRoll() {
 	}
 
 	// Linear interpolation for ball position
-	_activeBall.x = _activeBall.startX + (int)((_activeBall.endX - _activeBall.startX) * progress);
-	_activeBall.y = _activeBall.startY + (int)((_activeBall.endY - _activeBall.startY) * progress);
+	_activeBall.position.x = _activeBall.startPosition.x + static_cast<int32>((_activeBall.endPosition.x - _activeBall.startPosition.x) * progress);
+	_activeBall.position.y = _activeBall.startPosition.y + static_cast<int32>((_activeBall.endPosition.y - _activeBall.startPosition.y) * progress);
 }
 
 bool BooliesPuzzle::checkPinCollision() {
@@ -440,11 +415,11 @@ bool BooliesPuzzle::checkPinCollision() {
 			continue;
 
 		// Simple distance check
-		int dx = _activeBall.x - _pins[i].x;
-		int dy = _activeBall.y - _pins[i].y;
-		int distSq = dx * dx + dy * dy;
+		int32 dx = _activeBall.position.x - _pins[i].position.x;
+		int32 dy = _activeBall.position.y - _pins[i].position.y;
+		int32 distSq = dx * dx + dy * dy;
 
-		if (distSq < 30 * 30) {  // Within 30 pixels
+		if (distSq < 30 * 30) { // Within 30 pixels
 			return true;
 		}
 	}
@@ -460,9 +435,9 @@ void BooliesPuzzle::knockDownPins() {
 		if (_pins[i].knocked)
 			continue;
 
-		int dx = _activeBall.x - _pins[i].x;
-		int dy = _activeBall.y - _pins[i].y;
-		int distSq = dx * dx + dy * dy;
+		int32 dx = _activeBall.position.x - _pins[i].position.x;
+		int32 dy = _activeBall.position.y - _pins[i].position.y;
+		int32 distSq = dx * dx + dy * dy;
 
 		// Ball knocks down pins within range
 		// Larger range for positive balls, smaller for negative
@@ -495,7 +470,7 @@ void BooliesPuzzle::freeZoombini(int zoombiniIdx) {
 	if (zoombiniIdx < 0 || zoombiniIdx >= (int)_puzzleZoombinis.size())
 		return;
 
-	// Mark zoombini as free (byte+92 = 0 in original)
+	// Mark the selected Zoombini as released.
 	_puzzleZoombinis[zoombiniIdx]->_freeStatus = 0;
 	_freedCount++;
 
@@ -503,7 +478,6 @@ void BooliesPuzzle::freeZoombini(int zoombiniIdx) {
 }
 
 int BooliesPuzzle::countFreeZoombinis() const {
-	// Original: Boolies__CheckFreeZoombinis_40DED0
 	int count = 0;
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
 		if (_puzzleZoombinis[i]->_freeStatus == 0)
@@ -590,7 +564,7 @@ void BooliesPuzzle::draw(Graphics::ManagedSurface *screen) {
 }
 
 void BooliesPuzzle::drawSpots(Graphics::ManagedSurface *screen) {
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 
 	for (int i = 0; i < 5; i++) {
 		if (!_spots[i].active)
@@ -598,35 +572,35 @@ void BooliesPuzzle::drawSpots(Graphics::ManagedSurface *screen) {
 
 		RleBlock *gfx = _spotGfx[i];
 		if (gfx) {
-			gfx->drawToScreen(screen, _spots[i].x - 25, _spots[i].y - 25, lut);
+			gfx->drawToScreen(screen, _spots[i].position.x - 25, _spots[i].position.y - 25, lut);
 		} else {
 			// Fallback: draw circle
 			screen->fillRect(Common::Rect(
-				_spots[i].x - 20, _spots[i].y - 20,
-				_spots[i].x + 20, _spots[i].y + 20
-			), 0x00FFFF);
+								 static_cast<int16>(_spots[i].position.x - 20), static_cast<int16>(_spots[i].position.y - 20),
+								 static_cast<int16>(_spots[i].position.x + 20), static_cast<int16>(_spots[i].position.y + 20)),
+							 0x00FFFF);
 		}
 	}
 }
 
 void BooliesPuzzle::drawPins(Graphics::ManagedSurface *screen) {
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 
 	for (uint i = 0; i < _pins.size(); i++) {
 		const Pin &pin = _pins[i];
 
 		if (pin.knocked)
-			continue;  // Don't draw knocked pins
+			continue; // Don't draw knocked pins
 
 		RleBlock *gfx = pin.lighted ? _pinLightedGfx : _pinGfx;
 		if (gfx) {
-			gfx->drawToScreen(screen, pin.x - 10, pin.y - 20, lut);
+			gfx->drawToScreen(screen, pin.position.x - 10, pin.position.y - 20, lut);
 		} else {
 			// Fallback: draw triangle
 			uint32 color = pin.lighted ? 0xFFFF00 : 0xFFFFFF;
-			screen->drawLine(pin.x, pin.y - 20, pin.x - 10, pin.y, color);
-			screen->drawLine(pin.x, pin.y - 20, pin.x + 10, pin.y, color);
-			screen->drawLine(pin.x - 10, pin.y, pin.x + 10, pin.y, color);
+			screen->drawLine(pin.position.x, pin.position.y - 20, pin.position.x - 10, pin.position.y, color);
+			screen->drawLine(pin.position.x, pin.position.y - 20, pin.position.x + 10, pin.position.y, color);
+			screen->drawLine(pin.position.x - 10, pin.position.y, pin.position.x + 10, pin.position.y, color);
 		}
 	}
 }
@@ -635,18 +609,18 @@ void BooliesPuzzle::drawBall(Graphics::ManagedSurface *screen) {
 	if (_activeBall.type == kBallNone)
 		return;
 
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 
 	RleBlock *gfx = (_activeBall.type == kBallPositive) ? _ballPosGfx : _ballNegGfx;
 	if (gfx) {
-		gfx->drawToScreen(screen, _activeBall.x - 15, _activeBall.y - 15, lut);
+		gfx->drawToScreen(screen, _activeBall.position.x - 15, _activeBall.position.y - 15, lut);
 	} else {
 		// Fallback: draw circle
 		uint32 color = (_activeBall.type == kBallPositive) ? 0x00FF00 : 0xFF0000;
 		screen->fillRect(Common::Rect(
-			_activeBall.x - 15, _activeBall.y - 15,
-			_activeBall.x + 15, _activeBall.y + 15
-		), color);
+							 static_cast<int16>(_activeBall.position.x - 15), static_cast<int16>(_activeBall.position.y - 15),
+							 static_cast<int16>(_activeBall.position.x + 15), static_cast<int16>(_activeBall.position.y + 15)),
+						 color);
 	}
 }
 
@@ -654,19 +628,23 @@ void BooliesPuzzle::drawBoat(Graphics::ManagedSurface *screen) {
 	if (!_boatVisible)
 		return;
 
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 
 	if (_boatGfx) {
-		_boatGfx->drawToScreen(screen, _boatX, _boatY, lut);
+		_boatGfx->drawToScreen(screen, _boatPosition.x, _boatPosition.y, lut);
 	} else {
 		// Fallback: draw simple boat shape
-		screen->fillRect(Common::Rect(_boatX, _boatY + 20, _boatX + 80, _boatY + 40), 0x8B4513);
-		screen->fillRect(Common::Rect(_boatX + 30, _boatY, _boatX + 50, _boatY + 30), 0xFFFFFF);
+		screen->fillRect(Common::Rect(
+			static_cast<int16>(_boatPosition.x), static_cast<int16>(_boatPosition.y + 20),
+			static_cast<int16>(_boatPosition.x + 80), static_cast<int16>(_boatPosition.y + 40)), 0x8B4513);
+		screen->fillRect(Common::Rect(
+			static_cast<int16>(_boatPosition.x + 30), static_cast<int16>(_boatPosition.y),
+			static_cast<int16>(_boatPosition.x + 50), static_cast<int16>(_boatPosition.y + 30)), 0xFFFFFF);
 	}
 }
 
 void BooliesPuzzle::drawBlockers(Graphics::ManagedSurface *screen) {
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 	uint32 now = _engine->getGameTickCount();
 
 	for (uint i = 0; i < _blockers.size(); i++) {
@@ -676,7 +654,7 @@ void BooliesPuzzle::drawBlockers(Graphics::ManagedSurface *screen) {
 		if (_blockerAnim) {
 			int frameCount = _blockerAnim->getFrameCount();
 			if (frameCount > 0) {
-				int frameIdx = (now / 120) % frameCount;  // ~8 fps animation
+				int frameIdx = (now / 120) % frameCount; // ~8 fps animation
 				const RleBlock *frame = _blockerAnim->getFrame(frameIdx);
 				if (frame)
 					frame->drawToScreen(screen, pos.x, pos.y, lut);
@@ -692,7 +670,7 @@ void BooliesPuzzle::drawBlockers(Graphics::ManagedSurface *screen) {
 
 void BooliesPuzzle::drawZoombinis(Graphics::ManagedSurface *screen) {
 	// Draw zoombinis waiting on the boat (freed ones)
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 
 	if (!_zoombiniGfx)
 		return;
@@ -701,23 +679,22 @@ void BooliesPuzzle::drawZoombinis(Graphics::ManagedSurface *screen) {
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
 		if (_puzzleZoombinis[i]->_freeStatus == 0) {
 			// This zoombini is free - draw on boat
-			const Zoombini *z = _puzzleZoombinis[i];
-			int x = _boatX + 10 + (freeIdx % 4) * 18;
-			int y = _boatY + 10 + (freeIdx / 4) * 20;
+			const ZoombiniState *z = _puzzleZoombinis[i];
+			Common::Point32 position(_boatPosition.x + 10 + (freeIdx % 4) * 18, _boatPosition.y + 10 + (freeIdx / 4) * 20);
 
 			// Draw zoombini body
 			int baseIdx = 0;
 			const RleBlock *frame = _zoombiniGfx->getFrame(baseIdx, 0);
 			if (frame)
-				frame->drawToScreen(screen, x, y, lut);
+				frame->drawToScreen(screen, position.x, position.y, lut);
 
 			// Features
-			const byte features[4] = { z->_featureA, z->_featureB, z->_featureC, z->_featureD };
+			const byte features[4] = {z->_featureA, z->_featureB, z->_featureC, z->_featureD};
 			for (int feat = 1; feat <= 4; feat++) {
-				int featIdx = baseIdx + feat * ZoombiniGfx::kDim2 + features[feat - 1];
+				int featIdx = baseIdx + feat * ZoombiniGraphics::kDim2 + features[feat - 1];
 				frame = _zoombiniGfx->getFrame(featIdx, 0);
 				if (frame)
-					frame->drawToScreen(screen, x, y, lut);
+					frame->drawToScreen(screen, position.x, position.y, lut);
 			}
 
 			freeIdx++;

@@ -27,10 +27,13 @@
 namespace Zoombini2 {
 
 /** Party assembly, storage, and arrival hubs with direct access to the map. */
-class ShelterPage : public InteractivePage {
+class ZoombiniShelter : public ZoombiniInteractive {
 public:
-	explicit ShelterPage(Zoombini2Engine *engine) : InteractivePage(engine) {}
+	/** Bind a shelter page to @p engine. */
+	explicit ZoombiniShelter(Zoombini2Engine *engine) : ZoombiniInteractive(engine) {}
+	/** Return whether the shared sidebar is visible. */
 	bool hasSidebar() const override { return true; }
+	/** Identify this page as a shelter for global page policy. */
 	bool isShelter() const override { return true; }
 };
 

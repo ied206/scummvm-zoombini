@@ -221,8 +221,8 @@ SoundBuffer *SoundManager::findBuffer(int id) const {
 }
 
 Common::Path SoundManager::resolvePath(const Common::Path &filename) const {
-	// Original path resolution: '#' prefix = CD path, else = install path
-	// In ScummVM, all paths are relative to the game data directory
+	// A leading '#' selects the lower-priority disc-relative spelling.
+	// SearchMan resolves both forms against the configured game data roots.
 	Common::String str = filename.toString();
 	if (!str.empty() && str[0] == '#') {
 		str = str.substr(1);
@@ -233,7 +233,7 @@ Common::Path SoundManager::resolvePath(const Common::Path &filename) const {
 	// With extracted data only, BB files are in Data/Sounds/FX/
 	// Map sounds/music/XX-BB*.wav to sounds/fx/XX-BB*.wav for fallback
 	if (str.hasPrefix("sounds/music/")) {
-		Common::String basename = str.substr(13);  // Remove "sounds/music/"
+		Common::String basename = str.substr(13); // Remove "sounds/music/"
 		// Check if this is a numeric-prefix BB file (e.g. "01-BB01.wav")
 		if (basename.size() > 6 && basename[2] == '-' && basename[3] == 'B' && basename[4] == 'B') {
 			// Try sounds/fx/ path first for extracted data compatibility
@@ -249,11 +249,7 @@ Common::Path SoundManager::resolvePath(const Common::Path &filename) const {
 	return Common::Path(str);
 }
 
-/**
- * Normalize volume from game range (0-100) to ScummVM mixer range (0-255).
- * Original NormalizeVolume (0x46C463): converts 0-100% to MSS 0-127.
- * ScummVM uses 0-255 for mixer volume.
- */
+/** Normalize the game's zero-to-one-hundred volume into the mixer range. */
 byte SoundManager::normalizeVolume(int volume) const {
 	if (volume < 0)
 		volume = 0;

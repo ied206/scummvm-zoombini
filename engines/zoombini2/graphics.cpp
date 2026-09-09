@@ -24,7 +24,7 @@
 #include "common/memstream.h"
 #include "common/textconsole.h"
 
-#include "zoombini2/gfx.h"
+#include "zoombini2/graphics.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
@@ -41,10 +41,7 @@ BitBlock::~BitBlock() {
 	delete[] _alphaMap;
 }
 
-/**
- * Load a color+alpha BMP pair.
- * Original: CBitBlockPair__Load_457550 uses ReadBMP + ReadAlphaBMP.
- */
+/** Load a color BMP and separate alpha BMP into one drawable block. */
 bool BitBlock::loadFromBMPPair(const Common::Path &colorPath, const Common::Path &alphaPath) {
 	Common::File colorFile;
 	if (!colorFile.open(colorPath)) {
@@ -74,7 +71,7 @@ bool BitBlock::loadFromBMP(const Common::Path &colorPath) {
 }
 
 /**
- * Load from .bb cached BitBlock format — CBitBlock__Read_457670.
+ * Load the cached `.bb` BitBlock format.
  *
  * Format:
  *   - 20-byte header: field0(4) + pPixels_placeholder(4) + bufSize(4) + width(4) + height(4)
@@ -102,7 +99,7 @@ bool BitBlock::loadFromBB(const Common::Path &bbPath) {
 
 	// Read 4-byte data size
 	uint32 dataSize = f.readUint32LE();
-	uint32 expectedSize = (uint32)(_width * _height) * 3;
+	uint32 expectedSize = static_cast<uint32>(_width * _height) * 3;
 	if (dataSize != expectedSize)
 		dataSize = expectedSize;
 
@@ -117,7 +114,7 @@ bool BitBlock::loadFromBB(const Common::Path &bbPath) {
 		return false;
 	}
 
-	// Expand 3bpp BGR to 4bpp RGBA (original: 3-to-4 expansion in 32bpp mode)
+	// Expand BGR pixels into the internal four-byte format.
 	const byte *src = bgrBuf;
 	byte *dst = _pixels;
 	int pixelCount = _width * _height;
@@ -135,7 +132,7 @@ bool BitBlock::loadFromBB(const Common::Path &bbPath) {
 }
 
 /**
- * Unified loader — CBitBlock__Read_457670.
+ * Load a cached bit block with a bitmap fallback.
  * Tries .bb extension first, then falls back to .bmp.
  */
 bool BitBlock::load(const Common::Path &basePath) {
@@ -159,7 +156,7 @@ void BitBlock::createEmpty(int width, int height, bool withAlpha) {
 }
 
 /**
- * Read 24-bit color BMP — CBitBlock__ReadBMP_4573D0.
+ * Read a 24-bit color BMP.
  * Standard 14-byte file header + 40-byte info header.
  * Rows are bottom-up (flipped), padded to 4 bytes.
  */
@@ -195,11 +192,11 @@ bool BitBlock::loadColorBMP(Common::SeekableReadStream *stream) {
 	delete[] _pixels;
 	_pixels = new byte[_width * _height * 4];
 
-	int rowPadding = _width % 4;  // Original uses width % 4 for 24-bit BMP
+	int rowPadding = _width % 4;
 	byte padBuf[4];
 
 	// Read rows bottom-up, store top-down
-	for (int row = _height - 1; row >= 0; row--) {
+	for (int row = _height - 1; 0 <= row; row--) {
 		byte *dstRow = _pixels + row * _width * 4;
 		for (int col = 0; col < _width; col++) {
 			byte bgr[3];
@@ -222,7 +219,7 @@ bool BitBlock::loadColorBMP(Common::SeekableReadStream *stream) {
 }
 
 /**
- * Read 8-bit alpha mask BMP — CBitBlock__ReadAlphaBMP_4571A0.
+ * Read an 8-bit alpha-mask BMP.
  * 14-byte file header + 44-byte info header (V4) + palette + 8-bit rows.
  */
 bool BitBlock::loadAlphaBMP(Common::SeekableReadStream *stream) {
@@ -240,10 +237,11 @@ bool BitBlock::loadAlphaBMP(Common::SeekableReadStream *stream) {
 	int alphaHeight = READ_LE_INT32(bmpInfoHeader + 8);
 	int alphaBpp = READ_LE_INT16(bmpInfoHeader + 14);
 	int clrUsed = READ_LE_INT32(bmpInfoHeader + 32);
+	(void)alphaBpp;
 
 	if (alphaWidth != _width || alphaHeight != _height) {
 		warning("BitBlock: alpha BMP size %dx%d doesn't match color %dx%d",
-		        alphaWidth, alphaHeight, _width, _height);
+				alphaWidth, alphaHeight, _width, _height);
 		return false;
 	}
 
@@ -258,10 +256,18 @@ bool BitBlock::loadAlphaBMP(Common::SeekableReadStream *stream) {
 	// Calculate padding for 8-bit rows
 	int rowPad;
 	switch (alphaWidth % 4) {
-	case 1: rowPad = 3; break;
-	case 2: rowPad = 2; break;
-	case 3: rowPad = 1; break;
-	default: rowPad = 0; break;
+	case 1:
+		rowPad = 3;
+		break;
+	case 2:
+		rowPad = 2;
+		break;
+	case 3:
+		rowPad = 1;
+		break;
+	default:
+		rowPad = 0;
+		break;
 	}
 
 	// Read rows top-down into temp buffer, then flip
@@ -280,8 +286,8 @@ bool BitBlock::loadAlphaBMP(Common::SeekableReadStream *stream) {
 	_alphaMap = new byte[alphaWidth * alphaHeight];
 	for (int row = 0; row < alphaHeight; row++) {
 		memcpy(_alphaMap + row * alphaWidth,
-		       tempBuf + (alphaHeight - 1 - row) * alphaWidth,
-		       alphaWidth);
+			   tempBuf + (alphaHeight - 1 - row) * alphaWidth,
+			   alphaWidth);
 	}
 	delete[] tempBuf;
 
@@ -289,7 +295,7 @@ bool BitBlock::loadAlphaBMP(Common::SeekableReadStream *stream) {
 }
 
 /**
- * Draw bitmap to surface (opaque copy) — CBitBlock__DrawToScreen_456BE0.
+ * Draw the bitmap to a surface with opaque copying.
  */
 void BitBlock::drawToSurface(Graphics::ManagedSurface *dst, int x, int y) const {
 	if (!_pixels)
@@ -298,63 +304,63 @@ void BitBlock::drawToSurface(Graphics::ManagedSurface *dst, int x, int y) const 
 	const Graphics::PixelFormat &fmt = dst->format;
 	for (int row = 0; row < _height; row++) {
 		int dy = y + row;
-		if (dy < 0 || dy >= dst->h)
+		if (dy < 0 || dst->h <= dy)
 			continue;
 
 		for (int col = 0; col < _width; col++) {
 			int dx = x + col;
-			if (dx < 0 || dx >= dst->w)
+			if (dx < 0 || dst->w <= dx)
 				continue;
 
 			const byte *src = _pixels + (row * _width + col) * 4;
 			uint32 color = fmt.ARGBToColor(255, src[0], src[1], src[2]);
-			*((uint32 *)dst->getBasePtr(dx, dy)) = color;
+			*static_cast<uint32 *>(dst->getBasePtr(dx, dy)) = color;
 		}
 	}
 }
 
 /**
- * Draw sub-rectangle — CBitBlock__DrawSubRect_456D40.
+ * Draw a source subrectangle to a surface.
  */
 void BitBlock::drawSubRect(Graphics::ManagedSurface *dst, int x, int y,
-                           const Common::Rect &srcRect) const {
+						   const Common::Rect &srcRect) const {
 	if (!_pixels)
 		return;
 
 	const Graphics::PixelFormat &fmt = dst->format;
 	for (int row = srcRect.top; row < srcRect.bottom && row < _height; row++) {
 		int dy = y + (row - srcRect.top);
-		if (dy < 0 || dy >= dst->h)
+		if (dy < 0 || dst->h <= dy)
 			continue;
 
 		for (int col = srcRect.left; col < srcRect.right && col < _width; col++) {
 			int dx = x + (col - srcRect.left);
-			if (dx < 0 || dx >= dst->w)
+			if (dx < 0 || dst->w <= dx)
 				continue;
 
 			const byte *src = _pixels + (row * _width + col) * 4;
 			uint32 color = fmt.ARGBToColor(255, src[0], src[1], src[2]);
-			*((uint32 *)dst->getBasePtr(dx, dy)) = color;
+			*static_cast<uint32 *>(dst->getBasePtr(dx, dy)) = color;
 		}
 	}
 }
 
 /**
- * Draw with per-pixel alpha blending — CBitBlock__DrawAlphaBlend_456EE0.
+ * Draw with per-pixel alpha blending.
  */
 void BitBlock::drawAlphaBlend(Graphics::ManagedSurface *dst, int x, int y,
-                              const byte alphaLUT[256][256]) const {
+							  const byte alphaLUT[256][256]) const {
 	if (!_pixels || !_alphaMap)
 		return;
 
 	for (int row = 0; row < _height; row++) {
 		int dy = y + row;
-		if (dy < 0 || dy >= dst->h)
+		if (dy < 0 || dst->h <= dy)
 			continue;
 
 		for (int col = 0; col < _width; col++) {
 			int dx = x + col;
-			if (dx < 0 || dx >= dst->w)
+			if (dx < 0 || dst->w <= dx)
 				continue;
 
 			byte alpha = _alphaMap[row * _width + col];
@@ -362,7 +368,7 @@ void BitBlock::drawAlphaBlend(Graphics::ManagedSurface *dst, int x, int y,
 				continue;
 
 			const byte *src = _pixels + (row * _width + col) * 4;
-			byte *dstPixel = (byte *)dst->getBasePtr(dx, dy);
+			byte *dstPixel = static_cast<byte *>(dst->getBasePtr(dx, dy));
 
 			if (alpha == 255) {
 				dstPixel[0] = src[2]; // B
@@ -392,13 +398,14 @@ RleBlock::~RleBlock() {
 }
 
 /**
- * Load from standalone .rl/.rb file — CRleBlock__CRleBlock_45AC90.
+ * Load a standalone `.rl` or `.rb` resource.
  * File: [24-byte header] [4-byte dataSize] [dataSize bytes RLE data].
  */
 bool RleBlock::loadFromStream(Common::SeekableReadStream *stream) {
 	// Read 24-byte header
 	uint32 field0 = stream->readUint32LE();
-	stream->readUint32LE();  // pData placeholder (ignored)
+	(void)field0;
+	stream->readUint32LE(); // pData placeholder (ignored)
 	_dataSize = stream->readUint32LE();
 	_width = stream->readSint32LE();
 	_height = stream->readSint32LE();
@@ -410,20 +417,20 @@ bool RleBlock::loadFromStream(Common::SeekableReadStream *stream) {
 	// Use the larger of the two sizes for safety
 	uint32 allocSize = MAX(_dataSize, fileDataSize);
 
-	_rleData = (byte *)malloc(allocSize);
+	_rleData = static_cast<byte *>(malloc(allocSize));
 	if (!_rleData) {
 		warning("RleBlock: malloc failed for %u bytes", allocSize);
 		return false;
 	}
 
-	if ((uint32)stream->read(_rleData, allocSize) != allocSize) {
+	if (stream->read(_rleData, allocSize) != allocSize) {
 		warning("RleBlock: failed to read RLE data (%u bytes)", allocSize);
 		free(_rleData);
 		_rleData = nullptr;
 		return false;
 	}
 
-	// Expand 3bpp to 4bpp (original calls this when g_graphicsModeFlag == 0)
+	// Expand the loaded pixels into the internal four-byte format.
 	expand3to4bpp();
 
 	return true;
@@ -438,10 +445,7 @@ bool RleBlock::loadFromFile(const Common::Path &path) {
 	return loadFromStream(&f);
 }
 
-/**
- * Unified loader: appends .rb extension and loads.
- * Original: CRleBlock__CRleBlock_45AC90 expects .rb files.
- */
+/** Append the `.rb` extension and load the resulting RLE resource. */
 bool RleBlock::load(const Common::Path &basePath) {
 	Common::Path rbPath(basePath.toString() + ".rb");
 	return loadFromFile(rbPath);
@@ -454,8 +458,8 @@ bool RleBlock::load(const Common::Path &basePath) {
  */
 bool RleBlock::loadHeaderAndData(Common::SeekableReadStream *stream, uint32 dataSize) {
 	// Read 24-byte header
-	stream->readUint32LE();  // field0 (will be set from data)
-	stream->readUint32LE();  // pData placeholder
+	stream->readUint32LE(); // field0 (will be set from data)
+	stream->readUint32LE(); // pData placeholder
 	_dataSize = stream->readUint32LE();
 	_width = stream->readSint32LE();
 	_height = stream->readSint32LE();
@@ -467,11 +471,11 @@ bool RleBlock::loadHeaderAndData(Common::SeekableReadStream *stream, uint32 data
 	// Use the provided dataSize for allocation (matches header _dataSize)
 	uint32 readSize = MAX(_dataSize, MAX(dataSize, fileDataSize));
 
-	_rleData = (byte *)malloc(readSize);
+	_rleData = static_cast<byte *>(malloc(readSize));
 	if (!_rleData)
 		return false;
 
-	if ((uint32)stream->read(_rleData, readSize) != readSize) {
+	if (stream->read(_rleData, readSize) != readSize) {
 		free(_rleData);
 		_rleData = nullptr;
 		return false;
@@ -482,18 +486,16 @@ bool RleBlock::loadHeaderAndData(Common::SeekableReadStream *stream, uint32 data
 }
 
 /**
- * Convert RLE data from 3-byte to 4-byte per pixel format.
- * Original: CRleBlock__Expand3to4bpp_45AF90.
+ * Convert opaque RLE pixels from three bytes to the internal four-byte format.
  *
- * Mode 0 (opaque): 3 bytes/pixel → 4 bytes/pixel (RGB + pad)
- * Mode 1 (alpha):  already 4 bytes/pixel, copied as-is.
+ * Alpha-mode resources already contain four bytes per pixel and are copied unchanged.
  */
 void RleBlock::expand3to4bpp() {
 	if (!_rleData || _dataSize < 2)
 		return;
 
 	// Allocate expanded buffer (worst case 2x)
-	byte *newData = (byte *)malloc(_dataSize * 2);
+	byte *newData = static_cast<byte *>(malloc(_dataSize * 2));
 	if (!newData)
 		return;
 
@@ -516,12 +518,12 @@ void RleBlock::expand3to4bpp() {
 		dst += 6;
 
 		// Mode byte
-		if (src >= srcEnd)
+		if (srcEnd <= src)
 			break;
 		byte mode = *src;
 		*dst = mode;
-		src++;
-		dst++;
+		src += 1;
+		dst += 1;
 
 		if (mode != 0) {
 			// Mode 1 (alpha): already 4 bytes per pixel, copy as-is
@@ -532,7 +534,7 @@ void RleBlock::expand3to4bpp() {
 			src += copySize;
 			dst += copySize;
 		} else {
-			// Mode 0 (opaque): expand 3 bytes → 4 bytes per pixel
+			// Opaque mode expands three bytes to four bytes per pixel.
 			for (int i = 0; i < pixelCount; i++) {
 				if (src + 3 > srcEnd)
 					break;
@@ -546,26 +548,23 @@ void RleBlock::expand3to4bpp() {
 		}
 	}
 
-	uint32 newSize = (uint32)(dst - newData);
+	uint32 newSize = static_cast<uint32>(dst - newData);
 	free(_rleData);
 	_rleData = newData;
 	_dataSize = newSize;
 }
 
 /**
- * Draw RLE sprite to screen with alpha blending.
- * Original: CRleBlock__DrawToScreen_45B220.
+ * Draw the RLE spans with opaque copying or lookup-table alpha blending.
  *
- * Iterates spans from RLE data (starting at offset +2).
- * Mode 0: opaque copy (4 bytes per pixel after expand).
- * Mode 1: alpha-blended using premultiplied source + LUT.
+ * Span data begins after the two-byte resource prefix.
  */
 void RleBlock::drawToScreen(Graphics::ManagedSurface *dst, int x, int y,
-                            const byte alphaLUT[256][256]) const {
+							const byte alphaLUT[256][256]) const {
 	if (!_rleData || _dataSize < 2)
 		return;
 
-	const byte *ptr = _rleData + 2;  // Skip effectiveHeight
+	const byte *ptr = _rleData + 2; // Skip effectiveHeight
 	const byte *end = _rleData + _dataSize;
 
 	while (ptr < end) {
@@ -581,7 +580,7 @@ void RleBlock::drawToScreen(Graphics::ManagedSurface *dst, int x, int y,
 		int screenX = x + xOff;
 		int screenY = y + yOff;
 
-		if (screenY < 0 || screenY >= dst->h || pixelCount <= 0) {
+		if (screenY < 0 || dst->h <= screenY || pixelCount <= 0) {
 			// Skip pixel data
 			if (mode != 0) {
 				ptr += pixelCount * 4;
@@ -608,7 +607,7 @@ void RleBlock::drawToScreen(Graphics::ManagedSurface *dst, int x, int y,
 
 			if (startCol < endCol) {
 				const byte *srcPixel = ptr + startCol * 4;
-				byte *dstPixel = (byte *)dst->getBasePtr(screenX, screenY);
+				byte *dstPixel = static_cast<byte *>(dst->getBasePtr(screenX, screenY));
 
 				for (int i = startCol; i < endCol; i++) {
 					dstPixel[0] = srcPixel[0]; // B (ScummVM BGRA)
@@ -635,7 +634,7 @@ void RleBlock::drawToScreen(Graphics::ManagedSurface *dst, int x, int y,
 
 			if (startCol < endCol) {
 				const byte *srcPixel = ptr + startCol * 4;
-				byte *dstPixel = (byte *)dst->getBasePtr(screenX, screenY);
+				byte *dstPixel = static_cast<byte *>(dst->getBasePtr(screenX, screenY));
 
 				for (int i = startCol; i < endCol; i++) {
 					byte invAlpha = srcPixel[3];
@@ -655,9 +654,8 @@ void RleBlock::drawToScreen(Graphics::ManagedSurface *dst, int x, int y,
 }
 
 void RleBlock::drawToScreenClipped(Graphics::ManagedSurface *dst, int x, int y,
-                                   int clipLeft, int clipTop, int clipRight, int clipBottom,
-                                   const byte alphaLUT[256][256]) const {
-	// Original: CRleBlock__DrawToScreenClipped_45B410
+								   int clipLeft, int clipTop, int clipRight, int clipBottom,
+								   const byte alphaLUT[256][256]) const {
 	if (!_rleData || _dataSize < 2)
 		return;
 
@@ -678,8 +676,8 @@ void RleBlock::drawToScreenClipped(Graphics::ManagedSurface *dst, int x, int y,
 		int screenY = y + yOff;
 
 		// Clip vertically against clip rect and screen bounds
-		if (screenY < clipTop || screenY >= clipBottom ||
-		    screenY < 0 || screenY >= dst->h || pixelCount <= 0) {
+		if (screenY < clipTop || clipBottom <= screenY ||
+			screenY < 0 || dst->h <= screenY || pixelCount <= 0) {
 			ptr += pixelCount * 4;
 			continue;
 		}
@@ -688,7 +686,7 @@ void RleBlock::drawToScreenClipped(Graphics::ManagedSurface *dst, int x, int y,
 		int startCol = 0;
 		int endCol = pixelCount;
 
-		if (screenX + endCol <= clipLeft || screenX >= clipRight) {
+		if (screenX + endCol <= clipLeft || clipRight <= screenX) {
 			ptr += pixelCount * 4;
 			continue;
 		}
@@ -712,7 +710,7 @@ void RleBlock::drawToScreenClipped(Graphics::ManagedSurface *dst, int x, int y,
 
 		if (startCol < endCol) {
 			const byte *srcPixel = ptr + startCol * 4;
-			byte *dstPixel = (byte *)dst->getBasePtr(screenX, screenY);
+			byte *dstPixel = static_cast<byte *>(dst->getBasePtr(screenX, screenY));
 
 			if (mode == 0) {
 				for (int i = startCol; i < endCol; i++) {
@@ -752,7 +750,7 @@ Animation::~Animation() {
 }
 
 /**
- * Load animation from .an cache file — CAnimation__Read_455F30.
+ * Load an animation from an `.an` cache file.
  * Format: DWORD frameCount, per frame: 24-byte header + 4-byte dataSize + data.
  */
 bool Animation::loadFromFile(const Common::Path &path) {
@@ -765,7 +763,7 @@ bool Animation::loadFromFile(const Common::Path &path) {
 	uint32 frameCount = f.readUint32LE();
 	if (frameCount > 10000) {
 		warning("Animation: suspicious frame count %u in '%s'", frameCount,
-		        path.toString().c_str());
+				path.toString().c_str());
 		return false;
 	}
 
@@ -797,12 +795,12 @@ bool Animation::loadFromFile(const Common::Path &path) {
 	}
 
 	debug(3, "Animation: loaded %u frames from '%s'", frameCount,
-	      path.toString().c_str());
+		  path.toString().c_str());
 	return true;
 }
 
 const RleBlock *Animation::getFrame(int index) const {
-	if (index >= 0 && index < (int)_frames.size())
+	if (0 <= index && index < static_cast<int>(_frames.size()))
 		return _frames[index];
 	return nullptr;
 }
@@ -836,23 +834,23 @@ void AnimationPlayer::setAnimation(const Animation *anim) {
 }
 
 void AnimationPlayer::play(uint32 frameDelayMs, bool loop,
-                           AnimationCallback callback,
-                           void *userData, int animId) {
+						   AnimationCallback callback,
+						   void *userData, int animId) {
 	_frameDelayMs = frameDelayMs;
 	_loop = loop;
 	_callback = callback;
 	_userData = userData;
 	_animId = animId;
 	_currentFrame = 0;
-	_lastFrameTime = 0;  // Will be set on first update
+	_lastFrameTime = 0; // Will be set on first update
 	_playing = true;
 	_paused = false;
 	_finished = false;
 }
 
 void AnimationPlayer::playAt(uint32 tickCount, uint32 frameDelayMs, bool loop,
-                             AnimationCallback callback,
-                             void *userData, int animId) {
+							 AnimationCallback callback,
+							 void *userData, int animId) {
 	_frameDelayMs = frameDelayMs;
 	_loop = loop;
 	_callback = callback;
@@ -903,7 +901,7 @@ bool AnimationPlayer::update(uint32 tickCount) {
 
 		if (_loop) {
 			_currentFrame %= frameCount;
-		} else if (_currentFrame >= frameCount) {
+		} else if (frameCount <= _currentFrame) {
 			_currentFrame = frameCount - 1;
 			_finished = true;
 			_playing = false;
@@ -920,7 +918,7 @@ bool AnimationPlayer::update(uint32 tickCount) {
 }
 
 void AnimationPlayer::draw(Graphics::ManagedSurface *dst, int x, int y,
-                           const byte alphaLUT[256][256]) const {
+						   const byte alphaLUT[256][256]) const {
 	if (!_animation)
 		return;
 
@@ -940,23 +938,23 @@ void AnimationPlayer::setFrame(int frame) {
 }
 
 // ============================================================================
-// ZoombiniGfx
+// ZoombiniGraphics
 // ============================================================================
 
-ZoombiniGfx::Cell::~Cell() {
+ZoombiniGraphics::Cell::~Cell() {
 	for (uint i = 0; i < frames.size(); i++)
 		delete frames[i];
 }
 
-ZoombiniGfx::ZoombiniGfx() {
+ZoombiniGraphics::ZoombiniGraphics() {
 }
 
-ZoombiniGfx::~ZoombiniGfx() {
+ZoombiniGraphics::~ZoombiniGraphics() {
 }
 
 /**
- * Load from .anm file — CompressGfxZomb_Read_45C4D0.
- * 3000 cells (100 × 5 × 6). Per cell: DWORD frameCount,
+ * Load a little- or big-Zoombini `.anm` animation set.
+ * Each of 3000 cells stores a frame count followed by its frames.
  * per frame: DWORD dataSize + 24-byte header + data.
  */
 bool RleBlock::loadAnmFrame(Common::SeekableReadStream *stream) {
@@ -966,21 +964,21 @@ bool RleBlock::loadAnmFrame(Common::SeekableReadStream *stream) {
 	// This differs from .an format which has an inner DWORD size between header and data.
 	stream->readUint32LE(); // field0 (unused placeholder)
 	stream->readUint32LE(); // pData  (unused placeholder)
-	_dataSize  = stream->readUint32LE();
-	_width     = stream->readSint32LE();
-	_height    = stream->readSint32LE();
-	_field20   = stream->readSint32LE();
+	_dataSize = stream->readUint32LE();
+	_width = stream->readSint32LE();
+	_height = stream->readSint32LE();
+	_field20 = stream->readSint32LE();
 
 	if (stream->err() || stream->eos()) {
 		warning("RleBlock::loadAnmFrame: EOF/error reading header");
 		return false;
 	}
 
-	_rleData = (byte *)malloc(_dataSize);
+	_rleData = static_cast<byte *>(malloc(_dataSize));
 	if (!_rleData)
 		return false;
 
-	if ((uint32)stream->read(_rleData, _dataSize) != _dataSize) {
+	if (stream->read(_rleData, _dataSize) != _dataSize) {
 		free(_rleData);
 		_rleData = nullptr;
 		return false;
@@ -990,10 +988,10 @@ bool RleBlock::loadAnmFrame(Common::SeekableReadStream *stream) {
 	return true;
 }
 
-bool ZoombiniGfx::loadFromFile(const Common::Path &path) {
+bool ZoombiniGraphics::loadFromFile(const Common::Path &path) {
 	Common::File f;
 	if (!f.open(path)) {
-		warning("ZoombiniGfx: cannot open '%s'", path.toString().c_str());
+		warning("ZoombiniGraphics: cannot open '%s'", path.toString().c_str());
 		return false;
 	}
 
@@ -1003,7 +1001,7 @@ bool ZoombiniGfx::loadFromFile(const Common::Path &path) {
 			for (int d2 = 0; d2 < kDim2; d2++) {
 				uint32 frameCount = f.readUint32LE();
 				if (f.eos() || f.err()) {
-					warning("ZoombiniGfx: unexpected EOF at cell %d", cellIndex);
+					warning("ZoombiniGraphics: unexpected EOF at cell %d", cellIndex);
 					return false;
 				}
 
@@ -1015,11 +1013,11 @@ bool ZoombiniGfx::loadFromFile(const Common::Path &path) {
 					// 24-byte header + _dataSize bytes RLE data.
 					// The outer size is read here; loadAnmFrame reads the header
 					// and then exactly _dataSize (from header+8) bytes of data.
-					f.readUint32LE(); // outer dataSize — consumed but not used
+					f.readUint32LE(); // Consume the redundant outer data size.
 
 					RleBlock *frame = new RleBlock();
 					if (!frame->loadAnmFrame(&f)) {
-						warning("ZoombiniGfx: failed cell %d frame %u", cellIndex, fr);
+						warning("ZoombiniGraphics: failed cell %d frame %u", cellIndex, fr);
 						delete frame;
 						return false;
 					}
@@ -1027,27 +1025,27 @@ bool ZoombiniGfx::loadFromFile(const Common::Path &path) {
 					cell.frames.push_back(frame);
 				}
 
-				cellIndex++;
+				cellIndex += 1;
 			}
 		}
 	}
 
-	debug(2, "ZoombiniGfx: loaded %d cells from '%s'",
-	      kCellCount, path.toString().c_str());
+	debug(2, "ZoombiniGraphics: loaded %d cells from '%s'",
+		  kCellCount, path.toString().c_str());
 	return true;
 }
 
-const RleBlock *ZoombiniGfx::getFrame(int cellIndex, int frameIndex) const {
-	if (cellIndex < 0 || cellIndex >= kCellCount)
+const RleBlock *ZoombiniGraphics::getFrame(int cellIndex, int frameIndex) const {
+	if (cellIndex < 0 || kCellCount <= cellIndex)
 		return nullptr;
 	const Cell &cell = _cells[cellIndex];
-	if (frameIndex < 0 || frameIndex >= (int)cell.frames.size())
+	if (frameIndex < 0 || static_cast<int>(cell.frames.size()) <= frameIndex)
 		return nullptr;
 	return cell.frames[frameIndex];
 }
 
-int ZoombiniGfx::getFrameCount(int cellIndex) const {
-	if (cellIndex < 0 || cellIndex >= kCellCount)
+int ZoombiniGraphics::getFrameCount(int cellIndex) const {
+	if (cellIndex < 0 || kCellCount <= cellIndex)
 		return 0;
 	return _cells[cellIndex].frames.size();
 }

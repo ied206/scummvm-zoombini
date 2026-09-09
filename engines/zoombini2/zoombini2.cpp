@@ -33,17 +33,12 @@
 #include "graphics/managed_surface.h"
 #include "graphics/pixelformat.h"
 
-#include "zoombini2/zoombini2.h"
-#include "zoombini2/game_state.h"
-#include "zoombini2/gfx.h"
+#include "zoombini2/graphics.h"
+#include "zoombini2/pages/interactive_menuscreen.h"
+#include "zoombini2/pages/interactive_worldmap.h"
 #include "zoombini2/pages/page_base.h"
-#include "zoombini2/pages/transition_video.h"
-#include "zoombini2/pages/transition_title.h"
-#include "zoombini2/pages/shelter_zombiniville.h"
-#include "zoombini2/pages/transition_maptrans.h"
-#include "zoombini2/pages/puzzle_base.h"
 #include "zoombini2/pages/puzzle_aquacube.h"
-#include "zoombini2/pages/shelter_booliewood.h"
+#include "zoombini2/pages/puzzle_base.h"
 #include "zoombini2/pages/puzzle_boolies.h"
 #include "zoombini2/pages/puzzle_cheznorf.h"
 #include "zoombini2/pages/puzzle_crazyturtle.h"
@@ -52,19 +47,22 @@
 #include "zoombini2/pages/puzzle_snowboard.h"
 #include "zoombini2/pages/puzzle_walloffleens.h"
 #include "zoombini2/pages/puzzle_waterslide.h"
-#include "zoombini2/pages/interactive_menuscreen.h"
+#include "zoombini2/pages/shelter_booliewood.h"
+#include "zoombini2/pages/shelter_booliewood_final.h"
 #include "zoombini2/pages/shelter_rescue.h"
+#include "zoombini2/pages/shelter_zombiniville.h"
 #include "zoombini2/pages/transition_credits.h"
-#include "zoombini2/pages/transition_final.h"
-#include "zoombini2/pages/interactive_worldmap.h"
-#include "zoombini2/saveload.h"
-#include "zoombini2/sound.h"
-#include "zoombini2/zoombini.h"
+#include "zoombini2/pages/transition_maptrans.h"
+#include "zoombini2/pages/transition_title.h"
+#include "zoombini2/pages/transition_video.h"
 #include "zoombini2/sidebar.h"
+#include "zoombini2/sound.h"
+#include "zoombini2/state.h"
+#include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
-static Common::Path selectMoviePath(const char *fullSizePath, const char *halfSizePath) {
+Common::Path Zoombini2Engine::selectMoviePath(const char *fullSizePath, const char *halfSizePath) {
 	const Common::Path fullSize(fullSizePath);
 	if (SearchMan.hasFile(fullSize))
 		return fullSize;
@@ -86,8 +84,7 @@ Zoombini2Engine::Zoombini2Engine(OSystem *syst, const Zoombini2GameDescription *
 
 	// Cursor system
 	_cursorSprite = nullptr;
-	_cursorHotspotX = 0;
-	_cursorHotspotY = 0;
+	_cursorHotspot = Common::Point();
 	_cursorVisible = true;
 
 	_mouseDown = false;
@@ -114,7 +111,7 @@ Zoombini2Engine::Zoombini2Engine(OSystem *syst, const Zoombini2GameDescription *
 	_transitionState = 0;
 
 	for (int i = 0; i < kNumFeatures; i++)
-		_selectedFeatures[i] = -1; // 0xFFFF = unset
+		_selectedFeatures[i] = -1;
 
 	memset(_alphaBlendLUT, 0, sizeof(_alphaBlendLUT));
 }
@@ -236,11 +233,7 @@ Common::Error Zoombini2Engine::run() {
 	return Common::kNoError;
 }
 
-/**
- * Initialize the alpha blending lookup table.
- * Original: WinMain at 0x463ED0.
- * Formula: LUT[alpha][value] = (alpha * value) >> 8
- */
+/** Initialize the lookup table used to multiply color channels by alpha. */
 void Zoombini2Engine::initAlphaLUT() {
 	for (int alpha = 0; alpha < 256; alpha++) {
 		for (int value = 0; value < 256; value++) {
@@ -250,12 +243,9 @@ void Zoombini2Engine::initAlphaLUT() {
 }
 
 /**
- * Initialize the cursor system.
- * Original: MainGameLoop_4651E0 loads cursor sprites from Bmp/cursor/cursor01-04.rb.
- * The cursor is a software sprite drawn over the game screen.
+ * Load the four game cursor sprites and register the default cursor.
  *
- * We also register the cursor with CursorMan so it appears in the black
- * border area around the game screen when the window is larger than 800x600.
+ * CursorMan keeps the cursor visible over both the game viewport and any surrounding border.
  */
 void Zoombini2Engine::initCursor() {
 	// Load cursor sprite from cursor01.rb (default cursor)
@@ -267,9 +257,8 @@ void Zoombini2Engine::initCursor() {
 		return;
 	}
 
-	// Hotspot for cursor01 is at (0, 0) — top-left corner
-	_cursorHotspotX = 0;
-	_cursorHotspotY = 0;
+	// The default cursor hotspot is its top-left corner.
+	_cursorHotspot = Common::Point();
 	_cursorVisible = true;
 
 	// Register cursor with CursorMan so it's visible in the black border area.
@@ -277,17 +266,9 @@ void Zoombini2Engine::initCursor() {
 	registerCursorWithCursorMan();
 }
 
-/**
- * Draw the cursor sprite at the current mouse position.
- * Original: Cursor__DrawAndSave_45B830.
- *
- * Software cursor rendering is now disabled because the cursor is registered
- * with CursorMan in registerCursorWithCursorMan(), which handles rendering
- * at the backend level. This ensures the cursor is visible even in the
- * black border area outside the 800x600 game screen.
- */
+/** Leave cursor drawing to CursorMan, which owns the active hardware cursor. */
 void Zoombini2Engine::drawCursor() {
-	// CursorMan handles cursor rendering — no software drawing needed.
+	// CursorMan handles cursor rendering, so no software drawing is needed.
 }
 
 /**
@@ -309,7 +290,7 @@ void Zoombini2Engine::registerCursorWithCursorMan() {
 	// (bytesPerPixel=4, rBits=8, gBits=8, bBits=8, aBits=8,
 	//  rShift=16, gShift=8, bShift=0, aShift=24)
 	int bufSize = w * h * 4;
-	byte *buf = new byte[bufSize]();  // zero-initialized = transparent black
+	byte *buf = new byte[bufSize](); // zero-initialized = transparent black
 
 	// Render RLE cursor sprite into the buffer.
 	// RLE format after expand3to4bpp:
@@ -365,14 +346,14 @@ void Zoombini2Engine::registerCursorWithCursorMan() {
 			buf[i * 4 + 0] = MIN(bBlack * 255 / alpha, 255); // B
 			buf[i * 4 + 1] = MIN(gBlack * 255 / alpha, 255); // G
 			buf[i * 4 + 2] = MIN(rBlack * 255 / alpha, 255); // R
-			buf[i * 4 + 3] = (byte)alpha;                     // A
+			buf[i * 4 + 3] = (byte)alpha;                    // A
 		}
 	}
 
 	// Register with CursorMan
 	Graphics::PixelFormat cursorFormat(4, 8, 8, 8, 8, 16, 8, 0, 24);
-	CursorMan.replaceCursor(buf, w, h, _cursorHotspotX, _cursorHotspotY,
-	                        0, &cursorFormat);
+	CursorMan.replaceCursor(buf, w, h, _cursorHotspot.x, _cursorHotspot.y,
+							0, &cursorFormat);
 	CursorMan.showMouse(true);
 
 	delete[] buf;
@@ -424,13 +405,9 @@ void Zoombini2Engine::processEvents() {
 	}
 }
 
-/**
- * Main game loop — corresponds to MainGameLoop_4651E0.
- * Runs page update/draw cycle at approximately 30fps (original tick rate).
- */
+/** Run page updates, drawing, cursor changes, and presentation at approximately 30 frames per second. */
 void Zoombini2Engine::mainGameLoop() {
-	// Korean release starts with Arisu logo video, others start with TLC Logo
-	// Original: PageDispatcher_461020, case 1972 (kPageArisu) plays "arisu.bik"
+	// The Korean release starts with the Arisu logo; other releases start with the TLC logo.
 	if (getLanguage() == Common::KO_KOR) {
 		_nextPageId = kPageArisu;
 	} else {
@@ -474,9 +451,7 @@ void Zoombini2Engine::mainGameLoop() {
 			if (!dialogActive && _nextPageId == kPageNone)
 				_currentPage->update();
 
-			// Draw current page
-			// Only clear screen if the page requests it — allows pages to
-			// preserve frame buffer (double buffering like the original).
+			// Clear only when the page requests it so persistent-frame pages retain their prior image.
 			if (!dialogActive) {
 				if (_currentPage->needsScreenClear())
 					_screen->fillRect(Common::Rect(kScreenWidth, kScreenHeight), 0);
@@ -496,10 +471,10 @@ void Zoombini2Engine::mainGameLoop() {
 
 		// Present to screen
 		g_system->copyRectToScreen(_screen->getPixels(), _screen->pitch,
-			0, 0, kScreenWidth, kScreenHeight);
+								   0, 0, kScreenWidth, kScreenHeight);
 		g_system->updateScreen();
 
-		// ~30 fps (original game runs at approximately 30fps)
+		// Limit presentation to approximately 30 frames per second.
 		g_system->delayMillis(33);
 	}
 }
@@ -521,8 +496,8 @@ void Zoombini2Engine::destroyCurrentPage() {
 void Zoombini2Engine::switchPage(int pageId) {
 	debug(1, "Zoombini2: Switching from page %d to page %d", _currentPageId, pageId);
 	const bool usesMapMusic = pageId == kPageMenuLoad || pageId == kPageMenuNew ||
-	                          pageId == kPageMenuOptions || pageId == kPageWorldMap ||
-	                          pageId == kPageMenuAlt;
+							  pageId == kPageMenuOptions || pageId == kPageWorldMap ||
+							  pageId == kPageMenuAlt;
 	if (!usesMapMusic)
 		stopMapMusic();
 
@@ -532,8 +507,8 @@ void Zoombini2Engine::switchPage(int pageId) {
 	switch (pageId) {
 	case kPageTLCLogo:
 		_currentPage = new VideoPage(this,
-		    selectMoviePath("movies/tlclogo.bik", "movies/tlclogo50%.bik"),
-		    kPageLogopoly);
+									 selectMoviePath("movies/tlclogo.bik", "movies/tlclogo50%.bik"),
+									 kPageLogopoly);
 		break;
 
 	case kPageLogopoly:
@@ -543,24 +518,24 @@ void Zoombini2Engine::switchPage(int pageId) {
 	case kPageTitleAnim:
 		_isSavedGame = true;
 		_currentPage = new VideoPage(this,
-		    selectMoviePath("movies/zoom_movie1_100%.bik", "movies/zoom_movie1_50%.bik"),
-		    kPageZombiniville);
+									 selectMoviePath("movies/zoom_movie1_100%.bik", "movies/zoom_movie1_50%.bik"),
+									 kPageZombiniville);
 		break;
 
 	case kPageStoryBmp:
 		if (_gameState)
 			_gameState->markRescue1MoviePlayed();
 		_currentPage = new VideoPage(this,
-		    selectMoviePath("movies/zoom_movie2_100%.bik", "movies/zoom_movie2_50%.bik"),
-		    kPageRescue1);
+									 selectMoviePath("movies/zoom_movie2_100%.bik", "movies/zoom_movie2_50%.bik"),
+									 kPageRescue1);
 		break;
 
 	case kPageStoryAnim:
 		if (_gameState)
 			_gameState->markRescue2MoviePlayed();
 		_currentPage = new VideoPage(this,
-		    selectMoviePath("movies/zoom_movie3_100%.bik", "movies/zoom_movie3_50%.bik"),
-		    kPageRescue2);
+									 selectMoviePath("movies/zoom_movie3_100%.bik", "movies/zoom_movie3_50%.bik"),
+									 kPageRescue2);
 		break;
 
 	case kPageTitleScreen:
@@ -634,18 +609,15 @@ void Zoombini2Engine::switchPage(int pageId) {
 		break;
 
 	case kPageRescue1:
-		// Original: Rescue1__Init_428A00, object size 0x88
 		_currentPage = new RescuePage(this, 1);
 		break;
 
 	case kPageRescue2:
-		// Original: Rescue2__Init_42ADC0, object size 0x54
 		_currentPage = new RescuePage(this, 2);
 		break;
 
 	case kPageFinal:
-		// Original: Final__Init_418740, object size 0x54
-		_currentPage = new FinalPage(this);
+		_currentPage = new BooliewoodFinalPage(this);
 		break;
 
 	case kPageCredits:

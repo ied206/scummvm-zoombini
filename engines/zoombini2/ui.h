@@ -11,20 +11,20 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #ifndef ZOOMBINI2_UI_H
 #define ZOOMBINI2_UI_H
 
-#include "common/scummsys.h"
-#include "common/rect.h"
 #include "common/path.h"
+#include "common/rect.h"
+#include "common/scummsys.h"
 #include "common/str.h"
 
 #include "graphics/managed_surface.h"
@@ -35,296 +35,255 @@ class BitBlock;
 class RleBlock;
 
 /**
- * UIButton — clickable button with normal/hover/disabled states.
+ * Owns the normal, highlighted, and disabled images for one button.
  *
- * Original: Button struct (96 bytes) at unk_48AA68.
- * Init: Button__LoadImages_418F90
- * Draw/HitTest: Button__DrawAndHitTest_4191C0
- *
- * Layout (96 bytes):
- *   +4:  byte enabled
- *   +5:  byte forceShowDisabled
- *   +8:  DWORD x
- *   +12: DWORD y
- *   +16: DWORD width
- *   +20: DWORD height
- *   +24: char* pathNormal
- *   +28: char* pathHover
- *   +32: char* pathDisabled
- *   +36: char* maskPathNormal
- *   +40: char* maskPathHover
- *   +44: char* maskPathDisabled
- *   +48: DWORD wasHovering
- *   +52: byte hasMask
- *   +56: BitBlock* normalBB
- *   +60: BitBlock* hoverBB
- *   +64: BitBlock* disabledBB
- *   +68: RleBlock* normalRle
- *   +72: RleBlock* hoverRle
- *   +76: RleBlock* disabledRle
- *   +80: RleBlock* clipOverlay
- *   +84: DWORD* clipVarPtr
- *   +88: DWORD clipOffsetX
- *   +92: DWORD clipOffsetY
+ * A button may use an uncompressed @ref BitBlock or an @ref RleBlock for each
+ * state. Its draw call also performs the frame's hit test and reports whether
+ * the pointer has just entered or remains inside the enabled button.
  */
 class UIButton {
 public:
+	/** Construct an enabled button with an empty rectangle and no images. */
 	UIButton();
+	/** Release every image owned by the button. */
 	~UIButton();
 
 	/**
-	 * Load button images. If maskPaths are provided, uses RleBlock.
-	 * @param normalPath  Path to normal state image (without .bmp)
-	 * @param hoverPath   Path to hover state image (without .bmp), or empty
-	 * @param disabledPath Path to disabled state image, or empty
+	 * Load normal and optional alternate images without separate alpha masks.
+	 *
+	 * Each non-empty path is tried as a BitBlock and then as an RLE block.
+	 * The normal state is required; missing highlighted or disabled states are
+	 * non-fatal and fall back during drawing.
 	 */
-	bool loadImages(const Common::Path &normalPath,
-	                const Common::Path &hoverPath = Common::Path(),
-	                const Common::Path &disabledPath = Common::Path());
+	bool loadImages(const Common::Path &normalPath, const Common::Path &hoverPath = Common::Path(),
+					const Common::Path &disabledPath = Common::Path());
 
-	/**
-	 * Load button images with alpha masks (for RLE sprites).
-	 */
+	/** Load normal and optional alternate color-and-alpha BMP pairs. */
 	bool loadImagesWithMask(const Common::Path &normalPath, const Common::Path &normalMask,
-	                        const Common::Path &hoverPath = Common::Path(),
-	                        const Common::Path &hoverMask = Common::Path(),
-	                        const Common::Path &disabledPath = Common::Path(),
-	                        const Common::Path &disabledMask = Common::Path());
+							const Common::Path &hoverPath = Common::Path(), const Common::Path &hoverMask = Common::Path(),
+							const Common::Path &disabledPath = Common::Path(), const Common::Path &disabledMask = Common::Path());
 
-	/**
-	 * Set button position and dimensions.
-	 */
+	/** Set the button rectangle from a position and size. */
 	void setRect(int x, int y, int width, int height);
+	/** Replace the button rectangle with @p rect. */
 	void setRect(const Common::Rect &rect);
-
-	/**
-	 * Set enabled state.
-	 */
+	/** Enable or disable pointer interaction. */
 	void setEnabled(bool enabled) { _enabled = enabled; }
+	/** Return whether pointer interaction is enabled. */
 	bool isEnabled() const { return _enabled; }
 
 	/**
-	 * Draw button and perform hit test.
-	 * @param dst     Target surface
-	 * @param mouseX  Current mouse X
-	 * @param mouseY  Current mouse Y
-	 * @param alphaLUT  Alpha blend lookup table
-	 * @return 0 = no hover, 1 = new hover, 2 = continued hover
+	 * Draw the state selected by @p mouseX and @p mouseY.
+	 *
+	 * @return Zero when not hovered, one when newly hovered, or two when the
+	 * pointer remains over the button from the preceding draw.
 	 */
-	int drawAndHitTest(Graphics::ManagedSurface *dst, int mouseX, int mouseY,
-	                   const byte alphaLUT[256][256]);
+	int drawAndHitTest(Graphics::ManagedSurface *dst, int mouseX, int mouseY, const byte alphaLUT[256][256]);
 
-	/**
-	 * Check if point is within button bounds.
-	 */
+	/** Return whether the coordinates are inside the button rectangle. */
 	bool containsPoint(int x, int y) const;
-	bool containsPoint(const Common::Point &pt) const { return containsPoint(pt.x, pt.y); }
+	/** Return whether @p point is inside the button rectangle. */
+	bool containsPoint(const Common::Point &point) const { return containsPoint(point.x, point.y); }
 
+	/** Return the button rectangle. */
 	const Common::Rect &getRect() const { return _rect; }
+	/** Return whether the pointer was over the button during the preceding draw. */
 	bool wasHovering() const { return _wasHovering; }
+	/** Return whether the pointer was over the button during the current draw. */
 	bool isHovering() const { return _isHovering; }
 
 private:
+	/** Button position and hit-test bounds. */
 	Common::Rect _rect;
+	/** Whether the button responds to pointer input. */
 	bool _enabled;
+	/** Whether the loaded image set was requested with separate masks. */
 	bool _hasMask;
+	/** Hover state retained from the preceding draw. */
 	bool _wasHovering;
+	/** Hover state computed during the current draw. */
 	bool _isHovering;
 
-	// BitBlock versions (no mask)
+	/** Owned uncompressed normal-state image. */
 	BitBlock *_normalBB;
+	/** Owned uncompressed highlighted-state image. */
 	BitBlock *_hoverBB;
+	/** Owned uncompressed disabled-state image. */
 	BitBlock *_disabledBB;
-
-	// RleBlock versions (with mask)
+	/** Owned RLE normal-state image. */
 	RleBlock *_normalRle;
+	/** Owned RLE highlighted-state image. */
 	RleBlock *_hoverRle;
+	/** Owned RLE disabled-state image. */
 	RleBlock *_disabledRle;
 };
 
-/**
- * Menu button IDs corresponding to original button array.
- * 7 buttons at unk_47A850 (Z2-U) / unk_48AA68 (Z2-K).
- * Positions verified from Z2-U binary data.
- */
+/** Button indices used by the seven controls on the sign-in screen. */
 enum MenuButtonId {
-	kMenuButtonNext     = 0,  // ArrowUP: scroll up (613, 350, 46, 50)
-	kMenuButtonPrev     = 1,  // ArrowDOWN: scroll down (613, 416, 46, 50)
-	kMenuButtonStart    = 2,  // Start: play selected save (27, 561, 145, 39)
-	kMenuButtonOptions  = 3,  // Options: open options (175, 561, 145, 39)
-	kMenuButtonNew      = 4,  // New: create new party (321, 561, 145, 39)
-	kMenuButtonTraining = 5,  // Entrainement: training mode (468, 561, 145, 39)
-	kMenuButtonQuit     = 6,  // Quitter: quit game (613, 561, 145, 39)
-	kMenuButtonCount    = 7
+	kMenuButtonNext = 0,     ///< Scroll toward the preceding visible profile rows.
+	kMenuButtonPrev = 1,     ///< Scroll toward the following visible profile rows.
+	kMenuButtonStart = 2,    ///< Start the selected saved adventure.
+	kMenuButtonOptions = 3,  ///< Open the volume panel.
+	kMenuButtonNew = 4,      ///< Begin entry of a new profile name.
+	kMenuButtonTraining = 5, ///< Open the practice map.
+	kMenuButtonQuit = 6,     ///< Request exit from the sign-in screen.
+	kMenuButtonCount = 7     ///< Number of sign-in buttons.
 };
 
 /**
- * BitmapFont — bitmap-based font for UI text rendering.
+ * Owns and draws the 81 glyphs extracted from one bitmap-font strip.
  *
- * Original functions:
- *   BitmapFont__AllocAndLoad_4646A0 - Allocates glyph array
- *   BitmapFont__LoadGlyphs_464430   - Loads from "bmp/typo/bmt" + alpha
- *   BitmapFont__SetActive_464750    - Sets active font (dword_4E05AC)
- *   BitmapFont__DrawString_464B60   - Draws text with character mapping
- *
- * Character mapping (from DrawString_464B60):
- *   A-Z: indices 0-25
- *   a-z: indices 26-51
- *   0-9: indices 52-61
- *   Special chars (.,:;/()-+=@&#'?!*_): indices 62-80
- *   Space: advance 10 pixels
- *
- * Global active font: dword_4E05AC
- * Global glyph count: dword_4E08D0
+ * The supported glyph sequence contains uppercase letters, lowercase letters,
+ * digits, and nineteen punctuation characters. Spaces and unsupported bytes
+ * advance by @ref BitmapFont::kSpaceWidth without drawing.
  */
 class BitmapFont {
 public:
-	static const int kNumGlyphs = 81;   // A-Z(26) + a-z(26) + 0-9(10) + special(19)
-	static const int kSpaceWidth = 10;  // Pixels to advance for space
+	/** Number of glyphs in the fixed font-strip mapping. */
+	static const int kNumGlyphs = 81;
+	/** Horizontal advance used for spaces and unsupported characters. */
+	static const int kSpaceWidth = 10;
 
+	/** Construct an unloaded font. */
 	BitmapFont();
+	/** Release every extracted glyph bitmap. */
 	~BitmapFont();
 
-	/**
-	 * Load font glyphs from bitmap files.
-	 * Original: BitmapFont__LoadGlyphs_464430(glyphs, r, g, b)
-	 * @param basePath Base path without extension (e.g., "bmp/typo")
-	 * @param r Red component (0-255) for glyph color
-	 * @param g Green component (0-255) for glyph color
-	 * @param b Blue component (0-255) for glyph color
-	 * @return true on success
-	 */
-	bool load(const Common::Path &basePath, byte r, byte g, byte b);
-
-	/**
-	 * Draw text string to surface.
-	 * @param dst       Target surface
-	 * @param x         X position
-	 * @param y         Y position
-	 * @param text      Text to draw
-	 * @param alphaLUT  Alpha blend lookup table
-	 * @return Width of drawn text in pixels
-	 */
-	int drawString(Graphics::ManagedSurface *dst, int x, int y,
-	               const Common::String &text, const byte alphaLUT[256][256]) const;
-
-	/**
-	 * Calculate width of text string without drawing.
-	 * @param text Text to measure
-	 * @return Width in pixels
-	 */
+	/** Load a BMT color-and-alpha pair and color its extracted glyphs. */
+	bool load(const Common::Path &basePath, byte red, byte green, byte blue);
+	/** Draw @p text and return its horizontal pixel advance. */
+	int drawString(Graphics::ManagedSurface *dst, int x, int y, const Common::String &text, const byte alphaLUT[256][256]) const;
+	/** Return the horizontal pixel advance for @p text without drawing it. */
 	int getStringWidth(const Common::String &text) const;
-
-	/**
-	 * Get glyph index for character.
-	 * @param c Character to look up
-	 * @return Glyph index, or -1 if not found
-	 */
-	static int charToGlyphIndex(char c);
-
+	/** Return the glyph index for @p character, or -1 when it is unsupported. */
+	static int charToGlyphIndex(char character);
+	/** Return whether glyph extraction completed. */
 	bool isLoaded() const { return _loaded; }
 
 private:
+	/** Whether the font strip has been processed. */
 	bool _loaded;
-	BitBlock *_glyphs[kNumGlyphs];  // Individual character glyphs (color + alpha)
+	/** Owned glyph bitmaps in character-mapping order. */
+	BitBlock *_glyphs[kNumGlyphs];
 };
 
+/** Result of one @ref VolumePanel input-and-draw pass. */
 enum VolumePanelResult {
-	kVolumePanelOpen,
-	kVolumePanelChanged,
-	kVolumePanelApply,
-	kVolumePanelCancel
+	kVolumePanelOpen,    ///< The panel remains open without a new volume change.
+	kVolumePanelChanged, ///< At least one preview volume changed during this pass.
+	kVolumePanelApply,   ///< The player accepted the preview values.
+	kVolumePanelCancel   ///< The player cancelled the preview values.
 };
 
 /**
- * Volume sliders for music, sound effects, and speech.
+ * Owns the music, sound-effect, and speech sliders shared by map and menu pages.
  *
- * Slider changes are previewed while the panel remains open. Apply commits
- * all three values. Cancel restores the values captured when the panel opened.
+ * Slider changes are previewed while the panel remains open. Callers decide
+ * whether an apply result commits the values or a cancel result restores the
+ * initial values captured by @ref VolumePanel::setInitialVolumes.
  */
 class VolumePanel {
 public:
-	static const int kSliderMinX = 350;    // Minimum X for slider (button_x + 193)
-	static const int kSliderMaxX = 638;    // Maximum X (350 + 288)
-	static const int kSliderRange = 288;   // Pixel range for slider
+	/** Leftmost selectable gauge coordinate. */
+	static const int kSliderMinX = 350;
+	/** Rightmost selectable gauge coordinate. */
+	static const int kSliderMaxX = 638;
+	/** Number of pixels in the selectable gauge interval. */
+	static const int kSliderRange = 288;
 
-	// Label button positions.
+	/** Shared X coordinate of each slider label button. */
 	static const int kLabelX = 157;
+	/** Shared slider label width. */
 	static const int kLabelW = 520;
+	/** Shared slider label height. */
 	static const int kLabelH = 64;
+	/** Music slider label Y coordinate. */
 	static const int kMusicLabelY = 224;
+	/** Sound-effect slider label Y coordinate. */
 	static const int kSfxLabelY = 286;
+	/** Speech slider label Y coordinate. */
 	static const int kSpeechLabelY = 351;
 
-	// Gauge draw Y positions (button_y + clipOffsetY)
-	static const int kMusicGaugeY = 240;   // 224 + 16
-	static const int kSfxGaugeY = 305;     // 286 + 19
-	static const int kSpeechGaugeY = 374;  // 351 + 23
+	/** Music gauge Y coordinate. */
+	static const int kMusicGaugeY = 240;
+	/** Sound-effect gauge Y coordinate. */
+	static const int kSfxGaugeY = 305;
+	/** Speech gauge Y coordinate. */
+	static const int kSpeechGaugeY = 374;
 
+	/** Construct a panel with all current and initial volumes set to 100 percent. */
 	VolumePanel();
+	/** Release the owned gauge image. */
 	~VolumePanel();
 
-	/**
-	 * Initialize the panel resources.
-	 * @return true on success
-	 */
+	/** Load gauge and button resources. */
 	bool init();
 
 	/**
-	 * Draw volume panel and handle input.
-	 * @param dst       Target surface
-	 * @param mouseX    Mouse X position
-	 * @param mouseY    Mouse Y position
-	 * @param mouseDown Whether the mouse button is held
-	 * @param mouseClicked Whether the mouse button was pressed this frame
-	 * @param alphaLUT  Alpha blend lookup table
-	 * @return The current interaction result
+	 * Process slider and completion-button input while drawing the panel.
+	 *
+	 * @return The action or preview-change state observed during this pass.
 	 */
-	VolumePanelResult drawAndHandleInput(Graphics::ManagedSurface *dst, int mouseX, int mouseY,
-	                                     bool mouseDown, bool mouseClicked,
-	                                     const byte alphaLUT[256][256]);
+	VolumePanelResult drawAndHandleInput(Graphics::ManagedSurface *dst, int mouseX, int mouseY, bool mouseDown, bool mouseClicked,
+										 const byte alphaLUT[256][256]);
 
-	/**
-	 * Get current volume values (0-100).
-	 */
+	/** Return the current music volume percentage. */
 	int getMusicVolume() const { return _musicVolume; }
+	/** Return the current sound-effect volume percentage. */
 	int getSfxVolume() const { return _sfxVolume; }
+	/** Return the current speech volume percentage. */
 	int getSpeechVolume() const { return _speechVolume; }
+	/** Return the initial music volume percentage. */
 	int getInitialMusicVolume() const { return _initialMusicVolume; }
+	/** Return the initial sound-effect volume percentage. */
 	int getInitialSfxVolume() const { return _initialSfxVolume; }
+	/** Return the initial speech volume percentage. */
 	int getInitialSpeechVolume() const { return _initialSpeechVolume; }
 
-	/**
-	 * Set volume values (0-100).
-	 */
-	void setMusicVolume(int vol);
-	void setSfxVolume(int vol);
-	void setSpeechVolume(int vol);
+	/** Clamp and assign the current music volume. */
+	void setMusicVolume(int volume);
+	/** Clamp and assign the current sound-effect volume. */
+	void setSfxVolume(int volume);
+	/** Clamp and assign the current speech volume. */
+	void setSpeechVolume(int volume);
+	/** Assign current values and capture them as the panel's cancellation baseline. */
 	void setInitialVolumes(int music, int sfx, int speech);
 
-	/**
-	 * Convert between pixel position and volume percentage.
-	 */
+	/** Clamp @p x to the gauge interval and convert it to a percentage. */
 	static int pixelToVolume(int x);
+	/** Convert @p volume from a percentage to a gauge X coordinate. */
 	static int volumeToPixel(int volume);
 
 private:
+	/** Current music volume percentage. */
 	int _musicVolume;
+	/** Current sound-effect volume percentage. */
 	int _sfxVolume;
+	/** Current speech volume percentage. */
 	int _speechVolume;
+	/** Music volume restored when the caller cancels. */
 	int _initialMusicVolume;
+	/** Sound-effect volume restored when the caller cancels. */
 	int _initialSfxVolume;
+	/** Speech volume restored when the caller cancels. */
 	int _initialSpeechVolume;
 
+	/** Current music gauge endpoint. */
 	int _musicSliderX;
+	/** Current sound-effect gauge endpoint. */
 	int _sfxSliderX;
+	/** Current speech gauge endpoint. */
 	int _speechSliderX;
+	/** Dragged slider index, or -1 when no slider is captured. */
+	int _activeSlider;
 
-	int _activeSlider;  // -1 = none, 0 = music, 1 = sfx, 2 = speech
-
+	/** Owned gauge sprite shared by the three slider rows. */
 	RleBlock *_gaugeImage;
-	UIButton _sliderLabels[3];  // Music, SFX, Speech label buttons
+	/** Music, sound-effect, and speech label buttons. */
+	UIButton _sliderLabels[3];
+	/** Apply button. */
 	UIButton _okButton;
+	/** Cancel button. */
 	UIButton _noButton;
 };
 
