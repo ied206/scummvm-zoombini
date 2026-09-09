@@ -20,16 +20,15 @@
  */
 
 #include "zoombini2/sidebar.h"
-#include "zoombini2/zoombini2.h"
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/dialog_help.h"
-#include "zoombini2/gfx.h"
-#include "zoombini2/game_state.h"
 #include "zoombini2/pages/shelter_rescue.h"
-#include "zoombini2/zoombini.h"
 #include "zoombini2/sound.h"
+#include "zoombini2/state.h"
+#include "zoombini2/zoombini2.h"
 
-#include "common/system.h"
 #include "common/keyboard.h"
+#include "common/system.h"
 #include "graphics/managed_surface.h"
 
 namespace Zoombini2 {
@@ -45,9 +44,9 @@ Sidebar::Sidebar(Zoombini2Engine *engine)
 	  _confirmText(nullptr), _confirmActive(false), _confirmHover(0) {
 
 	// The sidebar keeps a fixed 34-pixel hit area for each button.
-	_helpButtonRect = Common::Rect(5, 480, 39, 514);   // 34x34
-	_mapButtonRect = Common::Rect(5, 514, 39, 548);   // 34x34
-	_goButtonRect = Common::Rect(5, 548, 39, 582);     // 34x34
+	_helpButtonRect = Common::Rect(5, 480, 39, 514); // 34x34
+	_mapButtonRect = Common::Rect(5, 514, 39, 548);  // 34x34
+	_goButtonRect = Common::Rect(5, 548, 39, 582);   // 34x34
 
 	_helpNormal = _engine->loadRleBlock("Bmp/BARRE/QUOI.RB");
 	_helpHighlight = _engine->loadRleBlock("Bmp/BARRE/QUOIROLL.RB");
@@ -142,8 +141,8 @@ bool Sidebar::draw(Graphics::ManagedSurface *screen) {
 
 	// Save background under sidebar buttons
 	_savedBackground->copyRectToSurface(*screen,
-	                                     0, 0,
-	                                     Common::Rect(5, 480, 39, 582));
+										0, 0,
+										Common::Rect(5, 480, 39, 582));
 
 	// Draw help button
 	if (_helpHovered && _helpHighlight) {
@@ -259,11 +258,11 @@ void Sidebar::onMapClick() {
 	const Page *page = _engine->getCurrentPage();
 	bool hasActive = false;
 	for (uint i = 0; i < _engine->_globalZoombinis.size(); i++) {
-		const Zoombini *zoombini = _engine->_globalZoombinis[i];
+		const ZoombiniState *zoombini = _engine->_globalZoombinis[i];
 		hasActive = hasActive || zoombini->_freeStatus == 1 || zoombini->_activeFlag == 1;
 	}
 	if ((page && page->isShelter()) ||
-	    (!hasActive && (!_engine->getCurrentPage() || _engine->isAdvancingWorld())))
+		(!hasActive && (!_engine->getCurrentPage() || _engine->isAdvancingWorld())))
 		returnToMap();
 	else
 		openSaveConfirmation();
@@ -293,8 +292,7 @@ void Sidebar::returnToMap() {
 
 void Sidebar::openSaveConfirmation() {
 	static constexpr const char *kPanelPaths[3] = {
-		"bmp/menu/QUIT_panel_nothing.rb", "bmp/menu/QUIT_panel_ok.rb", "bmp/menu/QUIT_panel_cancel.rb"
-	};
+		"bmp/menu/QUIT_panel_nothing.rb", "bmp/menu/QUIT_panel_ok.rb", "bmp/menu/QUIT_panel_cancel.rb"};
 	for (int i = 0; i < 3; i++) {
 		if (!_confirmPanels[i]) {
 			_confirmPanels[i] = new RleBlock();

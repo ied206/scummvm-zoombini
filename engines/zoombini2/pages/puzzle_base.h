@@ -29,33 +29,48 @@
 namespace Zoombini2 {
 
 class BitBlock;
-class Zoombini;
-class ZoombiniGfx;
+class ZoombiniState;
+class ZoombiniGraphics;
 
 /**
  * Common resources and party state for the nine puzzle activities.
  * Shelters, including Booliewood, have their own page implementations.
  */
-class PuzzlePage : public InteractivePage {
+class ZoombiniPuzzle : public ZoombiniInteractive {
 public:
-	PuzzlePage(Zoombini2Engine *engine, int puzzleId);
-	~PuzzlePage() override;
+	/** Bind shared puzzle state to @p engine and @p puzzleId. */
+	ZoombiniPuzzle(Zoombini2Engine *engine, int puzzleId);
+	/** Release shared puzzle resources and roster entries. */
+	~ZoombiniPuzzle() override;
+	/** Return whether the shared sidebar is visible. */
 	bool hasSidebar() const override { return true; }
 
+	/** Initialize the shared puzzle background, sprite grid, and roster. */
 	void init() override;
+	/** Advance the fallback puzzle state machine. */
 	void update() override;
+	/** Draw the shared background and party representation. */
 	void draw(Graphics::ManagedSurface *screen) override;
+	/** Handle the fallback puzzle-completion click. */
 	void handleClick(const Common::Point &pos) override;
 
+	/** Return the display name belonging to @p puzzleId. */
 	static const char *getPuzzleName(int puzzleId);
+	/** Return the resource-directory name belonging to @p puzzleId. */
 	static const char *getPuzzleDir(int puzzleId);
 
 protected:
+	/** Numeric dispatcher identifier for the concrete puzzle. */
 	int _puzzleId;
+	/** Shared full-screen puzzle background. */
 	BitBlock *_background;
-	ZoombiniGfx *_zoombiniGfx;
-	Common::Array<Zoombini *> _puzzleZoombinis;
+	/** Shared Zoombini sprite-grid owner. */
+	ZoombiniGraphics *_zoombiniGfx;
+	/** Puzzle-owned party entries transferred from the engine or profile state. */
+	Common::Array<ZoombiniState *> _puzzleZoombinis;
+	/** Shared fallback puzzle stage. */
 	int _puzzleState;
+	/** Gameplay deadline used by the shared fallback puzzle stage. */
 	uint32 _stateTimer;
 };
 

@@ -25,7 +25,7 @@
 
 static const PlainGameDescriptor zoombini2Games[] = {
 	{"zoombini2", "Zoombinis: Mountain Rescue"},
-	{nullptr, nullptr}
+	{nullptr, nullptr},
 };
 
 static const char *const directoryGlobs[] = {
@@ -36,13 +36,12 @@ static const char *const directoryGlobs[] = {
 	"ZOMBIS",
 	"Sounds",
 	"movies",
-	nullptr
-};
+	nullptr};
 
 class Zoombini2MetaEngineDetection : public AdvancedMetaEngineDetection<Zoombini2::Zoombini2GameDescription> {
 public:
 	Zoombini2MetaEngineDetection() : AdvancedMetaEngineDetection(Zoombini2::gameDescriptions, zoombini2Games) {
-		_maxScanDepth = 5;  // Supports INSTALL/HD/Bmp/ZOMBIS and Data/Bmp/ZOMBIS
+		_maxScanDepth = 5; // Supports INSTALL/HD/Bmp/ZOMBIS and Data/Bmp/ZOMBIS
 		_directoryGlobs = directoryGlobs;
 		_flags = kADFlagMatchFullPaths;
 	}

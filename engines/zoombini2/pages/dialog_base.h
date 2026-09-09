@@ -27,14 +27,21 @@
 namespace Zoombini2 {
 
 /** Modal overlay that retains the dispatched page and consumes its input. */
-class Dialog {
+class ZoombiniDialog {
 public:
-	virtual ~Dialog() {}
+	/** Release resources owned by the concrete dialog. */
+	virtual ~ZoombiniDialog() {}
+	/** Return the modal-dialog ownership category. */
 	PageCategory getCategory() const { return PageCategory::kDialog03; }
+	/** Return whether this dialog currently owns drawing and input. */
 	virtual bool isActive() const = 0;
+	/** Close the dialog and restore any retained page state. */
 	virtual void close() = 0;
+	/** Draw the dialog over @p screen. */
 	virtual void draw(Graphics::ManagedSurface *screen) = 0;
+	/** Handle a game-space click and report whether the dialog consumed it. */
 	virtual bool handleClick(const Common::Point &pos) = 0;
+	/** Update dialog hover state for @p pos. */
 	virtual void handleMouseMove(const Common::Point &pos) = 0;
 };
 

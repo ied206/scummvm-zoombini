@@ -22,7 +22,7 @@
 #include "common/debug.h"
 
 #include "zoombini2/pages/transition_title.h"
-#include "zoombini2/gfx.h"
+#include "zoombini2/graphics.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/zoombini2.h"
 

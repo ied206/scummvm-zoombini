@@ -23,10 +23,10 @@
 
 namespace Zoombini2 {
 
-Page::Page(Zoombini2Engine *engine) : _engine(engine), _pageId(-1) {
+ZoombiniPage::ZoombiniPage(Zoombini2Engine *engine) : _engine(engine), _pageId(-1) {
 }
 
-Page::~Page() {
+ZoombiniPage::~ZoombiniPage() {
 }
 
 } // End of namespace Zoombini2
