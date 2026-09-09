@@ -23,14 +23,16 @@
 
 #include "common/debug.h"
 #include "common/system.h"
-#include "zoombini2/game_state.h"
-#include "zoombini2/gfx.h"
+#include "zoombini2/state.h"
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/save_file_list.h"
 #include "zoombini2/pages/interactive_menuscreen.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
+
+const Common::Point32 MenuScreenPage::kFileListPosition(157, 286);
 
 const char *const MenuScreenPage::kValidNameCharacters =
 	"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ";
@@ -43,7 +45,7 @@ MenuScreenPage::MenuScreenPage(Zoombini2Engine *engine)
 	  _confirmType(kSaveMenuConfirmNone00), _confirmPanelNothing(nullptr),
 	  _confirmPanelOk(nullptr), _confirmPanelCancel(nullptr),
 	  _confirmTextDelete(nullptr), _confirmTextQuit(nullptr),
-	  _confirmButtonHover(0), _confirmX(0), _confirmY(0), _confirmDialogBackground(nullptr) {
+	  _confirmButtonHover(0), _confirmPosition(), _confirmDialogBackground(nullptr) {
 	_pageId = kPageMenuOptions;
 	for (int i = 0; i < kMenuButtonCount; ++i)
 		_buttons[i] = nullptr;
@@ -85,7 +87,7 @@ void MenuScreenPage::init() {
 	loadResources();
 	loadButtons();
 
-	_fileList = new SaveFileList(kFileListX, kFileListY, _selectionBar);
+	_fileList = new SaveFileList(kFileListPosition, _selectionBar);
 	if (!_fileList->init())
 		warning("MenuScreenPage: Failed to load save-list fonts");
 	scanSaveFiles();
@@ -201,7 +203,7 @@ void MenuScreenPage::drawMain(Graphics::ManagedSurface *screen) {
 	const Common::Point mouse = _engine->getMousePos();
 	BitBlock *selector = isInSelectorArea(mouse) ? _selectorHilite : _selectorNormal;
 	if (selector)
-		selector->drawToSurface(screen, kFileListX, kFileListY);
+		selector->drawToSurface(screen, kFileListPosition.x, kFileListPosition.y);
 	if (_fileList)
 		_fileList->draw(screen, _engine->getAlphaLUT());
 	drawButtons(screen, mouse.x, mouse.y);
@@ -248,8 +250,8 @@ int MenuScreenPage::hitTestButton(const Common::Point &pos) const {
 }
 
 bool MenuScreenPage::isInSelectorArea(const Common::Point &pos) const {
-	return kFileListX < pos.x && pos.x < kFileListX + kSelectorWidth &&
-	       kFileListY < pos.y && pos.y < kFileListY + kSelectorHeight;
+	return kFileListPosition.x < pos.x && pos.x < kFileListPosition.x + kSelectorWidth &&
+	       kFileListPosition.y < pos.y && pos.y < kFileListPosition.y + kSelectorHeight;
 }
 
 void MenuScreenPage::handleButtonClick(int buttonId) {
@@ -415,8 +417,8 @@ void MenuScreenPage::openConfirmDialog(SaveMenuConfirmType type) {
 	}
 
 	if (_confirmPanelOk && _confirmPanelOk->isValid()) {
-		_confirmX = kScreenWidth / 2 - _confirmPanelOk->getWidth() / 2;
-		_confirmY = kScreenHeight / 2 - _confirmPanelOk->getHeight() / 2;
+		_confirmPosition = Common::Point32(kScreenWidth / 2 - _confirmPanelOk->getWidth() / 2,
+			kScreenHeight / 2 - _confirmPanelOk->getHeight() / 2);
 	}
 	if (!_confirmDialogBackground)
 		_confirmDialogBackground = new Graphics::ManagedSurface();
@@ -450,19 +452,19 @@ void MenuScreenPage::drawConfirmDialog(Graphics::ManagedSurface *screen) {
 	else if (_confirmButtonHover == 2)
 		panel = _confirmPanelCancel;
 	if (panel && panel->isValid())
-		panel->drawToScreen(screen, _confirmX, _confirmY, _engine->getAlphaLUT());
+		panel->drawToScreen(screen, _confirmPosition.x, _confirmPosition.y, _engine->getAlphaLUT());
 
 	BitBlock *textImage = _confirmType == kSaveMenuConfirmDelete01 ? _confirmTextDelete : _confirmTextQuit;
 	if (textImage)
-		textImage->drawToSurface(screen, _confirmX + 17, _confirmY + 17);
+		textImage->drawToSurface(screen, _confirmPosition.x + 17, _confirmPosition.y + 17);
 }
 
 int MenuScreenPage::hitTestConfirmDialog(int x, int y) const {
-	if (_confirmX + 207 < x && x < _confirmX + 272 &&
-	    _confirmY + 77 < y && y < _confirmY + 145)
+	if (_confirmPosition.x + 207 < x && x < _confirmPosition.x + 272 &&
+	    _confirmPosition.y + 77 < y && y < _confirmPosition.y + 145)
 		return 1;
-	if (_confirmX + 287 < x && x < _confirmX + 352 &&
-	    _confirmY + 77 < y && y < _confirmY + 145)
+	if (_confirmPosition.x + 287 < x && x < _confirmPosition.x + 352 &&
+	    _confirmPosition.y + 77 < y && y < _confirmPosition.y + 145)
 		return 2;
 	return 0;
 }

@@ -19,12 +19,67 @@
  *
  */
 
-#include "zoombini2/game_state.h"
-#include "zoombini2/zoombini.h"
+#include <string.h>
+
+#include "common/debug.h"
+#include "common/memstream.h"
+#include "common/random.h"
+#include "common/savefile.h"
+
+#include "zoombini2/state.h"
 
 namespace Zoombini2 {
 
-void BoardRecord::store(const Zoombini &zoombini) {
+ZoombiniState::ZoombiniState() {
+	_status = 0;
+	_featureByte0 = 0;
+	_featureA = 0;
+	_featureB = 0;
+	_featureC = 0;
+	_featureD = 0;
+	_featureHash = 0;
+	memset(_extraState, 0, sizeof(_extraState));
+	_stateDword = 0;
+	_position = Common::Point32();
+	_targetPosition = Common::Point32();
+	_worldX = 0;
+	_worldY = 0;
+	_state34 = 0;
+	_activeFlag = 0;
+	_flagByte39 = 0;
+	_freeStatus = 0;
+	_sentinel = -1;
+	_stateByte6C = 0;
+	_zoombiniIndex = 0;
+}
+
+void ZoombiniState::randomize(uint32 seed) {
+	Common::RandomSource randomSource("zoombini_feature");
+	randomSource.setSeed(seed);
+	_featureA = randomSource.getRandomNumber(4) + 1;
+	_featureB = randomSource.getRandomNumber(4) + 1;
+	_featureC = randomSource.getRandomNumber(4) + 1;
+	_featureD = randomSource.getRandomNumber(4) + 1;
+	computeHash();
+}
+
+void ZoombiniState::setFeatures(byte featureA, byte featureB, byte featureC, byte featureD) {
+	_featureA = featureA;
+	_featureB = featureB;
+	_featureC = featureC;
+	_featureD = featureD;
+	computeHash();
+}
+
+void ZoombiniState::computeHash() {
+	_featureHash = calculateFeatureHash(_featureA, _featureB, _featureC, _featureD);
+}
+
+uint16 ZoombiniState::calculateFeatureHash(byte featureA, byte featureB, byte featureC, byte featureD) {
+	return featureD + 8 * (featureC + 8 * (featureB + 8 * featureA));
+}
+
+void BoardRecord::store(const ZoombiniState &zoombini) {
 	memcpy(data, zoombini._extraState, 15);
 	data[15] = zoombini._featureByte0;
 	data[16] = zoombini._featureA;
@@ -33,8 +88,8 @@ void BoardRecord::store(const Zoombini &zoombini) {
 	data[19] = zoombini._featureD;
 }
 
-Zoombini *BoardRecord::restore() const {
-	Zoombini *zoombini = new Zoombini();
+ZoombiniState *BoardRecord::restore() const {
+	ZoombiniState *zoombini = new ZoombiniState();
 	memcpy(zoombini->_extraState, data, 15);
 	zoombini->_featureByte0 = data[15];
 	zoombini->setFeatures(data[16], data[17], data[18], data[19]);
@@ -50,7 +105,7 @@ void GameState::clearBoard(BoardRecord **board) {
 	}
 }
 
-bool GameState::storeInBoard(BoardRecord **board, Zoombini &zoombini) {
+bool GameState::storeInBoard(BoardRecord **board, ZoombiniState &zoombini) {
 	int startRow = 62;
 	for (int i = 0; i < kBoardRows * kBoardCols; i++) {
 		if (board[i]) {
@@ -74,7 +129,7 @@ bool GameState::storeInBoard(BoardRecord **board, Zoombini &zoombini) {
 	return false;
 }
 
-void GameState::refillFromBoard(BoardRecord **board, Common::Array<Zoombini *> &roster, uint count) {
+void GameState::refillFromBoard(BoardRecord **board, Common::Array<ZoombiniState *> &roster, uint count) {
 	for (int col = 0; col < kBoardCols && roster.size() < count; col++) {
 		for (int row = 0; row < kBoardRows && roster.size() < count; row++) {
 			BoardRecord *&cell = board[row * kBoardCols + col];
@@ -233,11 +288,11 @@ bool GameState::load(Common::SeekableReadStream *stream) {
 	return true;
 }
 
-void GameState::transferSavedRoster(Common::Array<Zoombini *> &source, Common::Array<Zoombini *> &destination) {
+void GameState::transferSavedRoster(Common::Array<ZoombiniState *> &source, Common::Array<ZoombiniState *> &destination) {
 	assert(&source != &destination);
 	for (uint i = 0; i < source.size(); i++) {
-		const Zoombini *previous = source[i];
-		Zoombini *restored = new Zoombini();
+		const ZoombiniState *previous = source[i];
+		ZoombiniState *restored = new ZoombiniState();
 		restored->_featureByte0 = previous->_featureByte0;
 		restored->setFeatures(previous->_featureA, previous->_featureB, previous->_featureC, previous->_featureD);
 		memcpy(restored->_extraState, previous->_extraState, sizeof(restored->_extraState));
@@ -310,7 +365,7 @@ bool GameState::readState(Common::SeekableReadStream *stream) {
 		return false;
 	// The party is stored in two passes, unlike the interleaved sparse board records.
 	for (int32 i = 0; i < count; i++) {
-		Zoombini *zoombini = new Zoombini();
+		ZoombiniState *zoombini = new ZoombiniState();
 		_zoombinis.push_back(zoombini);
 		zoombini->_featureByte0 = stream->readByte();
 		zoombini->_featureA = stream->readByte();
@@ -343,7 +398,7 @@ int GameState::writeBoard(Common::WriteStream *stream, BoardRecord *const *board
 	return count;
 }
 
-bool GameState::save(Common::WriteStream *stream, const Common::Array<Zoombini *> *globalRoster) const {
+bool GameState::save(Common::WriteStream *stream, const Common::Array<ZoombiniState *> *globalRoster) const {
 	if (!stream || stream->err())
 		return false;
 	const uint32 globalCount = globalRoster && 0 <= _currentWorldId && _currentWorldId <= 3 ? globalRoster->size() : 0;
@@ -378,7 +433,7 @@ bool GameState::save(Common::WriteStream *stream, const Common::Array<Zoombini *
 	const int boardBCount = writeBoard(stream, _boardB);
 	stream->writeUint32LE(static_cast<uint32>(count));
 	for (uint64 i = 0; i < count; i++) {
-		const Zoombini *zoombini = i < _zoombinis.size() ? _zoombinis[i] : (*globalRoster)[i - _zoombinis.size()];
+		const ZoombiniState *zoombini = i < _zoombinis.size() ? _zoombinis[i] : (*globalRoster)[i - _zoombinis.size()];
 		if (!zoombini)
 			return false;
 		stream->writeByte(zoombini->_featureByte0);
@@ -388,7 +443,7 @@ bool GameState::save(Common::WriteStream *stream, const Common::Array<Zoombini *
 		stream->writeByte(zoombini->_featureD);
 	}
 	for (uint64 i = 0; i < count; i++) {
-		const Zoombini *zoombini = i < _zoombinis.size() ? _zoombinis[i] : (*globalRoster)[i - _zoombinis.size()];
+		const ZoombiniState *zoombini = i < _zoombinis.size() ? _zoombinis[i] : (*globalRoster)[i - _zoombinis.size()];
 		stream->write(zoombini->_extraState, 15);
 	}
 	const int64 expectedSize = 2822 + static_cast<int64>(nameLength) + (boardACount + boardBCount) * 28 + count * 20;
@@ -401,6 +456,162 @@ void GameState::registerWorldVisit(int worldId, int visitKind) {
 	byte &visits = _stateArray[5 * worldId + visitKind];
 	if (visits < 250)
 		visits += 1;
+}
+
+Zoombini2SavegameManager::Zoombini2SavegameManager(Common::SaveFileManager *saveFileManager, const Common::String &target)
+	: _saveFileManager(saveFileManager), _target(target.empty() ? "zoombini2" : target) {
+}
+
+Common::String Zoombini2SavegameManager::makeSaveFileName(const Common::String &profileName) const {
+	return Common::String::format("%s-%s.mk", _target.c_str(), profileName.c_str());
+}
+
+bool Zoombini2SavegameManager::isValidProfileName(const Common::String &profileName) {
+	if (profileName.empty() || kMaximumProfileNameLength < static_cast<int>(profileName.size()) || profileName.firstChar() == ' ' || profileName.lastChar() == ' ')
+		return false;
+
+	bool previousWasSpace = false;
+	for (uint i = 0; i < profileName.size(); i++) {
+		const char character = profileName[i];
+		const bool isLetter = ('A' <= character && character <= 'Z') || ('a' <= character && character <= 'z');
+		const bool isDigit = '0' <= character && character <= '9';
+		const bool isSpace = character == ' ';
+		if ((!isLetter && !isDigit && !isSpace) || (isSpace && previousWasSpace))
+			return false;
+		previousWasSpace = isSpace;
+	}
+	return true;
+}
+
+void Zoombini2SavegameManager::addProfileSorted(Common::StringArray &profiles, const Common::String &profileName) {
+	uint index = 0;
+	while (index < profiles.size() && profiles[index].compareToIgnoreCase(profileName) < 0)
+		index += 1;
+	if (index < profiles.size() && profiles[index].equalsIgnoreCase(profileName))
+		return;
+	profiles.insert_at(index, profileName);
+}
+
+Common::StringArray Zoombini2SavegameManager::listProfiles() const {
+	Common::StringArray profiles;
+	if (!_saveFileManager)
+		return profiles;
+
+	const Common::String prefix = _target + "-";
+	const Common::String suffix = ".mk";
+	const Common::StringArray saveFiles = _saveFileManager->listSavefiles(prefix + "*" + suffix);
+	for (uint i = 0; i < saveFiles.size(); i++) {
+		const Common::String &saveFileName = saveFiles[i];
+		if (saveFileName.size() <= prefix.size() + suffix.size())
+			continue;
+		if (!saveFileName.substr(0, prefix.size()).equalsIgnoreCase(prefix) || !saveFileName.substr(saveFileName.size() - suffix.size()).equalsIgnoreCase(suffix))
+			continue;
+
+		const Common::String profileName = saveFileName.substr(prefix.size(), saveFileName.size() - prefix.size() - suffix.size());
+		if (!isValidProfileName(profileName)) {
+			warning("Zoombini2SavegameManager: Ignoring invalid profile save '%s'", saveFileName.c_str());
+			continue;
+		}
+		addProfileSorted(profiles, profileName);
+	}
+	return profiles;
+}
+
+bool Zoombini2SavegameManager::verifySaveData(const Common::String &saveFileName, const byte *data, uint32 size) const {
+	Common::InSaveFile *stream = _saveFileManager->openForLoading(saveFileName);
+	if (!stream)
+		return false;
+
+	bool matches = stream->size() == size;
+	byte buffer[4096];
+	for (uint32 offset = 0; matches && offset < size;) {
+		const uint32 amount = MIN<uint32>(sizeof(buffer), size - offset);
+		matches = stream->read(buffer, amount) == amount && memcmp(buffer, data + offset, amount) == 0 && !stream->err();
+		offset += amount;
+	}
+	delete stream;
+	return matches;
+}
+
+bool Zoombini2SavegameManager::saveProfile(const Common::String &profileName, const GameState &state,
+										   const Common::Array<ZoombiniState *> *globalRoster) const {
+	if (!_saveFileManager || !isValidProfileName(profileName))
+		return false;
+
+	Common::MemoryWriteStreamDynamic data(DisposeAfterUse::YES);
+	if (!state.save(&data, globalRoster))
+		return false;
+
+	const Common::String saveFileName = makeSaveFileName(profileName);
+	Common::OutSaveFile *stream = _saveFileManager->openForSaving(saveFileName, false);
+	if (!stream) {
+		warning("Zoombini2SavegameManager: Could not open '%s' for writing", saveFileName.c_str());
+		return false;
+	}
+
+	bool ok = stream->write(data.getData(), data.size()) == data.size();
+	stream->finalize();
+	ok = ok && !stream->err();
+	delete stream;
+	if (ok)
+		ok = verifySaveData(saveFileName, data.getData(), data.size());
+
+	if (ok)
+		debug(1, "Saved Zoombini2 profile to %s", saveFileName.c_str());
+	else
+		warning("Zoombini2SavegameManager: Failed to write '%s'", saveFileName.c_str());
+	return ok;
+}
+
+bool Zoombini2SavegameManager::loadProfile(const Common::String &profileName, GameState &state) const {
+	if (!_saveFileManager || !isValidProfileName(profileName))
+		return false;
+
+	const Common::String saveFileName = makeSaveFileName(profileName);
+	Common::InSaveFile *stream = _saveFileManager->openForLoading(saveFileName);
+	if (!stream) {
+		warning("Zoombini2SavegameManager: Could not open '%s' for reading", saveFileName.c_str());
+		return false;
+	}
+
+	const bool ok = state.load(stream);
+	delete stream;
+	if (ok)
+		debug(1, "Loaded Zoombini2 profile from %s", saveFileName.c_str());
+	else
+		warning("Zoombini2SavegameManager: Failed to load '%s'", saveFileName.c_str());
+	return ok;
+}
+
+bool Zoombini2SavegameManager::deleteProfile(const Common::String &profileName) const {
+	if (!_saveFileManager || !isValidProfileName(profileName))
+		return false;
+	return _saveFileManager->removeSavefile(makeSaveFileName(profileName));
+}
+
+bool Zoombini2SavegameManager::renameProfile(const Common::String &oldProfileName, const Common::String &newProfileName) const {
+	if (!_saveFileManager || !isValidProfileName(oldProfileName) || !isValidProfileName(newProfileName))
+		return false;
+	if (oldProfileName == newProfileName)
+		return true;
+	if (oldProfileName.equalsIgnoreCase(newProfileName) || profileExists(newProfileName))
+		return false;
+
+	GameState renamedState;
+	if (!loadProfile(oldProfileName, renamedState))
+		return false;
+	renamedState._playerName = newProfileName;
+	if (!saveProfile(newProfileName, renamedState))
+		return false;
+	if (deleteProfile(oldProfileName))
+		return true;
+
+	deleteProfile(newProfileName);
+	return false;
+}
+
+bool Zoombini2SavegameManager::profileExists(const Common::String &profileName) const {
+	return _saveFileManager && isValidProfileName(profileName) && _saveFileManager->exists(makeSaveFileName(profileName));
 }
 
 } // End of namespace Zoombini2

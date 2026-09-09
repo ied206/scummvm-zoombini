@@ -23,35 +23,66 @@
 #include "common/random.h"
 #include "common/util.h"
 
-#include "zoombini2/game_state.h"
-#include "zoombini2/gfx.h"
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/puzzle_crazyturtle.h"
 #include "zoombini2/sound.h"
-#include "zoombini2/zoombini.h"
+#include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
 const CrazyTurtlePuzzle::TurtlePlacement CrazyTurtlePuzzle::kTurtlePlacements[kTurtleCount] = {
-	{3,   0, 322}, {3,   8, 383}, {3,  29, 448}, {4, 104, 482},
-	{4, 178, 463}, {2, 264, 444}, {1, 245, 378}, {3, 233, 308},
-	{4, 248, 238}, {4, 325, 196}, {2, 412, 175}, {1, 492, 165},
-	{3, 576, 172}, {2, 548, 245}, {2, 461, 301}, {3, 529, 346}
+	{3, 0, 322},
+	{3, 8, 383},
+	{3, 29, 448},
+	{4, 104, 482},
+	{4, 178, 463},
+	{2, 264, 444},
+	{1, 245, 378},
+	{3, 233, 308},
+	{4, 248, 238},
+	{4, 325, 196},
+	{2, 412, 175},
+	{1, 492, 165},
+	{3, 576, 172},
+	{2, 548, 245},
+	{2, 461, 301},
+	{3, 529, 346},
 };
 
 const Common::Point CrazyTurtlePuzzle::kZoombiniPositions[kZoombiniCount] = {
-	Common::Point(247, 120), Common::Point(245,  74), Common::Point(202, 117), Common::Point(200,  64),
-	Common::Point(166,  42), Common::Point(166,  87), Common::Point(146, 131), Common::Point( 99, 120),
-	Common::Point(131,  75), Common::Point(128,  30), Common::Point( 86,  66), Common::Point( 62, 105),
-	Common::Point( 49,  48), Common::Point( 18, 135), Common::Point( 25,  91), Common::Point(  8,  55)
+	Common::Point(247, 120),
+	Common::Point(245, 74),
+	Common::Point(202, 117),
+	Common::Point(200, 64),
+	Common::Point(166, 42),
+	Common::Point(166, 87),
+	Common::Point(146, 131),
+	Common::Point(99, 120),
+	Common::Point(131, 75),
+	Common::Point(128, 30),
+	Common::Point(86, 66),
+	Common::Point(62, 105),
+	Common::Point(49, 48),
+	Common::Point(18, 135),
+	Common::Point(25, 91),
+	Common::Point(8, 55),
 };
 
 const Common::Point CrazyTurtlePuzzle::kPrimaryIconPositions[kRuleSlotCount] = {
-	Common::Point(365, 15), Common::Point(395, 22), Common::Point(423, 28), Common::Point(450, 35), Common::Point(477, 42)
+	Common::Point(365, 15),
+	Common::Point(395, 22),
+	Common::Point(423, 28),
+	Common::Point(450, 35),
+	Common::Point(477, 42),
 };
 
 const Common::Point CrazyTurtlePuzzle::kSecondaryIconPositions[kRuleSlotCount] = {
-	Common::Point(365, 40), Common::Point(395, 47), Common::Point(423, 54), Common::Point(450, 60), Common::Point(477, 67)
+	Common::Point(365, 40),
+	Common::Point(395, 47),
+	Common::Point(423, 54),
+	Common::Point(450, 60),
+	Common::Point(477, 67),
 };
 
 CrazyTurtlePuzzle::CrazyTurtlePuzzle(Zoombini2Engine *engine)
@@ -134,18 +165,18 @@ void CrazyTurtlePuzzle::init() {
 		gameState->registerWorldVisit(kPageCrazyTurtle, 1);
 
 	debug(1, "CrazyTurtlePuzzle::init: difficulty=%d primary=%d secondary=%d mistakes=%d party=%u", _difficulty, _primaryFeature,
-	      _secondaryFeature, _remainingMistakes, _puzzleZoombinis.size());
+		  _secondaryFeature, _remainingMistakes, _puzzleZoombinis.size());
 }
 
 void CrazyTurtlePuzzle::loadResources() {
 	for (int type = 0; type < kFeatureCount; type++) {
 		const int resourceNumber = type + 1;
 		loadAnimationResource(_turtleIdleAnimations[type],
-		                      Common::Path(Common::String::format("Bmp/crazy_turtle/TORTUES/ATTENTE/%d/%d.AN", resourceNumber, resourceNumber)));
+							  Common::Path(Common::String::format("Bmp/crazy_turtle/TORTUES/ATTENTE/%d/%d.AN", resourceNumber, resourceNumber)));
 		loadAnimationResource(_turtleSpinAnimations[type],
-		                      Common::Path(Common::String::format("Bmp/crazy_turtle/TORTUES/tourbillonne/%d/%d.AN", resourceNumber, resourceNumber)));
+							  Common::Path(Common::String::format("Bmp/crazy_turtle/TORTUES/tourbillonne/%d/%d.AN", resourceNumber, resourceNumber)));
 		loadRleResource(_turtleFixedGraphics[type],
-		                Common::Path(Common::String::format("Bmp/crazy_turtle/TORTUES/tourbillonne/%d/FIXE%d.RB", resourceNumber, resourceNumber)));
+						Common::Path(Common::String::format("Bmp/crazy_turtle/TORTUES/tourbillonne/%d/FIXE%d.RB", resourceNumber, resourceNumber)));
 	}
 
 	loadAnimationResource(_motherAnimation, Common::Path("Bmp/crazy_turtle/TORTUES/MERE/mere.an"));
@@ -160,7 +191,7 @@ void CrazyTurtlePuzzle::loadResources() {
 	for (int feature = 0; feature < kFeatureCount; feature++) {
 		for (int value = 0; value < kFeatureValueCount; value++) {
 			loadRleResource(_traitGraphics[feature][value],
-			                Common::Path(Common::String::format("Bmp/mystic_marsh/TRAITS/%d-%d.RB", feature + 1, value + 1)));
+							Common::Path(Common::String::format("Bmp/mystic_marsh/TRAITS/%d-%d.RB", feature + 1, value + 1)));
 		}
 	}
 }
@@ -238,11 +269,9 @@ void CrazyTurtlePuzzle::activateRandomRuleSlots(bool *slots, int count) {
 void CrazyTurtlePuzzle::placeZoombinis() {
 	const uint count = MIN(static_cast<uint>(kZoombiniCount), _puzzleZoombinis.size());
 	for (uint index = 0; index < count; index++) {
-		Zoombini *zoombini = _puzzleZoombinis[index];
-		zoombini->_posX = kZoombiniPositions[index].x;
-		zoombini->_posY = kZoombiniPositions[index].y;
-		zoombini->_targetX = zoombini->_posX;
-		zoombini->_targetY = zoombini->_posY;
+		ZoombiniState *zoombini = _puzzleZoombinis[index];
+		zoombini->_position = kZoombiniPositions[index];
+		zoombini->_targetPosition = zoombini->_position;
 		zoombini->_activeFlag = 1;
 		zoombini->_freeStatus = 0;
 	}
@@ -264,7 +293,7 @@ void CrazyTurtlePuzzle::draw(Graphics::ManagedSurface *screen) {
 }
 
 void CrazyTurtlePuzzle::drawBridgeState(Graphics::ManagedSurface *screen) const {
-	const byte (*alphaLUT)[256] = _engine->getAlphaLUT();
+	const byte(*alphaLUT)[256] = _engine->getAlphaLUT();
 	if (0 < _remainingMistakes) {
 		if (_bridgeGraphic)
 			_bridgeGraphic->drawToScreen(screen, 10, 220, alphaLUT);
@@ -284,7 +313,7 @@ void CrazyTurtlePuzzle::drawBridgeState(Graphics::ManagedSurface *screen) const 
 }
 
 void CrazyTurtlePuzzle::drawRuleHints(Graphics::ManagedSurface *screen) const {
-	const byte (*alphaLUT)[256] = _engine->getAlphaLUT();
+	const byte(*alphaLUT)[256] = _engine->getAlphaLUT();
 	for (int slot = 0; slot < kRuleSlotCount; slot++) {
 		if (!_primaryRuleActive[slot])
 			continue;
@@ -300,7 +329,7 @@ void CrazyTurtlePuzzle::drawRuleHints(Graphics::ManagedSurface *screen) const {
 }
 
 void CrazyTurtlePuzzle::drawTurtles(Graphics::ManagedSurface *screen) const {
-	const byte (*alphaLUT)[256] = _engine->getAlphaLUT();
+	const byte(*alphaLUT)[256] = _engine->getAlphaLUT();
 	for (int index = 0; index < kTurtleCount; index++) {
 		const TurtlePlacement &placement = kTurtlePlacements[index];
 		const RleBlock *graphic = _turtleFixedGraphics[placement.type - 1];
@@ -320,20 +349,20 @@ void CrazyTurtlePuzzle::drawZoombinis(Graphics::ManagedSurface *screen) const {
 		drawZoombini(screen, *_puzzleZoombinis[index]);
 }
 
-void CrazyTurtlePuzzle::drawZoombini(Graphics::ManagedSurface *screen, const Zoombini &zoombini) const {
+void CrazyTurtlePuzzle::drawZoombini(Graphics::ManagedSurface *screen, const ZoombiniState &zoombini) const {
 	if (!_zoombiniGfx)
 		return;
-	const byte (*alphaLUT)[256] = _engine->getAlphaLUT();
+	const byte(*alphaLUT)[256] = _engine->getAlphaLUT();
 	static constexpr int kWaitingCell = 66;
-	const int baseIndex = kWaitingCell * ZoombiniGfx::kDim1 * ZoombiniGfx::kDim2;
+	const int baseIndex = kWaitingCell * ZoombiniGraphics::kDim1 * ZoombiniGraphics::kDim2;
 	const RleBlock *frame = _zoombiniGfx->getFrame(baseIndex, 0);
 	if (frame)
-		frame->drawToScreen(screen, zoombini._posX, zoombini._posY, alphaLUT);
+		frame->drawToScreen(screen, zoombini._position.x, zoombini._position.y, alphaLUT);
 	const byte features[kFeatureCount] = {zoombini._featureA, zoombini._featureB, zoombini._featureC, zoombini._featureD};
 	for (int layer = 1; layer <= kFeatureCount; layer++) {
-		frame = _zoombiniGfx->getFrame(baseIndex + layer * ZoombiniGfx::kDim2 + features[layer - 1], 0);
+		frame = _zoombiniGfx->getFrame(baseIndex + layer * ZoombiniGraphics::kDim2 + features[layer - 1], 0);
 		if (frame)
-			frame->drawToScreen(screen, zoombini._posX, zoombini._posY, alphaLUT);
+			frame->drawToScreen(screen, zoombini._position.x, zoombini._position.y, alphaLUT);
 	}
 }
 

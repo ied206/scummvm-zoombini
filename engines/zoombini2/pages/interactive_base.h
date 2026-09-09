@@ -27,9 +27,11 @@
 namespace Zoombini2 {
 
 /** Interactive screens, including menus, maps, shelters, and puzzles. */
-class InteractivePage : public Page {
+class ZoombiniInteractive : public ZoombiniPage {
 public:
-	explicit InteractivePage(Zoombini2Engine *engine) : Page(engine) {}
+	/** Bind an interactive page to @p engine. */
+	explicit ZoombiniInteractive(Zoombini2Engine *engine) : ZoombiniPage(engine) {}
+	/** Return the interactive ownership category. */
 	PageCategory getCategory() const override { return PageCategory::kInteractive01; }
 };
 

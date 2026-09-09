@@ -27,9 +27,11 @@
 namespace Zoombini2 {
 
 /** Movies and travel sequences that advance to another dispatched screen. */
-class TransitionPage : public Page {
+class ZoombiniTransition : public ZoombiniPage {
 public:
-	explicit TransitionPage(Zoombini2Engine *engine) : Page(engine) {}
+	/** Bind a transition page to @p engine. */
+	explicit ZoombiniTransition(Zoombini2Engine *engine) : ZoombiniPage(engine) {}
+	/** Return the transition ownership category. */
 	PageCategory getCategory() const override { return PageCategory::kTransition02; }
 };
 

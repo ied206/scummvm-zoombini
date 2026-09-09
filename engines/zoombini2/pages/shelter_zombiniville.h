@@ -34,8 +34,8 @@ class BitBlock;
 class Animation;
 class BitmapFont;
 class PathObject;
-class ZoombiniGfx;
-class Zoombini;
+class ZoombiniGraphics;
+class ZoombiniState;
 
 /**
  * Zoombiniville is the starting shelter, where a party of 16 is assembled.
@@ -44,71 +44,112 @@ class Zoombini;
  */
 class Zombiniville : public ShelterPage {
 public:
+	/** Construct the starting shelter for @p engine. */
 	Zombiniville(Zoombini2Engine *engine);
+	/** Release station animations, graphics, and entrance paths. */
 	~Zombiniville() override;
 
+	/** Load the shelter and initialize an empty boarding party. */
 	void init() override;
+	/** Advance feature controls and active entrance paths. */
 	void update() override;
+	/** Draw the shelter, feature stations, and boarding party. */
 	void draw(Graphics::ManagedSurface *screen) override;
+	/** Dispatch a click to a feature station or party action. */
 	void handleClick(const Common::Point &pos) override;
+	/** Return whether a full party of 16 can leave the shelter. */
 	bool canUseGoButton() const override;
 
 private:
+	/** Starting-shelter background. */
 	BitBlock *_background;
 
-	// Feature station buttons: 4 groups with 5 values each.
-	// Loaded from bmp/zombiniville/pikaroll/z1pi{group}{value}.an
+	/** Feature selection controls indexed by feature and value. */
 	Animation *_featureButtons[4][5];
+	/** Control that selects a random valid feature combination. */
 	Animation *_quickFillButton;
+	/** Control that fills the remaining party with valid Zoombinis. */
 	Animation *_batchFillButton;
+	/** Control that starts the route when the party is full. */
 	Animation *_goButton;
 
-	ZoombiniGfx *_bigZombGfx;
-	ZoombiniGfx *_littleZombGfx;
+	/** Large animation cells used for the feature preview. */
+	ZoombiniGraphics *_bigZombGfx;
+	/** Small animation cells used in the boarding area. */
+	ZoombiniGraphics *_littleZombGfx;
+	/** Font used for the generated Zoombini name. */
 	BitmapFont *_nameFont;
 
-	// Feature station button layouts
+	/** Geometry and current value for one feature station. */
 	struct FeatureStation {
+		/** Hit-test areas for the station's five values. */
 		Common::Rect buttonRects[5];
+		/** Draw positions for the station's five controls. */
 		Common::Point drawPos[5];
+		/** Currently selected feature value. */
 		int selectedValue;
 	};
+	/** Four stations corresponding to the four visible features. */
 	FeatureStation _stations[4];
+	/** Counts of each feature value already present in the party. */
 	int _featureCounts[4][6];
 
-	// Quick Fill, Batch Fill, and Go buttons.
+	/** Quick Fill control hit-test area. */
 	Common::Rect _quickFillRect;
+	/** Batch Fill control hit-test area. */
 	Common::Rect _batchFillRect;
+	/** Go control hit-test area. */
 	Common::Rect _goRect;
 
-	// Zoombini slots in the boarding area
-	Common::Array<Zoombini *> _boardingZoombinis;
+	/** Owned Zoombini states currently assembled for departure. */
+	Common::Array<ZoombiniState *> _boardingZoombinis;
+	/** Entrance path corresponding to each boarding Zoombini. */
 	Common::Array<PathObject *> _entrancePaths;
 
-	// Sound effect handles
+	/** Shelter music handle. */
 	int _musicId;
+	/** Sound played when a feature value is selected. */
 	int _sndFeatureSelect;
+	/** Sound played by Quick Fill. */
 	int _sndQuickFill;
+	/** Sound played by Batch Fill. */
 	int _sndBatchFill;
+	/** Sound played when a valid Zoombini joins the party. */
 	int _sndValidZoombini;
+	/** Sound played when the selected combination cannot join. */
 	int _sndWrongZoombini;
 
+	/** Generated name displayed for the current feature selection. */
 	Common::String _currentName;
 
+	/** Create one Zoombini from the current feature selection when valid. */
 	bool createZoombini(bool allowConcurrentEntrances);
+	/** Return whether the current feature selection satisfies party limits. */
 	bool canCreateSelectedZoombini() const;
+	/** Return whether any boarding Zoombini is still entering. */
 	bool hasActiveEntrance() const;
+	/** Return whether the supplied feature combination fits the current party. */
 	bool passesPackFeatureLimits(byte featureA, byte featureB, byte featureC, byte featureD) const;
+	/** Select a random feature combination. */
 	void randomizeSelectedFeatures();
+	/** Reset all four stations to their first values. */
 	void resetSelectedFeatures();
+	/** Recount feature values in the current boarding party. */
 	void refreshFeatureCounts();
+	/** Generate the displayed name for the current selection. */
 	Common::String generateName();
+	/** Create an entrance path ending at @p destination. */
 	PathObject *createEntrancePath(const Common::Point &destination) const;
+	/** Initialize station and action-control hit-test geometry. */
 	void setupFeatureRects();
+	/** Return the boarding-area position for @p index. */
 	static Common::Point getSlotPosition(uint index);
+	/** Draw one animation frame with the supplied alpha lookup table. */
 	static void drawAnimationFrame(Graphics::ManagedSurface *screen, const Animation *animation, int frameIndex, int x, int y,
-			const byte alphaLUT[256][256]);
-	void drawZoombini(Graphics::ManagedSurface *screen, const Zoombini &zoombini, int cellIndex) const;
+								   const byte alphaLUT[256][256]);
+	/** Draw one Zoombini at boarding cell @p cellIndex. */
+	void drawZoombini(Graphics::ManagedSurface *screen, const ZoombiniState &zoombini, int cellIndex) const;
+	/** Draw all Zoombinis currently in the boarding area. */
 	void drawBoardingZoombinis(Graphics::ManagedSurface *screen) const;
 };
 

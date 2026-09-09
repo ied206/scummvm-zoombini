@@ -37,107 +37,91 @@ class BitBlock;
 class RleBlock;
 
 /**
- * Modal help screen system
- * 
- * Provides context-sensitive help for each puzzle/difficulty level.
- * Help pages are files under bmp/help with page, difficulty, and sheet names.
+ * Owns the context-sensitive help overlay for one puzzle and difficulty.
+ *
+ * Help pages resolve below `bmp/help` from the puzzle, difficulty, and sheet
+ * number. The dialog pauses gameplay, retains the underlying screen, and
+ * restores both the screen and gameplay clock when it closes.
  */
 class HelpScreen : public Dialog {
 public:
+	/** Bind the reusable help overlay to @p engine. */
 	HelpScreen(Zoombini2Engine *engine);
+	/** Release the active page, controls, and saved screen. */
 	~HelpScreen() override;
 
-	/**
-	 * Check if a help page exists for the given parameters
-	 */
+	/** Return whether a help sheet exists for the supplied puzzle coordinates. */
 	bool isPageValid(int puzzleId, int difficulty, int page);
 
-	/**
-	 * Open help screen for current puzzle/difficulty
-	 * Returns true if successfully opened
-	 */
+	/** Save the current screen and open the first help sheet. */
 	bool open(int puzzleId, int difficulty);
 
-	/**
-	 * Close help screen and restore game
-	 */
+	/** Close the overlay, restore the saved screen, and resume gameplay timing. */
 	void close() override;
 
-	/**
-	 * Check if help screen is currently active
-	 */
+	/** Return whether this overlay currently owns drawing and input. */
 	bool isActive() const override { return _isActive; }
 
-	/**
-	 * Render help screen UI (called every frame when active)
-	 */
+	/** Draw the frame, current help sheet, and navigation controls. */
 	void draw(Graphics::ManagedSurface *screen) override;
 
-	/**
-	 * Handle mouse click in help screen
-	 * Returns true if click was handled
-	 */
+	/** Handle navigation or close-button input and report whether it was consumed. */
 	bool handleClick(const Common::Point &pos) override;
 
-	/**
-	 * Handle mouse movement for hover states
-	 */
+	/** Update navigation-control hover state for @p pos. */
 	void handleMouseMove(const Common::Point &pos) override;
 
 private:
-	/**
-	 * Load a specific help page
-	 * Returns true if successfully loaded
-	 */
+	/** Replace the active help bitmap with the requested sheet. */
 	bool loadPage(int puzzleId, int difficulty, int page);
-
-	/**
-	 * Free loaded help page
-	 */
+	/** Release the active help-sheet bitmap. */
 	void freePage();
-
-	/**
-	 * Get difficulty string for file path
-	 */
+	/** Return the resource-directory label for @p difficulty. */
 	const char *getDifficultyString(int difficulty);
 
+	/** Borrowed engine that owns this overlay. */
 	Zoombini2Engine *_engine;
-
-	// Help screen state
+	/** Whether the help overlay is active. */
 	bool _isActive;
+	/** Puzzle identifier used to resolve the active help resource. */
 	int _currentPuzzleId;
+	/** Difficulty used to resolve the active help resource. */
 	int _currentDifficulty;
+	/** One-based help sheet currently displayed. */
 	int _currentPage;
-
-	// Saved screen
+	/** Screen snapshot restored when the overlay closes. */
 	Graphics::ManagedSurface *_savedScreen;
-
-	// UI elements
-	RleBlock *_helpFrame;      // Help screen background frame
-	RleBlock *_placeholder;    // Placeholder image if no help available
-
-	// Navigation buttons
+	/** Help-window frame sprite. */
+	RleBlock *_helpFrame;
+	/** Fallback sprite shown when no help sheet is available. */
+	RleBlock *_placeholder;
+	/** Normal close-button bitmap. */
 	BitBlock *_okButtonNormal;
+	/** Pressed close-button bitmap. */
 	BitBlock *_okButtonPushed;
+	/** Enabled previous-sheet button bitmap. */
 	BitBlock *_leftArrowNormal;
+	/** Disabled previous-sheet button bitmap. */
 	BitBlock *_leftArrowEmpty;
+	/** Enabled next-sheet button bitmap. */
 	BitBlock *_rightArrowNormal;
+	/** Disabled next-sheet button bitmap. */
 	BitBlock *_rightArrowEmpty;
-
-	// Loaded help page
+	/** Active help-sheet bitmap. */
 	BitBlock *_helpPage;
-
-	// Button hitboxes
+	/** Close-button hit rectangle. */
 	Common::Rect _okButtonRect;
+	/** Previous-sheet button hit rectangle. */
 	Common::Rect _leftArrowRect;
+	/** Next-sheet button hit rectangle. */
 	Common::Rect _rightArrowRect;
-
-	// Hover states
+	/** Whether the pointer is over the close button. */
 	bool _okButtonHovered;
+	/** Whether the pointer is over the previous-sheet button. */
 	bool _leftArrowHovered;
+	/** Whether the pointer is over the next-sheet button. */
 	bool _rightArrowHovered;
-
-	// Pause management
+	/** System tick captured when the help overlay paused gameplay. */
 	uint32 _pauseStartTime;
 };
 

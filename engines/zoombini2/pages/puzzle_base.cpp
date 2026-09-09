@@ -21,9 +21,9 @@
 
 #include "common/debug.h"
 
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/puzzle_base.h"
-#include "zoombini2/gfx.h"
-#include "zoombini2/zoombini.h"
+#include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
@@ -37,20 +37,19 @@ static const struct {
 	int id;
 	const char *name;
 	const char *dir;
-	const char *bgName;  // Background BMP name (without bmp/ prefix or .bmp extension)
+	const char *bgName; // Background BMP name (without bmp/ prefix or .bmp extension)
 } kPuzzleInfo[] = {
 	// Public activity names paired with their internal resource directories.
-	{ kPageCrazyTurtle,  "Turtle Hurdle", "crazy_turtle",    "crazy_turtle/background" },
-	{ kPageWaterslide,   "Pipes of Paloo", "waterslide",      "waterslide/waterslides" },
-	{ kPageAquacube,     "Aqua Cube",    "aquacube",         "aquacube/background" },
-	{ kPageMysticMarsh,  "Bubble Bumpers", "mystic_marsh",    "mystic_marsh/background1" },
-	{ kPageMagicWall,    "Beetle Bug Alley", "magic_wall",      "magic_wall/magic wall" },
-	{ kPageWallOfFleens, "Magic Mirrors", "wall_of_fleens",  "wall_of_fleens/background" },
-	{ kPageChezNorf,     "Chez Norf",    "chez_norf",       "chez_norf/baquegund" },
-	{ kPageSnowboard,    "Snowboard Gulch", "snowboard",       "snowboard/snowboard-EASY" },
-	{ kPageBoolies,      "Boolie Boggle", "boolies",         "Boolies/background" },
-	{ 0, nullptr, nullptr, nullptr }
-};
+	{kPageCrazyTurtle, "Turtle Hurdle", "crazy_turtle", "crazy_turtle/background"},
+	{kPageWaterslide, "Pipes of Paloo", "waterslide", "waterslide/waterslides"},
+	{kPageAquacube, "Aqua Cube", "aquacube", "aquacube/background"},
+	{kPageMysticMarsh, "Bubble Bumpers", "mystic_marsh", "mystic_marsh/background1"},
+	{kPageMagicWall, "Beetle Bug Alley", "magic_wall", "magic_wall/magic wall"},
+	{kPageWallOfFleens, "Magic Mirrors", "wall_of_fleens", "wall_of_fleens/background"},
+	{kPageChezNorf, "Chez Norf", "chez_norf", "chez_norf/baquegund"},
+	{kPageSnowboard, "Snowboard Gulch", "snowboard", "snowboard/snowboard-EASY"},
+	{kPageBoolies, "Boolie Boggle", "boolies", "Boolies/background"},
+	{0, nullptr, nullptr, nullptr}};
 
 /* static */
 const char *PuzzlePage::getPuzzleName(int puzzleId) {
@@ -83,7 +82,7 @@ PuzzlePage::~PuzzlePage() {
 
 void PuzzlePage::init() {
 	const char *name = getPuzzleName(_puzzleId);
-	debug(1, "PuzzlePage::init — %s (page %d)", name, _puzzleId);
+	debug(1, "PuzzlePage::init - %s (page %d)", name, _puzzleId);
 
 	// Load the background from the activity resource table.
 	const char *bgName = nullptr;
@@ -105,7 +104,7 @@ void PuzzlePage::init() {
 	}
 
 	// Load zoombini sprite graphics for display
-	_zoombiniGfx = new ZoombiniGfx();
+	_zoombiniGfx = new ZoombiniGraphics();
 	if (!_zoombiniGfx->loadFromFile(Common::Path("bmp/zombis/littleZomb.anm"))) {
 		debug(1, "PuzzlePage: Failed to load zoombini graphics");
 		delete _zoombiniGfx;
@@ -128,7 +127,7 @@ void PuzzlePage::update() {
 
 	if (_puzzleState == 0) {
 		if (elapsed > kAutoAdvanceDelay) {
-			debug(1, "PuzzlePage: %s — auto-advance (stub)", getPuzzleName(_puzzleId));
+			debug(1, "PuzzlePage: %s - auto-advance (stub)", getPuzzleName(_puzzleId));
 			_puzzleState = 1;
 			_engine->_returningFromPuzzle = true;
 			_engine->_maptransSourceWorld = _puzzleId;
@@ -144,14 +143,14 @@ void PuzzlePage::draw(Graphics::ManagedSurface *screen) {
 
 	// Draw zoombinis in a simple row (stub visualization)
 	if (_zoombiniGfx && !_puzzleZoombinis.empty()) {
-		const byte (*lut)[256] = _engine->getAlphaLUT();
+		const byte(*lut)[256] = _engine->getAlphaLUT();
 		int numZoombinis = MIN((int)_puzzleZoombinis.size(), 16);
 		int startX = 100;
 		int startY = 500;
 		int spacing = 40;
 
 		for (int i = 0; i < numZoombinis; i++) {
-			const Zoombini *z = _puzzleZoombinis[i];
+			const ZoombiniState *z = _puzzleZoombinis[i];
 
 			// Cell 0 = standing still, facing right
 			int baseIdx = 0;
@@ -164,9 +163,9 @@ void PuzzlePage::draw(Graphics::ManagedSurface *screen) {
 				frame->drawToScreen(screen, x, y, lut);
 
 			// Features 1..4 (Hair, Eyes, Nose, Feet)
-			const byte features[4] = { z->_featureA, z->_featureB, z->_featureC, z->_featureD };
+			const byte features[4] = {z->_featureA, z->_featureB, z->_featureC, z->_featureD};
 			for (int slot = 1; slot <= 4; slot++) {
-				int featIdx = baseIdx + slot * ZoombiniGfx::kDim2 + features[slot - 1];
+				int featIdx = baseIdx + slot * ZoombiniGraphics::kDim2 + features[slot - 1];
 				frame = _zoombiniGfx->getFrame(featIdx, 0);
 				if (frame)
 					frame->drawToScreen(screen, x, y, lut);
@@ -179,9 +178,9 @@ void PuzzlePage::draw(Graphics::ManagedSurface *screen) {
 }
 
 void PuzzlePage::handleClick(const Common::Point &pos) {
-	// Click to skip — advance puzzle immediately (stub for testing)
+	// The current base-page fallback advances immediately when clicked.
 	if (_puzzleState == 0) {
-		debug(1, "PuzzlePage: %s — click skip", getPuzzleName(_puzzleId));
+		debug(1, "PuzzlePage: %s - click skip", getPuzzleName(_puzzleId));
 		_puzzleState = 1;
 		_engine->_returningFromPuzzle = true;
 		_engine->_maptransSourceWorld = _puzzleId;
