@@ -20,15 +20,15 @@
  */
 
 #include "common/debug.h"
-#include "common/str.h"
 #include "common/path.h"
+#include "common/str.h"
 #include "common/system.h"
 
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/interactive_worldmap.h"
-#include "zoombini2/gfx.h"
-#include "zoombini2/ui.h"
 #include "zoombini2/sound.h"
-#include "zoombini2/game_state.h"
+#include "zoombini2/state.h"
+#include "zoombini2/ui.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
@@ -42,19 +42,19 @@ namespace Zoombini2 {
  * Each entry supplies the icon origin and hit-test dimensions.
  */
 const WorldMapPage::IconRect WorldMapPage::kIconHitRects[kNumIcons] = {
-	{155, 343,  39, 75},   //  0 Zombiniville
-	{168, 259,  41, 42},   //  1 CrazyTurtle
-	{237, 206,  60, 50},   //  2 Waterslide
-	{305, 241,  54, 46},   //  3 Aquacube
-	{355, 290,  54, 45},   //  4 Rescue1
-	{441, 341,  29, 38},   //  5 MysticMarsh
-	{424, 235,  30, 33},   //  6 MagicWall
-	{517, 346,  42, 44},   //  7 WallOfFleens
-	{515, 215,  31, 47},   //  8 ChezNorf
-	{531, 277,  58, 44},   //  9 Rescue2
-	{591, 237,  48, 27},   // 10 Snowboard
-	{642, 190,  43, 45},   // 11 Boolies
-	{709,  48,  89, 76}    // 12 Booliewood
+	{155, 343, 39, 75}, //  0 Zombiniville
+	{168, 259, 41, 42}, //  1 CrazyTurtle
+	{237, 206, 60, 50}, //  2 Waterslide
+	{305, 241, 54, 46}, //  3 Aquacube
+	{355, 290, 54, 45}, //  4 Rescue1
+	{441, 341, 29, 38}, //  5 MysticMarsh
+	{424, 235, 30, 33}, //  6 MagicWall
+	{517, 346, 42, 44}, //  7 WallOfFleens
+	{515, 215, 31, 47}, //  8 ChezNorf
+	{531, 277, 58, 44}, //  9 Rescue2
+	{591, 237, 48, 27}, // 10 Snowboard
+	{642, 190, 43, 45}, // 11 Boolies
+	{709, 48, 89, 76}   // 12 Booliewood
 };
 
 /**
@@ -62,41 +62,41 @@ const WorldMapPage::IconRect WorldMapPage::kIconHitRects[kNumIcons] = {
  * Each entry supplies the title origin for one world icon.
  */
 const WorldMapPage::TitlePos WorldMapPage::kTitlePositions[kNumTitles] = {
-	{ 35, 414},   //  0 Zombiniville
-	{  0, 222},   //  1 CrazyTurtle
-	{140,  96},   //  2 Waterslide
-	{224, 287},   //  3 Aquacube
-	{406, 299},   //  4 Rescue1
-	{358, 385},   //  5 MysticMarsh
-	{352,  96},   //  6 MagicWall
-	{545, 379},   //  7 WallOfFleens
-	{464,  91},   //  8 ChezNorf
-	{579, 307},   //  9 Rescue2
-	{642, 247},   // 10 Snowboard
-	{695, 192},   // 11 Boolies
-	{575,  44}    // 12 Booliewood
+	{35, 414},  //  0 Zombiniville
+	{0, 222},   //  1 CrazyTurtle
+	{140, 96},  //  2 Waterslide
+	{224, 287}, //  3 Aquacube
+	{406, 299}, //  4 Rescue1
+	{358, 385}, //  5 MysticMarsh
+	{352, 96},  //  6 MagicWall
+	{545, 379}, //  7 WallOfFleens
+	{464, 91},  //  8 ChezNorf
+	{579, 307}, //  9 Rescue2
+	{642, 247}, // 10 Snowboard
+	{695, 192}, // 11 Boolies
+	{575, 44}   // 12 Booliewood
 };
 
 /** Stat label Y positions. */
-const int WorldMapPage::kStatLabelY[4] = { 15, 39, 63, 90 };
+const int WorldMapPage::kStatLabelY[4] = {15, 39, 63, 90};
 
 /**
  * Title sprite filenames per world (0-12).
  */
 const char *const WorldMapPage::kTitleFiles[kNumTitles] = {
-	"bmp/map/Title01",     //  0 Zombiniville
-	"bmp/map/Title02",     //  1 CrazyTurtle
-	"bmp/map/Title03",     //  2 Waterslide
-	"bmp/map/Title04",     //  3 Aquacube
-	"bmp/map/Title05",     //  4 Rescue1
-	"bmp/map/Title06a",    //  5 MysticMarsh
-	"bmp/map/Title06b",    //  6 MagicWall
-	"bmp/map/Title07a",    //  7 WallOfFleens
-	"bmp/map/Title07b",    //  8 ChezNorf
-	"bmp/map/Title08",     //  9 Rescue2
-	"bmp/map/Title09",     // 10 Snowboard
-	"bmp/map/Title10",     // 11 Boolies
-	"bmp/map/Title12"      // 12 Booliewood
+	"bmp/map/Title01",  //  0 Zombiniville
+	"bmp/map/Title02",  //  1 CrazyTurtle
+	"bmp/map/Title03",  //  2 Waterslide
+	"bmp/map/Title04",  //  3 Aquacube
+	"bmp/map/Title05",  //  4 Rescue1
+	"bmp/map/Title06a", //  5 MysticMarsh
+	"bmp/map/Title06b", //  6 MagicWall
+	"bmp/map/Title07a", //  7 WallOfFleens
+	"bmp/map/Title07b", //  8 ChezNorf
+	"bmp/map/Title08",  //  9 Rescue2
+	"bmp/map/Title09",  // 10 Snowboard
+	"bmp/map/Title10",  // 11 Boolies
+	"bmp/map/Title12"   // 12 Booliewood
 };
 
 /**
@@ -105,20 +105,20 @@ const char *const WorldMapPage::kTitleFiles[kNumTitles] = {
  * Slot 13 duplicates slot 12 (both 661, 101).
  */
 const WorldMapPage::SegmentPos WorldMapPage::kSegmentPositions[kNumSegments] = {
-	{151, 285},   //  0 segment_01
-	{204, 230},   //  1 segment_02
-	{271, 222},   //  2 segment_03
-	{342, 266},   //  3 segment_04
-	{377, 314},   //  4 segment_05a
-	{386, 256},   //  5 segment_05b
-	{456, 361},   //  6 segment_06a
-	{442, 239},   //  7 segment_06b
-	{540, 289},   //  8 segment_07a
-	{529, 244},   //  9 segment_07b
-	{575, 249},   // 10 segment_08
-	{623, 212},   // 11 segment_09
-	{661, 101},   // 12 segment_10
-	{661, 101}    // 13 duplicate of segment_10
+	{151, 285}, //  0 segment_01
+	{204, 230}, //  1 segment_02
+	{271, 222}, //  2 segment_03
+	{342, 266}, //  3 segment_04
+	{377, 314}, //  4 segment_05a
+	{386, 256}, //  5 segment_05b
+	{456, 361}, //  6 segment_06a
+	{442, 239}, //  7 segment_06b
+	{540, 289}, //  8 segment_07a
+	{529, 244}, //  9 segment_07b
+	{575, 249}, // 10 segment_08
+	{623, 212}, // 11 segment_09
+	{661, 101}, // 12 segment_10
+	{661, 101}  // 13 duplicate of segment_10
 };
 
 /**
@@ -128,51 +128,51 @@ const WorldMapPage::SegmentPos WorldMapPage::kSegmentPositions[kNumSegments] = {
  * Slot 12 is unused in saved-game mode.
  */
 const int WorldMapPage::kSegToWorld[kNumSegments] = {
-	1,   //  0: CrazyTurtle
-	2,   //  1: Waterslide
-	3,   //  2: Aquacube
-	3,   //  3: Aquacube
-	5,   //  4: MysticMarsh
-	6,   //  5: MagicWall
-	7,   //  6: WallOfFleens
-	8,   //  7: ChezNorf
-	7,   //  8: WallOfFleens
-	8,   //  9: ChezNorf
-	10,  // 10: Snowboard
-	11,  // 11: Boolies
-	11,  // 12: unused in saved-game mode
-	11   // 13: Boolies duplicate
+	1,  //  0: CrazyTurtle
+	2,  //  1: Waterslide
+	3,  //  2: Aquacube
+	3,  //  3: Aquacube
+	5,  //  4: MysticMarsh
+	6,  //  5: MagicWall
+	7,  //  6: WallOfFleens
+	8,  //  7: ChezNorf
+	7,  //  8: WallOfFleens
+	8,  //  9: ChezNorf
+	10, // 10: Snowboard
+	11, // 11: Boolies
+	11, // 12: unused in saved-game mode
+	11  // 13: Boolies duplicate
 };
 
 const char *const WorldMapPage::kSegmentDirs[kNumDiffTiers] = {
-	"bmp/map/04 neutral segments",   // 0 = neutral (unvisited)
-	"bmp/map/01 Easy segments",      // 1 = easy difficulty
-	"bmp/map/02 Medium segments",    // 2 = medium difficulty
-	"bmp/map/03 Hard segments"       // 3 = hard difficulty
+	"bmp/map/04 neutral segments", // 0 = neutral (unvisited)
+	"bmp/map/01 Easy segments",    // 1 = easy difficulty
+	"bmp/map/02 Medium segments",  // 2 = medium difficulty
+	"bmp/map/03 Hard segments"     // 3 = hard difficulty
 };
 
 const char *const WorldMapPage::kSegmentFiles[kNumSegments] = {
-	"segment_01",   //  0
-	"segment_02",   //  1
-	"segment_03",   //  2
-	"segment_04",   //  3
-	"segment_05a",  //  4
-	"segment_05b",  //  5
-	"segment_06a",  //  6
-	"segment_06b",  //  7
-	"segment_07a",  //  8
-	"segment_07b",  //  9
-	"segment_08",   // 10
-	"segment_09",   // 11
-	"segment_10",   // 12
-	"segment_10"    // 13 (duplicate)
+	"segment_01",  //  0
+	"segment_02",  //  1
+	"segment_03",  //  2
+	"segment_04",  //  3
+	"segment_05a", //  4
+	"segment_05b", //  5
+	"segment_06a", //  6
+	"segment_06b", //  7
+	"segment_07a", //  8
+	"segment_07b", //  9
+	"segment_08",  // 10
+	"segment_09",  // 11
+	"segment_10",  // 12
+	"segment_10"   // 13 (duplicate)
 };
 
 const char *const WorldMapPage::kLegendFiles[kNumLegends] = {
-	"bmp/map/map_legend_off",      // 0
-	"bmp/map/map_legend_level1",   // 1
-	"bmp/map/map_legend_level2",   // 2
-	"bmp/map/map_legend_level3"    // 3
+	"bmp/map/map_legend_off",    // 0
+	"bmp/map/map_legend_level1", // 1
+	"bmp/map/map_legend_level2", // 2
+	"bmp/map/map_legend_level3"  // 3
 };
 
 // ============================================================================
@@ -184,7 +184,7 @@ WorldMapPage::WorldMapPage(Zoombini2Engine *engine, WorldMapMode mode)
 	  _currentDifficulty(1), _hoveredLegendTab(0), _background(nullptr),
 	  _statsPractice(nullptr), _statsSavedGame(nullptr), _whiteFont(nullptr),
 	  _blipSoundId(-1), _mapMusicId(-1), _volumePanel(nullptr),
-	  _showQuitDialog(false), _quitDialogX(0), _quitDialogY(0),
+	  _showQuitDialog(false), _quitDialogPosition(),
 	  _quitDialogButtonHover(0), _quitPanelNothing(nullptr),
 	  _quitPanelOk(nullptr), _quitPanelCancel(nullptr), _quitTextQuit(nullptr), _quitDialogBackground(nullptr) {
 	_pageId = kPageWorldMap;
@@ -423,7 +423,7 @@ void WorldMapPage::loadSegments() {
 			_segments[tier][slot] = new RleBlock();
 			if (!_segments[tier][slot]->load(Common::Path(path))) {
 				warning("WorldMapPage: Failed to load segment tier=%d slot=%d path=%s!",
-				        tier, slot, path.c_str());
+						tier, slot, path.c_str());
 			}
 		}
 	}
@@ -444,7 +444,7 @@ void WorldMapPage::loadButtons() {
 
 	const ButtonSetup setup[kNumButtons] = {
 		// Button 0: Files / Parties
-		{27,  561, 145, 39, false,
+		{27, 561, 145, 39, false,
 		 "bmp/map/PANEL NL - Parties NORMAL",
 		 "bmp/map/PANEL NL - Parties HILITE", nullptr},
 		// Button 1: Options
@@ -454,12 +454,12 @@ void WorldMapPage::loadButtons() {
 		// Button 2: Game in practice mode or Entraine in saved-game mode
 		isPracticeMode()
 			? ButtonSetup{468, 561, 145, 39, true,
-			              "bmp/map/PANEL NL - Game NORMAL",
-			              "bmp/map/PANEL NL - Game HILITE",
-			              "bmp/map/PANEL NL - Game Gray"}
+						  "bmp/map/PANEL NL - Game NORMAL",
+						  "bmp/map/PANEL NL - Game HILITE",
+						  "bmp/map/PANEL NL - Game Gray"}
 			: ButtonSetup{468, 561, 145, 39, false,
-			              "bmp/map/PANEL NL - Entraine NORMAL",
-			              "bmp/map/PANEL NL - Entraine HILITE", nullptr},
+						  "bmp/map/PANEL NL - Entraine NORMAL",
+						  "bmp/map/PANEL NL - Entraine HILITE", nullptr},
 		// Button 3: Quitter
 		{613, 561, 145, 39, true,
 		 "bmp/map/PANEL NL - Quitter NORMAL",
@@ -472,8 +472,10 @@ void WorldMapPage::loadButtons() {
 		const ButtonSetup &s = setup[i];
 		MapButton &btn = _buttons[i];
 
-		btn.x = s.x;  btn.y = s.y;
-		btn.w = s.w;  btn.h = s.h;
+		btn.x = s.x;
+		btn.y = s.y;
+		btn.w = s.w;
+		btn.h = s.h;
 		btn.isRle = s.isRle;
 		btn.hovered = false;
 
@@ -569,7 +571,7 @@ void WorldMapPage::update() {
 		}
 		const MapButton &b = _buttons[i];
 		_buttons[i].hovered = (mouse.x > b.x && mouse.x < b.x + b.w &&
-		                       mouse.y > b.y && mouse.y < b.y + b.h);
+							   mouse.y > b.y && mouse.y < b.y + b.h);
 	}
 }
 
@@ -578,7 +580,7 @@ void WorldMapPage::update() {
 // ============================================================================
 
 void WorldMapPage::draw(Graphics::ManagedSurface *screen) {
-	const byte (*lut)[256] = _engine->getAlphaLUT();
+	const byte(*lut)[256] = _engine->getAlphaLUT();
 	GameState *gs = _engine->getGameState();
 
 	// 1. Background
@@ -621,7 +623,7 @@ void WorldMapPage::draw(Graphics::ManagedSurface *screen) {
 				Common::String valStr = Common::String::format("%d", _stats[i]);
 				int valWidth = _whiteFont->getStringWidth(valStr);
 				_whiteFont->drawString(screen, 226 - valWidth, kStatLabelY[i],
-				                       valStr, lut);
+									   valStr, lut);
 			}
 		}
 	}
@@ -647,7 +649,7 @@ void WorldMapPage::draw(Graphics::ManagedSurface *screen) {
 		RleBlock *icon = _icons[i];
 		if (icon && icon->isValid()) {
 			icon->drawToScreen(screen, kIconHitRects[i].x,
-			                   kIconHitRects[i].y, lut);
+							   kIconHitRects[i].y, lut);
 		}
 	}
 
@@ -656,8 +658,8 @@ void WorldMapPage::draw(Graphics::ManagedSurface *screen) {
 		RleBlock *title = _titles[_hoveredIcon];
 		if (title && title->isValid()) {
 			title->drawToScreen(screen,
-			                    kTitlePositions[_hoveredIcon].x,
-			                    kTitlePositions[_hoveredIcon].y, lut);
+								kTitlePositions[_hoveredIcon].x,
+								kTitlePositions[_hoveredIcon].y, lut);
 		}
 	}
 
@@ -683,11 +685,11 @@ void WorldMapPage::draw(Graphics::ManagedSurface *screen) {
 
 	// 8. Volume panel (if visible)
 	if (_volumePanel) {
-		const byte (*alphaLUT)[256] = _engine->getAlphaLUT();
+		const byte(*alphaLUT)[256] = _engine->getAlphaLUT();
 		Common::Point mouse = _engine->getMousePos();
 		const VolumePanelResult result = _volumePanel->drawAndHandleInput(screen,
-		        mouse.x, mouse.y, _engine->isMouseDown(), _engine->isMouseClicked(),
-		        alphaLUT);
+																		  mouse.x, mouse.y, _engine->isMouseDown(), _engine->isMouseClicked(),
+																		  alphaLUT);
 		if (result == kVolumePanelChanged)
 			applyVolumePanelVolumes(true);
 		else if (result == kVolumePanelApply)
@@ -718,8 +720,8 @@ void WorldMapPage::drawPracticeSegments(Graphics::ManagedSurface *screen, const 
 		RleBlock *seg = _segments[tier][slot];
 		if (seg && seg->isValid()) {
 			seg->drawToScreen(screen,
-			                  kSegmentPositions[slot].x,
-			                  kSegmentPositions[slot].y, lut);
+							  kSegmentPositions[slot].x,
+							  kSegmentPositions[slot].y, lut);
 		}
 	}
 }
@@ -734,7 +736,7 @@ void WorldMapPage::drawSavedGameSegments(Graphics::ManagedSurface *screen, const
 	// (Skips slot 12, draws slot 13 instead at same position.)
 	GameState *gs = _engine->getGameState();
 
-	static const int drawOrder[] = { 10, 1, 2, 3, 5, 4, 7, 6, 9, 8, 0, 11, 13 };
+	static const int drawOrder[] = {10, 1, 2, 3, 5, 4, 7, 6, 9, 8, 0, 11, 13};
 	for (int idx = 0; idx < 13; idx++) {
 		int slot = drawOrder[idx];
 		int worldId = kSegToWorld[slot];
@@ -745,8 +747,8 @@ void WorldMapPage::drawSavedGameSegments(Graphics::ManagedSurface *screen, const
 		RleBlock *seg = _segments[tier][slot];
 		if (seg && seg->isValid()) {
 			seg->drawToScreen(screen,
-			                  kSegmentPositions[slot].x,
-			                  kSegmentPositions[slot].y, lut);
+							  kSegmentPositions[slot].x,
+							  kSegmentPositions[slot].y, lut);
 		}
 	}
 }
@@ -867,7 +869,7 @@ int WorldMapPage::hitTestButton(const Common::Point &pos) const {
 			continue;
 		const MapButton &b = _buttons[i];
 		if (pos.x > b.x && pos.x < b.x + b.w &&
-		    pos.y > b.y && pos.y < b.y + b.h)
+			pos.y > b.y && pos.y < b.y + b.h)
 			return i;
 	}
 	return -1;
@@ -881,7 +883,7 @@ int WorldMapPage::hitTestIcon(const Common::Point &pos) const {
 				continue;
 			const IconRect &r = kIconHitRects[i];
 			if (pos.x > r.x && pos.x < r.x + r.w &&
-			    pos.y > r.y && pos.y < r.y + r.h) {
+				pos.y > r.y && pos.y < r.y + r.h) {
 				return i;
 			}
 		}
@@ -892,7 +894,7 @@ int WorldMapPage::hitTestIcon(const Common::Point &pos) const {
 				continue;
 			const IconRect &r = kIconHitRects[i];
 			if (pos.x > r.x && pos.x < r.x + r.w &&
-			    pos.y > r.y && pos.y < r.y + r.h) {
+				pos.y > r.y && pos.y < r.y + r.h) {
 				return i;
 			}
 		}
@@ -928,7 +930,7 @@ void WorldMapPage::openVolumePanel() {
 		SoundManager *sound = _engine->getSoundManager();
 		if (sound)
 			_volumePanel->setInitialVolumes(sound->_volumeMusic, sound->_volumeSFX,
-			                                sound->_volumeSpeech);
+											sound->_volumeSpeech);
 	}
 }
 
@@ -946,12 +948,9 @@ void WorldMapPage::applyVolumePanelVolumes(bool usePanelValues) {
 	SoundManager *sound = _engine->getSoundManager();
 	if (!sound)
 		return;
-	sound->_volumeMusic = usePanelValues ? _volumePanel->getMusicVolume() :
-	                                      _volumePanel->getInitialMusicVolume();
-	sound->_volumeSFX = usePanelValues ? _volumePanel->getSfxVolume() :
-	                                    _volumePanel->getInitialSfxVolume();
-	sound->_volumeSpeech = usePanelValues ? _volumePanel->getSpeechVolume() :
-	                                       _volumePanel->getInitialSpeechVolume();
+	sound->_volumeMusic = usePanelValues ? _volumePanel->getMusicVolume() : _volumePanel->getInitialMusicVolume();
+	sound->_volumeSFX = usePanelValues ? _volumePanel->getSfxVolume() : _volumePanel->getInitialSfxVolume();
+	sound->_volumeSpeech = usePanelValues ? _volumePanel->getSpeechVolume() : _volumePanel->getInitialSpeechVolume();
 	_engine->setMapMusicVolume(sound->_volumeMusic);
 }
 
@@ -985,11 +984,9 @@ void WorldMapPage::openQuitDialog() {
 	}
 
 	if (_quitPanelOk && _quitPanelOk->getWidth() > 0) {
-		_quitDialogX = 400 - _quitPanelOk->getWidth() / 2;
-		_quitDialogY = 300 - _quitPanelOk->getHeight() / 2;
+		_quitDialogPosition = Common::Point32(400 - _quitPanelOk->getWidth() / 2, 300 - _quitPanelOk->getHeight() / 2);
 	} else {
-		_quitDialogX = 200;
-		_quitDialogY = 200;
+		_quitDialogPosition = Common::Point32(200, 200);
 	}
 
 	if (!_quitDialogBackground)
@@ -1014,34 +1011,40 @@ void WorldMapPage::closeQuitDialog() {
 }
 
 void WorldMapPage::drawQuitDialog(Graphics::ManagedSurface *screen) {
-	const byte (*alphaLUT)[256] = _engine->getAlphaLUT();
+	const byte(*alphaLUT)[256] = _engine->getAlphaLUT();
 	if (_quitDialogBackground)
 		screen->copyFrom(*_quitDialogBackground);
 
 	RleBlock *panel = nullptr;
 	switch (_quitDialogButtonHover) {
-	case 1:  panel = _quitPanelOk;      break;
-	case 2:  panel = _quitPanelCancel;   break;
-	default: panel = _quitPanelNothing;  break;
+	case 1:
+		panel = _quitPanelOk;
+		break;
+	case 2:
+		panel = _quitPanelCancel;
+		break;
+	default:
+		panel = _quitPanelNothing;
+		break;
 	}
 
 	if (panel) {
-		panel->drawToScreen(screen, _quitDialogX, _quitDialogY, alphaLUT);
+		panel->drawToScreen(screen, _quitDialogPosition.x, _quitDialogPosition.y, alphaLUT);
 	}
 
 	if (_quitTextQuit) {
-		_quitTextQuit->drawToSurface(screen, _quitDialogX + 17, _quitDialogY + 17);
+		_quitTextQuit->drawToSurface(screen, _quitDialogPosition.x + 17, _quitDialogPosition.y + 17);
 	}
 }
 
 int WorldMapPage::hitTestQuitDialog(int x, int y) const {
-	if (x > _quitDialogX + 207 && x < _quitDialogX + 272 &&
-	    y > _quitDialogY + 77 && y < _quitDialogY + 145) {
-		return 1;  // OK
+	if (x > _quitDialogPosition.x + 207 && x < _quitDialogPosition.x + 272 &&
+		y > _quitDialogPosition.y + 77 && y < _quitDialogPosition.y + 145) {
+		return 1; // OK
 	}
-	if (x > _quitDialogX + 287 && x < _quitDialogX + 352 &&
-	    y > _quitDialogY + 77 && y < _quitDialogY + 145) {
-		return 2;  // Cancel
+	if (x > _quitDialogPosition.x + 287 && x < _quitDialogPosition.x + 352 &&
+		y > _quitDialogPosition.y + 77 && y < _quitDialogPosition.y + 145) {
+		return 2; // Cancel
 	}
 	return 0;
 }

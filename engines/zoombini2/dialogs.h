@@ -31,48 +31,70 @@ class ButtonWidget;
 class CommandSender;
 class ListWidget;
 class ThemeEval;
-}
+} // namespace GUI
 
 namespace Zoombini2 {
 
 /** Modal ScummVM dialog for managing one target's player-profile files. */
 class Zoombini2SaveManagementDialog : public GUI::Dialog {
 public:
+	/** Construct a profile manager for the target configuration @p domain. */
 	explicit Zoombini2SaveManagementDialog(const Common::String &domain);
 
+	/** Populate the profile list and enter the modal dialog. */
 	void open() override;
+	/** Handle list editing, deletion, and ordinary dialog commands. */
 	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
 
 private:
+	/** Command used to begin or finish editing the selected profile name. */
 	static const uint32 kEditProfileCommand;
+	/** Command used to delete the selected profile. */
 	static const uint32 kDeleteProfileCommand;
 
+	/** Reload the sorted profile list and optionally reselect @p selectedProfile. */
 	void refreshProfiles(const Common::String &selectedProfile = Common::String());
+	/** Enable or disable actions for the current selection and edit state. */
 	void updateButtons();
+	/** Validate and commit the profile name currently edited by the list widget. */
 	void finishRename();
+	/** Confirm and delete the selected profile. */
 	void deleteSelectedProfile();
 
+	/** Target configuration domain used to namespace profile files. */
 	Common::String _domain;
+	/** Profile names mirrored by @ref Zoombini2SaveManagementDialog::_profileList. */
 	Common::StringArray _profileNames;
+	/** Pre-edit profile name retained while a row is being edited. */
 	Common::String _profileNameBeforeEdit;
+	/** Dialog-owned profile list widget. */
 	GUI::ListWidget *_profileList;
+	/** Dialog-owned rename button. */
 	GUI::ButtonWidget *_editButton;
+	/** Dialog-owned delete button. */
 	GUI::ButtonWidget *_deleteButton;
+	/** Whether the selected profile row is currently editable. */
 	bool _editingProfile;
 };
 
 /** Engine-options entry point for the target-scoped profile manager. */
 class Zoombini2OptionsWidget : public GUI::OptionsContainerWidget {
 public:
+	/** Construct the options container under @p boss for @p domain. */
 	Zoombini2OptionsWidget(GUI::GuiObject *boss, const Common::String &name, const Common::String &domain);
 
+	/** Retain the empty options hook required by the container interface. */
 	void load() override;
+	/** Report that this launcher widget has no persistent option values. */
 	bool save() override;
+	/** Open the profile manager or forward an ordinary widget command. */
 	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
 
 private:
+	/** Command used to open @ref Zoombini2SaveManagementDialog. */
 	static const uint32 kManageProfilesCommand;
 
+	/** Define this widget's overlay-compatible GUI layout. */
 	void defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const override;
 };
 
