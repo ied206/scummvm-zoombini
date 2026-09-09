@@ -23,8 +23,8 @@
 #define ZOOMBINI2_PAGES_PUZZLE_MAGICWALL_H
 
 #include "common/array.h"
-#include "common/rect.h"
 #include "common/path.h"
+#include "common/rect.h"
 
 #include "zoombini2/pages/puzzle_base.h"
 #include "zoombini2/path.h"
@@ -41,166 +41,237 @@ class Animation;
  */
 class MagicWallPuzzle : public PuzzlePage {
 public:
+	/** Construct Beetle Bug Alley for @p engine. */
 	MagicWallPuzzle(Zoombini2Engine *engine);
+	/** Release maze elements, paths, graphics, and sounds. */
 	~MagicWallPuzzle() override;
 
+	/** Load the selected maze and assign colors to the puzzle roster. */
 	void init() override;
+	/** Advance the active path, gates, and completion state. */
 	void update() override;
+	/** Draw the maze, controls, color guides, gates, and Zoombinis. */
 	void draw(Graphics::ManagedSurface *screen) override;
+	/** Activate the tablet or lever at @p pos. */
 	void handleClick(const Common::Point &pos) override;
 
 private:
-	/**
-	 * Color indices matching resource naming.
-	 */
+	/** Color indices shared by doors, dots, bugs, and minimap lights. */
 	enum Color {
+		/** Blue resource set. */
 		kColorBlue = 0,
+		/** Green resource set. */
 		kColorGreen,
+		/** Navy resource set. */
 		kColorNavy,
+		/** Orange resource set. */
 		kColorOrange,
+		/** Purple resource set. */
 		kColorPurple,
+		/** Red resource set. */
 		kColorRed,
+		/** Rose resource set. */
 		kColorRose,
+		/** Turquoise resource set. */
 		kColorTurquoise,
+		/** Violet resource set. */
 		kColorViolet,
+		/** Yellow resource set. */
 		kColorYellow,
+		/** Number of color resource sets. */
 		kColorCount
 	};
 
+	/** Resource-name fragments indexed by @ref MagicWallPuzzle::Color. */
 	static const char *kColorNames[kColorCount];
 
-	/**
-	 * Puzzle state machine.
-	 */
+	/** Runtime phase of the Beetle Bug Alley interaction. */
 	enum State {
+		/** Complete initial maze setup. */
 		kStateInit,
-		kStateIdle,               // Waiting for player input
-		kStateZoombiniMoving,     // Zoombini traversing path
-		kStateGateOpening,        // Gate animation playing
-		kStateComplete,           // All zoombinis through
-		kStateDone                // Transitioning out
+		/** Wait for tablet or lever input. */
+		kStateIdle,
+		/** Move one Zoombini along its selected path. */
+		kStateZoombiniMoving,
+		/** Play the gate-opening animation. */
+		kStateGateOpening,
+		/** Hold after every assigned Zoombini reaches a destination. */
+		kStateComplete,
+		/** Stop accepting input while leaving the page. */
+		kStateDone
 	};
 
-	/**
-	 * Slot for a zoombini in the maze (4 slots, directions 0-3).
-	 */
+	/** One occupied or destination slot in the maze. */
 	struct ZoombiniSlot {
-		int zoombiniIdx;          // Index into _puzzleZoombinis (-1 = empty)
-		int pathProgress;         // Current position along path (0-100)
-		int targetColor;          // Destination color for the zoombini
-		bool captured;             // Has reached its destination
-		int x, y;                 // Current screen position
-		PathObject *path;         // Current path being traversed
-		uint32 pathStartTime;     // Tick when path started
+		/** Index into @ref PuzzlePage::_puzzleZoombinis, or `-1` when empty. */
+		int zoombiniIdx;
+		/** Percentage progress along the active path. */
+		int pathProgress;
+		/** Color required by this Zoombini's destination. */
+		int targetColor;
+		/** Whether the Zoombini has reached its destination. */
+		bool captured;
+		/** Current screen position. */
+		Common::Point32 position;
+		/** Path currently being traversed. */
+		PathObject *path;
+		/** Time at which path traversal began. */
+		uint32 pathStartTime;
 	};
 
-	/**
-	 * Color dot placed in the maze.
-	 */
+	/** One colored destination marker in the maze. */
 	struct ColorDot {
-		int colorIdx;             // Color enum value
-		int x, y;                 // Screen position
-		bool lightOn;             // Light above door is on
+		/** Color index used by this marker. */
+		int colorIdx;
+		/** Screen position. */
+		Common::Point32 position;
+		/** Whether the corresponding door light is enabled. */
+		bool lightOn;
 	};
 
-	/**
-	 * Colored bug that guides zoombinis.
-	 */
+	/** One colored beetle guide in the maze. */
 	struct ColorBug {
-		int colorIdx;             // Color enum value
-		int x, y;                 // Screen position
-		bool active;              // Currently guiding
+		/** Color index used by this beetle. */
+		int colorIdx;
+		/** Screen position. */
+		Common::Point32 position;
+		/** Whether the beetle is currently guiding a path. */
+		bool active;
 	};
 
-	/**
-	 * Stone tablet that moves beetles.
-	 */
+	/** Clickable stone tablet that transfers a beetle between slots. */
 	struct Tablet {
-		Common::Rect rect;        // Clickable region
-		int sourceSlot;           // Slot to move from
-		int destSlot;             // Slot to move to
-		PathObject *path;         // Path to follow
+		/** Clickable tablet area. */
+		Common::Rect rect;
+		/** Slot from which the tablet moves a beetle. */
+		int sourceSlot;
+		/** Slot to which the tablet moves a beetle. */
+		int destSlot;
+		/** Path followed during the transfer. */
+		PathObject *path;
 	};
 
-	/**
-	 * Gate/door in the maze.
-	 */
+	/** One destination gate and its animation state. */
 	struct Gate {
-		int gateIdx;              // Gate index (0-3 = A-D)
-		int x, y;                 // Screen position
-		bool open;                // Gate state
-		uint32 animStart;         // Animation start time
+		/** Gate index corresponding to gates A through D. */
+		int gateIdx;
+		/** Screen position. */
+		Common::Point32 position;
+		/** Whether this gate is open. */
+		bool open;
+		/** Time at which the opening animation began. */
+		uint32 animStart;
 	};
 
-	// Puzzle setup
+	/** Load all maze graphics, animations, paths, and sounds. */
 	void loadResources();
+	/** Configure the maze variant selected by difficulty. */
 	void setupMaze();
+	/** Place colored destination markers. */
 	void placeColorDots();
+	/** Place colored beetle guides. */
 	void placeColorBugs();
+	/** Configure tablet hit areas and transfer paths. */
 	void setupTablets();
+	/** Assign puzzle-roster entries to entrance slots. */
 	void assignZoombiniSlots();
 
-	// Game logic
+	/** Start path traversal for slot @p slotIdx. */
 	void startZoombiniPath(int slotIdx);
+	/** Advance the path traversal for slot @p slotIdx. */
 	void advanceZoombiniPath(int slotIdx);
+	/** Return whether slot @p slotIdx has reached the correct destination. */
 	bool checkSlotComplete(int slotIdx);
+	/** Mark slot @p slotIdx captured and update gate state. */
 	void completeSlot(int slotIdx);
+	/** Synchronize door lights with the current color arrangement. */
 	void updateLights();
+	/** Return the number of slots that reached their destinations. */
 	int countCaptured() const;
 
-	// Drawing helpers
+	/** Draw maze layer @p level. */
 	void drawMazeLevel(Graphics::ManagedSurface *screen, int level);
+	/** Draw colored destination markers. */
 	void drawColorDots(Graphics::ManagedSurface *screen);
+	/** Draw colored beetle guides. */
 	void drawColorBugs(Graphics::ManagedSurface *screen);
+	/** Draw stone tablet controls. */
 	void drawTablets(Graphics::ManagedSurface *screen);
+	/** Draw the glowworm wall lever. */
 	void drawWallLever(Graphics::ManagedSurface *screen);
+	/** Draw the minimap and its color lights. */
 	void drawMinimap(Graphics::ManagedSurface *screen);
+	/** Draw all destination gates. */
 	void drawGates(Graphics::ManagedSurface *screen);
+	/** Draw waiting and moving Zoombinis. */
 	void drawZoombinis(Graphics::ManagedSurface *screen);
 
-	// State
+	/** Current interaction phase. */
 	State _state;
-	int _currentLevel;            // Current maze level (difficulty based)
-	int _activeSlot;              // Currently moving slot (-1 = none)
-	int _destSlot;                // Destination slot for current movement
-	int _capturedCount;           // Number captured
+	/** Difficulty-selected maze level. */
+	int _currentLevel;
+	/** Currently moving slot, or `-1` when none is active. */
+	int _activeSlot;
+	/** Destination slot for the current movement. */
+	int _destSlot;
+	/** Number of Zoombinis already captured by their matching gates. */
+	int _capturedCount;
 
-	// Slots for zoombinis (4 internal, 4 exit)
+	/** Four entrance slots followed by four destination slots. */
 	ZoombiniSlot _slots[8];
 
-	// Map from zoombini index to color
+	/** Destination color indexed by puzzle-roster entry. */
 	int _zoombiniColors[16];
 
-	// Maze elements
+	/** Colored destination markers. */
 	Common::Array<ColorDot> _colorDots;
+	/** Colored beetle guides. */
 	Common::Array<ColorBug> _colorBugs;
+	/** Stone tablet controls. */
 	Common::Array<Tablet> _tablets;
+	/** Glowworm lever hit-test area. */
 	Common::Rect _wallLever;
+	/** Four destination gates. */
 	Gate _gates[4];
 
-	// Graphics
-	RleBlock *_dotGfx[kColorCount];        // DOT-{color}
-	RleBlock *_bugGfx[kColorCount];        // bug_c_{color}
-	RleBlock *_miniMapGfx;                 // mini-map
-	RleBlock *_miniMapDotGfx;              // mini-map-dot
-	RleBlock *_miniLightGfx[kColorCount];  // mini-light-{color}
-	RleBlock *_glowwormGfx;                // le_vier_luisant
-	Animation *_glowwormAnim;              // le_vier
-	Animation *_gateAnims[4];              // porte-A/B/C/D
-	Animation *_crystalAnims[5];           // Crystal1-5
+	/** Destination-dot visuals indexed by color. */
+	RleBlock *_dotGfx[kColorCount];
+	/** Beetle visuals indexed by color. */
+	RleBlock *_bugGfx[kColorCount];
+	/** Minimap background. */
+	RleBlock *_miniMapGfx;
+	/** Minimap position marker. */
+	RleBlock *_miniMapDotGfx;
+	/** Minimap lights indexed by color. */
+	RleBlock *_miniLightGfx[kColorCount];
+	/** Static glowworm lever visual. */
+	RleBlock *_glowwormGfx;
+	/** Animated glowworm lever visual. */
+	Animation *_glowwormAnim;
+	/** Gate-opening animations. */
+	Animation *_gateAnims[4];
+	/** Crystal feedback animations. */
+	Animation *_crystalAnims[5];
 
-	// PAT bezier paths for zoombini movement
-	PathObject *_exitPaths[4];             // EXIT1-4.PAT (exit paths)
-	PathObject *_bougePaths[4];            // BOUGE1-4.PAT (movement paths)
+	/** Paths from matching gates to the maze exits. */
+	PathObject *_exitPaths[4];
+	/** Internal movement paths connecting maze slots. */
+	PathObject *_bougePaths[4];
 
-	// Sounds
-	int _musicId;                          // BGM: sounds/music/06-BB01.wav
-	int _sndApproval[4];                   // sounds/6-A1.wav through 6-A4.wav
-	int _sndError[2];                      // sounds/6-E1.wav, 6-E2.wav
-	int _sndHint[4];                       // sounds/6-H1.wav through 6-H4.wav
-	int _sndGateOpen;                      // sounds/fx/06-BS01.wav (gate opening)
-	int _sndZoombiniMove;                  // sounds/fx/06-BS02.wav (movement)
-	int _nextApprovalIdx;                  // Cycles through approval sounds
+	/** Music handle used while Beetle Bug Alley is active. */
+	int _musicId;
+	/** Approval sounds cycled after successful moves. */
+	int _sndApproval[4];
+	/** Error sounds selected after invalid moves. */
+	int _sndError[2];
+	/** Hint sounds associated with the four gates. */
+	int _sndHint[4];
+	/** Gate-opening sound. */
+	int _sndGateOpen;
+	/** Zoombini movement sound. */
+	int _sndZoombiniMove;
+	/** Index of the next approval sound to play. */
+	int _nextApprovalIdx;
 };
 
 } // End of namespace Zoombini2

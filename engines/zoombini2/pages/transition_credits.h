@@ -35,28 +35,41 @@ class BitBlock;
  */
 class CreditsPage : public TransitionPage {
 public:
+	/** Bind the credits presentation to @p engine. */
 	CreditsPage(Zoombini2Engine *engine);
+	/** Release the credits bitmap and music. */
 	~CreditsPage() override;
 
+	/** Load resources and start the initial hold period. */
 	void init() override;
+	/** Advance initial hold, vertical scrolling, and final hold. */
 	void update() override;
+	/** Redraw the credits only when their scroll position changes. */
 	void draw(Graphics::ManagedSurface *screen) override;
+	/** Finish the credits when the player clicks. */
 	void handleClick(const Common::Point &pos) override;
 
-	// Credits uses conditional drawing via _redrawNeeded and never needs screen clear.
-	// The default false from Page is correct, so no override needed.
-
 private:
+	/** Gameplay deadline for the active hold period. */
 	uint32 _endTime;
+	/** Current vertical scroll offset. */
 	float _scrollY;
+	/** Largest vertical scroll offset exposed by the bitmap. */
 	int _maxScrollY;
+	/** Whether the credits are currently scrolling. */
 	bool _scrollActive;
+	/** Whether @ref CreditsPage::draw must update the screen. */
 	bool _redrawNeeded;
+	/** Gameplay tick used to calculate the next scroll delta. */
 	uint32 _lastUpdateTime;
+	/** Whether the presentation remains in its initial hold. */
 	bool _initialWait;
+	/** Owned credits bitmap. */
 	BitBlock *_background;
 
+	/** Credits music sound identifier. */
 	int _musicId;
+	/** Whether the credits have requested engine exit. */
 	bool _finished;
 };
 
