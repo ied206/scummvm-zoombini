@@ -34,12 +34,12 @@ namespace Zoombini2 {
 // Graph one is an eight-node cube for levels one and two.
 // Graph two is a sixteen-node double cube for levels three and four.
 //
-// Each entry: { adj[0], adj[1], adj[2], adj[3], position }
+// Each entry: { adj[0], adj[1], adj[2], adj[3], pos }
 // ============================================================================
 
 struct GraphInitData {
 	int adj[4];
-	Common::Point32 position;
+	Common::Point32 pos;
 };
 
 static const GraphInitData kGraph1Data[8] = {
@@ -83,7 +83,7 @@ static const GraphInitData kGraph2Data[16] = {
 	{{14, 12, 3, 11}, Common::Point32(109, 79)}};
 
 // Map each geometric vertex to one direction label per active dimension.
-const char AquacubePuzzle::kGraph1DirLabels[8][4] = {
+const char PuzzleAquacube::kGraph1DirLabels[8][4] = {
 	{'D', 'L', 'F', 0}, // Node 0
 	{'D', 'R', 'F', 0}, // Node 1
 	{'U', 'R', 'F', 0}, // Node 2
@@ -94,7 +94,7 @@ const char AquacubePuzzle::kGraph1DirLabels[8][4] = {
 	{'U', 'L', 'B', 0}  // Node 7
 };
 
-const char AquacubePuzzle::kGraph2DirLabels[16][4] = {
+const char PuzzleAquacube::kGraph2DirLabels[16][4] = {
 	{'D', 'L', 'F', 'X'}, // Node 0
 	{'D', 'R', 'F', 'X'}, // Node 1
 	{'U', 'R', 'F', 'X'}, // Node 2
@@ -113,8 +113,8 @@ const char AquacubePuzzle::kGraph2DirLabels[16][4] = {
 	{'U', 'L', 'B', 'X'}  // Node 15
 };
 
-// Difficulty-specific actor and movement limits.
-struct DiffParams {
+// Level-specific actor and movement limits.
+struct LevelParams {
 	int numZoombinis;
 	int field1;
 	int field2;
@@ -122,34 +122,34 @@ struct DiffParams {
 	int numFleens;
 };
 
-static const DiffParams kDiffParams[5] = {
-	{0, 0, 0, 0, 0},   // Diff 0 (unused)
-	{3, 7, 1, 6, 0},   // Diff 1: 3 zoombinis, 6 steps, 0 fleens
-	{3, 7, 1, 6, 1},   // Diff 2: 3 zoombinis, 6 steps, 1 fleen
-	{4, 12, 4, 11, 2}, // Diff 3: 4 zoombinis, 11 steps, 2 fleens
-	{4, 12, 4, 11, 2}  // Diff 4: 4 zoombinis, 11 steps, 2 fleens
+static const LevelParams kLevelParams[5] = {
+	{0, 0, 0, 0, 0},   // Level 0 (unused)
+	{3, 7, 1, 6, 0},   // Level 1: 3 zoombinis, 6 steps, 0 fleens
+	{3, 7, 1, 6, 1},   // Level 2: 3 zoombinis, 6 steps, 1 fleen
+	{4, 12, 4, 11, 2}, // Level 3: 4 zoombinis, 11 steps, 2 fleens
+	{4, 12, 4, 11, 2}  // Level 4: 4 zoombinis, 11 steps, 2 fleens
 };
 
 // Direction-arrow button positions.
-static const Common::Point32 kArrowPositions[4] = {
+static const Common::Point32 kArrowPos[4] = {
 	Common::Point32(649, 483), Common::Point32(674, 484), Common::Point32(698, 483), Common::Point32(725, 482)};
 
 // Step-arrow positions.
-static const Common::Point32 kStepArrowPositions[4] = {
+static const Common::Point32 kStepArrowPos[4] = {
 	Common::Point32(648, 526), Common::Point32(676, 527), Common::Point32(701, 526), Common::Point32(727, 525)};
 
 // Positions for up to eleven step indicators.
-static const Common::Point32 kStepIndicatorPositions[11] = {
+static const Common::Point32 kStepIndicatorPos[11] = {
 	Common::Point32(647, 565), Common::Point32(658, 565), Common::Point32(667, 565), Common::Point32(676, 565),
 	Common::Point32(685, 565), Common::Point32(695, 565), Common::Point32(705, 565), Common::Point32(713, 565),
 	Common::Point32(723, 565), Common::Point32(730, 565), Common::Point32(738, 565)};
 
 // Warp-control positions.
-static const Common::Point32 kWarpOverlayPosition(641, 541);
-static const Common::Point32 kWarpTimerPosition(666, 544);
+static const Common::Point32 kWarpOverlayPos(641, 541);
+static const Common::Point32 kWarpTimerPos(666, 544);
 
 // Cube background draw position.
-static const Common::Point32 kCubeDrawPosition(96, 152);
+static const Common::Point32 kCubeDrawPos(96, 152);
 
 // Direction-arrow hit-test dimensions.
 static const int kArrowHitW = 17;
@@ -159,13 +159,13 @@ static const int kArrowHitH = 41;
 // Constructor / Destructor
 // ============================================================================
 
-AquacubePuzzle::AquacubePuzzle(Zoombini2Engine *engine)
-	: PuzzlePage(engine, kPageAquacube),
-	  _difficulty(1), _numNodes(8),
+PuzzleAquacube::PuzzleAquacube(Zoombini2Engine *vm)
+	: PuzzleBase(vm, kPageAquaCube),
+	  _level(1), _numNodes(8),
 	  _ballNode(0), _targetNode(-1),
-	  _ballPosition(0, 0),
-	  _ballStartPosition(0, 0),
-	  _ballEndPosition(0, 0),
+	  _ballPos(0, 0),
+	  _ballStartPos(0, 0),
+	  _ballEndPos(0, 0),
 	  _moveStartTime(0),
 	  _numZoombinisToPlace(3), _totalSteps(6), _numFleens(0),
 	  _stepsUsed(0), _maxSteps(6),
@@ -173,46 +173,46 @@ AquacubePuzzle::AquacubePuzzle(Zoombini2Engine *engine)
 	  _fleenOffset(10, 6),
 	  _nodeOffset(0, 0),
 	  _warpAvailable(false), _warpActive(false),
-	  _lightGfx(nullptr),
-	  _manetteOnGfx(nullptr), _manetteOffGfx(nullptr),
-	  _ballGfx(nullptr), _ballBigGfx(nullptr),
-	  _shotsOnGfx(nullptr), _shotsOffGfx(nullptr),
-	  _lightRedGfx(nullptr), _lightGreyGfx(nullptr),
-	  _warpOnGfx(nullptr), _warpOffGfx(nullptr),
-	  _warpDisableGfx(nullptr), _warpTimerAnim(nullptr),
+	  _lightImage(nullptr),
+	  _manetteOnImage(nullptr), _manetteOffImage(nullptr),
+	  _ballImage(nullptr), _ballBigImage(nullptr),
+	  _shotsOnImage(nullptr), _shotsOffImage(nullptr),
+	  _lightRedImage(nullptr), _lightGreyImage(nullptr),
+	  _warpOnImage(nullptr), _warpOffImage(nullptr),
+	  _warpDisableImage(nullptr), _warpTimerAnim(nullptr),
 	  _gameState(kStateIdle), _freedCount(0), _musicId(-1) {
 
-	memset(_cubeGfx, 0, sizeof(_cubeGfx));
-	memset(_bubbleGfx, 0, sizeof(_bubbleGfx));
-	memset(_fleenGfx, 0, sizeof(_fleenGfx));
+	memset(_cubeImage, 0, sizeof(_cubeImage));
+	memset(_bubbleImage, 0, sizeof(_bubbleImage));
+	memset(_fleenImage, 0, sizeof(_fleenImage));
 	memset(_flareAnims, 0, sizeof(_flareAnims));
 }
 
-AquacubePuzzle::~AquacubePuzzle() {
+PuzzleAquacube::~PuzzleAquacube() {
 	if (_musicId >= 0) {
-		SoundManager *snd = _engine->getSoundManager();
+		SoundManager *snd = _vm->getSoundManager();
 		snd->stop(_musicId);
 		snd->unload(_musicId);
 	}
-	delete _lightGfx;
+	delete _lightImage;
 	for (int i = 0; i < 3; i++)
-		delete _cubeGfx[i];
-	delete _manetteOnGfx;
-	delete _manetteOffGfx;
-	delete _ballGfx;
-	delete _ballBigGfx;
-	delete _shotsOnGfx;
-	delete _shotsOffGfx;
-	delete _lightRedGfx;
-	delete _lightGreyGfx;
-	delete _warpOnGfx;
-	delete _warpOffGfx;
-	delete _warpDisableGfx;
+		delete _cubeImage[i];
+	delete _manetteOnImage;
+	delete _manetteOffImage;
+	delete _ballImage;
+	delete _ballBigImage;
+	delete _shotsOnImage;
+	delete _shotsOffImage;
+	delete _lightRedImage;
+	delete _lightGreyImage;
+	delete _warpOnImage;
+	delete _warpOffImage;
+	delete _warpDisableImage;
 	delete _warpTimerAnim;
 	for (int i = 0; i < 3; i++)
-		delete _bubbleGfx[i];
+		delete _bubbleImage[i];
 	for (int i = 0; i < 4; i++)
-		delete _fleenGfx[i];
+		delete _fleenImage[i];
 	for (int i = 0; i < 2; i++)
 		delete _flareAnims[i];
 }
@@ -221,30 +221,30 @@ AquacubePuzzle::~AquacubePuzzle() {
 // Initialization
 // ============================================================================
 
-void AquacubePuzzle::init() {
-	PuzzlePage::init();
+void PuzzleAquacube::init() {
+	PuzzleBase::init();
 
 	// Start the Aqua Cube music.
-	if (SoundManager *snd = _engine->getSoundManager()) {
-		_musicId = snd->load(true, Common::Path("sounds/music/03-BB01.wav"), true);
+	if (SoundManager *snd = _vm->getSoundManager()) {
+		_musicId = snd->load(true, Common::Path("#sounds/music/03-BB01.wav"), true);
 		if (_musicId >= 0) {
 			snd->playLoop(_musicId);
 			snd->setVolume(_musicId, snd->_volumeMusic);
 		}
 	}
 
-	_difficulty = CLIP(_engine->getGameState()->_gameMode, 1, 4);
-	debug(1, "AquacubePuzzle::init - difficulty %d", _difficulty);
+	_level = CLIP(_vm->getGameState()->_level, 1, 4);
+	debug(1, "PuzzleAquacube::init - level %d", _level);
 
-	// Apply the selected difficulty's actor and movement limits.
-	const DiffParams &dp = kDiffParams[_difficulty];
-	_numZoombinisToPlace = dp.numZoombinis;
-	_totalSteps = dp.totalSteps;
-	_maxSteps = dp.totalSteps;
-	_numFleens = dp.numFleens;
+	// Apply the selected level's actor and movement limits.
+	const LevelParams &levelParams = kLevelParams[_level];
+	_numZoombinisToPlace = levelParams.numZoombinis;
+	_totalSteps = levelParams.totalSteps;
+	_maxSteps = levelParams.totalSteps;
+	_numFleens = levelParams.numFleens;
 
 	// The larger graph uses a slightly different actor alignment.
-	if (_difficulty <= 2) {
+	if (_level <= 2) {
 		_zoombiniOffset = Common::Point32(-2, 6);
 	} else {
 		_zoombiniOffset = Common::Point32(-5, 5);
@@ -252,7 +252,7 @@ void AquacubePuzzle::init() {
 	_fleenOffset = Common::Point32(10, 6);
 	_nodeOffset = Common::Point32(0, 0);
 
-	_warpAvailable = (_difficulty > 1);
+	_warpAvailable = (_level > 1);
 
 	loadResources();
 	loadGraph();
@@ -263,17 +263,17 @@ void AquacubePuzzle::init() {
 	_stepsUsed = 0;
 	_freedCount = 0;
 	_gameState = kStateIdle;
-	_stateTimer = _engine->getGameTickCount();
+	_stateTimer = _vm->getGameTickCount();
 }
 
 // ============================================================================
 // Graph loading
 // ============================================================================
 
-void AquacubePuzzle::loadGraph() {
-	// Select graph based on difficulty (Init at line ~202)
+void PuzzleAquacube::loadGraph() {
+	// Select graph based on level.
 	const GraphInitData *srcData;
-	if (_difficulty <= 2) {
+	if (_level <= 2) {
 		srcData = kGraph1Data;
 		_numNodes = 8;
 	} else {
@@ -285,7 +285,7 @@ void AquacubePuzzle::loadGraph() {
 		GraphNode &n = _nodes[i];
 		for (int j = 0; j < 4; j++)
 			n.adj[j] = srcData[i].adj[j];
-		n.position = srcData[i].position;
+		n.pos = srcData[i].pos;
 		n.state = 1; // All nodes start as empty
 		n.occupantCount = 0;
 		n.occupants[0] = -1;
@@ -298,15 +298,15 @@ void AquacubePuzzle::loadGraph() {
 			n.dirValues[j] = -1;
 	}
 
-	debug(2, "AquacubePuzzle: Loaded %d-node graph for difficulty %d",
-		  _numNodes, _difficulty);
+	debug(2, "PuzzleAquacube: Loaded %d-node graph for level %d",
+		  _numNodes, _level);
 }
 
 // ============================================================================
 // Zoombini and Fleen placement
 // ============================================================================
 
-void AquacubePuzzle::placeZoombinis() {
+void PuzzleAquacube::placeZoombinis() {
 	// Pick random vertices and build binary coordinates from their direction labels.
 	Common::RandomSource rnd("aquacube_place");
 
@@ -340,13 +340,13 @@ void AquacubePuzzle::placeZoombinis() {
 		node.occupants[node.occupantCount] = z;
 		node.occupantCount++;
 
-		debug(2, "AquacubePuzzle: Zoombini %d placed at node %d (%d,%d) dir=%d",
-			  z, nodeIdx, node.position.x, node.position.y, dirChoices[z]);
+		debug(2, "PuzzleAquacube: Zoombini %d placed at node %d (%d,%d) dir=%d",
+			  z, nodeIdx, node.pos.x, node.pos.y, dirChoices[z]);
 	}
 
 	// Build direction values for all nodes based on direction labels
 	// Map direction labels to the chosen binary coordinate values.
-	const char (*labels)[4] = (_difficulty <= 2) ? kGraph1DirLabels : kGraph2DirLabels;
+	const char (*labels)[4] = (_level <= 2) ? kGraph1DirLabels : kGraph2DirLabels;
 
 	// Map direction chars to zoombini choices:
 	// Each opposing direction pair uses complementary binary values.
@@ -393,22 +393,22 @@ void AquacubePuzzle::placeZoombinis() {
 	}
 }
 
-void AquacubePuzzle::placeFleens() {
+void PuzzleAquacube::placeFleens() {
 	if (_numFleens == 0)
 		return;
 
 	// Prefer the all-ones vertex for the first Fleen.
-	// For diff 2: 1 fleen at (1,1,1)
-	// For diff 3-4: multiple fleens at various positions
+	// For level 2: 1 fleen at (1,1,1)
+	// For levels 3-4: multiple fleens at various positions
 
-	if (_difficulty == 2) {
+	if (_level == 2) {
 		int fleenNode = findNodeByDirValues3(1, 1, 1);
 		if (fleenNode >= 0) {
 			_nodes[fleenNode].state = 3;
 			_nodes[fleenNode].fleenType = 1;
-			debug(2, "AquacubePuzzle: Fleen placed at node %d", fleenNode);
+			debug(2, "PuzzleAquacube: Fleen placed at node %d", fleenNode);
 		}
-	} else if (_difficulty >= 3) {
+	} else if (_level >= 3) {
 		// First fleen at (1,1,1,1)
 		int fleenNode1 = findNodeByDirValues4(1, 1, 1, 1);
 		if (fleenNode1 >= 0) {
@@ -430,25 +430,25 @@ void AquacubePuzzle::placeFleens() {
 			if (attempts > 0) {
 				_nodes[nodeIdx].state = 3;
 				_nodes[nodeIdx].fleenType = f + 1;
-				debug(2, "AquacubePuzzle: Fleen %d placed at node %d", f + 1, nodeIdx);
+				debug(2, "PuzzleAquacube: Fleen %d placed at node %d", f + 1, nodeIdx);
 			}
 		}
 	}
 }
 
-void AquacubePuzzle::placeBallStart() {
-	// Select a difficulty-specific starting coordinate.
-	// Diff 1: dirValues = (0,0,0)
-	// Diff 2: random from (0,0,1), (0,1,0), (1,0,0)
-	// Diff 3: dirValues = (0,0,0,0)
-	// Diff 4: random pattern, avoid fleens
+void PuzzleAquacube::placeBallStart() {
+	// Select a level-specific starting coordinate.
+	// Level 1: dirValues = (0,0,0)
+	// Level 2: random from (0,0,1), (0,1,0), (1,0,0)
+	// Level 3: dirValues = (0,0,0,0)
+	// Level 4: random pattern, avoid fleens
 
 	Common::RandomSource rnd("aquacube_start");
 	int startNode = -1;
 
-	if (_difficulty == 1) {
+	if (_level == 1) {
 		startNode = findNodeByDirValues3(0, 0, 0);
-	} else if (_difficulty == 2) {
+	} else if (_level == 2) {
 		int pattern = rnd.getRandomNumber(2);
 		switch (pattern) {
 		case 0:
@@ -461,10 +461,10 @@ void AquacubePuzzle::placeBallStart() {
 			startNode = findNodeByDirValues3(1, 0, 0);
 			break;
 		}
-	} else if (_difficulty == 3) {
+	} else if (_level == 3) {
 		startNode = findNodeByDirValues4(0, 0, 0, 0);
 	} else {
-		// Diff 4: random empty node
+		// Level 4: random empty node
 		int attempts = 50;
 		do {
 			startNode = rnd.getRandomNumber(_numNodes - 1);
@@ -485,9 +485,9 @@ void AquacubePuzzle::placeBallStart() {
 	if (startNode >= 0) {
 		_nodes[startNode].state = 2;
 		_ballNode = startNode;
-		_ballPosition = _nodes[startNode].position;
-		debug(1, "AquacubePuzzle: Ball start at node %d (%d,%d)",
-			  startNode, _ballPosition.x, _ballPosition.y);
+		_ballPos = _nodes[startNode].pos;
+		debug(1, "PuzzleAquacube: Ball start at node %d (%d,%d)",
+			  startNode, _ballPos.x, _ballPos.y);
 	}
 }
 
@@ -495,7 +495,7 @@ void AquacubePuzzle::placeBallStart() {
 // Binary-coordinate vertex lookup
 // ============================================================================
 
-int AquacubePuzzle::findNodeByDirValues3(int a, int b, int c) const {
+int PuzzleAquacube::findNodeByDirValues3(int a, int b, int c) const {
 	for (int i = 0; i < 8; i++) {
 		if (_nodes[i].dirValues[0] == a &&
 			_nodes[i].dirValues[1] == b &&
@@ -505,7 +505,7 @@ int AquacubePuzzle::findNodeByDirValues3(int a, int b, int c) const {
 	return -1;
 }
 
-int AquacubePuzzle::findNodeByDirValues4(int a, int b, int c, int d) const {
+int PuzzleAquacube::findNodeByDirValues4(int a, int b, int c, int d) const {
 	for (int i = 0; i < 16; i++) {
 		if (_nodes[i].dirValues[0] == a &&
 			_nodes[i].dirValues[1] == b &&
@@ -520,37 +520,37 @@ int AquacubePuzzle::findNodeByDirValues4(int a, int b, int c, int d) const {
 // Resource loading
 // ============================================================================
 
-void AquacubePuzzle::loadResources() {
+void PuzzleAquacube::loadResources() {
 	// Ball sprites
-	_ballGfx = new RleBlock();
-	if (!_ballGfx->loadFromFile(Common::Path("bmp/aquacube/ball"))) {
-		delete _ballGfx;
-		_ballGfx = nullptr;
+	_ballImage = new RleBlock();
+	if (!_ballImage->loadFromFile(Common::Path("bmp/aquacube/ball"))) {
+		delete _ballImage;
+		_ballImage = nullptr;
 	}
 
-	_ballBigGfx = new RleBlock();
-	if (!_ballBigGfx->loadFromFile(Common::Path("bmp/aquacube/ballBIG"))) {
-		delete _ballBigGfx;
-		_ballBigGfx = nullptr;
+	_ballBigImage = new RleBlock();
+	if (!_ballBigImage->loadFromFile(Common::Path("bmp/aquacube/ballBIG"))) {
+		delete _ballBigImage;
+		_ballBigImage = nullptr;
 	}
 
 	// Light sprite
-	_lightGfx = new RleBlock();
-	if (!_lightGfx->loadFromFile(Common::Path("bmp/aquacube/light"))) {
-		delete _lightGfx;
-		_lightGfx = nullptr;
+	_lightImage = new RleBlock();
+	if (!_lightImage->loadFromFile(Common::Path("bmp/aquacube/light"))) {
+		delete _lightImage;
+		_lightImage = nullptr;
 	}
 
-	// Cube background layers (3 layers per difficulty range)
-	if (_difficulty <= 2) {
+	// Cube background layers (3 layers per level range)
+	if (_level <= 2) {
 		const char *names[] = {"bmp/aquacube/kub_easy_01",
 							   "bmp/aquacube/kub_easy_02",
 							   "bmp/aquacube/kub_easy_03"};
 		for (int i = 0; i < 3; i++) {
-			_cubeGfx[i] = new RleBlock();
-			if (!_cubeGfx[i]->loadFromFile(Common::Path(names[i]))) {
-				delete _cubeGfx[i];
-				_cubeGfx[i] = nullptr;
+			_cubeImage[i] = new RleBlock();
+			if (!_cubeImage[i]->loadFromFile(Common::Path(names[i]))) {
+				delete _cubeImage[i];
+				_cubeImage[i] = nullptr;
 			}
 		}
 	} else {
@@ -558,76 +558,76 @@ void AquacubePuzzle::loadResources() {
 							   "bmp/aquacube/kub_hard_02",
 							   "bmp/aquacube/kub_hard_03"};
 		for (int i = 0; i < 3; i++) {
-			_cubeGfx[i] = new RleBlock();
-			if (!_cubeGfx[i]->loadFromFile(Common::Path(names[i]))) {
-				delete _cubeGfx[i];
-				_cubeGfx[i] = nullptr;
+			_cubeImage[i] = new RleBlock();
+			if (!_cubeImage[i]->loadFromFile(Common::Path(names[i]))) {
+				delete _cubeImage[i];
+				_cubeImage[i] = nullptr;
 			}
 		}
 	}
 
 	// Joystick controls.
-	_manetteOnGfx = new RleBlock();
-	if (!_manetteOnGfx->loadFromFile(Common::Path("bmp/aquacube/control_manetteON"))) {
-		delete _manetteOnGfx;
-		_manetteOnGfx = nullptr;
+	_manetteOnImage = new RleBlock();
+	if (!_manetteOnImage->loadFromFile(Common::Path("bmp/aquacube/control_manetteON"))) {
+		delete _manetteOnImage;
+		_manetteOnImage = nullptr;
 	}
 
-	_manetteOffGfx = new RleBlock();
-	if (!_manetteOffGfx->loadFromFile(Common::Path("bmp/aquacube/control_manetteOFF"))) {
-		delete _manetteOffGfx;
-		_manetteOffGfx = nullptr;
+	_manetteOffImage = new RleBlock();
+	if (!_manetteOffImage->loadFromFile(Common::Path("bmp/aquacube/control_manetteOFF"))) {
+		delete _manetteOffImage;
+		_manetteOffImage = nullptr;
 	}
 
 	// Remaining-step controls.
-	_shotsOnGfx = new RleBlock();
-	if (!_shotsOnGfx->loadFromFile(Common::Path("bmp/aquacube/control_shotsON"))) {
-		delete _shotsOnGfx;
-		_shotsOnGfx = nullptr;
+	_shotsOnImage = new RleBlock();
+	if (!_shotsOnImage->loadFromFile(Common::Path("bmp/aquacube/control_shotsON"))) {
+		delete _shotsOnImage;
+		_shotsOnImage = nullptr;
 	}
 
-	_shotsOffGfx = new RleBlock();
-	if (!_shotsOffGfx->loadFromFile(Common::Path("bmp/aquacube/control_shotsOFF"))) {
-		delete _shotsOffGfx;
-		_shotsOffGfx = nullptr;
+	_shotsOffImage = new RleBlock();
+	if (!_shotsOffImage->loadFromFile(Common::Path("bmp/aquacube/control_shotsOFF"))) {
+		delete _shotsOffImage;
+		_shotsOffImage = nullptr;
 	}
 
 	// Direction lights
-	_lightRedGfx = new RleBlock();
-	if (!_lightRedGfx->loadFromFile(Common::Path("bmp/aquacube/control_manette_lightRED"))) {
-		delete _lightRedGfx;
-		_lightRedGfx = nullptr;
+	_lightRedImage = new RleBlock();
+	if (!_lightRedImage->loadFromFile(Common::Path("bmp/aquacube/control_manette_lightRED"))) {
+		delete _lightRedImage;
+		_lightRedImage = nullptr;
 	}
 
-	_lightGreyGfx = new RleBlock();
-	if (!_lightGreyGfx->loadFromFile(Common::Path("bmp/aquacube/control_manette_lightGREY"))) {
-		delete _lightGreyGfx;
-		_lightGreyGfx = nullptr;
+	_lightGreyImage = new RleBlock();
+	if (!_lightGreyImage->loadFromFile(Common::Path("bmp/aquacube/control_manette_lightGREY"))) {
+		delete _lightGreyImage;
+		_lightGreyImage = nullptr;
 	}
 
 	// Warp buttons
-	_warpOnGfx = new RleBlock();
-	if (!_warpOnGfx->loadFromFile(Common::Path("bmp/aquacube/control_warpBUTTON_ON"))) {
-		delete _warpOnGfx;
-		_warpOnGfx = nullptr;
+	_warpOnImage = new RleBlock();
+	if (!_warpOnImage->loadFromFile(Common::Path("bmp/aquacube/control_warpBUTTON_ON"))) {
+		delete _warpOnImage;
+		_warpOnImage = nullptr;
 	}
 
-	_warpOffGfx = new RleBlock();
-	if (!_warpOffGfx->loadFromFile(Common::Path("bmp/aquacube/control_warpBUTTON_OFF"))) {
-		delete _warpOffGfx;
-		_warpOffGfx = nullptr;
+	_warpOffImage = new RleBlock();
+	if (!_warpOffImage->loadFromFile(Common::Path("bmp/aquacube/control_warpBUTTON_OFF"))) {
+		delete _warpOffImage;
+		_warpOffImage = nullptr;
 	}
 
-	_warpDisableGfx = new RleBlock();
-	if (!_warpDisableGfx->loadFromFile(Common::Path("bmp/aquacube/control_warpBUTTON_DISABLE"))) {
-		delete _warpDisableGfx;
-		_warpDisableGfx = nullptr;
+	_warpDisableImage = new RleBlock();
+	if (!_warpDisableImage->loadFromFile(Common::Path("bmp/aquacube/control_warpBUTTON_DISABLE"))) {
+		delete _warpDisableImage;
+		_warpDisableImage = nullptr;
 	}
 
 	// Warp timer animation (replaces static empty timer)
 	_warpTimerAnim = new Animation();
 	if (!_warpTimerAnim->loadFromFile(Common::Path("bmp/aquacube/control_warpTIMER"))) {
-		debug(2, "AquacubePuzzle: Failed to load warp timer animation");
+		debug(2, "PuzzleAquacube: Failed to load warp timer animation");
 		delete _warpTimerAnim;
 		_warpTimerAnim = nullptr;
 	}
@@ -637,7 +637,7 @@ void AquacubePuzzle::loadResources() {
 		_flareAnims[i] = new Animation();
 		Common::Path path(Common::String::format("bmp/aquacube/FLARE%d", i + 1));
 		if (!_flareAnims[i]->loadFromFile(path)) {
-			debug(2, "AquacubePuzzle: Failed to load FLARE%d.AN", i + 1);
+			debug(2, "PuzzleAquacube: Failed to load FLARE%d.AN", i + 1);
 			delete _flareAnims[i];
 			_flareAnims[i] = nullptr;
 		}
@@ -645,21 +645,21 @@ void AquacubePuzzle::loadResources() {
 
 	// Bubbles
 	for (int i = 0; i < 3; i++) {
-		_bubbleGfx[i] = new RleBlock();
+		_bubbleImage[i] = new RleBlock();
 		Common::Path path(Common::String::format("bmp/aquacube/bubble%d", i + 1));
-		if (!_bubbleGfx[i]->loadFromFile(path)) {
-			delete _bubbleGfx[i];
-			_bubbleGfx[i] = nullptr;
+		if (!_bubbleImage[i]->loadFromFile(path)) {
+			delete _bubbleImage[i];
+			_bubbleImage[i] = nullptr;
 		}
 	}
 
 	// Fleen sprites (4 types)
 	for (int i = 0; i < 4; i++) {
-		_fleenGfx[i] = new RleBlock();
+		_fleenImage[i] = new RleBlock();
 		Common::Path path(Common::String::format("bmp/aquacube/fleen/fixe/f%dfixe", i + 1));
-		if (!_fleenGfx[i]->loadFromFile(path)) {
-			delete _fleenGfx[i];
-			_fleenGfx[i] = nullptr;
+		if (!_fleenImage[i]->loadFromFile(path)) {
+			delete _fleenImage[i];
+			_fleenImage[i] = nullptr;
 		}
 	}
 }
@@ -668,21 +668,21 @@ void AquacubePuzzle::loadResources() {
 // Ball movement
 // ============================================================================
 
-void AquacubePuzzle::startBallMove(int targetNode) {
+void PuzzleAquacube::startBallMove(int targetNode) {
 	_targetNode = targetNode;
-	_ballStartPosition = _ballPosition;
-	_ballEndPosition = _nodes[targetNode].position;
-	_moveStartTime = _engine->getGameTickCount();
+	_ballStartPos = _ballPos;
+	_ballEndPos = _nodes[targetNode].pos;
+	_moveStartTime = _vm->getGameTickCount();
 	if (_gameState != kStateWarpExecuting)
 		_gameState = kStateBallMoving;
 
-	debug(2, "AquacubePuzzle: Moving ball from node %d to %d", _ballNode, _targetNode);
+	debug(2, "PuzzleAquacube: Moving ball from node %d to %d", _ballNode, _targetNode);
 }
 
-void AquacubePuzzle::finishBallMove() {
+void PuzzleAquacube::finishBallMove() {
 	_ballNode = _targetNode;
 	_targetNode = -1;
-	_ballPosition = _nodes[_ballNode].position;
+	_ballPos = _nodes[_ballNode].pos;
 	_stepsUsed++;
 
 	// If we are executing a warp queue, advance to the next planned move
@@ -710,21 +710,21 @@ void AquacubePuzzle::finishBallMove() {
 			freeZoombini(_ballNode);
 		}
 		_gameState = kStateZoombiniFreed;
-		_stateTimer = _engine->getGameTickCount();
+		_stateTimer = _vm->getGameTickCount();
 		return;
 	} else if (node.state == 3) {
 		// Enter the Fleen penalty phase.
 		node.state = 1;
 		node.fleenType = 0;
 		_gameState = kStateFleenHit;
-		_stateTimer = _engine->getGameTickCount();
+		_stateTimer = _vm->getGameTickCount();
 		return;
 	}
 
 	// Check if steps exhausted
 	if (_stepsUsed >= _maxSteps) {
 		_gameState = kStateDone;
-		_stateTimer = _engine->getGameTickCount();
+		_stateTimer = _vm->getGameTickCount();
 	} else {
 		_gameState = kStateIdle;
 	}
@@ -734,16 +734,16 @@ void AquacubePuzzle::finishBallMove() {
 // Occupied vertices release their Zoombinis unconditionally without feature matching.
 // ============================================================================
 
-void AquacubePuzzle::freeZoombini(int nodeIdx) {
+void PuzzleAquacube::freeZoombini(int nodeIdx) {
 	GraphNode &node = _nodes[nodeIdx];
 	if (node.occupantCount <= 0)
 		return;
 
 	int zIdx = node.occupants[0];
-	debug(1, "AquacubePuzzle: Freed zoombini %d at node %d", zIdx, nodeIdx);
+	debug(1, "PuzzleAquacube: Freed zoombini %d at node %d", zIdx, nodeIdx);
 
 	if (zIdx >= 0 && zIdx < (int)_puzzleZoombinis.size()) {
-		_puzzleZoombinis[zIdx]->_freeStatus = 0; // Mark as free
+		_puzzleZoombinis[zIdx]->_puzzleStatus = 0;
 	}
 
 	// Shift remaining occupants
@@ -758,10 +758,10 @@ void AquacubePuzzle::freeZoombini(int nodeIdx) {
 	_freedCount++;
 }
 
-int AquacubePuzzle::countFreeZoombinis() const {
+int PuzzleAquacube::countFreeZoombinis() const {
 	int count = 0;
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
-		if (_puzzleZoombinis[i]->_freeStatus == 0)
+		if (_puzzleZoombinis[i]->_puzzleStatus == 0)
 			count++;
 	}
 	return count;
@@ -771,13 +771,13 @@ int AquacubePuzzle::countFreeZoombinis() const {
 // State-machine update
 // ============================================================================
 
-void AquacubePuzzle::update() {
-	uint32 now = _engine->getGameTickCount();
+void PuzzleAquacube::onUpdate() {
+	uint32 now = _vm->getGameTickCount();
 	uint32 elapsed = now - _stateTimer;
 
 	switch (_gameState) {
 	case kStateIdle:
-		// Input is handled by handleClick().
+		// Input is handled by onLButtonDown().
 		break;
 
 	case kStateBallMoving:
@@ -789,8 +789,8 @@ void AquacubePuzzle::update() {
 		} else {
 			// The control points reduce this movement to linear interpolation.
 			float progress = static_cast<float>(moveElapsed) / kMoveAnimDuration;
-			_ballPosition.x = _ballStartPosition.x + static_cast<int32>((_ballEndPosition.x - _ballStartPosition.x) * progress);
-			_ballPosition.y = _ballStartPosition.y + static_cast<int32>((_ballEndPosition.y - _ballStartPosition.y) * progress);
+			_ballPos.x = _ballStartPos.x + static_cast<int32>((_ballEndPos.x - _ballStartPos.x) * progress);
+			_ballPos.y = _ballStartPos.y + static_cast<int32>((_ballEndPos.y - _ballStartPos.y) * progress);
 		}
 		break;
 	}
@@ -803,7 +803,7 @@ void AquacubePuzzle::update() {
 	case kStateZoombiniFreed:
 		if (elapsed > 800) {
 			if (_freedCount >= _numZoombinisToPlace) {
-				debug(1, "AquacubePuzzle: Win! %d zoombinis freed", _freedCount);
+				debug(1, "PuzzleAquacube: Win! %d zoombinis freed", _freedCount);
 				_gameState = kStateDone;
 				_stateTimer = now;
 			} else if (_stepsUsed >= _maxSteps) {
@@ -827,15 +827,15 @@ void AquacubePuzzle::update() {
 		break;
 
 	case kStateWarpPlanning:
-		// Direction input is collected by handleClick().
+		// Direction input is collected by onLButtonDown().
 		break;
 
 	case kStateDone:
 		if (elapsed > 2000) {
-			debug(1, "AquacubePuzzle: Complete, returning to map");
-			_engine->_returningFromPuzzle = true;
-			_engine->_maptransSourceWorld = _pageId;
-			_engine->requestPageChange(kPageMapTrans);
+			debug(1, "PuzzleAquacube: Complete, returning to map");
+			_vm->_returningFromPuzzle = true;
+			_vm->_mapTransitionSourcePageId = static_cast<PageId>(_pageId);
+			_vm->requestPageChange(kPageMapTrans);
 		}
 		break;
 	}
@@ -845,39 +845,41 @@ void AquacubePuzzle::update() {
 // Draw
 // ============================================================================
 
-void AquacubePuzzle::draw(Graphics::ManagedSurface *screen) {
+void PuzzleAquacube::onRenderBackground(ManagedSurface32 *screen) {
 	// Draw background
 	if (_background)
-		_background->drawToSurface(screen, 0, 0);
+		_background->drawToSurface(screen, Common::Point32(0, 0));
+}
 
-	const byte(*lut)[256] = _engine->getAlphaLUT();
+void PuzzleAquacube::onRenderScene(ManagedSurface32 *screen) {
+	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 
 	// Draw the three overlapping cube layers at their shared origin.
-	if (_difficulty <= 2) {
+	if (_level <= 2) {
 		// Easy cube: draw layer 3, then 2, then 1 (back to front)
-		if (_cubeGfx[2])
-			_cubeGfx[2]->drawToScreen(screen, kCubeDrawPosition.x, kCubeDrawPosition.y, lut);
-		if (_cubeGfx[1])
-			_cubeGfx[1]->drawToScreen(screen, kCubeDrawPosition.x, kCubeDrawPosition.y, lut);
-		if (_cubeGfx[0])
-			_cubeGfx[0]->drawToScreen(screen, kCubeDrawPosition.x, kCubeDrawPosition.y, lut);
+		if (_cubeImage[2])
+			_cubeImage[2]->drawToScreen(screen, kCubeDrawPos, lut);
+		if (_cubeImage[1])
+			_cubeImage[1]->drawToScreen(screen, kCubeDrawPos, lut);
+		if (_cubeImage[0])
+			_cubeImage[0]->drawToScreen(screen, kCubeDrawPos, lut);
 	} else {
 		// Hard cube: draw in depth order for 3 node groups
-		if (_cubeGfx[0])
-			_cubeGfx[0]->drawToScreen(screen, kCubeDrawPosition.x, kCubeDrawPosition.y, lut);
-		if (_cubeGfx[1])
-			_cubeGfx[1]->drawToScreen(screen, kCubeDrawPosition.x, kCubeDrawPosition.y, lut);
-		if (_cubeGfx[2])
-			_cubeGfx[2]->drawToScreen(screen, kCubeDrawPosition.x, kCubeDrawPosition.y, lut);
+		if (_cubeImage[0])
+			_cubeImage[0]->drawToScreen(screen, kCubeDrawPos, lut);
+		if (_cubeImage[1])
+			_cubeImage[1]->drawToScreen(screen, kCubeDrawPos, lut);
+		if (_cubeImage[2])
+			_cubeImage[2]->drawToScreen(screen, kCubeDrawPos, lut);
 	}
 
 	// Draw node markers (ball circles at each vertex)
-	RleBlock *nodeGfx = (_difficulty <= 2) ? _ballBigGfx : _ballGfx;
-	if (nodeGfx) {
+	RleBlock *nodeImage = (_level <= 2) ? _ballBigImage : _ballImage;
+	if (nodeImage) {
 		for (int i = 0; i < _numNodes; i++) {
 			if (_nodes[i].state != 2) { // Don't draw at ball start position
-				Common::Point32 nodePosition = _nodes[i].position + _nodeOffset;
-				nodeGfx->drawToScreen(screen, nodePosition.x, nodePosition.y, lut);
+				Common::Point32 nodePos = _nodes[i].pos + _nodeOffset;
+				nodeImage->drawToScreen(screen, nodePos, lut);
 			}
 		}
 	}
@@ -886,75 +888,81 @@ void AquacubePuzzle::draw(Graphics::ManagedSurface *screen) {
 	for (int i = 0; i < _numNodes; i++) {
 		if (_nodes[i].state == 3 && _nodes[i].fleenType > 0) {
 			int fleenIdx = _nodes[i].fleenType - 1;
-			if (fleenIdx < 4 && _fleenGfx[fleenIdx]) {
-				Common::Point32 fleenPosition = _nodes[i].position + _fleenOffset;
-				_fleenGfx[fleenIdx]->drawToScreen(screen, fleenPosition.x, fleenPosition.y, lut);
+			if (fleenIdx < 4 && _fleenImage[fleenIdx]) {
+				Common::Point32 fleenPos = _nodes[i].pos + _fleenOffset;
+				_fleenImage[fleenIdx]->drawToScreen(screen, fleenPos, lut);
 			}
 		}
 	}
+}
 
+void PuzzleAquacube::onRenderActors(ManagedSurface32 *screen) {
+	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	// Draw the ball at current position
-	if (_ballBigGfx) {
-		_ballBigGfx->drawToScreen(screen, _ballPosition.x, _ballPosition.y, lut);
-	} else if (_ballGfx) {
-		_ballGfx->drawToScreen(screen, _ballPosition.x, _ballPosition.y, lut);
+	if (_ballBigImage) {
+		_ballBigImage->drawToScreen(screen, _ballPos, lut);
+	} else if (_ballImage) {
+		_ballImage->drawToScreen(screen, _ballPos, lut);
 	}
+}
 
+void PuzzleAquacube::onRenderForeground(ManagedSurface32 *screen) {
+	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	// Draw direction-arrow controls.
 	int numArrows = MIN(_numZoombinisToPlace, 4);
 	for (int i = 0; i < numArrows; i++) {
 		// Draw arrow connector
-		if (_manetteOnGfx)
-			_manetteOnGfx->drawToScreen(screen, kArrowPositions[i].x, kArrowPositions[i].y, lut);
+		if (_manetteOnImage)
+			_manetteOnImage->drawToScreen(screen, kArrowPos[i], lut);
 
 		// Draw step arrow
-		if (_shotsOnGfx)
-			_shotsOnGfx->drawToScreen(screen, kStepArrowPositions[i].x, kStepArrowPositions[i].y, lut);
+		if (_shotsOnImage)
+			_shotsOnImage->drawToScreen(screen, kStepArrowPos[i], lut);
 	}
 
 	// Draw step indicators
 	for (int i = 0; i < _totalSteps; i++) {
-		RleBlock *indicGfx;
+		RleBlock *indicatorImage;
 		if (i < _stepsUsed)
-			indicGfx = _lightRedGfx; // Used step
+			indicatorImage = _lightRedImage; // Used step
 		else
-			indicGfx = _lightGreyGfx; // Available step
+			indicatorImage = _lightGreyImage; // Available step
 
-		if (indicGfx && i < 11) {
-			indicGfx->drawToScreen(screen, kStepIndicatorPositions[i].x, kStepIndicatorPositions[i].y, lut);
+		if (indicatorImage && i < 11) {
+			indicatorImage->drawToScreen(screen, kStepIndicatorPos[i], lut);
 		}
 	}
 
-	// Draw warp button (diff > 1)
+	// Draw warp button (level > 1)
 	if (_warpAvailable) {
-		RleBlock *warpGfx;
+		RleBlock *warpImage;
 		if (_warpActive)
-			warpGfx = _warpOnGfx;
+			warpImage = _warpOnImage;
 		else if (_stepsUsed < _maxSteps)
-			warpGfx = _warpOffGfx;
+			warpImage = _warpOffImage;
 		else
-			warpGfx = _warpDisableGfx;
+			warpImage = _warpDisableImage;
 
-		if (warpGfx)
-			warpGfx->drawToScreen(screen, kWarpOverlayPosition.x, kWarpOverlayPosition.y, lut);
+		if (warpImage)
+			warpImage->drawToScreen(screen, kWarpOverlayPos, lut);
 
 		// Draw animated warp timer
 		if (_warpTimerAnim) {
-			uint32 now = _engine->getGameTickCount();
+			uint32 now = _vm->getGameTickCount();
 			int frameCount = _warpTimerAnim->getFrameCount();
 			if (frameCount > 0) {
 				int frameIdx = (now / 80) % frameCount; // ~12.5 fps
 				const RleBlock *frame = _warpTimerAnim->getFrame(frameIdx);
 				if (frame)
-					frame->drawToScreen(screen, kWarpTimerPosition.x, kWarpTimerPosition.y, lut);
+					frame->drawToScreen(screen, kWarpTimerPos, lut);
 			}
 		}
 	}
 
 	// Draw flare visual effects (decorative)
 	// Position flares at strategic points on the screen for visual polish
-	uint32 now = _engine->getGameTickCount();
-	static const Common::Point32 flarePositions[2] = {
+	uint32 now = _vm->getGameTickCount();
+	static const Common::Point32 flarePos[2] = {
 		Common::Point32(50, 400), // FLARE1 - lower left
 		Common::Point32(650, 100) // FLARE2 - upper right
 	};
@@ -967,7 +975,7 @@ void AquacubePuzzle::draw(Graphics::ManagedSurface *screen) {
 				int frameIdx = (now / timing) % frameCount;
 				const RleBlock *frame = _flareAnims[i]->getFrame(frameIdx);
 				if (frame)
-					frame->drawToScreen(screen, flarePositions[i].x, flarePositions[i].y, lut);
+					frame->drawToScreen(screen, flarePos[i], lut);
 			}
 		}
 	}
@@ -977,31 +985,31 @@ void AquacubePuzzle::draw(Graphics::ManagedSurface *screen) {
 // Input handling
 // ============================================================================
 
-void AquacubePuzzle::handleClick(const Common::Point &pos) {
+EventHandleResult PuzzleAquacube::onLButtonDown(const Common::Point &pos) {
 	if (_gameState == kStateWarpPlanning) {
 		// In warp planning, direction arrows add moves to the queue
-		int numDirections = (_difficulty <= 2) ? 3 : 4;
+		int numDirections = (_level <= 2) ? 3 : 4;
 		for (int d = 0; d < numDirections && d < 4; d++) {
 			Common::Rect hitbox(
-				static_cast<int16>(kArrowPositions[d].x), static_cast<int16>(kArrowPositions[d].y),
-				static_cast<int16>(kArrowPositions[d].x + kArrowHitW), static_cast<int16>(kArrowPositions[d].y + kArrowHitH));
+				static_cast<int16>(kArrowPos[d].x), static_cast<int16>(kArrowPos[d].y),
+				static_cast<int16>(kArrowPos[d].x + kArrowHitW), static_cast<int16>(kArrowPos[d].y + kArrowHitH));
 			if (hitbox.contains(pos)) {
 				_warpQueue.push_back(d);
-				debug(2, "AquacubePuzzle: Added direction %d to warp queue", d);
-				return;
+				debug(2, "PuzzleAquacube: Added direction %d to warp queue", d);
+				return EventHandleResult::kConsumed;
 			}
 		}
 
 		// Clicking warp button again executes the queue
 		Common::Rect warpHitbox(
-			static_cast<int16>(kWarpOverlayPosition.x), static_cast<int16>(kWarpOverlayPosition.y),
-			static_cast<int16>(kWarpOverlayPosition.x + 60), static_cast<int16>(kWarpOverlayPosition.y + 30));
+			static_cast<int16>(kWarpOverlayPos.x), static_cast<int16>(kWarpOverlayPos.y),
+			static_cast<int16>(kWarpOverlayPos.x + 60), static_cast<int16>(kWarpOverlayPos.y + 30));
 		if (warpHitbox.contains(pos)) {
 			if (!_warpQueue.empty()) {
 				_warpQueueIdx = 0;
 				_gameState = kStateWarpExecuting;
-				_stateTimer = _engine->getGameTickCount();
-				debug(2, "AquacubePuzzle: Executing warp queue of %d moves", static_cast<int>(_warpQueue.size()));
+				_stateTimer = _vm->getGameTickCount();
+				debug(2, "PuzzleAquacube: Executing warp queue of %d moves", static_cast<int>(_warpQueue.size()));
 
 				// Start first move in queue
 				int firstDir = _warpQueue[0];
@@ -1009,62 +1017,63 @@ void AquacubePuzzle::handleClick(const Common::Point &pos) {
 				if (adjNode >= 0)
 					startBallMove(adjNode);
 			}
-			return;
+			return EventHandleResult::kConsumed;
 		}
-		return;
+		return EventHandleResult::kPassthrough;
 	}
 
 	if (_gameState != kStateIdle)
-		return;
+		return EventHandleResult::kPassthrough;
 
 	// Check direction arrow buttons.
-	int numDirections = (_difficulty <= 2) ? 3 : 4;
+	int numDirections = (_level <= 2) ? 3 : 4;
 	for (int d = 0; d < numDirections && d < 4; d++) {
 		Common::Rect hitbox(
-			static_cast<int16>(kArrowPositions[d].x), static_cast<int16>(kArrowPositions[d].y),
-			static_cast<int16>(kArrowPositions[d].x + kArrowHitW), static_cast<int16>(kArrowPositions[d].y + kArrowHitH));
+			static_cast<int16>(kArrowPos[d].x), static_cast<int16>(kArrowPos[d].y),
+			static_cast<int16>(kArrowPos[d].x + kArrowHitW), static_cast<int16>(kArrowPos[d].y + kArrowHitH));
 
 		if (hitbox.contains(pos)) {
 			int adjNode = _nodes[_ballNode].adj[d];
 			if (adjNode >= 0 && adjNode < _numNodes) {
-				debug(2, "AquacubePuzzle: Direction %d clicked -> node %d", d, adjNode);
+				debug(2, "PuzzleAquacube: Direction %d clicked -> node %d", d, adjNode);
 				startBallMove(adjNode);
 			}
-			return;
+			return EventHandleResult::kConsumed;
 		}
 	}
 
 	// Check warp button
 	if (_warpAvailable) {
 		Common::Rect warpHitbox(
-			static_cast<int16>(kWarpOverlayPosition.x), static_cast<int16>(kWarpOverlayPosition.y),
-			static_cast<int16>(kWarpOverlayPosition.x + 60), static_cast<int16>(kWarpOverlayPosition.y + 30));
+			static_cast<int16>(kWarpOverlayPos.x), static_cast<int16>(kWarpOverlayPos.y),
+			static_cast<int16>(kWarpOverlayPos.x + 60), static_cast<int16>(kWarpOverlayPos.y + 30));
 
 		if (warpHitbox.contains(pos)) {
 			_warpQueue.clear();
 			_gameState = kStateWarpPlanning;
-			_stateTimer = _engine->getGameTickCount();
-			debug(2, "AquacubePuzzle: Entered warp planning mode");
-			return;
+			_stateTimer = _vm->getGameTickCount();
+			debug(2, "PuzzleAquacube: Entered warp planning mode");
+			return EventHandleResult::kConsumed;
 		}
 	}
 
 	// Check if clicked on a graph node directly (for accessibility)
 	for (int i = 0; i < _numNodes; i++) {
 		Common::Rect nodeHitbox(
-			static_cast<int16>(_nodes[i].position.x - 20), static_cast<int16>(_nodes[i].position.y - 20),
-			static_cast<int16>(_nodes[i].position.x + 20), static_cast<int16>(_nodes[i].position.y + 20));
+			static_cast<int16>(_nodes[i].pos.x - 20), static_cast<int16>(_nodes[i].pos.y - 20),
+			static_cast<int16>(_nodes[i].pos.x + 20), static_cast<int16>(_nodes[i].pos.y + 20));
 
 		if (nodeHitbox.contains(pos)) {
 			for (int d = 0; d < 4; d++) {
 				if (_nodes[_ballNode].adj[d] == i) {
-					debug(2, "AquacubePuzzle: Node %d clicked (adj dir %d)", i, d);
+					debug(2, "PuzzleAquacube: Node %d clicked (adj dir %d)", i, d);
 					startBallMove(i);
-					return;
+					return EventHandleResult::kConsumed;
 				}
 			}
 		}
 	}
+	return EventHandleResult::kPassthrough;
 }
 
 } // End of namespace Zoombini2

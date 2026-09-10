@@ -30,27 +30,31 @@
 namespace Zoombini2 {
 
 class Animation;
+class BitmapFont;
 class RleBlock;
 
 /**
- * Chez Norf is the restaurant activity on the left route to Rescue Site II.
- * The internal ChezNorf name identifies the bmp/chez_norf resources.
+ * Chez Norf (Route2-2)
+ *
+ * Use the Norfs' clues to prepare and serve each requested meal.
  */
-class ChezNorfPuzzle : public PuzzlePage {
+class PuzzleChezNorf : public PuzzleBase {
 public:
-	/** Construct Chez Norf for @p engine. */
-	ChezNorfPuzzle(Zoombini2Engine *engine);
+	/** Construct Chez Norf for @p vm. */
+	PuzzleChezNorf(Zoombini2Engine *vm);
 	/** Release food, table, and Norf resources. */
-	~ChezNorfPuzzle() override;
+	~PuzzleChezNorf() override;
 
-	/** Load the restaurant and generate the difficulty-selected clue layout. */
+	/** Load the restaurant and generate the level-selected clue layout. */
 	void init() override;
 	/** Advance serving and answer-feedback phases. */
-	void update() override;
+	void onUpdate() override;
 	/** Draw the clue board, tables, meals, Norf, and seated Zoombinis. */
-	void draw(Graphics::ManagedSurface *screen) override;
+	void onRenderScene(ManagedSurface32 *screen) override;
+	/** Draw feedback above table occupants. */
+	void onRenderForeground(ManagedSurface32 *screen) override;
 	/** Select food or serve the pending order to a table. */
-	void handleClick(const Common::Point &pos) override;
+	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 
 	/** Maximum table capacity used by the hardest layout. */
 	static const int kMaxTables = 6;
@@ -112,7 +116,7 @@ private:
 	/** One restaurant table and its current order. */
 	struct TableSlot {
 		/** Table position. */
-		Common::Point32 position;
+		Common::Point32 pos;
 		/** Clickable table area. */
 		Common::Rect hitbox;
 		/** Assigned puzzle-roster index, or `-1` when empty. */
@@ -151,7 +155,7 @@ private:
 
 	/** Return the table at @p pos, or `-1` when none is hit. */
 	int findTableAtPos(const Common::Point &pos) const;
-	/** Return the food item at @p pos, or @ref ChezNorfPuzzle::kFoodNone. */
+	/** Return the food item at @p pos, or @ref PuzzleChezNorf::kFoodNone. */
 	int findFoodAtPos(const Common::Point &pos) const;
 	/** Serve the pending course selections to table @p tableIdx. */
 	void serveFoodToTable(int tableIdx);
@@ -163,22 +167,26 @@ private:
 	int countFreeZoombinis() const;
 
 	/** Draw the colored-dot clue board and food selectors. */
-	void drawFoodBoard(Graphics::ManagedSurface *screen);
+	void drawFoodBoard(ManagedSurface32 *screen);
 	/** Draw the active table layout. */
-	void drawTables(Graphics::ManagedSurface *screen);
+	void drawTables(ManagedSurface32 *screen);
 	/** Draw served orders at their tables. */
-	void drawPlates(Graphics::ManagedSurface *screen);
+	void drawPlates(ManagedSurface32 *screen);
 	/** Draw Norf and current answer feedback. */
-	void drawNorf(Graphics::ManagedSurface *screen);
+	void drawNorf(ManagedSurface32 *screen);
+	/** Draw the developer diagnostic overlay while C is held. */
+	void drawDebugOverlay(ManagedSurface32 *screen);
+	/** Return the abbreviated debug label for @p foodId. */
+	static const char *getDebugFoodName(int foodId);
 	/** Draw every seated Zoombini that has not been released. */
-	void drawZoombinis(Graphics::ManagedSurface *screen);
+	void onRenderActors(ManagedSurface32 *screen) override;
 
 	/** Current interaction phase. */
 	State _state;
-	/** Number of tables enabled for the selected difficulty. */
+	/** Number of tables enabled for the selected level. */
 	int _numTables;
-	/** Difficulty level consumed by this page. */
-	int _difficulty;
+	/** Level consumed by this page. */
+	int _level;
 	/** Number of Zoombinis already released. */
 	int _freedCount;
 	/** Currently active table, or `-1` when none is active. */
@@ -187,7 +195,7 @@ private:
 	int _selectedFood;
 	/** Number of incorrect orders submitted. */
 	int _wrongCount;
-	/** Difficulty-dependent incorrect-order allowance. */
+	/** Level-dependent incorrect-order allowance. */
 	int _maxAttempts;
 	/** Number of feature attributes represented in the clue layout. */
 	int _clueAttrCount;
@@ -227,21 +235,23 @@ private:
 	RleBlock *_platoMini;
 
 	/** Dessert item visuals. */
-	RleBlock *_slurpGfx[3];
+	RleBlock *_slurpImage[3];
 
 	/** Main-dish item visuals. */
-	RleBlock *_miamGfx[3];
+	RleBlock *_miamImage[3];
 
 	/** Drink item visuals. */
-	RleBlock *_glouglouGfx[3];
+	RleBlock *_glouglouImage[3];
 
 	/** Order-panel visuals. */
-	RleBlock *_comandeGfx[3];
+	RleBlock *_comandeImage[3];
 
 	/** Default Norf visual. */
 	RleBlock *_norfDefault;
 	/** Selection highlight visual. */
-	RleBlock *_highlightGfx;
+	RleBlock *_highlightImage;
+	/** Lazily loaded green bitmap font for the developer overlay. */
+	BitmapFont *_debugFont;
 
 	/** Music handle used while Chez Norf is active. */
 	int _musicId;

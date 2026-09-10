@@ -25,66 +25,50 @@
 #include "common/array.h"
 #include "common/str.h"
 
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/transition_base.h"
-#include "zoombini2/path.h"
+#include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
 class BitBlock;
 class RleBlock;
-class ZoombiniGraphics;
-
-/** Runtime position and animation state for one Zoombini walking across the map. */
-struct ZoombiniWalkState {
-	/** Current screen position. */
-	Common::Point32 screenPosition;
-	/** Previous screen position used to determine direction. */
-	Common::Point32 previousScreenPosition;
-	/** Animation cell selected from the current movement direction. */
-	int cellIndex;
-	/** Whether this walker is still advancing along its path. */
-	bool active;
-};
+class ZoombiniAnimation;
 
 /** Transition page that walks the current party along a route on the mountain map. */
-class MapTransition : public TransitionPage {
+class TransitionMapTrans : public TransitionBase {
 public:
-	/** Construct the map transition for @p engine. */
-	MapTransition(Zoombini2Engine *engine);
+	/** Construct the map transition for @p vm. */
+	TransitionMapTrans(Zoombini2Engine *vm);
 	/** Release the composited map and per-Zoombini paths. */
-	~MapTransition() override;
+	~TransitionMapTrans() override;
 
 	/** Load the route, compose map overlays, and initialize the walking party. */
 	void init() override;
 	/** Start and advance staggered walkers until the transition completes. */
-	void update() override;
+	void onUpdate() override;
 	/** Draw the composited map and active walkers. */
-	void draw(Graphics::ManagedSurface *screen) override;
+	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderActors(ManagedSurface32 *screen) override;
 	/** Skip the remaining walking animation and enter the resolved destination. */
-	void handleClick(const Common::Point &pos) override;
-	/** Resolve the next world page from the source world, route, and rescue progress. */
-	static int getDestPage(int source, int route, int rescuedBoolies);
+	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
+	/** Resolve the next route page from the source page, Rescue Site I branch, and rescue progress. */
+	static PageId getDestPage(PageId src, RouteBranch routeBranch, int rescuedBoolies);
 
 private:
-	/** Draw one named overlay at @p position. */
-	void drawOverlaySprite(Graphics::ManagedSurface *dst,
-						   const Common::String &name, const Common::Point32 &position);
-	/** Compose overlays appropriate to @p source and @p mapRegion. */
-	void drawMapOverlays(Graphics::ManagedSurface *dst, int source, int mapRegion);
+	/** Draw one named overlay at @p pos. */
+	void drawOverlaySprite(Graphics::ManagedSurface *dst, const Common::String &name, const Common::Point32 &pos);
+	/** Compose overlays appropriate to @p src and @p mapRegion. */
+	void drawMapOverlays(Graphics::ManagedSurface *dst, PageId src, int mapRegion);
 	/** Start any due walkers and update all active party paths. */
 	void walkZoombinis();
-	/** Delete all owned path objects and clear walking state. */
+	/** Clear the paths and walking state assigned to the walking Zoombinis. */
 	void cleanupPaths();
 	/** Return the page entered after this transition. */
-	int getPostTransitionPage() const;
+	PageId getPostTransitionPage() const;
 	/** Commit the destination page after the last walker finishes. */
 	void finishTransition();
-	/** Convert a movement delta into a directional animation cell. */
-	int computeDirectionCell(int dx, int dy) const;
-	/** Draw one party member with the cell selected for its direction. */
-	void drawZoombiniSprite(Graphics::ManagedSurface *dst,
-							int zoombiniIdx, int cellIndex,
-							const Common::Point32 &position) const;
 
 	/** Background with route-specific overlays already applied. */
 	Graphics::ManagedSurface *_compositedBg;
@@ -92,10 +76,6 @@ private:
 	/** Route shared as the template for each party member's path. */
 	Common::Path _patPath;
 
-	/** Independently timed paths for the party. */
-	Common::Array<PathObject *> _zoombiniPaths;
-	/** Screen and direction state corresponding to @ref MapTransition::_zoombiniPaths. */
-	Common::Array<ZoombiniWalkState> _walkStates;
 	/** Index of the next party member waiting to start. */
 	int _nextWalkIndex;
 	/** Time at which the next walker may start. */
@@ -103,15 +83,15 @@ private:
 	/** Number of walkers that have reached the route endpoint. */
 	int _completedCount;
 
-	/** World whose entry page follows this route. */
-	int _targetWorld;
+	/** Page whose entry follows this route. */
+	PageId _targetPageId;
 	/** Whether the destination page has already been requested. */
 	bool _transitionFinished;
 	/** Music handle used during the map transition. */
 	int _musicId;
 
-	/** Shared little-Zoombini animation cells used for the walking party. */
-	ZoombiniGraphics *_zoombiniGfx;
+	/** Borrowed immutable sprite grid owned by the engine cache. */
+	const ZoombiniAnimation *_zoombiniAnimation;
 };
 
 } // End of namespace Zoombini2

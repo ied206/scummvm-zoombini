@@ -27,12 +27,10 @@
 namespace Zoombini2 {
 
 /** Movies and travel sequences that advance to another dispatched screen. */
-class ZoombiniTransition : public ZoombiniPage {
+class TransitionBase : public PageBase {
 public:
-	/** Bind a transition page to @p engine. */
-	explicit ZoombiniTransition(Zoombini2Engine *engine) : ZoombiniPage(engine) {}
-	/** Return the transition ownership category. */
-	PageCategory getCategory() const override { return PageCategory::kTransition02; }
+	/** Bind a transition page to @p vm. */
+	explicit TransitionBase(Zoombini2Engine *vm) : PageBase(vm, PageCategory::kTransition) {}
 };
 
 } // End of namespace Zoombini2
