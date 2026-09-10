@@ -22,8 +22,8 @@
 #ifndef ZOOMBINI2_PAGES_DIALOG_HELP_H
 #define ZOOMBINI2_PAGES_DIALOG_HELP_H
 
-#include "common/str.h"
 #include "common/rect.h"
+#include "common/str.h"
 #include "zoombini2/pages/dialog_base.h"
 
 namespace Graphics {
@@ -37,24 +37,24 @@ class BitBlock;
 class RleBlock;
 
 /**
- * Owns the context-sensitive help overlay for one puzzle and difficulty.
+ * Owns the context-sensitive help overlay for one puzzle and level.
  *
- * Help pages resolve below `bmp/help` from the puzzle, difficulty, and sheet
+ * Help pages resolve below `bmp/help` from the puzzle, level, and sheet
  * number. The dialog pauses gameplay, retains the underlying screen, and
  * restores both the screen and gameplay clock when it closes.
  */
-class HelpScreen : public Dialog {
+class DialogHelp : public DialogBase {
 public:
-	/** Bind the reusable help overlay to @p engine. */
-	HelpScreen(Zoombini2Engine *engine);
+	/** Bind the reusable help overlay to @p vm. */
+	DialogHelp(Zoombini2Engine *vm);
 	/** Release the active page, controls, and saved screen. */
-	~HelpScreen() override;
+	~DialogHelp() override;
 
 	/** Return whether a help sheet exists for the supplied puzzle coordinates. */
-	bool isPageValid(int puzzleId, int difficulty, int page);
+	bool isPageValid(int puzzleId, int level, int page);
 
 	/** Save the current screen and open the first help sheet. */
-	bool open(int puzzleId, int difficulty);
+	bool open(int puzzleId, int level);
 
 	/** Close the overlay, restore the saved screen, and resume gameplay timing. */
 	void close() override;
@@ -63,30 +63,28 @@ public:
 	bool isActive() const override { return _isActive; }
 
 	/** Draw the frame, current help sheet, and navigation controls. */
-	void draw(Graphics::ManagedSurface *screen) override;
+	void onRenderScene(ManagedSurface32 *screen) override;
 
-	/** Handle navigation or close-button input and report whether it was consumed. */
-	bool handleClick(const Common::Point &pos) override;
+	/** Handle navigation or close-button input while the modal is active. */
+	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 
 	/** Update navigation-control hover state for @p pos. */
-	void handleMouseMove(const Common::Point &pos) override;
+	EventHandleResult onMouseMove(const Common::Point &pos) override;
 
 private:
 	/** Replace the active help bitmap with the requested sheet. */
-	bool loadPage(int puzzleId, int difficulty, int page);
+	bool loadPage(int puzzleId, int level, int page);
 	/** Release the active help-sheet bitmap. */
 	void freePage();
-	/** Return the resource-directory label for @p difficulty. */
-	const char *getDifficultyString(int difficulty);
+	/** Return the resource-directory label for @p level. */
+	const char *getLevelString(int level);
 
-	/** Borrowed engine that owns this overlay. */
-	Zoombini2Engine *_engine;
 	/** Whether the help overlay is active. */
 	bool _isActive;
 	/** Puzzle identifier used to resolve the active help resource. */
 	int _currentPuzzleId;
-	/** Difficulty used to resolve the active help resource. */
-	int _currentDifficulty;
+	/** Level used to resolve the active help resource. */
+	int _currentLevel;
 	/** One-based help sheet currently displayed. */
 	int _currentPage;
 	/** Screen snapshot restored when the overlay closes. */

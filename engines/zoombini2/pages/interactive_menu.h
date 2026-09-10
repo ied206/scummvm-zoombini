@@ -19,13 +19,13 @@
  *
  */
 
-#ifndef ZOOMBINI2_PAGES_INTERACTIVE_MENUSCREEN_H
-#define ZOOMBINI2_PAGES_INTERACTIVE_MENUSCREEN_H
+#ifndef ZOOMBINI2_PAGES_INTERACTIVE_MENU_H
+#define ZOOMBINI2_PAGES_INTERACTIVE_MENU_H
 
 #include "common/rect.h"
 
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/interactive_base.h"
-#include "zoombini2/ui.h"
 
 namespace Zoombini2 {
 
@@ -35,47 +35,63 @@ class SaveFileList;
 
 enum SaveMenuState {
 	/** Display the saved-game list and its primary actions. */
-	kSaveMenuMain00 = 0,
+	kSaveMenuMain = 0,
 	/** Display the volume options panel. */
-	kSaveMenuOptions01 = 1,
+	kSaveMenuOptions = 1,
 	/** Display a destructive-action confirmation panel. */
-	kSaveMenuConfirm02 = 2
+	kSaveMenuConfirm = 2
 };
 
 enum SaveMenuConfirmType {
 	/** No confirmation request is active. */
-	kSaveMenuConfirmNone00 = 0,
+	kSaveMenuConfirmNone = 0,
 	/** Confirm deletion of the selected profile. */
-	kSaveMenuConfirmDelete01 = 1,
+	kSaveMenuConfirmDelete = 1,
 	/** Confirm leaving the game. */
-	kSaveMenuConfirmQuit02 = 2
+	kSaveMenuConfirmQuit = 2
 };
 
 /**
- * Sign-in screen containing a four-row sorted saved-game list.
+ * Sign-in page containing a four-row sorted saved-game list.
  *
  * The page owns visual resources, buttons, sounds, the options panel, and a
  * @ref SaveFileList. The list owns filename selection and editing semantics.
  */
-class MenuScreenPage : public InteractivePage {
+class InteractiveMenu : public InteractiveBase {
 public:
-	/** Construct the sign-in page for @p engine. */
-	explicit MenuScreenPage(Zoombini2Engine *engine);
+	/** Construct the sign-in page for @p vm. */
+	explicit InteractiveMenu(Zoombini2Engine *vm);
 	/** Release the loaded resources and owned controls. */
-	~MenuScreenPage() override;
+	~InteractiveMenu() override;
 
 	/** Load sign-in resources and scan the available profiles. */
 	void init() override;
 	/** Process text input and hover state for the active panel. */
-	void update() override;
+	void onUpdate() override;
 	/** Draw the saved-game list or the active modal panel. */
-	void draw(Graphics::ManagedSurface *screen) override;
+	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderForeground(ManagedSurface32 *screen) override;
 	/** Dispatch a click to the list, buttons, or active modal panel. */
-	void handleClick(const Common::Point &pos) override;
+	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	EventHandleResult onLButtonUp(const Common::Point &pos) override;
+	EventHandleResult onMouseMove(const Common::Point &pos) override;
+	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
+	bool hasActiveDialog() const override { return _state != kSaveMenuMain; }
 
 private:
+	void updateButtonAvailability();
+	EventHandleResult handleVolumePanelInput(const Common::Point &pos, bool mouseReleased);
+	bool _volumePanelMouseDown = false;
+	int _hoveredButton = -1;
+	/** Control selected in the confirmation panel, or no control. */
+	enum class ConfirmButtonKind {
+		kNone = 0,
+		kOkay,
+		kCancel
+	};
+
 	/** Screen origin of the saved-profile list. */
-	static const Common::Point32 kFileListPosition;
+	static const Common::Point32 kFileListPos;
 	static const int kSelectorWidth = 520;
 	static const int kSelectorHeight = 201;
 	static const char *const kValidNameCharacters;
@@ -90,7 +106,7 @@ private:
 	BitBlock *_selectorHilite;
 	/** Bar drawn behind the selected save row. */
 	RleBlock *_selectionBar;
-	/** Owned profile list and editor state. */
+	/** Profile list and editor state managed by this menu screen. */
 	SaveFileList *_fileList;
 	/** Primary menu controls indexed by menu button ID. */
 	UIButton *_buttons[kMenuButtonCount];
@@ -104,7 +120,7 @@ private:
 	/** Shared map music handle requested by this page. */
 	int _mapMusicId;
 
-	/** Owned volume panel while options are open. */
+	/** Volume panel managed by this page while options are open. */
 	VolumePanel *_volumePanel;
 	/** Confirmation action currently being presented. */
 	SaveMenuConfirmType _confirmType;
@@ -118,10 +134,10 @@ private:
 	BitBlock *_confirmTextDelete;
 	/** Quit-confirmation text. */
 	BitBlock *_confirmTextQuit;
-	/** Hovered confirmation button, or zero when neither is hovered. */
-	int _confirmButtonHover;
+	/** Hovered confirmation button, or @c kNone when neither is hovered. */
+	ConfirmButtonKind _confirmButtonHover;
 	/** Signed screen origin of the confirmation panel. */
-	Common::Point32 _confirmPosition;
+	Common::Point32 _confirmPos;
 	/** Saved pixels restored when the confirmation panel closes. */
 	Graphics::ManagedSurface *_confirmDialogBackground;
 
@@ -132,9 +148,9 @@ private:
 	/** Refresh the profile list from the savegame manager. */
 	void scanSaveFiles();
 	/** Draw the main sign-in panel. */
-	void drawMain(Graphics::ManagedSurface *screen);
+	void drawMain(ManagedSurface32 *screen);
 	/** Draw primary controls using the supplied mouse position. */
-	void drawButtons(Graphics::ManagedSurface *screen, int mouseX, int mouseY);
+	void drawButtons(ManagedSurface32 *screen, const Common::Point32 &mousePos);
 
 	/** Return the primary button at @p pos, or `-1` when none is hit. */
 	int hitTestButton(const Common::Point &pos) const;
@@ -153,19 +169,19 @@ private:
 	void openOptionsDialog();
 	/** Close options and optionally apply the panel values. */
 	void closeOptionsDialog(bool applyChanges);
-	/** Apply either panel or stored volume values to the engine. */
-	void applyOptionVolumes(bool usePanelValues);
+	/** Apply either panel or stored volume values, optionally persisting them for this target. */
+	void applyOptionVolumes(bool usePanelValues, bool persistChanges);
 
 	/** Open the confirmation panel for @p type. */
 	void openConfirmDialog(SaveMenuConfirmType type);
 	/** Close the active confirmation panel. */
 	void closeConfirmDialog();
 	/** Draw the active confirmation panel. */
-	void drawConfirmDialog(Graphics::ManagedSurface *screen);
-	/** Return the confirmation control at @p x and @p y, or zero. */
-	int hitTestConfirmDialog(int x, int y) const;
-	/** Dispatch @p buttonId within the active confirmation panel. */
-	void handleConfirmClick(int buttonId);
+	void drawConfirmDialog(ManagedSurface32 *screen);
+	/** Return the confirmation control at @p pos, or @c kNone. */
+	ConfirmButtonKind hitTestConfirmDialog(const Common::Point &pos) const;
+	/** Dispatch @p button within the active confirmation panel. */
+	void handleConfirmClick(ConfirmButtonKind button);
 	/** Delete the selected profile and refresh the list. */
 	void deleteSelectedSave();
 	/** Play @p soundId when it names a loaded sound. */
@@ -174,4 +190,4 @@ private:
 
 } // End of namespace Zoombini2
 
-#endif // ZOOMBINI2_PAGES_INTERACTIVE_MENUSCREEN_H
+#endif // ZOOMBINI2_PAGES_INTERACTIVE_MENU_H
