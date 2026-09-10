@@ -19,49 +19,64 @@
  *
  */
 
-#ifndef ZOOMBINI2_PAGES_INTERACTIVE_WORLDMAP_H
-#define ZOOMBINI2_PAGES_INTERACTIVE_WORLDMAP_H
+#ifndef ZOOMBINI2_PAGES_INTERACTIVE_MAP_SCREEN_H
+#define ZOOMBINI2_PAGES_INTERACTIVE_MAP_SCREEN_H
 
 #include "zoombini2/pages/interactive_base.h"
 
+namespace Common {
+class String;
+}
+
 namespace Zoombini2 {
 
+class AlphaBlendLUT;
 class BitBlock;
 class RleBlock;
 class BitmapFont;
 class VolumePanel;
+struct ZmbTrait;
 
-enum WorldMapMode {
-	/** Allow direct puzzle selection at one shared difficulty. */
-	kWorldMapPractice,
+enum MapScreenMode {
+	/** Allow direct puzzle selection at one shared level. */
+	kMapScreenPractice,
 	/** Show route progress and continue the active saved game. */
-	kWorldMapSavedGame
+	kMapScreenSavedGame
 };
 
 /**
  * Mountain map with distinct practice and saved-game modes.
  *
- * Practice mode enables puzzle icons and selects one difficulty for the whole
+ * Practice mode enables puzzle icons and selects one level for the whole
  * route. Saved-game mode enables visited route hubs and draws each route
- * segment at the difficulty stored by the active game.
+ * segment at the level stored by the active game.
  */
-class WorldMapPage : public InteractivePage {
+class InteractiveMap : public InteractiveBase {
 public:
-	/** Construct a mountain map in @p mode for @p engine. */
-	WorldMapPage(Zoombini2Engine *engine, WorldMapMode mode);
+	/** Construct a mountain map in @p mode for @p vm. */
+	InteractiveMap(Zoombini2Engine *vm, MapScreenMode mode);
 	/** Release map resources, controls, and modal panels. */
-	~WorldMapPage() override;
+	~InteractiveMap() override;
 
 	/** Load map resources and derive availability from the selected mode. */
 	void init() override;
 	/** Update icon, legend, button, and modal hover state. */
-	void update() override;
+	void onUpdate() override;
 	/** Draw the map, route progress, statistics, and active modal panel. */
-	void draw(Graphics::ManagedSurface *screen) override;
+	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderForeground(ManagedSurface32 *screen) override;
 	/** Dispatch a click to a map icon, control, legend tab, or modal panel. */
-	void handleClick(const Common::Point &pos) override;
+	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	EventHandleResult onLButtonUp(const Common::Point &pos) override;
+	EventHandleResult onMouseMove(const Common::Point &pos) override;
+	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
+	/** Return the required practice-party size for @p pageId, or zero for a shelter or unsupported page. */
+	static int getPracticePartySize(int pageId);
+	bool hasActiveDialog() const override { return _volumePanel || _showQuitDialog; }
 
 private:
+	EventHandleResult handleVolumePanelInput(const Common::Point &pos, bool mouseReleased);
+	bool _volumePanelMouseDown = false;
 	/** Number of selectable map icons. */
 	static const int kNumIcons = 13;
 	/** Number of title overlays corresponding to map icons. */
@@ -69,42 +84,33 @@ private:
 	/** Number of path-segment slots, including one alternate slot. */
 	static const int kNumSegments = 14;
 	/** Number of segment graphics tiers, including the neutral tier. */
-	static const int kNumDiffTiers = 4;
+	static const int kNumLevelTiers = 4;
 	/** Number of legend bitmaps, including the inactive legend. */
 	static const int kNumLegends = 4;
 
 	/** Icon hit-test rectangles in map coordinates. */
-	struct IconRect {
-		int16 x, y, w, h;
-	};
-	static const IconRect kIconHitRects[kNumIcons];
+	static const Common::Rect kIconHitRects[kNumIcons];
 
 	/** Title sprite draw positions. */
-	struct TitlePos {
-		int16 x, y;
-	};
-	static const TitlePos kTitlePositions[kNumTitles];
+	static const Common::Point32 kTitlePos[kNumTitles];
 
 	/** Route-segment draw positions. */
-	struct SegmentPos {
-		int16 x, y;
-	};
-	static const SegmentPos kSegmentPositions[kNumSegments];
+	static const Common::Point32 kSegmentPos[kNumSegments];
 
 	/** Vertical positions for the four saved-game statistics. */
 	static const int kStatLabelY[4];
 
 	/**
-	 * Segment-to-world mapping for saved-game per-world difficulty drawing.
-	 * Index = segment slot, value = world ID whose difficulty to use.
+	 * Segment-to-page mapping for saved-game page-level drawing.
+	 * Index = segment slot, value = page ID whose level to use.
 	 * Slot 12 is unused in saved-game mode; slot 13 occupies its position.
 	 */
-	static const int kSegToWorld[kNumSegments];
+	static const int kSegmentPageIds[kNumSegments];
 
 	/** One bottom-panel button with either RLE or bit-block visuals. */
 	struct MapButton {
-		/** Hit-test rectangle components. */
-		int x, y, w, h;
+		/** Hit-test rectangle in screen coordinates. */
+		Common::Rect rect;
 		/** Whether the button accepts clicks. */
 		bool enabled;
 		/** Whether the pointer is currently over the button. */
@@ -123,21 +129,21 @@ private:
 		BitBlock *hiliteBB;
 
 		/** Initialize an enabled button with no loaded visuals. */
-		MapButton() : x(0), y(0), w(0), h(0), enabled(true), hovered(false),
-		              isRle(false), normalRle(nullptr), hiliteRle(nullptr),
-		              grayRle(nullptr), normalBB(nullptr), hiliteBB(nullptr) {}
+		MapButton() : rect(), enabled(true), hovered(false),
+					  isRle(false), normalRle(nullptr), hiliteRle(nullptr),
+					  grayRle(nullptr), normalBB(nullptr), hiliteBB(nullptr) {}
 	};
 
 	/** Number of controls in the bottom panel. */
 	static const int kNumButtons = 4;
 
 	/** Practice or saved-game behavior selected at construction. */
-	WorldMapMode _mode;
+	MapScreenMode _mode;
 	/** Currently hovered icon, or `-1` when none is hovered. */
 	int _hoveredIcon;
-	/** Practice or selected-world difficulty in the range one through three. */
-	int _currentDifficulty;
-	/** Hovered difficulty legend, or zero when none is hovered. */
+	/** Practice or selected-page level in the range one through three. */
+	int _currentLevel;
+	/** Hovered level legend, or zero when none is hovered. */
 	int _hoveredLegendTab;
 
 	/** Mountain map background. */
@@ -146,13 +152,13 @@ private:
 	RleBlock *_icons[kNumIcons];
 	/** Title overlay corresponding to each map icon. */
 	RleBlock *_titles[kNumTitles];
-	/** Path graphics indexed by difficulty tier and segment slot. */
-	RleBlock *_segments[kNumDiffTiers][kNumSegments];
+	/** Path graphics indexed by level tier and segment slot. */
+	RleBlock *_segments[kNumLevelTiers][kNumSegments];
 	/** Practice-mode instruction panel. */
 	RleBlock *_statsPractice;
 	/** Saved-game progress panel. */
 	RleBlock *_statsSavedGame;
-	/** Legend graphics indexed by inactive or active difficulty. */
+	/** Legend graphics indexed by inactive or active level. */
 	BitBlock *_legends[kNumLegends];
 	/** White font used for saved-game statistics. */
 	BitmapFont *_whiteFont;
@@ -169,15 +175,15 @@ private:
 
 	/** Menu selection sound. */
 	int _blipSoundId;
-	/** Shared engine-owned map music handle. */
+	/** Handle for the map-music stream shared across this game instance. */
 	int _mapMusicId;
 
-	/** Owned volume panel while options are open. */
+	/** Volume panel managed by this page while options are open. */
 	VolumePanel *_volumePanel;
 	/** Whether quit confirmation is active. */
 	bool _showQuitDialog;
 	/** Quit confirmation panel origin. */
-	Common::Point32 _quitDialogPosition;
+	Common::Point32 _quitDialogPos;
 	/** Hovered quit confirmation control, or zero. */
 	int _quitDialogButtonHover;
 	/** Quit panel without a highlighted action. */
@@ -203,41 +209,47 @@ private:
 	int hitTestIcon(const Common::Point &pos) const;
 	/** Return the bottom-panel button at @p pos, or `-1`. */
 	int hitTestButton(const Common::Point &pos) const;
-	/** Return the difficulty legend tab at @p x and @p y, or zero. */
-	int hitTestLegendTab(int x, int y) const;
+	/** Return the level legend tab at @p pos, or zero. */
+	int hitTestLegendTab(const Common::Point32 &pos) const;
 
 	/** Return whether this page uses direct practice selection. */
-	bool isPracticeMode() const { return _mode == kWorldMapPractice; }
-	/** Draw every route segment at the practice difficulty. */
-	void drawPracticeSegments(Graphics::ManagedSurface *screen, const byte (*lut)[256]);
-	/** Draw visited route segments at their stored world difficulties. */
-	void drawSavedGameSegments(Graphics::ManagedSurface *screen, const byte (*lut)[256]);
+	bool isPracticeMode() const { return _mode == kMapScreenPractice; }
+	/** Replace the active roster with the route-sized practice party for @p pageId. */
+	void createPracticeParty(int pageId);
+	/** Return whether @p traits satisfy the practice party's trait distribution limits. */
+	bool practiceCandidateFitsPack(const ZmbTrait &traits) const;
+	/** Generate one name for a practice Zoombini. */
+	Common::String generatePracticeZoombiniName() const;
+	/** Draw every route segment at the practice level. */
+	void drawPracticeSegments(ManagedSurface32 *screen, const AlphaBlendLUT &lut);
+	/** Draw visited route segments at their stored page levels. */
+	void drawSavedGameSegments(ManagedSurface32 *screen, const AlphaBlendLUT &lut);
 
 	/** Open the volume panel. */
 	void openVolumePanel();
 	/** Close the volume panel and optionally apply its values. */
 	void closeVolumePanel(bool applyChanges);
-	/** Apply either panel or stored volume values to the engine. */
-	void applyVolumePanelVolumes(bool usePanelValues);
+	/** Apply either panel or stored volume values, optionally persisting them for this target. */
+	void applyVolumePanelVolumes(bool usePanelValues, bool persistChanges);
 	/** Open quit confirmation. */
 	void openQuitDialog();
 	/** Close quit confirmation. */
 	void closeQuitDialog();
 	/** Draw quit confirmation over the saved map background. */
-	void drawQuitDialog(Graphics::ManagedSurface *screen);
-	/** Return the quit confirmation control at @p x and @p y, or zero. */
-	int hitTestQuitDialog(int x, int y) const;
+	void drawQuitDialog(ManagedSurface32 *screen);
+	/** Return the quit confirmation control at @p pos, or zero. */
+	int hitTestQuitDialog(const Common::Point32 &pos) const;
 
 	/** Title resource paths indexed by icon. */
 	static const char *const kTitleFiles[kNumTitles];
-	/** Route-segment directories indexed by difficulty tier. */
-	static const char *const kSegmentDirs[kNumDiffTiers];
+	/** Route-segment directories indexed by level tier. */
+	static const char *const kSegmentDirs[kNumLevelTiers];
 	/** Route-segment filenames indexed by segment slot. */
 	static const char *const kSegmentFiles[kNumSegments];
-	/** Legend resource paths indexed by inactive or active difficulty. */
+	/** Legend resource paths indexed by inactive or active level. */
 	static const char *const kLegendFiles[kNumLegends];
 };
 
 } // End of namespace Zoombini2
 
-#endif // ZOOMBINI2_PAGES_INTERACTIVE_WORLDMAP_H
+#endif // ZOOMBINI2_PAGES_INTERACTIVE_MAP_SCREEN_H

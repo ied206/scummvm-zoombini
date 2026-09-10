@@ -20,13 +20,54 @@
  */
 
 #include "zoombini2/pages/page_base.h"
+#include "zoombini2/graphics.h"
 
 namespace Zoombini2 {
 
-ZoombiniPage::ZoombiniPage(Zoombini2Engine *engine) : _engine(engine), _pageId(-1) {
+PageBase::PageBase(Zoombini2Engine *vm, PageCategory pageCategory) : _vm(vm), _pageCategory(pageCategory), _pageId(-1) {
 }
 
-ZoombiniPage::~ZoombiniPage() {
+PageBase::~PageBase() {
+}
+
+EventHandleResult PageEventHandler::handleEvent(const Common::Event &event) {
+	switch (event.type) {
+	case Common::EVENT_LBUTTONDOWN:
+		return onLButtonDown(event.mouse);
+	case Common::EVENT_LBUTTONUP:
+		return onLButtonUp(event.mouse);
+	case Common::EVENT_MOUSEMOVE:
+		return onMouseMove(event.mouse);
+	case Common::EVENT_KEYDOWN:
+		return onKeyDown(event.kbd, event.kbdRepeat);
+	case Common::EVENT_KEYUP:
+		return onKeyUp(event.kbd);
+	default:
+		return EventHandleResult::kPassthrough;
+	}
+}
+
+void PageBase::onFrame(ManagedSurface32 *screen, bool advanceState) {
+	if (advanceState)
+		onUpdate();
+	renderFrame(screen, advanceState);
+}
+
+void PageBase::render(ManagedSurface32 *screen) {
+	renderFrame(screen, false);
+}
+
+void PageBase::renderFrame(ManagedSurface32 *screen, bool advanceState) {
+	if (needsScreenClear())
+		screen->fillRect(Common::Rect32(screen->w, screen->h), 0);
+	onRenderBackground(screen);
+	onRenderScene(screen);
+	onRenderActors(screen);
+	if (advanceState)
+		onActorsRendered();
+	onRenderForeground(screen);
+	if (advanceState)
+		onPostRender();
 }
 
 } // End of namespace Zoombini2

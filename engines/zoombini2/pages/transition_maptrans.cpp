@@ -34,75 +34,78 @@ namespace Zoombini2 {
 static const int kRescue1MovieMinimumZoombinis = 8;
 
 // ============================================================================
-// MapTransition - overworld map transition.
+// TransitionMapTrans - route-map transition.
 // ============================================================================
 
-MapTransition::MapTransition(Zoombini2Engine *engine)
-	: TransitionPage(engine), _compositedBg(nullptr), _nextWalkIndex(0),
-	  _nextWalkTime(0), _completedCount(0), _targetWorld(0),
-	  _transitionFinished(false), _musicId(-1), _zoombiniGfx(nullptr) {
+TransitionMapTrans::TransitionMapTrans(Zoombini2Engine *vm)
+	: TransitionBase(vm), _compositedBg(nullptr), _nextWalkIndex(0),
+	  _nextWalkTime(0), _completedCount(0), _targetPageId(kPageNone),
+	  _transitionFinished(false), _musicId(-1), _zoombiniAnimation(nullptr) {
 	_pageId = kPageMapTrans;
 }
 
-MapTransition::~MapTransition() {
+TransitionMapTrans::~TransitionMapTrans() {
 	if (_musicId >= 0) {
-		SoundManager *snd = _engine->getSoundManager();
+		SoundManager *snd = _vm->getSoundManager();
 		snd->stop(_musicId);
 		snd->unload(_musicId);
 	}
 	cleanupPaths();
 	delete _compositedBg;
-	delete _zoombiniGfx;
 }
 
-void MapTransition::cleanupPaths() {
-	for (uint i = 0; i < _zoombiniPaths.size(); i++)
-		delete _zoombiniPaths[i];
-	_zoombiniPaths.clear();
+void TransitionMapTrans::cleanupPaths() {
+	for (uint i = 0; i < _vm->_globalZoombinis.size(); i++) {
+		ZoombiniState *zoombini = _vm->_globalZoombinis[i];
+		if (!zoombini)
+			continue;
+		zoombini->clearMovement();
+		zoombini->resetAnimation();
+		zoombini->_hidden = false;
+	}
 }
 
 /** Load, draw, and release one map overlay and its alpha mask. */
-void MapTransition::drawOverlaySprite(Graphics::ManagedSurface *dst,
-							  const Common::String &name, const Common::Point32 &position) {
+void TransitionMapTrans::drawOverlaySprite(Graphics::ManagedSurface *dst, const Common::String &name, const Common::Point32 &pos) {
 	Common::Path colorPath(Common::String::format("bmp/maptrans/%s.bmp", name.c_str()));
 	Common::Path alphaPath(Common::String::format("bmp/maptrans/%s_a.bmp", name.c_str()));
 
 	BitBlock bit;
-	if (bit.loadFromBMPPair(colorPath, alphaPath)) {
-		bit.drawAlphaBlend(dst, position.x, position.y, _engine->getAlphaLUT());
+	if (bit.loadFromColorAlphaBMP(colorPath, alphaPath)) {
+		bit.drawAlphaBlend(dst, pos);
 	} else if (bit.load(Common::Path(Common::String::format("bmp/maptrans/%s", name.c_str())))) {
-		bit.drawToSurface(dst, position.x, position.y);
+		bit.drawToSurface(dst, pos);
 	} else {
 		debug(2, "MapTransition: overlay '%s' not found", name.c_str());
 	}
 }
 
 /**
- * Draw map overlay segments and icons based on visited-world state.
+ * Draw map overlay segments and icons based on visited-page state.
  *
  * Key pattern for each overlay:
- *   Draw if destWorld was already visited (past game),
- *   OR if we're currently transitioning FROM srcWorld and srcWorld is visited
- *   but destWorld hasn't been reached at this difficulty yet.
+ *   Draw if dstPageId was already visited during the current game,
+ *   or if the current transition starts at srcPageId and that page is visited
+ *   but dstPageId has not been reached at this level yet.
  *
- * Route direction (top/bottom) at world 4 fork is tracked via
- * GameState::isWorldVisitedAtDiff: world 6 diff1 = top path,
- * world 5 diff1 = bottom path.
+ * Route direction at the page-4 fork is tracked through @ref GameState::hasPageVisit.
+ * Page 6 visit kind 1 selects the upper path and page 5 selects the lower path.
  */
-void MapTransition::drawMapOverlays(Graphics::ManagedSurface *dst, int source, int mapRegion) {
-	GameState *gs = _engine->getGameState();
-	int route = _engine->_routeDirection;
+
+void TransitionMapTrans::drawMapOverlays(Graphics::ManagedSurface *dst, PageId src, int mapRegion) {
+	GameState *gs = _vm->getGameState();
+	const RouteBranch routeBranch = _vm->_routeDirection;
 
 	// Helper lambda: standard overlay visibility check.
 	// "Show this path piece if destination was previously visited,
 	// OR if we're currently transitioning and haven't arrived yet."
-	auto visible = [&](int srcWorld, int dstWorld) -> bool {
-		return gs->isWorldVisited(dstWorld) || (source == srcWorld && gs->isWorldVisited(srcWorld) && !gs->isWorldVisitedAtDiff(dstWorld, 1));
+	auto visible = [&](int srcPageId, int dstPageId) -> bool {
+		return gs->isPageVisited(dstPageId) || (src == srcPageId && gs->isPageVisited(srcPageId) && !gs->hasPageVisit(dstPageId, 1));
 	};
 
 	switch (mapRegion) {
 	case 1: {
-		// Map region one covers Zombiniville through Rescue Site I.
+		// Map region one covers ShelterZombiniville through Rescue Site I.
 		bool seg01vis = visible(0, 1);
 		bool seg02vis = visible(1, 2);
 		bool seg03vis = visible(2, 3);
@@ -140,45 +143,45 @@ void MapTransition::drawMapOverlays(Graphics::ManagedSurface *dst, int source, i
 
 	case 2: {
 		// Map region two covers both routes between the rescue sites.
-		bool topRoute = gs->isWorldVisitedAtDiff(6, 1) || route == 1;
-		bool botRoute = gs->isWorldVisitedAtDiff(5, 1) || route == 2;
+		bool northRoute = gs->hasPageVisit(6, 1) || routeBranch == RouteBranch::kLeft01;
+		bool southRoute = gs->hasPageVisit(5, 1) || routeBranch == RouteBranch::kRight02;
 
 		// Unconditional: start of route from Rescue1
 		drawOverlaySprite(dst, "bigmap_segment_03", Common::Point32(-18, 198));
 		drawOverlaySprite(dst, "bigmap_segment_04", Common::Point32(99, 280));
 
 		// Top path: fork, Magic Wall, Chez Norf, then Rescue Site II.
-		if (topRoute && visible(4, 6)) {
+		if (northRoute && visible(4, 6)) {
 			drawOverlaySprite(dst, "bigmap_segment_05a", Common::Point32(201, 260));
 		}
 
 		// Magic Wall to Chez Norf segment.
-		bool czNorfSeg = gs->isWorldVisited(8) || (source == 6 && gs->isWorldVisited(6) && !gs->isWorldVisitedAtDiff(8, 1));
+		bool czNorfSeg = gs->isPageVisited(8) || (src == 6 && gs->isPageVisited(6) && !gs->hasPageVisit(8, 1));
 		if (czNorfSeg) {
 			drawOverlaySprite(dst, "bigmap_segment_06a", Common::Point32(310, 230));
 		}
 
 		// Chez Norf to Rescue Site II segment.
-		if (gs->isWorldVisitedAtDiff(8, 1)) {
-			if (gs->isWorldVisited(9) || (source == 8 && gs->isWorldVisited(8) && !gs->isWorldVisitedAtDiff(9, 1))) {
+		if (gs->hasPageVisit(8, 1)) {
+			if (gs->isPageVisited(9) || (src == 8 && gs->isPageVisited(8) && !gs->hasPageVisit(9, 1))) {
 				drawOverlaySprite(dst, "bigmap_segment_07a", Common::Point32(480, 233));
 			}
 		}
 
 		// Bottom path: fork, Mystic Marsh, Wall of Fleens, then Rescue Site II.
-		if (botRoute && visible(4, 5)) {
+		if (southRoute && visible(4, 5)) {
 			drawOverlaySprite(dst, "bigmap_segment_05b", Common::Point32(164, 376));
 		}
 
 		// Mystic Marsh to Wall of Fleens segment.
-		bool wofSeg = gs->isWorldVisited(7) || (source == 5 && gs->isWorldVisited(5) && !gs->isWorldVisitedAtDiff(7, 1));
+		bool wofSeg = gs->isPageVisited(7) || (src == 5 && gs->isPageVisited(5) && !gs->hasPageVisit(7, 1));
 		if (wofSeg) {
 			drawOverlaySprite(dst, "bigmap_segment_06b", Common::Point32(339, 476));
 		}
 
 		// Wall of Fleens to Rescue Site II segment.
-		if (gs->isWorldVisitedAtDiff(7, 1)) {
-			if (gs->isWorldVisited(9) || (source == 7 && gs->isWorldVisited(7) && !gs->isWorldVisitedAtDiff(9, 1))) {
+		if (gs->hasPageVisit(7, 1)) {
+			if (gs->isPageVisited(9) || (src == 7 && gs->isPageVisited(7) && !gs->hasPageVisit(9, 1))) {
 				drawOverlaySprite(dst, "bigmap_segment_07b", Common::Point32(512, 360));
 			}
 		}
@@ -188,7 +191,7 @@ void MapTransition::drawMapOverlays(Graphics::ManagedSurface *dst, int source, i
 		drawOverlaySprite(dst, "bigmap_icon_05", Common::Point32(116, 315));
 
 		// Top route icons
-		if (topRoute && visible(4, 6)) {
+		if (northRoute && visible(4, 6)) {
 			drawOverlaySprite(dst, "bigmap_icon_06a", Common::Point32(259, 210));
 		}
 		if (czNorfSeg) {
@@ -196,14 +199,14 @@ void MapTransition::drawMapOverlays(Graphics::ManagedSurface *dst, int source, i
 		}
 
 		// Rescue2 icon (reachable from either path)
-		if (gs->isWorldVisited(9) ||
-			(source == 8 && gs->isWorldVisited(8) && !gs->isWorldVisitedAtDiff(9, 1)) ||
-			(source == 7 && gs->isWorldVisited(7) && !gs->isWorldVisitedAtDiff(9, 1))) {
+		if (gs->isPageVisited(9) ||
+			(src == 8 && gs->isPageVisited(8) && !gs->hasPageVisit(9, 1)) ||
+			(src == 7 && gs->isPageVisited(7) && !gs->hasPageVisit(9, 1))) {
 			drawOverlaySprite(dst, "bigmap_icon_08", Common::Point32(476, 271));
 		}
 
 		// Bottom route icons
-		if (botRoute && visible(4, 5)) {
+		if (southRoute && visible(4, 5)) {
 			drawOverlaySprite(dst, "bigmap_icon_06b", Common::Point32(290, 418));
 		}
 		if (visible(5, 7)) {
@@ -214,12 +217,12 @@ void MapTransition::drawMapOverlays(Graphics::ManagedSurface *dst, int source, i
 
 	case 3: {
 		// Map region three covers Rescue Site II through the finale.
-		bool topRouteFlag = gs->isWorldVisitedAtDiff(6, 1);
-		bool czNorfFlag = gs->isWorldVisitedAtDiff(8, 1);
-		bool wofFlag = gs->isWorldVisitedAtDiff(7, 1);
+		bool northRouteVisited = gs->hasPageVisit(6, 1);
+		bool czNorfFlag = gs->hasPageVisit(8, 1);
+		bool wofFlag = gs->hasPageVisit(7, 1);
 
 		// Previous route segments (show which path was taken)
-		if (topRouteFlag) {
+		if (northRouteVisited) {
 			drawOverlaySprite(dst, "bigmap_segment_05a", Common::Point32(-27, 418));
 			drawOverlaySprite(dst, "bigmap_segment_06a", Common::Point32(87, 386));
 		}
@@ -243,7 +246,7 @@ void MapTransition::drawMapOverlays(Graphics::ManagedSurface *dst, int source, i
 		}
 
 		// Prior-route icons remain conditional on saved progress.
-		if (topRouteFlag) {
+		if (northRouteVisited) {
 			drawOverlaySprite(dst, "bigmap_icon_06a", Common::Point32(33, 366));
 		}
 		if (czNorfFlag) {
@@ -274,61 +277,64 @@ void MapTransition::drawMapOverlays(Graphics::ManagedSurface *dst, int source, i
 	}
 }
 
-void MapTransition::init() {
+void TransitionMapTrans::init() {
 	debug(1, "MapTransition::init (source=%d, route=%d)",
-		  _engine->_maptransSourceWorld, _engine->_routeDirection);
+		  static_cast<int>(_vm->_mapTransitionSourcePageId), static_cast<int>(_vm->_routeDirection));
 
-	int source = _engine->_maptransSourceWorld;
-	int route = _engine->_routeDirection;
-	_engine->_skipMode = false;
+	const PageId src = _vm->_mapTransitionSourcePageId;
+	const RouteBranch routeBranch = _vm->_routeDirection;
+	_vm->_skipMode = false;
 	_transitionFinished = false;
 
-	// Select map region based on source world
+	// Select the map region from the source page.
 	int mapRegion;
-	if (source >= 0 && source <= 3)
+	if (kPageZombiniville <= src && src <= kPageAquaCube)
 		mapRegion = 1;
-	else if (source >= 4 && source <= 8)
+	else if (kPageRescue1 <= src && src <= kPageChezNorf)
 		mapRegion = 2;
 	else
 		mapRegion = 3;
 
-	// Select the walking path from the source world.
+	// Select the walking path from the source page.
 	Common::String patName;
-	switch (source) {
-	case 0:
+		switch (src) {
+	case kPageZombiniville:
 		patName = "tr1 - map1.pat";
 		break;
-	case 1:
+	case kPageCrazyTurtle:
 		patName = "tr2 - map1.pat";
 		break;
-	case 2:
+	case kPageWaterSlide:
 		patName = "tr3 - map1.pat";
 		break;
-	case 3:
+	case kPageAquaCube:
 		patName = "tr4 - map1.pat";
 		break;
-	case 4:
-		patName = (route == 1) ? "tr5 - map2.pat" : "tr8 - map2.pat";
+	case kPageRescue1:
+		if (routeBranch == RouteBranch::kLeft01)
+			patName = "tr5 - map2.pat";
+		else if (routeBranch == RouteBranch::kRight02)
+			patName = "tr8 - map2.pat";
 		break;
-	case 5:
+	case kPageMysticMarsh:
 		patName = "tr9 - map2.pat";
 		break;
-	case 6:
+	case kPageMagicWall:
 		patName = "tr6 - map2.pat";
 		break;
-	case 7:
+	case kPageWallOfFleens:
 		patName = "tr10 - map2.pat";
 		break;
-	case 8:
+	case kPageChezNorf:
 		patName = "tr7 - map2.pat";
 		break;
-	case 9:
+	case kPageRescue2:
 		patName = "tr11 - map3.pat";
 		break;
-	case 10:
+	case kPageSnowboard:
 		patName = "tr12 - map3.pat";
 		break;
-	case 11:
+	case kPageBoolies:
 		patName = "tr13 - map3.pat";
 		break;
 	default:
@@ -337,64 +343,62 @@ void MapTransition::init() {
 	}
 	_patPath = Common::Path(Common::String::format("bmp/maptrans/%s", patName.c_str()));
 
-	_targetWorld = getDestPage(source, route, _engine->getGameState()->_counterDword);
+	_targetPageId = getDestPage(src, routeBranch, _vm->getGameState()->_rescuedBoolieCount);
+	if (_targetPageId == kPageNone) {
+		warning("MapTransition: refusing invalid source/branch combination (%d, %d)",
+				static_cast<int>(src), static_cast<int>(routeBranch));
+		_vm->requestPageChange(src);
+		return;
+	}
 
 	// Load and composite the background
 	BitBlock bg;
-	Common::String bgPath = Common::String::format("bmp/maptrans/bigmap_background_%d", mapRegion);
+	Common::String bgPath = Common::String::format("#bmp/maptrans/bigmap_background_%d", mapRegion);
 
 	delete _compositedBg;
 	_compositedBg = new Graphics::ManagedSurface(kScreenWidth, kScreenHeight,
 												 Graphics::PixelFormat(4, 8, 8, 8, 8, 16, 8, 0, 24));
 
 	if (bg.load(Common::Path(bgPath))) {
-		bg.drawToSurface(_compositedBg, 0, 0);
+		bg.drawToSurface(_compositedBg, Common::Point32(0, 0));
 	} else {
 		warning("MapTransition: Failed to load background %s", bgPath.c_str());
 		_compositedBg->fillRect(Common::Rect(kScreenWidth, kScreenHeight), 0);
 	}
 
 	// Draw overlay sprites onto background
-	drawMapOverlays(_compositedBg, source, mapRegion);
+	drawMapOverlays(_compositedBg, src, mapRegion);
 
-	// Initialize zoombini walk state
+	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/littleZomb.anm"));
+	if (!_zoombiniAnimation)
+		warning("MapTransition: Failed to load littleZomb.anm");
+
+	// Initialize the runtime state owned by each walking Zoombini.
 	cleanupPaths();
-	int numZoombinis = static_cast<int>(_engine->_globalZoombinis.size());
-	_zoombiniPaths.resize(numZoombinis, nullptr);
-	_walkStates.resize(numZoombinis);
+	int numZoombinis = static_cast<int>(_vm->_globalZoombinis.size());
 	for (int i = 0; i < numZoombinis; i++) {
-		_walkStates[i].screenPosition = Common::Point32();
-		_walkStates[i].previousScreenPosition = Common::Point32();
-		_walkStates[i].cellIndex = 88; // default: facing down
-		_walkStates[i].active = false;
+		ZoombiniState *zoombini = _vm->_globalZoombinis[i];
+		zoombini->setDefaultAnimation(_zoombiniAnimation, 88);
+		zoombini->_hidden = true;
 	}
 	_nextWalkIndex = 0;
 	_nextWalkTime = 0;
 	_completedCount = 0;
 
-	// Load the little-Zoombini animation cells used by every walker.
-	delete _zoombiniGfx;
-	_zoombiniGfx = new ZoombiniGraphics();
-	if (!_zoombiniGfx->loadFromFile(Common::Path("bmp/zombis/littleZomb.anm"))) {
-		warning("MapTransition: Failed to load littleZomb.anm");
-		delete _zoombiniGfx;
-		_zoombiniGfx = nullptr;
-	}
-
 	debug(1, "MapTransition: source=%d -> target=%d (region %d, path=%s, zoombinis=%d)",
-		  source, _targetWorld, mapRegion, _patPath.toString().c_str(), numZoombinis);
+		  src, _targetPageId, mapRegion, _patPath.toString().c_str(), numZoombinis);
 
 	// Play transition music
-	_musicId = _engine->getSoundManager()->load(true,
-												Common::Path("sounds/music/ZMR-Transition.wav"), true);
+	_musicId = _vm->getSoundManager()->load(true,
+											Common::Path("#sounds/music/ZMR-Transition.wav"), true);
 	if (_musicId >= 0)
-		_engine->getSoundManager()->play(_musicId);
+		_vm->getSoundManager()->play(_musicId);
 }
 
 /** Start and advance one independent path per Zoombini with an 800-millisecond stagger. */
-void MapTransition::walkZoombinis() {
-	uint32 now = _engine->getGameTickCount();
-	int numZoombinis = static_cast<int>(_engine->_globalZoombinis.size());
+void TransitionMapTrans::walkZoombinis() {
+	uint32 now = _vm->getGameTickCount();
+	int numZoombinis = static_cast<int>(_vm->_globalZoombinis.size());
 
 	// Start the next zoombini walking if it's time
 	if (_nextWalkIndex < numZoombinis && now > _nextWalkTime) {
@@ -402,179 +406,146 @@ void MapTransition::walkZoombinis() {
 
 		PathObject *path = PathObject::loadFromPAT(_patPath);
 		if (path) {
-			path->start(now);
-			_zoombiniPaths[_nextWalkIndex] = path;
-
-			// Initialize walk state with path start position
-			CurveSegment *seg = path->segments[0];
-			const Common::Point32 pathPosition(seg->position.x >> 10, seg->position.y >> 10);
-			const Common::Point32 spritePosition(pathPosition.x - 13, pathPosition.y - 13);
-			_walkStates[_nextWalkIndex].screenPosition = spritePosition;
-			_walkStates[_nextWalkIndex].previousScreenPosition = spritePosition;
-			_walkStates[_nextWalkIndex].cellIndex = 88;
-			_walkStates[_nextWalkIndex].active = true;
+			ZoombiniState *zoombini = _vm->_globalZoombinis[_nextWalkIndex];
+			zoombini->_hidden = false;
+			zoombini->startMovement(path, now);
+			zoombini->startDirectionTrackedAnimation(now, 50);
 		}
 		_nextWalkIndex += 1;
 	}
 
 	// Update all walking zoombinis
 	for (int i = 0; i < numZoombinis; i++) {
-		PathObject *path = _zoombiniPaths[i];
-		if (!path)
+		ZoombiniState *zoombini = _vm->_globalZoombinis[i];
+		if (!zoombini->_movementPath)
 			continue;
-
-		Common::Point32 pathPosition;
-		if (!path->advance(now, pathPosition)) {
-			// Release the path after this Zoombini reaches its endpoint.
-			_walkStates[i].active = false;
-			delete path;
-			_zoombiniPaths[i] = nullptr;
+		if (!zoombini->advanceMovement(now, Common::Point32(13, 13), true))
 			_completedCount += 1;
-		} else {
-			// Update position and select a direction cell from the movement delta.
-			const Common::Point32 newScreenPosition(pathPosition.x - 13, pathPosition.y - 13);
-
-			_walkStates[i].previousScreenPosition = _walkStates[i].screenPosition;
-			_walkStates[i].screenPosition = newScreenPosition;
-
-			int dx = newScreenPosition.x - _walkStates[i].previousScreenPosition.x;
-			int dy = newScreenPosition.y - _walkStates[i].previousScreenPosition.y;
-			if (dx != 0 || dy != 0)
-				_walkStates[i].cellIndex = computeDirectionCell(dx, dy);
-		}
+		zoombini->updateAnimation(now);
 	}
 
 	// When all zoombinis are done, signal transition completion
 	if (_completedCount >= numZoombinis) {
-		_engine->_skipMode = true;
+		_vm->_skipMode = true;
 	}
 }
 
-void MapTransition::update() {
+void TransitionMapTrans::onUpdate() {
 	walkZoombinis();
 
 	// Space skips the walking animation but preserves the destination gate.
-	if (_engine->getLastKeyPressed() == Common::KEYCODE_SPACE || _engine->_skipMode) {
+	if (_vm->_skipMode) {
 		finishTransition();
 	}
 }
 
-int MapTransition::getPostTransitionPage() const {
-	GameState *gameState = _engine->getGameState();
+PageId TransitionMapTrans::getPostTransitionPage() const {
+	GameState *gameState = _vm->getGameState();
 	if (!gameState)
-		return _targetWorld;
+		return _targetPageId;
 
-	const int source = _engine->_maptransSourceWorld;
-	if (source == kPageAquacube && !gameState->hasPlayedRescue1Movie()) {
-		const int zoombiniCount = static_cast<int>(_engine->_globalZoombinis.size()) + gameState->_statA;
+	const PageId src = _vm->_mapTransitionSourcePageId;
+	if (src == kPageAquaCube && !gameState->hasPlayedRescue1Movie()) {
+		const int zoombiniCount = static_cast<int>(_vm->_globalZoombinis.size()) + gameState->_rescue1ArrivalCount;
 		if (kRescue1MovieMinimumZoombinis <= zoombiniCount)
-			return kPageStoryBmp;
+			return kPageCutsceneSecond;
 	}
 
-	if ((source == kPageWallOfFleens || source == kPageChezNorf) && !gameState->hasPlayedRescue2Movie()) {
-		return kPageStoryAnim;
+	if ((src == kPageWallOfFleens || src == kPageChezNorf) && !gameState->hasPlayedRescue2Movie()) {
+		return kPageCutsceneThird;
 	}
 
-	return _targetWorld;
+	return _targetPageId;
 }
 
-void MapTransition::finishTransition() {
+void TransitionMapTrans::finishTransition() {
 	if (_transitionFinished)
 		return;
 	_transitionFinished = true;
 
-	const int nextPage = getPostTransitionPage();
-	_engine->_maptransSourceWorld = _targetWorld;
-	_engine->requestPageChange(nextPage);
+	const PageId nextPage = getPostTransitionPage();
+	_vm->_mapTransitionSourcePageId = _targetPageId;
+	_vm->requestPageChange(nextPage);
 }
 
-/** Convert a movement vector into one of the sixteen directional animation cells. */
-int MapTransition::computeDirectionCell(int dx, int dy) const {
-	// Animation cells indexed by signed direction plus eight.
-	static constexpr int kDirTable[17] = {
-		44, 41, 11, 12, 22, 23, 33, 36, // directions -8..-1
-		66,                             // direction 0 (right)
-		69, 99, 98, 88, 87, 77, 74, 44  // directions 1..8
-	};
-
-	double dist = sqrt(static_cast<double>(dx * dx + dy * dy));
-	if (dist < 0.001)
-		return 88; // no movement: default down
-
-	double cosAngle = CLIP(static_cast<double>(dx) / dist, -1.0, 1.0);
-	double angleDeg = acos(cosAngle) * 180.0 / M_PI;
-	int direction = static_cast<int>(angleDeg / 22.0);
-	if (direction > 8)
-		direction = 8;
-	if (dy < 0)
-		direction = -direction;
-
-	return kDirTable[direction + 8];
-}
-
-/** Draw one Zoombini as a body layer followed by its four feature layers. */
-void MapTransition::drawZoombiniSprite(Graphics::ManagedSurface *dst,
-									   int zoombiniIdx, int cellIndex,
-									   const Common::Point32 &position) const {
-	if (!_zoombiniGfx || zoombiniIdx < 0 ||
-		zoombiniIdx >= static_cast<int>(_engine->_globalZoombinis.size()))
-		return;
-
-	const ZoombiniState *z = _engine->_globalZoombinis[zoombiniIdx];
-	const byte(*lut)[256] = _engine->getAlphaLUT();
-
-	// Base flat index for this direction: cellIndex * kDim1 * kDim2
-	int baseIdx = cellIndex * ZoombiniGraphics::kDim1 * ZoombiniGraphics::kDim2;
-
-	// Body: [cellIndex][0][0]
-	const RleBlock *frame = _zoombiniGfx->getFrame(baseIdx, 0);
-	if (frame)
-		frame->drawToScreen(dst, position.x, position.y, lut);
-
-	// Features 1..4 (Hair, Eyes, Nose, Feet)
-	const byte features[4] = {z->_featureA, z->_featureB, z->_featureC, z->_featureD};
-	for (int slot = 1; slot <= 4; slot++) {
-		int featIdx = baseIdx + slot * ZoombiniGraphics::kDim2 + features[slot - 1];
-		frame = _zoombiniGfx->getFrame(featIdx, 0);
-		if (frame)
-			frame->drawToScreen(dst, position.x, position.y, lut);
-	}
-}
-
-void MapTransition::draw(Graphics::ManagedSurface *screen) {
+void TransitionMapTrans::onRenderScene(ManagedSurface32 *screen) {
 	// Draw composited background (map + overlays)
 	if (_compositedBg)
-		screen->blitFrom(*_compositedBg, Common::Point(0, 0));
+		screen->blitFrom(*_compositedBg, Common::Point32(0, 0));
+}
 
+void TransitionMapTrans::onRenderActors(ManagedSurface32 *screen) {
 	// Sort walkers by vertical position so lower sprites overlap higher ones.
-	int numZoombinis = static_cast<int>(_engine->_globalZoombinis.size());
+	int numZoombinis = static_cast<int>(_vm->_globalZoombinis.size());
 
 	// Build sort order by Y
 	Common::Array<int> drawOrder;
 	for (int i = 0; i < numZoombinis; i++) {
-		if (_walkStates[i].active)
+		const ZoombiniState *zoombini = _vm->_globalZoombinis[i];
+		if (zoombini->_movementPath && !zoombini->_hidden)
 			drawOrder.push_back(i);
 	}
 
 	// The party is small enough for a direct pairwise sort.
 	for (uint i = 0; i < drawOrder.size(); i++) {
 		for (uint j = i + 1; j < drawOrder.size(); j++) {
-			if (_walkStates[drawOrder[j]].screenPosition.y < _walkStates[drawOrder[i]].screenPosition.y)
+			if (_vm->_globalZoombinis[drawOrder[j]]->_screenPos.y < _vm->_globalZoombinis[drawOrder[i]]->_screenPos.y)
 				SWAP(drawOrder[i], drawOrder[j]);
 		}
 	}
 
 	// Draw each zoombini in Y-sorted order
-	for (uint i = 0; i < drawOrder.size(); i++) {
-		int idx = drawOrder[i];
-		drawZoombiniSprite(screen, idx, _walkStates[idx].cellIndex, _walkStates[idx].screenPosition);
-	}
+	for (uint i = 0; i < drawOrder.size(); i++)
+		_vm->_globalZoombinis[drawOrder[i]]->draw(screen, _vm->getAlphaLUT());
 }
 
-void MapTransition::handleClick(const Common::Point &pos) {
+EventHandleResult TransitionMapTrans::onKeyDown(const Common::KeyState &key, bool repeat) {
+	(void)repeat;
+	if (key.keycode != Common::KEYCODE_SPACE)
+		return EventHandleResult::kPassthrough;
+	finishTransition();
+	return EventHandleResult::kConsumed;
+}
+EventHandleResult TransitionMapTrans::onLButtonDown(const Common::Point &pos) {
 	(void)pos;
 	// Skip map animation on click
 	finishTransition();
+	return EventHandleResult::kConsumed;
+}
+
+PageId TransitionMapTrans::getDestPage(PageId src, RouteBranch routeBranch, int rescuedBoolies) {
+	switch (src) {
+	case kPageZombiniville:
+		return kPageCrazyTurtle;
+	case kPageCrazyTurtle:
+		return kPageWaterSlide;
+	case kPageWaterSlide:
+		return kPageAquaCube;
+	case kPageAquaCube:
+		return kPageRescue1;
+	case kPageRescue1: {
+		if (routeBranch == RouteBranch::kLeft01)
+			return kPageMagicWall;
+		else if (routeBranch == RouteBranch::kRight02)
+			return kPageMysticMarsh;
+		return kPageNone;
+	}
+	case kPageMysticMarsh:
+		return kPageWallOfFleens;
+	case kPageMagicWall:
+		return kPageChezNorf;
+	case kPageWallOfFleens:
+	case kPageChezNorf:
+		return kPageRescue2;
+	case kPageRescue2:
+		return kPageSnowboard;
+	case kPageSnowboard:
+		return kPageBoolies;
+	case kPageBoolies:
+		return rescuedBoolies < 400 ? kPageBooliewood : kPageFinal;
+	default:
+		return kPageNone;
+	}
 }
 
 } // End of namespace Zoombini2

@@ -26,6 +26,7 @@
 #include "common/rect.h"
 
 #include "zoombini2/pages/puzzle_base.h"
+#include "zoombini2/state.h"
 
 namespace Zoombini2 {
 
@@ -33,26 +34,27 @@ class Animation;
 class RleBlock;
 
 /**
- * Pipes of Paloo pairs Zoombinis that share a selected visible feature.
+ * Pipes of Paloo (Route1-2)
  *
- * The generated pairs and matching strategy depend on difficulty. Correctly
- * paired Zoombinis slide away together, while incorrect placements are returned.
+ * Match Zoombini pairs to the pipe labels and fill the water system.
  */
-class WaterslidePuzzle : public PuzzlePage {
+class PuzzleWaterslide : public PuzzleBase {
 public:
-	/** Construct Pipes of Paloo for @p engine. */
-	WaterslidePuzzle(Zoombini2Engine *engine);
+	/** Construct Pipes of Paloo for @p vm. */
+	PuzzleWaterslide(Zoombini2Engine *vm);
 	/** Release pipe, indicator, and decoration resources. */
-	~WaterslidePuzzle() override;
+	~PuzzleWaterslide() override;
 
 	/** Load the pipe layout, build slots, and generate trait pairs. */
 	void init() override;
 	/** Advance movement, match feedback, sliding, and rejection phases. */
-	void update() override;
+	void onUpdate() override;
 	/** Draw pipes, slots, trait indicators, decorations, and Zoombinis. */
-	void draw(Graphics::ManagedSurface *screen) override;
+	void onRenderBackground(ManagedSurface32 *screen) override;
+	/** Draw scene decorations and slot indicators. */
+	void onRenderScene(ManagedSurface32 *screen) override;
 	/** Move the selected Zoombini into the clicked slot. */
-	void handleClick(const Common::Point &pos) override;
+	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 
 private:
 	/** Occupancy and feedback state of one pipe slot. */
@@ -88,7 +90,7 @@ private:
 	/** One clickable pipe slot and its current occupant. */
 	struct Slot {
 		/** Screen position. */
-		Common::Point32 position;
+		Common::Point32 pos;
 		/** Clickable area. */
 		Common::Rect hitbox;
 		/** Current occupancy or feedback state. */
@@ -99,15 +101,15 @@ private:
 		int pairSlot;
 	};
 
-	/** Correct pairing and its shared feature value. */
+	/** Correct pairing and its shared trait value. */
 	struct TraitPair {
 		/** First puzzle-roster index. */
 		int zoombiniA;
 		/** Second puzzle-roster index. */
 		int zoombiniB;
-		/** Visible feature index shared by the pair. */
-		int featureAxis;
-		/** Feature value shared by the pair. */
+		/** Trait index shared by the pair. */
+		ZmbTrait::TraitIndex traitAxis;
+		/** Trait value shared by the pair. */
 		int sharedValue;
 		/** Whether this pair has been placed correctly. */
 		bool matched;
@@ -115,18 +117,28 @@ private:
 
 	/** Load pipe, indicator, and decoration resources. */
 	void loadResources();
-	/** Return visible feature @p axis from @p zoombini. */
-	static byte getFeature(const ZoombiniState *zoombini, int axis);
+	/** Return trait @p axis from @p zoombini. */
+	static byte getTrait(const ZoombiniState *zoombini, ZmbTrait::TraitIndex axis);
 	/** Initialize slot geometry and partner relationships. */
 	void setupSlots();
-	/** Select the difficulty-specific pairing algorithm. */
+	/** Select the level-specific pairing algorithm. */
 	void computePairs();
-	/** Generate the difficulty-one pair layout. */
-	void computePairsDiff1();
-	/** Generate the difficulty-two pair layout. */
-	void computePairsDiff2();
-	/** Generate the upper-difficulty pair layout. */
-	void computePairsDiff3();
+	/** Generate the level-one pair layout. */
+	void computePairsLevel1();
+	/** Generate level-one pairs with the default linked-list-style matching branch. */
+	void computePairsLevel1Matching();
+	/** Generate level-one pairs with the alternate greedy scan/retry branch. */
+	void computePairsLevel1Greedy();
+	/** Generate the level-two pair layout. */
+	void computePairsLevel2();
+	/** Generate the upper-level pair layout. */
+	void computePairsLevel3();
+	/** Reset every generated pair slot. */
+	void clearPairs();
+	/** Append one generated pair sharing @p traitAxis and @p sharedValue. */
+	void addPair(int zoombiniA, int zoombiniB, ZmbTrait::TraitIndex traitAxis, int sharedValue);
+	/** Find a randomized shared trait for two roster entries. */
+	bool findSharedTrait(int zoombiniA, int zoombiniB, ZmbTrait::TraitIndex &traitAxis, int &sharedValue);
 
 	/** Dispatch a click on slot @p slotIdx. */
 	void clickSlot(int slotIdx);
@@ -145,15 +157,15 @@ private:
 	int countFreeZoombinis() const;
 
 	/** Draw pipe segments using their current feedback colors. */
-	void drawPipes(Graphics::ManagedSurface *screen);
+	void drawPipes(ManagedSurface32 *screen);
 	/** Draw every active slot and occupant marker. */
-	void drawSlots(Graphics::ManagedSurface *screen);
+	void drawSlots(ManagedSurface32 *screen);
 	/** Draw the feature icons for generated pairs. */
-	void drawTraitIndicators(Graphics::ManagedSurface *screen);
+	void drawTraitIndicators(ManagedSurface32 *screen);
 	/** Draw the fountain, tree, valve, and cascades. */
-	void drawDecorations(Graphics::ManagedSurface *screen);
+	void drawDecorations(ManagedSurface32 *screen);
 	/** Draw waiting and placed Zoombinis. */
-	void drawZoombinis(Graphics::ManagedSurface *screen);
+	void onRenderActors(ManagedSurface32 *screen) override;
 
 	/** Current interaction phase. */
 	PuzzleState _state;
@@ -182,8 +194,8 @@ private:
 	/** Number of generated pairs already matched. */
 	int _matchedPairs;
 
-	/** Trait indicators indexed by visible feature. */
-	RleBlock *_traitGfx[4];
+	/** Trait indicators indexed by trait axis. */
+	RleBlock *_traitImage[4];
 
 	/** Blue horizontal pipe segment. */
 	RleBlock *_pipeBlueHoriz;

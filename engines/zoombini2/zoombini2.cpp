@@ -19,13 +19,14 @@
  *
  */
 
-#include "common/archive.h"
 #include "common/config-manager.h"
 #include "common/debug.h"
 #include "common/error.h"
 #include "common/events.h"
-#include "common/file.h"
+#include "common/fs.h"
+#include "common/stream.h"
 #include "common/system.h"
+#include "common/tokenizer.h"
 
 #include "engines/util.h"
 
@@ -33,9 +34,11 @@
 #include "graphics/managed_surface.h"
 #include "graphics/pixelformat.h"
 
+#include "zoombini2/dialogs.h"
 #include "zoombini2/graphics.h"
-#include "zoombini2/pages/interactive_menuscreen.h"
-#include "zoombini2/pages/interactive_worldmap.h"
+#include "zoombini2/pages/interactive_base.h"
+#include "zoombini2/pages/interactive_map.h"
+#include "zoombini2/pages/interactive_menu.h"
 #include "zoombini2/pages/page_base.h"
 #include "zoombini2/pages/puzzle_aquacube.h"
 #include "zoombini2/pages/puzzle_base.h"
@@ -48,39 +51,140 @@
 #include "zoombini2/pages/puzzle_walloffleens.h"
 #include "zoombini2/pages/puzzle_waterslide.h"
 #include "zoombini2/pages/shelter_booliewood.h"
-#include "zoombini2/pages/shelter_booliewood_final.h"
-#include "zoombini2/pages/shelter_rescue.h"
+#include "zoombini2/pages/shelter_final.h"
+#include "zoombini2/pages/shelter_rescue1.h"
+#include "zoombini2/pages/shelter_rescue2.h"
 #include "zoombini2/pages/shelter_zombiniville.h"
 #include "zoombini2/pages/transition_credits.h"
 #include "zoombini2/pages/transition_maptrans.h"
 #include "zoombini2/pages/transition_title.h"
 #include "zoombini2/pages/transition_video.h"
-#include "zoombini2/sidebar.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
-Common::Path Zoombini2Engine::selectMoviePath(const char *fullSizePath, const char *halfSizePath) {
-	const Common::Path fullSize(fullSizePath);
-	if (SearchMan.hasFile(fullSize))
-		return fullSize;
+const char *const kConfigDebugHotkeys = "debug_hotkeys";
+const char *const kConfigStereoOutput = "stereo_output";
+const char *const kConfigGreedyWaterslidePairing = "greedy_waterslide_pairing";
+const char *const kConfigCachedFrameTime = "cached_frame_time";
+const char *const kConfigUseFloatingPointPaths = "use_floating_point_paths";
+
+/** Resolve original logical resource names against their distinct physical roots. */
+class Zoombini2Engine::ResourceFileResolver {
+public:
+	ResourceFileResolver(const Common::FSNode &cdDataDirectory, const Common::FSNode &installedDirectory)
+		: _cdDataDirectory(cdDataDirectory.isDirectory() ? new Common::FSDirectory(cdDataDirectory, 8) : nullptr),
+		  _installedDirectory(installedDirectory.isDirectory() ? new Common::FSDirectory(installedDirectory, 8) : nullptr) {
+	}
+
+	~ResourceFileResolver() {
+		delete _cdDataDirectory;
+		delete _installedDirectory;
+	}
+
+	bool hasFile(const Common::String &path) const {
+		Common::Path relativePath;
+		const Common::FSDirectory *directory = resolvePath(path, relativePath);
+		return directory && directory->hasFile(relativePath);
+	}
+
+	Common::SeekableReadStream *openFile(const Common::String &path) const {
+		Common::Path relativePath;
+		const Common::FSDirectory *directory = resolvePath(path, relativePath);
+		return directory ? directory->createReadStreamForMember(relativePath) : nullptr;
+	}
+
+private:
+	const Common::FSDirectory *resolvePath(const Common::String &path, Common::Path &relativePath) const {
+		Common::String logicalPath(path);
+		logicalPath.replace('\\', '/');
+		uint offset = 0;
+		const bool useInstalledDirectory = !logicalPath.empty() && logicalPath[0] == '#';
+		if (useInstalledDirectory)
+			offset += 1;
+		else if (logicalPath.hasPrefixIgnoreCase("Data/"))
+			offset += 5;
+		if (offset < logicalPath.size() && logicalPath[offset] == '.')
+			offset += 1;
+		if (offset < logicalPath.size() && logicalPath[offset] == '/')
+			offset += 1;
+		if (logicalPath.size() <= offset)
+			return nullptr;
+
+		relativePath = Common::Path(logicalPath.substr(offset), '/');
+		return useInstalledDirectory ? _installedDirectory : _cdDataDirectory;
+	}
+
+	Common::FSDirectory *_cdDataDirectory;
+	Common::FSDirectory *_installedDirectory;
+};
+
+Common::Path Zoombini2Engine::selectMoviePath(const char *fullSizePath, const char *halfSizePath) const {
+	if (hasResource(fullSizePath))
+		return Common::Path(fullSizePath);
 
 	return Common::Path(halfSizePath);
+}
+
+Common::FSNode Zoombini2Engine::findChildDirectoryIgnoreCase(const Common::FSNode &directory, const char *name) {
+	Common::FSList children;
+	if (!directory.getChildren(children, Common::FSNode::kListDirectoriesOnly))
+		return Common::FSNode();
+
+	Common::FSNode match;
+	for (const Common::FSNode &child : children) {
+		if (!child.getRealName().equalsIgnoreCase(name))
+			continue;
+
+		if (match.exists()) {
+			warning("Zoombini2Engine: multiple child directories match '%s' without case", name);
+			return Common::FSNode();
+		}
+		match = child;
+	}
+
+	return match;
+}
+
+void Zoombini2Engine::initializePath(const Common::FSNode &gamePath) {
+	const Common::FSNode dataDir = findChildDirectoryIgnoreCase(gamePath, "Data");
+	const Common::FSNode dataBmpDir = findChildDirectoryIgnoreCase(dataDir, "Bmp");
+	const Common::FSNode installDir = findChildDirectoryIgnoreCase(gamePath, "INSTALL");
+	const Common::FSNode installHdDir = findChildDirectoryIgnoreCase(installDir, "HD");
+	const Common::FSNode rootBmpDir = findChildDirectoryIgnoreCase(gamePath, "Bmp");
+
+	Common::FSNode cdDataRoot = dataDir;
+	Common::FSNode installedRoot = installHdDir;
+	if (!dataBmpDir.isDirectory() && rootBmpDir.isDirectory()) {
+		// Some supported installed releases already present both logical trees in one flattened directory.
+		cdDataRoot = gamePath;
+		installedRoot = gamePath;
+	}
+
+	if (!cdDataRoot.isDirectory())
+		warning("Zoombini2Engine: CD Data resource root is unavailable");
+	if (!installedRoot.isDirectory())
+		warning("Zoombini2Engine: installed resource root is unavailable");
+
+	delete _resourceFileResolver;
+	_resourceFileResolver = new ResourceFileResolver(cdDataRoot, installedRoot);
 }
 
 Zoombini2Engine::Zoombini2Engine(OSystem *syst, const Zoombini2GameDescription *desc)
 	: Engine(syst), _gameDescription(desc) {
 
 	_rnd = new Common::RandomSource("zoombini2");
+	_resourceFileResolver = nullptr;
 
 	_screen = nullptr;
 	_soundManager = nullptr;
 	_mapMusicId = -1;
 	_gameState = nullptr;
 	_currentPage = nullptr;
-	_sidebar = nullptr;
+	_threeButtons = nullptr;
+	_mainMenuDialog = new Zoombini2MenuDialog(this);
 
 	// Cursor system
 	_cursorSprite = nullptr;
@@ -88,32 +192,38 @@ Zoombini2Engine::Zoombini2Engine(OSystem *syst, const Zoombini2GameDescription *
 	_cursorVisible = true;
 
 	_mouseDown = false;
-	_mouseClicked = false;
-	_lastKeyPressed = 0;
 	_currentPageId = kPageNone;
-	_nextPageId = kPageTLCLogo;
+	_nextPageId = kPageLogoTLC;
 
 	_startTime = 0;
+	_cachedGameTickCount = 0;
+	_debugHotkeysEnabled = false;
+	_stereoOutputEnabled = false;
+	_useGreedyWaterslidePairing = false;
+	_useCachedFrameTime = false;
+	_useFloatingPointPaths = false;
+	_debugCompletionKeyDown = false;
+	_debugOverlayKeyDown = false;
 
 	// Global state flags
 	_returningFromPuzzle = false;
 	_isSavedGame = false;
 	_gameFlagB = 0;
-	_routeDirection = 0;
-	_maptransSourceWorld = 0;
+	_routeDirection = RouteBranch::kNone00;
+	_mapTransitionSourcePageId = kPageZombiniville;
 	_isPaused = false;
 	_pauseTimeAccum = 0;
 	_pauseTimeStart = 0;
 	_zoombiniWalkingFlag = false;
 	_skipMode = false;
-	_lastRouteDirection = 0;
-	_worldTransitionTimer = 0;
+	_lastRouteDirection = RouteBranch::kNone00;
+	_pageTransitionTimer = 0;
 	_transitionState = 0;
 
-	for (int i = 0; i < kNumFeatures; i++)
+	for (int i = 0; i < ZmbTrait::kTraitCount; i++)
 		_selectedFeatures[i] = -1;
 
-	memset(_alphaBlendLUT, 0, sizeof(_alphaBlendLUT));
+	refreshEngineSettings();
 }
 
 Zoombini2Engine::~Zoombini2Engine() {
@@ -122,19 +232,53 @@ Zoombini2Engine::~Zoombini2Engine() {
 	if (_gameState)
 		writeGameSave(_gameState->_playerName);
 	clearGlobalZoombinis();
+	clearZoombiniAnimationCache();
 
 	delete _cursorSprite;
 	delete _gameState;
-	delete _sidebar;
+	delete _threeButtons;
 	delete _soundManager;
 	delete _screen;
 	delete _rnd;
+	delete _resourceFileResolver;
 }
 
 void Zoombini2Engine::clearGlobalZoombinis() {
 	for (uint i = 0; i < _globalZoombinis.size(); i++)
 		delete _globalZoombinis[i];
 	_globalZoombinis.clear();
+}
+
+void Zoombini2Engine::recordBooliesCompletion() {
+	if (!_gameState || _globalZoombinis.empty() || !_globalZoombinis[0])
+		return;
+
+	const int rescuedBooliesPerZoombini = _globalZoombinis[0]->_rescuedBooliesPerZoombini;
+	_gameState->_rescuedBoolieCount += static_cast<int32>(_globalZoombinis.size()) * rescuedBooliesPerZoombini;
+	for (uint i = 0; i < _globalZoombinis.size(); i++) {
+		if (_globalZoombinis[i])
+			_gameState->recordCompletedZoombini(*_globalZoombinis[i]);
+	}
+}
+
+const ZoombiniAnimation *Zoombini2Engine::loadZoombiniAnimation(const Common::Path &path) {
+	ZoombiniAnimationCache::const_iterator cached = _zoombiniAnimationCache.find(path);
+	if (cached != _zoombiniAnimationCache.end())
+		return cached->_value;
+
+	ZoombiniAnimation *animation = new ZoombiniAnimation();
+	if (!animation->loadFromFile(path)) {
+		delete animation;
+		return nullptr;
+	}
+	_zoombiniAnimationCache[path] = animation;
+	return animation;
+}
+
+void Zoombini2Engine::clearZoombiniAnimationCache() {
+	for (ZoombiniAnimationCache::iterator entry = _zoombiniAnimationCache.begin(); entry != _zoombiniAnimationCache.end(); entry++)
+		delete entry->_value;
+	_zoombiniAnimationCache.clear();
 }
 
 bool Zoombini2Engine::writeGameSave(const Common::String &name) {
@@ -166,7 +310,7 @@ int Zoombini2Engine::ensureMapMusic() {
 		return -1;
 
 	if (_mapMusicId < 0)
-		_mapMusicId = _soundManager->load(true, Common::Path("sounds/music/ZMR-MapScreen.wav"), true);
+		_mapMusicId = _soundManager->load(true, Common::Path("#sounds/music/ZMR-MapScreen.wav"), true);
 	if (0 <= _mapMusicId) {
 		if (!_soundManager->isPlaying(_mapMusicId))
 			_soundManager->playLoop(_mapMusicId);
@@ -175,9 +319,32 @@ int Zoombini2Engine::ensureMapMusic() {
 	return _mapMusicId;
 }
 
-void Zoombini2Engine::setMapMusicVolume(int volume) {
-	if (_soundManager && 0 <= _mapMusicId)
-		_soundManager->setVolume(_mapMusicId, volume);
+int Zoombini2Engine::getMusicVolume() const {
+	return _soundManager ? _soundManager->_volumeMusic : mixerVolumeToPercent(ConfMan.getInt("music_volume"));
+}
+
+int Zoombini2Engine::getSFXVolume() const {
+	return _soundManager ? _soundManager->_volumeSFX : mixerVolumeToPercent(ConfMan.getInt("sfx_volume"));
+}
+
+int Zoombini2Engine::getSpeechVolume() const {
+	return _soundManager ? _soundManager->_volumeSpeech : mixerVolumeToPercent(ConfMan.getInt("speech_volume"));
+}
+
+void Zoombini2Engine::previewSoundVolumes(int music, int sfx, int speech) {
+	if (_soundManager)
+		_soundManager->setVolumeSettings(music, sfx, speech);
+	_mixer->setVolumeForSoundType(Audio::Mixer::kMusicSoundType, percentToMixerVolume(music));
+	_mixer->setVolumeForSoundType(Audio::Mixer::kSFXSoundType, percentToMixerVolume(sfx));
+	_mixer->setVolumeForSoundType(Audio::Mixer::kSpeechSoundType, percentToMixerVolume(speech));
+}
+
+void Zoombini2Engine::saveSoundVolumes(int music, int sfx, int speech) {
+	previewSoundVolumes(music, sfx, speech);
+	ConfMan.setInt("music_volume", percentToMixerVolume(music));
+	ConfMan.setInt("sfx_volume", percentToMixerVolume(sfx));
+	ConfMan.setInt("speech_volume", percentToMixerVolume(speech));
+	ConfMan.flushToDisk();
 }
 
 void Zoombini2Engine::stopMapMusic() {
@@ -189,57 +356,52 @@ void Zoombini2Engine::stopMapMusic() {
 }
 
 bool Zoombini2Engine::hasFeature(EngineFeature f) const {
-	return (f == kSupportsReturnToLauncher);
+	return f == kSupportsReturnToLauncher || f == kSupportsChangingOptionsDuringRuntime;
+}
+
+void Zoombini2Engine::syncSoundSettings() {
+	Engine::syncSoundSettings();
+	if (_soundManager) {
+		_soundManager->setVolumeSettings(mixerVolumeToPercent(ConfMan.getInt("music_volume")), mixerVolumeToPercent(ConfMan.getInt("sfx_volume")),
+										 mixerVolumeToPercent(ConfMan.getInt("speech_volume")));
+	}
+}
+
+void Zoombini2Engine::applyGameSettings() {
+	refreshEngineSettings();
+	if (_soundManager)
+		_soundManager->setStereoOutputEnabled(_stereoOutputEnabled);
 }
 
 Common::Error Zoombini2Engine::run() {
-	// Add subdirectories for ISO layout support
-	// BOTH folders are required: Data/ has main resources, INSTALL/HD/ has music and cached backgrounds
-	// INSTALL/HD gets higher priority (1) so cached .bb files override raw .bmp from Data/
-	const Common::FSNode gameDataDir(ConfMan.getPath("path"));
-	// Use engine-owned archive names so a shallower launcher search entry cannot suppress the complete trees.
-	if (!SearchMan.hasArchive("Zoombini2-HD"))
-		SearchMan.addDirectory("Zoombini2-HD", gameDataDir.getChild("INSTALL").getChild("HD"), 1, 8);
-	if (!SearchMan.hasArchive("Zoombini2-Data"))
-		SearchMan.addDirectory("Zoombini2-Data", gameDataDir.getChild("Data"), 0, 8);
-
 	// Initialize 800x600 32-bit graphics
 	// Use RGBA8888 format (same as internal surfaces)
 	Graphics::PixelFormat format32(4, 8, 8, 8, 8, 16, 8, 0, 24);
 	::initGraphics(kScreenWidth, kScreenHeight, &format32);
 
-	_screen = new Graphics::ManagedSurface(kScreenWidth, kScreenHeight, format32);
-
-	// Initialize alpha blend LUT
-	initAlphaLUT();
+	_screen = new ManagedSurface32(kScreenWidth, kScreenHeight, format32);
 
 	// Initialize cursor system
 	initCursor();
 
 	// Initialize sound manager
-	_soundManager = new SoundManager(_mixer);
+	_soundManager = new SoundManager(this, _mixer);
+	_soundManager->setStereoOutputEnabled(_stereoOutputEnabled);
+	syncSoundSettings();
 
 	// Initialize game state
 	_gameState = new GameState();
 
-	// Initialize sidebar UI system
-	_sidebar = new Sidebar(this);
+	// Initialize the shared Help, Map, and Go controls.
+	_threeButtons = new ThreeButtons(this);
 
 	_startTime = g_system->getMillis();
+	_cachedGameTickCount = 0;
 
 	// Run the main game loop
 	mainGameLoop();
 
 	return Common::kNoError;
-}
-
-/** Initialize the lookup table used to multiply color channels by alpha. */
-void Zoombini2Engine::initAlphaLUT() {
-	for (int alpha = 0; alpha < 256; alpha++) {
-		for (int value = 0; value < 256; value++) {
-			_alphaBlendLUT[alpha][value] = (alpha * value) >> 8;
-		}
-	}
 }
 
 /**
@@ -305,12 +467,12 @@ void Zoombini2Engine::registerCursorWithCursorMan() {
 	// Render onto black background
 	Graphics::ManagedSurface blackSurf(w, h, Graphics::PixelFormat(4, 8, 8, 8, 8, 16, 8, 0, 24));
 	blackSurf.fillRect(Common::Rect(w, h), blackSurf.format.ARGBToColor(255, 0, 0, 0));
-	_cursorSprite->drawToScreen(&blackSurf, 0, 0, _alphaBlendLUT);
+	_cursorSprite->drawToScreen(&blackSurf, Common::Point32(0, 0), _alphaBlendLUT);
 
 	// Render onto white background
 	Graphics::ManagedSurface whiteSurf(w, h, Graphics::PixelFormat(4, 8, 8, 8, 8, 16, 8, 0, 24));
 	whiteSurf.fillRect(Common::Rect(w, h), whiteSurf.format.ARGBToColor(255, 255, 255, 255));
-	_cursorSprite->drawToScreen(&whiteSurf, 0, 0, _alphaBlendLUT);
+	_cursorSprite->drawToScreen(&whiteSurf, Common::Point32(0, 0), _alphaBlendLUT);
 
 	// Derive alpha from the two renders:
 	// For premultiplied alpha compositing: result = src_premult + invAlpha * dst / 255
@@ -360,45 +522,153 @@ void Zoombini2Engine::registerCursorWithCursorMan() {
 }
 
 uint32 Zoombini2Engine::getGameTickCount() const {
-	uint32 elapsed = g_system->getMillis() - _startTime;
+	return _useCachedFrameTime ? _cachedGameTickCount : calculateGameTickCount();
+}
+
+uint32 Zoombini2Engine::calculateGameTickCount() const {
+	const uint32 now = g_system->getMillis();
+	uint32 elapsed = now - _startTime;
 	if (_isPaused)
-		elapsed -= _pauseTimeAccum + (g_system->getMillis() - _pauseTimeStart);
+		elapsed -= _pauseTimeAccum + (now - _pauseTimeStart);
 	else
 		elapsed -= _pauseTimeAccum;
 	return elapsed;
 }
 
+int Zoombini2Engine::mixerVolumeToPercent(int volume) {
+	return CLIP((CLIP<int>(volume, 0, Audio::Mixer::kMaxMixerVolume) * kMaxVolumePercent + 128) / 256, 0, kMaxVolumePercent);
+}
+
+int Zoombini2Engine::percentToMixerVolume(int volume) {
+	return MIN<int>(Audio::Mixer::kMaxMixerVolume, (CLIP(volume, 0, kMaxVolumePercent) * 256) / kMaxVolumePercent);
+}
+
+void Zoombini2Engine::refreshEngineSettings() {
+	_debugHotkeysEnabled = ConfMan.getBool(kConfigDebugHotkeys);
+	_stereoOutputEnabled = ConfMan.getBool(kConfigStereoOutput);
+	_useGreedyWaterslidePairing = ConfMan.getBool(kConfigGreedyWaterslidePairing);
+	_useCachedFrameTime = ConfMan.getBool(kConfigCachedFrameTime);
+	_useFloatingPointPaths = ConfMan.getBool(kConfigUseFloatingPointPaths);
+	if (!_debugHotkeysEnabled) {
+		_debugCompletionKeyDown = false;
+		_debugOverlayKeyDown = false;
+	}
+}
+
+void Zoombini2Engine::exportZoombiniSet() const {
+	if (_globalZoombinis.empty())
+		return;
+
+	Common::FSNode outputNode(Common::Path("zoombini.set"));
+	Common::SeekableWriteStream *output = outputNode.createWriteStream(false);
+	if (!output)
+		return;
+
+	output->writeString(Common::String::format("%u\n", _globalZoombinis.size()));
+	for (uint i = 0; i < _globalZoombinis.size(); i++) {
+		const ZoombiniState *zoombini = _globalZoombinis[i];
+		if (!zoombini)
+			continue;
+		output->writeString(Common::String::format("%u %u %u %u\n", zoombini->_traits._feet, zoombini->_traits._nose, zoombini->_traits._hair,
+												   zoombini->_traits._eyes));
+	}
+	output->finalize();
+	delete output;
+}
+
+void Zoombini2Engine::importZoombiniSet() {
+	Common::FSNode inputNode(Common::Path("zoombini.set"));
+	Common::SeekableReadStream *input = inputNode.createReadStream();
+	if (!input)
+		return;
+
+	const uint fileCount = static_cast<uint>(input->readLine().asUint64());
+	const uint importCount = MIN<uint>(fileCount, _globalZoombinis.size());
+	for (uint i = 0; i < importCount && !input->eos(); i++) {
+		Common::StringTokenizer tokens(input->readLine());
+		byte values[ZmbTrait::kTraitCount];
+		bool completeTuple = true;
+		for (int traitIndex = 0; traitIndex < ZmbTrait::kTraitCount; traitIndex++) {
+			if (tokens.empty()) {
+				completeTuple = false;
+				break;
+			}
+			values[traitIndex] = static_cast<byte>(tokens.nextToken().asUint64());
+		}
+		if (!completeTuple)
+			break;
+		if (_globalZoombinis[i])
+			_globalZoombinis[i]->setTraits(ZmbTrait(values[0], values[1], values[2], values[3]));
+	}
+	delete input;
+}
+
+void Zoombini2Engine::applyDebugPuzzleCompletion() {
+	if (!_debugHotkeysEnabled || !_debugCompletionKeyDown)
+		return;
+	if (_currentPageId == kPageZombiniville || _currentPageId == kPageRescue1 || _currentPageId == kPageRescue2 || _currentPageId == kPageBooliewood ||
+		_currentPageId == kPageFinal)
+		return;
+
+	for (uint i = 0; i < _globalZoombinis.size(); i++) {
+		if (_globalZoombinis[i])
+			_globalZoombinis[i]->_puzzleStatus = 1;
+	}
+	_zoombiniWalkingFlag = true;
+	if (_currentPage)
+		_currentPage->applyDebugPuzzleCompletion();
+}
+
 void Zoombini2Engine::processEvents() {
 	Common::Event event;
-
-	_mouseClicked = false;
-	_lastKeyPressed = 0;
+	_pendingPageEvents.clear();
 
 	while (g_system->getEventManager()->pollEvent(event)) {
 		switch (event.type) {
 		case Common::EVENT_QUIT:
 		case Common::EVENT_RETURN_TO_LAUNCHER:
 			return;
-
+		case Common::EVENT_MAINMENU:
+			openMainMenuDialog();
+			break;
 		case Common::EVENT_LBUTTONDOWN:
+			_pendingPageEvents.push_back(event);
 			_mouseDown = true;
-			_mouseClicked = true;
 			_mousePos = event.mouse;
 			break;
-
 		case Common::EVENT_LBUTTONUP:
+			_pendingPageEvents.push_back(event);
 			_mouseDown = false;
 			_mousePos = event.mouse;
 			break;
-
 		case Common::EVENT_MOUSEMOVE:
+			_pendingPageEvents.push_back(event);
 			_mousePos = event.mouse;
 			break;
-
 		case Common::EVENT_KEYDOWN:
-			_lastKeyPressed = event.kbd.keycode;
+			if (event.kbd.keycode == Common::KEYCODE_F5) {
+				openMainMenuDialog();
+				break;
+			}
+			if (_debugHotkeysEnabled) {
+				if (event.kbd.keycode == Common::KEYCODE_F2)
+					exportZoombiniSet();
+				else if (event.kbd.keycode == Common::KEYCODE_F3)
+					importZoombiniSet();
+				else if (event.kbd.keycode == Common::KEYCODE_p)
+					_debugCompletionKeyDown = true;
+				else if (event.kbd.keycode == Common::KEYCODE_c)
+					_debugOverlayKeyDown = true;
+			}
+			_pendingPageEvents.push_back(event);
 			break;
-
+		case Common::EVENT_KEYUP:
+			if (event.kbd.keycode == Common::KEYCODE_p)
+				_debugCompletionKeyDown = false;
+			else if (event.kbd.keycode == Common::KEYCODE_c)
+				_debugOverlayKeyDown = false;
+			_pendingPageEvents.push_back(event);
+			break;
 		default:
 			break;
 		}
@@ -409,61 +679,65 @@ void Zoombini2Engine::processEvents() {
 void Zoombini2Engine::mainGameLoop() {
 	// The Korean release starts with the Arisu logo; other releases start with the TLC logo.
 	if (getLanguage() == Common::KO_KOR) {
-		_nextPageId = kPageArisu;
+		_nextPageId = kPageLogoArisuMedia;
 	} else {
-		_nextPageId = kPageTLCLogo;
+		_nextPageId = kPageLogoTLC;
 	}
 
 	while (!shouldQuit()) {
+		_cachedGameTickCount = calculateGameTickCount();
 		processEvents();
 		if (shouldQuit())
 			break;
 
 		// Handle page transitions
 		if (_nextPageId != kPageNone) {
-			switchPage(_nextPageId);
+			const int requestedPage = _nextPageId;
 			_nextPageId = kPageNone;
+			switchPage(requestedPage);
+			_pendingPageEvents.clear();
 		}
 
 		// Update current page
 		if (_currentPage) {
-			const bool dialogWasActive = _sidebar && _sidebar->hasActiveDialog();
-			// Handle mouse movement for sidebar hover
-			if (_sidebar) {
-				_sidebar->handleMouseMove(_mousePos);
+			applyDebugPuzzleCompletion();
+			const bool dialogWasActive = _threeButtons && _threeButtons->hasActiveDialog();
+			bool modalInputBlocked = dialogWasActive;
+			const Common::Point32 polledMousePos = _mousePos;
+			const bool polledMouseDown = _mouseDown;
+			for (const Common::Event &event : _pendingPageEvents) {
+				if (_nextPageId != kPageNone)
+					break;
+				modalInputBlocked = modalInputBlocked || (_threeButtons && _threeButtons->hasActiveDialog());
+				const bool pageDialogWasActive = _currentPage->hasActiveDialog();
+				if (event.type == Common::EVENT_LBUTTONDOWN || event.type == Common::EVENT_LBUTTONUP || event.type == Common::EVENT_MOUSEMOVE)
+					_mousePos = event.mouse;
+				if (event.type == Common::EVENT_LBUTTONDOWN)
+					_mouseDown = true;
+				else if (event.type == Common::EVENT_LBUTTONUP)
+					_mouseDown = false;
+				EventHandleResult result = EventHandleResult::kPassthrough;
+				if (_threeButtons)
+					result = _threeButtons->handleEvent(event);
+				if (result == EventHandleResult::kPassthrough && !modalInputBlocked)
+					_currentPage->handleEvent(event);
+				if ((pageDialogWasActive && !_currentPage->hasActiveDialog()) ||
+					(modalInputBlocked && (!_threeButtons || !_threeButtons->hasActiveDialog())))
+					break;
 			}
+			_mousePos = polledMousePos;
+			_mouseDown = polledMouseDown;
 
-			// Handle mouse clicks
-			if (_mouseClicked) {
-				// Check sidebar first (if help screen is active, it captures all clicks)
-				bool handledBySidebar = false;
-				if (_sidebar) {
-					handledBySidebar = _sidebar->handleClick(_mousePos);
-				}
+			const bool dialogActive = dialogWasActive || (_threeButtons && _threeButtons->hasActiveDialog());
+			if (!dialogActive)
+				_currentPage->onFrame(_screen, _nextPageId == kPageNone);
 
-				// If sidebar didn't handle it, pass to page
-				if (!handledBySidebar && !dialogWasActive) {
-					_currentPage->handleClick(_mousePos);
-				}
-			}
-
-			const bool dialogActive = dialogWasActive || (_sidebar && _sidebar->hasActiveDialog());
-			if (!dialogActive && _nextPageId == kPageNone)
-				_currentPage->update();
-
-			// Clear only when the page requests it so persistent-frame pages retain their prior image.
-			if (!dialogActive) {
-				if (_currentPage->needsScreenClear())
-					_screen->fillRect(Common::Rect(kScreenWidth, kScreenHeight), 0);
-				_currentPage->draw(_screen);
-			}
-
-			// Draw sidebar on top of page (if visible)
-			if (_sidebar) {
-				_sidebar->draw(_screen);
+			// The shared sidebar polls the frame mouse state before it draws its controls.
+			if (_threeButtons) {
+				_threeButtons->drawAndHandleInput(_screen, _nextPageId == kPageNone);
 			}
 		} else {
-			_screen->fillRect(Common::Rect(kScreenWidth, kScreenHeight), 0);
+			_screen->fillRect(Common::Rect32(kScreenWidth, kScreenHeight), 0);
 		}
 
 		// Draw cursor on top of everything
@@ -487,7 +761,7 @@ void Zoombini2Engine::destroyCurrentPage() {
 	// Clear screen on page destroy to prevent stale content showing
 	// when transitioning to a new page that uses double buffering.
 	if (_screen)
-		_screen->fillRect(Common::Rect(kScreenWidth, kScreenHeight), 0);
+		_screen->fillRect(Common::Rect32(kScreenWidth, kScreenHeight), 0);
 }
 
 /**
@@ -495,8 +769,10 @@ void Zoombini2Engine::destroyCurrentPage() {
  */
 void Zoombini2Engine::switchPage(int pageId) {
 	debug(1, "Zoombini2: Switching from page %d to page %d", _currentPageId, pageId);
-	const bool usesMapMusic = pageId == kPageMenuLoad || pageId == kPageMenuNew ||
-							  pageId == kPageMenuOptions || pageId == kPageWorldMap ||
+	if (_currentPageId == kPageBoolies && pageId == kPageMapTrans)
+		recordBooliesCompletion();
+	const bool usesMapMusic = pageId == kPageMenuLoad || pageId == kPageMenuPractice ||
+							  pageId == kPageMenuOptions || pageId == kPageMapScreen ||
 							  pageId == kPageMenuAlt;
 	if (!usesMapMusic)
 		stopMapMusic();
@@ -505,129 +781,102 @@ void Zoombini2Engine::switchPage(int pageId) {
 	_currentPageId = pageId;
 
 	switch (pageId) {
-	case kPageTLCLogo:
-		_currentPage = new VideoPage(this,
-									 selectMoviePath("movies/tlclogo.bik", "movies/tlclogo50%.bik"),
-									 kPageLogopoly);
+	case kPageLogoTLC:
+		_currentPage = new TransitionVideo(this,
+										   selectMoviePath("movies/tlclogo.bik", "movies/tlclogo50%.bik"),
+										   kPageLogoPolygon);
 		break;
-
-	case kPageLogopoly:
-		_currentPage = new VideoPage(this, Common::Path("movies/logopoly.bik"), kPageTitleScreen);
+	case kPageLogoPolygon:
+		_currentPage = new TransitionVideo(this, Common::Path("movies/logopoly.bik"), kPageTitleScreen);
 		break;
-
-	case kPageTitleAnim:
+	case kPageCutsceneFirst:
 		_isSavedGame = true;
-		_currentPage = new VideoPage(this,
-									 selectMoviePath("movies/zoom_movie1_100%.bik", "movies/zoom_movie1_50%.bik"),
-									 kPageZombiniville);
+		_currentPage = new TransitionVideo(this,
+										   selectMoviePath("movies/zoom_movie1_100%.bik", "movies/zoom_movie1_50%.bik"),
+										   kPageZombiniville);
 		break;
-
-	case kPageStoryBmp:
+	case kPageCutsceneSecond:
 		if (_gameState)
 			_gameState->markRescue1MoviePlayed();
-		_currentPage = new VideoPage(this,
-									 selectMoviePath("movies/zoom_movie2_100%.bik", "movies/zoom_movie2_50%.bik"),
-									 kPageRescue1);
+		_currentPage = new TransitionVideo(this,
+										   selectMoviePath("movies/zoom_movie2_100%.bik", "movies/zoom_movie2_50%.bik"),
+										   kPageRescue1);
 		break;
-
-	case kPageStoryAnim:
+	case kPageCutsceneThird:
 		if (_gameState)
 			_gameState->markRescue2MoviePlayed();
-		_currentPage = new VideoPage(this,
-									 selectMoviePath("movies/zoom_movie3_100%.bik", "movies/zoom_movie3_50%.bik"),
-									 kPageRescue2);
+		_currentPage = new TransitionVideo(this,
+										   selectMoviePath("movies/zoom_movie3_100%.bik", "movies/zoom_movie3_50%.bik"),
+										   kPageRescue2);
 		break;
-
 	case kPageTitleScreen:
-		_currentPage = new TitleScreen(this);
+		_currentPage = new TransitionTitle(this);
 		break;
-
-	case kPageMenuNew:
-		_currentPage = new WorldMapPage(this, kWorldMapPractice);
+	case kPageMenuPractice:
+		_currentPage = new InteractiveMap(this, kMapScreenPractice);
 		break;
-
 	case kPageMenuLoad:
-		_currentPage = new WorldMapPage(this, kWorldMapSavedGame);
+		_currentPage = new InteractiveMap(this, kMapScreenSavedGame);
 		break;
-
-	case kPageWorldMap:
-		_currentPage = new WorldMapPage(this, kWorldMapSavedGame);
+	case kPageMapScreen:
+		_currentPage = new InteractiveMap(this, kMapScreenSavedGame);
 		break;
-
 	case kPageMenuOptions:
 	case kPageMenuAlt:
 		// Open the save-file menu from the map's Parties button.
-		_currentPage = new MenuScreenPage(this);
+		_currentPage = new InteractiveMenu(this);
 		break;
-
 	case kPageZombiniville:
-		_currentPage = new Zombiniville(this);
+		_currentPage = new ShelterZombiniville(this);
 		break;
-
 	case kPageMapTrans:
-		_currentPage = new MapTransition(this);
+		_currentPage = new TransitionMapTrans(this);
 		break;
-
 	case kPageMysticMarsh:
-		_currentPage = new MysticMarshPuzzle(this);
+		_currentPage = new PuzzleMysticMarsh(this);
 		break;
-
 	case kPageChezNorf:
-		_currentPage = new ChezNorfPuzzle(this);
+		_currentPage = new PuzzleChezNorf(this);
 		break;
-
 	case kPageWallOfFleens:
-		_currentPage = new WallOfFleensPuzzle(this);
+		_currentPage = new PuzzleWallOfFleens(this);
 		break;
-
 	case kPageBooliewood:
-		_currentPage = new BooliewoodPage(this);
+		_currentPage = new ShelterBooliewood(this);
 		break;
-
 	case kPageCrazyTurtle:
-		_currentPage = new CrazyTurtlePuzzle(this);
+		_currentPage = new PuzzleCrazyTurtle(this);
 		break;
-
 	case kPageBoolies:
-		_currentPage = new BooliesPuzzle(this);
+		_currentPage = new PuzzleBoolies(this);
 		break;
-
 	case kPageMagicWall:
-		_currentPage = new MagicWallPuzzle(this);
+		_currentPage = new PuzzleMagicWall(this);
 		break;
-
-	case kPageAquacube:
-		_currentPage = new AquacubePuzzle(this);
+	case kPageAquaCube:
+		_currentPage = new PuzzleAquacube(this);
 		break;
-
 	case kPageSnowboard:
-		_currentPage = new SnowboardPuzzle(this);
+		_currentPage = new PuzzleSnowboard(this);
 		break;
-
-	case kPageWaterslide:
-		_currentPage = new WaterslidePuzzle(this);
+	case kPageWaterSlide:
+		_currentPage = new PuzzleWaterslide(this);
 		break;
-
 	case kPageRescue1:
-		_currentPage = new RescuePage(this, 1);
+		_currentPage = new ShelterRescueSite1(this);
 		break;
-
 	case kPageRescue2:
-		_currentPage = new RescuePage(this, 2);
+		_currentPage = new ShelterRescueSite2(this);
 		break;
-
 	case kPageFinal:
-		_currentPage = new BooliewoodFinalPage(this);
+		_currentPage = new ShelterFinal(this);
 		break;
-
 	case kPageCredits:
-		_currentPage = new CreditsPage(this);
+		_currentPage = new TransitionCredits(this);
 		break;
-
-	case kPageArisu:
-		_currentPage = new VideoPage(this, Common::Path("movies/arisu.bik"), kPageTLCLogo);
+	case kPageLogoArisuMedia:
+		_currentPage = new TransitionVideo(this, Common::Path("movies/arisu.bik"), kPageLogoTLC);
 		break;
-
 	default:
 		warning("Zoombini2: Unknown page %d", pageId);
 		break;
@@ -636,7 +885,7 @@ void Zoombini2Engine::switchPage(int pageId) {
 	if (_currentPage) {
 		_currentPage->init();
 		if (_gameState && kPageZombiniville <= pageId && pageId <= kPageBooliewood)
-			_gameState->_currentWorldId = pageId;
+			_gameState->_currentGameplayPageId = pageId;
 	}
 }
 
@@ -658,9 +907,12 @@ RleBlock *Zoombini2Engine::loadRleBlock(const Common::String &path) {
 	return nullptr;
 }
 
-bool Zoombini2Engine::hasResource(const Common::String &path) {
-	Common::File file;
-	return file.exists(Common::Path(path));
+Common::SeekableReadStream *Zoombini2Engine::openResourceFile(const Common::String &path) const {
+	return _resourceFileResolver ? _resourceFileResolver->openFile(path) : nullptr;
+}
+
+bool Zoombini2Engine::hasResource(const Common::String &path) const {
+	return _resourceFileResolver && _resourceFileResolver->hasFile(path);
 }
 
 } // End of namespace Zoombini2

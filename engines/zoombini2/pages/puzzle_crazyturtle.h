@@ -32,37 +32,39 @@ class Animation;
 class RleBlock;
 
 /**
- * Turtle Hurdle: place Zoombinis in the order required by the turtles.
- * Incorrect placements damage the dock and strand any remaining Zoombinis.
- * The internal CrazyTurtle name identifies the bmp/crazy_turtle resources.
+ * Turtle Hurdle (Route1-1)
+ *
+ * Place the Zoombinis on the baby turtles in the required order.
  */
-class CrazyTurtlePuzzle : public PuzzlePage {
+class PuzzleCrazyTurtle : public PuzzleBase {
 public:
-	/** Construct Turtle Hurdle for @p engine. */
-	CrazyTurtlePuzzle(Zoombini2Engine *engine);
+	/** Construct Turtle Hurdle for @p vm. */
+	PuzzleCrazyTurtle(Zoombini2Engine *vm);
 	/** Release turtle, bridge, and trait resources. */
-	~CrazyTurtlePuzzle() override;
+	~PuzzleCrazyTurtle() override;
 
-	/** Load the dock and generate the difficulty-selected ordering rules. */
+	/** Load the dock and generate the level-selected ordering rules. */
 	void init() override;
 	/** Advance the common puzzle and active turtle animations. */
-	void update() override;
-	/** Draw the dock condition, rule hints, turtles, mother, and Zoombinis. */
-	void draw(Graphics::ManagedSurface *screen) override;
+	void onUpdate() override;
 	/** Place the next Zoombini on the selected turtle. */
-	void handleClick(const Common::Point &pos) override;
+	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 	/** Report that this puzzle does not use the common Go button. */
 	bool canUseGoButton() const override { return false; }
 
 private:
+	/** Restore the dock background. */
+	void onRenderBackground(ManagedSurface32 *screen) override;
+	/** Draw dock condition, rule hints, turtles, and mother. */
+	void onRenderScene(ManagedSurface32 *screen) override;
+	/** Draw the party in common depth order. */
+	void onRenderActors(ManagedSurface32 *screen) override;
 	/** Turtle resource type and draw position. */
 	struct TurtlePlacement {
 		/** Index of the turtle animation and fixed visual. */
 		int type;
-		/** Horizontal draw position. */
-		int x;
-		/** Vertical draw position. */
-		int y;
+		/** Screen position of the fixed visual. */
+		Common::Point32 pos;
 	};
 
 	/** Number of visible Zoombini features. */
@@ -81,11 +83,11 @@ private:
 	/** Turtle types and screen positions. */
 	static const TurtlePlacement kTurtlePlacements[kTurtleCount];
 	/** Screen positions used for Zoombinis standing on turtles. */
-	static const Common::Point kZoombiniPositions[kZoombiniCount];
+	static const Common::Point32 kZoombiniPos[kZoombiniCount];
 	/** Draw positions for primary-rule feature icons. */
-	static const Common::Point kPrimaryIconPositions[kRuleSlotCount];
+	static const Common::Point32 kPrimaryIconPos[kRuleSlotCount];
 	/** Draw positions for secondary-rule feature icons. */
-	static const Common::Point kSecondaryIconPositions[kRuleSlotCount];
+	static const Common::Point32 kSecondaryIconPos[kRuleSlotCount];
 
 	/** Load an animation from @p path and report whether it succeeded. */
 	static bool loadAnimationResource(Animation *&resource, const Common::Path &path);
@@ -103,20 +105,16 @@ private:
 	/** Position the puzzle roster before interaction begins. */
 	void placeZoombinis();
 	/** Draw the intact or damaged dock for the remaining mistake count. */
-	void drawBridgeState(Graphics::ManagedSurface *screen) const;
+	void drawBridgeState(ManagedSurface32 *screen) const;
 	/** Draw the active feature-order hints. */
-	void drawRuleHints(Graphics::ManagedSurface *screen) const;
+	void drawRuleHints(ManagedSurface32 *screen) const;
 	/** Draw each turtle in its current animation state. */
-	void drawTurtles(Graphics::ManagedSurface *screen) const;
+	void drawTurtles(ManagedSurface32 *screen) const;
 	/** Draw the mother turtle and feedback effects. */
-	void drawMother(Graphics::ManagedSurface *screen) const;
-	/** Draw all currently placed Zoombinis. */
-	void drawZoombinis(Graphics::ManagedSurface *screen) const;
-	/** Draw @p zoombini at its runtime position. */
-	void drawZoombini(Graphics::ManagedSurface *screen, const ZoombiniState &zoombini) const;
+	void drawMother(ManagedSurface32 *screen) const;
 
-	/** Difficulty level in the range one through four. */
-	int _difficulty;
+	/** Level in the range one through four. */
+	int _level;
 	/** Feature index used by the primary ordering rule. */
 	int _primaryFeature;
 	/** Feature index used by the secondary ordering rule. */
@@ -129,7 +127,7 @@ private:
 	bool _secondaryRuleActive[kRuleSlotCount];
 	/** Incorrect placements still allowed before the dock collapses. */
 	int _remainingMistakes;
-	/** Initial incorrect-placement allowance for the selected difficulty. */
+	/** Initial incorrect-placement allowance for the selected level. */
 	int _initialMistakes;
 
 	/** Idle turtle animations indexed by turtle type. */
@@ -137,7 +135,7 @@ private:
 	/** Feedback turtle animations indexed by turtle type. */
 	Animation *_turtleSpinAnimations[kFeatureCount];
 	/** Fixed turtle visuals indexed by turtle type. */
-	RleBlock *_turtleFixedGraphics[kFeatureCount];
+	RleBlock *_turtleFixedImages[kFeatureCount];
 	/** Mother turtle animation. */
 	Animation *_motherAnimation;
 	/** Mother turtle speech animation. */
@@ -145,17 +143,17 @@ private:
 	/** Dock-damage smoke animation. */
 	Animation *_smokeAnimation;
 	/** Mother turtle's starting visual. */
-	RleBlock *_motherStartGraphic;
+	RleBlock *_motherStartImage;
 	/** Mother turtle's ending visual. */
-	RleBlock *_motherEndGraphic;
+	RleBlock *_motherEndImage;
 	/** Intact dock visual. */
-	RleBlock *_bridgeGraphic;
+	RleBlock *_bridgeImage;
 	/** Collapsed dock visual. */
-	RleBlock *_collapsedBridgeGraphic;
+	RleBlock *_collapsedBridgeImage;
 	/** Individual dock-beam visual. */
-	RleBlock *_beamGraphic;
+	RleBlock *_beamImage;
 	/** Feature-value hint visuals. */
-	RleBlock *_traitGraphics[kFeatureCount][kFeatureValueCount];
+	RleBlock *_traitImages[kFeatureCount][kFeatureValueCount];
 
 	/** Music handle used while Turtle Hurdle is active. */
 	int _musicId;

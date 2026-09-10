@@ -5,21 +5,18 @@ MODULE_OBJS := \
 	graphics.o \
 	pages/dialog_help.o \
 	metaengine.o \
-	path.o \
-	sidebar.o \
 	sound.o \
 	state.o \
-	ui.o \
 	pages/page_base.o \
+	pages/interactive_base.o \
 	pages/transition_video.o \
 	pages/transition_title.o \
 	pages/shelter_zombiniville.o \
 	pages/transition_maptrans.o \
-	pages/transition_maptrans_route.o \
 	pages/puzzle_base.o \
 	pages/puzzle_aquacube.o \
 	pages/shelter_booliewood.o \
-	pages/shelter_booliewood_final.o \
+	pages/shelter_final.o \
 	pages/puzzle_boolies.o \
 	pages/puzzle_cheznorf.o \
 	pages/puzzle_crazyturtle.o \
@@ -28,10 +25,12 @@ MODULE_OBJS := \
 	pages/puzzle_snowboard.o \
 	pages/puzzle_waterslide.o \
 	pages/puzzle_walloffleens.o \
-	pages/interactive_worldmap.o \
+	pages/interactive_map.o \
 	pages/save_file_list.o \
-	pages/interactive_menuscreen.o \
-	pages/shelter_rescue.o \
+	pages/interactive_menu.o \
+	pages/shelter_base.o \
+	pages/shelter_rescue1.o \
+	pages/shelter_rescue2.o \
 	pages/transition_credits.o \
 	zoombini2.o
 

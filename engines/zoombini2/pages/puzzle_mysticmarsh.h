@@ -33,24 +33,27 @@ class Animation;
 class RleBlock;
 
 /**
- * Bubble Bumpers is the bubble-routing activity on the right branch.
- * The internal MysticMarsh name identifies the bmp/mystic_marsh resources.
+ * Bubble Bumpers (Route3-1)
+ *
+ * Choose each Zoombini's entrance and launch order to cross the marsh.
  */
-class MysticMarshPuzzle : public PuzzlePage {
+class PuzzleMysticMarsh : public PuzzleBase {
 public:
-	/** Construct Bubble Bumpers for @p engine. */
-	MysticMarshPuzzle(Zoombini2Engine *engine);
+	/** Construct Bubble Bumpers for @p vm. */
+	PuzzleMysticMarsh(Zoombini2Engine *vm);
 	/** Release grid, trait, bubble, and animation resources. */
-	~MysticMarshPuzzle() override;
+	~PuzzleMysticMarsh() override;
 
 	/** Load the selected marsh layout and generate its route rules. */
 	void init() override;
 	/** Advance the active Zoombini through the grid. */
-	void update() override;
+	void onUpdate() override;
 	/** Draw the grid, launch slots, and Zoombinis. */
-	void draw(Graphics::ManagedSurface *screen) override;
+	void onRenderBackground(ManagedSurface32 *screen) override;
+	/** Draw the grid behind active actors. */
+	void onRenderScene(ManagedSurface32 *screen) override;
 	/** Launch the next Zoombini from the selected entrance. */
-	void handleClick(const Common::Point &pos) override;
+	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 
 	/** Number of grid columns. */
 	static const int kGridCols = 16;
@@ -70,10 +73,10 @@ private:
 	struct GridCell {
 		/** Cell role identifying empty, symbol, crater, or marker cells. */
 		int type;
-		/** Index into @ref MysticMarshPuzzle::_symbolGfx for symbol cells. */
+		/** Index into @ref PuzzleMysticMarsh::_symbolImage for symbol cells. */
 		int symbolIdx;
 		/** Screen position. */
-		Common::Point32 position;
+		Common::Point32 pos;
 	};
 
 	/** One bubble-crater launch position. */
@@ -83,7 +86,7 @@ private:
 		/** Grid row. */
 		int cellRow;
 		/** Screen position. */
-		Common::Point32 position;
+		Common::Point32 pos;
 		/** Clickable launch area. */
 		Common::Rect hitbox;
 		/** Assigned puzzle-roster index, or `-1` when empty. */
@@ -110,14 +113,14 @@ private:
 
 	/** Grid position and timing for the currently moving Zoombini. */
 	struct ActiveZoombini {
-		/** Index into @ref PuzzlePage::_puzzleZoombinis. */
+		/** Index into @ref Puzzle::_puzzleZoombinis. */
 		int zoombiniIdx;
 		/** Current grid column. */
 		int cellCol;
 		/** Current grid row. */
 		int cellRow;
 		/** Interpolated screen position. */
-		Common::Point32 targetPosition;
+		Common::Point32 targetPos;
 		/** Time at which the current cell movement began. */
 		uint32 moveStartTime;
 	};
@@ -148,11 +151,9 @@ private:
 	int countFreeZoombinis() const;
 
 	/** Draw symbols and markers in the routing grid. */
-	void drawGrid(Graphics::ManagedSurface *screen);
-	/** Draw bubble-crater launch positions. */
-	void drawSlots(Graphics::ManagedSurface *screen);
+	void drawGrid(ManagedSurface32 *screen);
 	/** Draw waiting and active Zoombinis. */
-	void drawZoombinis(Graphics::ManagedSurface *screen);
+	void onRenderActors(ManagedSurface32 *screen) override;
 
 	/** Current interaction phase. */
 	State _state;
@@ -160,11 +161,11 @@ private:
 	int _freedCount;
 	/** Selected puzzle-roster index, or `-1` when none is selected. */
 	int _selectedZoombini;
-	/** Difficulty level in the range one through four. */
-	int _difficulty;
+	/** Level in the range one through four. */
+	int _level;
 	/** Selected background variant. */
 	int _bgIndex;
-	/** Number of launch slots populated in @ref MysticMarshPuzzle::_slots. */
+	/** Number of launch slots populated in @ref PuzzleMysticMarsh::_slots. */
 	int _numSlots;
 	/** Bubble-crater launch slots. */
 	Slot _slots[kMaxSlots];
@@ -176,20 +177,20 @@ private:
 
 	/** Runtime state of the currently moving Zoombini. */
 	ActiveZoombini _activeZ;
-	/** Whether @ref MysticMarshPuzzle::_activeZ is currently valid. */
+	/** Whether @ref PuzzleMysticMarsh::_activeZ is currently valid. */
 	bool _hasActiveZ;
 
 	/** Routing-grid cells stored in row-major order. */
 	GridCell _grid[kMaxCells];
 
 	/** Bubble-crater visual. */
-	RleBlock *_craterGfx;
+	RleBlock *_craterImage;
 	/** Grid-symbol visuals. */
-	RleBlock *_symbolGfx[kNumSymbols];
+	RleBlock *_symbolImage[kNumSymbols];
 	/** Feature icons indexed by feature and value. */
-	RleBlock *_traitGfx[4][5];
+	RleBlock *_traitImage[4][5];
 	/** Bubble visuals indexed by bubble type. */
-	RleBlock *_bubbleGfx[3];
+	RleBlock *_bubbleImage[3];
 	/** Bubble-crater animation. */
 	Animation *_bubbleCraterAnim;
 	/** Whirlpool animation. */

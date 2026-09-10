@@ -30,14 +30,21 @@ namespace Zoombini2 {
 enum GameFeatures {
 	GF_NONE = 0, ///< No release-family feature flags.
 	/**
-	 * Z2-10 base family: v1.0US and v1.0NL.
-	 * The ArisuMedia English package shares the v1.0US game files.
+	 * Zoombinis: Mountain Rescue - v1.0 family.
+	 * - v1.0US
+	 * - v1.0NL
+	 * - v1.0HE
 	 */
 	GF_Z2_V10 = (1 << 0),
 	/**
-	 * Z2-11 extended family: v1.1US, v1.1KR, v1.1SE and v1.1PL.
-	 * The Adventure Workshop package shares the v1.1US game files.
-	 * These codes identify engine generations; the Korean installer is labeled 1.0.
+	 * Zoombinis: Mountain Rescue - v1.1 family.
+	 * - v1.1US
+	 * - v1.1KR
+	 * - v1.1SE
+	 * - v1.1PL
+	 *
+	 * Gameplay is identical to the base v1.0 family.
+	 * No new puzzle rule or level change has been established.
 	 */
 	GF_Z2_V11 = (1 << 1),
 };

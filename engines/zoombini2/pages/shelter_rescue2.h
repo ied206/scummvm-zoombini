@@ -19,39 +19,35 @@
  *
  */
 
-#include "zoombini2/pages/transition_maptrans.h"
-#include "zoombini2/zoombini2.h"
+#ifndef ZOOMBINI2_PAGES_SHELTER_RESCUE2_H
+#define ZOOMBINI2_PAGES_SHELTER_RESCUE2_H
+
+#include "zoombini2/pages/shelter_base.h"
 
 namespace Zoombini2 {
 
-int MapTransition::getDestPage(int source, int route, int rescuedBoolies) {
-	switch (source) {
-	case kPageZombiniville:
-		return kPageCrazyTurtle;
-	case kPageCrazyTurtle:
-		return kPageWaterslide;
-	case kPageWaterslide:
-		return kPageAquacube;
-	case kPageAquacube:
-		return kPageRescue1;
-	case kPageRescue1:
-		return route == 1 ? kPageMagicWall : kPageMysticMarsh;
-	case kPageMysticMarsh:
-		return kPageWallOfFleens;
-	case kPageMagicWall:
-		return kPageChezNorf;
-	case kPageWallOfFleens:
-	case kPageChezNorf:
-		return kPageRescue2;
-	case kPageRescue2:
-		return kPageSnowboard;
-	case kPageSnowboard:
-		return kPageBoolies;
-	case kPageBoolies:
-		return rescuedBoolies < 400 ? kPageBooliewood : kPageFinal;
-	default:
-		return kPageNone;
-	}
-}
+/** Rescue Site II waiting shelter before Route4. */
+class ShelterRescueSite2 : public ShelterRescueSiteBase {
+public:
+	/** Create Rescue Site II with page identifier nine. */
+	explicit ShelterRescueSite2(Zoombini2Engine *vm);
+	/** Persist the Rescue Site II waiting roster. */
+	~ShelterRescueSite2() override;
+
+	/** Load Rescue Site II resources and restore its waiting roster. */
+	void init() override;
+	/** Require exactly eight departing Zoombinis. */
+	bool canUseGoButton() const override;
+
+protected:
+	/** Return the Rescue Site II waiting board. */
+	BoardRecord **getRescueBoard() const override;
+
+private:
+	/** Restore the Rescue Site II visit and departure-roster state. */
+	void initRescueRoster();
+};
 
 } // End of namespace Zoombini2
+
+#endif // ZOOMBINI2_PAGES_SHELTER_RESCUE2_H
