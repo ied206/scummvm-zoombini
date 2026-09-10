@@ -30,9 +30,9 @@
 
 namespace Zoombini2 {
 
-HelpScreen::HelpScreen(Zoombini2Engine *engine)
-	: _engine(engine), _isActive(false), _currentPuzzleId(-1),
-	  _currentDifficulty(-1), _currentPage(1), _savedScreen(nullptr),
+DialogHelp::DialogHelp(Zoombini2Engine *vm)
+	: DialogBase(vm), _isActive(false), _currentPuzzleId(-1),
+	  _currentLevel(-1), _currentPage(1), _savedScreen(nullptr),
 	  _helpFrame(nullptr), _placeholder(nullptr),
 	  _okButtonNormal(nullptr), _okButtonPushed(nullptr),
 	  _leftArrowNormal(nullptr), _leftArrowEmpty(nullptr),
@@ -47,25 +47,25 @@ HelpScreen::HelpScreen(Zoombini2Engine *engine)
 	_rightArrowRect = Common::Rect(209, 400, 253, 444); // 44x44
 
 	// Load help screen UI elements
-	_helpFrame = _engine->loadRleBlock("Bmp/MENU/help_screen_main.rb");
-	_placeholder = _engine->loadRleBlock("Bmp/MENU/help_screen_placeholder.rb");
+	_helpFrame = _vm->loadRleBlock("Bmp/MENU/help_screen_main.rb");
+	_placeholder = _vm->loadRleBlock("Bmp/MENU/help_screen_placeholder.rb");
 
-	_okButtonNormal = _engine->loadBitBlock("Bmp/MENU/help_screen_okbutton_normal.bb");
-	_okButtonPushed = _engine->loadBitBlock("Bmp/MENU/help_screen_okbutton_pushed.bb");
+	_okButtonNormal = _vm->loadBitBlock("Bmp/MENU/help_screen_okbutton_normal.bb");
+	_okButtonPushed = _vm->loadBitBlock("Bmp/MENU/help_screen_okbutton_pushed.bb");
 
-	_leftArrowNormal = _engine->loadBitBlock("Bmp/MENU/help_screen_leftarro_norma.bb");
-	_leftArrowEmpty = _engine->loadBitBlock("Bmp/MENU/help_screen_leftarro_empty.bb");
+	_leftArrowNormal = _vm->loadBitBlock("Bmp/MENU/help_screen_leftarro_norma.bb");
+	_leftArrowEmpty = _vm->loadBitBlock("Bmp/MENU/help_screen_leftarro_empty.bb");
 
-	_rightArrowNormal = _engine->loadBitBlock("Bmp/MENU/help_screen_rightarro_norma.bb");
-	_rightArrowEmpty = _engine->loadBitBlock("Bmp/MENU/help_screen_rightarro_empty.bb");
+	_rightArrowNormal = _vm->loadBitBlock("Bmp/MENU/help_screen_rightarro_norma.bb");
+	_rightArrowEmpty = _vm->loadBitBlock("Bmp/MENU/help_screen_rightarro_empty.bb");
 
 	// Create saved screen buffer
 	// Must match screen format to avoid assert in copyRectToSurface
 	_savedScreen = new Graphics::ManagedSurface(kScreenWidth, kScreenHeight,
-												_engine->getCurrentScreen()->format);
+												_vm->getCurrentScreen()->format);
 }
 
-HelpScreen::~HelpScreen() {
+DialogHelp::~DialogHelp() {
 	close();
 
 	delete _helpFrame;
@@ -79,8 +79,8 @@ HelpScreen::~HelpScreen() {
 	delete _savedScreen;
 }
 
-const char *HelpScreen::getDifficultyString(int difficulty) {
-	switch (difficulty) {
+const char *DialogHelp::getLevelString(int level) {
+	switch (level) {
 	case 1:
 		return "easy";
 	case 2:
@@ -92,46 +92,46 @@ const char *HelpScreen::getDifficultyString(int difficulty) {
 	}
 }
 
-bool HelpScreen::isPageValid(int puzzleId, int difficulty, int page) {
+bool DialogHelp::isPageValid(int puzzleId, int level, int page) {
 	// Construct help page path
 	Common::String path = Common::String::format("Bmp/help/%02d_help_%s_%02d.bb",
 												 puzzleId,
-												 getDifficultyString(difficulty),
+												 getLevelString(level),
 												 page);
 
 	// Check if file exists in archive
-	return _engine->hasResource(path);
+	return _vm->hasResource(path);
 }
 
-bool HelpScreen::open(int puzzleId, int difficulty) {
+bool DialogHelp::open(int puzzleId, int level) {
 	if (_isActive) {
 		return false; // Already open
 	}
 
 	// Check if page 1 exists
-	if (!isPageValid(puzzleId, difficulty, 1)) {
-		debug("No help available for puzzle %d, difficulty %d", puzzleId, difficulty);
+	if (!isPageValid(puzzleId, level, 1)) {
+		debug("No help available for puzzle %d, level %d", puzzleId, level);
 		return false;
 	}
 
 	_isActive = true;
 	_currentPuzzleId = puzzleId;
-	_currentDifficulty = difficulty;
+	_currentLevel = level;
 	_currentPage = 1;
 
 	// Record pause start time
 	_pauseStartTime = g_system->getMillis();
-	_engine->_isPaused = true;
-	_engine->_pauseTimeStart = _pauseStartTime;
+	_vm->_isPaused = true;
+	_vm->_pauseTimeStart = _pauseStartTime;
 
 	// Pause audio
-	_engine->getSoundManager()->pauseAll();
+	_vm->getSoundManager()->pauseAll();
 
 	// Save current screen
-	_savedScreen->copyFrom(*_engine->getCurrentScreen());
+	_savedScreen->copyFrom(*_vm->getCurrentScreen());
 
 	// Load first help page
-	if (!loadPage(puzzleId, difficulty, 1)) {
+	if (!loadPage(puzzleId, level, 1)) {
 		// Failed to load - close and return
 		close();
 		return false;
@@ -140,7 +140,7 @@ bool HelpScreen::open(int puzzleId, int difficulty) {
 	return true;
 }
 
-void HelpScreen::close() {
+void DialogHelp::close() {
 	if (!_isActive) {
 		return;
 	}
@@ -151,131 +151,132 @@ void HelpScreen::close() {
 	freePage();
 
 	// Restore saved screen
-	_engine->getCurrentScreen()->copyFrom(*_savedScreen);
+	_vm->getCurrentScreen()->copyFrom(*_savedScreen);
 
 	// Resume audio
-	_engine->getSoundManager()->resumeAll();
+	_vm->getSoundManager()->resumeAll();
 
 	// Update pause accumulator (for accurate timing)
 	uint32 pauseDuration = g_system->getMillis() - _pauseStartTime;
-	_engine->addPauseTime(pauseDuration);
-	_engine->_isPaused = false;
+	_vm->addPauseTime(pauseDuration);
+	_vm->_isPaused = false;
 
 	_currentPuzzleId = -1;
-	_currentDifficulty = -1;
+	_currentLevel = -1;
 	_currentPage = 1;
 }
 
-bool HelpScreen::loadPage(int puzzleId, int difficulty, int page) {
+bool DialogHelp::loadPage(int puzzleId, int level, int page) {
 	// Free existing page
 	freePage();
 
 	// Construct help page path
 	Common::String path = Common::String::format("Bmp/help/%02d_help_%s_%02d.bb",
 												 puzzleId,
-												 getDifficultyString(difficulty),
+												 getLevelString(level),
 												 page);
 
 	// Load help page
-	_helpPage = _engine->loadBitBlock(path);
+	_helpPage = _vm->loadBitBlock(path);
 
 	return (_helpPage != nullptr);
 }
 
-void HelpScreen::freePage() {
+void DialogHelp::freePage() {
 	delete _helpPage;
 	_helpPage = nullptr;
 }
 
-void HelpScreen::draw(Graphics::ManagedSurface *screen) {
+void DialogHelp::onRenderScene(ManagedSurface32 *screen) {
 	if (!_isActive) {
 		return;
 	}
 
 	// Get alpha LUT for RleBlock rendering
-	const byte(*lut)[256] = _engine->getAlphaLUT();
+	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	screen->copyFrom(*_savedScreen);
 
 	// Draw help frame overlay (darkened background)
 	if (_helpFrame) {
-		_helpFrame->drawToScreen(screen, 0, 0, lut);
+		_helpFrame->drawToScreen(screen, Common::Point32(0, 0), lut);
 	}
 
 	// Draw the sheet inside the help frame.
 	if (_helpPage) {
-		_helpPage->drawToSurface(screen, 135, 191);
+		_helpPage->drawToSurface(screen, Common::Point32(135, 191));
 	} else if (_placeholder) {
 		// Show placeholder if no help page loaded
-		_placeholder->drawToScreen(screen, 0, 0, lut);
+		_placeholder->drawToScreen(screen, Common::Point32(0, 0), lut);
 	}
 
 	// Draw OK button
 	if (_okButtonHovered && _okButtonPushed) {
-		_okButtonPushed->drawToSurface(screen, _okButtonRect.left, _okButtonRect.top);
+		_okButtonPushed->drawToSurface(screen, Common::Point32(_okButtonRect.left, _okButtonRect.top));
 	} else if (_okButtonNormal) {
-		_okButtonNormal->drawToSurface(screen, _okButtonRect.left, _okButtonRect.top);
+		_okButtonNormal->drawToSurface(screen, Common::Point32(_okButtonRect.left, _okButtonRect.top));
 	}
 
 	// Draw left arrow
-	bool leftEnabled = isPageValid(_currentPuzzleId, _currentDifficulty, _currentPage - 1);
+	bool leftEnabled = isPageValid(_currentPuzzleId, _currentLevel, _currentPage - 1);
 	if (leftEnabled && _leftArrowNormal) {
-		_leftArrowNormal->drawToSurface(screen, _leftArrowRect.left, _leftArrowRect.top);
+		_leftArrowNormal->drawToSurface(screen, Common::Point32(_leftArrowRect.left, _leftArrowRect.top));
 	} else if (_leftArrowEmpty) {
-		_leftArrowEmpty->drawToSurface(screen, _leftArrowRect.left, _leftArrowRect.top);
+		_leftArrowEmpty->drawToSurface(screen, Common::Point32(_leftArrowRect.left, _leftArrowRect.top));
 	}
 
 	// Draw right arrow
-	bool rightEnabled = isPageValid(_currentPuzzleId, _currentDifficulty, _currentPage + 1);
+	bool rightEnabled = isPageValid(_currentPuzzleId, _currentLevel, _currentPage + 1);
 	if (rightEnabled && _rightArrowNormal) {
-		_rightArrowNormal->drawToSurface(screen, _rightArrowRect.left, _rightArrowRect.top);
+		_rightArrowNormal->drawToSurface(screen, Common::Point32(_rightArrowRect.left, _rightArrowRect.top));
 	} else if (_rightArrowEmpty) {
-		_rightArrowEmpty->drawToSurface(screen, _rightArrowRect.left, _rightArrowRect.top);
+		_rightArrowEmpty->drawToSurface(screen, Common::Point32(_rightArrowRect.left, _rightArrowRect.top));
 	}
 }
 
-void HelpScreen::handleMouseMove(const Common::Point &pos) {
+EventHandleResult DialogHelp::onMouseMove(const Common::Point &pos) {
 	if (!_isActive) {
-		return;
+		return EventHandleResult::kPassthrough;
 	}
 
 	_okButtonHovered = _okButtonRect.contains(pos);
 	_leftArrowHovered = _leftArrowRect.contains(pos);
 	_rightArrowHovered = _rightArrowRect.contains(pos);
+	return EventHandleResult::kConsumed;
 }
 
-bool HelpScreen::handleClick(const Common::Point &pos) {
+EventHandleResult DialogHelp::onLButtonDown(const Common::Point &pos) {
 	if (!_isActive) {
-		return false;
+		return EventHandleResult::kPassthrough;
 	}
 
 	// OK button - close help
 	if (_okButtonRect.contains(pos)) {
 		close();
-		return true;
+		return EventHandleResult::kConsumed;
 	}
 
 	// Left arrow - previous page
 	if (_leftArrowRect.contains(pos)) {
-		if (isPageValid(_currentPuzzleId, _currentDifficulty, _currentPage - 1)) {
-			if (loadPage(_currentPuzzleId, _currentDifficulty, _currentPage - 1)) {
-				_currentPage--;
+		if (isPageValid(_currentPuzzleId, _currentLevel, _currentPage - 1)) {
+			if (loadPage(_currentPuzzleId, _currentLevel, _currentPage - 1)) {
+				_currentPage -= 1;
 			}
 		}
-		return true;
+		return EventHandleResult::kConsumed;
 	}
 
 	// Right arrow - next page
 	if (_rightArrowRect.contains(pos)) {
-		if (isPageValid(_currentPuzzleId, _currentDifficulty, _currentPage + 1)) {
-			if (loadPage(_currentPuzzleId, _currentDifficulty, _currentPage + 1)) {
-				_currentPage++;
+		if (isPageValid(_currentPuzzleId, _currentLevel, _currentPage + 1)) {
+			if (loadPage(_currentPuzzleId, _currentLevel, _currentPage + 1)) {
+				_currentPage += 1;
 			}
 		}
-		return true;
+		return EventHandleResult::kConsumed;
 	}
 
-	// Click outside buttons - no action but still handled
-	return true;
+	// Clicks outside buttons retain the active modal and do not reach its page.
+	return EventHandleResult::kPassthrough;
 }
 
 } // End of namespace Zoombini2

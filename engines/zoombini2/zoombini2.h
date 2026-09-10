@@ -25,6 +25,7 @@
 #include "common/array.h"
 #include "common/error.h"
 #include "common/events.h"
+#include "common/hashmap.h"
 #include "common/random.h"
 #include "common/rect.h"
 #include "common/scummsys.h"
@@ -35,16 +36,21 @@
 #include "graphics/surface.h"
 
 #include "zoombini2/detection.h"
+#include "zoombini2/graphics.h"
+#include "zoombini2/state.h"
+
+namespace Common {
+class SeekableReadStream;
+}
 
 namespace Zoombini2 {
 
 class BitBlock;
-class GameState;
-class Page;
+class PageBase;
 class RleBlock;
-class Sidebar;
 class SoundManager;
-class ZoombiniState;
+class ThreeButtons;
+class ZoombiniAnimation;
 
 /** Width of the fixed internal game screen. */
 const int kScreenWidth = 800;
@@ -52,47 +58,55 @@ const int kScreenWidth = 800;
 /** Height of the fixed internal game screen. */
 const int kScreenHeight = 600;
 
+/** Target configuration key enabling the developer hotkeys. */
+extern const char *const kConfigDebugHotkeys;
+/** Target configuration key selecting stereo game-audio streams. */
+extern const char *const kConfigStereoOutput;
+/** Target configuration key selecting the alternate level-one Waterslide pairing. */
+extern const char *const kConfigGreedyWaterslidePairing;
+/** Target configuration key selecting the once-per-frame gameplay clock snapshot. */
+extern const char *const kConfigCachedFrameTime;
+/** Target configuration key selecting floating-point Bezier path calculations. */
+extern const char *const kConfigUseFloatingPointPaths;
+
 /** Numeric page identifiers accepted by the engine dispatcher. */
 enum PageId {
-	kPageMenuLoad = -4,    ///< Saved-adventure sign-in flow.
-	kPageMenuNew = -3,     ///< Practice-map sign-in flow.
-	kPageMenuOptions = -2, ///< Sign-in screen.
-	kPageNone = -1,        ///< No dispatched page.
-	kPageZombiniville = 0, ///< Zoombiniville party-assembly shelter.
-	kPageCrazyTurtle = 1,  ///< Turtle Hurdle puzzle.
-	kPageWaterslide = 2,   ///< Pipes of Paloo puzzle.
-	kPageAquacube = 3,     ///< Aqua Cube puzzle.
-	kPageRescue1 = 4,      ///< First rescue-site shelter.
-	kPageMysticMarsh = 5,  ///< Bubble Bumpers puzzle.
-	kPageMagicWall = 6,    ///< Beetle Bug Alley puzzle.
-	kPageWallOfFleens = 7, ///< Magic Mirrors puzzle.
-	kPageChezNorf = 8,     ///< Chez Norf puzzle.
-	kPageRescue2 = 9,      ///< Second rescue-site shelter.
-	kPageSnowboard = 10,   ///< Snowboard Gulch puzzle.
-	kPageBoolies = 11,     ///< Boolie Boggle puzzle.
-	kPageBooliewood = 12,  ///< Booliewood arrival shelter.
-	kPageCredits = 16,     ///< Credits transition.
-	kPageTLCLogo = 17,     ///< Publisher-logo video.
-	kPageTitleAnim = 18,   ///< First story video.
-	kPageStoryBmp = 20,    ///< Second story video.
-	kPageStoryAnim = 21,   ///< Third story video.
-	kPageMapTrans = 22,    ///< Route-map travel transition.
-	kPageFinal = 23,       ///< Booliewood final-celebration shelter.
-	kPageTitleScreen = 24, ///< Title screen.
-	kPageLogopoly = 25,    ///< Logopoly video.
-	kPageWorldMap = 30,    ///< ScummVM world-map dispatcher alias.
-	kPageMenuAlt = 40,     ///< Alternate sign-in route.
-	kPageArisu = 1972      ///< Arisu splash video.
+	kPageMenuLoad = -4,         ///< Saved-adventure sign-in flow.
+	kPageMenuPractice = -3,     ///< Practice-map sign-in flow.
+	kPageMenuOptions = -2,      ///< Sign-in screen.
+	kPageNone = -1,             ///< No dispatched page.
+	kPageZombiniville = 0,      ///< Zoombiniville party-assembly shelter.
+	kPageCrazyTurtle = 1,       ///< Turtle Hurdle puzzle.
+	kPageWaterSlide = 2,        ///< Pipes of Paloo puzzle.
+	kPageAquaCube = 3,          ///< Aqua Cube puzzle.
+	kPageRescue1 = 4,           ///< First rescue-site shelter.
+	kPageMysticMarsh = 5,       ///< Bubble Bumpers puzzle.
+	kPageMagicWall = 6,         ///< Beetle Bug Alley puzzle.
+	kPageWallOfFleens = 7,      ///< Magic Mirrors puzzle.
+	kPageChezNorf = 8,          ///< Chez Norf puzzle.
+	kPageRescue2 = 9,           ///< Second rescue-site shelter.
+	kPageSnowboard = 10,        ///< Snowboard Gulch puzzle.
+	kPageBoolies = 11,          ///< Boolie Boggle puzzle.
+	kPageBooliewood = 12,       ///< Booliewood arrival shelter.
+	kPageCredits = 16,          ///< Credits transition.
+	kPageLogoTLC = 17,          ///< Splash video of The Learning Company
+	kPageCutsceneFirst = 18,    ///< First story video.
+	kPageCutsceneSecond = 20,   ///< Second story video.
+	kPageCutsceneThird = 21,    ///< Third story video.
+	kPageMapTrans = 22,         ///< Route-map travel transition
+	kPageFinal = 23,  ///< Booliewood final-celebration shelter
+	kPageTitleScreen = 24,      ///< Title screen
+	kPageLogoPolygon = 25,         ///< Splash video of Polygon Studio
+	kPageMapScreen = 30,        ///< ScummVM map-screen dispatcher alias
+	kPageMenuAlt = 40,          ///< Alternate sign-in route
+	kPageLogoArisuMedia = 1972, ///< (v1.1KR only) Splash video of ArisuMedia
 };
 
-/** Visible feature positions in a @ref ZoombiniState. */
-enum ZoombiniFeature {
-	kFeatureHair = 0,     ///< Hair feature slot.
-	kFeatureEyes = 1,     ///< Eyes feature slot.
-	kFeatureNose = 2,     ///< Nose feature slot.
-	kFeatureFeet = 3,     ///< Feet feature slot.
-	kNumFeatures = 4,     ///< Number of visible feature slots.
-	kNumFeatureValues = 5 ///< Number of values available in each feature slot.
+/** Rescue Site I branch selected for the next map transition. */
+enum class RouteBranch {
+	kNone00 = 0, ///< No branch selected.
+	kLeft01 = 1, ///< Left branch.
+	kRight02 = 2 ///< Right branch.
 };
 
 /** Maximum number of Zoombinis in the starting party. */
@@ -108,61 +122,81 @@ const int kMaxCombinations = 625;
  * Owns global resources, input, page dispatch, and the active game session.
  *
  * The engine presents a fixed 800x600 surface. It owns the shared game state,
- * global party, sidebar, sound manager, cursor resources, and exactly one
+ * global party, three-button controls, sound manager, cursor resources, and exactly one
  * dispatched @ref Page at a time.
  */
 class Zoombini2Engine : public Engine {
 public:
 	/** Construct an engine for one detected release. */
 	Zoombini2Engine(OSystem *syst, const Zoombini2GameDescription *desc);
-	/** Release the active page and all engine-owned session resources. */
+	/** Release the active page and all resources retained for this game instance. */
 	~Zoombini2Engine() override;
 
 	/** Initialize resources and run the main page loop. */
 	Common::Error run() override;
+	/** Initialize the original CD Data and installed-resource roots. */
+	void initializePath(const Common::FSNode &gamePath) override;
 	/** Return whether the engine exposes @p feature. */
 	bool hasFeature(EngineFeature feature) const override;
+	/** Synchronize the standard ScummVM audio settings with the game-facing percentages. */
+	void syncSoundSettings() override;
+	/** Refresh target-scoped engine settings changed through the global menu. */
+	void applyGameSettings() override;
 
 	/** Detected release descriptor retained for the engine lifetime. */
 	const Zoombini2GameDescription *_gameDescription;
 
-	/** Return the engine-owned gameplay random generator. */
+	/** Return the gameplay random generator for this game instance. */
 	Common::RandomSource *getRandom() { return _rnd; }
 	/** Return the most recently processed game-space mouse position. */
-	Common::Point getMousePos() const { return _mousePos; }
+	Common::Point32 getMousePos() const { return _mousePos; }
 	/** Return whether the primary mouse button is currently held. */
 	bool isMouseDown() const { return _mouseDown; }
-	/** Return whether the primary mouse button was pressed during this frame. */
-	bool isMouseClicked() const { return _mouseClicked; }
-	/** Return the most recently processed key code. */
-	uint32 getLastKeyPressed() const { return _lastKeyPressed; }
 
 	/** Return the detected release language. */
 	Common::Language getLanguage() const { return _gameDescription->desc.language; }
 	/** Return the detected release feature flags. */
 	uint32 getFeatures() const { return _gameDescription->features; }
 
-	/** Return the engine-owned drawing surface. */
-	Graphics::ManagedSurface *getScreen() { return _screen; }
-	/** Return the engine-owned drawing surface used by the active page. */
-	Graphics::ManagedSurface *getCurrentScreen() { return _screen; }
-	/** Return the immutable per-channel alpha-blending lookup table. */
-	const byte (*getAlphaLUT() const)[256] { return _alphaBlendLUT; }
-	/** Return the engine-owned sound manager. */
+	/** Return the drawing surface for this game instance. */
+	ManagedSurface32 *getScreen() { return _screen; }
+	/** Return the drawing surface used by the active page. */
+	ManagedSurface32 *getCurrentScreen() { return _screen; }
+	/** Return the single immutable alpha-blending lookup table shared by this game instance. */
+	const AlphaBlendLUT &getAlphaLUT() const { return _alphaBlendLUT; }
+	/** Return the sound manager for this game instance. */
 	SoundManager *getSoundManager() { return _soundManager; }
-	/** Return the engine-owned active profile state. */
+	/** Return the active profile state for this game instance. */
 	GameState *getGameState() { return _gameState; }
 	/** Start or retain the shared map-music stream and return its sound identifier. */
 	int ensureMapMusic();
-	/** Set the volume of the shared map-music stream. */
-	void setMapMusicVolume(int volume);
+	/** Return the game-facing music volume percentage. */
+	int getMusicVolume() const;
+	/** Return the game-facing sound-effect volume percentage. */
+	int getSFXVolume() const;
+	/** Return the game-facing speech volume percentage. */
+	int getSpeechVolume() const;
+	/** Preview the three game-facing volume percentages without changing the target configuration. */
+	void previewSoundVolumes(int music, int sfx, int speech);
+	/** Store the three game-facing volume percentages in the active target and apply them immediately. */
+	void saveSoundVolumes(int music, int sfx, int speech);
+	/** Return whether the alternate level-one Waterslide pairing is enabled. */
+	bool useGreedyWaterslidePairing() const { return _useGreedyWaterslidePairing; }
+	/** Return whether Bezier paths use floating-point rather than original Q10 calculations. */
+	bool useFloatingPointPaths() const { return _useFloatingPointPaths; }
+	/** Return whether the Chez Norf diagnostic overlay key is currently held. */
+	bool showChezNorfDebugOverlay() const { return _debugHotkeysEnabled && _debugOverlayKeyDown; }
 
-	/** Load a BitBlock through the configured loose-file search paths. */
+	/** Load a BitBlock through the engine resource resolver. */
 	BitBlock *loadBitBlock(const Common::String &path);
-	/** Load an RLE block through the configured loose-file search paths. */
+	/** Load an RLE block through the engine resource resolver. */
 	RleBlock *loadRleBlock(const Common::String &path);
-	/** Return whether @p path resolves through the configured search paths. */
-	bool hasResource(const Common::String &path);
+	/** Load or return an immutable Zoombini animation set cached by this game instance. */
+	const ZoombiniAnimation *loadZoombiniAnimation(const Common::Path &path);
+	/** Open an original logical resource name through the engine's CD/installed-root resolver. */
+	Common::SeekableReadStream *openResourceFile(const Common::String &path) const;
+	/** Return whether @p path resolves through the engine's CD/installed-root resolver. */
+	bool hasResource(const Common::String &path) const;
 
 	/** Add @p ms to the time excluded from gameplay tick calculations. */
 	void addPauseTime(uint32 ms) { _pauseTimeAccum += ms; }
@@ -178,33 +212,33 @@ public:
 	/** Delete and clear every entry in @ref Zoombini2Engine::_globalZoombinis. */
 	void clearGlobalZoombinis();
 
-	/** Engine-owned party entries not currently owned by @ref GameState. */
+	/** Party entries retained for active gameplay outside @ref GameState. */
 	Common::Array<ZoombiniState *> _globalZoombinis;
 
 	/** Request that the main loop replace the active page with @p pageId. */
 	void requestPageChange(int pageId) { _nextPageId = pageId; }
 	/** Return whether the pending transition leads back to a map or sign-in flow. */
-	bool isReturningToMap() const { return _nextPageId == kPageMenuLoad || _nextPageId == kPageMenuNew || _nextPageId == kPageWorldMap; }
-	/** Return whether the pending transition uses the route-map travel page. */
-	bool isAdvancingWorld() const { return _nextPageId == kPageMapTrans; }
+	bool isReturningToMap() const { return _nextPageId == kPageMenuLoad || _nextPageId == kPageMenuPractice || _nextPageId == kPageMapScreen; }
+	/** Return whether the pending page uses the route-map travel transition. */
+	bool isStartingMapTransition() const { return _nextPageId == kPageMapTrans; }
 	/** Return the active page identifier. */
 	int getCurrentPageId() const { return _currentPageId; }
 	/** Return the borrowed active page. */
-	Page *getCurrentPage() { return _currentPage; }
+	PageBase *getCurrentPage() { return _currentPage; }
 
 	/** Return elapsed gameplay milliseconds with accumulated pause time removed. */
 	uint32 getGameTickCount() const;
 
-	/** Whether the next puzzle entry restores the profile-owned party. */
+	/** Whether the next puzzle entry restores the profile's party. */
 	bool _returningFromPuzzle;
-	/** Whether the active world-map flow represents a saved adventure. */
+	/** Whether the active map-screen flow represents a saved adventure. */
 	bool _isSavedGame;
 	/** Shared byte-sized gameplay flag consumed by page flow. */
 	byte _gameFlagB;
-	/** Selected rescue route, where 1 is left and 2 is right. */
-	int _routeDirection;
-	/** Gameplay world shown as the source of the next map transition. */
-	int _maptransSourceWorld;
+	/** Selected Rescue Site I branch for the next map transition. */
+	RouteBranch _routeDirection;
+	/** Gameplay page shown as the source of the next map transition. */
+	PageId _mapTransitionSourcePageId;
 	/** Whether the engine's gameplay clock is currently paused. */
 	bool _isPaused;
 	/** Total paused time excluded from @ref Zoombini2Engine::getGameTickCount. */
@@ -215,68 +249,107 @@ public:
 	bool _zoombiniWalkingFlag;
 	/** Whether the current transition may skip its remaining presentation. */
 	bool _skipMode;
-	/** Most recently completed rescue-route direction. */
-	int _lastRouteDirection;
+	/** Most recently completed rescue-route branch. */
+	RouteBranch _lastRouteDirection;
 
-	/** Selected Zombiniville feature values, or -1 for an unselected slot. */
-	int16 _selectedFeatures[kNumFeatures];
+	/** Selected ShelterZombiniville feature values, or -1 for an unselected slot. */
+	int16 _selectedFeatures[ZmbTrait::kTraitCount];
 
-	/** Deadline or countdown used by the active world transition. */
-	int _worldTransitionTimer;
-	/** Shared stage value used by world-transition flow. */
+	/** Deadline or countdown used by the active page transition. */
+	int _pageTransitionTimer;
+	/** Shared stage value used by page-transition flow. */
 	int _transitionState;
 
 private:
+	class ResourceFileResolver;
+
+	typedef Common::HashMap<Common::Path, ZoombiniAnimation *, Common::Path::IgnoreCase_Hash, Common::Path::IgnoreCase_EqualTo> ZoombiniAnimationCache;
+
 	/** Select the full-size movie when present, otherwise return the half-size path. */
-	static Common::Path selectMoviePath(const char *fullSizePath, const char *halfSizePath);
+	Common::Path selectMoviePath(const char *fullSizePath, const char *halfSizePath) const;
+	/** Return the unique child directory whose name matches @p name without case. */
+	static Common::FSNode findChildDirectoryIgnoreCase(const Common::FSNode &directory, const char *name);
 
-	/** Engine-owned gameplay random generator. */
+	/** Gameplay random generator for this game instance. */
 	Common::RandomSource *_rnd;
-	/** Engine-owned fixed-size drawing surface. */
-	Graphics::ManagedSurface *_screen;
+	/** Original logical resource-name resolver for the CD and installed roots. */
+	ResourceFileResolver *_resourceFileResolver;
+	/** Fixed-size drawing surface for this game instance. */
+	ManagedSurface32 *_screen;
+	/** Immutable animation sets shared by page lifetimes. */
+	ZoombiniAnimationCache _zoombiniAnimationCache;
 
-	/** Engine-owned cursor sprite. */
+	/** Cursor sprite registered for this game instance. */
 	RleBlock *_cursorSprite;
 	/** Signed 16-bit hotspot offset used by the active cursor image. */
 	Common::Point _cursorHotspot;
 	/** Whether CursorMan should present the game cursor. */
 	bool _cursorVisible;
 
-	/** Engine-owned sound manager. */
+	/** Sound manager for this game instance. */
 	SoundManager *_soundManager;
 	/** Shared map-music sound identifier, or -1 when stopped. */
 	int _mapMusicId;
 
-	/** Engine-owned active profile state. */
+	/** Active profile state for this game instance. */
 	GameState *_gameState;
-	/** Engine-owned global sidebar. */
-	Sidebar *_sidebar;
+	/** Shared Help, Map, and Go controls for this game instance. */
+	ThreeButtons *_threeButtons;
 
 	/** Most recently processed game-space mouse position. */
-	Common::Point _mousePos;
+	Common::Point32 _mousePos;
 	/** Whether the primary mouse button is currently held. */
 	bool _mouseDown;
-	/** Whether the primary mouse button was pressed during this frame. */
-	bool _mouseClicked;
-	/** Most recently processed key code. */
-	uint32 _lastKeyPressed;
+	/** Ordered input events awaiting the current page's dispatch boundary. */
+	Common::Array<Common::Event> _pendingPageEvents;
 
 	/** Active page identifier. */
 	int _currentPageId;
 	/** Requested replacement page identifier. */
 	int _nextPageId;
-	/** Engine-owned active page, or nullptr between page lifetimes. */
-	Page *_currentPage;
+	/** Active page, or nullptr between page lifetimes. */
+	PageBase *_currentPage;
 
 	/** System tick used as the gameplay-clock origin. */
 	uint32 _startTime;
-	/** Per-channel alpha-blending lookup table. */
-	byte _alphaBlendLUT[256][256];
-
-	/** Populate @ref Zoombini2Engine::_alphaBlendLUT. */
-	void initAlphaLUT();
+	/** Gameplay tick snapshot refreshed once per main-loop pass. */
+	uint32 _cachedGameTickCount;
+	/** Whether the developer hotkeys are active. */
+	bool _debugHotkeysEnabled;
+	/** Whether newly started stereo game-audio streams retain both channels. */
+	bool _stereoOutputEnabled;
+	/** Whether Waterslide level one uses the alternate greedy pairing. */
+	bool _useGreedyWaterslidePairing;
+	/** Whether gameplay time reads use the current frame snapshot. */
+	bool _useCachedFrameTime;
+	/** Whether Bezier paths use the optional floating-point evaluator. */
+	bool _useFloatingPointPaths;
+	/** Held state of the global puzzle-completion key. */
+	bool _debugCompletionKeyDown;
+	/** Held state of the Chez Norf diagnostic-overlay key. */
+	bool _debugOverlayKeyDown;
+	/** Single immutable per-channel alpha-blending lookup table shared by this game instance. */
+	AlphaBlendLUT _alphaBlendLUT;
+	/** Convert a ScummVM mixer value to the game-facing zero-to-one-hundred scale. */
+	static int mixerVolumeToPercent(int volume);
+	/** Convert a game-facing zero-to-one-hundred percentage to a ScummVM mixer value. */
+	static int percentToMixerVolume(int volume);
+	/** Compute gameplay time directly from the backend clock. */
+	uint32 calculateGameTickCount() const;
+	/** Load the target-scoped compatibility and gameplay-improvement switches from ScummVM configuration. */
+	void refreshEngineSettings();
+	/** Export the active party's trait tuples to working-directory zoombini.set. */
+	void exportZoombiniSet() const;
+	/** Import bounded trait tuples from working-directory zoombini.set. */
+	void importZoombiniSet();
+	/** Apply the held global puzzle-completion shortcut to the active roster and page. */
+	void applyDebugPuzzleCompletion();
 	/** Stop the shared map-music stream and clear its identifier. */
 	void stopMapMusic();
+	/** Credit the party that completed Boolie Boggle to the active profile. */
+	void recordBooliesCompletion();
+	/** Release every Zoombini sprite grid cached by this game instance. */
+	void clearZoombiniAnimationCache();
 	/** Load and register the game cursor. */
 	void initCursor();
 	/** Register the loaded cursor sprite with CursorMan. */
