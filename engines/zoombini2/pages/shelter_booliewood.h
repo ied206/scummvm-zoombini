@@ -32,23 +32,34 @@ class Animation;
 class BitBlock;
 class PathObject;
 class RleBlock;
-class ZoombiniGraphics;
+class ZoombiniAnimation;
 class ZoombiniState;
 
-/** Arrival shelter that presents the rescued community across a scrolling panorama. */
-class BooliewoodPage : public ShelterPage {
+/** 
+ * Booliewood - In its normal state
+ * 
+ * Arrival shelter that presents the rescued community across a scrolling panorama.
+ * 
+ * @remark The save is considered complete after 400 Zoombinis arrive;
+ * This page is only shown if the save is not complete.
+ */
+class ShelterBooliewood : public ShelterBase {
 public:
-	/** Construct the world-12 Booliewood shelter for @p engine. */
-	explicit BooliewoodPage(Zoombini2Engine *engine);
-	/** Release page-owned scene, path, visual, and audio resources. */
-	~BooliewoodPage() override;
+	/** Construct the page-12 Booliewood shelter for @p vm. */
+	explicit ShelterBooliewood(Zoombini2Engine *vm);
+	/** Release this page's scene, path, visual, and audio resources. */
+	~ShelterBooliewood() override;
 
 	/** Build the community scene from the active profile's rescue history. */
 	void init() override;
 	/** Advance scrolling, attractions, walking Boolies, and crowd speech. */
-	void update() override;
+	void onUpdate() override;
+	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 	/** Draw the current cyclic viewport of the Booliewood panorama. */
-	void draw(Graphics::ManagedSurface *screen) override;
+	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderBackground(ManagedSurface32 *screen) override;
+	void onRenderActors(ManagedSurface32 *screen) override;
+	void onRenderForeground(ManagedSurface32 *screen) override;
 	/** Report that Booliewood has no forward Go action. */
 	bool hasGoButton() const override { return false; }
 
@@ -64,26 +75,38 @@ private:
 	/** Number of randomized Booliewood crowd clips. */
 	static const int kAmbientSpeechCount = 6;
 	/** Width of the cyclic panorama in pixels. */
-	static const int kWorldWidth = 4000;
+	static const int kSceneWidth = 4000;
 	/** Little-Zoombini cell used by seated community members. */
 	static const int kSeatedZoombiniCell = 33;
 
+	/** Initial position, horizontal limit, and row kind for one seat row. */
+	struct SeatDefinition {
+		/** Initial screen position for the first assigned Zoombini. */
+		Common::Point32 initialPos;
+		/** Largest permitted horizontal position for the row. */
+		int maximumX;
+		/** Animation or visual row kind. */
+		int rowKind;
+	};
+
 	/** Allocation state for one horizontal row of seats. */
 	struct Seat {
-		int initialX;
-		int y;
+		/** Next screen position available in this row. */
+		Common::Point32 nextPos;
+		/** Largest permitted horizontal position for the row. */
 		int maximumX;
+		/** Animation or visual row kind. */
 		int rowKind;
+		/** Number of Zoombinis assigned to this row. */
 		int assignedCount;
-		int nextX;
+		/** Whether no further position remains in this row. */
 		bool full;
 	};
 
 	/** Runtime state for one attraction animation. */
 	struct AttractionState {
 		Animation *animation;
-		int worldX;
-		int y;
+		Common::Point32 pos;
 		int frame;
 		uint32 nextFrameTime;
 		bool active;
@@ -92,27 +115,27 @@ private:
 	/** Runtime state for one Boolie that alternates between waiting and walking. */
 	struct CrowdActorState {
 		PathObject *path;
-		Common::Point32 waitPosition;
-		Common::Point32 position;
+		Common::Point32 waitPos;
+		Common::Point32 pos;
 		uint32 nextWalkTime;
 		uint32 nextFrameTime;
 		int frame;
 		bool walking;
 	};
 
-	/** Initial X, Y, maximum X, and row kind for every seat row. */
-	static const int kSeatDefinitions[kNumSeats][4];
+	/** Initial position, maximum X, and row kind for every seat row. */
+	static const SeatDefinition kSeatDefinitions[kNumSeats];
 	/** Rescued-crowd marker pattern, stored from top row to bottom row. */
 	static const char *const kCrowdPattern[27];
 
 	/** Reset all seat rows to their initial allocation state. */
 	void resetSeats();
-	/** Assign one randomized available seat to @p position. */
-	bool assignSeat(Common::Point32 &position);
+	/** Assign one randomized available seat to @p pos. */
+	bool assignSeat(Common::Point32 &pos);
 	/** Seat incoming and historical Zoombinis from the active profile. */
 	void buildSeatedCommunity(uint32 now);
-	/** Reconstruct one historical Zoombini from @p featureHash. */
-	static ZoombiniState *createHistoricalZoombini(int32 featureHash);
+	/** Reconstruct one historical Zoombini from @p traitHash. */
+	static ZoombiniState *createHistoricalZoombini(int32 traitHash);
 	/** Advance the looping attenteZomb frames assigned to historical Zoombinis. */
 	void updateSeatedAnimations(uint32 now);
 
@@ -138,25 +161,26 @@ private:
 	void playAmbientSpeech();
 
 	/** Draw the cyclic background window at the current scroll offset. */
-	void drawBackground(Graphics::ManagedSurface *screen) const;
-	/** Draw one animation frame at a cyclic world-space position. */
-	void drawAnimationAtWorld(const Animation *animation, int frameIndex, int worldX, int y, Graphics::ManagedSurface *screen) const;
-	/** Draw one RLE marker at a cyclic world-space position. */
-	void drawRleAtWorld(const RleBlock *frame, int worldX, int y, Graphics::ManagedSurface *screen) const;
+	void drawBackground(ManagedSurface32 *screen) const;
+	/** Draw one animation frame at a cyclic scene-space position. */
+	void drawAnimationInScene(const Animation *animation, int frameIndex, const Common::Point32 &pos, ManagedSurface32 *screen) const;
+	/** Draw one RLE marker at a cyclic scene-space position. */
+	void drawRleInScene(const RleBlock *frame, const Common::Point32 &pos, ManagedSurface32 *screen) const;
 	/** Draw the stage-gated attractions. */
-	void drawAttractions(Graphics::ManagedSurface *screen) const;
+	void drawAttractions(ManagedSurface32 *screen) const;
 	/** Draw the rescued-total marker crowd. */
-	void drawRescuedCrowd(Graphics::ManagedSurface *screen) const;
+	void drawRescuedCrowd(ManagedSurface32 *screen) const;
 	/** Draw the seated community in vertical order. */
-	void drawSeatedCommunity(Graphics::ManagedSurface *screen) const;
+	void drawSeatedCommunity(ManagedSurface32 *screen) const;
 	/** Draw all waiting and walking decorative Boolies. */
-	void drawCrowdActors(Graphics::ManagedSurface *screen) const;
-	/** Draw one Little-Zoombini state from @p graphics at a cyclic world position. */
-	void drawZoombiniAtWorld(const ZoombiniState &zoombini, const ZoombiniGraphics *graphics, int cell, int animationFrame, int worldX, int y,
-						  Graphics::ManagedSurface *screen) const;
+	void drawCrowdActors(ManagedSurface32 *screen) const;
+	/** Draw one Little-Zoombini state from @p animation at a cyclic scene position. */
+	void drawZoombiniInScene(const ZoombiniState &zoombini, const ZoombiniAnimation *animation, int cell, int animationFrame,
+							 const Common::Point32 &pos, ManagedSurface32 *screen) const;
 
 	/** Current horizontal origin within the cyclic panorama. */
 	int _scrollX;
+	int _pendingScrollDelta = 0;
 	/** Development stage selected from the rescued total. */
 	int _developmentStage;
 	/** Seat allocation state. */
@@ -166,21 +190,15 @@ private:
 	/** Decorative walking actor state. */
 	CrowdActorState _crowdActors[kCrowdActorCount];
 
-	/** Owned panorama background. */
+	/** Panorama background managed by this page. */
 	BitBlock *_background;
-	/** Owned Little-Zoombini sprite grid. */
-	ZoombiniGraphics *_zoombiniGfx;
-	/** Owned attenteZomb sprite grid used by selected historical Zoombinis. */
-	ZoombiniGraphics *_walkingZoombiniGfx;
-	/** Whether each visible Zoombini uses the looping attenteZomb grid. */
-	bool _seatedWalking[kMaximumVisibleZoombinis];
-	/** Current attenteZomb frame for each visible Zoombini. */
-	int _seatedAnimationFrames[kMaximumVisibleZoombinis];
-	/** Deadline for each visible Zoombini's next attenteZomb frame. */
-	uint32 _seatedNextFrameTimes[kMaximumVisibleZoombinis];
-	/** Owned marker for an ordinary rescued crowd cell. */
+	/** Borrowed immutable seated sprite grid owned by the engine cache. */
+	const ZoombiniAnimation *_zoombiniAnimation;
+	/** Borrowed immutable walking sprite grid owned by the engine cache. */
+	const ZoombiniAnimation *_walkingZoombiniAnimation;
+	/** Marker managed by this page for an ordinary rescued crowd cell. */
 	RleBlock *_contentMarker;
-	/** Owned marker for a special rescued crowd cell. */
+	/** Marker managed by this page for a special rescued crowd cell. */
 	RleBlock *_pascontentMarker;
 	/** Shared walking animation used by the 17 decorative actors. */
 	Animation *_walkingAnimation;

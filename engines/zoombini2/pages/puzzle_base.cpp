@@ -28,11 +28,6 @@
 
 namespace Zoombini2 {
 
-// Shared resource loading and fallback progression for puzzle pages.
-
-// Auto-advance delay in milliseconds (for unimplemented puzzles)
-static const uint32 kAutoAdvanceDelay = 5000;
-
 static const struct {
 	int id;
 	const char *name;
@@ -41,8 +36,8 @@ static const struct {
 } kPuzzleInfo[] = {
 	// Public activity names paired with their internal resource directories.
 	{kPageCrazyTurtle, "Turtle Hurdle", "crazy_turtle", "crazy_turtle/background"},
-	{kPageWaterslide, "Pipes of Paloo", "waterslide", "waterslide/waterslides"},
-	{kPageAquacube, "Aqua Cube", "aquacube", "aquacube/background"},
+	{kPageWaterSlide, "Pipes of Paloo", "waterslide", "waterslide/waterslides"},
+	{kPageAquaCube, "Aqua Cube", "aquacube", "aquacube/background"},
 	{kPageMysticMarsh, "Bubble Bumpers", "mystic_marsh", "mystic_marsh/background1"},
 	{kPageMagicWall, "Beetle Bug Alley", "magic_wall", "magic_wall/magic wall"},
 	{kPageWallOfFleens, "Magic Mirrors", "wall_of_fleens", "wall_of_fleens/background"},
@@ -52,7 +47,7 @@ static const struct {
 	{0, nullptr, nullptr, nullptr}};
 
 /* static */
-const char *PuzzlePage::getPuzzleName(int puzzleId) {
+const char *PuzzleBase::getPuzzleName(int puzzleId) {
 	for (int i = 0; kPuzzleInfo[i].name; i++) {
 		if (kPuzzleInfo[i].id == puzzleId)
 			return kPuzzleInfo[i].name;
@@ -61,7 +56,7 @@ const char *PuzzlePage::getPuzzleName(int puzzleId) {
 }
 
 /* static */
-const char *PuzzlePage::getPuzzleDir(int puzzleId) {
+const char *PuzzleBase::getPuzzleDir(int puzzleId) {
 	for (int i = 0; kPuzzleInfo[i].dir; i++) {
 		if (kPuzzleInfo[i].id == puzzleId)
 			return kPuzzleInfo[i].dir;
@@ -69,20 +64,19 @@ const char *PuzzlePage::getPuzzleDir(int puzzleId) {
 	return nullptr;
 }
 
-PuzzlePage::PuzzlePage(Zoombini2Engine *engine, int puzzleId)
-	: InteractivePage(engine), _puzzleId(puzzleId), _background(nullptr),
-	  _zoombiniGfx(nullptr), _puzzleState(0), _stateTimer(0) {
+PuzzleBase::PuzzleBase(Zoombini2Engine *vm, int puzzleId)
+	: InteractiveBase(vm), _puzzleId(puzzleId), _background(nullptr),
+	  _zoombiniAnimation(nullptr), _stateTimer(0) {
 	_pageId = puzzleId;
 }
 
-PuzzlePage::~PuzzlePage() {
+PuzzleBase::~PuzzleBase() {
 	delete _background;
-	delete _zoombiniGfx;
 }
 
-void PuzzlePage::init() {
+void PuzzleBase::init() {
 	const char *name = getPuzzleName(_puzzleId);
-	debug(1, "PuzzlePage::init - %s (page %d)", name, _puzzleId);
+	debug(1, "Puzzle::init - %s (page %d)", name, _puzzleId);
 
 	// Load the background from the activity resource table.
 	const char *bgName = nullptr;
@@ -94,98 +88,51 @@ void PuzzlePage::init() {
 	}
 
 	if (bgName) {
-		Common::Path bgPath(Common::String::format("bmp/%s", bgName));
+		Common::Path bgPath(Common::String::format("#bmp/%s", bgName));
 		_background = new BitBlock();
 		if (!_background->load(bgPath)) {
-			debug(1, "PuzzlePage: Failed to load background for %s", name);
+			debug(1, "Puzzle: Failed to load background for %s", name);
 			delete _background;
 			_background = nullptr;
 		}
 	}
 
-	// Load zoombini sprite graphics for display
-	_zoombiniGfx = new ZoombiniGraphics();
-	if (!_zoombiniGfx->loadFromFile(Common::Path("bmp/zombis/littleZomb.anm"))) {
-		debug(1, "PuzzlePage: Failed to load zoombini graphics");
-		delete _zoombiniGfx;
-		_zoombiniGfx = nullptr;
-	}
+	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/littleZomb.anm"));
+	if (!_zoombiniAnimation)
+		debug(1, "Puzzle: Failed to load zoombini graphics");
 
 	// Transfer zoombinis from global to puzzle
 	_puzzleZoombinis.clear();
-	for (uint i = 0; i < _engine->_globalZoombinis.size(); i++) {
-		_puzzleZoombinis.push_back(_engine->_globalZoombinis[i]);
+	for (uint i = 0; i < _vm->_globalZoombinis.size(); i++) {
+		_puzzleZoombinis.push_back(_vm->_globalZoombinis[i]);
 	}
 
-	_puzzleState = 0;
-	_stateTimer = _engine->getGameTickCount();
+	_stateTimer = _vm->getGameTickCount();
 }
 
-void PuzzlePage::update() {
-	// Fallback for pages that do not supply their own frame update.
-	uint32 elapsed = _engine->getGameTickCount() - _stateTimer;
-
-	if (_puzzleState == 0) {
-		if (elapsed > kAutoAdvanceDelay) {
-			debug(1, "PuzzlePage: %s - auto-advance (stub)", getPuzzleName(_puzzleId));
-			_puzzleState = 1;
-			_engine->_returningFromPuzzle = true;
-			_engine->_maptransSourceWorld = _puzzleId;
-			_engine->requestPageChange(kPageMapTrans);
+void PuzzleBase::renderZoombinis(ManagedSurface32 *screen) const {
+	Common::Array<uint> order;
+	const ZoombiniState *draggedZoombini = nullptr;
+	for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
+		const ZoombiniState *zoombini = _puzzleZoombinis[index];
+		if (!zoombini)
+			continue;
+		if (zoombini->_dragging) {
+			draggedZoombini = zoombini;
+			continue;
 		}
-	}
-}
-
-void PuzzlePage::draw(Graphics::ManagedSurface *screen) {
-	if (_background) {
-		_background->drawToSurface(screen, 0, 0);
-	}
-
-	// Draw zoombinis in a simple row (stub visualization)
-	if (_zoombiniGfx && !_puzzleZoombinis.empty()) {
-		const byte(*lut)[256] = _engine->getAlphaLUT();
-		int numZoombinis = MIN((int)_puzzleZoombinis.size(), 16);
-		int startX = 100;
-		int startY = 500;
-		int spacing = 40;
-
-		for (int i = 0; i < numZoombinis; i++) {
-			const ZoombiniState *z = _puzzleZoombinis[i];
-
-			// Cell 0 = standing still, facing right
-			int baseIdx = 0;
-
-			// Body: [0][0][0]
-			const RleBlock *frame = _zoombiniGfx->getFrame(baseIdx, 0);
-			int x = startX + i * spacing;
-			int y = startY;
-			if (frame)
-				frame->drawToScreen(screen, x, y, lut);
-
-			// Features 1..4 (Hair, Eyes, Nose, Feet)
-			const byte features[4] = {z->_featureA, z->_featureB, z->_featureC, z->_featureD};
-			for (int slot = 1; slot <= 4; slot++) {
-				int featIdx = baseIdx + slot * ZoombiniGraphics::kDim2 + features[slot - 1];
-				frame = _zoombiniGfx->getFrame(featIdx, 0);
-				if (frame)
-					frame->drawToScreen(screen, x, y, lut);
-			}
+		uint insertion = order.size();
+		order.push_back(index);
+		while (0 < insertion && zoombini->_screenPos.y < _puzzleZoombinis[order[insertion - 1]]->_screenPos.y) {
+			order[insertion] = order[insertion - 1];
+			insertion -= 1;
 		}
+		order[insertion] = index;
 	}
-
-	// Per-puzzle scene elements, animations, and zoombini sprites
-	// require individual puzzle class implementations.
-}
-
-void PuzzlePage::handleClick(const Common::Point &pos) {
-	// The current base-page fallback advances immediately when clicked.
-	if (_puzzleState == 0) {
-		debug(1, "PuzzlePage: %s - click skip", getPuzzleName(_puzzleId));
-		_puzzleState = 1;
-		_engine->_returningFromPuzzle = true;
-		_engine->_maptransSourceWorld = _puzzleId;
-		_engine->requestPageChange(kPageMapTrans);
-	}
+	for (uint index : order)
+		_puzzleZoombinis[index]->draw(screen, _vm->getAlphaLUT());
+	if (draggedZoombini)
+		draggedZoombini->draw(screen, _vm->getAlphaLUT());
 }
 
 } // End of namespace Zoombini2

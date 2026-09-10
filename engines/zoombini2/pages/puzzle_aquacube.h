@@ -33,26 +33,31 @@ class RleBlock;
 class Animation;
 
 /**
- * Cube-graph puzzle that moves a ball between nodes to release Zoombinis.
+ * Aqua Cube (Route1-3)
  *
- * The lower difficulties use an eight-node graph, while the upper difficulties
- * use a sixteen-node graph. Higher levels add Fleens and expose the warp control.
+ * Use the levers to move the magic ball through the cube and rescue Zoombinis.
  */
-class AquacubePuzzle : public PuzzlePage {
+class PuzzleAquacube : public PuzzleBase {
 public:
-	/** Construct the Aqua Cube puzzle for @p engine. */
-	AquacubePuzzle(Zoombini2Engine *engine);
+	/** Construct the Aqua Cube puzzle for @p vm. */
+	PuzzleAquacube(Zoombini2Engine *vm);
 	/** Release graph sprites and animations. */
-	~AquacubePuzzle() override;
+	~PuzzleAquacube() override;
 
-	/** Load the graph selected by difficulty and place all puzzle actors. */
+	/** Load the graph selected by level and place all puzzle actors. */
 	void init() override;
 	/** Advance ball, match, penalty, and warp phases. */
-	void update() override;
+	void onUpdate() override;
 	/** Draw the cube graph, actors, controls, and remaining-step display. */
-	void draw(Graphics::ManagedSurface *screen) override;
+	void onRenderBackground(ManagedSurface32 *screen) override;
+	/** Draw the layered cube and node sprites. */
+	void onRenderScene(ManagedSurface32 *screen) override;
+	/** Draw the moving ball. */
+	void onRenderActors(ManagedSurface32 *screen) override;
+	/** Draw direction controls, indicators, and visual effects. */
+	void onRenderForeground(ManagedSurface32 *screen) override;
 	/** Start a direction move or toggle the warp control. */
-	void handleClick(const Common::Point &pos) override;
+	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 
 private:
 	/** One cube-graph vertex with adjacency, display, and occupant state. */
@@ -60,7 +65,7 @@ private:
 		/** Adjacent vertex indices, with `-1` marking a missing edge. */
 		int adj[4];
 		/** Signed 32-bit screen position of this vertex. */
-		Common::Point32 position;
+		Common::Point32 pos;
 		/** Vertex role identifying occupants, the ball start, or a Fleen. */
 		int state;
 		/** Number of Zoombinis assigned to this vertex. */
@@ -93,12 +98,12 @@ private:
 		kStateDone
 	};
 
-	/** Difficulty level in the range one through four. */
-	int _difficulty;
+	/** Level in the range one through four. */
+	int _level;
 
-	/** Number of active vertices in @ref AquacubePuzzle::_nodes. */
+	/** Number of active vertices in @ref PuzzleAquacube::_nodes. */
 	int _numNodes;
-	/** Graph storage sized for the largest difficulty. */
+	/** Graph storage sized for the largest level. */
 	GraphNode _nodes[16];
 	/** Vertex currently occupied by the ball. */
 	int _ballNode;
@@ -106,19 +111,19 @@ private:
 	int _targetNode;
 
 	/** Current screen position of the moving ball. */
-	Common::Point32 _ballPosition;
+	Common::Point32 _ballPos;
 	/** Ball position at the start of the current move. */
-	Common::Point32 _ballStartPosition;
+	Common::Point32 _ballStartPos;
 	/** Ball position at the end of the current move. */
-	Common::Point32 _ballEndPosition;
+	Common::Point32 _ballEndPos;
 	/** Time at which the current ball movement began. */
 	uint32 _moveStartTime;
 	/** Duration of one graph-edge movement in milliseconds. */
 	static const uint32 kMoveAnimDuration = 680;
 
-	/** Number of Zoombinis placed on the graph for this difficulty. */
+	/** Number of Zoombinis placed on the graph for this level. */
 	int _numZoombinisToPlace;
-	/** Initial movement allowance for this difficulty. */
+	/** Initial movement allowance for this level. */
 	int _totalSteps;
 	/** Number of Fleen obstacles placed on the graph. */
 	int _numFleens;
@@ -134,7 +139,7 @@ private:
 	/** Offset applied when drawing graph-vertex markers. */
 	Common::Point32 _nodeOffset;
 
-	/** Whether the selected difficulty exposes the warp control. */
+	/** Whether the selected level exposes the warp control. */
 	bool _warpAvailable;
 	/** Whether direction clicks are currently building a warp sequence. */
 	bool _warpActive;
@@ -144,37 +149,37 @@ private:
 	int _warpQueueIdx;
 
 	/** Direction cursor light. */
-	RleBlock *_lightGfx;
+	RleBlock *_lightImage;
 	/** Three cube layers drawn behind and around the actors. */
-	RleBlock *_cubeGfx[3];
+	RleBlock *_cubeImage[3];
 	/** Enabled joystick visual. */
-	RleBlock *_manetteOnGfx;
+	RleBlock *_manetteOnImage;
 	/** Disabled joystick visual. */
-	RleBlock *_manetteOffGfx;
+	RleBlock *_manetteOffImage;
 	/** Normal ball visual. */
-	RleBlock *_ballGfx;
+	RleBlock *_ballImage;
 	/** Enlarged ball visual used during movement effects. */
-	RleBlock *_ballBigGfx;
+	RleBlock *_ballBigImage;
 	/** Active movement-counter mark. */
-	RleBlock *_shotsOnGfx;
+	RleBlock *_shotsOnImage;
 	/** Consumed movement-counter mark. */
-	RleBlock *_shotsOffGfx;
+	RleBlock *_shotsOffImage;
 	/** Red direction indicator. */
-	RleBlock *_lightRedGfx;
+	RleBlock *_lightRedImage;
 	/** Inactive direction indicator. */
-	RleBlock *_lightGreyGfx;
+	RleBlock *_lightGreyImage;
 	/** Active warp-control visual. */
-	RleBlock *_warpOnGfx;
+	RleBlock *_warpOnImage;
 	/** Available warp-control visual. */
-	RleBlock *_warpOffGfx;
+	RleBlock *_warpOffImage;
 	/** Disabled warp-control visual. */
-	RleBlock *_warpDisableGfx;
+	RleBlock *_warpDisableImage;
 	/** Warp timing effect. */
 	Animation *_warpTimerAnim;
 	/** Bubble effects used at occupied graph vertices. */
-	RleBlock *_bubbleGfx[3];
+	RleBlock *_bubbleImage[3];
 	/** Fleen visuals indexed by obstacle variant. */
-	RleBlock *_fleenGfx[4];
+	RleBlock *_fleenImage[4];
 	/** Flare effects used while releasing occupants. */
 	Animation *_flareAnims[2];
 
@@ -188,11 +193,11 @@ private:
 	/** Direction labels for the sixteen-node cube. */
 	static const char kGraph2DirLabels[16][4];
 
-	/** Populate the graph topology selected by difficulty. */
+	/** Populate the graph topology selected by level. */
 	void loadGraph();
 	/** Assign puzzle-roster entries to graph vertices. */
 	void placeZoombinis();
-	/** Place the difficulty-selected number of Fleen obstacles. */
+	/** Place the level-selected number of Fleen obstacles. */
 	void placeFleens();
 	/** Select the graph vertex at which the ball begins. */
 	void placeBallStart();

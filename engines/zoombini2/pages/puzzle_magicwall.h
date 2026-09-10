@@ -26,8 +26,8 @@
 #include "common/path.h"
 #include "common/rect.h"
 
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/puzzle_base.h"
-#include "zoombini2/path.h"
 
 namespace Zoombini2 {
 
@@ -35,25 +35,27 @@ class RleBlock;
 class Animation;
 
 /**
- * Beetle Bug Alley: stone tablets permute beetles to match colored markers.
- * Matching the markers opens doors for the Zoombinis.
- * The internal MagicWall name identifies the bmp/magic_wall resources.
+ * Beetle Bug Alley (Route2-1)
+ *
+ * Use the stone tablets to move every beetle onto its matching color marker.
  */
-class MagicWallPuzzle : public PuzzlePage {
+class PuzzleMagicWall : public PuzzleBase {
 public:
-	/** Construct Beetle Bug Alley for @p engine. */
-	MagicWallPuzzle(Zoombini2Engine *engine);
+	/** Construct Beetle Bug Alley for @p vm. */
+	PuzzleMagicWall(Zoombini2Engine *vm);
 	/** Release maze elements, paths, graphics, and sounds. */
-	~MagicWallPuzzle() override;
+	~PuzzleMagicWall() override;
 
 	/** Load the selected maze and assign colors to the puzzle roster. */
 	void init() override;
 	/** Advance the active path, gates, and completion state. */
-	void update() override;
+	void onUpdate() override;
 	/** Draw the maze, controls, color guides, gates, and Zoombinis. */
-	void draw(Graphics::ManagedSurface *screen) override;
+	void onRenderScene(ManagedSurface32 *screen) override;
+	/** Restore the page background. */
+	void onRenderBackground(ManagedSurface32 *screen) override;
 	/** Activate the tablet or lever at @p pos. */
-	void handleClick(const Common::Point &pos) override;
+	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 
 private:
 	/** Color indices shared by doors, dots, bugs, and minimap lights. */
@@ -103,7 +105,7 @@ private:
 
 	/** One occupied or destination slot in the maze. */
 	struct ZoombiniSlot {
-		/** Index into @ref PuzzlePage::_puzzleZoombinis, or `-1` when empty. */
+		/** Index into @ref Puzzle::_puzzleZoombinis, or `-1` when empty. */
 		int zoombiniIdx;
 		/** Percentage progress along the active path. */
 		int pathProgress;
@@ -112,7 +114,7 @@ private:
 		/** Whether the Zoombini has reached its destination. */
 		bool captured;
 		/** Current screen position. */
-		Common::Point32 position;
+		Common::Point32 pos;
 		/** Path currently being traversed. */
 		PathObject *path;
 		/** Time at which path traversal began. */
@@ -124,7 +126,7 @@ private:
 		/** Color index used by this marker. */
 		int colorIdx;
 		/** Screen position. */
-		Common::Point32 position;
+		Common::Point32 pos;
 		/** Whether the corresponding door light is enabled. */
 		bool lightOn;
 	};
@@ -134,7 +136,7 @@ private:
 		/** Color index used by this beetle. */
 		int colorIdx;
 		/** Screen position. */
-		Common::Point32 position;
+		Common::Point32 pos;
 		/** Whether the beetle is currently guiding a path. */
 		bool active;
 	};
@@ -156,7 +158,7 @@ private:
 		/** Gate index corresponding to gates A through D. */
 		int gateIdx;
 		/** Screen position. */
-		Common::Point32 position;
+		Common::Point32 pos;
 		/** Whether this gate is open. */
 		bool open;
 		/** Time at which the opening animation began. */
@@ -165,7 +167,7 @@ private:
 
 	/** Load all maze graphics, animations, paths, and sounds. */
 	void loadResources();
-	/** Configure the maze variant selected by difficulty. */
+	/** Configure the maze variant selected by level. */
 	void setupMaze();
 	/** Place colored destination markers. */
 	void placeColorDots();
@@ -190,25 +192,25 @@ private:
 	int countCaptured() const;
 
 	/** Draw maze layer @p level. */
-	void drawMazeLevel(Graphics::ManagedSurface *screen, int level);
+	void drawMazeLevel(ManagedSurface32 *screen, int level);
 	/** Draw colored destination markers. */
-	void drawColorDots(Graphics::ManagedSurface *screen);
+	void drawColorDots(ManagedSurface32 *screen);
 	/** Draw colored beetle guides. */
-	void drawColorBugs(Graphics::ManagedSurface *screen);
+	void drawColorBugs(ManagedSurface32 *screen);
 	/** Draw stone tablet controls. */
-	void drawTablets(Graphics::ManagedSurface *screen);
+	void drawTablets(ManagedSurface32 *screen);
 	/** Draw the glowworm wall lever. */
-	void drawWallLever(Graphics::ManagedSurface *screen);
+	void drawWallLever(ManagedSurface32 *screen);
 	/** Draw the minimap and its color lights. */
-	void drawMinimap(Graphics::ManagedSurface *screen);
+	void drawMinimap(ManagedSurface32 *screen);
 	/** Draw all destination gates. */
-	void drawGates(Graphics::ManagedSurface *screen);
+	void drawGates(ManagedSurface32 *screen);
 	/** Draw waiting and moving Zoombinis. */
-	void drawZoombinis(Graphics::ManagedSurface *screen);
+	void onRenderActors(ManagedSurface32 *screen) override;
 
 	/** Current interaction phase. */
 	State _state;
-	/** Difficulty-selected maze level. */
+	/** Level-selected maze variant. */
 	int _currentLevel;
 	/** Currently moving slot, or `-1` when none is active. */
 	int _activeSlot;
@@ -235,17 +237,17 @@ private:
 	Gate _gates[4];
 
 	/** Destination-dot visuals indexed by color. */
-	RleBlock *_dotGfx[kColorCount];
+	RleBlock *_dotImage[kColorCount];
 	/** Beetle visuals indexed by color. */
-	RleBlock *_bugGfx[kColorCount];
+	RleBlock *_bugImage[kColorCount];
 	/** Minimap background. */
-	RleBlock *_miniMapGfx;
+	RleBlock *_miniMapImage;
 	/** Minimap position marker. */
-	RleBlock *_miniMapDotGfx;
+	RleBlock *_miniMapDotImage;
 	/** Minimap lights indexed by color. */
-	RleBlock *_miniLightGfx[kColorCount];
+	RleBlock *_miniLightImage[kColorCount];
 	/** Static glowworm lever visual. */
-	RleBlock *_glowwormGfx;
+	RleBlock *_glowwormImage;
 	/** Animated glowworm lever visual. */
 	Animation *_glowwormAnim;
 	/** Gate-opening animations. */

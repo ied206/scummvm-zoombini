@@ -32,8 +32,10 @@ class ManagedSurface;
 
 namespace Zoombini2 {
 
+class AlphaBlendLUT;
 class BitmapFont;
 class RleBlock;
+class ManagedSurface32;
 
 /**
  * Sorted save-name list used by the menu screen.
@@ -67,7 +69,7 @@ public:
 	static const int kVisibleRows = 4;
 
 	/** Construct a list at @p x and @p y using the borrowed @p selectionBar. */
-	SaveFileList(const Common::Point32 &position, RleBlock *selectionBar);
+	SaveFileList(const Common::Point32 &pos, RleBlock *selectionBar);
 	/** Release the list's three owned fonts. */
 	~SaveFileList();
 
@@ -79,7 +81,7 @@ public:
 	bool addItemSorted(const Common::String &name);
 
 	/** Draw the visible rows and the borrowed selection bar. */
-	void draw(Graphics::ManagedSurface *screen, const byte alphaLUT[256][256]) const;
+	void draw(ManagedSurface32 *screen, const AlphaBlendLUT &alphaLUT) const;
 	/** Select the row at @p pos and report whether the list consumed the click. */
 	bool handleClick(const Common::Point &pos);
 	/** Normalize and apply @p c to selection or the active edit buffer. */
@@ -142,14 +144,14 @@ private:
 	static const int kTextOffsetY = 7;
 
 	/** Signed screen origin of the list. */
-	Common::Point32 _position;
+	Common::Point32 _pos;
 	/** Borrowed selection-bar sprite owned by the menu screen. */
 	RleBlock *_selectionBar;
-	/** Owned font for ordinary existing rows. */
+	/** Font managed by this list for ordinary existing rows. */
 	BitmapFont *_defaultFont;
-	/** Owned font for the row matching a typed prefix. */
+	/** Font managed by this list for the row matching a typed prefix. */
 	BitmapFont *_matchFont;
-	/** Owned font for a provisional or explicitly edited row. */
+	/** Font managed by this list for a provisional or explicitly edited row. */
 	BitmapFont *_editFont;
 
 	/** Profile names in case-insensitive display order. */

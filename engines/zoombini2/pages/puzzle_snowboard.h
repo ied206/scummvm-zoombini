@@ -25,6 +25,7 @@
 #include "common/rect.h"
 
 #include "zoombini2/pages/puzzle_base.h"
+#include "zoombini2/state.h"
 
 namespace Zoombini2 {
 
@@ -32,39 +33,42 @@ class RleBlock;
 class Animation;
 
 /**
- * Snowboard Gulch routes Zoombinis to lanes through a generated decision tree.
+ * Snowboard Gulch (Route4-1)
  *
- * Each internal node tests a visible feature. Matching values take one branch,
- * nonmatching values take the other, and the reached leaf selects a lane.
+ * Send each Zoombini down the trail that matches its visible traits.
  */
-class SnowboardPuzzle : public PuzzlePage {
+class PuzzleSnowboard : public PuzzleBase {
 public:
-	/** Construct Snowboard Gulch for @p engine. */
-	SnowboardPuzzle(Zoombini2Engine *engine);
+	/** Construct Snowboard Gulch for @p vm. */
+	PuzzleSnowboard(Zoombini2Engine *vm);
 	/** Release lane, trait, board, and scenery resources. */
-	~SnowboardPuzzle() override;
+	~PuzzleSnowboard() override;
 
 	/** Generate the decision tree and assign the current puzzle roster to lanes. */
 	void init() override;
 	/** Advance the current snowboarder and completion state. */
-	void update() override;
+	void onUpdate() override;
 	/** Draw the board, scenery, decision hints, and current snowboarder. */
-	void draw(Graphics::ManagedSurface *screen) override;
+	void onRenderScene(ManagedSurface32 *screen) override;
+	/** Draw lane occupants and the current sliding actor. */
+	void onRenderActors(ManagedSurface32 *screen) override;
+	/** Restore the page background. */
+	void onRenderBackground(ManagedSurface32 *screen) override;
 	/** Ignore clicks because lane traversal advances automatically. */
-	void handleClick(const Common::Point &pos) override;
+	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 
 private:
-	/** One generated feature test in the lane-classification tree. */
+	/** One generated trait test in the lane-classification tree. */
 	struct TreeNode {
-		/** Feature index tested by this node. */
-		byte featureIdx;
+		/** Trait index tested by this node. */
+		ZmbTrait::TraitIndex traitIndex;
 		/** Primary value that selects the matching branch. */
 		byte matchVal1;
-		/** Optional second matching value used at higher difficulty. */
+		/** Optional second matching value used at higher levels. */
 		byte matchVal2;
 	};
 
-	/** Generate the decision tree for the current difficulty. */
+	/** Generate the decision tree for the current level. */
 	void generateTree();
 
 	/** Classify @p z and return its destination lane. */
@@ -76,8 +80,8 @@ private:
 	/** Load the lane, board, trait, and scenery resources. */
 	void loadLaneGraphics();
 
-	/** Draw a feature-value hint at @p position. */
-	void drawTraitIcon(Graphics::ManagedSurface *screen, int feature, int value, const Common::Point32 &position);
+	/** Draw a trait-value hint at @p pos. */
+	void drawTraitIcon(ManagedSurface32 *screen, ZmbTrait::TraitIndex traitIndex, int value, const Common::Point32 &pos);
 
 	/** Generated internal decision-tree nodes. */
 	Common::Array<TreeNode> _tree;
@@ -89,10 +93,10 @@ private:
 	/** Destination lane indexed by puzzle-roster entry. */
 	Common::Array<int> _laneAssignments;
 
-	/** Feature-value hint visuals. */
-	RleBlock *_traitIcons[4][5];
+	/** Trait-value hint visuals. */
+	RleBlock *_traitIcons[ZmbTrait::kTraitCount][ZmbTrait::kTraitValueCount];
 	/** Static board visual. */
-	BitBlock *_boardGfx;
+	BitBlock *_boardBitmap;
 	/** Animated board sequence. */
 	Animation *_boardAnim;
 	/** Lift engine animation. */

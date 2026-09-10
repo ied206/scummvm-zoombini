@@ -21,21 +21,21 @@
 
 #include "common/debug.h"
 
-#include "zoombini2/pages/transition_title.h"
 #include "zoombini2/graphics.h"
+#include "zoombini2/pages/transition_title.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
-TitleScreen::TitleScreen(Zoombini2Engine *engine)
-	: TransitionPage(engine), _background(nullptr), _clicked(false), _deadline(0), _musicId(-1) {
+TransitionTitle::TransitionTitle(Zoombini2Engine *vm)
+	: TransitionBase(vm), _background(nullptr), _clicked(false), _deadline(0), _musicId(-1) {
 	_pageId = kPageTitleScreen;
 }
 
-TitleScreen::~TitleScreen() {
+TransitionTitle::~TransitionTitle() {
 	// Unload music
-	SoundManager *sound = _engine->getSoundManager();
+	SoundManager *sound = _vm->getSoundManager();
 	if (sound && _musicId >= 0) {
 		sound->unload(_musicId);
 	}
@@ -43,9 +43,9 @@ TitleScreen::~TitleScreen() {
 	delete _background;
 }
 
-void TitleScreen::init() {
+void TransitionTitle::init() {
 	debug(1, "TitleScreen::init");
-	_deadline = _engine->getGameTickCount() + 10000;
+	_deadline = _vm->getGameTickCount() + 10000;
 
 	// Load the static title background.
 	_background = new BitBlock();
@@ -54,9 +54,9 @@ void TitleScreen::init() {
 	}
 
 	// Play the title music until the page is dismissed.
-	SoundManager *sound = _engine->getSoundManager();
+	SoundManager *sound = _vm->getSoundManager();
 	if (sound) {
-		_musicId = sound->load(true, Common::Path("sounds/music/Booliewood_Level1.wav"), true);
+		_musicId = sound->load(true, Common::Path("#sounds/music/Booliewood_Level1.wav"), true);
 		if (_musicId >= 0) {
 			sound->playLoop(_musicId);
 			sound->setVolume(_musicId, sound->_volumeMusic);
@@ -64,27 +64,35 @@ void TitleScreen::init() {
 	}
 }
 
-void TitleScreen::update() {
+void TransitionTitle::onUpdate() {
 	if (_clicked)
 		return;
 
-	if (_deadline < _engine->getGameTickCount()
-	    || _engine->isMouseClicked() || _engine->getLastKeyPressed()) {
-		_clicked = true;
-		_engine->requestPageChange(kPageMenuOptions);
-	}
+	if (_deadline < _vm->getGameTickCount())
+		dismiss();
 }
 
-void TitleScreen::draw(Graphics::ManagedSurface *screen) {
+void TransitionTitle::onRenderScene(ManagedSurface32 *screen) {
 	if (_background) {
-		_background->drawToSurface(screen, 0, 0);
+		_background->drawToSurface(screen, Common::Point32(0, 0));
 	}
 }
 
-void TitleScreen::handleClick(const Common::Point &pos) {
+EventHandleResult TransitionTitle::onLButtonDown(const Common::Point &pos) {
 	(void)pos;
+	return dismiss();
+}
+
+EventHandleResult TransitionTitle::onKeyDown(const Common::KeyState &key, bool repeat) {
+	(void)key;
+	(void)repeat;
+	return dismiss();
+}
+
+EventHandleResult TransitionTitle::dismiss() {
 	_clicked = true;
-	_engine->requestPageChange(kPageMenuOptions);
+	_vm->requestPageChange(kPageMenuOptions);
+	return EventHandleResult::kConsumed;
 }
 
 } // End of namespace Zoombini2

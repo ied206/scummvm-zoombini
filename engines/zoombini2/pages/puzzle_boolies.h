@@ -33,24 +33,29 @@ class RleBlock;
 class Animation;
 
 /**
- * Boolie Boggle is the final puzzle activity before arrival at Booliewood.
- * The internal Boolies name identifies the bmp/boolies resources.
+ * Boolie Boggle (Route4-2)
+ *
+ * Use pinballs to make each Boolie group happy and ready to board a boat.
  */
-class BooliesPuzzle : public PuzzlePage {
+class PuzzleBoolies : public PuzzleBase {
 public:
-	/** Construct Boolie Boggle for @p engine. */
-	BooliesPuzzle(Zoombini2Engine *engine);
+	/** Construct Boolie Boggle for @p vm. */
+	PuzzleBoolies(Zoombini2Engine *vm);
 	/** Release all bowling and boat resources. */
-	~BooliesPuzzle() override;
+	~PuzzleBoolies() override;
 
 	/** Load the lane and assign the active Zoombinis. */
 	void init() override;
 	/** Advance the ball, pins, released Zoombini, and boat phases. */
-	void update() override;
+	void onUpdate() override;
 	/** Draw the launch spots, obstacles, pins, actors, and boat. */
-	void draw(Graphics::ManagedSurface *screen) override;
+	void onRenderScene(ManagedSurface32 *screen) override;
+	/** Restore the page background. */
+	void onRenderBackground(ManagedSurface32 *screen) override;
 	/** Launch the current ball from the selected active spot. */
-	void handleClick(const Common::Point &pos) override;
+	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	/** Return the rescued-Boolie credit assigned to each party member at @p level. */
+	static int getRescuedBooliesPerZoombini(int level);
 
 private:
 	/** Polarity assigned to a rolling Zoombini. */
@@ -84,7 +89,7 @@ private:
 	/** One bowling pin's position and feedback state. */
 	struct Pin {
 		/** Screen position. */
-		Common::Point32 position;
+		Common::Point32 pos;
 		/** Whether the pin has been knocked down. */
 		bool knocked;
 		/** Whether the pin is shown as an active target. */
@@ -94,7 +99,7 @@ private:
 	/** One selectable ball launch position. */
 	struct Spot {
 		/** Screen position. */
-		Common::Point32 position;
+		Common::Point32 pos;
 		/** Clickable area. */
 		Common::Rect hitbox;
 		/** Whether this spot can launch the current ball. */
@@ -108,11 +113,11 @@ private:
 		/** Puzzle-roster index represented by this ball. */
 		int zoombiniIdx;
 		/** Current screen position. */
-		Common::Point32 position;
+		Common::Point32 pos;
 		/** Screen position at the start of the roll. */
-		Common::Point32 startPosition;
+		Common::Point32 startPos;
 		/** Target screen position. */
-		Common::Point32 endPosition;
+		Common::Point32 endPos;
 		/** Time at which the roll began. */
 		uint32 rollStart;
 	};
@@ -140,17 +145,17 @@ private:
 	int countFreeZoombinis() const;
 
 	/** Draw the five launch spots. */
-	void drawSpots(Graphics::ManagedSurface *screen);
+	void drawSpots(ManagedSurface32 *screen);
 	/** Draw standing and knocked pins. */
-	void drawPins(Graphics::ManagedSurface *screen);
+	void drawPins(ManagedSurface32 *screen);
 	/** Draw the currently rolling ball. */
-	void drawBall(Graphics::ManagedSurface *screen);
+	void drawBall(ManagedSurface32 *screen);
 	/** Draw the escape boat when visible. */
-	void drawBoat(Graphics::ManagedSurface *screen);
+	void drawBoat(ManagedSurface32 *screen);
 	/** Draw lane blockers. */
-	void drawBlockers(Graphics::ManagedSurface *screen);
+	void drawBlockers(ManagedSurface32 *screen);
 	/** Draw waiting and released Zoombinis. */
-	void drawZoombinis(Graphics::ManagedSurface *screen);
+	void onRenderActors(ManagedSurface32 *screen) override;
 
 	/** Current interaction phase. */
 	State _state;
@@ -160,9 +165,6 @@ private:
 	int _freedCount;
 	/** Total number of pins already knocked down. */
 	int _pinsKnocked;
-	/** Difficulty-dependent attempt allowance per Zoombini. */
-	int _maxAttempts;
-
 	/** Launch positions. */
 	Spot _spots[5];
 	/** Active bowling pin layout. */
@@ -171,31 +173,31 @@ private:
 	Ball _activeBall;
 
 	/** Current escape-boat position. */
-	Common::Point32 _boatPosition;
+	Common::Point32 _boatPos;
 	/** Whether the escape boat is currently drawn. */
 	bool _boatVisible;
 
 	/** Screen positions of lane blockers. */
-	Common::Array<Common::Point> _blockers;
+	Common::Array<Common::Point32> _blockers;
 
 	/** Positive ball visual. */
-	RleBlock *_ballPosGfx;
+	RleBlock *_ballPosImage;
 	/** Negative ball visual. */
-	RleBlock *_ballNegGfx;
+	RleBlock *_ballNegImage;
 	/** Normal pin visual. */
-	RleBlock *_pinGfx;
+	RleBlock *_pinImage;
 	/** Highlighted active-pin visual. */
-	RleBlock *_pinLightedGfx;
+	RleBlock *_pinLightedImage;
 	/** Escape-boat visual. */
-	RleBlock *_boatGfx;
+	RleBlock *_boatImage;
 	/** Launch-spot visuals. */
-	RleBlock *_spotGfx[5];
+	RleBlock *_spotImage[5];
 	/** Static blocker visual. */
-	RleBlock *_blockerGfx;
+	RleBlock *_blockerImage;
 	/** First fixed lane overlay. */
-	RleBlock *_fixeGfx;
+	RleBlock *_fixeImage;
 	/** Second fixed lane overlay. */
-	RleBlock *_fixe2Gfx;
+	RleBlock *_fixe2Image;
 	/** First walking animation. */
 	Animation *_marcheAnim;
 	/** Second walking animation. */

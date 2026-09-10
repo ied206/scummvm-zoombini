@@ -29,8 +29,8 @@
 
 namespace Zoombini2 {
 
-CreditsPage::CreditsPage(Zoombini2Engine *engine)
-	: TransitionPage(engine),
+TransitionCredits::TransitionCredits(Zoombini2Engine *vm)
+	: TransitionBase(vm),
 	  _endTime(0),
 	  _scrollY(0.0f),
 	  _maxScrollY(0),
@@ -44,22 +44,22 @@ CreditsPage::CreditsPage(Zoombini2Engine *engine)
 	_pageId = kPageCredits;
 }
 
-CreditsPage::~CreditsPage() {
+TransitionCredits::~TransitionCredits() {
 	if (_musicId >= 0) {
-		SoundManager *sm = _engine->getSoundManager();
+		SoundManager *sm = _vm->getSoundManager();
 		sm->stop(_musicId);
 		sm->unload(_musicId);
 	}
 	delete _background;
 }
 
-void CreditsPage::init() {
-	debug(1, "CreditsPage::init");
+void TransitionCredits::init() {
+	debug(1, "TransitionCredits::init");
 	static constexpr uint32 kInitialHoldMilliseconds = 4000;
 
 	_background = new BitBlock();
-	if (!_background->load(Common::Path("bmp/credits/credits"))) {
-		warning("CreditsPage: Failed to load bmp/credits/credits");
+	if (!_background->load(Common::Path("#bmp/credits/credits"))) {
+		warning("TransitionCredits: Failed to load bmp/credits/credits");
 	}
 
 	_maxScrollY = (600 < _background->getHeight()) ? (_background->getHeight() - 600) : 0;
@@ -69,11 +69,11 @@ void CreditsPage::init() {
 	_redrawNeeded = true;
 	_initialWait = true;
 
-	_endTime = _engine->getGameTickCount() + kInitialHoldMilliseconds;
-	_lastUpdateTime = _engine->getGameTickCount();
+	_endTime = _vm->getGameTickCount() + kInitialHoldMilliseconds;
+	_lastUpdateTime = _vm->getGameTickCount();
 
-	SoundManager *sm = _engine->getSoundManager();
-	_musicId = sm->load(true, Common::Path("sounds/music/ZMR-Transition.wav"), true);
+	SoundManager *sm = _vm->getSoundManager();
+	_musicId = sm->load(true, Common::Path("#sounds/music/ZMR-Transition.wav"), true);
 	if (_musicId >= 0) {
 		sm->playLoop(_musicId);
 		sm->setVolume(_musicId, sm->_volumeMusic);
@@ -82,11 +82,11 @@ void CreditsPage::init() {
 	_finished = false;
 }
 
-void CreditsPage::update() {
+void TransitionCredits::onUpdate() {
 	static constexpr float kScrollPixelsPerMillisecond = 0.03f;
 	static constexpr uint32 kEndHoldMilliseconds = 10000;
 
-	uint32 now = _engine->getGameTickCount();
+	uint32 now = _vm->getGameTickCount();
 
 	if (_scrollActive) {
 		if (_initialWait) {
@@ -113,7 +113,7 @@ void CreditsPage::update() {
 		Engine::quitGame();
 }
 
-void CreditsPage::draw(Graphics::ManagedSurface *screen) {
+void TransitionCredits::onRenderScene(ManagedSurface32 *screen) {
 	if (!_redrawNeeded)
 		return;
 	_redrawNeeded = false;
@@ -128,15 +128,17 @@ void CreditsPage::draw(Graphics::ManagedSurface *screen) {
 	if (bmpH < srcBottom)
 		srcBottom = bmpH;
 
-	_background->drawSubRect(screen, 0, 0, Common::Rect(0, y, bmpW, srcBottom));
+	_background->drawSubRect(screen, Common::Point32(0, 0), Common::Rect(0, y, bmpW, srcBottom));
 }
 
-void CreditsPage::handleClick(const Common::Point &pos) {
+EventHandleResult TransitionCredits::onLButtonDown(const Common::Point &pos) {
 	(void)pos;
 	if (!_finished) {
 		_finished = true;
 		Engine::quitGame();
+		return EventHandleResult::kConsumed;
 	}
+	return EventHandleResult::kPassthrough;
 }
 
 } // End of namespace Zoombini2

@@ -23,12 +23,11 @@
 
 #include "zoombini2/graphics.h"
 #include "zoombini2/pages/save_file_list.h"
-#include "zoombini2/ui.h"
 
 namespace Zoombini2 {
 
-SaveFileList::SaveFileList(const Common::Point32 &position, RleBlock *selectionBar)
-	: _position(position), _selectionBar(selectionBar), _defaultFont(nullptr),
+SaveFileList::SaveFileList(const Common::Point32 &pos, RleBlock *selectionBar)
+	: _pos(pos), _selectionBar(selectionBar), _defaultFont(nullptr),
 	  _matchFont(nullptr), _editFont(nullptr), _editState(kEditIdle00),
 	  _selectedIndex(0), _scrollOffset(0), _validSelection(false) {
 }
@@ -71,7 +70,7 @@ bool SaveFileList::addItemSorted(const Common::String &name) {
 	return true;
 }
 
-void SaveFileList::draw(Graphics::ManagedSurface *screen, const byte alphaLUT[256][256]) const {
+void SaveFileList::draw(ManagedSurface32 *screen, const AlphaBlendLUT &alphaLUT) const {
 	for (int row = 0; row < kVisibleRows; ++row) {
 		const int itemIndex = _scrollOffset + row;
 		if (static_cast<int>(_items.size()) <= itemIndex)
@@ -79,9 +78,7 @@ void SaveFileList::draw(Graphics::ManagedSurface *screen, const byte alphaLUT[25
 
 		const bool selected = itemIndex == _selectedIndex;
 		if (selected && _selectionBar && _selectionBar->isValid()) {
-			_selectionBar->drawToScreen(screen, _position.x + kSelectionOffsetX,
-										_position.y + kSelectionOffsetY + row * kRowStride,
-										alphaLUT);
+			_selectionBar->drawToScreen(screen, Common::Point32(_pos.x + kSelectionOffsetX, _pos.y + kSelectionOffsetY + row * kRowStride), alphaLUT);
 		}
 
 		BitmapFont *font = _defaultFont;
@@ -91,9 +88,7 @@ void SaveFileList::draw(Graphics::ManagedSurface *screen, const byte alphaLUT[25
 			font = _editFont;
 
 		if (font && font->isLoaded()) {
-			font->drawString(screen, _position.x + kSelectionOffsetX + kTextOffsetX,
-							 _position.y + kSelectionOffsetY + kTextOffsetY + row * kRowStride,
-							 _items[itemIndex], alphaLUT);
+			font->drawString(screen, Common::Point32(_pos.x + kSelectionOffsetX + kTextOffsetX, _pos.y + kSelectionOffsetY + kTextOffsetY + row * kRowStride), _items[itemIndex], alphaLUT);
 		}
 	}
 }
@@ -102,8 +97,8 @@ bool SaveFileList::handleClick(const Common::Point &pos) {
 	if (kEditPrefixMatch01 < _editState || !_selectionBar || !_selectionBar->isValid())
 		return false;
 
-	const int left = _position.x + kSelectionOffsetX;
-	const int top = _position.y + kSelectionOffsetY;
+	const int left = _pos.x + kSelectionOffsetX;
+	const int top = _pos.y + kSelectionOffsetY;
 	const int width = _selectionBar->getWidth();
 	const int height = _selectionBar->getHeight() * kVisibleRows;
 	if (pos.x < left || left + width <= pos.x || pos.y < top || top + height <= pos.y)

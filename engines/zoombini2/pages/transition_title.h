@@ -29,24 +29,26 @@ namespace Zoombini2 {
 class BitBlock;
 
 /** Load the title background and wait for input or the timeout. */
-class TitleScreen : public TransitionPage {
+class TransitionTitle : public TransitionBase {
 public:
-	/** Bind the title screen to @p engine. */
-	TitleScreen(Zoombini2Engine *engine);
+	/** Bind the title screen to @p vm. */
+	TransitionTitle(Zoombini2Engine *vm);
 	/** Release the title background and music. */
-	~TitleScreen() override;
+	~TransitionTitle() override;
 
 	/** Load the background, start music, and establish the timeout. */
 	void init() override;
 	/** Request the sign-in page after input or timeout. */
-	void update() override;
+	void onUpdate() override;
 	/** Draw the title background. */
-	void draw(Graphics::ManagedSurface *screen) override;
+	void onRenderScene(ManagedSurface32 *screen) override;
 	/** Mark the title screen as dismissed by the player. */
-	void handleClick(const Common::Point &pos) override;
+	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
 
 private:
-	/** Owned title-screen bitmap. */
+	EventHandleResult dismiss();
+	/** Title-screen background bitmap. */
 	BitBlock *_background;
 	/** Whether the player clicked to dismiss the title screen. */
 	bool _clicked;

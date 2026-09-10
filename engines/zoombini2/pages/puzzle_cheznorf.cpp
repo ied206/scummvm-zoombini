@@ -31,7 +31,7 @@
 namespace Zoombini2 {
 
 // ============================================================================
-// ChezNorfPuzzle - restaurant food-matching puzzle.
+// PuzzleChezNorf - restaurant food-matching puzzle.
 //
 // Layout: Norf character at center, tables arranged right at x=205+i*85.
 // Food board grid drawn in 3 sections at left side of screen.
@@ -58,45 +58,45 @@ static const uint32 kDoneDelay = 3000;
 static const int kMinFreed = 4;
 
 // Position of the first table plate.
-static const Common::Point32 kFirstTablePosition(205, 500);
+static const Common::Point32 kFirstTablePos(205, 500);
 
-// Tolerance thresholds per difficulty (from CheckFoodMatch)
-// Diff 1: 2 wrong guesses before reject, Diff 2: 1, Diff 3: 0
+// Tolerance thresholds per level (from CheckFoodMatch)
+// Level 1: 2 wrong guesses before reject, Level 2: 1, Level 3: 0
 static const int kWrongTolerance[] = {0, 2, 1, 0};
 
-// Attempt limits indexed by difficulty, with index zero unused.
+// Attempt limits indexed by level, with index zero unused.
 static const int kMaxAttempts[] = {0, 5, 4, 3};
 
-// Visible clue-attribute counts indexed by difficulty, with index zero unused.
+// Visible clue-attribute counts indexed by level, with index zero unused.
 static const int kClueAttrCount[] = {0, 8, 7, 8};
 
 // ============================================================================
 // Construction / Destruction
 // ============================================================================
 
-ChezNorfPuzzle::ChezNorfPuzzle(Zoombini2Engine *engine)
-	: PuzzlePage(engine, kPageChezNorf),
-	  _state(kStateInit), _numTables(4), _difficulty(1),
+PuzzleChezNorf::PuzzleChezNorf(Zoombini2Engine *vm)
+	: PuzzleBase(vm, kPageChezNorf),
+	  _state(kStateInit), _numTables(4), _level(1),
 	  _freedCount(0), _currentTable(-1), _selectedFood(kFoodNone),
 	  _wrongCount(0), _maxAttempts(0), _clueAttrCount(0), _norfState(0),
 	  _templateId(11), _pendingSlurp(-1), _pendingMiam(-1), _pendingGlouglou(-1),
 	  _symbOK(nullptr), _symbNO(nullptr), _symbMaybe(nullptr),
 	  _plato(nullptr), _platoMini(nullptr),
-	  _norfDefault(nullptr), _highlightGfx(nullptr),
+	  _norfDefault(nullptr), _highlightImage(nullptr), _debugFont(nullptr),
 	  _musicId(-1) {
 
 	for (int i = 0; i < 3; i++) {
-		_slurpGfx[i] = nullptr;
-		_miamGfx[i] = nullptr;
-		_glouglouGfx[i] = nullptr;
-		_comandeGfx[i] = nullptr;
+		_slurpImage[i] = nullptr;
+		_miamImage[i] = nullptr;
+		_glouglouImage[i] = nullptr;
+		_comandeImage[i] = nullptr;
 	}
 
 	memset(_foodGrid, 0, sizeof(_foodGrid));
 	memset(_foodVals, 0, sizeof(_foodVals));
 
 	for (int i = 0; i < kMaxTables; i++) {
-		_tables[i].position = Common::Point32();
+		_tables[i].pos = Common::Point32();
 		_tables[i].hitbox = Common::Rect();
 		_tables[i].zoombiniIdx = -1;
 		_tables[i].foodSlurp = -1;
@@ -111,9 +111,9 @@ ChezNorfPuzzle::ChezNorfPuzzle(Zoombini2Engine *engine)
 	}
 }
 
-ChezNorfPuzzle::~ChezNorfPuzzle() {
+PuzzleChezNorf::~PuzzleChezNorf() {
 	if (_musicId >= 0) {
-		SoundManager *snd = _engine->getSoundManager();
+		SoundManager *snd = _vm->getSoundManager();
 		snd->stop(_musicId);
 		snd->unload(_musicId);
 	}
@@ -124,24 +124,22 @@ ChezNorfPuzzle::~ChezNorfPuzzle() {
 	delete _platoMini;
 
 	for (int i = 0; i < 3; i++) {
-		delete _slurpGfx[i];
-		delete _miamGfx[i];
-		delete _glouglouGfx[i];
-		delete _comandeGfx[i];
+		delete _slurpImage[i];
+		delete _miamImage[i];
+		delete _glouglouImage[i];
+		delete _comandeImage[i];
 	}
 
 	delete _norfDefault;
-	delete _highlightGfx;
+	delete _highlightImage;
+	delete _debugFont;
 }
 
 // ============================================================================
 // Resource Loading
 // ============================================================================
 
-void ChezNorfPuzzle::loadResources() {
-	const byte(*lut)[256] = _engine->getAlphaLUT();
-	(void)lut;
-
+void PuzzleChezNorf::loadResources() {
 	// Food symbol sprites (feedback indicators)
 	_symbOK = new RleBlock();
 	_symbOK->loadFromFile(Common::Path("bmp/chez_norf/symb_OK"));
@@ -153,7 +151,7 @@ void ChezNorfPuzzle::loadResources() {
 	_symbMaybe->loadFromFile(Common::Path("bmp/chez_norf/symb_MAYBE"));
 
 	// Plate sprites
-	if (_difficulty == 1) {
+	if (_level == 1) {
 		_plato = new RleBlock();
 		_plato->loadFromFile(Common::Path("bmp/chez_norf/plato2"));
 	} else {
@@ -167,29 +165,29 @@ void ChezNorfPuzzle::loadResources() {
 	// Slurp (dessert) items
 	static const char *slurpNames[] = {"slurp_glace", "slurp_pasteque", "slurp_tarte"};
 	for (int i = 0; i < 3; i++) {
-		_slurpGfx[i] = new RleBlock();
-		_slurpGfx[i]->loadFromFile(Common::Path(Common::String::format("bmp/chez_norf/%s", slurpNames[i])));
+		_slurpImage[i] = new RleBlock();
+		_slurpImage[i]->loadFromFile(Common::Path(Common::String::format("bmp/chez_norf/%s", slurpNames[i])));
 	}
 
 	// Miam (main dish) items
 	static const char *miamNames[] = {"miam_poisson", "miam_salade", "miam_sandwitch"};
 	for (int i = 0; i < 3; i++) {
-		_miamGfx[i] = new RleBlock();
-		_miamGfx[i]->loadFromFile(Common::Path(Common::String::format("bmp/chez_norf/%s", miamNames[i])));
+		_miamImage[i] = new RleBlock();
+		_miamImage[i]->loadFromFile(Common::Path(Common::String::format("bmp/chez_norf/%s", miamNames[i])));
 	}
 
 	// Glouglou (drink) items
 	static const char *glouglouNames[] = {"glouglou_cafe", "glouglou_lait", "glouglou_orange"};
 	for (int i = 0; i < 3; i++) {
-		_glouglouGfx[i] = new RleBlock();
-		_glouglouGfx[i]->loadFromFile(Common::Path(Common::String::format("bmp/chez_norf/%s", glouglouNames[i])));
+		_glouglouImage[i] = new RleBlock();
+		_glouglouImage[i]->loadFromFile(Common::Path(Common::String::format("bmp/chez_norf/%s", glouglouNames[i])));
 	}
 
 	// Command/order background overlays
 	static const char *comandeNames[] = {"COMANDE1", "comande2", "comande3"};
 	for (int i = 0; i < 3; i++) {
-		_comandeGfx[i] = new RleBlock();
-		_comandeGfx[i]->loadFromFile(Common::Path(Common::String::format("bmp/chez_norf/%s", comandeNames[i])));
+		_comandeImage[i] = new RleBlock();
+		_comandeImage[i]->loadFromFile(Common::Path(Common::String::format("bmp/chez_norf/%s", comandeNames[i])));
 	}
 
 	// Norf default sprite
@@ -197,37 +195,37 @@ void ChezNorfPuzzle::loadResources() {
 	_norfDefault->loadFromFile(Common::Path("bmp/chez_norf/norf/norfDeBaz"));
 
 	// Highlight
-	_highlightGfx = new RleBlock();
-	_highlightGfx->loadFromFile(Common::Path("bmp/chez_norf/highlight"));
+	_highlightImage = new RleBlock();
+	_highlightImage->loadFromFile(Common::Path("bmp/chez_norf/highlight"));
 }
 
 // ============================================================================
 // Initialization
 // ============================================================================
 
-void ChezNorfPuzzle::init() {
-	PuzzlePage::init();
+void PuzzleChezNorf::init() {
+	PuzzleBase::init();
 
 	// Start the restaurant music.
-	if (SoundManager *snd = _engine->getSoundManager()) {
-		_musicId = snd->load(true, Common::Path("sounds/music/07-BB02.wav"), true);
+	if (SoundManager *snd = _vm->getSoundManager()) {
+		_musicId = snd->load(true, Common::Path("#sounds/music/07-BB02.wav"), true);
 		if (_musicId >= 0) {
 			snd->playLoop(_musicId);
 			snd->setVolume(_musicId, snd->_volumeMusic);
 		}
 	}
 
-	_difficulty = _engine->getGameState()->_gameMode;
-	if (_difficulty < 1)
-		_difficulty = 1;
-	if (_difficulty > 3)
-		_difficulty = 3;
+	_level = _vm->getGameState()->_level;
+	if (_level < 1)
+		_level = 1;
+	if (_level > 3)
+		_level = 3;
 
-	_maxAttempts = kMaxAttempts[_difficulty];
-	_clueAttrCount = kClueAttrCount[_difficulty];
+	_maxAttempts = kMaxAttempts[_level];
+	_clueAttrCount = kClueAttrCount[_level];
 
-	// Table count: 4 for difficulty 1-2, 6 for difficulty 3 (from Init)
-	if (_difficulty == 1 || _difficulty == 2)
+	// Table count: 4 for level 1-2, 6 for level 3 (from Init)
+	if (_level == 1 || _level == 2)
 		_numTables = 4;
 	else
 		_numTables = 6;
@@ -236,14 +234,14 @@ void ChezNorfPuzzle::init() {
 
 	// Set up table positions (from Init: x starting at 205, +85 each)
 	for (int i = 0; i < _numTables; i++) {
-		_tables[i].position = Common::Point32(kFirstTablePosition.x + i * kTableSpacing, kFirstTablePosition.y);
+		_tables[i].pos = Common::Point32(kFirstTablePos.x + i * kTableSpacing, kFirstTablePos.y);
 
 		// Use the loaded plate dimensions for its clickable table area.
 		int plateW = _plato ? _plato->getWidth() : 85;
 		int plateH = _plato ? _plato->getHeight() : 80;
 		_tables[i].hitbox = Common::Rect(
-			static_cast<int16>(_tables[i].position.x), static_cast<int16>(_tables[i].position.y),
-			static_cast<int16>(_tables[i].position.x + plateW), static_cast<int16>(_tables[i].position.y + plateH));
+			static_cast<int16>(_tables[i].pos.x), static_cast<int16>(_tables[i].pos.y),
+			static_cast<int16>(_tables[i].pos.x + plateW), static_cast<int16>(_tables[i].pos.y + plateH));
 
 		_tables[i].zoombiniIdx = -1;
 		_tables[i].foodSlurp = -1;
@@ -259,8 +257,8 @@ void ChezNorfPuzzle::init() {
 	}
 
 	generateFoodVals();
-	// Select one of four clue templates within the current difficulty family.
-	_templateId = (_difficulty * 10) + (_engine->getRandom()->getRandomNumber(3) + 1);
+	// Select one of four clue templates within the current level family.
+	_templateId = (_level * 10) + (_vm->getRandom()->getRandomNumber(3) + 1);
 	setTableAnswersByTemplate();
 	generateFoodGrid();
 
@@ -272,22 +270,22 @@ void ChezNorfPuzzle::init() {
 	_pendingSlurp = -1;
 	_pendingMiam = -1;
 	_pendingGlouglou = -1;
-	_stateTimer = _engine->getGameTickCount();
+	_stateTimer = _vm->getGameTickCount();
 
-	debug(1, "ChezNorfPuzzle::init - difficulty=%d numTables=%d maxAttempts=%d clueAttrs=%d",
-		  _difficulty, _numTables, _maxAttempts, _clueAttrCount);
+	debug(1, "PuzzleChezNorf::init - level=%d numTables=%d maxAttempts=%d clueAttrs=%d",
+		  _level, _numTables, _maxAttempts, _clueAttrCount);
 }
 
 // ============================================================================
 // Food Grid & Answer Generation
 // ============================================================================
 
-void ChezNorfPuzzle::generateFoodVals() {
+void PuzzleChezNorf::generateFoodVals() {
 	// Generate nine food values, with three distinct values per category.
 	// Slurp (0-2): any 3 distinct values in [0,2]
 	// Miam  (3-5): any 3 distinct values in [3,5]
 	// Glouglou (6-8): any 3 distinct values in [6,8]
-	Common::RandomSource *rng = _engine->getRandom();
+	Common::RandomSource *rng = _vm->getRandom();
 
 	// Slurp
 	_foodVals[0] = rng->getRandomNumber(2);
@@ -315,7 +313,7 @@ void ChezNorfPuzzle::generateFoodVals() {
 	} while (_foodVals[8] == _foodVals[6] || _foodVals[8] == _foodVals[7]);
 }
 
-void ChezNorfPuzzle::setTableAnswersByTemplate() {
+void PuzzleChezNorf::setTableAnswersByTemplate() {
 	// Assigns food values from _foodVals[0..8] to _answers[0..5].
 	// Naming: s0=_foodVals[0], s1=_foodVals[1], s2=_foodVals[2],
 	//         m0=_foodVals[3], m1=_foodVals[4], m2=_foodVals[5],
@@ -327,7 +325,7 @@ void ChezNorfPuzzle::setTableAnswersByTemplate() {
 	const int g0 = _foodVals[6], g1 = _foodVals[7], g2 = _foodVals[8];
 
 	switch (_templateId) {
-	// Difficulty one uses four tables.
+	// Level one uses four tables.
 	case 11:
 		// Template 11.
 		_answers[0] = {s0, 9, 9};
@@ -356,7 +354,7 @@ void ChezNorfPuzzle::setTableAnswersByTemplate() {
 		_answers[2] = {s1, 9, 9};
 		_answers[3] = {m0, m1, 9};
 		break;
-	// Difficulty two uses four tables.
+	// Level two uses four tables.
 	case 21:
 		// Template 21.
 		_answers[0] = {s0, g2, 9};
@@ -385,7 +383,7 @@ void ChezNorfPuzzle::setTableAnswersByTemplate() {
 		_answers[2] = {s1, g2, 9};
 		_answers[3] = {s0, g0, m2};
 		break;
-	// Difficulty three uses six tables.
+	// Level three uses six tables.
 	case 31:
 		// Template 31.
 		_answers[0] = {g2, g2, m1};
@@ -430,14 +428,14 @@ void ChezNorfPuzzle::setTableAnswersByTemplate() {
 	}
 }
 
-void ChezNorfPuzzle::generateFoodGrid() {
+void PuzzleChezNorf::generateFoodGrid() {
 	// The food board grid shows colored dot markers for the clue layout.
 	// From DrawBoard_40F9B0: grid drawn in 3 sections (slurp/miam/glouglou),
 	// each with columns at x=51+n*14 and rows at section_base_y+row*15.
 	// Values 1/2/3 map to different dot sprites; we use _foodVals to fill.
 	// Simplified: each food item in a category is placed across some cells.
 	// This board is decorative and does not own interaction state.
-	Common::RandomSource *rng = _engine->getRandom();
+	Common::RandomSource *rng = _vm->getRandom();
 
 	for (int section = 0; section < 3; section++) {
 		for (int col = 0; col < 6; col++) {
@@ -452,14 +450,14 @@ void ChezNorfPuzzle::generateFoodGrid() {
 // Per-frame state-machine update
 // ============================================================================
 
-void ChezNorfPuzzle::update() {
-	uint32 now = _engine->getGameTickCount();
+void PuzzleChezNorf::onUpdate() {
+	uint32 now = _vm->getGameTickCount();
 	uint32 elapsed = now - _stateTimer;
 
 	switch (_state) {
 	case kStateInit:
 		_state = kStateIdle;
-		_stateTimer = _engine->getGameTickCount();
+		_stateTimer = _vm->getGameTickCount();
 		break;
 
 	case kStateIdle:
@@ -470,7 +468,7 @@ void ChezNorfPuzzle::update() {
 		// Serving animation delay
 		if (elapsed > kServeDelay) {
 			_state = kStateMatching;
-			_stateTimer = _engine->getGameTickCount();
+			_stateTimer = _vm->getGameTickCount();
 		}
 		break;
 
@@ -484,7 +482,7 @@ void ChezNorfPuzzle::update() {
 				_state = kStateWrong;
 				_wrongCount++;
 			}
-			_stateTimer = _engine->getGameTickCount();
+			_stateTimer = _vm->getGameTickCount();
 		}
 		break;
 
@@ -499,7 +497,7 @@ void ChezNorfPuzzle::update() {
 			} else {
 				_state = kStateIdle;
 			}
-			_stateTimer = _engine->getGameTickCount();
+			_stateTimer = _vm->getGameTickCount();
 		}
 		break;
 
@@ -514,10 +512,10 @@ void ChezNorfPuzzle::update() {
 			}
 			_currentTable = -1;
 
-			// Check if player is fired based on difficulty tolerance
-			if (_wrongCount > kWrongTolerance[_difficulty]) {
-				debug(1, "ChezNorfPuzzle: Player fired! Wrong count %d exceeds tolerance %d",
-					  _wrongCount, kWrongTolerance[_difficulty]);
+			// Check if player is fired based on level tolerance
+			if (_wrongCount > kWrongTolerance[_level]) {
+				debug(1, "PuzzleChezNorf: Player fired! Wrong count %d exceeds tolerance %d",
+					  _wrongCount, kWrongTolerance[_level]);
 				_state = kStateDone;
 				_stateTimer = now;
 			} else {
@@ -530,10 +528,10 @@ void ChezNorfPuzzle::update() {
 	case kStateDone:
 		// Leave the puzzle after its completion delay.
 		if (elapsed > kDoneDelay) {
-			debug(1, "ChezNorfPuzzle: done - freed %d Zoombinis", _freedCount);
-			_engine->_returningFromPuzzle = true;
-			_engine->_maptransSourceWorld = _puzzleId;
-			_engine->requestPageChange(kPageMapTrans);
+			debug(1, "PuzzleChezNorf: done - freed %d Zoombinis", _freedCount);
+			_vm->_returningFromPuzzle = true;
+			_vm->_mapTransitionSourcePageId = static_cast<PageId>(_puzzleId);
+			_vm->requestPageChange(kPageMapTrans);
 		}
 		break;
 	}
@@ -543,7 +541,7 @@ void ChezNorfPuzzle::update() {
 // Gameplay Logic
 // ============================================================================
 
-int ChezNorfPuzzle::findTableAtPos(const Common::Point &pos) const {
+int PuzzleChezNorf::findTableAtPos(const Common::Point &pos) const {
 	for (int i = 0; i < _numTables; i++) {
 		if (!_tables[i].completed && _tables[i].hitbox.contains(pos))
 			return i;
@@ -551,7 +549,7 @@ int ChezNorfPuzzle::findTableAtPos(const Common::Point &pos) const {
 	return -1;
 }
 
-void ChezNorfPuzzle::serveFoodToTable(int tableIdx) {
+void PuzzleChezNorf::serveFoodToTable(int tableIdx) {
 	if (tableIdx < 0 || tableIdx >= _numTables)
 		return;
 
@@ -559,11 +557,11 @@ void ChezNorfPuzzle::serveFoodToTable(int tableIdx) {
 	if (slot.completed)
 		return;
 
-	// Requirements based on difficulty:
-	// Diff 1: Main (Miam) and Drink (Glouglou)
-	// Diff 2+: All three (Slurp, Miam, Glouglou)
+	// Requirements based on level:
+	// Level 1: Main (Miam) and Drink (Glouglou)
+	// Level 2+: All three (Slurp, Miam, Glouglou)
 	bool requirementsMet = false;
-	if (_difficulty == 1) {
+	if (_level == 1) {
 		requirementsMet = (_pendingMiam >= 0 && _pendingGlouglou >= 0);
 	} else {
 		requirementsMet = (_pendingSlurp >= 0 && _pendingMiam >= 0 && _pendingGlouglou >= 0);
@@ -584,10 +582,10 @@ void ChezNorfPuzzle::serveFoodToTable(int tableIdx) {
 
 	_currentTable = tableIdx;
 	_state = kStateServing;
-	_stateTimer = _engine->getGameTickCount();
+	_stateTimer = _vm->getGameTickCount();
 }
 
-bool ChezNorfPuzzle::checkFoodMatch(int tableIdx) {
+bool PuzzleChezNorf::checkFoodMatch(int tableIdx) {
 	// From IsFoodCorrect_453590: compare 3 food values against stored answers.
 	// Value 9 in an answer slot is a wildcard (any served food accepted).
 	// foodSlurp/foodMiam/foodGlouglou store the absolute food IDs (0-8).
@@ -601,14 +599,14 @@ bool ChezNorfPuzzle::checkFoodMatch(int tableIdx) {
 	return foodMatches(slot.foodSlurp, answer.slurp) && foodMatches(slot.foodMiam, answer.miam) && foodMatches(slot.foodGlouglou, answer.glouglou);
 }
 
-void ChezNorfPuzzle::freeZoombini(int tableIdx) {
+void PuzzleChezNorf::freeZoombini(int tableIdx) {
 	if (tableIdx < 0 || tableIdx >= _numTables)
 		return;
 
 	TableSlot &slot = _tables[tableIdx];
 	if (slot.zoombiniIdx >= 0 && slot.zoombiniIdx < (int)_puzzleZoombinis.size()) {
 		ZoombiniState *z = _puzzleZoombinis[slot.zoombiniIdx];
-		z->_freeStatus = 1; // Freed
+		z->_puzzleStatus = 1;
 		debug(2, "ChezNorf: freed zoombini %d from table %d", slot.zoombiniIdx, tableIdx);
 	}
 
@@ -616,10 +614,10 @@ void ChezNorfPuzzle::freeZoombini(int tableIdx) {
 	_freedCount++;
 }
 
-int ChezNorfPuzzle::countFreeZoombinis() const {
+int PuzzleChezNorf::countFreeZoombinis() const {
 	int count = 0;
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
-		if (_puzzleZoombinis[i]->_freeStatus == 0)
+		if (_puzzleZoombinis[i]->_puzzleStatus == 0)
 			count++;
 	}
 	return count;
@@ -629,9 +627,9 @@ int ChezNorfPuzzle::countFreeZoombinis() const {
 // Click Handling
 // ============================================================================
 
-void ChezNorfPuzzle::handleClick(const Common::Point &pos) {
+EventHandleResult PuzzleChezNorf::onLButtonDown(const Common::Point &pos) {
 	if (_state != kStateIdle)
-		return;
+		return EventHandleResult::kPassthrough;
 
 	// Check food board click first (left side of screen).
 	// Board sections: slurp y=47..92, miam y=104..149, glouglou y=164..209, x=51..135
@@ -650,7 +648,7 @@ void ChezNorfPuzzle::handleClick(const Common::Point &pos) {
 			_pendingGlouglou = _foodVals[foodIdx];
 			debug(2, "ChezNorf: selected glouglou food %d (val=%d)", foodIdx - 6, _pendingGlouglou);
 		}
-		return;
+		return EventHandleResult::kConsumed;
 	}
 
 	// Serve a clicked table only after all three food categories are selected.
@@ -664,11 +662,12 @@ void ChezNorfPuzzle::handleClick(const Common::Point &pos) {
 			debug(2, "ChezNorf: clicked table %d but not all food selected (s=%d m=%d g=%d)",
 				  tableIdx, _pendingSlurp, _pendingMiam, _pendingGlouglou);
 		}
-		return;
+		return EventHandleResult::kConsumed;
 	}
+	return EventHandleResult::kPassthrough;
 }
 
-int ChezNorfPuzzle::findFoodAtPos(const Common::Point &pos) const {
+int PuzzleChezNorf::findFoodAtPos(const Common::Point &pos) const {
 	// Food board is on the left portion of the screen.
 	// From DrawBoard_40F9B0: columns at x=51..135 (6 cols * 14px), rows 15px apart.
 	// Section 0 (slurp):    y = 47..107  (3 rows at 47, 62, 77 + ~15px height)
@@ -703,54 +702,89 @@ int ChezNorfPuzzle::findFoodAtPos(const Common::Point &pos) const {
 // Drawing
 // ============================================================================
 
-void ChezNorfPuzzle::draw(Graphics::ManagedSurface *screen) {
+void PuzzleChezNorf::onRenderScene(ManagedSurface32 *screen) {
 	// Background (loaded by base class)
 	if (_background) {
-		_background->drawToSurface(screen, 0, 0);
+		_background->drawToSurface(screen, Common::Point32(0, 0));
 	}
 
-	const byte(*lut)[256] = _engine->getAlphaLUT();
+	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 
-	// Select the order-panel background for the current difficulty.
+	// Select the order-panel background for the current level.
 	RleBlock *bgOverlay = nullptr;
-	switch (_difficulty) {
+	switch (_level) {
 	case 1:
-		bgOverlay = _comandeGfx[2];
+		bgOverlay = _comandeImage[2];
 		break; // comande3
 	case 2:
-		bgOverlay = _comandeGfx[0];
+		bgOverlay = _comandeImage[0];
 		break; // comande1
 	case 3:
-		bgOverlay = _comandeGfx[1];
+		bgOverlay = _comandeImage[1];
 		break; // comande2
 	default:
 		break;
 	}
 	if (bgOverlay && bgOverlay->isValid()) {
-		bgOverlay->drawToScreen(screen, 0, 0, lut);
+		bgOverlay->drawToScreen(screen, Common::Point32(0, 0), lut);
 	}
 
 	drawFoodBoard(screen);
 	drawTables(screen);
 	drawPlates(screen);
 	drawNorf(screen);
-	drawZoombinis(screen);
+}
 
+void PuzzleChezNorf::onRenderForeground(ManagedSurface32 *screen) {
+	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	// Draw feedback overlay for current state
 	if (_currentTable >= 0) {
-		const Common::Point32 feedbackPosition(
-			_tables[_currentTable].position.x, _tables[_currentTable].position.y - 40);
+		const Common::Point32 feedbackPos(
+			_tables[_currentTable].pos.x, _tables[_currentTable].pos.y - 40);
 
 		if (_state == kStateCorrect && _symbOK && _symbOK->isValid()) {
-			_symbOK->drawToScreen(screen, feedbackPosition.x, feedbackPosition.y, lut);
+			_symbOK->drawToScreen(screen, feedbackPos, lut);
 		} else if (_state == kStateWrong && _symbNO && _symbNO->isValid()) {
-			_symbNO->drawToScreen(screen, feedbackPosition.x, feedbackPosition.y, lut);
+			_symbNO->drawToScreen(screen, feedbackPos, lut);
 		}
+	}
+	if (_vm->showChezNorfDebugOverlay())
+		drawDebugOverlay(screen);
+}
+
+const char *PuzzleChezNorf::getDebugFoodName(int foodId) {
+	static constexpr const char *names[] = {"IC", "Melon", "Pie", "Fish", "Salad", "Swich", "tea", "Milk", "Ornge", "Rien"};
+	return 0 <= foodId && foodId < static_cast<int>(ARRAYSIZE(names)) ? names[foodId] : "?";
+}
+
+void PuzzleChezNorf::drawDebugOverlay(ManagedSurface32 *screen) {
+	if (!_debugFont) {
+		_debugFont = new BitmapFont();
+		if (!_debugFont->load(Common::Path("bmp/typo"), 0, 255, 0)) {
+			delete _debugFont;
+			_debugFont = nullptr;
+			return;
+		}
+	}
+
+	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
+	const Common::String header = Common::String::format("%d - %d %d %d - %d %d %d - %d %d %d", _templateId, _foodVals[0], _foodVals[1],
+														 _foodVals[2], _foodVals[3], _foodVals[4], _foodVals[5], _foodVals[6], _foodVals[7], _foodVals[8]);
+	_debugFont->drawString(screen, Common::Point32(100, 0), header, lut);
+
+	for (int tableIndex = 0; tableIndex < _numTables; tableIndex++) {
+		const FoodAnswer &answer = _answers[tableIndex];
+		const int x = 205 + tableIndex * kTableSpacing;
+		_debugFont->drawString(screen, Common::Point32(x, 50), getDebugFoodName(answer.slurp), lut);
+		_debugFont->drawString(screen, Common::Point32(x, 80), getDebugFoodName(answer.miam), lut);
+		_debugFont->drawString(screen, Common::Point32(x, 110), getDebugFoodName(answer.glouglou), lut);
+		const int assignmentCount = static_cast<int>(answer.slurp != 9) + static_cast<int>(answer.miam != 9) + static_cast<int>(answer.glouglou != 9);
+		_debugFont->drawString(screen, Common::Point32(x, 140), Common::String::format("%d", assignmentCount), lut);
 	}
 }
 
-void ChezNorfPuzzle::drawFoodBoard(Graphics::ManagedSurface *screen) {
-	const byte(*lut)[256] = _engine->getAlphaLUT();
+void PuzzleChezNorf::drawFoodBoard(ManagedSurface32 *screen) {
+	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 
 	// Draw 3 sections of food grid dots from DrawBoard_40F9B0
 	// Section 1: y starts at 47, step 15; Section 2: 104; Section 3: 164
@@ -766,7 +800,7 @@ void ChezNorfPuzzle::drawFoodBoard(Graphics::ManagedSurface *screen) {
 			for (int row = 0; row < 3; row++) {
 				int val = _foodGrid[section][col][row];
 				if (val >= 1 && val <= 3 && symbByType[val] && symbByType[val]->isValid()) {
-					symbByType[val]->drawToScreen(screen, baseX, gridY, lut);
+					symbByType[val]->drawToScreen(screen, Common::Point32(baseX, gridY), lut);
 				}
 				gridY += 15;
 			}
@@ -775,20 +809,20 @@ void ChezNorfPuzzle::drawFoodBoard(Graphics::ManagedSurface *screen) {
 	}
 }
 
-void ChezNorfPuzzle::drawTables(Graphics::ManagedSurface *screen) {
-	const byte(*lut)[256] = _engine->getAlphaLUT();
+void PuzzleChezNorf::drawTables(ManagedSurface32 *screen) {
+	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 
 	// Draw highlight on non-completed tables
 	for (int i = 0; i < _numTables; i++) {
-		if (!_tables[i].completed && _highlightGfx && _highlightGfx->isValid()) {
+		if (!_tables[i].completed && _highlightImage && _highlightImage->isValid()) {
 			// Highlight drawn at norf slot position (y=205 area from Init)
-			_highlightGfx->drawToScreen(screen, _tables[i].position.x, 205, lut);
+			_highlightImage->drawToScreen(screen, Common::Point32(_tables[i].pos.x, 205), lut);
 		}
 	}
 }
 
-void ChezNorfPuzzle::drawPlates(Graphics::ManagedSurface *screen) {
-	const byte(*lut)[256] = _engine->getAlphaLUT();
+void PuzzleChezNorf::drawPlates(ManagedSurface32 *screen) {
+	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 
 	for (int i = 0; i < _numTables; i++) {
 		if (_tables[i].completed)
@@ -796,51 +830,51 @@ void ChezNorfPuzzle::drawPlates(Graphics::ManagedSurface *screen) {
 
 		// Draw plate at table position
 		if (_plato && _plato->isValid()) {
-			_plato->drawToScreen(screen, _tables[i].position.x, _tables[i].position.y, lut);
+			_plato->drawToScreen(screen, _tables[i].pos, lut);
 		}
 
 		// Draw food items on served plates
 		if (_tables[i].served) {
-			const Common::Point32 foodPosition(_tables[i].position.x + 5, _tables[i].position.y + 5);
+			const Common::Point32 foodPos(_tables[i].pos.x + 5, _tables[i].pos.y + 5);
 
 			// Draw slurp
 			if (_tables[i].foodSlurp >= 0 && _tables[i].foodSlurp < 3) {
-				RleBlock *gfx = _slurpGfx[_tables[i].foodSlurp];
-				if (gfx && gfx->isValid())
-					gfx->drawToScreen(screen, foodPosition.x, foodPosition.y, lut);
+				RleBlock *image = _slurpImage[_tables[i].foodSlurp];
+				if (image && image->isValid())
+					image->drawToScreen(screen, foodPos, lut);
 			}
 
 			// Draw miam
 			if (_tables[i].foodMiam >= 0 && _tables[i].foodMiam < 3) {
-				RleBlock *gfx = _miamGfx[_tables[i].foodMiam];
-				if (gfx && gfx->isValid())
-					gfx->drawToScreen(screen, foodPosition.x + 20, foodPosition.y, lut);
+				RleBlock *image = _miamImage[_tables[i].foodMiam];
+				if (image && image->isValid())
+					image->drawToScreen(screen, Common::Point32(foodPos.x + 20, foodPos.y), lut);
 			}
 
 			// Draw glouglou
 			if (_tables[i].foodGlouglou >= 0 && _tables[i].foodGlouglou < 3) {
-				RleBlock *gfx = _glouglouGfx[_tables[i].foodGlouglou];
-				if (gfx && gfx->isValid())
-					gfx->drawToScreen(screen, foodPosition.x + 40, foodPosition.y, lut);
+				RleBlock *image = _glouglouImage[_tables[i].foodGlouglou];
+				if (image && image->isValid())
+					image->drawToScreen(screen, Common::Point32(foodPos.x + 40, foodPos.y), lut);
 			}
 		}
 	}
 }
 
-void ChezNorfPuzzle::drawNorf(Graphics::ManagedSurface *screen) {
-	const byte(*lut)[256] = _engine->getAlphaLUT();
+void PuzzleChezNorf::drawNorf(ManagedSurface32 *screen) {
+	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 
 	// Draw Norf default sprite at center area
 	if (_norfDefault && _norfDefault->isValid()) {
-		_norfDefault->drawToScreen(screen, 100, 350, lut);
+		_norfDefault->drawToScreen(screen, Common::Point32(100, 350), lut);
 	}
 }
 
-void ChezNorfPuzzle::drawZoombinis(Graphics::ManagedSurface *screen) {
-	if (!_zoombiniGfx)
+void PuzzleChezNorf::onRenderActors(ManagedSurface32 *screen) {
+	if (!_zoombiniAnimation)
 		return;
 
-	const byte(*lut)[256] = _engine->getAlphaLUT();
+	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 
 	// Draw zoombinis at their table positions
 	for (int i = 0; i < _numTables; i++) {
@@ -852,21 +886,9 @@ void ChezNorfPuzzle::drawZoombinis(Graphics::ManagedSurface *screen) {
 			continue;
 
 		const ZoombiniState *z = _puzzleZoombinis[zIdx];
-		const Common::Point32 position(_tables[i].position.x, _tables[i].position.y - 60);
+		const Common::Point32 pos(_tables[i].pos.x, _tables[i].pos.y - 60);
 
-		// Body sprite (standing, frame 0)
-		const RleBlock *body = _zoombiniGfx->getFrame(0, 0);
-		if (body)
-			body->drawToScreen(screen, position.x, position.y, lut);
-
-		// Features
-		const byte features[4] = {z->_featureA, z->_featureB, z->_featureC, z->_featureD};
-		for (int feat = 1; feat <= 4; feat++) {
-			int idx = feat * ZoombiniGraphics::kDim2 + features[feat - 1];
-			const RleBlock *frame = _zoombiniGfx->getFrame(idx, 0);
-			if (frame)
-				frame->drawToScreen(screen, position.x, position.y, lut);
-		}
+		_zoombiniAnimation->drawZoombini(screen, z->_traits, pos, 0, 0, lut);
 	}
 }
 

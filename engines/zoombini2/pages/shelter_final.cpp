@@ -23,34 +23,35 @@
 #include "common/str.h"
 
 #include "zoombini2/graphics.h"
-#include "zoombini2/pages/shelter_booliewood_final.h"
+#include "zoombini2/pages/shelter_final.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
-const int BooliewoodFinalPage::kDancingBooliePositions[kDancingBoolieCount][2] = {
-	{100, 530},
-	{300, 530},
-	{400, 530},
+const Common::Point32 ShelterFinal::kDancingBooliePos[kDancingBoolieCount] = {
+	Common::Point32(100, 530),
+	Common::Point32(300, 530),
+	Common::Point32(400, 530),
 };
-const int BooliewoodFinalPage::kDecorativeZoombiniPositions[kDecorativeZoombiniCount][2] = {
-	{500, 550},
-	{200, 550},
+const Common::Point32 ShelterFinal::kDecorativeZoombiniPos[kDecorativeZoombiniCount] = {
+	Common::Point32(500, 550),
+	Common::Point32(200, 550),
 };
-const int BooliewoodFinalPage::kDecorativeZoombiniCells[kDecorativeZoombiniCount] = {77, 99};
+const int ShelterFinal::kDecorativeZoombiniCells[kDecorativeZoombiniCount] = {77, 99};
 
-BooliewoodFinalPage::BooliewoodFinalPage(Zoombini2Engine *engine)
-	: ShelterPage(engine), _background(nullptr), _fullBigBool(nullptr), _revealBigBool(nullptr), _dancingBoolie(nullptr), _boolDance(nullptr),
-	  _revealFlare1(nullptr), _revealFlare2(nullptr), _zoombiniGfx(nullptr), _walkingZoombiniGfx(nullptr), _animationStartTime(0), _openingSpeechFinished(false),
+ShelterFinal::ShelterFinal(Zoombini2Engine *vm)
+	: ShelterBase(vm), _background(nullptr), _fullBigBool(nullptr), _revealBigBool(nullptr), _dancingBoolie(nullptr), _boolDance(nullptr),
+	  _revealFlare1(nullptr), _revealFlare2(nullptr), _zoombiniAnimation(nullptr), _walkingZoombiniAnimation(nullptr), _animationStartTime(0),
+	  _openingSpeechFinished(false),
 	  _closingSpeechTime(0), _revealStarted(false), _revealCellReady(false), _revealRow(0), _revealColumn(0), _musicId(-1),
 	  _openingSpeechId(-1), _closingSpeechId(-1), _nextAmbientTime(0) {
 	_pageId = kPageFinal;
 	for (int i = 0; i < kFireworkCount; i++) {
 		_fireworks[i].animation = nullptr;
 		_fireworks[i].collisionRect = Common::Rect(1000, 1000, 1001, 1001);
-		_fireworks[i].startY = 0;
+		_fireworks[i].startPos = Common::Point32();
 		_fireworks[i].timeStep = 0;
 		_fireworks[i].frame = 0;
 		_fireworks[i].nextFrameTime = 0;
@@ -58,16 +59,12 @@ BooliewoodFinalPage::BooliewoodFinalPage(Zoombini2Engine *engine)
 	}
 	for (int i = 0; i < kAmbientSoundCount; i++)
 		_ambientSoundIds[i] = -1;
-	for (int i = 0; i < kDecorativeZoombiniCount; i++) {
-		_decorativeAnimationFrames[i] = 0;
-		_decorativeNextFrameTimes[i] = 0;
-	}
 }
 
-BooliewoodFinalPage::~BooliewoodFinalPage() {
-	_engine->clearGlobalZoombinis();
+ShelterFinal::~ShelterFinal() {
+	_vm->clearGlobalZoombinis();
 
-	SoundManager *sound = _engine->getSoundManager();
+	SoundManager *sound = _vm->getSoundManager();
 	if (sound) {
 		if (0 <= _musicId) {
 			sound->stop(_musicId);
@@ -90,19 +87,17 @@ BooliewoodFinalPage::~BooliewoodFinalPage() {
 	delete _boolDance;
 	delete _revealFlare1;
 	delete _revealFlare2;
-	delete _zoombiniGfx;
-	delete _walkingZoombiniGfx;
 	for (int i = 0; i < kFireworkCount; i++)
 		delete _fireworks[i].animation;
 
-	GameState *state = _engine->getGameState();
+	GameState *state = _vm->getGameState();
 	if (state)
-		_engine->writeGameSave(state->_playerName);
+		_vm->writeGameSave(state->_playerName);
 }
 
-void BooliewoodFinalPage::init() {
+void ShelterFinal::init() {
 	debug(1, "BooliewoodFinalPage::init");
-	_engine->clearGlobalZoombinis();
+	_vm->clearGlobalZoombinis();
 
 	_background = new BitBlock();
 	if (!_background->load(Common::Path("bmp/final/big BOOL"))) {
@@ -148,7 +143,7 @@ void BooliewoodFinalPage::init() {
 		"bmp/final/FWGREEN.an",
 		"bmp/final/FWRED.an",
 	};
-	const uint32 now = _engine->getGameTickCount();
+	const uint32 now = _vm->getGameTickCount();
 	for (int i = 0; i < kFireworkCount; i++) {
 		FireworkState &firework = _fireworks[i];
 		firework.animation = new Animation();
@@ -161,18 +156,12 @@ void BooliewoodFinalPage::init() {
 		firework.nextFrameTime = now + 40;
 	}
 
-	_zoombiniGfx = new ZoombiniGraphics();
-	if (!_zoombiniGfx->loadFromFile(Common::Path("bmp/zombis/littleZomb.anm"))) {
+	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/littleZomb.anm"));
+	if (!_zoombiniAnimation)
 		warning("BooliewoodFinalPage: Failed to load littleZomb.anm");
-		delete _zoombiniGfx;
-		_zoombiniGfx = nullptr;
-	}
-	_walkingZoombiniGfx = new ZoombiniGraphics();
-	if (!_walkingZoombiniGfx->loadFromFile(Common::Path("bmp/zombis/attente/attenteZomb.anm"))) {
+	_walkingZoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/attente/attenteZomb.anm"));
+	if (!_walkingZoombiniAnimation)
 		warning("BooliewoodFinalPage: Failed to load attenteZomb.anm");
-		delete _walkingZoombiniGfx;
-		_walkingZoombiniGfx = nullptr;
-	}
 	createDecorativeZoombinis();
 
 	_animationStartTime = now;
@@ -183,9 +172,9 @@ void BooliewoodFinalPage::init() {
 	_revealRow = 0;
 	_revealColumn = 0;
 
-	SoundManager *sound = _engine->getSoundManager();
+	SoundManager *sound = _vm->getSoundManager();
 	if (sound) {
-		_musicId = sound->load(true, Common::Path("sounds/music/Booliewood_Finale.wav"), true);
+		_musicId = sound->load(true, Common::Path("#sounds/music/Booliewood_Finale.wav"), true);
 		if (0 <= _musicId) {
 			sound->playLoop(_musicId);
 			sound->setVolume(_musicId, sound->_volumeMusic);
@@ -203,9 +192,9 @@ void BooliewoodFinalPage::init() {
 	scheduleNextAmbient(now);
 }
 
-void BooliewoodFinalPage::update() {
-	const uint32 now = _engine->getGameTickCount();
-	SoundManager *sound = _engine->getSoundManager();
+void ShelterFinal::onUpdate() {
+	const uint32 now = _vm->getGameTickCount();
+	SoundManager *sound = _vm->getSoundManager();
 	if (!_openingSpeechFinished && (!sound || _openingSpeechId < 0 || !sound->isPlaying(_openingSpeechId))) {
 		_openingSpeechFinished = true;
 		_closingSpeechTime = now + 60000;
@@ -224,78 +213,65 @@ void BooliewoodFinalPage::update() {
 	}
 }
 
-void BooliewoodFinalPage::draw(Graphics::ManagedSurface *screen) {
+void ShelterFinal::onRenderScene(ManagedSurface32 *screen) {
 	if (_background)
-		_background->drawToSurface(screen, 0, 0);
+		_background->drawToSurface(screen, Common::Point32(0, 0));
 	if (_fullBigBool)
-		_fullBigBool->drawToSurface(screen, 225, 34);
+		_fullBigBool->drawToSurface(screen, Common::Point32(225, 34));
 
-	const uint32 elapsed = _engine->getGameTickCount() - _animationStartTime;
+	const uint32 elapsed = _vm->getGameTickCount() - _animationStartTime;
 	if (_boolDance && 0 < _boolDance->getFrameCount())
-		drawAnimation(_boolDance, static_cast<int>(elapsed / 200) % _boolDance->getFrameCount(), 151, 31, screen);
+		drawAnimation(_boolDance, static_cast<int>(elapsed / 200) % _boolDance->getFrameCount(), Common::Point32(151, 31), screen);
 	if (_dancingBoolie && 0 < _dancingBoolie->getFrameCount()) {
 		const int frame = static_cast<int>(elapsed / 100) % _dancingBoolie->getFrameCount();
 		for (int i = 0; i < kDancingBoolieCount; i++)
-			drawAnimation(_dancingBoolie, frame, kDancingBooliePositions[i][0], kDancingBooliePositions[i][1], screen);
+			drawAnimation(_dancingBoolie, frame, kDancingBooliePos[i], screen);
 	}
 	for (int i = 0; i < kFireworkCount; i++) {
 		const FireworkState &firework = _fireworks[i];
 		if (firework.active)
-			drawAnimation(firework.animation, firework.frame, firework.collisionRect.left, firework.collisionRect.top, screen);
+			drawAnimation(firework.animation, firework.frame,
+						  Common::Point32(firework.collisionRect.left, firework.collisionRect.top), screen);
 	}
-	for (int i = 0; i < kDecorativeZoombiniCount && i < static_cast<int>(_engine->_globalZoombinis.size()); i++)
-		drawZoombini(*_engine->_globalZoombinis[i], i, screen);
 }
 
-void BooliewoodFinalPage::handleClick(const Common::Point &pos) {
+void ShelterFinal::onRenderActors(ManagedSurface32 *screen) {
+	for (int i = 0; i < kDecorativeZoombiniCount && i < static_cast<int>(_vm->_globalZoombinis.size()); i++)
+		drawZoombini(*_vm->_globalZoombinis[i], screen);
+}
+
+EventHandleResult ShelterFinal::onLButtonDown(const Common::Point &pos) {
 	(void)pos;
-	_engine->requestPageChange(kPageMenuOptions);
+	_vm->requestPageChange(kPageMenuOptions);
+	return EventHandleResult::kConsumed;
 }
 
-void BooliewoodFinalPage::createDecorativeZoombinis() {
+void ShelterFinal::createDecorativeZoombinis() {
 	for (int i = 0; i < kDecorativeZoombiniCount; i++) {
 		ZoombiniState *zoombini = new ZoombiniState();
-		zoombini->setFeatures(static_cast<byte>(_engine->getRandom()->getRandomNumber(4) + 1),
-							  static_cast<byte>(_engine->getRandom()->getRandomNumber(4) + 1),
-							  static_cast<byte>(_engine->getRandom()->getRandomNumber(4) + 1),
-							  static_cast<byte>(_engine->getRandom()->getRandomNumber(4) + 1));
-		zoombini->_position = Common::Point32(kDecorativeZoombiniPositions[i][0], kDecorativeZoombiniPositions[i][1]);
-		zoombini->_activeFlag = 0;
-		zoombini->_stateByte6C = 0;
-		zoombini->_zoombiniIndex = kDecorativeZoombiniCells[i];
-		_decorativeAnimationFrames[i] = 0;
-		_decorativeNextFrameTimes[i] = 0;
-		_engine->_globalZoombinis.push_back(zoombini);
+		zoombini->setTraits(ZmbTrait(static_cast<byte>(_vm->getRandom()->getRandomNumber(4) + 1),
+									 static_cast<byte>(_vm->getRandom()->getRandomNumber(4) + 1),
+									 static_cast<byte>(_vm->getRandom()->getRandomNumber(4) + 1),
+									 static_cast<byte>(_vm->getRandom()->getRandomNumber(4) + 1)));
+		zoombini->setPosition(kDecorativeZoombiniPos[i]);
+		zoombini->setDefaultAnimation(_zoombiniAnimation, kDecorativeZoombiniCells[i]);
+		zoombini->_inputEnabled = false;
+		_vm->_globalZoombinis.push_back(zoombini);
 	}
 }
 
-void BooliewoodFinalPage::updateDecorativeZoombinis(uint32 now) {
-	for (int i = 0; i < kDecorativeZoombiniCount && i < static_cast<int>(_engine->_globalZoombinis.size()); i++) {
-		ZoombiniState *zoombini = _engine->_globalZoombinis[i];
-		if (zoombini->_stateByte6C == 1) {
-			if (_decorativeNextFrameTimes[i] < now) {
-				_decorativeAnimationFrames[i] += 1;
-				_decorativeNextFrameTimes[i] = now + 50;
-				if (11 <= _decorativeAnimationFrames[i])
-					_decorativeAnimationFrames[i] = 1;
-			}
-		}
-		if (zoombini->_stateByte6C == 0 && _engine->getRandom()->getRandomNumber(99) == 10) {
-			zoombini->_stateByte6C = 1;
-			zoombini->_zoombiniIndex = 33;
-			_decorativeAnimationFrames[i] = 1;
-			_decorativeNextFrameTimes[i] = now + 50;
-		}
-		if (zoombini->_stateByte6C == 1 && _engine->getRandom()->getRandomNumber(49) == 10) {
-			zoombini->_stateByte6C = 0;
-			zoombini->_zoombiniIndex = kDecorativeZoombiniCells[i];
-			_decorativeAnimationFrames[i] = 0;
-			_decorativeNextFrameTimes[i] = 0;
-		}
+void ShelterFinal::updateDecorativeZoombinis(uint32 now) {
+	for (int i = 0; i < kDecorativeZoombiniCount && i < static_cast<int>(_vm->_globalZoombinis.size()); i++) {
+		ZoombiniState *zoombini = _vm->_globalZoombinis[i];
+		zoombini->updateAnimation(now);
+		if (!zoombini->_animationActive && _vm->getRandom()->getRandomNumber(99) == 10)
+			zoombini->startAnimation(_walkingZoombiniAnimation, 33, now, 50, true);
+		if (zoombini->_animationActive && _vm->getRandom()->getRandomNumber(49) == 10)
+			zoombini->resetAnimation();
 	}
 }
 
-void BooliewoodFinalPage::updateFireworks(uint32 now) {
+void ShelterFinal::updateFireworks(uint32 now) {
 	for (int i = 0; i < kFireworkCount; i++)
 		advanceFireworkAnimation(_fireworks[i], now);
 	if (!_fireworks[0].active) {
@@ -315,7 +291,7 @@ void BooliewoodFinalPage::updateFireworks(uint32 now) {
 	moveFirework(_fireworks[2]);
 }
 
-void BooliewoodFinalPage::advanceFireworkAnimation(FireworkState &firework, uint32 now) {
+void ShelterFinal::advanceFireworkAnimation(FireworkState &firework, uint32 now) {
 	if (!firework.active || !firework.animation)
 		return;
 	while (firework.nextFrameTime <= now) {
@@ -328,93 +304,84 @@ void BooliewoodFinalPage::advanceFireworkAnimation(FireworkState &firework, uint
 	}
 }
 
-void BooliewoodFinalPage::resetFirework(int fireworkIndex, uint32 now) {
+void ShelterFinal::resetFirework(int fireworkIndex, uint32 now) {
 	FireworkState &firework = _fireworks[fireworkIndex];
 	if (!firework.animation)
 		return;
-	int x;
-	int y;
+	Common::Point32 pos;
 	do {
-		x = _engine->getRandom()->getRandomNumber(749);
-		y = _engine->getRandom()->getRandomNumber(299);
-	} while (!isFireworkPositionFree(x, y));
-	firework.collisionRect = Common::Rect(x, y, x + 60, y + 59);
-	firework.startY = y;
+		pos.x = _vm->getRandom()->getRandomNumber(749);
+		pos.y = _vm->getRandom()->getRandomNumber(299);
+	} while (!isFireworkPositionFree(pos));
+	firework.collisionRect = Common::Rect(pos.x, pos.y, pos.x + 60, pos.y + 59);
+	firework.startPos = pos;
 	firework.timeStep = 0;
 	firework.frame = 0;
 	firework.nextFrameTime = now + 40;
 	firework.active = true;
 }
 
-void BooliewoodFinalPage::moveFirework(FireworkState &firework) {
+void ShelterFinal::moveFirework(FireworkState &firework) {
 	const double time = static_cast<double>(firework.timeStep);
-	const int y = static_cast<int>(static_cast<double>(firework.startY) - 2.0 * time + 0.06 * time * time);
+	const int y = static_cast<int>(static_cast<double>(firework.startPos.y) - 2.0 * time + 0.06 * time * time);
 	firework.timeStep += 1;
 	firework.collisionRect.top = y;
 	firework.collisionRect.right = firework.collisionRect.left + 60;
 	firework.collisionRect.bottom = y + 59;
 }
 
-bool BooliewoodFinalPage::isFireworkPositionFree(int x, int y) const {
+bool ShelterFinal::isFireworkPositionFree(const Common::Point32 &pos) const {
+	const Common::Point32 corners[4] = {
+		pos,
+		Common::Point32(pos.x + 60, pos.y),
+		Common::Point32(pos.x, pos.y + 59),
+		Common::Point32(pos.x + 60, pos.y + 59)};
 	Common::Rect fixedRects[2] = {Common::Rect(153, 3, 647, 416), Common::Rect(0, 387, 800, 600)};
 	for (int i = 0; i < kFireworkCount; i++) {
 		const Common::Rect &rect = _fireworks[i].collisionRect;
-		if (pointInsidePaddedRect(x, y, rect) || pointInsidePaddedRect(x + 60, y, rect) ||
-			pointInsidePaddedRect(x, y + 59, rect) || pointInsidePaddedRect(x + 60, y + 59, rect))
-			return false;
+		for (int corner = 0; corner < 4; corner++) {
+			if (pointInsidePaddedRect(corners[corner], rect))
+				return false;
+		}
 	}
 	for (int i = 0; i < 2; i++) {
 		const Common::Rect &rect = fixedRects[i];
-		if (pointInsidePaddedRect(x, y, rect) || pointInsidePaddedRect(x + 60, y, rect) ||
-			pointInsidePaddedRect(x, y + 59, rect) || pointInsidePaddedRect(x + 60, y + 59, rect))
-			return false;
+		for (int corner = 0; corner < 4; corner++) {
+			if (pointInsidePaddedRect(corners[corner], rect))
+				return false;
+		}
 	}
 	return true;
 }
 
-bool BooliewoodFinalPage::pointInsidePaddedRect(int x, int y, const Common::Rect &rect) {
-	return rect.left - 15 < x && x < rect.right + 15 && rect.top - 15 < y && y < rect.bottom + 15;
+bool ShelterFinal::pointInsidePaddedRect(const Common::Point32 &pos, const Common::Rect &rect) {
+	return rect.left - 15 < pos.x && pos.x < rect.right + 15 && rect.top - 15 < pos.y && pos.y < rect.bottom + 15;
 }
 
-void BooliewoodFinalPage::scheduleNextAmbient(uint32 now) {
-	_nextAmbientTime = now + 1000 * (_engine->getRandom()->getRandomNumber(9) + 10);
+void ShelterFinal::scheduleNextAmbient(uint32 now) {
+	_nextAmbientTime = now + 1000 * (_vm->getRandom()->getRandomNumber(9) + 10);
 }
 
-void BooliewoodFinalPage::playRandomAmbient() {
-	SoundManager *sound = _engine->getSoundManager();
+void ShelterFinal::playRandomAmbient() {
+	SoundManager *sound = _vm->getSoundManager();
 	if (!sound)
 		return;
-	const int index = _engine->getRandom()->getRandomNumber(kAmbientSoundCount - 1);
+	const int index = _vm->getRandom()->getRandomNumber(kAmbientSoundCount - 1);
 	if (0 <= _ambientSoundIds[index])
 		sound->playWithVolume(_ambientSoundIds[index], sound->_volumeSpeech);
 }
 
-void BooliewoodFinalPage::drawAnimation(const Animation *animation, int frameIndex, int x, int y, Graphics::ManagedSurface *screen) const {
+void ShelterFinal::drawAnimation(const Animation *animation, int frameIndex,
+										const Common::Point32 &pos, ManagedSurface32 *screen) const {
 	if (!animation || animation->getFrameCount() <= 0)
 		return;
 	const RleBlock *frame = animation->getFrame(frameIndex % animation->getFrameCount());
 	if (frame)
-		frame->drawToScreen(screen, x, y, _engine->getAlphaLUT());
+		frame->drawToScreen(screen, pos, _vm->getAlphaLUT());
 }
 
-void BooliewoodFinalPage::drawZoombini(const ZoombiniState &zoombini, int decorativeIndex, Graphics::ManagedSurface *screen) const {
-	const ZoombiniGraphics *graphics = zoombini._stateByte6C == 1 ? _walkingZoombiniGfx : _zoombiniGfx;
-	if (!graphics)
-		return;
-	const int baseIndex = zoombini._zoombiniIndex * ZoombiniGraphics::kDim1 * ZoombiniGraphics::kDim2;
-	const int animationFrame = _decorativeAnimationFrames[decorativeIndex];
-	int frameIndex = graphics->getFrameCount(baseIndex) == 1 ? 0 : animationFrame;
-	const RleBlock *frame = graphics->getFrame(baseIndex, frameIndex);
-	if (frame)
-		frame->drawToScreen(screen, zoombini._position.x, zoombini._position.y, _engine->getAlphaLUT());
-	const byte features[kNumFeatures] = {zoombini._featureA, zoombini._featureB, zoombini._featureC, zoombini._featureD};
-	for (int layer = 1; layer <= kNumFeatures; layer++) {
-		const int featureIndex = baseIndex + layer * ZoombiniGraphics::kDim2 + features[layer - 1];
-		frameIndex = graphics->getFrameCount(featureIndex) == 1 ? 0 : animationFrame;
-		frame = graphics->getFrame(featureIndex, frameIndex);
-		if (frame)
-			frame->drawToScreen(screen, zoombini._position.x, zoombini._position.y, _engine->getAlphaLUT());
-	}
+void ShelterFinal::drawZoombini(const ZoombiniState &zoombini, ManagedSurface32 *screen) const {
+	zoombini.draw(screen, _vm->getAlphaLUT());
 }
 
 } // End of namespace Zoombini2

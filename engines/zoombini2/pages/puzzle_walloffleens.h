@@ -26,6 +26,7 @@
 #include "common/rect.h"
 
 #include "zoombini2/pages/puzzle_base.h"
+#include "zoombini2/state.h"
 
 namespace Zoombini2 {
 
@@ -33,27 +34,29 @@ class Animation;
 class RleBlock;
 
 /**
- * Magic Mirrors asks the player to fire each Zoombini at a matching Fleen.
- *
- * Difficulty controls the grid size, mirror allowance, and matching rules.
- * A complete feature match captures the selected Fleen, while a miss consumes
- * a mirror. Releasing at least four Zoombinis completes the puzzle.
+ * Magic Mirrors (Route3-2)
+ * 
+ * Find the real Fleens behind the strange mirrors.
  */
-class WallOfFleensPuzzle : public PuzzlePage {
+class PuzzleWallOfFleens : public PuzzleBase {
 public:
-	/** Construct Magic Mirrors for @p engine. */
-	WallOfFleensPuzzle(Zoombini2Engine *engine);
+	/** Construct Magic Mirrors for @p vm. */
+	PuzzleWallOfFleens(Zoombini2Engine *vm);
 	/** Release grid, cannon, mirror, and animation resources. */
-	~WallOfFleensPuzzle() override;
+	~PuzzleWallOfFleens() override;
 
-	/** Build the difficulty-selected grid and initialize its mirror allowance. */
+	/** Build the level-selected grid and initialize its mirror allowance. */
 	void init() override;
 	/** Advance aiming, projectile, feedback, and completion phases. */
-	void update() override;
+	void onUpdate() override;
 	/** Draw the grid, cannon, projectile, mirrors, and active Zoombini. */
-	void draw(Graphics::ManagedSurface *screen) override;
+	void onRenderScene(ManagedSurface32 *screen) override;
+	/** Draw the level indicator above the actors. */
+	void onRenderForeground(ManagedSurface32 *screen) override;
 	/** Aim the cannon at the selected uncaught Fleen. */
-	void handleClick(const Common::Point &pos) override;
+	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	/** Mark the terminal board successful for the global debug-completion hotkey. */
+	void applyDebugPuzzleCompletion() override;
 
 	/** Maximum number of grid columns. */
 	static const int kMaxGridCols = 12;
@@ -71,14 +74,12 @@ public:
 	static const int kCellWidth = 52;
 	/** Vertical spacing between grid cells. */
 	static const int kCellHeight = 68;
-	/** Number of visible Zoombini features compared with a Fleen. */
-	static const int kNumFeatures = 4;
-	/** Maximum value of a visible feature. */
-	static const int kMaxFeatureVal = 5;
+	/** Maximum value of a visible trait. */
+	static const int kMaxTraitValue = 5;
 	/** Number of level-progress indicator visuals. */
 	static const int kNumLevelIndicators = 5;
-	/** Number of grid panels cycled by difficulty one. */
-	static const int kNumDiff1Panels = 6;
+	/** Number of grid panels cycled by level one. */
+	static const int kNumLevel1Panels = 6;
 
 	/** Runtime phase of the Magic Mirrors interaction. */
 	enum GameState {
@@ -114,10 +115,10 @@ public:
 		kMirrorEmpty05 = 5
 	};
 
-	/** One Fleen's features, grid position, and capture state. */
+	/** One Fleen's traits, grid position, and capture state. */
 	struct FleenCell {
-		/** Visible feature values. */
-		byte features[kNumFeatures];
+		/** Visible traits compared with a Zoombini. */
+		ZmbTrait traits;
 		/** Whether this Fleen has already been captured. */
 		bool caught;
 		/** Grid column. */
@@ -127,25 +128,23 @@ public:
 		/** Clickable grid-cell area. */
 		Common::Rect hitbox;
 
-		/** Initialize an uncaught Fleen with zeroed features at grid origin. */
-		FleenCell() : caught(false), gridCol(0), gridRow(0) {
-			memset(features, 0, sizeof(features));
-		}
+		/** Initialize an uncaught Fleen with empty traits at grid origin. */
+		FleenCell() : traits(), caught(false), gridCol(0), gridRow(0) {}
 	};
 
 private:
 	/** Load cannon, grid, mirror, animation, and audio resources. */
 	void loadResources();
 
-	/** Configure cell geometry for the selected difficulty. */
+	/** Configure cell geometry for the selected level. */
 	void buildGrid();
-	/** Generate visible features for each active Fleen. */
-	void generateFleenFeatures();
+	/** Generate visible traits for each active Fleen. */
+	void generateFleenTraits();
 
 	/** Convert target position into the nearest cannon angle. */
-	int computeCannonAngle(const Common::Point32 &targetPosition) const;
-	/** Count features shared by the current Zoombini and Fleen @p fleenIdx. */
-	int countMatchingFeatures(int fleenIdx) const;
+	int computeCannonAngle(const Common::Point32 &targetPos) const;
+	/** Count traits shared by the current Zoombini and Fleen @p fleenIdx. */
+	int countMatchingTraits(int fleenIdx) const;
 	/** Start the projectile phase after the cannon finishes aiming. */
 	void fireCannon();
 	/** Capture Fleen @p fleenIdx and release the current Zoombini. */
@@ -160,18 +159,18 @@ private:
 	int fleenIndexAt(int col, int row) const;
 
 	/** Draw every active Fleen grid cell. */
-	void drawGrid(Graphics::ManagedSurface *screen);
+	void drawGrid(ManagedSurface32 *screen);
 	/** Draw the cannon at its current angle. */
-	void drawCannon(Graphics::ManagedSurface *screen);
+	void drawCannon(ManagedSurface32 *screen);
 	/** Draw the projectile while it is in flight. */
-	void drawCannonball(Graphics::ManagedSurface *screen);
+	void drawCannonball(ManagedSurface32 *screen);
 	/** Draw remaining and consumed chance mirrors. */
-	void drawMirrors(Graphics::ManagedSurface *screen);
+	void drawMirrors(ManagedSurface32 *screen);
 	/** Draw the current and already released Zoombinis. */
-	void drawZoombinis(Graphics::ManagedSurface *screen);
+	void onRenderActors(ManagedSurface32 *screen) override;
 
-	/** Difficulty level in the range one through four. */
-	int _difficulty;
+	/** Level in the range one through four. */
+	int _level;
 	/** Number of columns in the active grid. */
 	int _gridCols;
 	/** Number of rows in the active grid. */
@@ -191,10 +190,10 @@ private:
 	/** Time at which the current phase began. */
 	uint32 _actionTimer;
 
-	/** Current grid panel cycled by difficulty one. */
+	/** Current grid panel cycled by level one. */
 	int _gridPage;
 
-	/** Fleen grid storage sized for the largest difficulty. */
+	/** Fleen grid storage sized for the largest level. */
 	FleenCell _fleens[kMaxFleens];
 
 	/** Screen origin of the active grid. */
@@ -210,37 +209,37 @@ private:
 	int _targetRow;
 
 	/** Current projectile position. */
-	Common::Point32 _cannonballPosition;
+	Common::Point32 _cannonballPos;
 	/** Projectile position at the muzzle. */
-	Common::Point32 _cannonballStartPosition;
+	Common::Point32 _cannonballStartPos;
 	/** Projectile target at the selected Fleen. */
-	Common::Point32 _cannonballEndPosition;
+	Common::Point32 _cannonballEndPos;
 	/** Fixed-point projectile progress from zero through one thousand. */
 	int _cannonballProgress;
 
 	/** Number of chance mirrors still available. */
 	int _mirrorsLeft;
-	/** Initial mirror allowance for the selected difficulty. */
+	/** Initial mirror allowance for the selected level. */
 	int _mirrorsTotal;
 
 	/** Cannon visuals indexed by angle. */
-	RleBlock *_cannonGfx[kNumCannonAngles];
+	RleBlock *_cannonImage[kNumCannonAngles];
 	/** Background restored around the rotating cannon. */
 	RleBlock *_cannonCache;
 	/** Active grid-cell background. */
-	RleBlock *_slotActiveGfx;
+	RleBlock *_slotActiveImage;
 	/** Empty grid-cell background. */
-	RleBlock *_slotEmptyGfx;
+	RleBlock *_slotEmptyImage;
 	/** Selected-cell cursor overlay. */
-	RleBlock *_slotCursorGfx;
-	/** Mirror visuals indexed by @ref WallOfFleensPuzzle::MirrorState. */
-	RleBlock *_mirrorGfx[kNumMirrorStates];
+	RleBlock *_slotCursorImage;
+	/** Mirror visuals indexed by @ref PuzzleWallOfFleens::MirrorState. */
+	RleBlock *_mirrorImage[kNumMirrorStates];
 	/** Cannon nozzle visual. */
-	RleBlock *_tuyereGfx;
+	RleBlock *_tuyereImage;
 	/** Progress indicators for released Zoombinis. */
-	RleBlock *_levelRedGfx[kNumLevelIndicators];
+	RleBlock *_levelRedImage[kNumLevelIndicators];
 	/** Successful-capture highlight. */
-	RleBlock *_highlightGfx;
+	RleBlock *_highlightImage;
 
 	/** Background lava-bubble animation. */
 	Animation *_lavaBubbleAnim;
