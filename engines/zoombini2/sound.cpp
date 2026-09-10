@@ -20,7 +20,6 @@
  */
 
 #include "common/debug.h"
-#include "common/file.h"
 #include "common/system.h"
 
 #include "audio/audiostream.h"
@@ -28,12 +27,51 @@
 #include "audio/mixer.h"
 
 #include "zoombini2/sound.h"
+#include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
-SoundManager::SoundManager(Audio::Mixer *mixer) : _mixer(mixer) {
+/** Convert stereo samples to one mono sample per source frame. */
+class SoundManager::MonoAudioStream : public Audio::AudioStream {
+public:
+	explicit MonoAudioStream(Audio::AudioStream *parent) : _parent(parent) {
+	}
+
+	~MonoAudioStream() override {
+		delete _parent;
+	}
+
+	int readBuffer(int16 *buffer, const int numSamples) override {
+		if (!_parent->isStereo())
+			return _parent->readBuffer(buffer, numSamples);
+
+		int samplesRead = 0;
+		while (samplesRead < numSamples && !_parent->endOfData()) {
+			int16 stereoFrame[2];
+			const int frameSamples = _parent->readBuffer(stereoFrame, ARRAYSIZE(stereoFrame));
+			if (frameSamples < 0)
+				return samplesRead == 0 ? frameSamples : samplesRead;
+			if (frameSamples < static_cast<int>(ARRAYSIZE(stereoFrame)))
+				break;
+			buffer[samplesRead] = static_cast<int16>((static_cast<int32>(stereoFrame[0]) + static_cast<int32>(stereoFrame[1])) / 2);
+			samplesRead += 1;
+		}
+		return samplesRead;
+	}
+
+	bool isStereo() const override { return false; }
+	int getRate() const override { return _parent->getRate(); }
+	bool endOfData() const override { return _parent->endOfData(); }
+	bool endOfStream() const override { return _parent->endOfStream(); }
+
+private:
+	Audio::AudioStream *_parent;
+};
+
+SoundManager::SoundManager(Zoombini2Engine *vm, Audio::Mixer *mixer) : _vm(vm), _mixer(mixer) {
 	_nextId = 1;
 	_muteRefCount = 0;
+	_stereoOutputEnabled = false;
 	_volumeSFX = 100;
 	_volumeMusic = 100;
 	_volumeSpeech = 100;
@@ -46,10 +84,12 @@ SoundManager::~SoundManager() {
 int SoundManager::load(bool isStream, const Common::Path &filename, bool loop) {
 	SoundBuffer *buf = new SoundBuffer();
 	buf->id = _nextId++;
-	buf->path = resolvePath(filename);
+	buf->path = resolveCompatibilityPath(filename);
 	buf->isStream = isStream;
 	buf->loop = loop;
+	buf->category = classifySound(filename);
 	buf->volume = kMaxVolumePercent;
+	buf->usesCategoryVolume = true;
 	_buffers.push_back(buf);
 	return buf->id;
 }
@@ -78,10 +118,9 @@ void SoundManager::play(int id) {
 	if (!buf)
 		return;
 
-	Common::File *f = new Common::File();
-	if (!f->open(buf->path)) {
+	Common::SeekableReadStream *f = _vm->openResourceFile(buf->path.toString('/'));
+	if (!f) {
 		debug(1, "SoundManager::play: Cannot open '%s'", buf->path.toString().c_str());
-		delete f;
 		return;
 	}
 
@@ -95,9 +134,26 @@ void SoundManager::play(int id) {
 	} else {
 		audioStream = stream;
 	}
+	if (!_stereoOutputEnabled && audioStream->isStereo())
+		audioStream = new MonoAudioStream(audioStream);
 
-	byte vol = normalizeVolume(buf->volume);
-	_mixer->playStream(Audio::Mixer::kSFXSoundType, &buf->handles[0], audioStream, -1, vol);
+	Audio::SoundHandle *handle = &buf->streamHandle;
+	if (!buf->isStream) {
+		handle = nullptr;
+		for (int i = 0; i < kMaxSampleSlots; i++) {
+			if (!_mixer->isSoundHandleActive(buf->handles[i])) {
+				handle = &buf->handles[i];
+				break;
+			}
+		}
+		if (!handle) {
+			delete audioStream;
+			return;
+		}
+	}
+
+	const byte volume = buf->usesCategoryVolume ? static_cast<byte>(Audio::Mixer::kMaxChannelVolume) : normalizeVolume(buf->volume);
+	_mixer->playStream(getMixerSoundType(buf->category), handle, audioStream, -1, volume);
 }
 
 void SoundManager::playWithVolume(int id, int volume) {
@@ -169,15 +225,16 @@ void SoundManager::setVolume(int id, int volume) {
 	if (!buf)
 		return;
 
-	buf->volume = volume;
-	byte vol = normalizeVolume(volume);
+	buf->volume = CLIP(volume, 0, kMaxVolumePercent);
+	buf->usesCategoryVolume = buf->volume == getCategoryVolume(buf->category);
+	const byte channelVolume = buf->usesCategoryVolume ? static_cast<byte>(Audio::Mixer::kMaxChannelVolume) : normalizeVolume(buf->volume);
 
 	for (int i = 0; i < kMaxSampleSlots; i++) {
 		if (_mixer->isSoundHandleActive(buf->handles[i]))
-			_mixer->setChannelVolume(buf->handles[i], vol);
+			_mixer->setChannelVolume(buf->handles[i], channelVolume);
 	}
 	if (_mixer->isSoundHandleActive(buf->streamHandle))
-		_mixer->setChannelVolume(buf->streamHandle, vol);
+		_mixer->setChannelVolume(buf->streamHandle, channelVolume);
 }
 
 void SoundManager::setVolumeAll(int volume) {
@@ -212,6 +269,12 @@ void SoundManager::resumeAll() {
 	_mixer->pauseAll(false);
 }
 
+void SoundManager::setVolumeSettings(int music, int sfx, int speech) {
+	_volumeMusic = CLIP(music, 0, kMaxVolumePercent);
+	_volumeSFX = CLIP(sfx, 0, kMaxVolumePercent);
+	_volumeSpeech = CLIP(speech, 0, kMaxVolumePercent);
+}
+
 SoundBuffer *SoundManager::findBuffer(int id) const {
 	for (uint i = 0; i < _buffers.size(); i++) {
 		if (_buffers[i]->id == id)
@@ -220,42 +283,69 @@ SoundBuffer *SoundManager::findBuffer(int id) const {
 	return nullptr;
 }
 
-Common::Path SoundManager::resolvePath(const Common::Path &filename) const {
-	// A leading '#' selects the lower-priority disc-relative spelling.
-	// SearchMan resolves both forms against the configured game data roots.
-	Common::String str = filename.toString();
-	if (!str.empty() && str[0] == '#') {
-		str = str.substr(1);
-	}
+Common::Path SoundManager::resolveCompatibilityPath(const Common::Path &filename) const {
+	if (_vm->hasResource(filename.toString('/')))
+		return filename;
 
-	// Handle music directory mapping:
-	// With full game installation, music files are in INSTALL/HD/sounds/music/
-	// With extracted data only, BB files are in Data/Sounds/FX/
-	// Map sounds/music/XX-BB*.wav to sounds/fx/XX-BB*.wav for fallback
-	if (str.hasPrefix("sounds/music/")) {
-		Common::String basename = str.substr(13); // Remove "sounds/music/"
+	// Some extracted-data layouts retain the numbered background tracks in the CD sound-effects directory.
+	const Common::String str = filename.toString('/');
+	const Common::String installedMusicPrefix("#sounds/music/");
+	if (str.hasPrefix(installedMusicPrefix)) {
+		const Common::String basename = str.substr(installedMusicPrefix.size());
 		// Check if this is a numeric-prefix BB file (e.g. "01-BB01.wav")
 		if (basename.size() > 6 && basename[2] == '-' && basename[3] == 'B' && basename[4] == 'B') {
-			// Try sounds/fx/ path first for extracted data compatibility
-			Common::Path fxPath = Common::Path(Common::String::format("sounds/fx/%s", basename.c_str()));
-			Common::File testFile;
-			if (testFile.open(fxPath)) {
-				testFile.close();
+			const Common::Path fxPath(Common::String::format("sounds/fx/%s", basename.c_str()));
+			if (_vm->hasResource(fxPath.toString('/')))
 				return fxPath;
-			}
 		}
 	}
 
-	return Common::Path(str);
+	return filename;
+}
+
+SoundCategory SoundManager::classifySound(const Common::Path &filename) {
+	Common::String path = filename.toString('/');
+	if (!path.empty() && path[0] == '#')
+		path = path.substr(1);
+	else if (path.hasPrefixIgnoreCase("Data/"))
+		path = path.substr(5);
+	path.toLowercase();
+	if (path.hasPrefix("sounds/music/"))
+		return SoundCategory::kMusic00;
+	if (path.hasPrefix("sounds/fx/") || path == "sounds/blip.wav")
+		return SoundCategory::kSFX01;
+	if (path.hasPrefix("sounds/"))
+		return SoundCategory::kSpeech02;
+	return SoundCategory::kSFX01;
+}
+
+Audio::Mixer::SoundType SoundManager::getMixerSoundType(SoundCategory category) {
+	switch (category) {
+	case SoundCategory::kMusic00:
+		return Audio::Mixer::kMusicSoundType;
+	case SoundCategory::kSpeech02:
+		return Audio::Mixer::kSpeechSoundType;
+	case SoundCategory::kSFX01:
+	default:
+		return Audio::Mixer::kSFXSoundType;
+	}
+}
+
+int SoundManager::getCategoryVolume(SoundCategory category) const {
+	switch (category) {
+	case SoundCategory::kMusic00:
+		return _volumeMusic;
+	case SoundCategory::kSpeech02:
+		return _volumeSpeech;
+	case SoundCategory::kSFX01:
+	default:
+		return _volumeSFX;
+	}
 }
 
 /** Normalize the game's zero-to-one-hundred volume into the mixer range. */
-byte SoundManager::normalizeVolume(int volume) const {
-	if (volume < 0)
-		volume = 0;
-	if (volume > kMaxVolumePercent)
-		volume = kMaxVolumePercent;
-	return (byte)((volume * 255) / kMaxVolumePercent);
+byte SoundManager::normalizeVolume(int volume) {
+	return static_cast<byte>((CLIP(volume, 0, kMaxVolumePercent) * Audio::Mixer::kMaxChannelVolume) / kMaxVolumePercent);
 }
 
 } // End of namespace Zoombini2

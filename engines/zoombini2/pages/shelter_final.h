@@ -19,8 +19,8 @@
  *
  */
 
-#ifndef ZOOMBINI2_PAGES_SHELTER_BOOLIEWOOD_FINAL_H
-#define ZOOMBINI2_PAGES_SHELTER_BOOLIEWOOD_FINAL_H
+#ifndef ZOOMBINI2_PAGES_SHELTER_FINAL_H
+#define ZOOMBINI2_PAGES_SHELTER_FINAL_H
 
 #include "common/rect.h"
 
@@ -31,28 +31,34 @@ namespace Zoombini2 {
 class Animation;
 class BitBlock;
 class RleBlock;
-class ZoombiniGraphics;
+class ZoombiniAnimation;
 class ZoombiniState;
 
-/** Separate world-23 Booliewood celebration shown after 400 rescues. */
-class BooliewoodFinalPage : public ShelterPage {
+/** 
+ * Booliewood - Celebration shown after 400 rescues.
+ * 
+ * @remark The save is considered complete after 400 Zoombinis arrive;
+ * This page is only shown if the save is complete.
+ */
+class ShelterFinal : public ShelterBase {
 public:
-	/** Construct the final Booliewood shelter for @p engine. */
-	explicit BooliewoodFinalPage(Zoombini2Engine *engine);
+	/** Construct the final Booliewood shelter for @p vm. */
+	explicit ShelterFinal(Zoombini2Engine *vm);
 	/** Clear decorative Zoombinis, save the profile, and release celebration resources. */
-	~BooliewoodFinalPage() override;
+	~ShelterFinal() override;
 
 	/** Load the fixed celebration, decorative Zoombinis, music, and speech. */
 	void init() override;
 	/** Advance dancers, decorative Zoombinis, fireworks, and speech deadlines. */
-	void update() override;
+	void onUpdate() override;
 	/** Draw the complete fixed celebration scene. */
-	void draw(Graphics::ManagedSurface *screen) override;
+	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderActors(ManagedSurface32 *screen) override;
 	/** Return to the sign-in menu on any click. */
-	void handleClick(const Common::Point &pos) override;
+	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 
-	/** Hide the shared shelter sidebar on the final celebration. */
-	bool hasSidebar() const override { return false; }
+	/** Hide the shared shelter three-button controls on the final celebration. */
+	bool hasThreeButtons() const override { return false; }
 	/** Suppress the shelter Go action on the final celebration. */
 	bool hasGoButton() const override { return false; }
 
@@ -63,14 +69,15 @@ private:
 	static const int kDancingBoolieCount = 3;
 	/** Number of randomized celebration ambience clips. */
 	static const int kAmbientSoundCount = 7;
-	/** Number of page-owned decorative Zoombinis. */
+	/** Number of decorative Zoombinis created for the celebration. */
 	static const int kDecorativeZoombiniCount = 2;
 
 	/** Runtime position, animation, and parabolic motion for one firework. */
 	struct FireworkState {
 		Animation *animation;
 		Common::Rect collisionRect;
-		int startY;
+		/** Initial screen position used by the parabolic trajectory. */
+		Common::Point32 startPos;
 		int timeStep;
 		int frame;
 		uint32 nextFrameTime;
@@ -78,9 +85,9 @@ private:
 	};
 
 	/** Fixed locations of the three lower-edge dancers. */
-	static const int kDancingBooliePositions[kDancingBoolieCount][2];
-	/** Fixed locations of the two page-owned Zoombinis. */
-	static const int kDecorativeZoombiniPositions[kDecorativeZoombiniCount][2];
+	static const Common::Point32 kDancingBooliePos[kDancingBoolieCount];
+	/** Fixed locations of the two decorative Zoombinis in the celebration. */
+	static const Common::Point32 kDecorativeZoombiniPos[kDecorativeZoombiniCount];
 	/** Resting cells restored after the two decorative Zoombinis finish walking. */
 	static const int kDecorativeZoombiniCells[kDecorativeZoombiniCount];
 
@@ -97,41 +104,37 @@ private:
 	/** Advance one active firework by one parabolic motion step. */
 	static void moveFirework(FireworkState &firework);
 	/** Return whether the original four-corner test accepts a candidate firework origin. */
-	bool isFireworkPositionFree(int x, int y) const;
+	bool isFireworkPositionFree(const Common::Point32 &pos) const;
 	/** Return whether one point lies strictly within the padded collision rectangle. */
-	static bool pointInsidePaddedRect(int x, int y, const Common::Rect &rect);
+	static bool pointInsidePaddedRect(const Common::Point32 &pos, const Common::Rect &rect);
 
 	/** Schedule the next randomized 10-through-19-second ambient deadline. */
 	void scheduleNextAmbient(uint32 now);
 	/** Play one randomized celebration ambience clip. */
 	void playRandomAmbient();
 	/** Draw one plain AN animation frame at a fixed position. */
-	void drawAnimation(const Animation *animation, int frameIndex, int x, int y, Graphics::ManagedSurface *screen) const;
+	void drawAnimation(const Animation *animation, int frameIndex, const Common::Point32 &pos, ManagedSurface32 *screen) const;
 	/** Draw one Little-Zoombini state at a fixed position. */
-	void drawZoombini(const ZoombiniState &zoombini, int decorativeIndex, Graphics::ManagedSurface *screen) const;
+	void drawZoombini(const ZoombiniState &zoombini, ManagedSurface32 *screen) const;
 
-	/** Owned fixed celebration background. */
+	/** Fixed celebration background managed by this page. */
 	BitBlock *_background;
-	/** Owned persistent Grand Boolie foreground. */
+	/** Persistent Grand Boolie foreground managed by this page. */
 	BitBlock *_fullBigBool;
-	/** Owned dormant cell-reveal image. */
+	/** Dormant cell-reveal image managed by this page. */
 	RleBlock *_revealBigBool;
-	/** Owned lower-edge dancing Boolie animation. */
+	/** Lower-edge dancing Boolie animation managed by this page. */
 	Animation *_dancingBoolie;
-	/** Owned upper Boolie dance animation. */
+	/** Upper Boolie dance animation managed by this page. */
 	Animation *_boolDance;
-	/** Owned dormant first reveal flare. */
+	/** Dormant first reveal flare managed by this page. */
 	Animation *_revealFlare1;
-	/** Owned dormant second reveal flare. */
+	/** Dormant second reveal flare managed by this page. */
 	Animation *_revealFlare2;
-	/** Owned Little-Zoombini sprite grid. */
-	ZoombiniGraphics *_zoombiniGfx;
-	/** Owned attenteZomb sprite grid used while a decorative Zoombini walks. */
-	ZoombiniGraphics *_walkingZoombiniGfx;
-	/** Current attenteZomb frame for each decorative Zoombini. */
-	int _decorativeAnimationFrames[kDecorativeZoombiniCount];
-	/** Deadline for each decorative Zoombini's next attenteZomb frame. */
-	uint32 _decorativeNextFrameTimes[kDecorativeZoombiniCount];
+	/** Borrowed immutable seated sprite grid owned by the engine cache. */
+	const ZoombiniAnimation *_zoombiniAnimation;
+	/** Borrowed immutable walking sprite grid owned by the engine cache. */
+	const ZoombiniAnimation *_walkingZoombiniAnimation;
 	/** Firework states in blue, green, red order. */
 	FireworkState _fireworks[kFireworkCount];
 

@@ -36,24 +36,37 @@ class RewindableAudioStream;
 
 namespace Zoombini2 {
 
+class Zoombini2Engine;
+
 /** Maximum volume accepted by the game-facing sound API. */
 const int kMaxVolumePercent = 100;
 
 /** Number of sample handles reserved for one logical sound. */
 const int kMaxSampleSlots = 5;
 
+/** Logical mixer category derived from a loose-file resource path. */
+enum class SoundCategory {
+	kMusic00 = 0,
+	kSFX01 = 1,
+	kSpeech02 = 2
+};
+
 /** Retains the path, playback policy, volume, and mixer handles for one sound. */
 struct SoundBuffer {
 	/** Manager-assigned sound identifier. */
 	int id;
-	/** Resolved loose-file path. */
+	/** Original logical resource name, including any installed-root marker. */
 	Common::Path path;
 	/** Whether the caller requested streaming playback. */
 	bool isStream;
 	/** Whether playback should restart after the final sample. */
 	bool loop;
+	/** Mixer category controlling this sound. */
+	SoundCategory category;
 	/** Game-facing volume in the inclusive range 0 through 100. */
 	int volume;
+	/** Whether the channel should use the complete volume of its mixer category. */
+	bool usesCategoryVolume;
 	/** Mixer handles reserved for overlapping sample playback. */
 	Audio::SoundHandle handles[kMaxSampleSlots];
 	/** Mixer handle reserved for streamed playback. */
@@ -64,14 +77,14 @@ struct SoundBuffer {
  * Owns logical sound records and routes WAV playback through Audio::Mixer.
  *
  * Loading records a path and playback policy but does not decode audio.
- * Playback opens and decodes the WAV on demand. A leading `#` is removed from
- * disc-style paths, and numbered music paths may resolve to the extracted FX
- * directory when that resource exists.
+ * Playback opens and decodes the WAV on demand through the engine resource
+ * resolver. Numbered installed-music paths may resolve to the extracted CD
+ * sound-effects directory when that compatibility resource exists.
  */
 class SoundManager {
 public:
-	/** Bind sound playback to the borrowed @p mixer. */
-	explicit SoundManager(Audio::Mixer *mixer);
+	/** Bind sound playback to the borrowed @p vm and @p mixer. */
+	SoundManager(Zoombini2Engine *vm, Audio::Mixer *mixer);
 	/** Stop playback and release every owned @ref SoundBuffer. */
 	~SoundManager();
 
@@ -113,6 +126,11 @@ public:
 	/** Resume all mixer channels. */
 	void resumeAll();
 
+	/** Synchronize the game-facing percentages with ScummVM's mixer settings. */
+	void setVolumeSettings(int music, int sfx, int speech);
+	/** Select stereo input streams or downmix them to mono before playback. */
+	void setStereoOutputEnabled(bool enabled) { _stereoOutputEnabled = enabled; }
+
 	/** Global sound-effect volume in the inclusive range 0 through 100. */
 	int _volumeSFX;
 	/** Global music volume in the inclusive range 0 through 100. */
@@ -121,6 +139,10 @@ public:
 	int _volumeSpeech;
 
 private:
+	class MonoAudioStream;
+
+	/** Borrowed vm that resolves original logical resource names. */
+	Zoombini2Engine *_vm;
 	/** Borrowed mixer used by every sound record. */
 	Audio::Mixer *_mixer;
 	/** Loaded sound records owned by this manager. */
@@ -129,13 +151,21 @@ private:
 	int _nextId;
 	/** Nested mute-request count. */
 	int _muteRefCount;
+	/** Whether newly started stereo WAV streams retain both channels. */
+	bool _stereoOutputEnabled;
 
 	/** Return the borrowed sound record for @p id, or nullptr. */
 	SoundBuffer *findBuffer(int id) const;
-	/** Normalize a game resource name into a SearchMan-relative path. */
-	Common::Path resolvePath(const Common::Path &filename) const;
+	/** Select an optional extracted-data compatibility alternative without resolving a physical path. */
+	Common::Path resolveCompatibilityPath(const Common::Path &filename) const;
+	/** Classify @p filename before any music-path fallback is applied. */
+	static SoundCategory classifySound(const Common::Path &filename);
+	/** Convert a logical sound category to its mixer sound type. */
+	static Audio::Mixer::SoundType getMixerSoundType(SoundCategory category);
+	/** Return the current game-facing percentage for @p category. */
+	int getCategoryVolume(SoundCategory category) const;
 	/** Clamp a percentage and convert it to the Audio::Mixer volume range. */
-	byte normalizeVolume(int volume) const;
+	static byte normalizeVolume(int volume);
 };
 
 } // End of namespace Zoombini2

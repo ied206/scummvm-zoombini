@@ -30,47 +30,41 @@ namespace Zoombini2 {
 
 class BitBlock;
 class ZoombiniState;
-class ZoombiniGraphics;
+class ZoombiniAnimation;
 
 /**
- * Common resources and party state for the nine puzzle activities.
- * Shelters, including Booliewood, have their own page implementations.
+ * Common page base for the nine rescue-mission puzzles.
+ *
+ * Provides shared puzzle resources and party state.
  */
-class ZoombiniPuzzle : public ZoombiniInteractive {
+class PuzzleBase : public InteractiveBase {
 public:
-	/** Bind shared puzzle state to @p engine and @p puzzleId. */
-	ZoombiniPuzzle(Zoombini2Engine *engine, int puzzleId);
+	/** Bind shared puzzle state to @p vm and @p puzzleId. */
+	PuzzleBase(Zoombini2Engine *vm, int puzzleId);
 	/** Release shared puzzle resources and roster entries. */
-	~ZoombiniPuzzle() override;
-	/** Return whether the shared sidebar is visible. */
-	bool hasSidebar() const override { return true; }
+	~PuzzleBase() override;
+	/** Return whether the shared three-button controls are visible. */
+	bool hasThreeButtons() const override { return true; }
 
 	/** Initialize the shared puzzle background, sprite grid, and roster. */
 	void init() override;
-	/** Advance the fallback puzzle state machine. */
-	void update() override;
-	/** Draw the shared background and party representation. */
-	void draw(Graphics::ManagedSurface *screen) override;
-	/** Handle the fallback puzzle-completion click. */
-	void handleClick(const Common::Point &pos) override;
-
 	/** Return the display name belonging to @p puzzleId. */
 	static const char *getPuzzleName(int puzzleId);
 	/** Return the resource-directory name belonging to @p puzzleId. */
 	static const char *getPuzzleDir(int puzzleId);
 
 protected:
+	/** Render active roster entries in stable ascending logical-Y order, with the held entry last. */
+	void renderZoombinis(ManagedSurface32 *screen) const;
 	/** Numeric dispatcher identifier for the concrete puzzle. */
 	int _puzzleId;
 	/** Shared full-screen puzzle background. */
 	BitBlock *_background;
-	/** Shared Zoombini sprite-grid owner. */
-	ZoombiniGraphics *_zoombiniGfx;
-	/** Puzzle-owned party entries transferred from the engine or profile state. */
+	/** Borrowed immutable sprite grid owned by the engine cache. */
+	const ZoombiniAnimation *_zoombiniAnimation;
+	/** Active party entries mirrored from the engine's roster for this puzzle. */
 	Common::Array<ZoombiniState *> _puzzleZoombinis;
-	/** Shared fallback puzzle stage. */
-	int _puzzleState;
-	/** Gameplay deadline used by the shared fallback puzzle stage. */
+	/** Gameplay deadline used by the concrete puzzle state machine. */
 	uint32 _stateTimer;
 };
 

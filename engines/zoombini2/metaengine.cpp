@@ -20,6 +20,7 @@
  */
 
 #include "base/plugins.h"
+#include "common/config-manager.h"
 #include "engines/advancedDetector.h"
 
 #include "zoombini2/detection.h"
@@ -35,6 +36,7 @@ public:
 	Common::Error createInstance(OSystem *syst, Engine **engine, const Zoombini2::Zoombini2GameDescription *desc) const override;
 
 	bool hasFeature(MetaEngineFeature f) const override;
+	void registerDefaultSettings(const Common::String &target) const override;
 	GUI::OptionsContainerWidget *buildEngineOptionsWidget(GUI::GuiObject *boss, const Common::String &name, const Common::String &target) const override;
 };
 
@@ -45,6 +47,15 @@ Common::Error Zoombini2MetaEngine::createInstance(OSystem *syst, Engine **engine
 
 bool Zoombini2MetaEngine::hasFeature(MetaEngineFeature f) const {
 	return false;
+}
+
+void Zoombini2MetaEngine::registerDefaultSettings(const Common::String &target) const {
+	(void)target;
+	ConfMan.registerDefault(Zoombini2::kConfigDebugHotkeys, false);
+	ConfMan.registerDefault(Zoombini2::kConfigStereoOutput, false);
+	ConfMan.registerDefault(Zoombini2::kConfigGreedyWaterslidePairing, false);
+	ConfMan.registerDefault(Zoombini2::kConfigCachedFrameTime, false);
+	ConfMan.registerDefault(Zoombini2::kConfigUseFloatingPointPaths, false);
 }
 
 GUI::OptionsContainerWidget *Zoombini2MetaEngine::buildEngineOptionsWidget(GUI::GuiObject *boss, const Common::String &name,

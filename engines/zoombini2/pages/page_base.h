@@ -22,6 +22,7 @@
 #ifndef ZOOMBINI2_PAGES_PAGE_BASE_H
 #define ZOOMBINI2_PAGES_PAGE_BASE_H
 
+#include "common/events.h"
 #include "common/rect.h"
 #include "common/scummsys.h"
 
@@ -30,56 +31,126 @@
 namespace Zoombini2 {
 
 class Zoombini2Engine;
+class ManagedSurface32;
 
-/** Page ownership categories used by engine and sidebar policy. */
+/** Page ownership categories used by engine and three-button policy. */
 enum class PageCategory {
-	kNone00 = 0,        ///< No page category.
-	kInteractive01 = 1, ///< Player-controlled map, shelter, menu, or puzzle.
-	kTransition02 = 2,  ///< Timed travel, title, video, or credits page.
-	kDialog03 = 3       ///< Modal overlay retaining its underlying page.
+	/** Player-controlled map, shelter, menu, or puzzle. */
+	kInteractive = 1,
+	/** Timed travel, title, video, or credits page. */
+	kTransition = 2,
+	/** Modal overlay retaining its underlying page. */
+	kDialog = 3,
+};
+
+/** Result returned by an input handler after it processes one event. */
+enum class EventHandleResult {
+	/** This handler did not claim the event. */
+	kPassthrough,
+	/** This handler claimed the event. */
+	kConsumed,
+};
+
+/** Common ordered input dispatch for pages and their shared controls. */
+class PageEventHandler {
+public:
+	virtual ~PageEventHandler() {}
+	/** Dispatch one backend event to its typed callback. */
+	EventHandleResult handleEvent(const Common::Event &event);
+	/** Handle a left-button press. */
+	virtual EventHandleResult onLButtonDown(const Common::Point &pos) {
+		(void)pos;
+		return EventHandleResult::kPassthrough;
+	}
+	/** Handle a left-button release. */
+	virtual EventHandleResult onLButtonUp(const Common::Point &pos) {
+		(void)pos;
+		return EventHandleResult::kPassthrough;
+	}
+	/** Handle a pointer movement in game coordinates. */
+	virtual EventHandleResult onMouseMove(const Common::Point &pos) {
+		(void)pos;
+		return EventHandleResult::kPassthrough;
+	}
+	/** Handle a key press with its backend repeat flag. */
+	virtual EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) {
+		(void)key;
+		(void)repeat;
+		return EventHandleResult::kPassthrough;
+	}
+	/** Handle a key release. */
+	virtual EventHandleResult onKeyUp(const Common::KeyState &key) {
+		(void)key;
+		return EventHandleResult::kPassthrough;
+	}
 };
 
 /**
- * Owns one dispatched screen and its update, drawing, and input lifecycle.
- * Modal dialogs retain the underlying page and have a separate lifetime.
+ * Owns one screen-facing update, drawing, and input lifecycle.
+ * The engine dispatches one regular page at a time. Modal dialogs derive from
+ * this base but remain separately owned by the three-button controls while retaining the
+ * underlying dispatched page.
  */
-class ZoombiniPage {
+class PageBase : public PageEventHandler {
 public:
-	/** Bind this page to its owning @p engine. */
-	ZoombiniPage(Zoombini2Engine *engine);
+	/** Bind this page to its owning @p vm and record its @p pageCategory. */
+	PageBase(Zoombini2Engine *vm, PageCategory pageCategory);
 	/** Release resources owned by the concrete page. */
-	virtual ~ZoombiniPage();
+	virtual ~PageBase();
+
+	/** Advance page state when permitted, then execute the complete render pass. */
+	void onFrame(ManagedSurface32 *screen, bool advanceState);
+	/** Recompose the selected visuals without advancing simulation or completion callbacks. */
+	void render(ManagedSurface32 *screen);
 
 	/** Initialize page-local state and resources. */
 	virtual void init() = 0;
-	/** Advance page-local timers, animation, and transitions. */
-	virtual void update() = 0;
-	/** Draw the page into @p screen. */
-	virtual void draw(Graphics::ManagedSurface *screen) = 0;
-	/** Handle a game-space click at @p pos. */
-	virtual void handleClick(const Common::Point &pos) {}
-
-	/** Return whether the engine must clear the screen before @ref ZoombiniPage::draw. */
+	/** Return whether the engine must clear the screen before @ref Page::render. */
 	virtual bool needsScreenClear() const { return false; }
+	/** Return whether a panel belonging to this page exclusively handles its input. */
+	virtual bool hasActiveDialog() const { return false; }
 
 	/** Return the numeric dispatcher identifier assigned by the concrete page. */
 	int getPageId() const { return _pageId; }
-	/** Return the ownership category used by engine and sidebar policy. */
-	virtual PageCategory getCategory() const = 0;
-	/** Return whether the global sidebar is visible over this page. */
-	virtual bool hasSidebar() const { return false; }
-	/** Return whether the sidebar includes a Go button for this page. */
-	virtual bool hasGoButton() const { return hasSidebar(); }
+	/** Return the ownership category recorded when this page was constructed. */
+	PageCategory getCategory() const { return _pageCategory; }
+	/** Return whether the shared three-button controls are visible over this page. */
+	virtual bool hasThreeButtons() const { return false; }
+	/** Return whether the three-button group includes a Go button for this page. */
+	virtual bool hasGoButton() const { return hasThreeButtons(); }
 	/** Return whether the visible Go button currently accepts input. */
 	virtual bool canUseGoButton() const { return hasGoButton(); }
 	/** Return whether this page owns a shelter flow. */
 	virtual bool isShelter() const { return false; }
+	/** Apply any page-local state required by the global debug-completion hotkey. */
+	virtual void applyDebugPuzzleCompletion() {}
 
 protected:
-	/** Borrowed engine that owns this page. */
-	Zoombini2Engine *_engine;
+	/** Advance this page's simulation before rendering. */
+	virtual void onUpdate() {}
+	/** Restore or draw this page's background pixels. */
+	virtual void onRenderBackground(ManagedSurface32 *screen) { (void)screen; }
+	/** Draw this page's scene elements behind its actors. */
+	virtual void onRenderScene(ManagedSurface32 *screen) = 0;
+	/** Draw actors at the page's actor boundary. */
+	virtual void onRenderActors(ManagedSurface32 *screen) { (void)screen; }
+	/** Advance actor completion work after drawing, before foreground composition, on an active frame only. */
+	virtual void onActorsRendered() {}
+	/** Draw this page's elements that cover its actors. */
+	virtual void onRenderForeground(ManagedSurface32 *screen) { (void)screen; }
+	/** Complete work after composition on an active frame only. */
+	virtual void onPostRender() {}
+
+	/** Reference to the engine interface. */
+	Zoombini2Engine *_vm;
+	/** Category assigned to this page for lifecycle and UI policy. */
+	PageCategory _pageCategory;
 	/** Numeric dispatcher identifier for this page. */
 	int _pageId;
+
+private:
+	/** Run visual hooks and, when requested, the two completion boundaries. */
+	void renderFrame(ManagedSurface32 *screen, bool advanceState);
 };
 
 } // End of namespace Zoombini2

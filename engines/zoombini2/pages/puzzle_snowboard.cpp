@@ -31,26 +31,26 @@
 namespace Zoombini2 {
 
 // ============================================================================
-// SnowboardPuzzle - binary decision tree classifier.
+// PuzzleSnowboard - binary decision tree classifier.
 //
 // Core algorithm:
-//   - Tree nodes stored in array, each with: featureIdx, matchVal1, matchVal2
+//   - Tree nodes stored in array, each with: traitIndex, matchVal1, matchVal2
 //   - A match selects the left child; a nonmatch selects the right child.
 //   - The leaf index selects the destination snowboard lane.
-//   - Difficulty 3 accepts matchVal1 OR matchVal2
+//   - Level 3 accepts matchVal1 OR matchVal2
 // ============================================================================
 
-// Number of lanes indexed by difficulty, with index zero unused.
-static const int kLanesByDifficulty[] = {0, 2, 4, 4}; // diff 0(unused), 1, 2, 3
+// Number of lanes indexed by level, with index zero unused.
+static const int kLanesByLevel[] = {0, 2, 4, 4}; // level 0(unused), 1, 2, 3
 
-SnowboardPuzzle::SnowboardPuzzle(Zoombini2Engine *engine)
-	: PuzzlePage(engine, kPageSnowboard), _treeDepth(0), _numLanes(0),
-	  _boardGfx(nullptr), _boardAnim(nullptr), _engineAnim(nullptr),
+PuzzleSnowboard::PuzzleSnowboard(Zoombini2Engine *vm)
+	: PuzzleBase(vm, kPageSnowboard), _treeDepth(0), _numLanes(0),
+	  _boardBitmap(nullptr), _boardAnim(nullptr), _engineAnim(nullptr),
 	  _currentZoombini(0), _animFrame(0), _lastFrameTime(0),
 	  _state(kStateInit), _musicId(-1) {
 
-	for (int f = 0; f < 4; f++) {
-		for (int v = 0; v < 5; v++) {
+	for (int f = 0; f < ZmbTrait::kTraitCount; f++) {
+		for (int v = 0; v < ZmbTrait::kTraitValueCount; v++) {
 			_traitIcons[f][v] = nullptr;
 		}
 	}
@@ -59,18 +59,18 @@ SnowboardPuzzle::SnowboardPuzzle(Zoombini2Engine *engine)
 	}
 }
 
-SnowboardPuzzle::~SnowboardPuzzle() {
+PuzzleSnowboard::~PuzzleSnowboard() {
 	if (_musicId >= 0) {
-		SoundManager *snd = _engine->getSoundManager();
+		SoundManager *snd = _vm->getSoundManager();
 		snd->stop(_musicId);
 		snd->unload(_musicId);
 	}
-	for (int f = 0; f < 4; f++) {
-		for (int v = 0; v < 5; v++) {
+	for (int f = 0; f < ZmbTrait::kTraitCount; f++) {
+		for (int v = 0; v < ZmbTrait::kTraitValueCount; v++) {
 			delete _traitIcons[f][v];
 		}
 	}
-	delete _boardGfx;
+	delete _boardBitmap;
 	delete _boardAnim;
 	delete _engineAnim;
 	for (int i = 0; i < 5; i++) {
@@ -78,22 +78,22 @@ SnowboardPuzzle::~SnowboardPuzzle() {
 	}
 }
 
-void SnowboardPuzzle::init() {
+void PuzzleSnowboard::init() {
 	// Call base init for background and zoombini loading
-	PuzzlePage::init();
+	PuzzleBase::init();
 
 	// Start the Snowboard Gulch music.
-	if (SoundManager *snd = _engine->getSoundManager()) {
-		_musicId = snd->load(true, Common::Path("sounds/music/01-BS06.wav"), true);
+	if (SoundManager *snd = _vm->getSoundManager()) {
+		_musicId = snd->load(true, Common::Path("#sounds/music/01-BS06.wav"), true);
 		if (_musicId >= 0) {
 			snd->playLoop(_musicId);
 			snd->setVolume(_musicId, snd->_volumeMusic);
 		}
 	}
 
-	int diff = CLIP(_engine->getGameState()->_gameMode, 1, 3);
-	debug(1, "SnowboardPuzzle::init - difficulty %d", diff);
-	_numLanes = kLanesByDifficulty[diff];
+	int level = CLIP(_vm->getGameState()->_level, 1, 3);
+	debug(1, "PuzzleSnowboard::init - level %d", level);
+	_numLanes = kLanesByLevel[level];
 	_treeDepth = _numLanes - 1; // Binary tree: depth = numLeaves - 1
 
 	// Load trait icons
@@ -107,17 +107,17 @@ void SnowboardPuzzle::init() {
 
 	_currentZoombini = 0;
 	_state = kStateSliding;
-	_stateTimer = _engine->getGameTickCount();
+	_stateTimer = _vm->getGameTickCount();
 }
 
-void SnowboardPuzzle::loadLaneGraphics() {
-	// Load trait icons: bmp/snowboard/traits/{feature}-{value}.rb
-	for (int f = 0; f < 4; f++) {
-		for (int v = 0; v < 5; v++) {
+void PuzzleSnowboard::loadLaneGraphics() {
+	// Load trait icons: bmp/snowboard/traits/{trait}-{value}.rb
+	for (int f = 0; f < ZmbTrait::kTraitCount; f++) {
+		for (int v = 0; v < ZmbTrait::kTraitValueCount; v++) {
 			Common::Path path(Common::String::format("bmp/snowboard/traits/%d-%d", f + 1, v + 1));
 			_traitIcons[f][v] = new RleBlock();
 			if (!_traitIcons[f][v]->loadFromFile(path)) {
-				debug(1, "SnowboardPuzzle: Failed to load trait %d-%d", f + 1, v + 1);
+				debug(1, "PuzzleSnowboard: Failed to load trait %d-%d", f + 1, v + 1);
 				delete _traitIcons[f][v];
 				_traitIcons[f][v] = nullptr;
 			}
@@ -126,17 +126,17 @@ void SnowboardPuzzle::loadLaneGraphics() {
 
 	// Load board graphics
 	Common::Path boardPath("bmp/snowboard/board01");
-	_boardGfx = new BitBlock();
-	if (!_boardGfx->load(boardPath)) {
-		delete _boardGfx;
-		_boardGfx = nullptr;
+	_boardBitmap = new BitBlock();
+	if (!_boardBitmap->load(boardPath)) {
+		delete _boardBitmap;
+		_boardBitmap = nullptr;
 	}
 
 	// Load board animation (BOARD.AN)
 	Common::Path boardAnimPath("bmp/snowboard/BOARD");
 	_boardAnim = new Animation();
 	if (!_boardAnim->loadFromFile(boardAnimPath)) {
-		debug(1, "SnowboardPuzzle: Failed to load BOARD.AN");
+		debug(1, "PuzzleSnowboard: Failed to load BOARD.AN");
 		delete _boardAnim;
 		_boardAnim = nullptr;
 	}
@@ -145,7 +145,7 @@ void SnowboardPuzzle::loadLaneGraphics() {
 	Common::Path engineAnimPath("bmp/snowboard/ENGINE");
 	_engineAnim = new Animation();
 	if (!_engineAnim->loadFromFile(engineAnimPath)) {
-		debug(1, "SnowboardPuzzle: Failed to load ENGINE.AN");
+		debug(1, "PuzzleSnowboard: Failed to load ENGINE.AN");
 		delete _engineAnim;
 		_engineAnim = nullptr;
 	}
@@ -157,47 +157,47 @@ void SnowboardPuzzle::loadLaneGraphics() {
 		Common::Path decorPath(Common::String::format("bmp/snowboard/N1So-%d", decorNumbers[i]));
 		_decorAnims[i] = new Animation();
 		if (!_decorAnims[i]->loadFromFile(decorPath)) {
-			debug(2, "SnowboardPuzzle: Failed to load N1So-%d", decorNumbers[i]);
+			debug(2, "PuzzleSnowboard: Failed to load N1So-%d", decorNumbers[i]);
 			delete _decorAnims[i];
 			_decorAnims[i] = nullptr;
 		}
 	}
 }
 
-void SnowboardPuzzle::generateTree() {
-	// Generate a binary decision tree for the current difficulty.
+void PuzzleSnowboard::generateTree() {
+	// Generate a binary decision tree for the current level.
 	// Tree structure: internal nodes at indices 0 to (depth-1),
 	// leaves at indices depth to (2*depth).
 	//
-	// The current implementation selects features intended to distribute the roster evenly.
+	// The current implementation selects traits intended to distribute the roster evenly.
 
 	_tree.clear();
 	_tree.resize(_treeDepth);
 
 	Common::RandomSource rnd("snowboard");
 
-	// For each internal node, pick a random feature and a random match value
+	// For each internal node, pick a random trait and a random match value.
 	for (int i = 0; i < _treeDepth; i++) {
 		TreeNode &node = _tree[i];
-		node.featureIdx = rnd.getRandomNumber(3); // 0-3 = hair, eyes, nose, feet
-		node.matchVal1 = rnd.getRandomNumber(4);  // 0-4 = feature variants
-		node.matchVal2 = rnd.getRandomNumber(4);  // For difficulty 3
+		node.traitIndex = static_cast<ZmbTrait::TraitIndex>(rnd.getRandomNumber(ZmbTrait::kTraitCount - 1));
+		node.matchVal1 = rnd.getRandomNumber(ZmbTrait::kTraitValueCount - 1);  // 0-4 = trait variants
+		node.matchVal2 = rnd.getRandomNumber(ZmbTrait::kTraitValueCount - 1);  // For level 3
 	}
 
-	debug(2, "SnowboardPuzzle: Generated tree with %d internal nodes", _treeDepth);
+	debug(2, "PuzzleSnowboard: Generated tree with %d internal nodes", _treeDepth);
 	for (int i = 0; i < _treeDepth; i++) {
-		debug(2, "  Node %d: feature=%d match1=%d match2=%d",
-			  i, _tree[i].featureIdx, _tree[i].matchVal1, _tree[i].matchVal2);
+		debug(2, "  Node %d: trait=%d match1=%d match2=%d",
+			  i, static_cast<int>(_tree[i].traitIndex), _tree[i].matchVal1, _tree[i].matchVal2);
 	}
 }
 
-int SnowboardPuzzle::classifyZoombini(const ZoombiniState *z) const {
+int PuzzleSnowboard::classifyZoombini(const ZoombiniState *z) const {
 	// Traverse the binary decision tree to determine the destination lane.
 	// Algorithm:
 	//   v = 0 (root)
 	//   while v < depth:
 	//     node = tree[v]
-	//     zoombiniVal = z->feature[node.featureIdx]
+	//     zoombiniVal = z->traits[node.traitIndex]
 	//     if match: v = 2*v + 1 (left child)
 	//     else: v = 2*v + 2 (right child)
 	//   lane = v - depth
@@ -206,21 +206,18 @@ int SnowboardPuzzle::classifyZoombini(const ZoombiniState *z) const {
 		return 0;
 
 	int v = 0;
-	int diff = _engine->getGameState()->_gameMode;
-
-	// Get zoombini features
-	const byte features[4] = {z->_featureA, z->_featureB, z->_featureC, z->_featureD};
+	int level = _vm->getGameState()->_level;
 
 	while (v < _treeDepth) {
 		const TreeNode &node = _tree[v];
-		byte zoombiniVal = features[node.featureIdx];
+		const byte zoombiniVal = z->_traits.getValue(node.traitIndex);
 
 		bool match;
-		if (diff >= 3) {
-			// Difficulty 3: match either value
+		if (level >= 3) {
+			// Level 3: match either value
 			match = (zoombiniVal == node.matchVal1 || zoombiniVal == node.matchVal2);
 		} else {
-			// Difficulty 1-2: single value match
+			// Levels 1-2: single value match
 			match = (zoombiniVal == node.matchVal1);
 		}
 
@@ -235,7 +232,7 @@ int SnowboardPuzzle::classifyZoombini(const ZoombiniState *z) const {
 	return CLIP(lane, 0, _numLanes - 1);
 }
 
-void SnowboardPuzzle::assignZoombinisToLanes() {
+void PuzzleSnowboard::assignZoombinisToLanes() {
 	_laneAssignments.clear();
 	_laneAssignments.resize(_puzzleZoombinis.size());
 
@@ -245,8 +242,8 @@ void SnowboardPuzzle::assignZoombinisToLanes() {
 	}
 }
 
-void SnowboardPuzzle::update() {
-	uint32 now = _engine->getGameTickCount();
+void PuzzleSnowboard::onUpdate() {
+	uint32 now = _vm->getGameTickCount();
 	uint32 elapsed = now - _stateTimer;
 
 	switch (_state) {
@@ -262,7 +259,7 @@ void SnowboardPuzzle::update() {
 
 			if (_currentZoombini >= (int)_puzzleZoombinis.size()) {
 				_state = kStateDone;
-				debug(1, "SnowboardPuzzle: All zoombinis assigned");
+				debug(1, "PuzzleSnowboard: All zoombinis assigned");
 			}
 		}
 		break;
@@ -270,26 +267,28 @@ void SnowboardPuzzle::update() {
 	case kStateDone:
 		// Wait 2 seconds then exit
 		if (elapsed > 2000) {
-			debug(1, "SnowboardPuzzle: Complete, returning to map");
-			_engine->_returningFromPuzzle = true;
-			_engine->_maptransSourceWorld = kPageSnowboard;
-			_engine->requestPageChange(kPageMapTrans);
+			debug(1, "PuzzleSnowboard: Complete, returning to map");
+			_vm->_returningFromPuzzle = true;
+			_vm->_mapTransitionSourcePageId = kPageSnowboard;
+			_vm->requestPageChange(kPageMapTrans);
 		}
 		break;
 	}
 }
 
-void SnowboardPuzzle::draw(Graphics::ManagedSurface *screen) {
-	// Draw background
+void PuzzleSnowboard::onRenderBackground(ManagedSurface32 *screen) {
 	if (_background)
-		_background->drawToSurface(screen, 0, 0);
+		_background->drawToSurface(screen, Common::Point32(0, 0));
+}
 
-	const byte(*lut)[256] = _engine->getAlphaLUT();
-	uint32 now = _engine->getGameTickCount();
+void PuzzleSnowboard::onRenderScene(ManagedSurface32 *screen) {
+
+	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
+	uint32 now = _vm->getGameTickCount();
 
 	// Draw decorative/scenery animations (positioned across the scene)
 	// These add visual polish with animated background elements
-	static const Common::Point32 decorPositions[5] = {
+	static const Common::Point32 decorPos[5] = {
 		Common::Point32(50, 350),  // N1So-1 - bottom left
 		Common::Point32(450, 100), // N1So-3 - top right
 		Common::Point32(600, 200), // N1So-4 - right side
@@ -305,13 +304,13 @@ void SnowboardPuzzle::draw(Graphics::ManagedSurface *screen) {
 				int frameIdx = (now / timings[i]) % frameCount;
 				const RleBlock *frame = _decorAnims[i]->getFrame(frameIdx);
 				if (frame)
-					frame->drawToScreen(screen, decorPositions[i].x, decorPositions[i].y, lut);
+					frame->drawToScreen(screen, decorPos[i], lut);
 			}
 		}
 	}
 
 	// Draw board animation or static sprite
-	static const Common::Point32 kBoardPosition(150, 100);
+	static const Common::Point32 kBoardPos(150, 100);
 	if (_boardAnim) {
 		// Cycle through board animation frames
 		int frameCount = _boardAnim->getFrameCount();
@@ -319,44 +318,49 @@ void SnowboardPuzzle::draw(Graphics::ManagedSurface *screen) {
 			int frameIdx = (now / 100) % frameCount; // ~10 fps animation
 			const RleBlock *frame = _boardAnim->getFrame(frameIdx);
 			if (frame)
-				frame->drawToScreen(screen, kBoardPosition.x, kBoardPosition.y, lut);
+				frame->drawToScreen(screen, kBoardPos, lut);
 		}
-	} else if (_boardGfx) {
+	} else if (_boardBitmap) {
 		// Fallback to static board sprite
-		_boardGfx->drawToSurface(screen, kBoardPosition.x, kBoardPosition.y);
+		_boardBitmap->drawToSurface(screen, kBoardPos);
 	}
 
 	// Draw engine animation (lift mechanism)
-	static const Common::Point32 kEnginePosition(50, 400);
+	static const Common::Point32 kEnginePos(50, 400);
 	if (_engineAnim) {
 		int frameCount = _engineAnim->getFrameCount();
 		if (frameCount > 0) {
 			int frameIdx = (now / 100) % frameCount;
 			const RleBlock *frame = _engineAnim->getFrame(frameIdx);
 			if (frame)
-				frame->drawToScreen(screen, kEnginePosition.x, kEnginePosition.y, lut);
+				frame->drawToScreen(screen, kEnginePos, lut);
 		}
 	}
 
 	// Draw decision tree visualization
-	// Show which features are being checked at each level
-	static const Common::Point32 kTreePosition(50, 50);
+	// Show which traits are being checked at each level.
+	static const Common::Point32 kTreePos(50, 50);
 
 	for (int i = 0; i < _treeDepth; i++) {
 		const TreeNode &node = _tree[i];
+		const int traitIndex = static_cast<int>(node.traitIndex);
 		// Draw the trait icon for this node's match value
-		if (_traitIcons[node.featureIdx][node.matchVal1]) {
-			_traitIcons[node.featureIdx][node.matchVal1]->drawToScreen(
-				screen, kTreePosition.x + i * 60, kTreePosition.y, lut);
+		if (_traitIcons[traitIndex][node.matchVal1]) {
+			_traitIcons[traitIndex][node.matchVal1]->drawToScreen(
+				screen, Common::Point32(kTreePos.x + i * 60, kTreePos.y), lut);
 		}
 	}
 
+}
+
+void PuzzleSnowboard::onRenderActors(ManagedSurface32 *screen) {
+	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	// Draw lane indicators
 	int laneSpacing = 150;
-	const Common::Point32 laneStartPosition((800 - (_numLanes - 1) * laneSpacing) / 2, 400);
+	const Common::Point32 laneStartPos((800 - (_numLanes - 1) * laneSpacing) / 2, 400);
 
 	for (int lane = 0; lane < _numLanes; lane++) {
-		const Common::Point32 lanePosition(laneStartPosition.x + lane * laneSpacing, laneStartPosition.y);
+		const Common::Point32 lanePos(laneStartPos.x + lane * laneSpacing, laneStartPos.y);
 
 		// Count zoombinis in this lane
 		int count = 0;
@@ -366,7 +370,7 @@ void SnowboardPuzzle::draw(Graphics::ManagedSurface *screen) {
 		}
 
 		// Draw zoombinis in this lane
-		if (_zoombiniGfx) {
+		if (_zoombiniAnimation) {
 			for (int z = 0; z < count && z < 4; z++) {
 				// Find the z-th zoombini assigned to this lane
 				int zoombiniIdx = -1;
@@ -383,21 +387,9 @@ void SnowboardPuzzle::draw(Graphics::ManagedSurface *screen) {
 
 				if (zoombiniIdx >= 0 && zoombiniIdx < (int)_puzzleZoombinis.size()) {
 					const ZoombiniState *zb = _puzzleZoombinis[zoombiniIdx];
-					const Common::Point32 position(lanePosition.x + (z % 2) * 25, lanePosition.y + (z / 2) * 30);
+					const Common::Point32 pos(lanePos.x + (z % 2) * 25, lanePos.y + (z / 2) * 30);
 
-					// Draw body
-					const RleBlock *frame = _zoombiniGfx->getFrame(0, 0);
-					if (frame)
-						frame->drawToScreen(screen, position.x, position.y, lut);
-
-					// Draw features
-					const byte features[4] = {zb->_featureA, zb->_featureB, zb->_featureC, zb->_featureD};
-					for (int slot = 1; slot <= 4; slot++) {
-						int featIdx = slot * ZoombiniGraphics::kDim2 + features[slot - 1];
-						frame = _zoombiniGfx->getFrame(featIdx, 0);
-						if (frame)
-							frame->drawToScreen(screen, position.x, position.y, lut);
-					}
+					_zoombiniAnimation->drawZoombini(screen, zb->_traits, pos, 0, 0, lut);
 				}
 			}
 		}
@@ -406,50 +398,44 @@ void SnowboardPuzzle::draw(Graphics::ManagedSurface *screen) {
 	// Draw current zoombini being processed
 	if (_state == kStateSliding && _currentZoombini < (int)_puzzleZoombinis.size()) {
 		const ZoombiniState *z = _puzzleZoombinis[_currentZoombini];
-		static const Common::Point32 kCurrentZoombiniPosition(400, 200);
+		static const Common::Point32 kCurrentZoombiniPos(400, 200);
 
-		if (_zoombiniGfx) {
-			const RleBlock *frame = _zoombiniGfx->getFrame(0, 0);
-			if (frame)
-				frame->drawToScreen(screen, kCurrentZoombiniPosition.x, kCurrentZoombiniPosition.y, lut);
-
-			const byte features[4] = {z->_featureA, z->_featureB, z->_featureC, z->_featureD};
-			for (int slot = 1; slot <= 4; slot++) {
-				int featIdx = slot * ZoombiniGraphics::kDim2 + features[slot - 1];
-				frame = _zoombiniGfx->getFrame(featIdx, 0);
-				if (frame)
-					frame->drawToScreen(screen, kCurrentZoombiniPosition.x, kCurrentZoombiniPosition.y, lut);
-			}
+		if (_zoombiniAnimation) {
+			_zoombiniAnimation->drawZoombini(screen, z->_traits, kCurrentZoombiniPos, 0, 0, lut);
 		}
 	}
 }
 
-void SnowboardPuzzle::handleClick(const Common::Point &pos) {
+EventHandleResult PuzzleSnowboard::onLButtonDown(const Common::Point &pos) {
 	// Click to advance faster
 	if (_state == kStateSliding) {
 		_currentZoombini++;
-		_stateTimer = _engine->getGameTickCount();
+		_stateTimer = _vm->getGameTickCount();
 
 		if (_currentZoombini >= (int)_puzzleZoombinis.size()) {
 			_state = kStateDone;
 		}
+		return EventHandleResult::kConsumed;
 	} else if (_state == kStateDone) {
 		// Skip wait and exit
-		_engine->_returningFromPuzzle = true;
-		_engine->_maptransSourceWorld = kPageSnowboard;
-		_engine->requestPageChange(kPageMapTrans);
+		_vm->_returningFromPuzzle = true;
+		_vm->_mapTransitionSourcePageId = kPageSnowboard;
+		_vm->requestPageChange(kPageMapTrans);
+		return EventHandleResult::kConsumed;
 	}
+	return EventHandleResult::kPassthrough;
 }
 
-void SnowboardPuzzle::drawTraitIcon(Graphics::ManagedSurface *screen,
-									int feature, int value, const Common::Point32 &position) {
-	if (feature < 0 || feature > 3 || value < 0 || value > 4)
+void PuzzleSnowboard::drawTraitIcon(ManagedSurface32 *screen,
+									ZmbTrait::TraitIndex traitIndex, int value, const Common::Point32 &pos) {
+	const int traitOrdinal = static_cast<int>(traitIndex);
+	if (traitOrdinal < 0 || ZmbTrait::kTraitCount <= traitOrdinal || value < 0 || ZmbTrait::kTraitValueCount <= value)
 		return;
 
-	RleBlock *icon = _traitIcons[feature][value];
+	RleBlock *icon = _traitIcons[traitOrdinal][value];
 	if (icon) {
-		const byte(*lut)[256] = _engine->getAlphaLUT();
-		icon->drawToScreen(screen, position.x, position.y, lut);
+		const AlphaBlendLUT &lut = _vm->getAlphaLUT();
+		icon->drawToScreen(screen, pos, lut);
 	}
 }
 

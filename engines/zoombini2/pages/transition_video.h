@@ -37,36 +37,39 @@ namespace Zoombini2 {
  * Play a centered Bink video and transition to the next page.
  * Video audio follows the music mixer volume.
  */
-class VideoPage : public TransitionPage {
+class TransitionVideo : public TransitionBase {
 public:
 	/** Configure the video resource and the page dispatched after playback. */
-	VideoPage(Zoombini2Engine *engine, const Common::Path &videoPath, int nextPageId);
+	TransitionVideo(Zoombini2Engine *vm, const Common::Path &videoPath, int nextPageId);
 	/** Stop and release the decoder and retained frame. */
-	~VideoPage() override;
+	~TransitionVideo() override;
 
 	/** Open the video, select its audio volume, and begin playback. */
 	void init() override;
 	/** Decode due frames and request the next page after playback. */
-	void update() override;
+	void onUpdate() override;
 	/** Draw the most recently decoded frame at its centered position. */
-	void draw(Graphics::ManagedSurface *screen) override;
+	void onRenderScene(ManagedSurface32 *screen) override;
+	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
 
 	/** Request a black screen behind the centered video frame. */
 	bool needsScreenClear() const override { return true; }
 
 private:
-	/** SearchMan-relative video path. */
+	EventHandleResult skip();
+	/** Original logical video resource name. */
 	Common::Path _videoPath;
 	/** Page requested when playback finishes or fails to start. */
 	int _nextPageId;
-	/** Owned video decoder. */
+	/** Bink Video decoder. */
 	Video::VideoDecoder *_decoder;
 	/** Whether decoder playback started successfully. */
 	bool _started;
-	/** Owned copy of the most recently decoded frame. */
+	/** Retain the most recently decoded frame. */
 	Graphics::ManagedSurface *_lastFrame;
-	/** Signed screen coordinate used to center @ref VideoPage::_lastFrame. */
-	Common::Point32 _framePosition;
+	/** Signed screen coordinate used to center @ref TransitionVideo::_lastFrame. */
+	Common::Point32 _framePos;
 };
 
 } // End of namespace Zoombini2
