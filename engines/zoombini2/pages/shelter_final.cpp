@@ -23,6 +23,7 @@
 #include "common/str.h"
 
 #include "zoombini2/graphics.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/pages/shelter_final.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
@@ -42,23 +43,8 @@ const Common::Point32 ShelterFinal::kDecorativeZoombiniPos[kDecorativeZoombiniCo
 const int ShelterFinal::kDecorativeZoombiniCells[kDecorativeZoombiniCount] = {77, 99};
 
 ShelterFinal::ShelterFinal(Zoombini2Engine *vm)
-	: ShelterBase(vm), _background(nullptr), _fullBigBool(nullptr), _revealBigBool(nullptr), _dancingBoolie(nullptr), _boolDance(nullptr),
-	  _revealFlare1(nullptr), _revealFlare2(nullptr), _zoombiniAnimation(nullptr), _walkingZoombiniAnimation(nullptr), _animationStartTime(0),
-	  _openingSpeechFinished(false),
-	  _closingSpeechTime(0), _revealStarted(false), _revealCellReady(false), _revealRow(0), _revealColumn(0), _musicId(-1),
-	  _openingSpeechId(-1), _closingSpeechId(-1), _nextAmbientTime(0) {
+	: ShelterBase(vm) {
 	_pageId = kPageFinal;
-	for (int i = 0; i < kFireworkCount; i++) {
-		_fireworks[i].animation = nullptr;
-		_fireworks[i].collisionRect = Common::Rect(1000, 1000, 1001, 1001);
-		_fireworks[i].startPos = Common::Point32();
-		_fireworks[i].timeStep = 0;
-		_fireworks[i].frame = 0;
-		_fireworks[i].nextFrameTime = 0;
-		_fireworks[i].active = true;
-	}
-	for (int i = 0; i < kAmbientSoundCount; i++)
-		_ambientSoundIds[i] = -1;
 }
 
 ShelterFinal::~ShelterFinal() {
@@ -99,40 +85,40 @@ void ShelterFinal::init() {
 	debug(1, "BooliewoodFinalPage::init");
 	_vm->clearGlobalZoombinis();
 
-	_background = new BitBlock();
+	_background = new BitBlock(_vm);
 	if (!_background->load(Common::Path("bmp/final/big BOOL"))) {
 		warning("BooliewoodFinalPage: Failed to load big BOOL background");
 		delete _background;
 		_background = nullptr;
 	}
-	_fullBigBool = new BitBlock();
+	_fullBigBool = new BitBlock(_vm);
 	if (!_fullBigBool->load(Common::Path("bmp/final/thefullbigbool"))) {
 		warning("BooliewoodFinalPage: Failed to load thefullbigbool overlay");
 		delete _fullBigBool;
 		_fullBigBool = nullptr;
 	}
-	_revealBigBool = new RleBlock();
+	_revealBigBool = new RleBlock(_vm);
 	if (!_revealBigBool->loadFromFile(Common::Path("bmp/final/therealbigbool.rb"))) {
 		delete _revealBigBool;
 		_revealBigBool = nullptr;
 	}
 
-	_dancingBoolie = new Animation();
+	_dancingBoolie = new Animation(_vm);
 	if (!_dancingBoolie->loadFromFile(Common::Path("bmp/final/dancing_boolie.an"))) {
 		delete _dancingBoolie;
 		_dancingBoolie = nullptr;
 	}
-	_boolDance = new Animation();
+	_boolDance = new Animation(_vm);
 	if (!_boolDance->loadFromFile(Common::Path("bmp/final/booldance.an"))) {
 		delete _boolDance;
 		_boolDance = nullptr;
 	}
-	_revealFlare1 = new Animation();
+	_revealFlare1 = new Animation(_vm);
 	if (!_revealFlare1->loadFromFile(Common::Path("bmp/aquacube/flare1.an"))) {
 		delete _revealFlare1;
 		_revealFlare1 = nullptr;
 	}
-	_revealFlare2 = new Animation();
+	_revealFlare2 = new Animation(_vm);
 	if (!_revealFlare2->loadFromFile(Common::Path("bmp/aquacube/flare2.an"))) {
 		delete _revealFlare2;
 		_revealFlare2 = nullptr;
@@ -146,7 +132,7 @@ void ShelterFinal::init() {
 	const uint32 now = _vm->getGameTickCount();
 	for (int i = 0; i < kFireworkCount; i++) {
 		FireworkState &firework = _fireworks[i];
-		firework.animation = new Animation();
+		firework.animation = new Animation(_vm);
 		if (!firework.animation->loadFromFile(Common::Path(fireworkPaths[i]))) {
 			delete firework.animation;
 			firework.animation = nullptr;

@@ -86,30 +86,30 @@ private:
 	/** Generated internal decision-tree nodes. */
 	Common::Array<TreeNode> _tree;
 	/** Number of internal nodes, with one more destination leaf than this value. */
-	int _treeDepth;
+	int _treeDepth = 0;
 	/** Number of destination lanes. */
-	int _numLanes;
+	int _numLanes = 0;
 
 	/** Destination lane indexed by puzzle-roster entry. */
 	Common::Array<int> _laneAssignments;
 
 	/** Trait-value hint visuals. */
-	RleBlock *_traitIcons[ZmbTrait::kTraitCount][ZmbTrait::kTraitValueCount];
+	RleBlock *_traitIcons[ZmbTrait::kTraitCount][ZmbTrait::kTraitValueCount] = {};
 	/** Static board visual. */
-	BitBlock *_boardBitmap;
+	BitBlock *_boardBitmap = nullptr;
 	/** Animated board sequence. */
-	Animation *_boardAnim;
+	Animation *_boardAnim = nullptr;
 	/** Lift engine animation. */
-	Animation *_engineAnim;
+	Animation *_engineAnim = nullptr;
 	/** Background scenery animations. */
-	Animation *_decorAnims[5];
+	Animation *_decorAnims[5] = {};
 
 	/** Puzzle-roster index currently sliding. */
-	int _currentZoombini;
+	int _currentZoombini = 0;
 	/** Current frame of the active board animation. */
-	int _animFrame;
+	int _animFrame = 0;
 	/** Time at which the animation last advanced. */
-	uint32 _lastFrameTime;
+	uint32 _lastFrameTime = 0;
 
 	/** Runtime phase of the automatic snowboard sequence. */
 	enum State {
@@ -121,10 +121,10 @@ private:
 		kStateDone
 	};
 	/** Current automatic sequence phase. */
-	State _state;
+	State _state = kStateInit;
 
 	/** Music handle used while Snowboard Gulch is active. */
-	int _musicId;
+	int _musicId = -1;
 };
 
 } // End of namespace Zoombini2

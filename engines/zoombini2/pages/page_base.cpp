@@ -24,7 +24,7 @@
 
 namespace Zoombini2 {
 
-PageBase::PageBase(Zoombini2Engine *vm, PageCategory pageCategory) : _vm(vm), _pageCategory(pageCategory), _pageId(-1) {
+PageBase::PageBase(Zoombini2Engine *vm, PageCategory pageCategory) : _vm(vm), _pageCategory(pageCategory) {
 }
 
 PageBase::~PageBase() {

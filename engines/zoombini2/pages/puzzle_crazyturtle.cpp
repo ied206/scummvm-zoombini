@@ -20,10 +20,10 @@
  */
 
 #include "common/debug.h"
-#include "common/random.h"
 #include "common/util.h"
 
 #include "zoombini2/graphics.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/pages/puzzle_crazyturtle.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
@@ -86,19 +86,7 @@ const Common::Point32 PuzzleCrazyTurtle::kSecondaryIconPos[kRuleSlotCount] = {
 };
 
 PuzzleCrazyTurtle::PuzzleCrazyTurtle(Zoombini2Engine *vm)
-	: PuzzleBase(vm, kPageCrazyTurtle), _level(1), _primaryFeature(0), _secondaryFeature(1), _remainingMistakes(0), _initialMistakes(0),
-	  _motherAnimation(nullptr), _motherSpeechAnimation(nullptr), _smokeAnimation(nullptr), _motherStartImage(nullptr), _motherEndImage(nullptr),
-	  _bridgeImage(nullptr), _collapsedBridgeImage(nullptr), _beamImage(nullptr), _musicId(-1) {
-	memset(_ruleValues, 0, sizeof(_ruleValues));
-	memset(_primaryRuleActive, 0, sizeof(_primaryRuleActive));
-	memset(_secondaryRuleActive, 0, sizeof(_secondaryRuleActive));
-	for (int type = 0; type < kFeatureCount; type++) {
-		_turtleIdleAnimations[type] = nullptr;
-		_turtleSpinAnimations[type] = nullptr;
-		_turtleFixedImages[type] = nullptr;
-		for (int value = 0; value < kFeatureValueCount; value++)
-			_traitImages[type][value] = nullptr;
-	}
+	: PuzzleBase(vm, kPageCrazyTurtle) {
 }
 
 PuzzleCrazyTurtle::~PuzzleCrazyTurtle() {
@@ -125,7 +113,7 @@ PuzzleCrazyTurtle::~PuzzleCrazyTurtle() {
 }
 
 bool PuzzleCrazyTurtle::loadAnimationResource(Animation *&resource, const Common::Path &path) {
-	resource = new Animation();
+	resource = new Animation(_vm);
 	if (resource->loadFromFile(path))
 		return true;
 	warning("CrazyTurtlePuzzle: cannot load animation '%s'", path.toString().c_str());
@@ -135,7 +123,7 @@ bool PuzzleCrazyTurtle::loadAnimationResource(Animation *&resource, const Common
 }
 
 bool PuzzleCrazyTurtle::loadRleResource(RleBlock *&resource, const Common::Path &path) {
-	resource = new RleBlock();
+	resource = new RleBlock(_vm);
 	if (resource->loadFromFile(path))
 		return true;
 	warning("CrazyTurtlePuzzle: cannot load RLE graphic '%s'", path.toString().c_str());
@@ -197,7 +185,7 @@ void PuzzleCrazyTurtle::loadResources() {
 }
 
 void PuzzleCrazyTurtle::generateRules() {
-	Common::RandomSource *randomSrc = _vm->getRandom();
+	Zoombini2Random *randomSrc = _vm->getRandom();
 	_primaryFeature = randomSrc->getRandomNumber(kFeatureCount - 1);
 	int remainingFeatures[kFeatureCount - 1];
 	int remainingCount = 0;
@@ -243,7 +231,7 @@ void PuzzleCrazyTurtle::generateRules() {
 void PuzzleCrazyTurtle::generateFeatureOrder(int group) {
 	int values[kFeatureValueCount] = {1, 2, 3, 4, 5};
 	int remainingCount = kFeatureValueCount;
-	Common::RandomSource *randomSrc = _vm->getRandom();
+	Zoombini2Random *randomSrc = _vm->getRandom();
 	for (int slot = 0; slot < kRuleSlotCount; slot++) {
 		const int selected = randomSrc->getRandomNumber(remainingCount - 1);
 		_ruleValues[group][slot] = values[selected];
@@ -256,7 +244,7 @@ void PuzzleCrazyTurtle::generateFeatureOrder(int group) {
 void PuzzleCrazyTurtle::activateRandomRuleSlots(bool *slots, int count) {
 	int available[kRuleSlotCount] = {0, 1, 2, 3, 4};
 	int availableCount = kRuleSlotCount;
-	Common::RandomSource *randomSrc = _vm->getRandom();
+	Zoombini2Random *randomSrc = _vm->getRandom();
 	for (int selectedCount = 0; selectedCount < count; selectedCount++) {
 		const int selected = randomSrc->getRandomNumber(availableCount - 1);
 		slots[available[selected]] = true;
@@ -279,7 +267,7 @@ void PuzzleCrazyTurtle::placeZoombinis() {
 
 void PuzzleCrazyTurtle::onUpdate() {
 	// The initial puzzle state remains stable until the player chooses a
-	// Zoombini placement or uses the three-button controls to leave the current game.
+	// Zoombini placement or uses the sidebar to leave the current game.
 }
 
 void PuzzleCrazyTurtle::onRenderBackground(ManagedSurface32 *screen) {

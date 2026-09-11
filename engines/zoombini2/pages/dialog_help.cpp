@@ -31,20 +31,7 @@
 namespace Zoombini2 {
 
 DialogHelp::DialogHelp(Zoombini2Engine *vm)
-	: DialogBase(vm), _isActive(false), _currentPuzzleId(-1),
-	  _currentLevel(-1), _currentPage(1), _savedScreen(nullptr),
-	  _helpFrame(nullptr), _placeholder(nullptr),
-	  _okButtonNormal(nullptr), _okButtonPushed(nullptr),
-	  _leftArrowNormal(nullptr), _leftArrowEmpty(nullptr),
-	  _rightArrowNormal(nullptr), _rightArrowEmpty(nullptr),
-	  _helpPage(nullptr), _okButtonHovered(false),
-	  _leftArrowHovered(false), _rightArrowHovered(false),
-	  _pauseStartTime(0) {
-
-	// Initialize the three bottom-panel button hitboxes.
-	_okButtonRect = Common::Rect(597, 400, 671, 444);   // 74x44
-	_leftArrowRect = Common::Rect(135, 400, 181, 444);  // 46x44
-	_rightArrowRect = Common::Rect(209, 400, 253, 444); // 44x44
+	: DialogBase(vm) {
 
 	// Load help screen UI elements
 	_helpFrame = _vm->loadRleBlock("Bmp/MENU/help_screen_main.rb");
