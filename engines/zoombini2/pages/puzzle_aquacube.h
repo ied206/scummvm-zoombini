@@ -99,94 +99,94 @@ private:
 	};
 
 	/** Level in the range one through four. */
-	int _level;
+	int _level = 1;
 
 	/** Number of active vertices in @ref PuzzleAquacube::_nodes. */
-	int _numNodes;
+	int _numNodes = 8;
 	/** Graph storage sized for the largest level. */
 	GraphNode _nodes[16];
 	/** Vertex currently occupied by the ball. */
-	int _ballNode;
+	int _ballNode = 0;
 	/** Destination vertex while the ball is moving. */
-	int _targetNode;
+	int _targetNode = -1;
 
 	/** Current screen position of the moving ball. */
-	Common::Point32 _ballPos;
+	Common::Point32 _ballPos = Common::Point32();
 	/** Ball position at the start of the current move. */
-	Common::Point32 _ballStartPos;
+	Common::Point32 _ballStartPos = Common::Point32();
 	/** Ball position at the end of the current move. */
-	Common::Point32 _ballEndPos;
+	Common::Point32 _ballEndPos = Common::Point32();
 	/** Time at which the current ball movement began. */
-	uint32 _moveStartTime;
+	uint32 _moveStartTime = 0;
 	/** Duration of one graph-edge movement in milliseconds. */
 	static const uint32 kMoveAnimDuration = 680;
 
 	/** Number of Zoombinis placed on the graph for this level. */
-	int _numZoombinisToPlace;
+	int _numZoombinisToPlace = 3;
 	/** Initial movement allowance for this level. */
-	int _totalSteps;
+	int _totalSteps = 6;
 	/** Number of Fleen obstacles placed on the graph. */
-	int _numFleens;
+	int _numFleens = 0;
 	/** Number of ball movements already consumed. */
-	int _stepsUsed;
+	int _stepsUsed = 0;
 	/** Maximum number of ball movements allowed. */
-	int _maxSteps;
+	int _maxSteps = 6;
 
 	/** Offset applied when drawing Zoombinis at graph vertices. */
-	Common::Point32 _zoombiniOffset;
+	Common::Point32 _zoombiniOffset = Common::Point32(-2, 6);
 	/** Offset applied when drawing Fleens at graph vertices. */
-	Common::Point32 _fleenOffset;
+	Common::Point32 _fleenOffset = Common::Point32(10, 6);
 	/** Offset applied when drawing graph-vertex markers. */
-	Common::Point32 _nodeOffset;
+	Common::Point32 _nodeOffset = Common::Point32();
 
 	/** Whether the selected level exposes the warp control. */
-	bool _warpAvailable;
+	bool _warpAvailable = false;
 	/** Whether direction clicks are currently building a warp sequence. */
-	bool _warpActive;
+	bool _warpActive = false;
 	/** Planned sequence of direction indices. */
 	Common::Array<int> _warpQueue;
 	/** Index of the warp movement currently being executed. */
-	int _warpQueueIdx;
+	int _warpQueueIdx = 0;
 
 	/** Direction cursor light. */
-	RleBlock *_lightImage;
+	RleBlock *_lightImage = nullptr;
 	/** Three cube layers drawn behind and around the actors. */
-	RleBlock *_cubeImage[3];
+	RleBlock *_cubeImage[3] = {};
 	/** Enabled joystick visual. */
-	RleBlock *_manetteOnImage;
+	RleBlock *_manetteOnImage = nullptr;
 	/** Disabled joystick visual. */
-	RleBlock *_manetteOffImage;
+	RleBlock *_manetteOffImage = nullptr;
 	/** Normal ball visual. */
-	RleBlock *_ballImage;
+	RleBlock *_ballImage = nullptr;
 	/** Enlarged ball visual used during movement effects. */
-	RleBlock *_ballBigImage;
+	RleBlock *_ballBigImage = nullptr;
 	/** Active movement-counter mark. */
-	RleBlock *_shotsOnImage;
+	RleBlock *_shotsOnImage = nullptr;
 	/** Consumed movement-counter mark. */
-	RleBlock *_shotsOffImage;
+	RleBlock *_shotsOffImage = nullptr;
 	/** Red direction indicator. */
-	RleBlock *_lightRedImage;
+	RleBlock *_lightRedImage = nullptr;
 	/** Inactive direction indicator. */
-	RleBlock *_lightGreyImage;
+	RleBlock *_lightGreyImage = nullptr;
 	/** Active warp-control visual. */
-	RleBlock *_warpOnImage;
+	RleBlock *_warpOnImage = nullptr;
 	/** Available warp-control visual. */
-	RleBlock *_warpOffImage;
+	RleBlock *_warpOffImage = nullptr;
 	/** Disabled warp-control visual. */
-	RleBlock *_warpDisableImage;
+	RleBlock *_warpDisableImage = nullptr;
 	/** Warp timing effect. */
-	Animation *_warpTimerAnim;
+	Animation *_warpTimerAnim = nullptr;
 	/** Bubble effects used at occupied graph vertices. */
-	RleBlock *_bubbleImage[3];
+	RleBlock *_bubbleImage[3] = {};
 	/** Fleen visuals indexed by obstacle variant. */
-	RleBlock *_fleenImage[4];
+	RleBlock *_fleenImage[4] = {};
 	/** Flare effects used while releasing occupants. */
-	Animation *_flareAnims[2];
+	Animation *_flareAnims[2] = {};
 
 	/** Current interaction phase. */
-	GameState _gameState;
+	GameState _gameState = kStateIdle;
 	/** Number of Zoombinis successfully released. */
-	int _freedCount;
+	int _freedCount = 0;
 
 	/** Direction labels for the eight-node cube. */
 	static const char kGraph1DirLabels[8][4];
@@ -217,7 +217,7 @@ private:
 	void loadResources();
 
 	/** Music handle used while Aqua Cube is active. */
-	int _musicId;
+	int _musicId = -1;
 };
 
 } // End of namespace Zoombini2

@@ -29,7 +29,7 @@
 namespace Zoombini2 {
 
 TransitionTitle::TransitionTitle(Zoombini2Engine *vm)
-	: TransitionBase(vm), _background(nullptr), _clicked(false), _deadline(0), _musicId(-1) {
+	: TransitionBase(vm) {
 	_pageId = kPageTitleScreen;
 }
 
@@ -48,7 +48,7 @@ void TransitionTitle::init() {
 	_deadline = _vm->getGameTickCount() + 10000;
 
 	// Load the static title background.
-	_background = new BitBlock();
+	_background = new BitBlock(_vm);
 	if (!_background->load(Common::Path("bmp/story_intro/title_screen"))) {
 		warning("TitleScreen: Failed to load title background");
 	}

@@ -80,47 +80,47 @@ private:
 	const char *getLevelString(int level);
 
 	/** Whether the help overlay is active. */
-	bool _isActive;
+	bool _isActive = false;
 	/** Puzzle identifier used to resolve the active help resource. */
-	int _currentPuzzleId;
+	int _currentPuzzleId = -1;
 	/** Level used to resolve the active help resource. */
-	int _currentLevel;
+	int _currentLevel = -1;
 	/** One-based help sheet currently displayed. */
-	int _currentPage;
+	int _currentPage = 1;
 	/** Screen snapshot restored when the overlay closes. */
-	Graphics::ManagedSurface *_savedScreen;
+	Graphics::ManagedSurface *_savedScreen = nullptr;
 	/** Help-window frame sprite. */
-	RleBlock *_helpFrame;
+	RleBlock *_helpFrame = nullptr;
 	/** Fallback sprite shown when no help sheet is available. */
-	RleBlock *_placeholder;
+	RleBlock *_placeholder = nullptr;
 	/** Normal close-button bitmap. */
-	BitBlock *_okButtonNormal;
+	BitBlock *_okButtonNormal = nullptr;
 	/** Pressed close-button bitmap. */
-	BitBlock *_okButtonPushed;
+	BitBlock *_okButtonPushed = nullptr;
 	/** Enabled previous-sheet button bitmap. */
-	BitBlock *_leftArrowNormal;
+	BitBlock *_leftArrowNormal = nullptr;
 	/** Disabled previous-sheet button bitmap. */
-	BitBlock *_leftArrowEmpty;
+	BitBlock *_leftArrowEmpty = nullptr;
 	/** Enabled next-sheet button bitmap. */
-	BitBlock *_rightArrowNormal;
+	BitBlock *_rightArrowNormal = nullptr;
 	/** Disabled next-sheet button bitmap. */
-	BitBlock *_rightArrowEmpty;
+	BitBlock *_rightArrowEmpty = nullptr;
 	/** Active help-sheet bitmap. */
-	BitBlock *_helpPage;
+	BitBlock *_helpPage = nullptr;
 	/** Close-button hit rectangle. */
-	Common::Rect _okButtonRect;
+	Common::Rect _okButtonRect = Common::Rect(597, 400, 671, 444);
 	/** Previous-sheet button hit rectangle. */
-	Common::Rect _leftArrowRect;
+	Common::Rect _leftArrowRect = Common::Rect(135, 400, 181, 444);
 	/** Next-sheet button hit rectangle. */
-	Common::Rect _rightArrowRect;
+	Common::Rect _rightArrowRect = Common::Rect(209, 400, 253, 444);
 	/** Whether the pointer is over the close button. */
-	bool _okButtonHovered;
+	bool _okButtonHovered = false;
 	/** Whether the pointer is over the previous-sheet button. */
-	bool _leftArrowHovered;
+	bool _leftArrowHovered = false;
 	/** Whether the pointer is over the next-sheet button. */
-	bool _rightArrowHovered;
+	bool _rightArrowHovered = false;
 	/** System tick captured when the help overlay paused gameplay. */
-	uint32 _pauseStartTime;
+	uint32 _pauseStartTime = 0;
 };
 
 } // End of namespace Zoombini2

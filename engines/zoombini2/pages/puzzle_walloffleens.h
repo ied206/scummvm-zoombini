@@ -120,16 +120,16 @@ public:
 		/** Visible traits compared with a Zoombini. */
 		ZmbTrait traits;
 		/** Whether this Fleen has already been captured. */
-		bool caught;
+		bool caught = false;
 		/** Grid column. */
-		int gridCol;
+		int gridCol = 0;
 		/** Grid row. */
-		int gridRow;
+		int gridRow = 0;
 		/** Clickable grid-cell area. */
-		Common::Rect hitbox;
+		Common::Rect hitbox = Common::Rect();
 
 		/** Initialize an uncaught Fleen with empty traits at grid origin. */
-		FleenCell() : traits(), caught(false), gridCol(0), gridRow(0) {}
+		FleenCell() = default;
 	};
 
 private:
@@ -170,84 +170,84 @@ private:
 	void onRenderActors(ManagedSurface32 *screen) override;
 
 	/** Level in the range one through four. */
-	int _level;
+	int _level = 1;
 	/** Number of columns in the active grid. */
-	int _gridCols;
+	int _gridCols = 3;
 	/** Number of rows in the active grid. */
-	int _gridRows;
+	int _gridRows = 2;
 	/** Number of active Fleens. */
-	int _numFleens;
+	int _numFleens = 6;
 	/** Puzzle-roster size before any Zoombinis are released. */
-	int _initialZoombiniCount;
+	int _initialZoombiniCount = 0;
 	/** Number of Zoombinis already released. */
-	int _freedCount;
+	int _freedCount = 0;
 	/** Puzzle-roster index currently at the cannon. */
-	int _currentZoombini;
+	int _currentZoombini = 0;
 	/** Selected Fleen index, or `-1` when none is selected. */
-	int _selectedFleen;
+	int _selectedFleen = -1;
 	/** Current interaction phase. */
-	GameState _gameState;
+	GameState _gameState = kStateIdle00;
 	/** Time at which the current phase began. */
-	uint32 _actionTimer;
+	uint32 _actionTimer = 0;
 
 	/** Current grid panel cycled by level one. */
-	int _gridPage;
+	int _gridPage = 0;
 
 	/** Fleen grid storage sized for the largest level. */
-	FleenCell _fleens[kMaxFleens];
+	FleenCell _fleens[kMaxFleens] = {};
 
 	/** Screen origin of the active grid. */
-	Common::Point32 _gridOrigin;
+	Common::Point32 _gridOrigin = Common::Point32(380, 200);
 
 	/** Current cannon angle index. */
-	int _cannonAngle;
+	int _cannonAngle = 4;
 	/** Target cannon angle index. */
-	int _targetAngle;
+	int _targetAngle = 4;
 	/** Selected Fleen grid column. */
-	int _targetCol;
+	int _targetCol = 0;
 	/** Selected Fleen grid row. */
-	int _targetRow;
+	int _targetRow = 0;
 
 	/** Current projectile position. */
-	Common::Point32 _cannonballPos;
+	Common::Point32 _cannonballPos = Common::Point32();
 	/** Projectile position at the muzzle. */
-	Common::Point32 _cannonballStartPos;
+	Common::Point32 _cannonballStartPos = Common::Point32();
 	/** Projectile target at the selected Fleen. */
-	Common::Point32 _cannonballEndPos;
+	Common::Point32 _cannonballEndPos = Common::Point32();
 	/** Fixed-point projectile progress from zero through one thousand. */
-	int _cannonballProgress;
+	int _cannonballProgress = 0;
 
 	/** Number of chance mirrors still available. */
-	int _mirrorsLeft;
+	int _mirrorsLeft = 12;
 	/** Initial mirror allowance for the selected level. */
-	int _mirrorsTotal;
+	int _mirrorsTotal = 12;
 
 	/** Cannon visuals indexed by angle. */
-	RleBlock *_cannonImage[kNumCannonAngles];
+	RleBlock *_cannonImage[kNumCannonAngles] = {};
 	/** Background restored around the rotating cannon. */
-	RleBlock *_cannonCache;
+	RleBlock *_cannonCache = nullptr;
 	/** Active grid-cell background. */
-	RleBlock *_slotActiveImage;
+	RleBlock *_slotActiveImage = nullptr;
 	/** Empty grid-cell background. */
-	RleBlock *_slotEmptyImage;
+	RleBlock *_slotEmptyImage = nullptr;
 	/** Selected-cell cursor overlay. */
-	RleBlock *_slotCursorImage;
+	RleBlock *_slotCursorImage = nullptr;
 	/** Mirror visuals indexed by @ref PuzzleWallOfFleens::MirrorState. */
-	RleBlock *_mirrorImage[kNumMirrorStates];
+	RleBlock *_mirrorImage[kNumMirrorStates] = {};
 	/** Cannon nozzle visual. */
-	RleBlock *_tuyereImage;
+	RleBlock *_tuyereImage = nullptr;
 	/** Progress indicators for released Zoombinis. */
-	RleBlock *_levelRedImage[kNumLevelIndicators];
+	RleBlock *_levelRedImage[kNumLevelIndicators] = {};
 	/** Successful-capture highlight. */
-	RleBlock *_highlightImage;
+	RleBlock *_highlightImage = nullptr;
 
 	/** Background lava-bubble animation. */
-	Animation *_lavaBubbleAnim;
+	Animation *_lavaBubbleAnim = nullptr;
 	/** Mirror-breaking animation. */
-	Animation *_mirrorExplodeAnim;
+	Animation *_mirrorExplodeAnim = nullptr;
 
 	/** Music handle used while Magic Mirrors is active. */
-	int _musicId;
+	int _musicId = -1;
 };
 
 } // End of namespace Zoombini2

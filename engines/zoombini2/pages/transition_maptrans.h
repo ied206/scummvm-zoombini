@@ -71,27 +71,27 @@ private:
 	void finishTransition();
 
 	/** Background with route-specific overlays already applied. */
-	Graphics::ManagedSurface *_compositedBg;
+	Graphics::ManagedSurface *_compositedBg = nullptr;
 
 	/** Route shared as the template for each party member's path. */
 	Common::Path _patPath;
 
 	/** Index of the next party member waiting to start. */
-	int _nextWalkIndex;
+	int _nextWalkIndex = 0;
 	/** Time at which the next walker may start. */
-	uint32 _nextWalkTime;
+	uint32 _nextWalkTime = 0;
 	/** Number of walkers that have reached the route endpoint. */
-	int _completedCount;
+	int _completedCount = 0;
 
 	/** Page whose entry follows this route. */
-	PageId _targetPageId;
+	PageId _targetPageId = kPageNone;
 	/** Whether the destination page has already been requested. */
-	bool _transitionFinished;
+	bool _transitionFinished = false;
 	/** Music handle used during the map transition. */
-	int _musicId;
+	int _musicId = -1;
 
 	/** Borrowed immutable sprite grid owned by the engine cache. */
-	const ZoombiniAnimation *_zoombiniAnimation;
+	const ZoombiniAnimation *_zoombiniAnimation = nullptr;
 };
 
 } // End of namespace Zoombini2

@@ -20,9 +20,8 @@
  */
 
 #include "common/debug.h"
-#include "common/random.h"
-
 #include "zoombini2/graphics.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/pages/puzzle_cheznorf.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
@@ -75,40 +74,7 @@ static const int kClueAttrCount[] = {0, 8, 7, 8};
 // ============================================================================
 
 PuzzleChezNorf::PuzzleChezNorf(Zoombini2Engine *vm)
-	: PuzzleBase(vm, kPageChezNorf),
-	  _state(kStateInit), _numTables(4), _level(1),
-	  _freedCount(0), _currentTable(-1), _selectedFood(kFoodNone),
-	  _wrongCount(0), _maxAttempts(0), _clueAttrCount(0), _norfState(0),
-	  _templateId(11), _pendingSlurp(-1), _pendingMiam(-1), _pendingGlouglou(-1),
-	  _symbOK(nullptr), _symbNO(nullptr), _symbMaybe(nullptr),
-	  _plato(nullptr), _platoMini(nullptr),
-	  _norfDefault(nullptr), _highlightImage(nullptr), _debugFont(nullptr),
-	  _musicId(-1) {
-
-	for (int i = 0; i < 3; i++) {
-		_slurpImage[i] = nullptr;
-		_miamImage[i] = nullptr;
-		_glouglouImage[i] = nullptr;
-		_comandeImage[i] = nullptr;
-	}
-
-	memset(_foodGrid, 0, sizeof(_foodGrid));
-	memset(_foodVals, 0, sizeof(_foodVals));
-
-	for (int i = 0; i < kMaxTables; i++) {
-		_tables[i].pos = Common::Point32();
-		_tables[i].hitbox = Common::Rect();
-		_tables[i].zoombiniIdx = -1;
-		_tables[i].foodSlurp = -1;
-		_tables[i].foodMiam = -1;
-		_tables[i].foodGlouglou = -1;
-		_tables[i].served = false;
-		_tables[i].completed = false;
-
-		_answers[i].slurp = 0;
-		_answers[i].miam = 0;
-		_answers[i].glouglou = 0;
-	}
+	: PuzzleBase(vm, kPageChezNorf) {
 }
 
 PuzzleChezNorf::~PuzzleChezNorf() {
@@ -141,61 +107,61 @@ PuzzleChezNorf::~PuzzleChezNorf() {
 
 void PuzzleChezNorf::loadResources() {
 	// Food symbol sprites (feedback indicators)
-	_symbOK = new RleBlock();
+	_symbOK = new RleBlock(_vm);
 	_symbOK->loadFromFile(Common::Path("bmp/chez_norf/symb_OK"));
 
-	_symbNO = new RleBlock();
+	_symbNO = new RleBlock(_vm);
 	_symbNO->loadFromFile(Common::Path("bmp/chez_norf/symb_NO"));
 
-	_symbMaybe = new RleBlock();
+	_symbMaybe = new RleBlock(_vm);
 	_symbMaybe->loadFromFile(Common::Path("bmp/chez_norf/symb_MAYBE"));
 
 	// Plate sprites
 	if (_level == 1) {
-		_plato = new RleBlock();
+		_plato = new RleBlock(_vm);
 		_plato->loadFromFile(Common::Path("bmp/chez_norf/plato2"));
 	} else {
-		_plato = new RleBlock();
+		_plato = new RleBlock(_vm);
 		_plato->loadFromFile(Common::Path("bmp/chez_norf/plato"));
 	}
 
-	_platoMini = new RleBlock();
+	_platoMini = new RleBlock(_vm);
 	_platoMini->loadFromFile(Common::Path("bmp/chez_norf/plato_mini"));
 
 	// Slurp (dessert) items
 	static const char *slurpNames[] = {"slurp_glace", "slurp_pasteque", "slurp_tarte"};
 	for (int i = 0; i < 3; i++) {
-		_slurpImage[i] = new RleBlock();
+		_slurpImage[i] = new RleBlock(_vm);
 		_slurpImage[i]->loadFromFile(Common::Path(Common::String::format("bmp/chez_norf/%s", slurpNames[i])));
 	}
 
 	// Miam (main dish) items
 	static const char *miamNames[] = {"miam_poisson", "miam_salade", "miam_sandwitch"};
 	for (int i = 0; i < 3; i++) {
-		_miamImage[i] = new RleBlock();
+		_miamImage[i] = new RleBlock(_vm);
 		_miamImage[i]->loadFromFile(Common::Path(Common::String::format("bmp/chez_norf/%s", miamNames[i])));
 	}
 
 	// Glouglou (drink) items
 	static const char *glouglouNames[] = {"glouglou_cafe", "glouglou_lait", "glouglou_orange"};
 	for (int i = 0; i < 3; i++) {
-		_glouglouImage[i] = new RleBlock();
+		_glouglouImage[i] = new RleBlock(_vm);
 		_glouglouImage[i]->loadFromFile(Common::Path(Common::String::format("bmp/chez_norf/%s", glouglouNames[i])));
 	}
 
 	// Command/order background overlays
 	static const char *comandeNames[] = {"COMANDE1", "comande2", "comande3"};
 	for (int i = 0; i < 3; i++) {
-		_comandeImage[i] = new RleBlock();
+		_comandeImage[i] = new RleBlock(_vm);
 		_comandeImage[i]->loadFromFile(Common::Path(Common::String::format("bmp/chez_norf/%s", comandeNames[i])));
 	}
 
 	// Norf default sprite
-	_norfDefault = new RleBlock();
+	_norfDefault = new RleBlock(_vm);
 	_norfDefault->loadFromFile(Common::Path("bmp/chez_norf/norf/norfDeBaz"));
 
 	// Highlight
-	_highlightImage = new RleBlock();
+	_highlightImage = new RleBlock(_vm);
 	_highlightImage->loadFromFile(Common::Path("bmp/chez_norf/highlight"));
 }
 
@@ -224,7 +190,7 @@ void PuzzleChezNorf::init() {
 	_maxAttempts = kMaxAttempts[_level];
 	_clueAttrCount = kClueAttrCount[_level];
 
-	// Table count: 4 for level 1-2, 6 for level 3 (from Init)
+	// Use four tables for levels one and two, and six for level three.
 	if (_level == 1 || _level == 2)
 		_numTables = 4;
 	else
@@ -232,7 +198,7 @@ void PuzzleChezNorf::init() {
 
 	loadResources();
 
-	// Set up table positions (from Init: x starting at 205, +85 each)
+	// Set up table positions from x 205 with 85 pixels between tables.
 	for (int i = 0; i < _numTables; i++) {
 		_tables[i].pos = Common::Point32(kFirstTablePos.x + i * kTableSpacing, kFirstTablePos.y);
 
@@ -256,6 +222,7 @@ void PuzzleChezNorf::init() {
 		_tables[i].zoombiniIdx = i + 1;
 	}
 
+	_vm->reseedRandomForV10();
 	generateFoodVals();
 	// Select one of four clue templates within the current level family.
 	_templateId = (_level * 10) + (_vm->getRandom()->getRandomNumber(3) + 1);
@@ -285,7 +252,7 @@ void PuzzleChezNorf::generateFoodVals() {
 	// Slurp (0-2): any 3 distinct values in [0,2]
 	// Miam  (3-5): any 3 distinct values in [3,5]
 	// Glouglou (6-8): any 3 distinct values in [6,8]
-	Common::RandomSource *rng = _vm->getRandom();
+	Zoombini2Random *rng = _vm->getRandom();
 
 	// Slurp
 	_foodVals[0] = rng->getRandomNumber(2);
@@ -430,12 +397,13 @@ void PuzzleChezNorf::setTableAnswersByTemplate() {
 
 void PuzzleChezNorf::generateFoodGrid() {
 	// The food board grid shows colored dot markers for the clue layout.
-	// From DrawBoard_40F9B0: grid drawn in 3 sections (slurp/miam/glouglou),
-	// each with columns at x=51+n*14 and rows at section_base_y+row*15.
+	// The grid has three sections for slurp, miam, and glouglou markers.
+	// Columns begin at x 51 with 14-pixel spacing, and rows use 15-pixel spacing.
 	// Values 1/2/3 map to different dot sprites; we use _foodVals to fill.
 	// Simplified: each food item in a category is placed across some cells.
 	// This board is decorative and does not own interaction state.
-	Common::RandomSource *rng = _vm->getRandom();
+	_vm->reseedRandomForV10();
+	Zoombini2Random *rng = _vm->getRandom();
 
 	for (int section = 0; section < 3; section++) {
 		for (int col = 0; col < 6; col++) {
@@ -759,7 +727,7 @@ const char *PuzzleChezNorf::getDebugFoodName(int foodId) {
 
 void PuzzleChezNorf::drawDebugOverlay(ManagedSurface32 *screen) {
 	if (!_debugFont) {
-		_debugFont = new BitmapFont();
+		_debugFont = new BitmapFont(_vm);
 		if (!_debugFont->load(Common::Path("bmp/typo"), 0, 255, 0)) {
 			delete _debugFont;
 			_debugFont = nullptr;

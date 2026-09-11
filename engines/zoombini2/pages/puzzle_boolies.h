@@ -91,9 +91,9 @@ private:
 		/** Screen position. */
 		Common::Point32 pos;
 		/** Whether the pin has been knocked down. */
-		bool knocked;
+		bool knocked = false;
 		/** Whether the pin is shown as an active target. */
-		bool lighted;
+		bool lighted = false;
 	};
 
 	/** One selectable ball launch position. */
@@ -103,15 +103,15 @@ private:
 		/** Clickable area. */
 		Common::Rect hitbox;
 		/** Whether this spot can launch the current ball. */
-		bool active;
+		bool active = false;
 	};
 
 	/** Position and timing for the currently rolling Zoombini. */
 	struct Ball {
 		/** Positive or negative path selection. */
-		BallType type;
+		BallType type = kBallNone;
 		/** Puzzle-roster index represented by this ball. */
-		int zoombiniIdx;
+		int zoombiniIdx = -1;
 		/** Current screen position. */
 		Common::Point32 pos;
 		/** Screen position at the start of the roll. */
@@ -119,7 +119,7 @@ private:
 		/** Target screen position. */
 		Common::Point32 endPos;
 		/** Time at which the roll began. */
-		uint32 rollStart;
+		uint32 rollStart = 0;
 	};
 
 	/** Load all puzzle graphics and animations. */
@@ -158,63 +158,63 @@ private:
 	void onRenderActors(ManagedSurface32 *screen) override;
 
 	/** Current interaction phase. */
-	State _state;
+	State _state = kStateInit;
 	/** Selected launch spot, or `-1` when none is selected. */
-	int _currentSpot;
+	int _currentSpot = -1;
 	/** Number of Zoombinis already released. */
-	int _freedCount;
+	int _freedCount = 0;
 	/** Total number of pins already knocked down. */
-	int _pinsKnocked;
+	int _pinsKnocked = 0;
 	/** Launch positions. */
-	Spot _spots[5];
+	Spot _spots[5] = {};
 	/** Active bowling pin layout. */
 	Common::Array<Pin> _pins;
 	/** Currently rolling Zoombini state. */
 	Ball _activeBall;
 
 	/** Current escape-boat position. */
-	Common::Point32 _boatPos;
+	Common::Point32 _boatPos = Common::Point32(550, 100);
 	/** Whether the escape boat is currently drawn. */
-	bool _boatVisible;
+	bool _boatVisible = true;
 
 	/** Screen positions of lane blockers. */
 	Common::Array<Common::Point32> _blockers;
 
 	/** Positive ball visual. */
-	RleBlock *_ballPosImage;
+	RleBlock *_ballPosImage = nullptr;
 	/** Negative ball visual. */
-	RleBlock *_ballNegImage;
+	RleBlock *_ballNegImage = nullptr;
 	/** Normal pin visual. */
-	RleBlock *_pinImage;
+	RleBlock *_pinImage = nullptr;
 	/** Highlighted active-pin visual. */
-	RleBlock *_pinLightedImage;
+	RleBlock *_pinLightedImage = nullptr;
 	/** Escape-boat visual. */
-	RleBlock *_boatImage;
+	RleBlock *_boatImage = nullptr;
 	/** Launch-spot visuals. */
-	RleBlock *_spotImage[5];
+	RleBlock *_spotImage[5] = {};
 	/** Static blocker visual. */
-	RleBlock *_blockerImage;
+	RleBlock *_blockerImage = nullptr;
 	/** First fixed lane overlay. */
-	RleBlock *_fixeImage;
+	RleBlock *_fixeImage = nullptr;
 	/** Second fixed lane overlay. */
-	RleBlock *_fixe2Image;
+	RleBlock *_fixe2Image = nullptr;
 	/** First walking animation. */
-	Animation *_marcheAnim;
+	Animation *_marcheAnim = nullptr;
 	/** Second walking animation. */
-	Animation *_marche2Anim;
+	Animation *_marche2Anim = nullptr;
 	/** First waiting animation. */
-	Animation *_attendAnim;
+	Animation *_attendAnim = nullptr;
 	/** Second waiting animation. */
-	Animation *_attend2Anim;
+	Animation *_attend2Anim = nullptr;
 	/** Positive rolling animation. */
-	Animation *_rollAnim;
+	Animation *_rollAnim = nullptr;
 	/** Negative rolling animation. */
-	Animation *_roll2Anim;
+	Animation *_roll2Anim = nullptr;
 	/** Animated blocker effect. */
-	Animation *_blockerAnim;
+	Animation *_blockerAnim = nullptr;
 
 	/** Music handle used while Boolie Boggle is active. */
-	int _musicId;
+	int _musicId = -1;
 };
 
 } // End of namespace Zoombini2

@@ -20,9 +20,8 @@
  */
 
 #include "common/debug.h"
-#include "common/random.h"
-
 #include "zoombini2/graphics.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/pages/puzzle_aquacube.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
@@ -160,32 +159,7 @@ static const int kArrowHitH = 41;
 // ============================================================================
 
 PuzzleAquacube::PuzzleAquacube(Zoombini2Engine *vm)
-	: PuzzleBase(vm, kPageAquaCube),
-	  _level(1), _numNodes(8),
-	  _ballNode(0), _targetNode(-1),
-	  _ballPos(0, 0),
-	  _ballStartPos(0, 0),
-	  _ballEndPos(0, 0),
-	  _moveStartTime(0),
-	  _numZoombinisToPlace(3), _totalSteps(6), _numFleens(0),
-	  _stepsUsed(0), _maxSteps(6),
-	  _zoombiniOffset(-2, 6),
-	  _fleenOffset(10, 6),
-	  _nodeOffset(0, 0),
-	  _warpAvailable(false), _warpActive(false),
-	  _lightImage(nullptr),
-	  _manetteOnImage(nullptr), _manetteOffImage(nullptr),
-	  _ballImage(nullptr), _ballBigImage(nullptr),
-	  _shotsOnImage(nullptr), _shotsOffImage(nullptr),
-	  _lightRedImage(nullptr), _lightGreyImage(nullptr),
-	  _warpOnImage(nullptr), _warpOffImage(nullptr),
-	  _warpDisableImage(nullptr), _warpTimerAnim(nullptr),
-	  _gameState(kStateIdle), _freedCount(0), _musicId(-1) {
-
-	memset(_cubeImage, 0, sizeof(_cubeImage));
-	memset(_bubbleImage, 0, sizeof(_bubbleImage));
-	memset(_fleenImage, 0, sizeof(_fleenImage));
-	memset(_flareAnims, 0, sizeof(_flareAnims));
+	: PuzzleBase(vm, kPageAquacube) {
 }
 
 PuzzleAquacube::~PuzzleAquacube() {
@@ -308,13 +282,14 @@ void PuzzleAquacube::loadGraph() {
 
 void PuzzleAquacube::placeZoombinis() {
 	// Pick random vertices and build binary coordinates from their direction labels.
-	Common::RandomSource rnd("aquacube_place");
+	_vm->reseedRandomForV10();
+	Zoombini2Random *rnd = _vm->getRandom();
 
 	// Track which nodes are used for zoombinis
 	bool usedNodes[16];
 	memset(usedNodes, 0, sizeof(usedNodes));
 
-	// Random binary direction choices per zoombini (Init v14 = rand()%2)
+	// Random binary direction choice for each Zoombini.
 	int dirChoices[4];
 
 	int numZoombinis = MIN(_numZoombinisToPlace, (int)_puzzleZoombinis.size());
@@ -324,7 +299,7 @@ void PuzzleAquacube::placeZoombinis() {
 		int nodeIdx;
 		int attempts = 50;
 		do {
-			nodeIdx = rnd.getRandomNumber(_numNodes - 1);
+			nodeIdx = rnd->getRandomNumber(_numNodes - 1);
 			attempts--;
 		} while (attempts > 0 && usedNodes[nodeIdx]);
 
@@ -332,7 +307,7 @@ void PuzzleAquacube::placeZoombinis() {
 			break;
 
 		usedNodes[nodeIdx] = true;
-		dirChoices[z] = rnd.getRandomNumber(1); // 0 or 1
+		dirChoices[z] = rnd->getRandomNumber(1); // 0 or 1
 
 		// Place zoombini at this node
 		GraphNode &node = _nodes[nodeIdx];
@@ -417,13 +392,13 @@ void PuzzleAquacube::placeFleens() {
 		}
 
 		// Place additional fleens at other high-value positions
-		Common::RandomSource rnd("aquacube_fleen");
+		Zoombini2Random *rnd = _vm->getRandom();
 		for (int f = 1; f < _numFleens && f < 3; f++) {
 			// Find another node that is empty (state=1) to place a fleen
 			int attempts = 50;
 			int nodeIdx;
 			do {
-				nodeIdx = rnd.getRandomNumber(_numNodes - 1);
+				nodeIdx = rnd->getRandomNumber(_numNodes - 1);
 				attempts--;
 			} while (attempts > 0 && _nodes[nodeIdx].state != 1);
 
@@ -443,13 +418,13 @@ void PuzzleAquacube::placeBallStart() {
 	// Level 3: dirValues = (0,0,0,0)
 	// Level 4: random pattern, avoid fleens
 
-	Common::RandomSource rnd("aquacube_start");
+	Zoombini2Random *rnd = _vm->getRandom();
 	int startNode = -1;
 
 	if (_level == 1) {
 		startNode = findNodeByDirValues3(0, 0, 0);
 	} else if (_level == 2) {
-		int pattern = rnd.getRandomNumber(2);
+		int pattern = rnd->getRandomNumber(2);
 		switch (pattern) {
 		case 0:
 			startNode = findNodeByDirValues3(0, 0, 1);
@@ -467,7 +442,7 @@ void PuzzleAquacube::placeBallStart() {
 		// Level 4: random empty node
 		int attempts = 50;
 		do {
-			startNode = rnd.getRandomNumber(_numNodes - 1);
+			startNode = rnd->getRandomNumber(_numNodes - 1);
 			attempts--;
 		} while (attempts > 0 && _nodes[startNode].state == 3);
 	}
@@ -522,20 +497,20 @@ int PuzzleAquacube::findNodeByDirValues4(int a, int b, int c, int d) const {
 
 void PuzzleAquacube::loadResources() {
 	// Ball sprites
-	_ballImage = new RleBlock();
+	_ballImage = new RleBlock(_vm);
 	if (!_ballImage->loadFromFile(Common::Path("bmp/aquacube/ball"))) {
 		delete _ballImage;
 		_ballImage = nullptr;
 	}
 
-	_ballBigImage = new RleBlock();
+	_ballBigImage = new RleBlock(_vm);
 	if (!_ballBigImage->loadFromFile(Common::Path("bmp/aquacube/ballBIG"))) {
 		delete _ballBigImage;
 		_ballBigImage = nullptr;
 	}
 
 	// Light sprite
-	_lightImage = new RleBlock();
+	_lightImage = new RleBlock(_vm);
 	if (!_lightImage->loadFromFile(Common::Path("bmp/aquacube/light"))) {
 		delete _lightImage;
 		_lightImage = nullptr;
@@ -547,7 +522,7 @@ void PuzzleAquacube::loadResources() {
 							   "bmp/aquacube/kub_easy_02",
 							   "bmp/aquacube/kub_easy_03"};
 		for (int i = 0; i < 3; i++) {
-			_cubeImage[i] = new RleBlock();
+			_cubeImage[i] = new RleBlock(_vm);
 			if (!_cubeImage[i]->loadFromFile(Common::Path(names[i]))) {
 				delete _cubeImage[i];
 				_cubeImage[i] = nullptr;
@@ -558,7 +533,7 @@ void PuzzleAquacube::loadResources() {
 							   "bmp/aquacube/kub_hard_02",
 							   "bmp/aquacube/kub_hard_03"};
 		for (int i = 0; i < 3; i++) {
-			_cubeImage[i] = new RleBlock();
+			_cubeImage[i] = new RleBlock(_vm);
 			if (!_cubeImage[i]->loadFromFile(Common::Path(names[i]))) {
 				delete _cubeImage[i];
 				_cubeImage[i] = nullptr;
@@ -567,65 +542,65 @@ void PuzzleAquacube::loadResources() {
 	}
 
 	// Joystick controls.
-	_manetteOnImage = new RleBlock();
+	_manetteOnImage = new RleBlock(_vm);
 	if (!_manetteOnImage->loadFromFile(Common::Path("bmp/aquacube/control_manetteON"))) {
 		delete _manetteOnImage;
 		_manetteOnImage = nullptr;
 	}
 
-	_manetteOffImage = new RleBlock();
+	_manetteOffImage = new RleBlock(_vm);
 	if (!_manetteOffImage->loadFromFile(Common::Path("bmp/aquacube/control_manetteOFF"))) {
 		delete _manetteOffImage;
 		_manetteOffImage = nullptr;
 	}
 
 	// Remaining-step controls.
-	_shotsOnImage = new RleBlock();
+	_shotsOnImage = new RleBlock(_vm);
 	if (!_shotsOnImage->loadFromFile(Common::Path("bmp/aquacube/control_shotsON"))) {
 		delete _shotsOnImage;
 		_shotsOnImage = nullptr;
 	}
 
-	_shotsOffImage = new RleBlock();
+	_shotsOffImage = new RleBlock(_vm);
 	if (!_shotsOffImage->loadFromFile(Common::Path("bmp/aquacube/control_shotsOFF"))) {
 		delete _shotsOffImage;
 		_shotsOffImage = nullptr;
 	}
 
 	// Direction lights
-	_lightRedImage = new RleBlock();
+	_lightRedImage = new RleBlock(_vm);
 	if (!_lightRedImage->loadFromFile(Common::Path("bmp/aquacube/control_manette_lightRED"))) {
 		delete _lightRedImage;
 		_lightRedImage = nullptr;
 	}
 
-	_lightGreyImage = new RleBlock();
+	_lightGreyImage = new RleBlock(_vm);
 	if (!_lightGreyImage->loadFromFile(Common::Path("bmp/aquacube/control_manette_lightGREY"))) {
 		delete _lightGreyImage;
 		_lightGreyImage = nullptr;
 	}
 
 	// Warp buttons
-	_warpOnImage = new RleBlock();
+	_warpOnImage = new RleBlock(_vm);
 	if (!_warpOnImage->loadFromFile(Common::Path("bmp/aquacube/control_warpBUTTON_ON"))) {
 		delete _warpOnImage;
 		_warpOnImage = nullptr;
 	}
 
-	_warpOffImage = new RleBlock();
+	_warpOffImage = new RleBlock(_vm);
 	if (!_warpOffImage->loadFromFile(Common::Path("bmp/aquacube/control_warpBUTTON_OFF"))) {
 		delete _warpOffImage;
 		_warpOffImage = nullptr;
 	}
 
-	_warpDisableImage = new RleBlock();
+	_warpDisableImage = new RleBlock(_vm);
 	if (!_warpDisableImage->loadFromFile(Common::Path("bmp/aquacube/control_warpBUTTON_DISABLE"))) {
 		delete _warpDisableImage;
 		_warpDisableImage = nullptr;
 	}
 
 	// Warp timer animation (replaces static empty timer)
-	_warpTimerAnim = new Animation();
+	_warpTimerAnim = new Animation(_vm);
 	if (!_warpTimerAnim->loadFromFile(Common::Path("bmp/aquacube/control_warpTIMER"))) {
 		debug(2, "PuzzleAquacube: Failed to load warp timer animation");
 		delete _warpTimerAnim;
@@ -634,7 +609,7 @@ void PuzzleAquacube::loadResources() {
 
 	// Flare visual effects
 	for (int i = 0; i < 2; i++) {
-		_flareAnims[i] = new Animation();
+		_flareAnims[i] = new Animation(_vm);
 		Common::Path path(Common::String::format("bmp/aquacube/FLARE%d", i + 1));
 		if (!_flareAnims[i]->loadFromFile(path)) {
 			debug(2, "PuzzleAquacube: Failed to load FLARE%d.AN", i + 1);
@@ -645,7 +620,7 @@ void PuzzleAquacube::loadResources() {
 
 	// Bubbles
 	for (int i = 0; i < 3; i++) {
-		_bubbleImage[i] = new RleBlock();
+		_bubbleImage[i] = new RleBlock(_vm);
 		Common::Path path(Common::String::format("bmp/aquacube/bubble%d", i + 1));
 		if (!_bubbleImage[i]->loadFromFile(path)) {
 			delete _bubbleImage[i];
@@ -655,7 +630,7 @@ void PuzzleAquacube::loadResources() {
 
 	// Fleen sprites (4 types)
 	for (int i = 0; i < 4; i++) {
-		_fleenImage[i] = new RleBlock();
+		_fleenImage[i] = new RleBlock(_vm);
 		Common::Path path(Common::String::format("bmp/aquacube/fleen/fixe/f%dfixe", i + 1));
 		if (!_fleenImage[i]->loadFromFile(path)) {
 			delete _fleenImage[i];
@@ -779,7 +754,6 @@ void PuzzleAquacube::onUpdate() {
 	case kStateIdle:
 		// Input is handled by onLButtonDown().
 		break;
-
 	case kStateBallMoving:
 	case kStateWarpExecuting: {
 		uint32 moveElapsed = now - _moveStartTime;
@@ -794,12 +768,10 @@ void PuzzleAquacube::onUpdate() {
 		}
 		break;
 	}
-
 	case kStateMatchCheck:
 		// Immediate transition
 		_gameState = kStateIdle;
 		break;
-
 	case kStateZoombiniFreed:
 		if (elapsed > 800) {
 			if (_freedCount >= _numZoombinisToPlace) {
@@ -814,7 +786,6 @@ void PuzzleAquacube::onUpdate() {
 			}
 		}
 		break;
-
 	case kStateFleenHit:
 		if (elapsed > 1000) {
 			if (_stepsUsed >= _maxSteps) {
@@ -825,13 +796,11 @@ void PuzzleAquacube::onUpdate() {
 			}
 		}
 		break;
-
 	case kStateWarpPlanning:
 		// Direction input is collected by onLButtonDown().
 		break;
-
 	case kStateDone:
-		if (elapsed > 2000) {
+		if (2000 < elapsed) {
 			debug(1, "PuzzleAquacube: Complete, returning to map");
 			_vm->_returningFromPuzzle = true;
 			_vm->_mapTransitionSourcePageId = static_cast<PageId>(_pageId);

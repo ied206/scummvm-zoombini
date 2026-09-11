@@ -22,6 +22,7 @@
 #include "common/debug.h"
 
 #include "zoombini2/graphics.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/pages/shelter_base.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
@@ -30,9 +31,7 @@
 namespace Zoombini2 {
 
 ShelterRescueSiteBase::ShelterRescueSiteBase(Zoombini2Engine *vm)
-	: ShelterBase(vm), _selector(nullptr), _porteSelect(nullptr), _buttonUp(nullptr), _buttonDown(nullptr), _gridBasePos(), _scrollUpRect(), _scrollDownRect(),
-	  _buttonUpPos(), _buttonDownPos(), _scrollOffset(0), _selectedZoombini(-1), _readyToDepart(false), _phase(0), _phaseTimer(0), _musicId(-1),
-	  _zoombiniAnimation(nullptr) {
+	: ShelterBase(vm) {
 }
 
 ShelterRescueSiteBase::~ShelterRescueSiteBase() {
@@ -47,13 +46,12 @@ ShelterRescueSiteBase::~ShelterRescueSiteBase() {
 
 void ShelterRescueSiteBase::loadBackground(const char *path) {
 	_vm->getScreen()->fillRect(Common::Rect32(kScreenWidth, kScreenHeight), 0);
-	BitBlock background;
+	BitBlock background(_vm);
 	if (background.load(Common::Path(path)))
 		background.drawToSurface(_vm->getScreen(), Common::Point32(0, 0));
 }
 
-void ShelterRescueSiteBase::configureRosterLayout(const Common::Point32 &gridBasePos, const Common::Rect &scrollUpRect, const Common::Rect &scrollDownRect,
-									   const Common::Point32 &buttonUpPos, const Common::Point32 &buttonDownPos) {
+void ShelterRescueSiteBase::configureRosterLayout(const Common::Point32 &gridBasePos, const Common::Rect32 &scrollUpRect, const Common::Rect32 &scrollDownRect, const Common::Point32 &buttonUpPos, const Common::Point32 &buttonDownPos) {
 	_gridBasePos = gridBasePos;
 	_scrollUpRect = scrollUpRect;
 	_scrollDownRect = scrollDownRect;
@@ -62,20 +60,20 @@ void ShelterRescueSiteBase::configureRosterLayout(const Common::Point32 &gridBas
 }
 
 void ShelterRescueSiteBase::loadSelector(const char *path) {
-	_selector = new RleBlock();
+	_selector = new RleBlock(_vm);
 	_selector->loadFromFile(Common::Path(path));
 }
 
 void ShelterRescueSiteBase::loadPorteSelector(const char *path) {
-	_porteSelect = new RleBlock();
+	_porteSelect = new RleBlock(_vm);
 	_porteSelect->loadFromFile(Common::Path(path));
 }
 
 void ShelterRescueSiteBase::loadScrollButtons(const char *buttonUpPath, const char *buttonDownPath) {
-	_buttonUp = new Animation();
+	_buttonUp = new Animation(_vm);
 	_buttonUp->loadFromFile(Common::Path(buttonUpPath));
 
-	_buttonDown = new Animation();
+	_buttonDown = new Animation(_vm);
 	_buttonDown->loadFromFile(Common::Path(buttonDownPath));
 }
 
@@ -90,7 +88,7 @@ void ShelterRescueSiteBase::resetRescueState() {
 		for (int row = 0; row < kGridRows; row++) {
 			const int idx = col * kGridRows + row;
 			const Common::Point32 slotPos(_gridBasePos.x + col * kSlotWidth, _gridBasePos.y + row * kSlotHeight);
-			_slotRects[idx] = Common::Rect(slotPos.x + 18, slotPos.y + 30, slotPos.x + 58, slotPos.y + 87);
+			_slotRects[idx] = Common::Rect32(slotPos.x + 18, slotPos.y + 30, slotPos.x + 58, slotPos.y + 87);
 		}
 	}
 

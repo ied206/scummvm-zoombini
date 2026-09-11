@@ -53,6 +53,10 @@ public:
 
 	/** Apply game and sound settings immediately after the nested options dialog closes. */
 	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
+
+private:
+	/** Borrowed vm used to apply game-specific settings. */
+	Zoombini2Engine *_vm;
 };
 
 /** Modal dialog for renaming a Zoombini2 profile. */
@@ -70,7 +74,7 @@ public:
 
 private:
 	/** Profile-name editor managed by this dialog. */
-	GUI::EditTextWidget *_edit;
+	GUI::EditTextWidget *_edit = nullptr;
 };
 
 /** Modal ScummVM dialog for managing one target's player-profile files. */
@@ -149,37 +153,37 @@ private:
 	/** Exclusive selection group for the profile-table rows. */
 	GUI::RadiobuttonGroup _profileSelectionGroup;
 	/** Selected row in @ref Zoombini2SaveManagementDialog::_profileNames, or -1. */
-	int _selectedProfileIndex;
+	int _selectedProfileIndex = -1;
 	/** Scroll container holding profile rows. */
-	GUI::ScrollContainerWidget *_profileList;
+	GUI::ScrollContainerWidget *_profileList = nullptr;
 	/** Container holding the fixed-column row widgets. */
-	GUI::ContainerWidget *_profileTable;
+	GUI::ContainerWidget *_profileTable = nullptr;
 	/** Number of rows currently populated in the table. */
-	int _profileRowCount;
+	int _profileRowCount = 0;
 	/** Rename button managed by this dialog. */
-	GUI::ButtonWidget *_editButton;
+	GUI::ButtonWidget *_editButton = nullptr;
 	/** Import button managed by this dialog. */
-	GUI::ButtonWidget *_importButton;
+	GUI::ButtonWidget *_importButton = nullptr;
 	/** Export button managed by this dialog. */
-	GUI::ButtonWidget *_exportButton;
+	GUI::ButtonWidget *_exportButton = nullptr;
 	/** Delete button managed by this dialog. */
-	GUI::ButtonWidget *_deleteButton;
+	GUI::ButtonWidget *_deleteButton = nullptr;
 	/** Uncaptioned selection controls for visible profile rows. */
-	GUI::RadiobuttonWidget *_profileSelectionButtons[kMaximumProfileRows];
+	GUI::RadiobuttonWidget *_profileSelectionButtons[kMaximumProfileRows] = {};
 	/** Profile-name cells. */
-	GUI::StaticTextWidget *_profileNameLabels[kMaximumProfileRows];
+	GUI::StaticTextWidget *_profileNameLabels[kMaximumProfileRows] = {};
 	/** Zombiniville-stage population cells. */
-	GUI::StaticTextWidget *_zombinivilleLabels[kMaximumProfileRows];
+	GUI::StaticTextWidget *_zombinivilleLabels[kMaximumProfileRows] = {};
 	/** Rescue Site I population cells. */
-	GUI::StaticTextWidget *_rescue1Labels[kMaximumProfileRows];
+	GUI::StaticTextWidget *_rescue1Labels[kMaximumProfileRows] = {};
 	/** Rescue Site II population cells. */
-	GUI::StaticTextWidget *_rescue2Labels[kMaximumProfileRows];
+	GUI::StaticTextWidget *_rescue2Labels[kMaximumProfileRows] = {};
 	/** Booliewood population cells. */
-	GUI::StaticTextWidget *_booliewoodLabels[kMaximumProfileRows];
+	GUI::StaticTextWidget *_booliewoodLabels[kMaximumProfileRows] = {};
 	/** Serialized active-party population cells. */
-	GUI::StaticTextWidget *_activePartyLabels[kMaximumProfileRows];
+	GUI::StaticTextWidget *_activePartyLabels[kMaximumProfileRows] = {};
 	/** Whether each visible profile row contains a valid parsed .mk stream. */
-	bool _profileStateValid[kMaximumProfileRows];
+	bool _profileStateValid[kMaximumProfileRows] = {};
 };
 
 /** Engine-options entry point for target-scoped profiles and compatibility switches. */
@@ -201,15 +205,17 @@ private:
 	/** Command used to open @ref Zoombini2SaveManagementDialog. */
 	static const uint32 kManageProfilesCommand;
 	/** Toggle for the F2, F3, P, and Chez Norf C developer keys. */
-	GUI::CheckboxWidget *_debugHotkeysCheckbox;
+	GUI::CheckboxWidget *_debugHotkeysCheckbox = nullptr;
 	/** Toggle selecting stereo rather than mono game-audio streams. */
-	GUI::CheckboxWidget *_stereoOutputCheckbox;
+	GUI::CheckboxWidget *_stereoOutputCheckbox = nullptr;
 	/** Toggle selecting the alternate level-one Waterslide pairing. */
-	GUI::CheckboxWidget *_greedyWaterslideCheckbox;
+	GUI::CheckboxWidget *_greedyWaterslideCheckbox = nullptr;
 	/** Toggle selecting one gameplay-clock snapshot per rendered frame. */
-	GUI::CheckboxWidget *_cachedFrameTimeCheckbox;
+	GUI::CheckboxWidget *_cachedFrameTimeCheckbox = nullptr;
+	/** Toggle selecting the original Windows random-number generator. */
+	GUI::CheckboxWidget *_originalPrngCheckbox = nullptr;
 	/** Toggle selecting floating-point rather than original Q10 Bezier calculations. */
-	GUI::CheckboxWidget *_floatingPointPathsCheckbox;
+	GUI::CheckboxWidget *_floatingPointPathsCheckbox = nullptr;
 
 	/** Define this widget's overlay-compatible GUI layout. */
 	void defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const override;

@@ -32,8 +32,7 @@ static const Zoombini2GameDescription gameDescriptions[] = {
 	{
 		{"zoombini2",
 		 "v1.0US",
-		 AD_ENTRY3s("Data/Bmp/ZOMBIS/littleZomb.anm", "45a25d37d7c01a5dd4eea814340aad32", 1451723,
-					"INSTALL/HD/Bmp/Map/background.bb", "8810734b173c40bac5863997a7196f12", 1440024,
+		 AD_ENTRY2s("INSTALL/HD/Bmp/Map/background.bb", "8810734b173c40bac5863997a7196f12", 1440024,
 					"INSTALL/HD/zoombini2.exe", "e3e8951dc399ffb571fdfa46f5ae3a0c", 647168),
 		 Common::EN_USA,
 		 Common::kPlatformWindows,
@@ -46,8 +45,7 @@ static const Zoombini2GameDescription gameDescriptions[] = {
 	{
 		{"zoombini2",
 		 "v1.0NL",
-		 AD_ENTRY3s("Data/Bmp/ZOMBIS/littleZomb.anm", "45a25d37d7c01a5dd4eea814340aad32", 1451723,
-					"INSTALL/HD/Bmp/Map/background.bb", "cfc9d681ca98b4aa639fdd43a21dce8e", 1440024,
+		 AD_ENTRY2s("INSTALL/HD/Bmp/Map/background.bb", "cfc9d681ca98b4aa639fdd43a21dce8e", 1440024,
 					"INSTALL/HD/zoombini2.exe", "f8cf557d5f5075af8d0342b74922fe40", 1639009),
 		 Common::NL_NLD,
 		 Common::kPlatformWindows,
@@ -60,8 +58,7 @@ static const Zoombini2GameDescription gameDescriptions[] = {
 	{
 		{"zoombini2",
 		 "v1.0HE",
-		 AD_ENTRY3s("Data/Bmp/ZOMBIS/littleZomb.anm", "45a25d37d7c01a5dd4eea814340aad32", 1451723,
-					"INSTALL/HD/Bmp/Map/background.bb", "b2b60177a0fdbb315961f86d4ef8d06d", 1440024,
+		 AD_ENTRY2s("INSTALL/HD/Bmp/Map/background.bb", "b2b60177a0fdbb315961f86d4ef8d06d", 1440024,
 					"INSTALL/HD/zoombini2.exe", "b566daeadb2c60a80ba26064860f911c", 815104),
 		 Common::HE_ISR,
 		 Common::kPlatformWindows,
@@ -74,8 +71,7 @@ static const Zoombini2GameDescription gameDescriptions[] = {
 	{
 		{"zoombini2",
 		 "v1.1US",
-		 AD_ENTRY3s("Data/Bmp/ZOMBIS/littleZomb.anm", "45a25d37d7c01a5dd4eea814340aad32", 1451723,
-					"INSTALL/HD/Bmp/Map/background.bb", "8810734b173c40bac5863997a7196f12", 1440024,
+		 AD_ENTRY2s("INSTALL/HD/Bmp/Map/background.bb", "8810734b173c40bac5863997a7196f12", 1440024,
 					"INSTALL/HD/zoombini2.exe", "df24a5559803c10f03b399b25950ea00", 725073),
 		 Common::EN_USA,
 		 Common::kPlatformWindows,
@@ -88,8 +84,7 @@ static const Zoombini2GameDescription gameDescriptions[] = {
 	{
 		{"zoombini2",
 		 "v1.1KR",
-		 AD_ENTRY3s("Data/Bmp/ZOMBIS/littleZomb.anm", "45a25d37d7c01a5dd4eea814340aad32", 1451723,
-					"INSTALL/HD/Bmp/Map/background.bb", "019d27367ef3cd4fc83ab77ac8c4f217", 1440024,
+		 AD_ENTRY2s("INSTALL/HD/Bmp/Map/background.bb", "019d27367ef3cd4fc83ab77ac8c4f217", 1440024,
 					"INSTALL/HD/zoombini2.exe", "7e2e8636a7d32c5b9a7a0286ed55105e", 708684),
 		 Common::KO_KOR,
 		 Common::kPlatformWindows,
@@ -102,8 +97,7 @@ static const Zoombini2GameDescription gameDescriptions[] = {
 	{
 		{"zoombini2",
 		 "v1.1SE",
-		 AD_ENTRY3s("Data/Bmp/ZOMBIS/littleZomb.anm", "45a25d37d7c01a5dd4eea814340aad32", 1451723,
-					"INSTALL/HD/Bmp/Map/background.bb", "8810734b173c40bac5863997a7196f12", 1440024,
+		 AD_ENTRY2s("INSTALL/HD/Bmp/Map/background.bb", "8810734b173c40bac5863997a7196f12", 1440024,
 					"INSTALL/HD/zoombini2.exe", "0b7546aa8ba6d3f0ad05d37c3276d676", 2395248),
 		 Common::SV_SWE,
 		 Common::kPlatformWindows,
@@ -116,8 +110,7 @@ static const Zoombini2GameDescription gameDescriptions[] = {
 	{
 		{"zoombini2",
 		 "v1.1PL",
-		 AD_ENTRY3s("Bmp/ZOMBIS/littleZomb.anm", "45a25d37d7c01a5dd4eea814340aad32", 1451723,
-					"Bmp/Map/background.bb", "b58e398807cd459d563cb6338c3fa32b", 1440024,
+		 AD_ENTRY2s("Bmp/Map/background.bb", "b58e398807cd459d563cb6338c3fa32b", 1440024,
 					"zoombini2.exe", "e7267a51d0edd95718ce9a849dd21e63", 729169),
 		 Common::PL_POL,
 		 Common::kPlatformWindows,

@@ -26,10 +26,8 @@
 
 namespace Zoombini2 {
 
-SaveFileList::SaveFileList(const Common::Point32 &pos, RleBlock *selectionBar)
-	: _pos(pos), _selectionBar(selectionBar), _defaultFont(nullptr),
-	  _matchFont(nullptr), _editFont(nullptr), _editState(kEditIdle00),
-	  _selectedIndex(0), _scrollOffset(0), _validSelection(false) {
+SaveFileList::SaveFileList(Zoombini2Engine *vm, const Common::Point32 &pos, RleBlock *selectionBar)
+	: _vm(vm), _pos(pos), _selectionBar(selectionBar) {
 }
 
 SaveFileList::~SaveFileList() {
@@ -39,9 +37,9 @@ SaveFileList::~SaveFileList() {
 }
 
 bool SaveFileList::init() {
-	_defaultFont = new BitmapFont();
-	_matchFont = new BitmapFont();
-	_editFont = new BitmapFont();
+	_defaultFont = new BitmapFont(_vm);
+	_matchFont = new BitmapFont(_vm);
+	_editFont = new BitmapFont(_vm);
 
 	const Common::Path fontPath("bmp/typo");
 	return _defaultFont->load(fontPath, 16, 16, 16) &&

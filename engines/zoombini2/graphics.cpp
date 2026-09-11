@@ -24,6 +24,8 @@
 #include "common/ptr.h"
 #include "common/textconsole.h"
 
+#include "image/bmp.h"
+
 #include "zoombini2/graphics.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
@@ -62,19 +64,19 @@ void ManagedSurface32::blitFrom(const Graphics::ManagedSurface &src, const Commo
 }
 
 AlphaBlendLUT::AlphaBlendLUT() {
-	// Fill the complete table once. Blended pixels reuse these products for
-	// every color channel, avoiding multiplication and division in the inner
-	// drawing loops.
+	// Fill the complete table once.
+	// Blended pixels reuse these products for every color channel,
+	// avoiding multiplication and division in the inner drawing loops.
 	//
-	// The shift is deliberate: it produces floor(factor * value / 256), which
-	// is the renderer's exact byte-based rule rather than a /255 blend.
+	// The shift is deliberate: it produces floor(factor * value / 256),
+	// which is the renderer's exact byte-based rule rather than a /255 blend.
 	for (int factor = 0; factor < kValueCount; factor++) {
 		for (int value = 0; value < kValueCount; value++)
 			_values[factor][value] = static_cast<byte>((factor * value) >> 8);
 	}
 }
 
-BitBlock::BitBlock() : _width(0), _height(0), _pixels(nullptr), _alphaMap(nullptr) {
+BitBlock::BitBlock(Zoombini2Engine *vm) : _vm(vm) {
 }
 
 BitBlock::~BitBlock() {
@@ -84,19 +86,18 @@ BitBlock::~BitBlock() {
 
 /** Load a color BMP and separate alpha BMP into one drawable block. */
 bool BitBlock::loadFromColorAlphaBMP(const Common::Path &colorPath, const Common::Path &alphaPath) {
-	Zoombini2Engine *vm = static_cast<Zoombini2Engine *>(g_engine);
-	Common::ScopedPtr<Common::SeekableReadStream> colorStream(vm ? vm->openResourceFile(colorPath.toString('/')) : nullptr);
+	Common::ScopedPtr<Common::SeekableReadStream> colorStream(_vm->openResourceFile(colorPath.toString('/')));
 	if (!colorStream) {
 		warning("BitBlock: cannot open color BMP '%s'", colorPath.toString().c_str());
 		return false;
 	}
 	Common::SeekableReadStream &colorFile = *colorStream;
 
-	BitBlock loaded;
+	BitBlock loaded(_vm);
 	if (!loaded.loadColorBMP(&colorFile))
 		return false;
 
-	Common::ScopedPtr<Common::SeekableReadStream> alphaStream(vm ? vm->openResourceFile(alphaPath.toString('/')) : nullptr);
+	Common::ScopedPtr<Common::SeekableReadStream> alphaStream(_vm->openResourceFile(alphaPath.toString('/')));
 	if (!alphaStream) {
 		warning("BitBlock: cannot open alpha BMP '%s'", alphaPath.toString().c_str());
 		return false;
@@ -113,14 +114,13 @@ bool BitBlock::loadFromColorAlphaBMP(const Common::Path &colorPath, const Common
 }
 
 bool BitBlock::loadFromColorBMP(const Common::Path &colorPath) {
-	Zoombini2Engine *vm = static_cast<Zoombini2Engine *>(g_engine);
-	Common::ScopedPtr<Common::SeekableReadStream> colorStream(vm ? vm->openResourceFile(colorPath.toString('/')) : nullptr);
+	Common::ScopedPtr<Common::SeekableReadStream> colorStream(_vm->openResourceFile(colorPath.toString('/')));
 	if (!colorStream) {
 		debug(3, "BitBlock: cannot open BMP '%s'", colorPath.toString().c_str());
 		return false;
 	}
 	Common::SeekableReadStream &colorFile = *colorStream;
-	BitBlock loaded;
+	BitBlock loaded(_vm);
 	if (!loaded.loadColorBMP(&colorFile))
 		return false;
 
@@ -137,8 +137,7 @@ bool BitBlock::loadFromColorBMP(const Common::Path &colorPath) {
  *   - Raw BGR pixel data (3 bytes per pixel, top-to-bottom)
  */
 bool BitBlock::loadFromBB(const Common::Path &bbPath) {
-	Zoombini2Engine *vm = static_cast<Zoombini2Engine *>(g_engine);
-	Common::ScopedPtr<Common::SeekableReadStream> stream(vm ? vm->openResourceFile(bbPath.toString('/')) : nullptr);
+	Common::ScopedPtr<Common::SeekableReadStream> stream(_vm->openResourceFile(bbPath.toString('/')));
 	if (!stream) {
 		debug(3, "BitBlock: cannot open BB '%s'", bbPath.toString().c_str());
 		return false;
@@ -250,69 +249,31 @@ void BitBlock::createEmpty(int width, int height, bool withAlpha) {
 	_alphaMap = withAlpha ? new byte[width * height]() : nullptr;
 }
 
-/**
- * Read a 24-bit color BMP.
- * Standard 14-byte file header + 40-byte info header.
- * Rows are bottom-up (flipped), padded to 4 bytes.
- */
 bool BitBlock::loadColorBMP(Common::SeekableReadStream *stream) {
-	// Read 14-byte BITMAPFILEHEADER
-	byte bmpFileHeader[14];
-	if (stream->read(bmpFileHeader, 14) != 14) {
-		warning("BitBlock: failed to read BMP file header");
+	Image::BitmapDecoder decoder;
+	if (!decoder.loadStream(*stream)) {
+		warning("BitBlock: failed to decode color BMP");
 		return false;
 	}
 
-	// Read 40-byte BITMAPINFOHEADER
-	byte bmpInfoHeader[40];
-	if (stream->read(bmpInfoHeader, 40) != 40) {
-		warning("BitBlock: failed to read BMP info header");
+	const Graphics::Surface *surface = decoder.getSurface();
+	if (!surface || surface->format != Graphics::PixelFormat::createFormatBGR24()) {
+		warning("BitBlock: color BMP is not 24-bit BGR");
 		return false;
 	}
 
-	const int32 width = READ_LE_INT32(bmpInfoHeader + 4);
-	const int32 height = READ_LE_INT32(bmpInfoHeader + 8);
-	const int bitsPerPixel = READ_LE_INT16(bmpInfoHeader + 14);
-
-	if (width <= 0 || height <= 0) {
-		warning("BitBlock: invalid BMP dimensions %dx%d", width, height);
-		return false;
-	}
-
-	if (bitsPerPixel != 24) {
-		warning("BitBlock: unsupported BMP bpp %d (expected 24)", bitsPerPixel);
-		return false;
-	}
-
+	const int32 width = surface->w;
+	const int32 height = surface->h;
 	const uint64 pixelCount64 = static_cast<uint64>(width) * static_cast<uint64>(height);
 	if (0x3FFFFFFFU < pixelCount64) {
 		warning("BitBlock: BMP dimensions are too large");
 		return false;
 	}
+
+	Common::ScopedPtr<Graphics::Surface, Graphics::SurfaceDeleter> rgbaSurface(surface->convertTo(Graphics::PixelFormat::createFormatRGBA32()));
 	byte *pixels = new byte[static_cast<uint32>(pixelCount64) * 4];
-
-	const int rowPadding = width % 4;
-	byte padBuf[4];
-
-	for (int row = height - 1; 0 <= row; row--) {
-		byte *dstRow = pixels + row * width * 4;
-		for (int col = 0; col < width; col++) {
-			byte bgr[3];
-			if (stream->read(bgr, 3) != 3) {
-				warning("BitBlock: failed to read pixel data");
-				delete[] pixels;
-				return false;
-			}
-			dstRow[col * 4 + 0] = bgr[2];
-			dstRow[col * 4 + 1] = bgr[1];
-			dstRow[col * 4 + 2] = bgr[0];
-			dstRow[col * 4 + 3] = 255;
-		}
-		if (0 < rowPadding && stream->read(padBuf, rowPadding) != static_cast<uint32>(rowPadding)) {
-			delete[] pixels;
-			return false;
-		}
-	}
+	for (int row = 0; row < height; row++)
+		memcpy(pixels + row * width * 4, rgbaSurface->getBasePtr(0, row), width * 4);
 
 	delete[] _pixels;
 	delete[] _alphaMap;
@@ -324,86 +285,31 @@ bool BitBlock::loadColorBMP(Common::SeekableReadStream *stream) {
 	return true;
 }
 
-/**
- * Read an 8-bit alpha-mask BMP.
- * The fixed read covers the 14-byte file header, 40-byte info header, and the
- * first four-byte palette entry. The remaining palette precedes the rows.
- */
 bool BitBlock::loadAlphaBMP(Common::SeekableReadStream *stream) {
-	// Read 14-byte BITMAPFILEHEADER
-	byte bmpFileHeader[14];
-	if (stream->read(bmpFileHeader, 14) != 14)
+	Image::BitmapDecoder decoder;
+	if (!decoder.loadStream(*stream))
 		return false;
 
-	// Read the 40-byte info header and first palette entry.
-	byte bmpInfoHeader[44];
-	if (stream->read(bmpInfoHeader, 44) != 44)
+	const Graphics::Surface *surface = decoder.getSurface();
+	if (!surface || !surface->format.isCLUT8()) {
+		warning("BitBlock: alpha BMP is not indexed");
 		return false;
+	}
 
-	int alphaWidth = READ_LE_INT32(bmpInfoHeader + 4);
-	int alphaHeight = READ_LE_INT32(bmpInfoHeader + 8);
-	const int alphaBpp = READ_LE_INT16(bmpInfoHeader + 14);
-	const int clrUsed = READ_LE_INT32(bmpInfoHeader + 32);
-
-	if (alphaBpp != 8 || alphaWidth != _width || alphaHeight != _height) {
+	const int alphaWidth = surface->w;
+	const int alphaHeight = surface->h;
+	if (alphaWidth != _width || alphaHeight != _height) {
 		warning("BitBlock: alpha BMP size %dx%d doesn't match color %dx%d",
 				alphaWidth, alphaHeight, _width, _height);
 		return false;
 	}
 
-	// Read and discard palette
-	int paletteEntries = clrUsed ? (clrUsed - 1) : 255;
-	if (paletteEntries > 0) {
-		byte *palette = new byte[paletteEntries * 4];
-		if (stream->read(palette, paletteEntries * 4) != static_cast<uint32>(paletteEntries * 4)) {
-			delete[] palette;
-			return false;
-		}
-		delete[] palette;
-	}
+	byte *alphaMap = new byte[alphaWidth * alphaHeight];
+	for (int row = 0; row < alphaHeight; row++)
+		memcpy(alphaMap + row * alphaWidth, surface->getBasePtr(0, row), alphaWidth);
 
-	// Calculate padding for 8-bit rows
-	int rowPad;
-	switch (alphaWidth % 4) {
-	case 1:
-		rowPad = 3;
-		break;
-	case 2:
-		rowPad = 2;
-		break;
-	case 3:
-		rowPad = 1;
-		break;
-	default:
-		rowPad = 0;
-		break;
-	}
-
-	// Read rows top-down into temp buffer, then flip
-	byte *tempBuf = new byte[alphaWidth * alphaHeight];
-	byte padBuf[4];
-	byte *ptr = tempBuf;
-	for (int row = 0; row < alphaHeight; row++) {
-		if (stream->read(ptr, alphaWidth) != static_cast<uint32>(alphaWidth)) {
-			delete[] tempBuf;
-			return false;
-		}
-		ptr += alphaWidth;
-		if (0 < rowPad && stream->read(padBuf, rowPad) != static_cast<uint32>(rowPad)) {
-			delete[] tempBuf;
-			return false;
-		}
-	}
-
-	// Flip bottom-up to top-down
 	delete[] _alphaMap;
-	_alphaMap = new byte[alphaWidth * alphaHeight];
-	for (int row = 0; row < alphaHeight; row++) {
-		memcpy(_alphaMap + row * alphaWidth,
-			   tempBuf + (alphaHeight - 1 - row) * alphaWidth,
-			   alphaWidth);
-	}
-	delete[] tempBuf;
+	_alphaMap = alphaMap;
 
 	return true;
 }
@@ -554,7 +460,7 @@ void BitBlock::drawRleMaskBlend(Graphics::ManagedSurface *dst, const Common::Poi
 	}
 }
 
-RleBlock::RleBlock() : _width(0), _height(0), _dataSize(0), _rleData(nullptr), _field20(0) {
+RleBlock::RleBlock(Zoombini2Engine *vm) : _vm(vm) {
 }
 
 RleBlock::~RleBlock() {
@@ -637,14 +543,13 @@ bool RleBlock::loadFromFile(const Common::Path &path) {
 		resolvedPath = resolvedPath.append(".rb");
 	}
 
-	Zoombini2Engine *vm = static_cast<Zoombini2Engine *>(g_engine);
-	Common::ScopedPtr<Common::SeekableReadStream> stream(vm ? vm->openResourceFile(resolvedPath.toString('/')) : nullptr);
+	Common::ScopedPtr<Common::SeekableReadStream> stream(_vm->openResourceFile(resolvedPath.toString('/')));
 	if (!stream) {
 		debug(3, "RleBlock: cannot open '%s'", resolvedPath.toString().c_str());
 		return false;
 	}
 	Common::SeekableReadStream &f = *stream;
-	RleBlock loaded;
+	RleBlock loaded(_vm);
 	if (!loaded.loadFromStream(&f))
 		return false;
 	if (f.pos() != f.size())
@@ -974,7 +879,7 @@ void RleBlock::drawToScreenClipped(Graphics::ManagedSurface *dst, const Common::
 // Animation
 // ============================================================================
 
-Animation::Animation() {
+Animation::Animation(Zoombini2Engine *vm) : _vm(vm) {
 }
 
 Animation::~Animation() {
@@ -995,8 +900,7 @@ bool Animation::loadFromFile(const Common::Path &path) {
 		resolvedPath = resolvedPath.append(".an");
 	}
 
-	Zoombini2Engine *vm = static_cast<Zoombini2Engine *>(g_engine);
-	Common::ScopedPtr<Common::SeekableReadStream> stream(vm ? vm->openResourceFile(resolvedPath.toString('/')) : nullptr);
+	Common::ScopedPtr<Common::SeekableReadStream> stream(_vm->openResourceFile(resolvedPath.toString('/')));
 	if (!stream) {
 		debug(3, "Animation: cannot open '%s'", resolvedPath.toString().c_str());
 		return false;
@@ -1015,7 +919,7 @@ bool Animation::loadFromFile(const Common::Path &path) {
 	bool complete = true;
 
 	for (uint32 i = 0; i < frameCount; i++) {
-		RleBlock *frame = new RleBlock();
+		RleBlock *frame = new RleBlock(_vm);
 		if (!frame->loadFromStream(&f)) {
 			warning("Animation: stopped after %u of %u frames in '%s'", i, frameCount, resolvedPath.toString().c_str());
 			delete frame;
@@ -1048,575 +952,6 @@ const RleBlock *Animation::getFrame(int index) const {
 }
 
 // ============================================================================
-// Fixed32
-// ============================================================================
-
-Fixed32 Fixed32::fromInt(int32 value) {
-	return fromRawBits(static_cast<uint32>(value) << kFractionalBits);
-}
-
-Fixed32 Fixed32::fromFloat(Float32 value) {
-	static constexpr Float32 kMinimum = -2097152.0f;
-	static constexpr Float32 kMaximumExclusive = 2097152.0f;
-	static constexpr Float32 kScale = 1 << kFractionalBits;
-	assert(kMinimum <= value && value < kMaximumExclusive);
-	return Fixed32(static_cast<int32>(value * kScale));
-}
-
-int32 Fixed32::toInt() const {
-	return arithmeticShiftRight(static_cast<uint32>(_rawValue));
-}
-
-Float32 Fixed32::toFloat() const {
-	static constexpr Float32 kScale = 1 << kFractionalBits;
-	return static_cast<Float32>(_rawValue) / kScale;
-}
-
-Fixed32 Fixed32::operator*(const Fixed32 &right) const {
-	const uint32 productLow = static_cast<uint32>(_rawValue) * static_cast<uint32>(right._rawValue);
-	return Fixed32(arithmeticShiftRight(productLow));
-}
-
-Fixed32 Fixed32::operator/(const Fixed32 &right) const {
-	assert(right._rawValue != 0);
-	const int64 dividend = static_cast<int64>(_rawValue) * (1 << kFractionalBits);
-	const int64 quotient = dividend / static_cast<int64>(right._rawValue);
-	return fromRawBits(static_cast<uint32>(quotient));
-}
-
-Fixed32 Fixed32::operator-(const Fixed32 &right) const {
-	return fromRawBits(static_cast<uint32>(_rawValue) - static_cast<uint32>(right._rawValue));
-}
-
-Fixed32 Fixed32::operator+(const Fixed32 &right) const {
-	return fromRawBits(static_cast<uint32>(_rawValue) + static_cast<uint32>(right._rawValue));
-}
-
-void Fixed32::operator+=(const Fixed32 &right) {
-	*this = *this + right;
-}
-
-void Fixed32::operator-=(const Fixed32 &right) {
-	*this = *this - right;
-}
-
-void Fixed32::operator*=(const Fixed32 &right) {
-	*this = *this * right;
-}
-
-void Fixed32::operator/=(const Fixed32 &right) {
-	*this = *this / right;
-}
-
-bool Fixed32::operator>(const Fixed32 &right) const {
-	return right._rawValue < _rawValue;
-}
-
-bool Fixed32::operator==(const Fixed32 &right) const {
-	return _rawValue == right._rawValue;
-}
-
-bool Fixed32::operator!=(const Fixed32 &right) const {
-	return !(*this == right);
-}
-
-Common::String Fixed32::toString() const {
-	static constexpr double kScale = 1 << kFractionalBits;
-	Common::String result = Common::String::format("%.10f", static_cast<double>(_rawValue) / kScale);
-
-	while (result.lastChar() == '0')
-		result.deleteLastChar();
-	if (result.lastChar() == '.')
-		result.deleteLastChar();
-
-	return result;
-}
-
-Fixed32 Fixed32::fromRawBits(uint32 value) {
-	static constexpr uint32 kMaxPositive = 0x7FFFFFFFU;
-
-	if (value <= kMaxPositive)
-		return Fixed32(static_cast<int32>(value));
-
-	return Fixed32(-1 - static_cast<int32>(~value));
-}
-
-int32 Fixed32::arithmeticShiftRight(uint32 value) {
-	static constexpr uint32 kSignBit = 0x80000000U;
-	static constexpr int32 kNegativeBias = 1 << (32 - kFractionalBits);
-	const uint32 shifted = value >> kFractionalBits;
-
-	if ((value & kSignBit) == 0)
-		return static_cast<int32>(shifted);
-
-	return static_cast<int32>(shifted) - kNegativeBias;
-}
-
-bool PointFixed32::operator==(const PointFixed32 &right) const {
-	return x == right.x && y == right.y;
-}
-
-bool PointFixed32::operator!=(const PointFixed32 &right) const {
-	return !(*this == right);
-}
-
-PointFixed32 PointFixed32::operator+(const PointFixed32 &right) const {
-	return PointFixed32(x + right.x, y + right.y);
-}
-
-PointFixed32 PointFixed32::operator-(const PointFixed32 &right) const {
-	return PointFixed32(x - right.x, y - right.y);
-}
-
-PointFixed32 PointFixed32::operator*(const Fixed32 &right) const {
-	return PointFixed32(x * right, y * right);
-}
-
-PointFixed32 PointFixed32::operator*(int32 right) const {
-	return *this * Fixed32::fromInt(right);
-}
-
-PointFixed32 PointFixed32::operator/(const Fixed32 &right) const {
-	return PointFixed32(x / right, y / right);
-}
-
-PointFixed32 PointFixed32::operator/(int32 right) const {
-	return *this / Fixed32::fromInt(right);
-}
-
-void PointFixed32::operator+=(const PointFixed32 &right) {
-	x += right.x;
-	y += right.y;
-}
-
-void PointFixed32::operator-=(const PointFixed32 &right) {
-	x -= right.x;
-	y -= right.y;
-}
-
-void PointFixed32::operator*=(const Fixed32 &right) {
-	x *= right;
-	y *= right;
-}
-
-void PointFixed32::operator/=(const Fixed32 &right) {
-	x /= right;
-	y /= right;
-}
-
-Fixed32 PointFixed32::sqrDist(const PointFixed32 &right) const {
-	static constexpr uint64 kFractionMask = (1ULL << Fixed32::kFractionalBits) - 1;
-	const uint64 xDifference = rawMagnitudeDifference(x, right.x);
-	const uint64 yDifference = rawMagnitudeDifference(y, right.y);
-	const uint64 xSquared = xDifference * xDifference;
-	const uint64 ySquared = yDifference * yDifference;
-	const uint64 fractionalCarry = ((xSquared & kFractionMask) + (ySquared & kFractionMask)) >> Fixed32::kFractionalBits;
-	const uint64 distanceRaw = (xSquared >> Fixed32::kFractionalBits) + (ySquared >> Fixed32::kFractionalBits) + fractionalCarry;
-	return Fixed32::fromRawBits(static_cast<uint32>(distanceRaw));
-}
-
-Common::String PointFixed32::toString() const {
-	return Common::String::format("%s, %s", x.toString().c_str(), y.toString().c_str());
-}
-
-uint64 PointFixed32::rawMagnitudeDifference(const Fixed32 &left, const Fixed32 &right) {
-	const int64 difference = static_cast<int64>(left._rawValue) - static_cast<int64>(right._rawValue);
-	if (difference < 0)
-		return static_cast<uint64>(-difference);
-	return static_cast<uint64>(difference);
-}
-
-PointFixed32 operator*(const Fixed32 &left, const PointFixed32 &right) {
-	return right * left;
-}
-
-PointFixed32 operator*(int32 left, const PointFixed32 &right) {
-	return right * left;
-}
-
-// ============================================================================
-// CurveSegment - runtime-selected cubic Bezier numeric representation.
-// ============================================================================
-
-class CurveSegment::Evaluator {
-public:
-	virtual ~Evaluator() {}
-	virtual void init(const Common::Point32 &start, const Common::Point32 &control0, const Common::Point32 &control1, const Common::Point32 &end,
-					  int stepValue, int waitInitial) = 0;
-	virtual void computeCoeffs() = 0;
-	virtual bool evaluate(uint32 tickCount, Common::Point32 &outPosition) = 0;
-	virtual Common::Point32 getPosition() const = 0;
-	virtual void setStartTime(uint32 tickCount) = 0;
-	virtual uint32 getStartTime() const = 0;
-	virtual void setWaitRemaining(int waitRemaining) = 0;
-	virtual int getWaitRemaining() const = 0;
-	virtual void setParameter(Float32 parameter) = 0;
-	virtual Float32 getParameter() const = 0;
-};
-
-struct CurveSegment::FixedNumeric {
-	typedef Fixed32 Scalar;
-	typedef PointFixed32 Point;
-
-	static Scalar fromInt(int32 value) { return Fixed32::fromInt(value); }
-	static Scalar fromRaw(int32 value) { return Fixed32::fromRaw(value); }
-	static Scalar fromFloat(Float32 value) { return Fixed32::fromFloat(value); }
-	static int32 toInt(const Scalar &value) { return value.toInt(); }
-	static Float32 toFloat(const Scalar &value) { return value.toFloat(); }
-	static bool greater(const Scalar &left, const Scalar &right) { return left > right; }
-};
-
-struct CurveSegment::FloatNumeric {
-	typedef Float32 Scalar;
-
-	struct Point {
-		Scalar x;
-		Scalar y;
-
-		Point() : x(0.0f), y(0.0f) {}
-		Point(Scalar xValue, Scalar yValue) : x(xValue), y(yValue) {}
-
-		Point operator+(const Point &right) const { return Point(x + right.x, y + right.y); }
-		Point operator-(const Point &right) const { return Point(x - right.x, y - right.y); }
-		Point operator*(Scalar right) const { return Point(x * right, y * right); }
-	};
-
-	static Scalar fromInt(int32 value) { return static_cast<Scalar>(value); }
-	static Scalar fromRaw(int32 value) { return static_cast<Scalar>(value) / 1024.0f; }
-	static Scalar fromFloat(Float32 value) { return value; }
-	static int32 toInt(Scalar value) {
-		int32 result = static_cast<int32>(value);
-		if (value < static_cast<Scalar>(result))
-			result -= 1;
-		return result;
-	}
-	static Float32 toFloat(Scalar value) { return value; }
-	static bool greater(Scalar left, Scalar right) { return right < left; }
-};
-
-template<typename Numeric>
-class CurveSegment::TypedEvaluator : public CurveSegment::Evaluator {
-public:
-	typedef typename Numeric::Scalar Scalar;
-	typedef typename Numeric::Point Point;
-
-	TypedEvaluator()
-		: _start(), _control0(), _control1(), _end(), _cubic(), _quadratic(), _linear(), _parameter(), _position(), _step(), _waitInitial(0),
-		  _waitRemaining(0), _startTime(0) {
-	}
-
-	void init(const Common::Point32 &start, const Common::Point32 &control0, const Common::Point32 &control1, const Common::Point32 &end,
-			  int stepValue, int waitInitial) override {
-		_start = Point(Numeric::fromInt(start.x), Numeric::fromInt(start.y));
-		_control0 = Point(Numeric::fromInt(control0.x), Numeric::fromInt(control0.y));
-		_control1 = Point(Numeric::fromInt(control1.x), Numeric::fromInt(control1.y));
-		_end = Point(Numeric::fromInt(end.x), Numeric::fromInt(end.y));
-		_cubic = Point();
-		_quadratic = Point();
-		_linear = Point();
-		_parameter = Scalar();
-		_position = _start;
-		_step = Numeric::fromRaw(stepValue);
-		_waitInitial = waitInitial;
-		_waitRemaining = waitInitial;
-		_startTime = 0;
-	}
-
-	void computeCoeffs() override {
-		_parameter = Scalar();
-		const Scalar three = Numeric::fromInt(3);
-		_linear = (_control0 - _start) * three;
-		_quadratic = (_control1 - _control0) * three - _linear;
-		_cubic = _end - _start - _linear - _quadratic;
-		_waitRemaining = _waitInitial;
-	}
-
-	bool evaluate(uint32 tickCount, Common::Point32 &outPosition) override {
-		const Scalar completionThreshold = Numeric::fromRaw(950);
-		if (!Numeric::greater(_parameter, completionThreshold)) {
-			const uint32 elapsed = tickCount - _startTime;
-			const int32 ticks = static_cast<int32>(elapsed / 5u);
-			_parameter = _step * Numeric::fromInt(ticks);
-			calculatePosition();
-			outPosition = getPosition();
-			return true;
-		}
-
-		if (0 < _waitRemaining) {
-			_waitRemaining -= 1;
-			return true;
-		}
-
-		return false;
-	}
-
-	Common::Point32 getPosition() const override {
-		return Common::Point32(Numeric::toInt(_position.x), Numeric::toInt(_position.y));
-	}
-
-	void setStartTime(uint32 tickCount) override { _startTime = tickCount; }
-	uint32 getStartTime() const override { return _startTime; }
-	void setWaitRemaining(int waitRemaining) override { _waitRemaining = waitRemaining; }
-	int getWaitRemaining() const override { return _waitRemaining; }
-	void setParameter(Float32 parameter) override {
-		_parameter = Numeric::fromFloat(parameter);
-		calculatePosition();
-	}
-	Float32 getParameter() const override { return Numeric::toFloat(_parameter); }
-
-private:
-	Point _start;
-	Point _control0;
-	Point _control1;
-	Point _end;
-	Point _cubic;
-	Point _quadratic;
-	Point _linear;
-	Scalar _parameter;
-	Point _position;
-	Scalar _step;
-	int _waitInitial;
-	int _waitRemaining;
-	uint32 _startTime;
-
-	void calculatePosition() {
-		const Scalar squaredParameter = _parameter * _parameter;
-		const Scalar cubedParameter = squaredParameter * _parameter;
-		_position = _start + _linear * _parameter + _quadratic * squaredParameter + _cubic * cubedParameter;
-	}
-};
-
-CurveSegment::CurveSegment(bool useFloatingPoint)
-	: _evaluator(createEvaluator(useFloatingPoint)), _start(), _control0(), _control1(), _end(), _stepValue(0), _waitInitial(0), _initialized(false),
-	  _coefficientsReady(false), _useFloatingPoint(useFloatingPoint) {
-}
-
-CurveSegment::~CurveSegment() {
-	delete _evaluator;
-}
-
-void CurveSegment::init(const Common::Point32 &start, const Common::Point32 &control0, const Common::Point32 &control1, const Common::Point32 &end,
-						int stepValue, int waitInitial) {
-	_start = start;
-	_control0 = control0;
-	_control1 = control1;
-	_end = end;
-	_stepValue = stepValue;
-	_waitInitial = waitInitial;
-	_initialized = true;
-	_coefficientsReady = false;
-	_evaluator->init(start, control0, control1, end, stepValue, waitInitial);
-}
-
-void CurveSegment::computeCoeffs() {
-	assert(_initialized);
-	_evaluator->computeCoeffs();
-	_coefficientsReady = true;
-}
-
-bool CurveSegment::evaluate(uint32 tickCount, Common::Point32 &outPosition) {
-	assert(_coefficientsReady);
-	return _evaluator->evaluate(tickCount, outPosition);
-}
-
-Common::Point32 CurveSegment::getStartPosition() const {
-	return _start;
-}
-
-Common::Point32 CurveSegment::getEndPosition() const {
-	return _end;
-}
-
-Common::Point32 CurveSegment::getPosition() const {
-	return _initialized ? _evaluator->getPosition() : Common::Point32();
-}
-
-void CurveSegment::setStartTime(uint32 tickCount) {
-	_evaluator->setStartTime(tickCount);
-}
-
-void CurveSegment::setFloatingPointMode(bool useFloatingPoint) {
-	if (_useFloatingPoint == useFloatingPoint)
-		return;
-	_useFloatingPoint = useFloatingPoint;
-	rebuildEvaluator();
-}
-
-CurveSegment::Evaluator *CurveSegment::createEvaluator(bool useFloatingPoint) {
-	if (useFloatingPoint)
-		return new TypedEvaluator<FloatNumeric>();
-	return new TypedEvaluator<FixedNumeric>();
-}
-
-void CurveSegment::rebuildEvaluator() {
-	const uint32 previousStartTime = _evaluator->getStartTime();
-	const int previousWaitRemaining = _evaluator->getWaitRemaining();
-	const Float32 previousParameter = _evaluator->getParameter();
-
-	delete _evaluator;
-	_evaluator = createEvaluator(_useFloatingPoint);
-	if (!_initialized)
-		return;
-
-	_evaluator->init(_start, _control0, _control1, _end, _stepValue, _waitInitial);
-	_evaluator->setStartTime(previousStartTime);
-	if (_coefficientsReady) {
-		_evaluator->computeCoeffs();
-		_evaluator->setStartTime(previousStartTime);
-		_evaluator->setWaitRemaining(previousWaitRemaining);
-		_evaluator->setParameter(previousParameter);
-	}
-}
-
-// ============================================================================
-// PathObject - Bezier path composed of chained CurveSegments.
-// ============================================================================
-
-PathObject::PathObject()
-	: currentSegment(0), looping(false), finished(false),
-	  endPos(), startTime(0) {
-}
-
-PathObject::~PathObject() {
-	for (uint i = 0; i < segments.size(); i++)
-		delete segments[i];
-}
-
-void PathObject::appendSegment(const Common::Point32 &start, const Common::Point32 &control0, const Common::Point32 &control1, const Common::Point32 &end,
-						   int stepValue, int waitInitial) {
-	Zoombini2Engine *vm = static_cast<Zoombini2Engine *>(g_engine);
-	CurveSegment *segment = new CurveSegment(vm && vm->useFloatingPointPaths());
-	segment->init(start, control0, control1, end, stepValue, waitInitial);
-	segments.push_back(segment);
-}
-
-/**
- * Load a `.PAT` Bezier path file.
- *
- * Format:
- *   FIRST=coord:x0,y0,cx0,cy0,cx1,cy1,x1,y1 step:S wait:W
- *   NEXT_N=coord:cx0,cy0,cx1,cy1,x1,y1 step:S wait:W
- *
- * NEXT segments chain from the previous segment's endpoint and retain their own
- * step and wait values.
- */
-PathObject *PathObject::loadFromPAT(const Common::Path &path) {
-	Zoombini2Engine *vm = static_cast<Zoombini2Engine *>(g_engine);
-	Common::ScopedPtr<Common::SeekableReadStream> stream(vm ? vm->openResourceFile(path.toString('/')) : nullptr);
-	if (!stream) {
-		warning("PathObject: cannot open PAT '%s'", path.toString().c_str());
-		return nullptr;
-	}
-	Common::SeekableReadStream &f = *stream;
-
-	PathObject *obj = new PathObject();
-
-	// Read FIRST line
-	Common::String line = f.readLine();
-	if (line.hasPrefix("FIRST=coord:")) {
-		int x0, y0, cx0, cy0, cx1, cy1, x1, y1, stepVal, waitVal;
-		if (sscanf(line.c_str(),
-				   "FIRST=coord:%d,%d,%d,%d,%d,%d,%d,%d step:%d wait:%d",
-				   &x0, &y0, &cx0, &cy0, &cx1, &cy1, &x1, &y1,
-				   &stepVal, &waitVal) >= 10) {
-			obj->appendSegment(Common::Point32(x0, y0), Common::Point32(cx0, cy0), Common::Point32(cx1, cy1), Common::Point32(x1, y1), stepVal, waitVal);
-		}
-	}
-
-	// Read NEXT lines (start with 'N')
-	while (!f.eos()) {
-		line = f.readLine();
-		if (line.empty() || line[0] != 'N')
-			break;
-
-		// Parse the continuation coordinates, speed, and endpoint wait.
-		int ext, ncx0, ncy0, ncx1, ncy1, nx1, ny1, stepVal, waitVal;
-		// Skip the leading 'N' and parse the remaining `EXT` record.
-		if (sscanf(line.c_str() + 1,
-				   "EXT_%d=coord:%d,%d,%d,%d,%d,%d step:%d wait:%d",
-				   &ext, &ncx0, &ncy0, &ncx1, &ncy1, &nx1, &ny1, &stepVal, &waitVal) >= 9) {
-			CurveSegment *prev = obj->segments.back();
-			// P0 comes from previous segment's P1
-			obj->appendSegment(prev->getEndPosition(), Common::Point32(ncx0, ncy0), Common::Point32(ncx1, ncy1), Common::Point32(nx1, ny1), stepVal, waitVal);
-		}
-	}
-
-	if (obj->segments.empty()) {
-		delete obj;
-		return nullptr;
-	}
-
-	// Set endpoint from last segment
-	CurveSegment *last = obj->segments.back();
-	obj->endPos = last->getEndPosition();
-
-	return obj;
-}
-
-/**
- * Start path evaluation. Sets startTime on all segments and computes
- * coefficients for the first segment.
- */
-void PathObject::start(uint32 tickCount) {
-	synchronizeNumericMode();
-	currentSegment = 0;
-	finished = false;
-	startTime = tickCount;
-
-	for (uint i = 0; i < segments.size(); i++)
-		segments[i]->setStartTime(tickCount);
-
-	if (!segments.empty())
-		segments[0]->computeCoeffs();
-}
-
-/**
- * Advance the path evaluation. Returns true if still walking,
- * false if the entire path is complete.
- * @p outPos receives the current screen pos.
- */
-bool PathObject::advance(uint32 tickCount, Common::Point32 &outPos) {
-	synchronizeNumericMode();
-	if (finished) {
-		outPos = endPos;
-		return false;
-	}
-
-	if (currentSegment >= static_cast<int>(segments.size())) {
-		finished = true;
-		outPos = endPos;
-		return false;
-	}
-
-	CurveSegment *seg = segments[currentSegment];
-	if (seg->evaluate(tickCount, outPos))
-		return true;
-
-	// Advance after the current segment completes.
-	currentSegment += 1;
-	if (static_cast<int>(segments.size()) <= currentSegment) {
-		// All segments done
-		finished = true;
-		outPos = endPos;
-		return false;
-	}
-
-	// Compute coefficients for the next segment and evaluate it
-	CurveSegment *next = segments[currentSegment];
-	next->computeCoeffs();
-	next->setStartTime(tickCount);
-	next->evaluate(tickCount, outPos);
-	return true;
-}
-
-void PathObject::synchronizeNumericMode() {
-	Zoombini2Engine *vm = static_cast<Zoombini2Engine *>(g_engine);
-	const bool useFloatingPoint = vm && vm->useFloatingPointPaths();
-	for (uint i = 0; i < segments.size(); i++)
-		segments[i]->setFloatingPointMode(useFloatingPoint);
-}
-
-// ============================================================================
 // ZoombiniAnimation
 // ============================================================================
 
@@ -1625,15 +960,14 @@ ZoombiniAnimation::Cell::~Cell() {
 		delete frames[i];
 }
 
-ZoombiniAnimation::ZoombiniAnimation() {
+ZoombiniAnimation::ZoombiniAnimation(Zoombini2Engine *vm) : _vm(vm) {
 }
 
 ZoombiniAnimation::~ZoombiniAnimation() {
 }
 
 bool ZoombiniAnimation::loadFromFile(const Common::Path &path) {
-	Zoombini2Engine *vm = static_cast<Zoombini2Engine *>(g_engine);
-	Common::ScopedPtr<Common::SeekableReadStream> stream(vm ? vm->openResourceFile(path.toString('/')) : nullptr);
+	Common::ScopedPtr<Common::SeekableReadStream> stream(_vm->openResourceFile(path.toString('/')));
 	if (!stream) {
 		warning("ZoombiniAnimation: cannot open '%s'", path.toString().c_str());
 		return false;
@@ -1665,7 +999,7 @@ bool ZoombiniAnimation::loadFromFile(const Common::Path &path) {
 						break;
 					}
 
-					RleBlock *frame = new RleBlock();
+					RleBlock *frame = new RleBlock(_vm);
 					if (!frame->loadAnmFrame(&f, outerSize)) {
 						warning("ZoombiniAnimation: failed cell %d frame %u", cellIndex, fr);
 						delete frame;
@@ -1755,22 +1089,8 @@ void ZoombiniAnimation::drawZoombini(Graphics::ManagedSurface *screen, const Zmb
 // UIButton - clickable button with normal, hovered, and disabled states.
 // ============================================================================
 
-UIButton::UIButton()
-	: _rect(0, 0, 0, 0),
-	  _enabled(true),
-	  _drawWhenNotHovered(true),
-	  _useRleMaskBlend(false),
-	  _wasHovering(false),
-	  _isHovering(false),
-	  _normalBB(nullptr),
-	  _hoverBB(nullptr),
-	  _disabledBB(nullptr),
-	  _normalRle(nullptr),
-	  _hoverRle(nullptr),
-	  _disabledRle(nullptr),
-	  _overlay(nullptr),
-	  _overlayOffset(),
-	  _overlayClipRight(nullptr) {
+UIButton::UIButton(Zoombini2Engine *vm)
+	: _vm(vm) {
 }
 
 UIButton::~UIButton() {
@@ -1851,13 +1171,13 @@ bool UIButton::loadImage(const Common::Path &path, BitBlock *&bitmap, RleBlock *
 	if (path.empty())
 		return true;
 
-	bitmap = new BitBlock();
+	bitmap = new BitBlock(_vm);
 	if (bitmap->load(path))
 		return true;
 	delete bitmap;
 	bitmap = nullptr;
 
-	rle = new RleBlock();
+	rle = new RleBlock(_vm);
 	if (rle->load(path))
 		return true;
 	delete rle;
@@ -1871,13 +1191,13 @@ bool UIButton::loadMaskedImage(const Common::Path &colorPath, const Common::Path
 	if (colorPath.empty() || maskPath.empty())
 		return false;
 
-	rle = new RleBlock();
+	rle = new RleBlock(_vm);
 	if (rle->load(colorPath))
 		return true;
 	delete rle;
 	rle = nullptr;
 
-	bitmap = new BitBlock();
+	bitmap = new BitBlock(_vm);
 	if (bitmap->loadFromColorAlphaBMP(colorPath, maskPath))
 		return true;
 	delete bitmap;
@@ -1962,10 +1282,7 @@ int UIButton::drawAndHitTest(Graphics::ManagedSurface *dst, const Common::Point3
 // BitmapFont - bitmap-based font for UI text rendering.
 // ============================================================================
 
-BitmapFont::BitmapFont() : _loaded(false) {
-	for (int i = 0; i < kNumGlyphs; i++) {
-		_glyphs[i] = nullptr;
-	}
+BitmapFont::BitmapFont(Zoombini2Engine *vm) : _vm(vm) {
 }
 
 BitmapFont::~BitmapFont() {
@@ -1982,7 +1299,7 @@ bool BitmapFont::load(const Common::Path &basePath, byte r, byte g, byte b) {
 	stemPath.removeExtension();
 	const Common::Path alphaPath(stemPath.toString() + "-A.bmt");
 
-	BitBlock alphaBB;
+	BitBlock alphaBB(_vm);
 	if (!alphaBB.loadFromColorAlphaBMP(colorPath, alphaPath)) {
 		warning("BitmapFont: Failed to load BMP pair from %s", basePath.toString().c_str());
 		return false;
@@ -2034,7 +1351,7 @@ bool BitmapFont::load(const Common::Path &basePath, byte r, byte g, byte b) {
 
 		const int glyphWidth = col - startCol + 2;
 
-		BitBlock *glyph = new BitBlock();
+		BitBlock *glyph = new BitBlock(_vm);
 		glyph->createEmpty(glyphWidth, height, true);
 
 		byte *dstAlpha = const_cast<byte *>(glyph->getAlpha());
@@ -2187,24 +1504,11 @@ int BitmapFont::getStringWidth(const Common::String &text) const {
 // VolumePanel
 // ============================================================================
 
-VolumePanel::VolumePanel()
-	: _musicVolume(100),
-	  _sfxVolume(100),
-	  _speechVolume(100),
-	  _initialMusicVolume(100),
-	  _initialSfxVolume(100),
-	  _initialSpeechVolume(100),
-	  _musicSliderX(kSliderMaxX),
-	  _sfxSliderX(kSliderMaxX),
-	  _speechSliderX(kSliderMaxX),
-	  _activeSlider(-1),
-	  _heldMousePos(),
-	  _hasHeldMouse(false),
-	  _lastAdjustedSlider(-1),
-	  _soundManager(nullptr),
-	  _speechPreviewSoundId(-1),
-	  _sfxPreviewSoundId(-1),
-	  _gaugeImage(nullptr) {
+VolumePanel::VolumePanel(Zoombini2Engine *vm)
+	: _vm(vm),
+	  _sliderLabels{UIButton(vm), UIButton(vm), UIButton(vm)},
+	  _okButton(vm),
+	  _noButton(vm) {
 }
 
 VolumePanel::~VolumePanel() {
@@ -2222,7 +1526,7 @@ VolumePanel::~VolumePanel() {
 bool VolumePanel::init(SoundManager *soundManager) {
 	_soundManager = soundManager;
 	delete _gaugeImage;
-	_gaugeImage = new RleBlock();
+	_gaugeImage = new RleBlock(_vm);
 	bool loaded = true;
 	if (!_gaugeImage->loadFromFile(Common::Path("bmp/menu/OPTION - Jauge.rb"))) {
 		warning("VolumePanel: Failed to load gauge image");

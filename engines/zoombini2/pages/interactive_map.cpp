@@ -22,9 +22,11 @@
 #include "common/debug.h"
 #include "common/path.h"
 #include "common/str.h"
-#include "common/system.h"
+#include "common/callback.h"
 
 #include "zoombini2/graphics.h"
+#include "zoombini2/pages/dialog_msgbox.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/pages/interactive_map.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
@@ -180,48 +182,11 @@ const char *const InteractiveMap::kLegendFiles[kNumLegends] = {
 // ============================================================================
 
 InteractiveMap::InteractiveMap(Zoombini2Engine *vm, MapScreenMode mode)
-	: InteractiveBase(vm), _mode(mode), _hoveredIcon(-1),
-	  _currentLevel(1), _hoveredLegendTab(0), _background(nullptr),
-	  _statsPractice(nullptr), _statsSavedGame(nullptr), _whiteFont(nullptr),
-	  _blipSoundId(-1), _mapMusicId(-1), _volumePanel(nullptr),
-	  _showQuitDialog(false), _quitDialogPos(),
-	  _quitDialogButtonHover(0), _quitPanelNothing(nullptr),
-	  _quitPanelOk(nullptr), _quitPanelCancel(nullptr), _quitTextQuit(nullptr), _quitDialogBackground(nullptr) {
+	: InteractiveBase(vm), _mode(mode) {
 	_pageId = kPageMapScreen;
-
-	for (int i = 0; i < kNumIcons; i++) {
-		_icons[i] = nullptr;
-		_iconClickable[i] = false;
-		_iconColored[i] = false;
-	}
-	for (int i = 0; i < kNumTitles; i++) {
-		_titles[i] = nullptr;
-	}
-	for (int tier = 0; tier < kNumLevelTiers; tier++) {
-		for (int slot = 0; slot < kNumSegments; slot++) {
-			_segments[tier][slot] = nullptr;
-		}
-	}
-	for (int i = 0; i < kNumLegends; i++) {
-		_legends[i] = nullptr;
-	}
-	for (int i = 0; i < kNumButtons; i++) {
-		_buttons[i].rect = Common::Rect();
-		_buttons[i].enabled = false;
-		_buttons[i].hovered = false;
-		_buttons[i].isRle = false;
-		_buttons[i].normalRle = nullptr;
-		_buttons[i].hiliteRle = nullptr;
-		_buttons[i].grayRle = nullptr;
-		_buttons[i].normalBB = nullptr;
-		_buttons[i].hiliteBB = nullptr;
-	}
-	memset(_stats, 0, sizeof(_stats));
 }
 
 InteractiveMap::~InteractiveMap() {
-	if (_showQuitDialog)
-		closeQuitDialog();
 	delete _background;
 	for (int i = 0; i < kNumIcons; i++) {
 		delete _icons[i];
@@ -254,11 +219,6 @@ InteractiveMap::~InteractiveMap() {
 		sm->unload(_blipSoundId);
 
 	delete _volumePanel;
-	delete _quitPanelNothing;
-	delete _quitPanelOk;
-	delete _quitPanelCancel;
-	delete _quitTextQuit;
-	delete _quitDialogBackground;
 }
 
 // ============================================================================
@@ -280,7 +240,7 @@ void InteractiveMap::init() {
 	}
 
 	// --- Background ---
-	_background = new BitBlock();
+	_background = new BitBlock(_vm);
 	if (!_background->load(Common::Path("#bmp/Map/background"))) {
 		warning("MapScreenPage: Failed to load map background");
 	}
@@ -290,7 +250,7 @@ void InteractiveMap::init() {
 
 	// --- Title overlays ---
 	for (int i = 0; i < kNumTitles; i++) {
-		_titles[i] = new RleBlock();
+		_titles[i] = new RleBlock(_vm);
 		if (!_titles[i]->load(Common::Path(kTitleFiles[i]))) {
 			warning("MapScreenPage: Failed to load title %d!", i);
 		}
@@ -301,19 +261,19 @@ void InteractiveMap::init() {
 
 	// --- Stats overlays (both always loaded) ---
 	// Practice and saved-game maps use different statistics panels.
-	_statsPractice = new RleBlock();
+	_statsPractice = new RleBlock(_vm);
 	_statsPractice->load(Common::Path("bmp/map/stats_scr3"));
-	_statsSavedGame = new RleBlock();
+	_statsSavedGame = new RleBlock(_vm);
 	_statsSavedGame->load(Common::Path("bmp/map/stats_scr1"));
 
 	// --- Legend bitmaps (all 4: off, level1, level2, level3) ---
 	for (int i = 0; i < kNumLegends; i++) {
-		_legends[i] = new BitBlock();
+		_legends[i] = new BitBlock(_vm);
 		_legends[i]->load(Common::Path(kLegendFiles[i]));
 	}
 
 	// --- White bitmap font for stats ---
-	_whiteFont = new BitmapFont();
+	_whiteFont = new BitmapFont(_vm);
 	_whiteFont->load(Common::Path("bmp/typo"), 255, 255, 255);
 
 	// --- Set initial level ---
@@ -358,7 +318,7 @@ void InteractiveMap::setupIcons() {
 			} else {
 				path = Common::String::format("bmp/map/icon%02d", i);
 			}
-			_icons[i] = new RleBlock();
+			_icons[i] = new RleBlock(_vm);
 			if (!_icons[i]->load(Common::Path(path))) {
 				warning("MapScreenPage: Failed to load icon %d at %s!", i, path.c_str());
 			}
@@ -379,7 +339,7 @@ void InteractiveMap::setupIcons() {
 				} else {
 					path = Common::String::format("bmp/map/icon%02dgray", i);
 				}
-				_icons[i] = new RleBlock();
+				_icons[i] = new RleBlock(_vm);
 				_icons[i]->load(Common::Path(path));
 			}
 		} else {
@@ -399,7 +359,7 @@ void InteractiveMap::setupIcons() {
 				} else {
 					path = Common::String::format("bmp/map/icon%02dgray", i);
 				}
-				_icons[i] = new RleBlock();
+				_icons[i] = new RleBlock(_vm);
 				if (!_icons[i]->load(Common::Path(path))) {
 					warning("MapScreenPage: Failed to load icon %d at %s!", i, path.c_str());
 				}
@@ -518,7 +478,7 @@ Common::String InteractiveMap::generatePracticeZoombiniName() const {
 		"tw",
 	};
 
-	Common::RandomSource *randomSrc = _vm->getRandom();
+	Zoombini2Random *randomSrc = _vm->getRandom();
 	char name[8] = {};
 	const int targetLength = randomSrc->getRandomNumber(1) + 4;
 	bool useVowelPair = randomSrc->getRandomNumber(98) + 1 < 40;
@@ -566,7 +526,7 @@ void InteractiveMap::createPracticeParty(int pageId) {
 	if (partySize == 0)
 		return;
 
-	Common::RandomSource *randomSrc = _vm->getRandom();
+	Zoombini2Random *randomSrc = _vm->getRandom();
 	while (static_cast<int>(_vm->_globalZoombinis.size()) < partySize) {
 		const byte hair = static_cast<byte>(randomSrc->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
 		const byte eyes = static_cast<byte>(randomSrc->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
@@ -599,7 +559,7 @@ void InteractiveMap::loadSegments() {
 		for (int slot = 0; slot < kNumSegments; slot++) {
 			Common::String path = Common::String::format(
 				"%s/%s", kSegmentDirs[tier], kSegmentFiles[slot]);
-			_segments[tier][slot] = new RleBlock();
+			_segments[tier][slot] = new RleBlock(_vm);
 			if (!_segments[tier][slot]->load(Common::Path(path))) {
 				warning("MapScreenPage: Failed to load segment tier=%d slot=%d path=%s!",
 						tier, slot, path.c_str());
@@ -664,25 +624,25 @@ void InteractiveMap::loadButtons() {
 		}
 
 		if (s.isRle) {
-			btn.normalRle = new RleBlock();
+			btn.normalRle = new RleBlock(_vm);
 			if (!btn.normalRle->load(Common::Path(s.normalName)))
 				debug(2, "MapScreenPage: button %d normal rle failed", i);
 
-			btn.hiliteRle = new RleBlock();
+			btn.hiliteRle = new RleBlock(_vm);
 			if (!btn.hiliteRle->load(Common::Path(s.hiliteName)))
 				debug(2, "MapScreenPage: button %d hilite rle failed", i);
 
 			if (s.grayName) {
-				btn.grayRle = new RleBlock();
+				btn.grayRle = new RleBlock(_vm);
 				if (!btn.grayRle->load(Common::Path(s.grayName)))
 					debug(2, "MapScreenPage: button %d gray rle failed", i);
 			}
 		} else {
-			btn.normalBB = new BitBlock();
+			btn.normalBB = new BitBlock(_vm);
 			if (!btn.normalBB->load(Common::Path(s.normalName)))
 				debug(2, "MapScreenPage: button %d normal bb failed", i);
 
-			btn.hiliteBB = new BitBlock();
+			btn.hiliteBB = new BitBlock(_vm);
 			if (!btn.hiliteBB->load(Common::Path(s.hiliteName)))
 				debug(2, "MapScreenPage: button %d hilite bb failed", i);
 		}
@@ -720,11 +680,6 @@ void InteractiveMap::computeStats() {
 void InteractiveMap::onUpdate() {
 	const Common::Point32 mousePos = _vm->getMousePos();
 	const Common::Point mouseEventPos(mousePos.x, mousePos.y);
-
-	if (_showQuitDialog) {
-		_quitDialogButtonHover = hitTestQuitDialog(mousePos);
-		return;
-	}
 
 	if (_volumePanel) {
 		return;
@@ -861,10 +816,6 @@ void InteractiveMap::onRenderForeground(ManagedSurface32 *screen) {
 		const Common::Point32 mousePos(_vm->getMousePos());
 		_volumePanel->draw(screen, mousePos, _vm->getAlphaLUT());
 	}
-	// 9. Quit dialog (if visible)
-	if (_showQuitDialog) {
-		drawQuitDialog(screen);
-	}
 }
 
 // ============================================================================
@@ -945,28 +896,14 @@ EventHandleResult InteractiveMap::onMouseMove(const Common::Point &pos) {
 
 EventHandleResult InteractiveMap::onKeyDown(const Common::KeyState &key, bool repeat) {
 	(void)repeat;
-	if (!_volumePanel && !_showQuitDialog)
+	if (!_volumePanel)
 		return EventHandleResult::kPassthrough;
 	if (key.keycode == Common::KEYCODE_ESCAPE) {
-		if (_volumePanel)
-			closeVolumePanel(false);
-		else
-			closeQuitDialog();
+		closeVolumePanel(false);
 	}
 	return EventHandleResult::kConsumed;
 }
 EventHandleResult InteractiveMap::onLButtonDown(const Common::Point &pos) {
-	if (_showQuitDialog) {
-		int quitBtn = hitTestQuitDialog(Common::Point32(pos));
-		if (quitBtn == 1) {
-			closeQuitDialog();
-			_vm->requestPageChange(kPageCredits);
-		} else if (quitBtn == 2) {
-			closeQuitDialog();
-		}
-		return EventHandleResult::kConsumed;
-	}
-
 	if (_volumePanel) {
 		_volumePanelMouseDown = true;
 		_volumePanel->handleMouseInput(Common::Point32(pos), true, false);
@@ -1009,7 +946,7 @@ EventHandleResult InteractiveMap::onLButtonDown(const Common::Point &pos) {
 			break;
 		case 3:
 			debug(1, "MapScreenPage: Quit button clicked");
-			openQuitDialog();
+			requestQuitConfirmation();
 			break;
 		default:
 			break;
@@ -1129,7 +1066,7 @@ int InteractiveMap::hitTestLegendTab(const Common::Point32 &pos) const {
 
 void InteractiveMap::openVolumePanel() {
 	if (!_volumePanel) {
-		_volumePanel = new VolumePanel();
+		_volumePanel = new VolumePanel(_vm);
 		_volumePanel->init(_vm->getSoundManager());
 		_volumePanel->setInitialVolumes(_vm->getMusicVolume(), _vm->getSFXVolume(), _vm->getSpeechVolume());
 	}
@@ -1155,106 +1092,21 @@ void InteractiveMap::applyVolumePanelVolumes(bool usePanelValues, bool persistCh
 		_vm->previewSoundVolumes(music, sfx, speech);
 }
 
-void InteractiveMap::openQuitDialog() {
-	if (_showQuitDialog)
-		return;
-	_quitDialogButtonHover = 0;
-
-	if (!_quitPanelNothing) {
-		_quitPanelNothing = new RleBlock();
-		if (!_quitPanelNothing->loadFromFile(Common::Path("bmp/menu/QUIT_panel_nothing.rb"))) {
-			warning("MapScreenPage: Failed to load QUIT_panel_nothing");
-		}
-	}
-	if (!_quitPanelOk) {
-		_quitPanelOk = new RleBlock();
-		if (!_quitPanelOk->loadFromFile(Common::Path("bmp/menu/QUIT_panel_ok.rb"))) {
-			warning("MapScreenPage: Failed to load QUIT_panel_ok");
-		}
-	}
-	if (!_quitPanelCancel) {
-		_quitPanelCancel = new RleBlock();
-		if (!_quitPanelCancel->loadFromFile(Common::Path("bmp/menu/QUIT_panel_cancel.rb"))) {
-			warning("MapScreenPage: Failed to load QUIT_panel_cancel");
-		}
-	}
-
-	if (!_quitTextQuit) {
-		_quitTextQuit = new BitBlock();
-		_quitTextQuit->load(Common::Path("bmp/menu/Quit_panel_text_quit"));
-	}
-
-	if (_quitPanelOk && _quitPanelOk->getWidth() > 0) {
-		_quitDialogPos = Common::Point32(400 - _quitPanelOk->getWidth() / 2, 300 - _quitPanelOk->getHeight() / 2);
-	} else {
-		_quitDialogPos = Common::Point32(200, 200);
-	}
-
-	if (!_quitDialogBackground)
-		_quitDialogBackground = new Graphics::ManagedSurface();
-	_quitDialogBackground->copyFrom(*_vm->getCurrentScreen());
-	_showQuitDialog = true;
-	_vm->_isPaused = true;
-	_vm->_pauseTimeStart = g_system->getMillis();
-	_vm->getSoundManager()->pauseAll();
+void InteractiveMap::requestQuitConfirmation() {
+	_vm->getMsgBoxDialog()->request(Common::Path("bmp/menu/Quit_panel_text_quit"),
+		new Common::Callback<InteractiveMap, DialogMsgBoxButton>(this, &InteractiveMap::handleQuitConfirmation));
 }
 
-void InteractiveMap::closeQuitDialog() {
-	if (!_showQuitDialog)
-		return;
-	_showQuitDialog = false;
-	_quitDialogButtonHover = 0;
-	if (_quitDialogBackground)
-		_vm->getCurrentScreen()->copyFrom(*_quitDialogBackground);
-	_vm->addPauseTime(g_system->getMillis() - _vm->_pauseTimeStart);
-	_vm->_isPaused = false;
-	_vm->getSoundManager()->resumeAll();
-}
-
-void InteractiveMap::drawQuitDialog(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &alphaLUT = _vm->getAlphaLUT();
-	if (_quitDialogBackground)
-		screen->copyFrom(*_quitDialogBackground);
-
-	RleBlock *panel = nullptr;
-	switch (_quitDialogButtonHover) {
-	case 1:
-		panel = _quitPanelOk;
-		break;
-	case 2:
-		panel = _quitPanelCancel;
-		break;
-	default:
-		panel = _quitPanelNothing;
-		break;
-	}
-
-	if (panel) {
-		panel->drawToScreen(screen, _quitDialogPos, alphaLUT);
-	}
-
-	if (_quitTextQuit) {
-		_quitTextQuit->drawToSurface(screen, Common::Point32(_quitDialogPos.x + 17, _quitDialogPos.y + 17));
-	}
-}
-
-int InteractiveMap::hitTestQuitDialog(const Common::Point32 &pos) const {
-	if (_quitDialogPos.x + 207 < pos.x && pos.x < _quitDialogPos.x + 272 &&
-		_quitDialogPos.y + 77 < pos.y && pos.y < _quitDialogPos.y + 145) {
-		return 1; // OK
-	}
-	if (_quitDialogPos.x + 287 < pos.x && pos.x < _quitDialogPos.x + 352 &&
-		_quitDialogPos.y + 77 < pos.y && pos.y < _quitDialogPos.y + 145) {
-		return 2; // Cancel
-	}
-	return 0;
+void InteractiveMap::handleQuitConfirmation(DialogMsgBoxButton button) {
+	if (button == DialogMsgBoxButton::kOkay01)
+		_vm->requestPageChange(kPageCredits);
 }
 
 int InteractiveMap::getPracticePartySize(int pageId) {
 	switch (pageId) {
 	case kPageCrazyTurtle:
-	case kPageWaterSlide:
-	case kPageAquaCube:
+	case kPageWaterslide:
+	case kPageAquacube:
 		return kMaxPackSize;
 	case kPageMysticMarsh:
 	case kPageMagicWall:

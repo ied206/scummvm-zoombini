@@ -28,9 +28,12 @@
 
 namespace Zoombini2 {
 
+constexpr Common::Point32 ShelterRescueSite1::kRosterGridBasePos;
+constexpr Common::Point32 ShelterRescueSite1::kRosterButtonUpPos;
+constexpr Common::Point32 ShelterRescueSite1::kRosterButtonDownPos;
+
 ShelterRescueSite1::ShelterRescueSite1(Zoombini2Engine *vm)
-	: ShelterRescueSiteBase(vm), _portal(nullptr), _portalTop(nullptr), _cramure(nullptr), _arrowLeftOff(nullptr), _arrowLeftOn(nullptr),
-	  _arrowRightOff(nullptr), _arrowRightOn(nullptr), _arrowLeftPos(), _arrowRightPos(), _portalPos(), _portalTopPos(), _cramurePos() {
+	: ShelterRescueSiteBase(vm) {
 	_pageId = kPageRescue1;
 }
 
@@ -50,8 +53,7 @@ void ShelterRescueSite1::init() {
 	debug(1, "ShelterRescueSite1::init");
 
 	loadBackground("#bmp/rescue1/background");
-	configureRosterLayout(Common::Point32(68, 95), Common::Rect(26, 240, 89, 326), Common::Rect(276, 240, 339, 319), Common::Point32(26, 240),
-						  Common::Point32(276, 240));
+	configureRosterLayout(kRosterGridBasePos, _rosterScrollUpRect, _rosterScrollDownRect, kRosterButtonUpPos, kRosterButtonDownPos);
 
 	_arrowLeftPos = Common::Point32(525, 248);
 	_arrowRightPos = Common::Point32(641, 253);
@@ -61,27 +63,27 @@ void ShelterRescueSite1::init() {
 
 	loadSelector("bmp/rescue1/SELECTOR.RB");
 
-	_portal = new RleBlock();
+	_portal = new RleBlock(_vm);
 	_portal->loadFromFile(Common::Path("bmp/rescue1/PORTE.RB"));
 
-	_portalTop = new RleBlock();
+	_portalTop = new RleBlock(_vm);
 	_portalTop->loadFromFile(Common::Path("bmp/rescue1/portal_top.rb"));
 
 	loadPorteSelector("bmp/rescue1/porte_select.rb");
 
-	_cramure = new RleBlock();
+	_cramure = new RleBlock(_vm);
 	_cramure->loadFromFile(Common::Path("bmp/rescue1/CRAMURE.RB"));
 
-	_arrowLeftOff = new BitBlock();
+	_arrowLeftOff = new BitBlock(_vm);
 	_arrowLeftOff->loadFromBB(Common::Path("bmp/rescue1/inside_arrow_left_off.bb"));
 
-	_arrowLeftOn = new BitBlock();
+	_arrowLeftOn = new BitBlock(_vm);
 	_arrowLeftOn->loadFromBB(Common::Path("bmp/rescue1/inside_arrow_left_on.bb"));
 
-	_arrowRightOff = new BitBlock();
+	_arrowRightOff = new BitBlock(_vm);
 	_arrowRightOff->loadFromBB(Common::Path("bmp/rescue1/inside_arrow_right_off.bb"));
 
-	_arrowRightOn = new BitBlock();
+	_arrowRightOn = new BitBlock(_vm);
 	_arrowRightOn->loadFromBB(Common::Path("bmp/rescue1/inside_arrow_right_on.bb"));
 
 	loadScrollButtons("bmp/rescue1/button_left.an", "bmp/rescue1/button_right.an");

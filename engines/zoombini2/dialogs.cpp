@@ -58,7 +58,7 @@ protected:
 	}
 };
 
-Zoombini2MenuDialog::Zoombini2MenuDialog(Zoombini2Engine *vm) : MainMenuDialog(vm) {
+Zoombini2MenuDialog::Zoombini2MenuDialog(Zoombini2Engine *vm) : MainMenuDialog(vm), _vm(vm) {
 }
 
 void Zoombini2MenuDialog::handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) {
@@ -66,9 +66,8 @@ void Zoombini2MenuDialog::handleCommand(GUI::CommandSender *sender, uint32 cmd, 
 		GUI::ConfigDialog configDialog;
 		configDialog.runModal();
 
-		Zoombini2Engine *vm = static_cast<Zoombini2Engine *>(_engine);
-		vm->applyGameSettings();
-		vm->syncSoundSettings();
+		_vm->applyGameSettings();
+		_vm->syncSoundSettings();
 		return;
 	}
 
@@ -76,7 +75,7 @@ void Zoombini2MenuDialog::handleCommand(GUI::CommandSender *sender, uint32 cmd, 
 }
 
 Zoombini2ProfileNameDialog::Zoombini2ProfileNameDialog(const Common::U32String &initialName)
-	: GUI::Dialog(0, 0, 360, 144), _edit(nullptr) {
+	: GUI::Dialog(0, 0, 360, 144) {
 	new GUI::StaticTextWidget(this, 12, 10, 336, 24, Common::U32String("Rename saved game"), Graphics::kTextAlignStart);
 	new GUI::StaticTextWidget(this, 12, 38, 336, 20, false, Common::U32String("Use 1 to 16 letters, digits, or spaces"), Graphics::kTextAlignStart,
 							  Common::U32String(), GUI::ThemeEngine::kFontStyleNormal, Common::UNK_LANG, false);
@@ -110,19 +109,7 @@ void Zoombini2ProfileNameDialog::handleCommand(GUI::CommandSender *sender, uint3
 }
 
 Zoombini2SaveManagementDialog::Zoombini2SaveManagementDialog(const Common::String &domain)
-	: GUI::Dialog(0, 0, 1, 1), _domain(domain), _profileSelectionGroup(this, kProfileSelectionChangedCommand), _selectedProfileIndex(-1),
-	  _profileList(nullptr), _profileTable(nullptr), _profileRowCount(0), _editButton(nullptr), _importButton(nullptr), _exportButton(nullptr),
-	  _deleteButton(nullptr) {
-	for (int i = 0; i < kMaximumProfileRows; i++) {
-		_profileSelectionButtons[i] = nullptr;
-		_profileNameLabels[i] = nullptr;
-		_zombinivilleLabels[i] = nullptr;
-		_rescue1Labels[i] = nullptr;
-		_rescue2Labels[i] = nullptr;
-		_booliewoodLabels[i] = nullptr;
-		_activePartyLabels[i] = nullptr;
-		_profileStateValid[i] = false;
-	}
+	: GUI::Dialog(0, 0, 1, 1), _domain(domain), _profileSelectionGroup(this, kProfileSelectionChangedCommand) {
 
 	new GUI::StaticTextWidget(this, kDialogMargin, 8, kTableWidth, 24, true, Common::U32String("Manage saved games"), Graphics::kTextAlignStart);
 
@@ -458,27 +445,29 @@ void Zoombini2SaveManagementDialog::handleCommand(GUI::CommandSender *sender, ui
 }
 
 Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Common::String &name, const Common::String &domain)
-	: GUI::OptionsContainerWidget(boss, name, "Zoombini2EngineOptionsDialog", domain), _debugHotkeysCheckbox(nullptr), _stereoOutputCheckbox(nullptr),
-	  _greedyWaterslideCheckbox(nullptr), _cachedFrameTimeCheckbox(nullptr), _floatingPointPathsCheckbox(nullptr) {
+	: GUI::OptionsContainerWidget(boss, name, "Zoombini2EngineOptionsDialog", domain) {
 	_debugHotkeysCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.DebugHotkeys", Common::U32String("Enable developer hotkeys"),
 													Common::U32String("Enables F2/F3 party exchange, P puzzle completion, and the Chez Norf C overlay."));
 	_stereoOutputCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.StereoOutput", Common::U32String("Enable stereo game audio"),
 													Common::U32String("Keeps both channels of stereo WAV resources instead of downmixing them to mono."));
 	_greedyWaterslideCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GreedyWaterslide",
-												Common::U32String("Use alternate Pipes of Paloo pairing"),
-												Common::U32String("Selects the alternate pairing branch for level one."));
+														Common::U32String("Use alternate Pipes of Paloo pairing"),
+														Common::U32String("Selects the alternate pairing branch for level one."));
 	_cachedFrameTimeCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.CachedFrameTime",
 													   Common::U32String("Use frame-cached game timing"),
 													   Common::U32String("Makes gameplay time reads share one clock snapshot per rendered frame."));
+	_originalPrngCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.OriginalPRNG",
+													Common::U32String("Use original random number generator (requires restart)"),
+													Common::U32String("Uses the original Windows engine's Visual C++ 6.0 CRT generator instead of ScummVM's default."));
 
 	new SeparatorWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayImprovementsSeparator");
 	GUI::StaticTextWidget *gameplayImprovementsHeader = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayImprovements",
-																	 Common::U32String("Gameplay improvements"), Common::U32String(),
-																	 GUI::ThemeEngine::kFontStyleBold);
+																				  Common::U32String("Gameplay improvements"), Common::U32String(),
+																				  GUI::ThemeEngine::kFontStyleBold);
 	gameplayImprovementsHeader->setAlign(Graphics::TextAlign::kTextAlignStart);
 	_floatingPointPathsCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.FloatingPointPaths",
-															 Common::U32String("Use floating-point path calculations"),
-															 Common::U32String("Uses 32-bit floating point instead of the original signed Q10 fixed-point arithmetic for Bezier movement paths."));
+														  Common::U32String("Use floating-point path calculations"),
+														  Common::U32String("Uses 32-bit floating point instead of the original signed Q10 fixed-point arithmetic for Bezier movement paths."));
 
 	GUI::ButtonWidget *manageProfilesButton = new GUI::ButtonWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ManageProfiles", Common::U32String("Saved games"),
 																	Common::U32String(), kManageProfilesCommand);
@@ -493,6 +482,7 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 		.addWidget("StereoOutput", "Checkbox")
 		.addWidget("GreedyWaterslide", "Checkbox")
 		.addWidget("CachedFrameTime", "Checkbox")
+		.addWidget("OriginalPRNG", "Checkbox")
 		.addWidget("ManageProfiles", "Button")
 		.addSpace(10)
 		.addWidget("GameplayImprovementsSeparator", "", -1, 2)
@@ -507,15 +497,23 @@ void Zoombini2OptionsWidget::load() {
 	_stereoOutputCheckbox->setState(ConfMan.getBool(kConfigStereoOutput, _domain));
 	_greedyWaterslideCheckbox->setState(ConfMan.getBool(kConfigGreedyWaterslidePairing, _domain));
 	_cachedFrameTimeCheckbox->setState(ConfMan.getBool(kConfigCachedFrameTime, _domain));
+	_originalPrngCheckbox->setState(ConfMan.getBool(kConfigOriginalPRNG, _domain));
 	_floatingPointPathsCheckbox->setState(ConfMan.getBool(kConfigUseFloatingPointPaths, _domain));
 }
 
 bool Zoombini2OptionsWidget::save() {
+	const bool originalPrngChanged = ConfMan.getBool(kConfigOriginalPRNG, _domain) != _originalPrngCheckbox->getState();
+
 	ConfMan.setBool(kConfigDebugHotkeys, _debugHotkeysCheckbox->getState(), _domain);
 	ConfMan.setBool(kConfigStereoOutput, _stereoOutputCheckbox->getState(), _domain);
 	ConfMan.setBool(kConfigGreedyWaterslidePairing, _greedyWaterslideCheckbox->getState(), _domain);
 	ConfMan.setBool(kConfigCachedFrameTime, _cachedFrameTimeCheckbox->getState(), _domain);
+	ConfMan.setBool(kConfigOriginalPRNG, _originalPrngCheckbox->getState(), _domain);
 	ConfMan.setBool(kConfigUseFloatingPointPaths, _floatingPointPathsCheckbox->getState(), _domain);
+	if (originalPrngChanged && g_engine) {
+		GUI::MessageDialog dialog(Common::U32String("The random number generator change will take effect after restarting the game."));
+		dialog.runModal();
+	}
 	return true;
 }
 
