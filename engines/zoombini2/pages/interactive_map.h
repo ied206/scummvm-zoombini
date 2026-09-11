@@ -32,6 +32,7 @@ namespace Zoombini2 {
 
 class AlphaBlendLUT;
 class BitBlock;
+enum class DialogMsgBoxButton;
 class RleBlock;
 class BitmapFont;
 class VolumePanel;
@@ -55,24 +56,24 @@ class InteractiveMap : public InteractiveBase {
 public:
 	/** Construct a mountain map in @p mode for @p vm. */
 	InteractiveMap(Zoombini2Engine *vm, MapScreenMode mode);
-	/** Release map resources, controls, and modal panels. */
+	/** Release map resources, controls, and its owned volume panel. */
 	~InteractiveMap() override;
 
 	/** Load map resources and derive availability from the selected mode. */
 	void init() override;
-	/** Update icon, legend, button, and modal hover state. */
+	/** Update icon, legend, button, and volume-panel hover state. */
 	void onUpdate() override;
-	/** Draw the map, route progress, statistics, and active modal panel. */
+	/** Draw the map, route progress, statistics, and owned volume panel. */
 	void onRenderScene(ManagedSurface32 *screen) override;
 	void onRenderForeground(ManagedSurface32 *screen) override;
-	/** Dispatch a click to a map icon, control, legend tab, or modal panel. */
+	/** Dispatch a click to a map icon, control, legend tab, or volume panel. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
 	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
 	/** Return the required practice-party size for @p pageId, or zero for a shelter or unsupported page. */
 	static int getPracticePartySize(int pageId);
-	bool hasActiveDialog() const override { return _volumePanel || _showQuitDialog; }
+	bool hasActiveDialog() const override { return _volumePanel != nullptr; }
 
 private:
 	EventHandleResult handleVolumePanelInput(const Common::Point &pos, bool mouseReleased);
@@ -110,28 +111,26 @@ private:
 	/** One bottom-panel button with either RLE or bit-block visuals. */
 	struct MapButton {
 		/** Hit-test rectangle in screen coordinates. */
-		Common::Rect rect;
+		Common::Rect rect = Common::Rect();
 		/** Whether the button accepts clicks. */
-		bool enabled;
+		bool enabled = true;
 		/** Whether the pointer is currently over the button. */
-		bool hovered;
+		bool hovered = false;
 		/** Whether this button uses RLE sprites instead of bit blocks. */
-		bool isRle;
+		bool isRle = false;
 		/** Normal RLE visual when @ref MapButton::isRle is true. */
-		RleBlock *normalRle;
+		RleBlock *normalRle = nullptr;
 		/** Hovered RLE visual when @ref MapButton::isRle is true. */
-		RleBlock *hiliteRle;
+		RleBlock *hiliteRle = nullptr;
 		/** Optional disabled RLE visual. */
-		RleBlock *grayRle;
+		RleBlock *grayRle = nullptr;
 		/** Normal bit-block visual when @ref MapButton::isRle is false. */
-		BitBlock *normalBB;
+		BitBlock *normalBB = nullptr;
 		/** Hovered bit-block visual when @ref MapButton::isRle is false. */
-		BitBlock *hiliteBB;
+		BitBlock *hiliteBB = nullptr;
 
 		/** Initialize an enabled button with no loaded visuals. */
-		MapButton() : rect(), enabled(true), hovered(false),
-					  isRle(false), normalRle(nullptr), hiliteRle(nullptr),
-					  grayRle(nullptr), normalBB(nullptr), hiliteBB(nullptr) {}
+		MapButton() = default;
 	};
 
 	/** Number of controls in the bottom panel. */
@@ -140,62 +139,46 @@ private:
 	/** Practice or saved-game behavior selected at construction. */
 	MapScreenMode _mode;
 	/** Currently hovered icon, or `-1` when none is hovered. */
-	int _hoveredIcon;
+	int _hoveredIcon = -1;
 	/** Practice or selected-page level in the range one through three. */
-	int _currentLevel;
+	int _currentLevel = 1;
 	/** Hovered level legend, or zero when none is hovered. */
-	int _hoveredLegendTab;
+	int _hoveredLegendTab = 0;
 
 	/** Mountain map background. */
-	BitBlock *_background;
+	BitBlock *_background = nullptr;
 	/** One colored or disabled icon for each map destination. */
-	RleBlock *_icons[kNumIcons];
+	RleBlock *_icons[kNumIcons] = {};
 	/** Title overlay corresponding to each map icon. */
-	RleBlock *_titles[kNumTitles];
+	RleBlock *_titles[kNumTitles] = {};
 	/** Path graphics indexed by level tier and segment slot. */
-	RleBlock *_segments[kNumLevelTiers][kNumSegments];
+	RleBlock *_segments[kNumLevelTiers][kNumSegments] = {};
 	/** Practice-mode instruction panel. */
-	RleBlock *_statsPractice;
+	RleBlock *_statsPractice = nullptr;
 	/** Saved-game progress panel. */
-	RleBlock *_statsSavedGame;
+	RleBlock *_statsSavedGame = nullptr;
 	/** Legend graphics indexed by inactive or active level. */
-	BitBlock *_legends[kNumLegends];
+	BitBlock *_legends[kNumLegends] = {};
 	/** White font used for saved-game statistics. */
-	BitmapFont *_whiteFont;
+	BitmapFont *_whiteFont = nullptr;
 
 	/** Whether each icon accepts clicks in the current mode and progress state. */
-	bool _iconClickable[kNumIcons];
+	bool _iconClickable[kNumIcons] = {};
 	/** Whether each icon uses its colored rather than disabled visual. */
-	bool _iconColored[kNumIcons];
+	bool _iconColored[kNumIcons] = {};
 	/** Remaining, first-board, second-board, and completed Zoombini counts. */
-	int _stats[4];
+	int _stats[4] = {};
 
 	/** Bottom-panel controls. */
-	MapButton _buttons[kNumButtons];
+	MapButton _buttons[kNumButtons] = {};
 
 	/** Menu selection sound. */
-	int _blipSoundId;
+	int _blipSoundId = -1;
 	/** Handle for the map-music stream shared across this game instance. */
-	int _mapMusicId;
+	int _mapMusicId = -1;
 
 	/** Volume panel managed by this page while options are open. */
-	VolumePanel *_volumePanel;
-	/** Whether quit confirmation is active. */
-	bool _showQuitDialog;
-	/** Quit confirmation panel origin. */
-	Common::Point32 _quitDialogPos;
-	/** Hovered quit confirmation control, or zero. */
-	int _quitDialogButtonHover;
-	/** Quit panel without a highlighted action. */
-	RleBlock *_quitPanelNothing;
-	/** Quit panel with OK highlighted. */
-	RleBlock *_quitPanelOk;
-	/** Quit panel with Cancel highlighted. */
-	RleBlock *_quitPanelCancel;
-	/** Quit confirmation text. */
-	BitBlock *_quitTextQuit;
-	/** Saved pixels restored when quit confirmation closes. */
-	Graphics::ManagedSurface *_quitDialogBackground;
+	VolumePanel *_volumePanel = nullptr;
 
 	/** Recompute progress statistics from the active game state. */
 	void computeStats();
@@ -231,14 +214,10 @@ private:
 	void closeVolumePanel(bool applyChanges);
 	/** Apply either panel or stored volume values, optionally persisting them for this target. */
 	void applyVolumePanelVolumes(bool usePanelValues, bool persistChanges);
-	/** Open quit confirmation. */
-	void openQuitDialog();
-	/** Close quit confirmation. */
-	void closeQuitDialog();
-	/** Draw quit confirmation over the saved map background. */
-	void drawQuitDialog(ManagedSurface32 *screen);
-	/** Return the quit confirmation control at @p pos, or zero. */
-	int hitTestQuitDialog(const Common::Point32 &pos) const;
+	/** Request the shared quit confirmation. */
+	void requestQuitConfirmation();
+	/** Apply the shared quit-confirmation result. */
+	void handleQuitConfirmation(DialogMsgBoxButton button);
 
 	/** Title resource paths indexed by icon. */
 	static const char *const kTitleFiles[kNumTitles];

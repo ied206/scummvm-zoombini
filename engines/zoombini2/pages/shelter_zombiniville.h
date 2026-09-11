@@ -70,27 +70,27 @@ public:
 
 private:
 	/** Starting-shelter background. */
-	BitBlock *_background;
+	BitBlock *_background = nullptr;
 
 	/** Feature selection controls indexed by feature and value. */
-	Animation *_featureButtons[ZmbTrait::kTraitCount][ZmbTrait::kTraitValueCount];
+	Animation *_featureButtons[ZmbTrait::kTraitCount][ZmbTrait::kTraitValueCount] = {};
 	/** Control that selects a random valid feature combination. */
-	Animation *_quickFillButton;
+	Animation *_quickFillButton = nullptr;
 	/** Control that fills the remaining party with valid Zoombinis. */
-	Animation *_batchFillButton;
+	Animation *_batchFillButton = nullptr;
 	/** Control that starts the route when the party is full. */
-	Animation *_goButton;
+	Animation *_goButton = nullptr;
 
 	/** Borrowed immutable large-sprite grid owned by the engine cache. */
-	const ZoombiniAnimation *_bigZombAnimation;
+	const ZoombiniAnimation *_bigZombAnimation = nullptr;
 	/** Borrowed immutable small-sprite grid owned by the engine cache. */
-	const ZoombiniAnimation *_littleZombAnimation;
+	const ZoombiniAnimation *_littleZombAnimation = nullptr;
 	/** Borrowed immutable pickup-sprite grid owned by the engine cache. */
-	const ZoombiniAnimation *_pickupZombAnimation;
+	const ZoombiniAnimation *_pickupZombAnimation = nullptr;
 	/** Borrowed immutable random-idle sprite grid owned by the engine cache. */
-	const ZoombiniAnimation *_idleZombAnimation;
+	const ZoombiniAnimation *_idleZombAnimation = nullptr;
 	/** Font used for the generated Zoombini name. */
-	BitmapFont *_nameFont;
+	BitmapFont *_nameFont = nullptr;
 
 	/** Geometry and current value for one feature station. */
 	struct FeatureStation {
@@ -99,35 +99,35 @@ private:
 		/** Draw positions for the station's five controls. */
 		Common::Point32 drawPos[ZmbTrait::kTraitValueCount];
 		/** Currently selected feature value. */
-		int selectedValue;
+		int selectedValue = 0;
 	};
 	/** Four stations corresponding to the four visible features. */
-	FeatureStation _stations[ZmbTrait::kTraitCount];
+	FeatureStation _stations[ZmbTrait::kTraitCount] = {};
 	/** Counts of each feature value already present in the party. */
-	int _featureCounts[ZmbTrait::kTraitCount][ZmbTrait::kTraitValueCount + 1];
+	int _featureCounts[ZmbTrait::kTraitCount][ZmbTrait::kTraitValueCount + 1] = {};
 
 	/** 32-bit Quick Fill control hit-test area. */
-	Common::Rect32 _quickFillRect;
+	Common::Rect32 _quickFillRect = Common::Rect32();
 	/** 32-bit Batch Fill control hit-test area. */
-	Common::Rect32 _batchFillRect;
+	Common::Rect32 _batchFillRect = Common::Rect32();
 	/** 32-bit Go control hit-test area. */
-	Common::Rect32 _goRect;
+	Common::Rect32 _goRect = Common::Rect32();
 
 	/** Zoombini states assigned to departure slots. */
 	Common::Array<ZoombiniState *> _boardingZoombinis;
 
 	/** Shelter music handle. */
-	int _musicId;
+	int _musicId = -1;
 	/** Sound played when a feature value is selected. */
-	int _sndFeatureSelect;
+	int _sndFeatureSelect = -1;
 	/** Sound played by Quick Fill. */
-	int _sndQuickFill;
+	int _sndQuickFill = -1;
 	/** Sound played by Batch Fill. */
-	int _sndBatchFill;
+	int _sndBatchFill = -1;
 	/** Sound played when a valid Zoombini joins the party. */
-	int _sndValidZoombini;
+	int _sndValidZoombini = -1;
 	/** Sound played when the selected combination cannot join. */
-	int _sndWrongZoombini;
+	int _sndWrongZoombini = -1;
 
 	/** Generated name displayed for the current feature selection. */
 	Common::String _currentName;

@@ -24,6 +24,7 @@
 #include "common/tokenizer.h"
 
 #include "zoombini2/graphics.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/pages/transition_maptrans.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
@@ -38,9 +39,7 @@ static const int kRescue1MovieMinimumZoombinis = 8;
 // ============================================================================
 
 TransitionMapTrans::TransitionMapTrans(Zoombini2Engine *vm)
-	: TransitionBase(vm), _compositedBg(nullptr), _nextWalkIndex(0),
-	  _nextWalkTime(0), _completedCount(0), _targetPageId(kPageNone),
-	  _transitionFinished(false), _musicId(-1), _zoombiniAnimation(nullptr) {
+	: TransitionBase(vm) {
 	_pageId = kPageMapTrans;
 }
 
@@ -65,16 +64,13 @@ void TransitionMapTrans::cleanupPaths() {
 	}
 }
 
-/** Load, draw, and release one map overlay and its alpha mask. */
+/** Load, draw, and release one cached map-overlay RLE sprite. */
 void TransitionMapTrans::drawOverlaySprite(Graphics::ManagedSurface *dst, const Common::String &name, const Common::Point32 &pos) {
-	Common::Path colorPath(Common::String::format("bmp/maptrans/%s.bmp", name.c_str()));
-	Common::Path alphaPath(Common::String::format("bmp/maptrans/%s_a.bmp", name.c_str()));
+	Common::Path overlayPath(Common::String::format("bmp/maptrans/%s.bmp", name.c_str()));
 
-	BitBlock bit;
-	if (bit.loadFromColorAlphaBMP(colorPath, alphaPath)) {
-		bit.drawAlphaBlend(dst, pos);
-	} else if (bit.load(Common::Path(Common::String::format("bmp/maptrans/%s", name.c_str())))) {
-		bit.drawToSurface(dst, pos);
+	RleBlock overlay(_vm);
+	if (overlay.load(overlayPath)) {
+		overlay.drawToScreen(dst, pos, _vm->getAlphaLUT());
 	} else {
 		debug(2, "MapTransition: overlay '%s' not found", name.c_str());
 	}
@@ -288,7 +284,7 @@ void TransitionMapTrans::init() {
 
 	// Select the map region from the source page.
 	int mapRegion;
-	if (kPageZombiniville <= src && src <= kPageAquaCube)
+	if (kPageZombiniville <= src && src <= kPageAquacube)
 		mapRegion = 1;
 	else if (kPageRescue1 <= src && src <= kPageChezNorf)
 		mapRegion = 2;
@@ -304,10 +300,10 @@ void TransitionMapTrans::init() {
 	case kPageCrazyTurtle:
 		patName = "tr2 - map1.pat";
 		break;
-	case kPageWaterSlide:
+	case kPageWaterslide:
 		patName = "tr3 - map1.pat";
 		break;
-	case kPageAquaCube:
+	case kPageAquacube:
 		patName = "tr4 - map1.pat";
 		break;
 	case kPageRescue1:
@@ -352,7 +348,7 @@ void TransitionMapTrans::init() {
 	}
 
 	// Load and composite the background
-	BitBlock bg;
+	BitBlock bg(_vm);
 	Common::String bgPath = Common::String::format("#bmp/maptrans/bigmap_background_%d", mapRegion);
 
 	delete _compositedBg;
@@ -404,7 +400,7 @@ void TransitionMapTrans::walkZoombinis() {
 	if (_nextWalkIndex < numZoombinis && now > _nextWalkTime) {
 		_nextWalkTime = now + 800;
 
-		PathObject *path = PathObject::loadFromPAT(_patPath);
+		PathObject *path = PathObject::loadFromPAT(_vm, _patPath);
 		if (path) {
 			ZoombiniState *zoombini = _vm->_globalZoombinis[_nextWalkIndex];
 			zoombini->_hidden = false;
@@ -445,7 +441,7 @@ PageId TransitionMapTrans::getPostTransitionPage() const {
 		return _targetPageId;
 
 	const PageId src = _vm->_mapTransitionSourcePageId;
-	if (src == kPageAquaCube && !gameState->hasPlayedRescue1Movie()) {
+	if (src == kPageAquacube && !gameState->hasPlayedRescue1Movie()) {
 		const int zoombiniCount = static_cast<int>(_vm->_globalZoombinis.size()) + gameState->_rescue1ArrivalCount;
 		if (kRescue1MovieMinimumZoombinis <= zoombiniCount)
 			return kPageCutsceneSecond;
@@ -518,10 +514,10 @@ PageId TransitionMapTrans::getDestPage(PageId src, RouteBranch routeBranch, int 
 	case kPageZombiniville:
 		return kPageCrazyTurtle;
 	case kPageCrazyTurtle:
-		return kPageWaterSlide;
-	case kPageWaterSlide:
-		return kPageAquaCube;
-	case kPageAquaCube:
+		return kPageWaterslide;
+	case kPageWaterslide:
+		return kPageAquacube;
+	case kPageAquacube:
 		return kPageRescue1;
 	case kPageRescue1: {
 		if (routeBranch == RouteBranch::kLeft01)

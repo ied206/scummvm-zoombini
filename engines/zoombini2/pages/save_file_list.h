@@ -36,6 +36,7 @@ class AlphaBlendLUT;
 class BitmapFont;
 class RleBlock;
 class ManagedSurface32;
+class Zoombini2Engine;
 
 /**
  * Sorted save-name list used by the menu screen.
@@ -68,8 +69,8 @@ public:
 	/** Number of rows visible in the list viewport. */
 	static const int kVisibleRows = 4;
 
-	/** Construct a list at @p x and @p y using the borrowed @p selectionBar. */
-	SaveFileList(const Common::Point32 &pos, RleBlock *selectionBar);
+	/** Construct a list for @p vm at @p pos using the borrowed @p selectionBar. */
+	SaveFileList(Zoombini2Engine *vm, const Common::Point32 &pos, RleBlock *selectionBar);
 	/** Release the list's three owned fonts. */
 	~SaveFileList();
 
@@ -143,29 +144,31 @@ private:
 	/** Text vertical offset from the list origin. */
 	static const int kTextOffsetY = 7;
 
+	/** Borrowed vm used to construct the list's fonts. */
+	Zoombini2Engine *_vm;
 	/** Signed screen origin of the list. */
 	Common::Point32 _pos;
 	/** Borrowed selection-bar sprite owned by the menu screen. */
 	RleBlock *_selectionBar;
 	/** Font managed by this list for ordinary existing rows. */
-	BitmapFont *_defaultFont;
+	BitmapFont *_defaultFont = nullptr;
 	/** Font managed by this list for the row matching a typed prefix. */
-	BitmapFont *_matchFont;
+	BitmapFont *_matchFont = nullptr;
 	/** Font managed by this list for a provisional or explicitly edited row. */
-	BitmapFont *_editFont;
+	BitmapFont *_editFont = nullptr;
 
 	/** Profile names in case-insensitive display order. */
 	Common::Array<Common::String> _items;
 	/** Text being used for prefix matching or a new profile row. */
 	Common::String _editBuffer;
 	/** Active editing stage. */
-	EditState _editState;
+	EditState _editState = kEditIdle00;
 	/** Selected row index. */
-	int _selectedIndex;
+	int _selectedIndex = 0;
 	/** Index of the first visible row. */
-	int _scrollOffset;
+	int _scrollOffset = 0;
 	/** Whether @ref SaveFileList::_selectedIndex names an existing item. */
-	bool _validSelection;
+	bool _validSelection = false;
 
 	/** Return the sorted insertion index for @p name. */
 	int findInsertionPoint(const Common::String &name) const;

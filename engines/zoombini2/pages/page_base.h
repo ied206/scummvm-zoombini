@@ -33,7 +33,7 @@ namespace Zoombini2 {
 class Zoombini2Engine;
 class ManagedSurface32;
 
-/** Page ownership categories used by engine and three-button policy. */
+/** Page ownership categories used by engine and sidebar policy. */
 enum class PageCategory {
 	/** Player-controlled map, shelter, menu, or puzzle. */
 	kInteractive = 1,
@@ -88,7 +88,7 @@ public:
 /**
  * Owns one screen-facing update, drawing, and input lifecycle.
  * The engine dispatches one regular page at a time. Modal dialogs derive from
- * this base but remain separately owned by the three-button controls while retaining the
+ * this base but remain separately owned by the sidebar while retaining the
  * underlying dispatched page.
  */
 class PageBase : public PageEventHandler {
@@ -114,10 +114,10 @@ public:
 	int getPageId() const { return _pageId; }
 	/** Return the ownership category recorded when this page was constructed. */
 	PageCategory getCategory() const { return _pageCategory; }
-	/** Return whether the shared three-button controls are visible over this page. */
-	virtual bool hasThreeButtons() const { return false; }
-	/** Return whether the three-button group includes a Go button for this page. */
-	virtual bool hasGoButton() const { return hasThreeButtons(); }
+	/** Return whether the shared sidebar is visible over this page. */
+	virtual bool hasSidebar() const { return false; }
+	/** Return whether the sidebar includes a Go button for this page. */
+	virtual bool hasGoButton() const { return hasSidebar(); }
 	/** Return whether the visible Go button currently accepts input. */
 	virtual bool canUseGoButton() const { return hasGoButton(); }
 	/** Return whether this page owns a shelter flow. */
@@ -146,7 +146,7 @@ protected:
 	/** Category assigned to this page for lifecycle and UI policy. */
 	PageCategory _pageCategory;
 	/** Numeric dispatcher identifier for this page. */
-	int _pageId;
+	int _pageId = -1;
 
 private:
 	/** Run visual hooks and, when requested, the two completion boundaries. */

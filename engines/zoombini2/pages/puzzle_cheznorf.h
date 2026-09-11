@@ -116,31 +116,35 @@ private:
 	/** One restaurant table and its current order. */
 	struct TableSlot {
 		/** Table position. */
-		Common::Point32 pos;
+		Common::Point32 pos = Common::Point32();
 		/** Clickable table area. */
-		Common::Rect hitbox;
+		Common::Rect hitbox = Common::Rect();
 		/** Assigned puzzle-roster index, or `-1` when empty. */
-		int zoombiniIdx;
+		int zoombiniIdx = -1;
 		/** Selected dessert choice, or `-1` when none is present. */
-		int foodSlurp;
+		int foodSlurp = -1;
 		/** Selected main-dish choice, or `-1` when none is present. */
-		int foodMiam;
+		int foodMiam = -1;
 		/** Selected drink choice, or `-1` when none is present. */
-		int foodGlouglou;
+		int foodGlouglou = -1;
 		/** Whether the pending order has been served. */
-		bool served;
+		bool served = false;
 		/** Whether the assigned Zoombini has been released. */
-		bool completed;
+		bool completed = false;
 	};
 
 	/** Required food-category values for one table. */
 	struct FoodAnswer {
 		/** Required dessert, or the wildcard value. */
-		int slurp;
+		int slurp = 0;
 		/** Required main dish, or the wildcard value. */
-		int miam;
+		int miam = 0;
 		/** Required drink, or the wildcard value. */
-		int glouglou;
+		int glouglou = 0;
+
+		FoodAnswer() = default;
+		FoodAnswer(int slurpValue, int miamValue, int glouglouValue)
+			: slurp(slurpValue), miam(miamValue), glouglou(glouglouValue) {}
 	};
 
 	/** Load all restaurant graphics. */
@@ -182,79 +186,79 @@ private:
 	void onRenderActors(ManagedSurface32 *screen) override;
 
 	/** Current interaction phase. */
-	State _state;
+	State _state = kStateInit;
 	/** Number of tables enabled for the selected level. */
-	int _numTables;
+	int _numTables = 4;
 	/** Level consumed by this page. */
-	int _level;
+	int _level = 1;
 	/** Number of Zoombinis already released. */
-	int _freedCount;
+	int _freedCount = 0;
 	/** Currently active table, or `-1` when none is active. */
-	int _currentTable;
+	int _currentTable = -1;
 	/** Most recently selected food item. */
-	int _selectedFood;
+	int _selectedFood = kFoodNone;
 	/** Number of incorrect orders submitted. */
-	int _wrongCount;
+	int _wrongCount = 0;
 	/** Level-dependent incorrect-order allowance. */
-	int _maxAttempts;
+	int _maxAttempts = 0;
 	/** Number of feature attributes represented in the clue layout. */
-	int _clueAttrCount;
+	int _clueAttrCount = 0;
 	/** Current Norf feedback visual state. */
-	int _norfState;
+	int _norfState = 0;
 
 	/** Generated item order, grouped into dessert, main-dish, and drink ranges. */
-	int _foodVals[9];
+	int _foodVals[9] = {};
 	/** Identifier of the generated clue template. */
-	int _templateId;
+	int _templateId = 11;
 
 	/** Pending dessert index within its category, or `-1`. */
-	int _pendingSlurp;
+	int _pendingSlurp = -1;
 	/** Pending main-dish index within its category, or `-1`. */
-	int _pendingMiam;
+	int _pendingMiam = -1;
 	/** Pending drink index within its category, or `-1`. */
-	int _pendingGlouglou;
+	int _pendingGlouglou = -1;
 
 	/** Table runtime state. */
-	TableSlot _tables[kMaxTables];
+	TableSlot _tables[kMaxTables] = {};
 	/** Correct answer corresponding to each table. */
-	FoodAnswer _answers[kMaxTables];
+	FoodAnswer _answers[kMaxTables] = {};
 
 	/** Clue symbols indexed by category section, column, and row. */
-	int _foodGrid[3][6][4];
+	int _foodGrid[3][6][4] = {};
 
 	/** Correct-answer feedback symbol. */
-	RleBlock *_symbOK;
+	RleBlock *_symbOK = nullptr;
 	/** Incorrect-answer feedback symbol. */
-	RleBlock *_symbNO;
+	RleBlock *_symbNO = nullptr;
 	/** Partial-match feedback symbol. */
-	RleBlock *_symbMaybe;
+	RleBlock *_symbMaybe = nullptr;
 
 	/** Full-size served-order platter. */
-	RleBlock *_plato;
+	RleBlock *_plato = nullptr;
 	/** Small served-order platter. */
-	RleBlock *_platoMini;
+	RleBlock *_platoMini = nullptr;
 
 	/** Dessert item visuals. */
-	RleBlock *_slurpImage[3];
+	RleBlock *_slurpImage[3] = {};
 
 	/** Main-dish item visuals. */
-	RleBlock *_miamImage[3];
+	RleBlock *_miamImage[3] = {};
 
 	/** Drink item visuals. */
-	RleBlock *_glouglouImage[3];
+	RleBlock *_glouglouImage[3] = {};
 
 	/** Order-panel visuals. */
-	RleBlock *_comandeImage[3];
+	RleBlock *_comandeImage[3] = {};
 
 	/** Default Norf visual. */
-	RleBlock *_norfDefault;
+	RleBlock *_norfDefault = nullptr;
 	/** Selection highlight visual. */
-	RleBlock *_highlightImage;
+	RleBlock *_highlightImage = nullptr;
 	/** Lazily loaded green bitmap font for the developer overlay. */
-	BitmapFont *_debugFont;
+	BitmapFont *_debugFont = nullptr;
 
 	/** Music handle used while Chez Norf is active. */
-	int _musicId;
+	int _musicId = -1;
 };
 
 } // End of namespace Zoombini2

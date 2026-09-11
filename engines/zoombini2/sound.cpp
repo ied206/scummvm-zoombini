@@ -20,10 +20,14 @@
  */
 
 #include "common/debug.h"
+#include "common/memstream.h"
+#include "common/substream.h"
 #include "common/system.h"
 
 #include "audio/audiostream.h"
+#include "audio/decoders/raw.h"
 #include "audio/decoders/wave.h"
+#include "audio/decoders/wave_types.h"
 #include "audio/mixer.h"
 
 #include "zoombini2/sound.h"
@@ -69,12 +73,6 @@ private:
 };
 
 SoundManager::SoundManager(Zoombini2Engine *vm, Audio::Mixer *mixer) : _vm(vm), _mixer(mixer) {
-	_nextId = 1;
-	_muteRefCount = 0;
-	_stereoOutputEnabled = false;
-	_volumeSFX = 100;
-	_volumeMusic = 100;
-	_volumeSpeech = 100;
 }
 
 SoundManager::~SoundManager() {
@@ -83,13 +81,34 @@ SoundManager::~SoundManager() {
 
 int SoundManager::load(bool isStream, const Common::Path &filename, bool loop) {
 	SoundBuffer *buf = new SoundBuffer();
-	buf->id = _nextId++;
+	buf->id = _nextId;
+	_nextId += 1;
 	buf->path = resolveCompatibilityPath(filename);
 	buf->isStream = isStream;
 	buf->loop = loop;
 	buf->category = classifySound(filename);
 	buf->volume = kMaxVolumePercent;
 	buf->usesCategoryVolume = true;
+	if (!isStream) {
+		Common::SeekableReadStream *file = _vm->openResourceFile(buf->path.toString('/'));
+		if (!file) {
+			warning("SoundManager::load: Cannot retain sample '%s'", buf->path.toString().c_str());
+		} else {
+			const int64 fileSize = file->size();
+			if (0 < fileSize && fileSize <= UINT32_MAX) {
+				buf->sampleData.resize(static_cast<uint32>(fileSize));
+				const uint32 bytesRead = file->read(buf->sampleData.data(), static_cast<uint32>(fileSize));
+				if (bytesRead != fileSize) {
+					warning("SoundManager::load: Short read while retaining sample '%s' (expected %lld bytes, found %u)", buf->path.toString().c_str(),
+							static_cast<long long int>(fileSize), bytesRead);
+					buf->sampleData.clear();
+				}
+			} else {
+				warning("SoundManager::load: Invalid sample size for '%s' (%lld bytes)", buf->path.toString().c_str(), static_cast<long long int>(fileSize));
+			}
+			delete file;
+		}
+	}
 	_buffers.push_back(buf);
 	return buf->id;
 }
@@ -97,7 +116,7 @@ int SoundManager::load(bool isStream, const Common::Path &filename, bool loop) {
 void SoundManager::unload(int id) {
 	for (uint i = 0; i < _buffers.size(); i++) {
 		if (_buffers[i]->id == id) {
-			stop(id);
+			releasePlayback(*_buffers[i]);
 			delete _buffers[i];
 			_buffers.remove_at(i);
 			return;
@@ -107,7 +126,7 @@ void SoundManager::unload(int id) {
 
 void SoundManager::unloadAll() {
 	for (uint i = 0; i < _buffers.size(); i++) {
-		stop(_buffers[i]->id);
+		releasePlayback(*_buffers[i]);
 		delete _buffers[i];
 	}
 	_buffers.clear();
@@ -118,13 +137,32 @@ void SoundManager::play(int id) {
 	if (!buf)
 		return;
 
-	Common::SeekableReadStream *f = _vm->openResourceFile(buf->path.toString('/'));
-	if (!f) {
-		debug(1, "SoundManager::play: Cannot open '%s'", buf->path.toString().c_str());
-		return;
+	Audio::SoundHandle *handle = &buf->streamHandle;
+	int sampleSlot = -1;
+	if (!buf->isStream) {
+		for (int i = 0; i < kMaxSampleSlots; i++) {
+			if (!_mixer->isSoundHandleActive(buf->handles[i])) {
+				handle = &buf->handles[i];
+				sampleSlot = i;
+				break;
+			}
+		}
+		if (sampleSlot < 0 || buf->sampleData.empty())
+			return;
 	}
 
-	Audio::RewindableAudioStream *stream = Audio::makeWAVStream(f, DisposeAfterUse::YES);
+	Common::SeekableReadStream *f;
+	if (buf->isStream) {
+		f = _vm->openResourceFile(buf->path.toString('/'));
+		if (!f) {
+			debug(1, "SoundManager::play: Cannot open '%s'", buf->path.toString().c_str());
+			return;
+		}
+	} else {
+		f = new Common::MemoryReadStream(buf->sampleData.data(), static_cast<uint32>(buf->sampleData.size()));
+	}
+
+	Audio::RewindableAudioStream *stream = makeAudioStream(f, buf->path);
 	if (!stream)
 		return;
 
@@ -137,23 +175,14 @@ void SoundManager::play(int id) {
 	if (!_stereoOutputEnabled && audioStream->isStereo())
 		audioStream = new MonoAudioStream(audioStream);
 
-	Audio::SoundHandle *handle = &buf->streamHandle;
-	if (!buf->isStream) {
-		handle = nullptr;
-		for (int i = 0; i < kMaxSampleSlots; i++) {
-			if (!_mixer->isSoundHandleActive(buf->handles[i])) {
-				handle = &buf->handles[i];
-				break;
-			}
-		}
-		if (!handle) {
-			delete audioStream;
-			return;
-		}
-	}
-
 	const byte volume = buf->usesCategoryVolume ? static_cast<byte>(Audio::Mixer::kMaxChannelVolume) : normalizeVolume(buf->volume);
+	if (buf->isStream && _mixer->isSoundHandleActive(buf->streamHandle))
+		_mixer->stopHandle(buf->streamHandle);
 	_mixer->playStream(getMixerSoundType(buf->category), handle, audioStream, -1, volume);
+	if (buf->isStream)
+		buf->streamPaused = false;
+	else
+		buf->handlesPaused[sampleSlot] = false;
 }
 
 void SoundManager::playWithVolume(int id, int volume) {
@@ -174,12 +203,19 @@ void SoundManager::stop(int id) {
 	if (!buf)
 		return;
 
+	if (buf->isStream) {
+		if (!buf->streamPaused && _mixer->isSoundHandleActive(buf->streamHandle)) {
+			_mixer->pauseHandle(buf->streamHandle, true);
+			buf->streamPaused = true;
+		}
+		return;
+	}
+
 	for (int i = 0; i < kMaxSampleSlots; i++) {
 		if (_mixer->isSoundHandleActive(buf->handles[i]))
 			_mixer->stopHandle(buf->handles[i]);
+		buf->handlesPaused[i] = false;
 	}
-	if (_mixer->isSoundHandleActive(buf->streamHandle))
-		_mixer->stopHandle(buf->streamHandle);
 }
 
 void SoundManager::pause(int id) {
@@ -187,12 +223,20 @@ void SoundManager::pause(int id) {
 	if (!buf)
 		return;
 
-	for (int i = 0; i < kMaxSampleSlots; i++) {
-		if (_mixer->isSoundHandleActive(buf->handles[i]))
-			_mixer->pauseHandle(buf->handles[i], true);
+	if (buf->isStream) {
+		if (!buf->streamPaused && _mixer->isSoundHandleActive(buf->streamHandle)) {
+			_mixer->pauseHandle(buf->streamHandle, true);
+			buf->streamPaused = true;
+		}
+		return;
 	}
-	if (_mixer->isSoundHandleActive(buf->streamHandle))
-		_mixer->pauseHandle(buf->streamHandle, true);
+
+	for (int i = 0; i < kMaxSampleSlots; i++) {
+		if (!buf->handlesPaused[i] && _mixer->isSoundHandleActive(buf->handles[i])) {
+			_mixer->pauseHandle(buf->handles[i], true);
+			buf->handlesPaused[i] = true;
+		}
+	}
 }
 
 void SoundManager::resume(int id) {
@@ -200,12 +244,22 @@ void SoundManager::resume(int id) {
 	if (!buf)
 		return;
 
-	for (int i = 0; i < kMaxSampleSlots; i++) {
-		if (_mixer->isSoundHandleActive(buf->handles[i]))
-			_mixer->pauseHandle(buf->handles[i], false);
+	if (buf->isStream) {
+		if (buf->streamPaused) {
+			if (_mixer->isSoundHandleActive(buf->streamHandle))
+				_mixer->pauseHandle(buf->streamHandle, false);
+			buf->streamPaused = false;
+		}
+		return;
 	}
-	if (_mixer->isSoundHandleActive(buf->streamHandle))
-		_mixer->pauseHandle(buf->streamHandle, false);
+
+	for (int i = 0; i < kMaxSampleSlots; i++) {
+		if (buf->handlesPaused[i]) {
+			if (_mixer->isSoundHandleActive(buf->handles[i]))
+				_mixer->pauseHandle(buf->handles[i], false);
+			buf->handlesPaused[i] = false;
+		}
+	}
 }
 
 bool SoundManager::isPlaying(int id) const {
@@ -213,11 +267,14 @@ bool SoundManager::isPlaying(int id) const {
 	if (!buf)
 		return false;
 
+	if (buf->isStream)
+		return !buf->streamPaused && _mixer->isSoundHandleActive(buf->streamHandle);
+
 	for (int i = 0; i < kMaxSampleSlots; i++) {
-		if (_mixer->isSoundHandleActive(buf->handles[i]))
+		if (!buf->handlesPaused[i] && _mixer->isSoundHandleActive(buf->handles[i]))
 			return true;
 	}
-	return _mixer->isSoundHandleActive(buf->streamHandle);
+	return false;
 }
 
 void SoundManager::setVolume(int id, int volume) {
@@ -243,7 +300,7 @@ void SoundManager::setVolumeAll(int volume) {
 }
 
 void SoundManager::mute() {
-	_muteRefCount++;
+	_muteRefCount += 1;
 	if (_muteRefCount == 1) {
 		_mixer->muteSoundType(Audio::Mixer::kSFXSoundType, true);
 		_mixer->muteSoundType(Audio::Mixer::kSpeechSoundType, true);
@@ -252,8 +309,8 @@ void SoundManager::mute() {
 }
 
 void SoundManager::unmute() {
-	if (_muteRefCount > 0)
-		_muteRefCount--;
+	if (0 < _muteRefCount)
+		_muteRefCount -= 1;
 	if (_muteRefCount == 0) {
 		_mixer->muteSoundType(Audio::Mixer::kSFXSoundType, false);
 		_mixer->muteSoundType(Audio::Mixer::kSpeechSoundType, false);
@@ -262,11 +319,13 @@ void SoundManager::unmute() {
 }
 
 void SoundManager::pauseAll() {
-	_mixer->pauseAll(true);
+	for (uint i = 0; i < _buffers.size(); i++)
+		pause(_buffers[i]->id);
 }
 
 void SoundManager::resumeAll() {
-	_mixer->pauseAll(false);
+	for (uint i = 0; i < _buffers.size(); i++)
+		resume(_buffers[i]->id);
 }
 
 void SoundManager::setVolumeSettings(int music, int sfx, int speech) {
@@ -281,6 +340,77 @@ SoundBuffer *SoundManager::findBuffer(int id) const {
 			return _buffers[i];
 	}
 	return nullptr;
+}
+
+void SoundManager::releasePlayback(SoundBuffer &buffer) {
+	for (int i = 0; i < kMaxSampleSlots; i++) {
+		if (_mixer->isSoundHandleActive(buffer.handles[i]))
+			_mixer->stopHandle(buffer.handles[i]);
+		buffer.handlesPaused[i] = false;
+	}
+	if (_mixer->isSoundHandleActive(buffer.streamHandle))
+		_mixer->stopHandle(buffer.streamHandle);
+	buffer.streamPaused = false;
+}
+
+Audio::RewindableAudioStream *SoundManager::makeAudioStream(Common::SeekableReadStream *stream, const Common::Path &path) {
+	const int64 initialPos = stream->pos();
+	int dataSize;
+	int rate;
+	byte flags;
+	uint16 wavType;
+	if (!Audio::loadWAVFromStream(*stream, dataSize, rate, flags, &wavType)) {
+		delete stream;
+		return nullptr;
+	}
+
+	if (wavType != Audio::kWaveFormatPCM) {
+		stream->seek(initialPos);
+		return Audio::makeWAVStream(stream, DisposeAfterUse::YES);
+	}
+
+	const int channels = (flags & Audio::FLAG_STEREO) ? 2 : 1;
+	const int bytesPerSample = (flags & Audio::FLAG_24BITS) ? 3 : ((flags & Audio::FLAG_16BITS) ? 2 : 1);
+	const int sampleFrameSize = channels * bytesPerSample;
+	const int64 dataOffset = stream->pos();
+	if (dataSize < 0 || stream->size() < dataOffset) {
+		warning("SoundManager::makeAudioStream: Invalid PCM data bounds in '%s'", path.toString().c_str());
+		delete stream;
+		return nullptr;
+	}
+
+	const int64 availableDataSize = stream->size() - dataOffset;
+	if (dataSize % sampleFrameSize == 0 && dataSize <= availableDataSize) {
+		stream->seek(initialPos);
+		return Audio::makeWAVStream(stream, DisposeAfterUse::YES);
+	}
+
+	if (availableDataSize < dataSize) {
+		warning("SoundManager::makeAudioStream: Truncated PCM data in '%s' (declared %d bytes, found %lld)",
+				path.toString().c_str(), dataSize, static_cast<long long int>(availableDataSize));
+	}
+
+	const int64 boundedDataSize = MIN<int64>(dataSize, availableDataSize);
+	const int64 completeDataSize = boundedDataSize - boundedDataSize % sampleFrameSize;
+	if (completeDataSize == 0) {
+		warning("SoundManager::makeAudioStream: No complete PCM sample frames in '%s'", path.toString().c_str());
+		delete stream;
+		return nullptr;
+	}
+
+	static constexpr int64 kMaxSubstreamPosition = UINT32_MAX;
+	if (kMaxSubstreamPosition < dataOffset || kMaxSubstreamPosition - dataOffset < completeDataSize) {
+		warning("SoundManager::makeAudioStream: PCM data range is too large in '%s'", path.toString().c_str());
+		delete stream;
+		return nullptr;
+	}
+
+	debug(2, "SoundManager::makeAudioStream: Ignoring %lld incomplete PCM bytes in '%s'",
+		  static_cast<long long int>(boundedDataSize - completeDataSize), path.toString().c_str());
+	const uint32 dataStart = static_cast<uint32>(dataOffset);
+	const uint32 dataEnd = static_cast<uint32>(dataOffset + completeDataSize);
+	Common::SeekableReadStream *dataStream = new Common::SeekableSubReadStream(stream, dataStart, dataEnd, DisposeAfterUse::YES);
+	return Audio::makeRawStream(dataStream, rate, flags);
 }
 
 Common::Path SoundManager::resolveCompatibilityPath(const Common::Path &filename) const {
