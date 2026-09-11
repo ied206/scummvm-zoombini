@@ -20,9 +20,8 @@
  */
 
 #include "common/debug.h"
-#include "common/random.h"
-
 #include "zoombini2/graphics.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/pages/puzzle_snowboard.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
@@ -44,19 +43,7 @@ namespace Zoombini2 {
 static const int kLanesByLevel[] = {0, 2, 4, 4}; // level 0(unused), 1, 2, 3
 
 PuzzleSnowboard::PuzzleSnowboard(Zoombini2Engine *vm)
-	: PuzzleBase(vm, kPageSnowboard), _treeDepth(0), _numLanes(0),
-	  _boardBitmap(nullptr), _boardAnim(nullptr), _engineAnim(nullptr),
-	  _currentZoombini(0), _animFrame(0), _lastFrameTime(0),
-	  _state(kStateInit), _musicId(-1) {
-
-	for (int f = 0; f < ZmbTrait::kTraitCount; f++) {
-		for (int v = 0; v < ZmbTrait::kTraitValueCount; v++) {
-			_traitIcons[f][v] = nullptr;
-		}
-	}
-	for (int i = 0; i < 5; i++) {
-		_decorAnims[i] = nullptr;
-	}
+	: PuzzleBase(vm, kPageSnowboard) {
 }
 
 PuzzleSnowboard::~PuzzleSnowboard() {
@@ -115,7 +102,7 @@ void PuzzleSnowboard::loadLaneGraphics() {
 	for (int f = 0; f < ZmbTrait::kTraitCount; f++) {
 		for (int v = 0; v < ZmbTrait::kTraitValueCount; v++) {
 			Common::Path path(Common::String::format("bmp/snowboard/traits/%d-%d", f + 1, v + 1));
-			_traitIcons[f][v] = new RleBlock();
+			_traitIcons[f][v] = new RleBlock(_vm);
 			if (!_traitIcons[f][v]->loadFromFile(path)) {
 				debug(1, "PuzzleSnowboard: Failed to load trait %d-%d", f + 1, v + 1);
 				delete _traitIcons[f][v];
@@ -126,7 +113,7 @@ void PuzzleSnowboard::loadLaneGraphics() {
 
 	// Load board graphics
 	Common::Path boardPath("bmp/snowboard/board01");
-	_boardBitmap = new BitBlock();
+	_boardBitmap = new BitBlock(_vm);
 	if (!_boardBitmap->load(boardPath)) {
 		delete _boardBitmap;
 		_boardBitmap = nullptr;
@@ -134,7 +121,7 @@ void PuzzleSnowboard::loadLaneGraphics() {
 
 	// Load board animation (BOARD.AN)
 	Common::Path boardAnimPath("bmp/snowboard/BOARD");
-	_boardAnim = new Animation();
+	_boardAnim = new Animation(_vm);
 	if (!_boardAnim->loadFromFile(boardAnimPath)) {
 		debug(1, "PuzzleSnowboard: Failed to load BOARD.AN");
 		delete _boardAnim;
@@ -143,7 +130,7 @@ void PuzzleSnowboard::loadLaneGraphics() {
 
 	// Load engine animation (ENGINE.AN)
 	Common::Path engineAnimPath("bmp/snowboard/ENGINE");
-	_engineAnim = new Animation();
+	_engineAnim = new Animation(_vm);
 	if (!_engineAnim->loadFromFile(engineAnimPath)) {
 		debug(1, "PuzzleSnowboard: Failed to load ENGINE.AN");
 		delete _engineAnim;
@@ -155,7 +142,7 @@ void PuzzleSnowboard::loadLaneGraphics() {
 	static const int decorNumbers[] = {1, 3, 4, 5, 6};
 	for (int i = 0; i < 5; i++) {
 		Common::Path decorPath(Common::String::format("bmp/snowboard/N1So-%d", decorNumbers[i]));
-		_decorAnims[i] = new Animation();
+		_decorAnims[i] = new Animation(_vm);
 		if (!_decorAnims[i]->loadFromFile(decorPath)) {
 			debug(2, "PuzzleSnowboard: Failed to load N1So-%d", decorNumbers[i]);
 			delete _decorAnims[i];
@@ -174,14 +161,14 @@ void PuzzleSnowboard::generateTree() {
 	_tree.clear();
 	_tree.resize(_treeDepth);
 
-	Common::RandomSource rnd("snowboard");
+	Zoombini2Random *rnd = _vm->getRandom();
 
 	// For each internal node, pick a random trait and a random match value.
 	for (int i = 0; i < _treeDepth; i++) {
 		TreeNode &node = _tree[i];
-		node.traitIndex = static_cast<ZmbTrait::TraitIndex>(rnd.getRandomNumber(ZmbTrait::kTraitCount - 1));
-		node.matchVal1 = rnd.getRandomNumber(ZmbTrait::kTraitValueCount - 1);  // 0-4 = trait variants
-		node.matchVal2 = rnd.getRandomNumber(ZmbTrait::kTraitValueCount - 1);  // For level 3
+		node.traitIndex = static_cast<ZmbTrait::TraitIndex>(rnd->getRandomNumber(ZmbTrait::kTraitCount - 1));
+		node.matchVal1 = rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1);  // 0-4 = trait variants
+		node.matchVal2 = rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1);  // For level 3
 	}
 
 	debug(2, "PuzzleSnowboard: Generated tree with %d internal nodes", _treeDepth);

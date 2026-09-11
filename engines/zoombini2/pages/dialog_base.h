@@ -35,7 +35,7 @@ public:
 	~DialogBase() override {}
 	/** Dialog setup is driven by the opener rather than the page dispatcher. */
 	void init() override {}
-	/** Dialogs have no dispatcher update step; their opener and the three-button controls drive them. */
+	/** Dialogs have no dispatcher update step; their owner or the engine-level modal route drives them. */
 	void onUpdate() override {}
 	/** Return whether this dialog currently owns drawing and input. */
 	virtual bool isActive() const = 0;

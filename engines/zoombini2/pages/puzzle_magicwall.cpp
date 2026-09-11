@@ -20,9 +20,8 @@
  */
 
 #include "common/debug.h"
-#include "common/random.h"
-
 #include "zoombini2/graphics.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/pages/puzzle_magicwall.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
@@ -80,53 +79,9 @@ static const Common::Rect kPathButtons[4] = {
 };
 
 PuzzleMagicWall::PuzzleMagicWall(Zoombini2Engine *vm)
-	: PuzzleBase(vm, kPageMagicWall),
-	  _state(kStateInit),
-	  _currentLevel(0),
-	  _activeSlot(-1),
-	  _destSlot(-1),
-	  _capturedCount(0),
-	  _miniMapImage(nullptr),
-	  _miniMapDotImage(nullptr),
-	  _glowwormImage(nullptr),
-	  _glowwormAnim(nullptr),
-	  _musicId(-1),
-	  _sndGateOpen(-1),
-	  _sndZoombiniMove(-1),
-	  _nextApprovalIdx(0),
-	  _wallLever(0, 0, 0, 0) {
-
-	for (int i = 0; i < 4; i++) {
-		_sndApproval[i] = -1;
-		_sndHint[i] = -1;
-	}
-	for (int i = 0; i < 2; i++) {
-		_sndError[i] = -1;
-	}
-
-	for (int i = 0; i < kColorCount; i++) {
-		_dotImage[i] = nullptr;
-		_bugImage[i] = nullptr;
-		_miniLightImage[i] = nullptr;
-	}
-	for (int i = 0; i < 4; i++) {
-		_gateAnims[i] = nullptr;
-		_exitPaths[i] = nullptr;
-		_bougePaths[i] = nullptr;
-		_slots[i].zoombiniIdx = -1;
-		_slots[i].pathProgress = 0;
-		_slots[i].targetColor = -1;
-		_slots[i].captured = false;
-		_slots[i].pos = Common::Point32();
-		_slots[i].path = nullptr;
-		_slots[i].pathStartTime = 0;
+	: PuzzleBase(vm, kPageMagicWall) {
+	for (int i = 0; i < 4; i++)
 		_gates[i].gateIdx = i;
-		_gates[i].open = false;
-		_gates[i].animStart = 0;
-	}
-	for (int i = 0; i < 5; i++) {
-		_crystalAnims[i] = nullptr;
-	}
 }
 
 PuzzleMagicWall::~PuzzleMagicWall() {
@@ -241,7 +196,7 @@ void PuzzleMagicWall::loadResources() {
 	// Load color dot sprites (DOT-{color}.rb)
 	for (int i = 0; i < kColorCount; i++) {
 		Common::Path dotPath(Common::String::format("bmp/magic_wall/DOT-%s", kColorNames[i]));
-		_dotImage[i] = new RleBlock();
+		_dotImage[i] = new RleBlock(_vm);
 		if (!_dotImage[i]->loadFromFile(dotPath)) {
 			debug(2, "PuzzleMagicWall: Failed to load DOT-%s", kColorNames[i]);
 			delete _dotImage[i];
@@ -252,7 +207,7 @@ void PuzzleMagicWall::loadResources() {
 	// Load color bug sprites (bug_c_{color}.rb)
 	for (int i = 0; i < kColorCount; i++) {
 		Common::Path bugPath(Common::String::format("bmp/magic_wall/bug_c_%s", kColorNames[i]));
-		_bugImage[i] = new RleBlock();
+		_bugImage[i] = new RleBlock(_vm);
 		if (!_bugImage[i]->loadFromFile(bugPath)) {
 			debug(2, "PuzzleMagicWall: Failed to load bug_c_%s", kColorNames[i]);
 			delete _bugImage[i];
@@ -262,14 +217,14 @@ void PuzzleMagicWall::loadResources() {
 
 	// Load minimap sprites
 	Common::Path miniMapPath("bmp/magic_wall/mini-map");
-	_miniMapImage = new RleBlock();
+	_miniMapImage = new RleBlock(_vm);
 	if (!_miniMapImage->loadFromFile(miniMapPath)) {
 		delete _miniMapImage;
 		_miniMapImage = nullptr;
 	}
 
 	Common::Path miniMapDotPath("bmp/magic_wall/mini-map-dot");
-	_miniMapDotImage = new RleBlock();
+	_miniMapDotImage = new RleBlock(_vm);
 	if (!_miniMapDotImage->loadFromFile(miniMapDotPath)) {
 		delete _miniMapDotImage;
 		_miniMapDotImage = nullptr;
@@ -278,7 +233,7 @@ void PuzzleMagicWall::loadResources() {
 	// Load minimap lights for each color
 	for (int i = 0; i < kColorCount; i++) {
 		Common::Path lightPath(Common::String::format("bmp/magic_wall/mini-light-%s", kColorNames[i]));
-		_miniLightImage[i] = new RleBlock();
+		_miniLightImage[i] = new RleBlock(_vm);
 		if (!_miniLightImage[i]->loadFromFile(lightPath)) {
 			delete _miniLightImage[i];
 			_miniLightImage[i] = nullptr;
@@ -287,7 +242,7 @@ void PuzzleMagicWall::loadResources() {
 
 	// Load glowworm (le_vier_luisant.bb)
 	Common::Path glowwormPath("bmp/magic_wall/le_vier_luisant");
-	_glowwormImage = new RleBlock();
+	_glowwormImage = new RleBlock(_vm);
 	if (!_glowwormImage->loadFromFile(glowwormPath)) {
 		delete _glowwormImage;
 		_glowwormImage = nullptr;
@@ -295,7 +250,7 @@ void PuzzleMagicWall::loadResources() {
 
 	// Load glowworm animation (le_vier.an)
 	Common::Path glowwormAnimPath("bmp/magic_wall/le_vier");
-	_glowwormAnim = new Animation();
+	_glowwormAnim = new Animation(_vm);
 	if (!_glowwormAnim->loadFromFile(glowwormAnimPath)) {
 		delete _glowwormAnim;
 		_glowwormAnim = nullptr;
@@ -305,7 +260,7 @@ void PuzzleMagicWall::loadResources() {
 	const char *gateNames[] = {"porte-A", "porte-B", "porte-C", "porte-D"};
 	for (int i = 0; i < 4; i++) {
 		Common::Path gatePath(Common::String::format("bmp/magic_wall/%s", gateNames[i]));
-		_gateAnims[i] = new Animation();
+		_gateAnims[i] = new Animation(_vm);
 		if (!_gateAnims[i]->loadFromFile(gatePath)) {
 			delete _gateAnims[i];
 			_gateAnims[i] = nullptr;
@@ -315,7 +270,7 @@ void PuzzleMagicWall::loadResources() {
 	// Load crystal animations (Crystal1-5.an)
 	for (int i = 0; i < 5; i++) {
 		Common::Path crystalPath(Common::String::format("bmp/magic_wall/Crystal%d", i + 1));
-		_crystalAnims[i] = new Animation();
+			_crystalAnims[i] = new Animation(_vm);
 		if (!_crystalAnims[i]->loadFromFile(crystalPath)) {
 			delete _crystalAnims[i];
 			_crystalAnims[i] = nullptr;
@@ -325,13 +280,13 @@ void PuzzleMagicWall::loadResources() {
 	// Load exit and internal movement paths.
 	for (int i = 0; i < 4; i++) {
 		Common::Path exitPath(Common::String::format("bmp/magic_wall/PAT/EXIT%d.PAT", i + 1));
-		_exitPaths[i] = PathObject::loadFromPAT(exitPath);
+		_exitPaths[i] = PathObject::loadFromPAT(_vm, exitPath);
 		if (!_exitPaths[i]) {
 			debug(2, "PuzzleMagicWall: Failed to load EXIT%d.PAT", i + 1);
 		}
 
 		Common::Path bougePath(Common::String::format("bmp/magic_wall/PAT/BOUGE%d.PAT", i + 1));
-		_bougePaths[i] = PathObject::loadFromPAT(bougePath);
+		_bougePaths[i] = PathObject::loadFromPAT(_vm, bougePath);
 		if (!_bougePaths[i]) {
 			debug(2, "PuzzleMagicWall: Failed to load BOUGE%d.PAT", i + 1);
 		}
@@ -384,7 +339,8 @@ void PuzzleMagicWall::placeColorBugs() {
 
 	_colorBugs.clear();
 
-	Common::RandomSource rnd("magicwall_bugs");
+	_vm->reseedRandomForV10();
+	Zoombini2Random *rnd = _vm->getRandom();
 
 	// Match bugs to dots
 	for (uint i = 0; i < _colorDots.size(); i++) {
@@ -392,7 +348,7 @@ void PuzzleMagicWall::placeColorBugs() {
 		bug.colorIdx = _colorDots[i].colorIdx;
 		// Place bug near but not on top of dot
 		bug.pos = Common::Point32(
-			_colorDots[i].pos.x + rnd.getRandomNumberRng(-50, 50), _colorDots[i].pos.y + rnd.getRandomNumberRng(-30, 30));
+			_colorDots[i].pos.x + rnd->getRandomNumberRng(-50, 50), _colorDots[i].pos.y + rnd->getRandomNumberRng(-30, 30));
 		bug.active = true;
 		_colorBugs.push_back(bug);
 	}

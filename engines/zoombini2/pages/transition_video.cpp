@@ -30,10 +30,46 @@
 
 namespace Zoombini2 {
 
-TransitionVideo::TransitionVideo(Zoombini2Engine *vm, const Common::Path &videoPath, int nextPageId)
-	: TransitionBase(vm), _videoPath(videoPath), _nextPageId(nextPageId),
-	  _decoder(nullptr), _started(false),
-	  _lastFrame(nullptr), _framePos() {
+TransitionVideo::TransitionVideo(Zoombini2Engine *vm, int pageId)
+	: TransitionBase(vm) {
+	_pageId = pageId;
+
+	switch (pageId) {
+	case kPageLogoTLC:
+		_videoPath = selectMoviePath("movies/tlclogo.bik", "movies/tlclogo50%.bik");
+		_nextPageId = kPageLogoPolygon;
+		break;
+	case kPageLogoPolygon:
+		_videoPath = Common::Path("movies/logopoly.bik");
+		_nextPageId = kPageTitleScreen;
+		break;
+	case kPageCutsceneFirst:
+		_videoPath = selectMoviePath("movies/zoom_movie1_100%.bik", "movies/zoom_movie1_50%.bik");
+		_nextPageId = kPageZombiniville;
+		break;
+	case kPageCutsceneSecond:
+		_videoPath = selectMoviePath("movies/zoom_movie2_100%.bik", "movies/zoom_movie2_50%.bik");
+		_nextPageId = kPageRescue1;
+		break;
+	case kPageCutsceneThird:
+		_videoPath = selectMoviePath("movies/zoom_movie3_100%.bik", "movies/zoom_movie3_50%.bik");
+		_nextPageId = kPageRescue2;
+		break;
+	case kPageLogoArisuMedia:
+		_videoPath = Common::Path("movies/arisu.bik");
+		_nextPageId = kPageLogoTLC;
+		break;
+	default:
+		warning("TransitionVideo: Unknown page %d", pageId);
+		break;
+	}
+}
+
+Common::Path TransitionVideo::selectMoviePath(const char *fullSizePath, const char *halfSizePath) const {
+	if (_vm->hasResource(fullSizePath))
+		return Common::Path(fullSizePath);
+
+	return Common::Path(halfSizePath);
 }
 
 TransitionVideo::~TransitionVideo() {

@@ -20,9 +20,8 @@
  */
 
 #include "common/debug.h"
-#include "common/random.h"
-
 #include "zoombini2/graphics.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/pages/puzzle_mysticmarsh.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
@@ -78,42 +77,7 @@ static const char *kSymbolNames[PuzzleMysticMarsh::kNumSymbols] = {
 	"S_DIV1", "S_DIV1", "S_DIV1", "S_DIV1"};
 
 PuzzleMysticMarsh::PuzzleMysticMarsh(Zoombini2Engine *vm)
-	: PuzzleBase(vm, kPageMysticMarsh),
-	  _state(kStateInit),
-	  _freedCount(0),
-	  _selectedZoombini(-1),
-	  _bgIndex(1),
-	  _level(1),
-	  _numSlots(0),
-	  _craterImage(nullptr),
-	  _bubbleCraterAnim(nullptr),
-	  _tourbiAnim(nullptr),
-	  _musicId(-1) {
-
-	for (int i = 0; i < kMaxCells; i++) {
-		_grid[i].type = 0;
-		_grid[i].symbolIdx = 0;
-		_grid[i].pos = Common::Point32();
-	}
-
-	for (int i = 0; i < kNumSymbols; i++)
-		_symbolImage[i] = nullptr;
-
-	for (int f = 0; f < 4; f++)
-		for (int v = 0; v < 5; v++)
-			_traitImage[f][v] = nullptr;
-
-	for (int i = 0; i < 3; i++)
-		_bubbleImage[i] = nullptr;
-
-	for (int i = 0; i < kMaxSlots; i++) {
-		_slots[i].cellCol = 0;
-		_slots[i].cellRow = 0;
-		_slots[i].pos = Common::Point32();
-		_slots[i].hitbox = Common::Rect();
-		_slots[i].zoombiniIdx = -1;
-		_slots[i].occupied = false;
-	}
+	: PuzzleBase(vm, kPageMysticMarsh) {
 }
 
 PuzzleMysticMarsh::~PuzzleMysticMarsh() {
@@ -189,7 +153,7 @@ void PuzzleMysticMarsh::init() {
 
 	// Reload background with level-appropriate variant
 	delete _background;
-	_background = new BitBlock();
+	_background = new BitBlock(_vm);
 	Common::Path bgPath(Common::String::format("#bmp/mystic_marsh/background%d", _bgIndex));
 	if (!_background->load(bgPath)) {
 		debug(1, "PuzzleMysticMarsh: Failed to load background%d", _bgIndex);
@@ -212,10 +176,12 @@ void PuzzleMysticMarsh::init() {
 	_stateTimer = _vm->getGameTickCount();
 
 	// Generate a target launch sequence for this puzzle
-	Common::RandomSource rnd("mysticmarsh_seq");
+	if (_level == 3)
+		_vm->reseedRandomForV10();
+	Zoombini2Random *rnd = _vm->getRandom();
 	_targetSequence.clear();
 	for (int i = 0; i < (int)_puzzleZoombinis.size(); i++) {
-		_targetSequence.push_back(rnd.getRandomNumber(4)); // 4 possible entrances
+		_targetSequence.push_back(rnd->getRandomNumber(4)); // 4 possible entrances
 	}
 }
 
@@ -226,7 +192,7 @@ void PuzzleMysticMarsh::loadResources() {
 
 	// Load crater sprite
 	Common::Path craterPath("bmp/mystic_marsh/crater");
-	_craterImage = new RleBlock();
+	_craterImage = new RleBlock(_vm);
 	if (!_craterImage->loadFromFile(craterPath)) {
 		delete _craterImage;
 		_craterImage = nullptr;
@@ -234,7 +200,7 @@ void PuzzleMysticMarsh::loadResources() {
 
 	// Load BubbleCrater animation
 	Common::Path bubbleCraterPath("bmp/mystic_marsh/BubbleCrater");
-	_bubbleCraterAnim = new Animation();
+	_bubbleCraterAnim = new Animation(_vm);
 	if (!_bubbleCraterAnim->loadFromFile(bubbleCraterPath)) {
 		delete _bubbleCraterAnim;
 		_bubbleCraterAnim = nullptr;
@@ -242,7 +208,7 @@ void PuzzleMysticMarsh::loadResources() {
 
 	// Load tourbi (whirlpool) animation
 	Common::Path tourbiPath("bmp/mystic_marsh/symbols/tourbi_anim");
-	_tourbiAnim = new Animation();
+	_tourbiAnim = new Animation(_vm);
 	if (!_tourbiAnim->loadFromFile(tourbiPath)) {
 		delete _tourbiAnim;
 		_tourbiAnim = nullptr;
@@ -257,7 +223,7 @@ void PuzzleMysticMarsh::loadTraits() {
 		for (int v = 0; v < 5; v++) {
 			Common::Path traitPath(Common::String::format(
 				"bmp/mystic_marsh/traits/%d-%d", f + 1, v + 1));
-			_traitImage[f][v] = new RleBlock();
+			_traitImage[f][v] = new RleBlock(_vm);
 			if (!_traitImage[f][v]->loadFromFile(traitPath)) {
 				delete _traitImage[f][v];
 				_traitImage[f][v] = nullptr;
@@ -271,7 +237,7 @@ void PuzzleMysticMarsh::loadSymbols() {
 	for (int i = 0; i < kNumSymbols; i++) {
 		Common::Path symPath(Common::String::format(
 			"bmp/mystic_marsh/symbols/%s", kSymbolNames[i]));
-		_symbolImage[i] = new RleBlock();
+		_symbolImage[i] = new RleBlock(_vm);
 		if (!_symbolImage[i]->loadFromFile(symPath)) {
 			delete _symbolImage[i];
 			_symbolImage[i] = nullptr;
@@ -284,7 +250,7 @@ void PuzzleMysticMarsh::loadBubbles() {
 	for (int i = 0; i < 3; i++) {
 		Common::Path bubblePath(Common::String::format(
 			"bmp/mystic_marsh/bubble%d", i + 1));
-		_bubbleImage[i] = new RleBlock();
+		_bubbleImage[i] = new RleBlock(_vm);
 		if (!_bubbleImage[i]->loadFromFile(bubblePath)) {
 			delete _bubbleImage[i];
 			_bubbleImage[i] = nullptr;
@@ -348,7 +314,8 @@ void PuzzleMysticMarsh::generateRules() {
 	}
 
 	// Place some decorative symbols between craters
-	Common::RandomSource *rnd = _vm->getRandom();
+	_vm->reseedRandomForV10();
+	Zoombini2Random *rnd = _vm->getRandom();
 	for (int col = 0; col < kGridCols; col++) {
 		for (int row = 0; row < kGridRows; row++) {
 			int idx = col * kGridRows + row;

@@ -27,6 +27,10 @@
 
 namespace Zoombini2 {
 
+constexpr Common::Point32 ShelterRescueSite2::kRosterGridBasePos;
+constexpr Common::Point32 ShelterRescueSite2::kRosterButtonUpPos;
+constexpr Common::Point32 ShelterRescueSite2::kRosterButtonDownPos;
+
 ShelterRescueSite2::ShelterRescueSite2(Zoombini2Engine *vm) : ShelterRescueSiteBase(vm) {
 	_pageId = kPageRescue2;
 }
@@ -39,8 +43,7 @@ void ShelterRescueSite2::init() {
 	debug(1, "ShelterRescueSite2::init");
 
 	loadBackground("#bmp/rescue2/background");
-	configureRosterLayout(Common::Point32(75, 193), Common::Rect(20, 332, 83, 418), Common::Rect(289, 332, 352, 411), Common::Point32(20, 332),
-						  Common::Point32(289, 332));
+	configureRosterLayout(kRosterGridBasePos, _rosterScrollUpRect, _rosterScrollDownRect, kRosterButtonUpPos, kRosterButtonDownPos);
 	loadSelector("bmp/rescue2/selector.rb");
 	loadPorteSelector("bmp/rescue2/porte_select.rb");
 	loadScrollButtons("bmp/rescue2/button_left.an", "bmp/rescue2/button_right.an");

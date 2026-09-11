@@ -44,6 +44,22 @@ protected:
 	BoardRecord **getRescueBoard() const override;
 
 private:
+	/** Origin of the Rescue Site II waiting-roster grid. */
+	static constexpr Common::Point32 kRosterGridBasePos = Common::Point32(75, 193);
+	/** Position of the upward Rescue Site II roster-scroll animation. */
+	static constexpr Common::Point32 kRosterButtonUpPos = Common::Point32(20, 332);
+	/** Position of the downward Rescue Site II roster-scroll animation. */
+	static constexpr Common::Point32 kRosterButtonDownPos = Common::Point32(289, 332);
+
+	/**
+	 * Immutable Rescue Site II layout rectangles are instance members because
+	 * Common::Rect32 requires runtime construction and ScummVM prohibits global C++ constructors.
+	 */
+	/** Hit rectangle for upward Rescue Site II roster scrolling. */
+	const Common::Rect32 _rosterScrollUpRect = Common::Rect32(20, 332, 83, 418);
+	/** Hit rectangle for downward Rescue Site II roster scrolling. */
+	const Common::Rect32 _rosterScrollDownRect = Common::Rect32(289, 332, 352, 411);
+
 	/** Restore the Rescue Site II visit and departure-roster state. */
 	void initRescueRoster();
 };

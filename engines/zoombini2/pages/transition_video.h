@@ -39,8 +39,8 @@ namespace Zoombini2 {
  */
 class TransitionVideo : public TransitionBase {
 public:
-	/** Configure the video resource and the page dispatched after playback. */
-	TransitionVideo(Zoombini2Engine *vm, const Common::Path &videoPath, int nextPageId);
+	/** Configure the video and the page dispatched after playback for @p pageId. */
+	TransitionVideo(Zoombini2Engine *vm, int pageId);
 	/** Stop and release the decoder and retained frame. */
 	~TransitionVideo() override;
 
@@ -58,18 +58,20 @@ public:
 
 private:
 	EventHandleResult skip();
-	/** Original logical video resource name. */
-	Common::Path _videoPath;
+	/** Select the full-size movie when present, otherwise use the half-size path. */
+	Common::Path selectMoviePath(const char *fullSizePath, const char *halfSizePath) const;
+	/** Original logical video resource name selected for the current page. */
+	Common::Path _videoPath = Common::Path();
 	/** Page requested when playback finishes or fails to start. */
-	int _nextPageId;
+	int _nextPageId = -1;
 	/** Bink Video decoder. */
-	Video::VideoDecoder *_decoder;
+	Video::VideoDecoder *_decoder = nullptr;
 	/** Whether decoder playback started successfully. */
-	bool _started;
+	bool _started = false;
 	/** Retain the most recently decoded frame. */
-	Graphics::ManagedSurface *_lastFrame;
+	Graphics::ManagedSurface *_lastFrame = nullptr;
 	/** Signed screen coordinate used to center @ref TransitionVideo::_lastFrame. */
-	Common::Point32 _framePos;
+	Common::Point32 _framePos = Common::Point32();
 };
 
 } // End of namespace Zoombini2

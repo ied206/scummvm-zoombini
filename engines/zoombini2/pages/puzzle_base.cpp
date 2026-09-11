@@ -22,6 +22,7 @@
 #include "common/debug.h"
 
 #include "zoombini2/graphics.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/pages/puzzle_base.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
@@ -36,8 +37,8 @@ static const struct {
 } kPuzzleInfo[] = {
 	// Public activity names paired with their internal resource directories.
 	{kPageCrazyTurtle, "Turtle Hurdle", "crazy_turtle", "crazy_turtle/background"},
-	{kPageWaterSlide, "Pipes of Paloo", "waterslide", "waterslide/waterslides"},
-	{kPageAquaCube, "Aqua Cube", "aquacube", "aquacube/background"},
+	{kPageWaterslide, "Pipes of Paloo", "waterslide", "waterslide/waterslides"},
+	{kPageAquacube, "Aqua Cube", "aquacube", "aquacube/background"},
 	{kPageMysticMarsh, "Bubble Bumpers", "mystic_marsh", "mystic_marsh/background1"},
 	{kPageMagicWall, "Beetle Bug Alley", "magic_wall", "magic_wall/magic wall"},
 	{kPageWallOfFleens, "Magic Mirrors", "wall_of_fleens", "wall_of_fleens/background"},
@@ -65,8 +66,7 @@ const char *PuzzleBase::getPuzzleDir(int puzzleId) {
 }
 
 PuzzleBase::PuzzleBase(Zoombini2Engine *vm, int puzzleId)
-	: InteractiveBase(vm), _puzzleId(puzzleId), _background(nullptr),
-	  _zoombiniAnimation(nullptr), _stateTimer(0) {
+	: InteractiveBase(vm), _puzzleId(puzzleId) {
 	_pageId = puzzleId;
 }
 
@@ -89,7 +89,7 @@ void PuzzleBase::init() {
 
 	if (bgName) {
 		Common::Path bgPath(Common::String::format("#bmp/%s", bgName));
-		_background = new BitBlock();
+		_background = new BitBlock(_vm);
 		if (!_background->load(bgPath)) {
 			debug(1, "Puzzle: Failed to load background for %s", name);
 			delete _background;
