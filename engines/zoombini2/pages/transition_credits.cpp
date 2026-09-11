@@ -30,17 +30,7 @@
 namespace Zoombini2 {
 
 TransitionCredits::TransitionCredits(Zoombini2Engine *vm)
-	: TransitionBase(vm),
-	  _endTime(0),
-	  _scrollY(0.0f),
-	  _maxScrollY(0),
-	  _scrollActive(false),
-	  _redrawNeeded(false),
-	  _lastUpdateTime(0),
-	  _initialWait(false),
-	  _background(nullptr),
-	  _musicId(-1),
-	  _finished(false) {
+	: TransitionBase(vm) {
 	_pageId = kPageCredits;
 }
 
@@ -57,7 +47,7 @@ void TransitionCredits::init() {
 	debug(1, "TransitionCredits::init");
 	static constexpr uint32 kInitialHoldMilliseconds = 4000;
 
-	_background = new BitBlock();
+	_background = new BitBlock(_vm);
 	if (!_background->load(Common::Path("#bmp/credits/credits"))) {
 		warning("TransitionCredits: Failed to load bmp/credits/credits");
 	}

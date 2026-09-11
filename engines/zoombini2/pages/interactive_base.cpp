@@ -21,33 +21,21 @@
 
 #include "zoombini2/pages/interactive_base.h"
 #include "zoombini2/graphics.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/pages/dialog_help.h"
+#include "zoombini2/pages/dialog_msgbox.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
 
+#include "common/callback.h"
 #include "common/keyboard.h"
-#include "common/system.h"
 #include "graphics/managed_surface.h"
 
 namespace Zoombini2 {
 
-ThreeButtons::ThreeButtons(Zoombini2Engine *vm)
-	: _vm(vm), _helpScreen(nullptr),
-	  _helpNormal(nullptr), _helpHighlight(nullptr),
-	  _mapNormal(nullptr), _mapHighlight(nullptr),
-	  _goNormal(nullptr), _goHighlight(nullptr), _goDisabled(nullptr),
-	  _helpClickSoundId(-1), _mapClickSoundId(-1),
-	  _helpHovered(false), _mapHovered(false), _goHovered(false), _primaryButtonArmed(false), _pendingMouseRelease(false),
-	  _goWasEnabled(false), _goBlinkHighlighted(false),
-	  _goBlinkTogglesRemaining(0), _goPageId(-1), _goBlinkDeadline(0),
-	  _savedBackground(nullptr), _confirmBackground(nullptr), _confirmPanels(),
-	  _confirmText(nullptr), _confirmActive(false), _confirmHover(0) {
-
-	// The three-button group keeps a fixed 34-pixel hit area for each control.
-	_helpButtonRect = Common::Rect(5, 480, 39, 514); // 34x34
-	_mapButtonRect = Common::Rect(5, 514, 39, 548);  // 34x34
-	_goButtonRect = Common::Rect(5, 548, 39, 582);   // 34x34
+Sidebar::Sidebar(Zoombini2Engine *vm)
+	: _vm(vm) {
 
 	_helpNormal = _vm->loadRleBlock("Bmp/BARRE/QUOI.RB");
 	_helpHighlight = _vm->loadRleBlock("Bmp/BARRE/QUOIROLL.RB");
@@ -67,12 +55,7 @@ ThreeButtons::ThreeButtons(Zoombini2Engine *vm)
 	_savedBackground = new Graphics::ManagedSurface(34, 102, _vm->getCurrentScreen()->format);
 }
 
-ThreeButtons::~ThreeButtons() {
-	closeSaveConfirmation();
-	for (int i = 0; i < 3; i++)
-		delete _confirmPanels[i];
-	delete _confirmText;
-	delete _confirmBackground;
+Sidebar::~Sidebar() {
 	delete _helpScreen;
 	delete _helpNormal;
 	delete _helpHighlight;
@@ -84,20 +67,20 @@ ThreeButtons::~ThreeButtons() {
 	delete _savedBackground;
 }
 
-DialogBase *ThreeButtons::getActiveDialog() const {
+DialogBase *Sidebar::getActiveDialog() const {
 	return _helpScreen && _helpScreen->isActive() ? _helpScreen : nullptr;
 }
 
-bool ThreeButtons::hasActiveDialog() const {
-	return _confirmActive || getActiveDialog() != nullptr;
+bool Sidebar::hasActiveDialog() const {
+	return getActiveDialog() != nullptr;
 }
 
-bool ThreeButtons::shouldShow() const {
+bool Sidebar::shouldShow() const {
 	const PageBase *page = _vm->getCurrentPage();
-	return page && page->hasThreeButtons();
+	return page && page->hasSidebar();
 }
 
-void ThreeButtons::updateGoBlink(bool goEnabled, int pageId) {
+void Sidebar::updateGoBlink(bool goEnabled, int pageId) {
 	if (_goPageId != pageId) {
 		_goPageId = pageId;
 		_goWasEnabled = goEnabled;
@@ -126,16 +109,16 @@ void ThreeButtons::updateGoBlink(bool goEnabled, int pageId) {
 	}
 }
 
-bool ThreeButtons::isPointStrictlyInside(const Common::Rect &rect, const Common::Point &pos) {
+bool Sidebar::isPointStrictlyInside(const Common::Rect &rect, const Common::Point &pos) {
 	return rect.left < pos.x && pos.x < rect.right && rect.top < pos.y && pos.y < rect.bottom;
 }
 
-bool ThreeButtons::isInButtonRegion(const Common::Point &pos) const {
+bool Sidebar::isInButtonRegion(const Common::Point &pos) const {
 	return isPointStrictlyInside(_helpButtonRect, pos) || isPointStrictlyInside(_mapButtonRect, pos) ||
 		isPointStrictlyInside(_goButtonRect, pos);
 }
 
-void ThreeButtons::updateHoverState(const Common::Point &pos, bool inputAllowed) {
+void Sidebar::updateHoverState(const Common::Point &pos, bool inputAllowed) {
 	if (!inputAllowed) {
 		_helpHovered = false;
 		_mapHovered = false;
@@ -149,7 +132,7 @@ void ThreeButtons::updateHoverState(const Common::Point &pos, bool inputAllowed)
 	_goHovered = page && page->hasGoButton() && page->canUseGoButton() && isPointStrictlyInside(_goButtonRect, pos);
 }
 
-void ThreeButtons::consumePendingRelease() {
+void Sidebar::consumePendingRelease() {
 	if (!_pendingMouseRelease)
 		return;
 
@@ -163,7 +146,7 @@ void ThreeButtons::consumePendingRelease() {
 	}
 }
 
-EventHandleResult ThreeButtons::onLButtonUp(const Common::Point &pos) {
+EventHandleResult Sidebar::onLButtonUp(const Common::Point &pos) {
 	if (_primaryButtonArmed) {
 		_primaryButtonArmed = false;
 		_pendingMouseRelease = true;
@@ -178,12 +161,7 @@ EventHandleResult ThreeButtons::onLButtonUp(const Common::Point &pos) {
 	return hasActiveDialog() ? EventHandleResult::kConsumed : EventHandleResult::kPassthrough;
 }
 
-EventHandleResult ThreeButtons::onKeyDown(const Common::KeyState &key, bool repeat) {
-	if (_confirmActive) {
-		if (key.keycode == Common::KEYCODE_ESCAPE)
-			closeSaveConfirmation();
-		return EventHandleResult::kConsumed;
-	}
+EventHandleResult Sidebar::onKeyDown(const Common::KeyState &key, bool repeat) {
 	if (DialogBase *dialog = getActiveDialog()) {
 		dialog->onKeyDown(key, repeat);
 		return EventHandleResult::kConsumed;
@@ -191,17 +169,12 @@ EventHandleResult ThreeButtons::onKeyDown(const Common::KeyState &key, bool repe
 	return EventHandleResult::kPassthrough;
 }
 
-EventHandleResult ThreeButtons::onKeyUp(const Common::KeyState &key) {
+EventHandleResult Sidebar::onKeyUp(const Common::KeyState &key) {
 	if (DialogBase *dialog = getActiveDialog())
 		dialog->onKeyUp(key);
 	return hasActiveDialog() ? EventHandleResult::kConsumed : EventHandleResult::kPassthrough;
 }
-void ThreeButtons::drawAndHandleInput(ManagedSurface32 *screen, bool inputAllowed) {
-	if (_confirmActive) {
-		_pendingMouseRelease = false;
-		drawSaveConfirmation(screen);
-		return;
-	}
+void Sidebar::drawAndHandleInput(ManagedSurface32 *screen, bool inputAllowed) {
 	if (DialogBase *dialog = getActiveDialog()) {
 		_pendingMouseRelease = false;
 		dialog->render(screen);
@@ -229,10 +202,6 @@ void ThreeButtons::drawAndHandleInput(ManagedSurface32 *screen, bool inputAllowe
 	else
 		_pendingMouseRelease = false;
 
-	if (_confirmActive) {
-		drawSaveConfirmation(screen);
-		return;
-	}
 	if (DialogBase *dialog = getActiveDialog()) {
 		dialog->render(screen);
 		return;
@@ -262,11 +231,7 @@ void ThreeButtons::drawAndHandleInput(ManagedSurface32 *screen, bool inputAllowe
 	}
 }
 
-EventHandleResult ThreeButtons::onMouseMove(const Common::Point &pos) {
-	if (_confirmActive) {
-		_confirmHover = hitTestSaveConfirmation(pos);
-		return EventHandleResult::kConsumed;
-	}
+EventHandleResult Sidebar::onMouseMove(const Common::Point &pos) {
 	if (DialogBase *dialog = getActiveDialog()) {
 		dialog->onMouseMove(pos);
 		return EventHandleResult::kConsumed;
@@ -274,17 +239,8 @@ EventHandleResult ThreeButtons::onMouseMove(const Common::Point &pos) {
 	return EventHandleResult::kPassthrough;
 }
 
-EventHandleResult ThreeButtons::onLButtonDown(const Common::Point &pos) {
+EventHandleResult Sidebar::onLButtonDown(const Common::Point &pos) {
 	_primaryButtonArmed = true;
-	if (_confirmActive) {
-		const int button = hitTestSaveConfirmation(pos);
-		if (button) {
-			closeSaveConfirmation();
-			if (button == 1)
-				returnToMap();
-		}
-		return EventHandleResult::kConsumed;
-	}
 	if (DialogBase *dialog = getActiveDialog()) {
 		return dialog->onLButtonDown(pos);
 	}
@@ -295,7 +251,7 @@ EventHandleResult ThreeButtons::onLButtonDown(const Common::Point &pos) {
 	return EventHandleResult::kPassthrough;
 }
 
-void ThreeButtons::onHelpClick() {
+void Sidebar::onHelpClick() {
 	if (!_helpScreen) {
 		return;
 	}
@@ -307,7 +263,7 @@ void ThreeButtons::onHelpClick() {
 	_helpScreen->open(static_cast<int>(currentPage), level);
 }
 
-void ThreeButtons::onMapClick() {
+void Sidebar::onMapClick() {
 	_vm->getSoundManager()->play(_mapClickSoundId);
 	if (!_vm->_isSavedGame) {
 		returnToMap();
@@ -325,10 +281,10 @@ void ThreeButtons::onMapClick() {
 		(!hasActive && (!_vm->getCurrentPage() || _vm->isStartingMapTransition())))
 		returnToMap();
 	else
-		openSaveConfirmation();
+		requestAbandonConfirmation();
 }
 
-void ThreeButtons::onGoClick() {
+void Sidebar::onGoClick() {
 	const PageBase *page = _vm->getCurrentPage();
 	if (!page || !page->canUseGoButton())
 		return;
@@ -341,62 +297,18 @@ void ThreeButtons::onGoClick() {
 	_vm->requestPageChange(kPageMapTrans);
 }
 
-void ThreeButtons::returnToMap() {
+void Sidebar::returnToMap() {
 	_vm->requestPageChange(_vm->_isSavedGame ? kPageMenuLoad : kPageMenuPractice);
 }
 
-void ThreeButtons::openSaveConfirmation() {
-	static constexpr const char *kPanelPaths[3] = {
-		"bmp/menu/QUIT_panel_nothing.rb", "bmp/menu/QUIT_panel_ok.rb", "bmp/menu/QUIT_panel_cancel.rb"};
-	for (int i = 0; i < 3; i++) {
-		if (!_confirmPanels[i]) {
-			_confirmPanels[i] = new RleBlock();
-			_confirmPanels[i]->loadFromFile(Common::Path(kPanelPaths[i]));
-		}
-		if (!_confirmPanels[i]->isValid())
-			return;
-	}
-	if (!_confirmText) {
-		_confirmText = new BitBlock();
-		_confirmText->load(Common::Path("bmp/menu/Quit_panel_text_abandon"));
-	}
-	if (!_confirmBackground)
-		_confirmBackground = new Graphics::ManagedSurface();
-	_confirmBackground->copyFrom(*_vm->getCurrentScreen());
-	_confirmPos = Common::Point32(400 - _confirmPanels[1]->getWidth() / 2, 300 - _confirmPanels[1]->getHeight() / 2);
-	_confirmHover = 0;
-	_confirmActive = true;
-	_vm->_isPaused = true;
-	_vm->_pauseTimeStart = g_system->getMillis();
-	_vm->getSoundManager()->pauseAll();
+void Sidebar::requestAbandonConfirmation() {
+	_vm->getMsgBoxDialog()->request(Common::Path("bmp/menu/Quit_panel_text_abandon"),
+		new Common::Callback<Sidebar, DialogMsgBoxButton>(this, &Sidebar::handleAbandonConfirmation));
 }
 
-void ThreeButtons::closeSaveConfirmation() {
-	if (!_confirmActive)
-		return;
-	_confirmActive = false;
-	_vm->getCurrentScreen()->copyFrom(*_confirmBackground);
-	_vm->addPauseTime(g_system->getMillis() - _vm->_pauseTimeStart);
-	_vm->_isPaused = false;
-	_vm->getSoundManager()->resumeAll();
-}
-
-int ThreeButtons::hitTestSaveConfirmation(const Common::Point &pos) const {
-	const int x = pos.x - _confirmPos.x;
-	const int y = pos.y - _confirmPos.y;
-	if (77 < y && y < 145) {
-		if (207 < x && x < 272)
-			return 1;
-		if (287 < x && x < 352)
-			return 2;
-	}
-	return 0;
-}
-
-void ThreeButtons::drawSaveConfirmation(ManagedSurface32 *screen) {
-	screen->copyFrom(*_confirmBackground);
-	_confirmPanels[_confirmHover]->drawToScreen(screen, _confirmPos, _vm->getAlphaLUT());
-	_confirmText->drawToSurface(screen, Common::Point32(_confirmPos.x + 17, _confirmPos.y + 17));
+void Sidebar::handleAbandonConfirmation(DialogMsgBoxButton button) {
+	if (button == DialogMsgBoxButton::kOkay01)
+		returnToMap();
 }
 
 } // End of namespace Zoombini2

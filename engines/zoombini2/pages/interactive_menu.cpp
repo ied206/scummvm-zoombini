@@ -21,9 +21,10 @@
 
 #include <string.h>
 
+#include "common/callback.h"
 #include "common/debug.h"
-#include "common/system.h"
 #include "zoombini2/graphics.h"
+#include "zoombini2/pages/dialog_msgbox.h"
 #include "zoombini2/pages/interactive_menu.h"
 #include "zoombini2/pages/save_file_list.h"
 #include "zoombini2/sound.h"
@@ -38,22 +39,11 @@ const char *const InteractiveMenu::kValidNameCharacters =
 	"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ";
 
 InteractiveMenu::InteractiveMenu(Zoombini2Engine *vm)
-	: InteractiveBase(vm), _state(kSaveMenuMain), _background(nullptr),
-	  _selectorNormal(nullptr), _selectorHilite(nullptr), _selectionBar(nullptr),
-	  _fileList(nullptr), _blipSoundId(-1), _typeSoundId(-1),
-	  _deleteSoundId(-1), _mapMusicId(-1), _volumePanel(nullptr),
-	  _confirmType(kSaveMenuConfirmNone), _confirmPanelNothing(nullptr),
-	  _confirmPanelOk(nullptr), _confirmPanelCancel(nullptr),
-	  _confirmTextDelete(nullptr), _confirmTextQuit(nullptr),
-	  _confirmButtonHover(ConfirmButtonKind::kNone), _confirmPos(), _confirmDialogBackground(nullptr) {
+	: InteractiveBase(vm) {
 	_pageId = kPageMenuOptions;
-	for (int i = 0; i < kMenuButtonCount; ++i)
-		_buttons[i] = nullptr;
 }
 
 InteractiveMenu::~InteractiveMenu() {
-	if (_state == kSaveMenuConfirm)
-		closeConfirmDialog();
 	delete _fileList;
 	delete _background;
 	delete _selectorNormal;
@@ -63,12 +53,6 @@ InteractiveMenu::~InteractiveMenu() {
 		delete _buttons[i];
 
 	delete _volumePanel;
-	delete _confirmPanelNothing;
-	delete _confirmPanelOk;
-	delete _confirmPanelCancel;
-	delete _confirmTextDelete;
-	delete _confirmTextQuit;
-	delete _confirmDialogBackground;
 
 	SoundManager *sound = _vm->getSoundManager();
 	if (sound) {
@@ -87,29 +71,29 @@ void InteractiveMenu::init() {
 	loadResources();
 	loadButtons();
 
-	_fileList = new SaveFileList(kFileListPos, _selectionBar);
+	_fileList = new SaveFileList(_vm, kFileListPos, _selectionBar);
 	if (!_fileList->init())
 		warning("MenuScreenPage: Failed to load save-list fonts");
 	scanSaveFiles();
 
 	_mapMusicId = _vm->ensureMapMusic();
-	_state = kSaveMenuMain;
+	_state = MenuScreenState::kMain00;
 }
 
 void InteractiveMenu::loadResources() {
-	_background = new BitBlock();
+	_background = new BitBlock(_vm);
 	if (!_background->load(Common::Path("#bmp/menu/background")))
 		warning("MenuScreenPage: Failed to load menu background");
 
-	_selectorNormal = new BitBlock();
+	_selectorNormal = new BitBlock(_vm);
 	if (!_selectorNormal->load(Common::Path("bmp/menu/PARTIEs - selector NORMAL")))
 		warning("MenuScreenPage: Failed to load normal selector");
 
-	_selectorHilite = new BitBlock();
+	_selectorHilite = new BitBlock(_vm);
 	if (!_selectorHilite->load(Common::Path("bmp/menu/PARTIEs - selector HILITE")))
 		warning("MenuScreenPage: Failed to load highlighted selector");
 
-	_selectionBar = new RleBlock();
+	_selectionBar = new RleBlock(_vm);
 	if (!_selectionBar->loadFromFile(Common::Path("bmp/menu/barre-cache.rb")))
 		warning("MenuScreenPage: Failed to load save selection bar");
 
@@ -142,7 +126,7 @@ void InteractiveMenu::loadButtons() {
 
 	for (int i = 0; i < kMenuButtonCount; ++i) {
 		const ButtonDefinition &definition = definitions[i];
-		_buttons[i] = new UIButton();
+		_buttons[i] = new UIButton(_vm);
 		_buttons[i]->setRect(definition.pos, definition.width, definition.height);
 		_buttons[i]->loadImages(Common::Path(definition.normalPath),
 								Common::Path(definition.hoverPath),
@@ -164,7 +148,7 @@ void InteractiveMenu::onUpdate() {
 }
 
 void InteractiveMenu::onRenderScene(ManagedSurface32 *screen) {
-	if (_state == kSaveMenuOptions) {
+	if (_state == MenuScreenState::kOptions01) {
 		if (_background)
 			_background->drawToSurface(screen, Common::Point32(0, 0));
 	} else {
@@ -173,11 +157,9 @@ void InteractiveMenu::onRenderScene(ManagedSurface32 *screen) {
 }
 
 void InteractiveMenu::onRenderForeground(ManagedSurface32 *screen) {
-	if (_state == kSaveMenuOptions && _volumePanel) {
+	if (_state == MenuScreenState::kOptions01 && _volumePanel) {
 		const Common::Point32 mousePos(_vm->getMousePos());
 		_volumePanel->draw(screen, mousePos, _vm->getAlphaLUT());
-	} else if (_state == kSaveMenuConfirm) {
-		drawConfirmDialog(screen);
 	}
 }
 
@@ -202,13 +184,9 @@ EventHandleResult InteractiveMenu::onLButtonUp(const Common::Point &pos) {
 }
 
 EventHandleResult InteractiveMenu::onMouseMove(const Common::Point &pos) {
-	if (_state == kSaveMenuOptions) {
+	if (_state == MenuScreenState::kOptions01) {
 		if (_volumePanel)
 			_volumePanel->handleMouseInput(Common::Point32(pos), _volumePanelMouseDown, false);
-		return EventHandleResult::kConsumed;
-	}
-	if (_state == kSaveMenuConfirm) {
-		_confirmButtonHover = hitTestConfirmDialog(pos);
 		return EventHandleResult::kConsumed;
 	}
 	const int hovered = hitTestButton(pos);
@@ -220,15 +198,10 @@ EventHandleResult InteractiveMenu::onMouseMove(const Common::Point &pos) {
 
 EventHandleResult InteractiveMenu::onKeyDown(const Common::KeyState &key, bool repeat) {
 	(void)repeat;
-	if (_state == kSaveMenuMain) {
+	if (_state == MenuScreenState::kMain00) {
 		const uint32 keyCode = key.ascii ? static_cast<uint32>(key.ascii) : static_cast<uint32>(key.keycode);
 		handleKeyInput(keyCode);
 		updateButtonAvailability();
-	} else if (key.keycode == Common::KEYCODE_ESCAPE) {
-		if (_state == kSaveMenuOptions)
-			closeOptionsDialog(false);
-		else if (_state == kSaveMenuConfirm)
-			closeConfirmDialog();
 	}
 	return EventHandleResult::kConsumed;
 }
@@ -262,16 +235,10 @@ void InteractiveMenu::drawButtons(ManagedSurface32 *screen, const Common::Point3
 
 EventHandleResult InteractiveMenu::onLButtonDown(const Common::Point &pos) {
 	updateButtonAvailability();
-	if (_state == kSaveMenuOptions) {
+	if (_state == MenuScreenState::kOptions01) {
 		_volumePanelMouseDown = true;
 		if (_volumePanel)
 			_volumePanel->handleMouseInput(Common::Point32(pos), true, false);
-		return EventHandleResult::kConsumed;
-	}
-	if (_state == kSaveMenuConfirm) {
-		const ConfirmButtonKind button = hitTestConfirmDialog(pos);
-		if (button != ConfirmButtonKind::kNone)
-			handleConfirmClick(button);
 		return EventHandleResult::kConsumed;
 	}
 
@@ -321,7 +288,7 @@ void InteractiveMenu::handleButtonClick(int buttonId) {
 		_vm->requestPageChange(kPageMenuPractice);
 		break;
 	case kMenuButtonQuit:
-		openConfirmDialog(kSaveMenuConfirmQuit);
+		requestQuitConfirmation();
 		break;
 	default:
 		return;
@@ -397,24 +364,46 @@ void InteractiveMenu::startSelectedSave() {
 }
 
 void InteractiveMenu::requestDeleteConfirmation() {
-	if (_fileList->hasValidSelection() && !_fileList->isEditing())
-		openConfirmDialog(kSaveMenuConfirmDelete);
+	if (!_fileList->hasValidSelection() || _fileList->isEditing())
+		return;
+
+	_pendingDeleteProfileName = _fileList->getSelectedName();
+	if (_pendingDeleteProfileName.empty())
+		return;
+	_vm->getMsgBoxDialog()->request(Common::Path("bmp/menu/Quit_panel_text_suppr"),
+		new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleDeleteConfirmation));
+}
+
+void InteractiveMenu::requestQuitConfirmation() {
+	_vm->getMsgBoxDialog()->request(Common::Path("bmp/menu/Quit_panel_text_quit"),
+		new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleQuitConfirmation));
+}
+
+void InteractiveMenu::handleDeleteConfirmation(DialogMsgBoxButton button) {
+	if (button == DialogMsgBoxButton::kOkay01)
+		deleteSelectedSave();
+	_pendingDeleteProfileName.clear();
+}
+
+void InteractiveMenu::handleQuitConfirmation(DialogMsgBoxButton button) {
+	if (button == DialogMsgBoxButton::kOkay01)
+		_vm->requestPageChange(kPageCredits);
 }
 
 void InteractiveMenu::openOptionsDialog() {
 	if (!_volumePanel) {
-		_volumePanel = new VolumePanel();
+		_volumePanel = new VolumePanel(_vm);
 		_volumePanel->init(_vm->getSoundManager());
 		_volumePanel->setInitialVolumes(_vm->getMusicVolume(), _vm->getSFXVolume(), _vm->getSpeechVolume());
 	}
-	_state = kSaveMenuOptions;
+	_state = MenuScreenState::kOptions01;
 }
 
 void InteractiveMenu::closeOptionsDialog(bool applyChanges) {
 	applyOptionVolumes(applyChanges, applyChanges);
 	delete _volumePanel;
 	_volumePanel = nullptr;
-	_state = kSaveMenuMain;
+	_state = MenuScreenState::kMain00;
 }
 
 void InteractiveMenu::applyOptionVolumes(bool usePanelValues, bool persistChanges) {
@@ -429,114 +418,15 @@ void InteractiveMenu::applyOptionVolumes(bool usePanelValues, bool persistChange
 		_vm->previewSoundVolumes(music, sfx, speech);
 }
 
-void InteractiveMenu::openConfirmDialog(SaveMenuConfirmType type) {
-	if (_state == kSaveMenuConfirm)
-		return;
-	_confirmType = type;
-	_confirmButtonHover = ConfirmButtonKind::kNone;
-
-	if (!_confirmPanelNothing) {
-		_confirmPanelNothing = new RleBlock();
-		_confirmPanelNothing->loadFromFile(Common::Path("bmp/menu/QUIT_panel_nothing.rb"));
-	}
-	if (!_confirmPanelOk) {
-		_confirmPanelOk = new RleBlock();
-		_confirmPanelOk->loadFromFile(Common::Path("bmp/menu/QUIT_panel_ok.rb"));
-	}
-	if (!_confirmPanelCancel) {
-		_confirmPanelCancel = new RleBlock();
-		_confirmPanelCancel->loadFromFile(Common::Path("bmp/menu/QUIT_panel_cancel.rb"));
-	}
-
-	if (type == kSaveMenuConfirmDelete && !_confirmTextDelete) {
-		_confirmTextDelete = new BitBlock();
-		_confirmTextDelete->load(Common::Path("bmp/menu/Quit_panel_text_suppr"));
-	} else if (type == kSaveMenuConfirmQuit && !_confirmTextQuit) {
-		_confirmTextQuit = new BitBlock();
-		_confirmTextQuit->load(Common::Path("bmp/menu/Quit_panel_text_quit"));
-	}
-
-	if (_confirmPanelOk && _confirmPanelOk->isValid()) {
-		_confirmPos = Common::Point32(kScreenWidth / 2 - _confirmPanelOk->getWidth() / 2,
-										   kScreenHeight / 2 - _confirmPanelOk->getHeight() / 2);
-	}
-	if (!_confirmDialogBackground)
-		_confirmDialogBackground = new Graphics::ManagedSurface();
-	_confirmDialogBackground->copyFrom(*_vm->getCurrentScreen());
-	_state = kSaveMenuConfirm;
-	_vm->_isPaused = true;
-	_vm->_pauseTimeStart = g_system->getMillis();
-	_vm->getSoundManager()->pauseAll();
-}
-
-void InteractiveMenu::closeConfirmDialog() {
-	if (_state != kSaveMenuConfirm)
-		return;
-	_confirmType = kSaveMenuConfirmNone;
-	_confirmButtonHover = ConfirmButtonKind::kNone;
-	if (_confirmDialogBackground)
-		_vm->getCurrentScreen()->copyFrom(*_confirmDialogBackground);
-	_vm->addPauseTime(g_system->getMillis() - _vm->_pauseTimeStart);
-	_vm->_isPaused = false;
-	_vm->getSoundManager()->resumeAll();
-	_state = kSaveMenuMain;
-}
-
-void InteractiveMenu::drawConfirmDialog(ManagedSurface32 *screen) {
-	if (_confirmDialogBackground)
-		screen->copyFrom(*_confirmDialogBackground);
-
-	RleBlock *panel = _confirmPanelNothing;
-	if (_confirmButtonHover == ConfirmButtonKind::kOkay)
-		panel = _confirmPanelOk;
-	else if (_confirmButtonHover == ConfirmButtonKind::kCancel)
-		panel = _confirmPanelCancel;
-	if (panel && panel->isValid())
-		panel->drawToScreen(screen, _confirmPos, _vm->getAlphaLUT());
-
-	BitBlock *textImage = _confirmType == kSaveMenuConfirmDelete ? _confirmTextDelete : _confirmTextQuit;
-	if (textImage)
-		textImage->drawToSurface(screen, Common::Point32(_confirmPos.x + 17, _confirmPos.y + 17));
-}
-
-InteractiveMenu::ConfirmButtonKind InteractiveMenu::hitTestConfirmDialog(const Common::Point &pos) const {
-	const Common::Rect okRect(
-		static_cast<int16>(_confirmPos.x + 208), static_cast<int16>(_confirmPos.y + 78),
-		static_cast<int16>(_confirmPos.x + 272), static_cast<int16>(_confirmPos.y + 145));
-	const Common::Rect cancelRect(
-		static_cast<int16>(_confirmPos.x + 288), static_cast<int16>(_confirmPos.y + 78),
-		static_cast<int16>(_confirmPos.x + 352), static_cast<int16>(_confirmPos.y + 145));
-
-	if (okRect.contains(pos))
-		return ConfirmButtonKind::kOkay;
-	if (cancelRect.contains(pos))
-		return ConfirmButtonKind::kCancel;
-	return ConfirmButtonKind::kNone;
-}
-
-void InteractiveMenu::handleConfirmClick(ConfirmButtonKind button) {
-	if (button == ConfirmButtonKind::kOkay) {
-		if (_confirmType == kSaveMenuConfirmDelete)
-			deleteSelectedSave();
-		else if (_confirmType == kSaveMenuConfirmQuit) {
-			closeConfirmDialog();
-			_vm->requestPageChange(kPageCredits);
-			return;
-		}
-	}
-	closeConfirmDialog();
-}
-
 void InteractiveMenu::deleteSelectedSave() {
-	const Common::String saveName = _fileList->getSelectedName();
-	if (saveName.empty())
+	if (_pendingDeleteProfileName.empty())
 		return;
 
-	if (_vm->deleteGameSave(saveName)) {
+	if (_vm->deleteGameSave(_pendingDeleteProfileName)) {
 		_fileList->deleteSelected();
 		playSound(_deleteSoundId);
 	} else {
-		warning("MenuScreenPage: Failed to delete profile '%s'", saveName.c_str());
+		warning("MenuScreenPage: Failed to delete profile '%s'", _pendingDeleteProfileName.c_str());
 	}
 }
 

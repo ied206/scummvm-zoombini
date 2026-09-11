@@ -43,8 +43,8 @@ public:
 	PuzzleBase(Zoombini2Engine *vm, int puzzleId);
 	/** Release shared puzzle resources and roster entries. */
 	~PuzzleBase() override;
-	/** Return whether the shared three-button controls are visible. */
-	bool hasThreeButtons() const override { return true; }
+	/** Return whether the shared sidebar is visible. */
+	bool hasSidebar() const override { return true; }
 
 	/** Initialize the shared puzzle background, sprite grid, and roster. */
 	void init() override;
@@ -59,13 +59,13 @@ protected:
 	/** Numeric dispatcher identifier for the concrete puzzle. */
 	int _puzzleId;
 	/** Shared full-screen puzzle background. */
-	BitBlock *_background;
+	BitBlock *_background = nullptr;
 	/** Borrowed immutable sprite grid owned by the engine cache. */
-	const ZoombiniAnimation *_zoombiniAnimation;
+	const ZoombiniAnimation *_zoombiniAnimation = nullptr;
 	/** Active party entries mirrored from the engine's roster for this puzzle. */
 	Common::Array<ZoombiniState *> _puzzleZoombinis;
 	/** Gameplay deadline used by the concrete puzzle state machine. */
-	uint32 _stateTimer;
+	uint32 _stateTimer = 0;
 };
 
 } // End of namespace Zoombini2

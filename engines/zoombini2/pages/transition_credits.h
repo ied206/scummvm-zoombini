@@ -51,26 +51,26 @@ public:
 
 private:
 	/** Gameplay deadline for the active hold period. */
-	uint32 _endTime;
+	uint32 _endTime = 0;
 	/** Current vertical scroll offset. */
-	float _scrollY;
+	float _scrollY = 0.0f;
 	/** Largest vertical scroll offset exposed by the bitmap. */
-	int _maxScrollY;
+	int _maxScrollY = 0;
 	/** Whether the credits are currently scrolling. */
-	bool _scrollActive;
+	bool _scrollActive = false;
 	/** Whether @ref TransitionCredits::draw must update the screen. */
-	bool _redrawNeeded;
+	bool _redrawNeeded = false;
 	/** Gameplay tick used to calculate the next scroll delta. */
-	uint32 _lastUpdateTime;
+	uint32 _lastUpdateTime = 0;
 	/** Whether the presentation remains in its initial hold. */
-	bool _initialWait;
+	bool _initialWait = false;
 	/** Horizontal-scrolled credits bitmap. */
-	BitBlock *_background;
+	BitBlock *_background = nullptr;
 
 	/** Credits music sound identifier. */
-	int _musicId;
+	int _musicId = -1;
 	/** Whether the credits have requested engine exit. */
-	bool _finished;
+	bool _finished = false;
 };
 
 } // End of namespace Zoombini2

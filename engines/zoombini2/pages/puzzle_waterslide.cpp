@@ -20,9 +20,9 @@
  */
 
 #include "common/debug.h"
-#include "common/random.h"
 
 #include "zoombini2/graphics.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/pages/puzzle_waterslide.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
@@ -97,46 +97,7 @@ static const Common::Point32 kPipePos[8] = {
 };
 
 PuzzleWaterslide::PuzzleWaterslide(Zoombini2Engine *vm)
-	: PuzzleBase(vm, kPageWaterSlide),
-	  _state(kStateInit),
-	  _freedCount(0),
-	  _selectedZoombini(-1),
-	  _selectedSlot(-1),
-	  _numSlots(0),
-	  _numPairs(0),
-	  _matchedPairs(0),
-	  _pipeBlueHoriz(nullptr),
-	  _pipeGreyHoriz(nullptr),
-	  _pipeRedHoriz(nullptr),
-	  _pipeBlueBigone(nullptr),
-	  _pipeGreyBigone(nullptr),
-	  _pipeRedBigone(nullptr),
-	  _pastilleBlue(nullptr),
-	  _pastilleGrey(nullptr),
-	  _edgeNeutre(nullptr),
-	  _blueFountainAnim(nullptr),
-	  _littleTreeAnim(nullptr),
-	  _valveAnim(nullptr),
-	  _cascade1Anim(nullptr),
-	  _cascade2Anim(nullptr),
-	  _musicId(-1) {
-
-	for (int i = 0; i < 4; i++) {
-		_traitImage[i] = nullptr;
-	}
-
-	for (int i = 0; i < kMaxSlots; i++) {
-		_slots[i].pos = Common::Point32();
-		_slots[i].state = kSlotEmpty;
-		_slots[i].zoombiniIdx = -1;
-		_slots[i].pairSlot = -1;
-	}
-
-	for (int i = 0; i < kMaxPairs; i++) {
-		_pairs[i].zoombiniA = -1;
-		_pairs[i].zoombiniB = -1;
-		_pairs[i].matched = false;
-	}
+	: PuzzleBase(vm, kPageWaterslide) {
 }
 
 PuzzleWaterslide::~PuzzleWaterslide() {
@@ -208,7 +169,7 @@ void PuzzleWaterslide::loadResources() {
 	// Load trait icons (4 features)
 	for (int i = 0; i < 4; i++) {
 		Common::Path traitPath(Common::String::format("bmp/waterslide/traits/%d", i + 1));
-		_traitImage[i] = new RleBlock();
+		_traitImage[i] = new RleBlock(_vm);
 		if (!_traitImage[i]->loadFromFile(traitPath)) {
 			delete _traitImage[i];
 			_traitImage[i] = nullptr;
@@ -217,14 +178,14 @@ void PuzzleWaterslide::loadResources() {
 
 	// Load pipe graphics - blue
 	Common::Path pipeBlueHPath("bmp/waterslide/pipes - blue/pipe - horizontal");
-	_pipeBlueHoriz = new RleBlock();
+	_pipeBlueHoriz = new RleBlock(_vm);
 	if (!_pipeBlueHoriz->loadFromFile(pipeBlueHPath)) {
 		delete _pipeBlueHoriz;
 		_pipeBlueHoriz = nullptr;
 	}
 
 	Common::Path pipeBlueBPath("bmp/waterslide/pipes - blue/pipe - lev1_bigone");
-	_pipeBlueBigone = new RleBlock();
+	_pipeBlueBigone = new RleBlock(_vm);
 	if (!_pipeBlueBigone->loadFromFile(pipeBlueBPath)) {
 		delete _pipeBlueBigone;
 		_pipeBlueBigone = nullptr;
@@ -232,7 +193,7 @@ void PuzzleWaterslide::loadResources() {
 
 	// Load pipe graphics - grey
 	Common::Path pipeGreyHPath("bmp/waterslide/pipes - grey/pipe - horizontal");
-	_pipeGreyHoriz = new RleBlock();
+	_pipeGreyHoriz = new RleBlock(_vm);
 	if (!_pipeGreyHoriz->loadFromFile(pipeGreyHPath)) {
 		delete _pipeGreyHoriz;
 		_pipeGreyHoriz = nullptr;
@@ -240,7 +201,7 @@ void PuzzleWaterslide::loadResources() {
 
 	// Load pipe graphics - red
 	Common::Path pipeRedHPath("bmp/waterslide/pipes - red/pipe - horizontal");
-	_pipeRedHoriz = new RleBlock();
+	_pipeRedHoriz = new RleBlock(_vm);
 	if (!_pipeRedHoriz->loadFromFile(pipeRedHPath)) {
 		delete _pipeRedHoriz;
 		_pipeRedHoriz = nullptr;
@@ -248,14 +209,14 @@ void PuzzleWaterslide::loadResources() {
 
 	// Load pastilles
 	Common::Path pastilleBluePath("bmp/waterslide/pastilles blue");
-	_pastilleBlue = new RleBlock();
+	_pastilleBlue = new RleBlock(_vm);
 	if (!_pastilleBlue->loadFromFile(pastilleBluePath)) {
 		delete _pastilleBlue;
 		_pastilleBlue = nullptr;
 	}
 
 	Common::Path pastilleGreyPath("bmp/waterslide/pastilles grey");
-	_pastilleGrey = new RleBlock();
+	_pastilleGrey = new RleBlock(_vm);
 	if (!_pastilleGrey->loadFromFile(pastilleGreyPath)) {
 		delete _pastilleGrey;
 		_pastilleGrey = nullptr;
@@ -263,7 +224,7 @@ void PuzzleWaterslide::loadResources() {
 
 	// Load edge
 	Common::Path edgePath("bmp/waterslide/edge neutre");
-	_edgeNeutre = new RleBlock();
+	_edgeNeutre = new RleBlock(_vm);
 	if (!_edgeNeutre->loadFromFile(edgePath)) {
 		delete _edgeNeutre;
 		_edgeNeutre = nullptr;
@@ -271,35 +232,35 @@ void PuzzleWaterslide::loadResources() {
 
 	// Load decorative animations
 	Common::Path fountainPath("bmp/waterslide/blue fountain");
-	_blueFountainAnim = new Animation();
+	_blueFountainAnim = new Animation(_vm);
 	if (!_blueFountainAnim->loadFromFile(fountainPath)) {
 		delete _blueFountainAnim;
 		_blueFountainAnim = nullptr;
 	}
 
 	Common::Path treePath("bmp/waterslide/little tree");
-	_littleTreeAnim = new Animation();
+	_littleTreeAnim = new Animation(_vm);
 	if (!_littleTreeAnim->loadFromFile(treePath)) {
 		delete _littleTreeAnim;
 		_littleTreeAnim = nullptr;
 	}
 
 	Common::Path valvePath("bmp/waterslide/mr valve master");
-	_valveAnim = new Animation();
+	_valveAnim = new Animation(_vm);
 	if (!_valveAnim->loadFromFile(valvePath)) {
 		delete _valveAnim;
 		_valveAnim = nullptr;
 	}
 
 	Common::Path cascade1Path("bmp/waterslide/pipe - cascade 1");
-	_cascade1Anim = new Animation();
+	_cascade1Anim = new Animation(_vm);
 	if (!_cascade1Anim->loadFromFile(cascade1Path)) {
 		delete _cascade1Anim;
 		_cascade1Anim = nullptr;
 	}
 
 	Common::Path cascade2Path("bmp/waterslide/pipe - cascade 2");
-	_cascade2Anim = new Animation();
+	_cascade2Anim = new Animation(_vm);
 	if (!_cascade2Anim->loadFromFile(cascade2Path)) {
 		delete _cascade2Anim;
 		_cascade2Anim = nullptr;
@@ -712,7 +673,7 @@ void PuzzleWaterslide::onUpdate() {
 		if (elapsed > 2000) {
 			debug(1, "WaterslidePuzzle: Complete, %d zoombinis freed", _freedCount);
 			_vm->_returningFromPuzzle = true;
-			_vm->_mapTransitionSourcePageId = kPageWaterSlide;
+			_vm->_mapTransitionSourcePageId = kPageWaterslide;
 			_vm->requestPageChange(kPageMapTrans);
 		}
 		break;

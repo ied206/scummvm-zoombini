@@ -51,33 +51,49 @@ protected:
 	EventHandleResult onSiteLButtonDown(const Common::Point &pos) override;
 
 private:
+	/** Origin of the Rescue Site I waiting-roster grid. */
+	static constexpr Common::Point32 kRosterGridBasePos = Common::Point32(68, 95);
+	/** Position of the upward Rescue Site I roster-scroll animation. */
+	static constexpr Common::Point32 kRosterButtonUpPos = Common::Point32(26, 240);
+	/** Position of the downward Rescue Site I roster-scroll animation. */
+	static constexpr Common::Point32 kRosterButtonDownPos = Common::Point32(276, 240);
+
+	/**
+	 * Immutable Rescue Site I layout rectangles are instance members because
+	 * Common::Rect32 requires runtime construction and ScummVM prohibits global C++ constructors.
+	 */
+	/** Hit rectangle for upward Rescue Site I roster scrolling. */
+	const Common::Rect32 _rosterScrollUpRect = Common::Rect32(26, 240, 89, 326);
+	/** Hit rectangle for downward Rescue Site I roster scrolling. */
+	const Common::Rect32 _rosterScrollDownRect = Common::Rect32(276, 240, 339, 319);
+
 	/** Restore the Rescue Site I visit and departure-roster state. */
 	void initRescueRoster();
 
 	/** Portal body. */
-	RleBlock *_portal;
+	RleBlock *_portal = nullptr;
 	/** Portal foreground. */
-	RleBlock *_portalTop;
+	RleBlock *_portalTop = nullptr;
 	/** Foreground overlay. */
-	RleBlock *_cramure;
+	RleBlock *_cramure = nullptr;
 	/** Inactive left route arrow. */
-	BitBlock *_arrowLeftOff;
+	BitBlock *_arrowLeftOff = nullptr;
 	/** Highlighted left route arrow. */
-	BitBlock *_arrowLeftOn;
+	BitBlock *_arrowLeftOn = nullptr;
 	/** Inactive right route arrow. */
-	BitBlock *_arrowRightOff;
+	BitBlock *_arrowRightOff = nullptr;
 	/** Highlighted right route arrow. */
-	BitBlock *_arrowRightOn;
+	BitBlock *_arrowRightOn = nullptr;
 	/** Left route-arrow draw position. */
-	Common::Point32 _arrowLeftPos;
+	Common::Point32 _arrowLeftPos = Common::Point32();
 	/** Right route-arrow draw position. */
-	Common::Point32 _arrowRightPos;
+	Common::Point32 _arrowRightPos = Common::Point32();
 	/** Portal-body draw position. */
-	Common::Point32 _portalPos;
+	Common::Point32 _portalPos = Common::Point32();
 	/** Portal-foreground draw position. */
-	Common::Point32 _portalTopPos;
+	Common::Point32 _portalTopPos = Common::Point32();
 	/** Foreground-overlay draw position. */
-	Common::Point32 _cramurePos;
+	Common::Point32 _cramurePos = Common::Point32();
 };
 
 } // End of namespace Zoombini2

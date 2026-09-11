@@ -105,22 +105,22 @@ private:
 
 	/** Runtime state for one attraction animation. */
 	struct AttractionState {
-		Animation *animation;
-		Common::Point32 pos;
-		int frame;
-		uint32 nextFrameTime;
-		bool active;
+		Animation *animation = nullptr;
+		Common::Point32 pos = Common::Point32();
+		int frame = 0;
+		uint32 nextFrameTime = 0;
+		bool active = false;
 	};
 
 	/** Runtime state for one Boolie that alternates between waiting and walking. */
 	struct CrowdActorState {
-		PathObject *path;
-		Common::Point32 waitPos;
-		Common::Point32 pos;
-		uint32 nextWalkTime;
-		uint32 nextFrameTime;
-		int frame;
-		bool walking;
+		PathObject *path = nullptr;
+		Common::Point32 waitPos = Common::Point32();
+		Common::Point32 pos = Common::Point32();
+		uint32 nextWalkTime = 0;
+		uint32 nextFrameTime = 0;
+		int frame = 0;
+		bool walking = false;
 	};
 
 	/** Initial position, maximum X, and row kind for every seat row. */
@@ -179,42 +179,42 @@ private:
 							 const Common::Point32 &pos, ManagedSurface32 *screen) const;
 
 	/** Current horizontal origin within the cyclic panorama. */
-	int _scrollX;
+	int _scrollX = 0;
 	int _pendingScrollDelta = 0;
 	/** Development stage selected from the rescued total. */
-	int _developmentStage;
+	int _developmentStage = 1;
 	/** Seat allocation state. */
-	Seat _seats[kNumSeats];
+	Seat _seats[kNumSeats] = {};
 	/** Attraction animation state. */
-	AttractionState _attractions[kAttractionCount];
+	AttractionState _attractions[kAttractionCount] = {};
 	/** Decorative walking actor state. */
-	CrowdActorState _crowdActors[kCrowdActorCount];
+	CrowdActorState _crowdActors[kCrowdActorCount] = {};
 
 	/** Panorama background managed by this page. */
-	BitBlock *_background;
+	BitBlock *_background = nullptr;
 	/** Borrowed immutable seated sprite grid owned by the engine cache. */
-	const ZoombiniAnimation *_zoombiniAnimation;
+	const ZoombiniAnimation *_zoombiniAnimation = nullptr;
 	/** Borrowed immutable walking sprite grid owned by the engine cache. */
-	const ZoombiniAnimation *_walkingZoombiniAnimation;
+	const ZoombiniAnimation *_walkingZoombiniAnimation = nullptr;
 	/** Marker managed by this page for an ordinary rescued crowd cell. */
-	RleBlock *_contentMarker;
+	RleBlock *_contentMarker = nullptr;
 	/** Marker managed by this page for a special rescued crowd cell. */
-	RleBlock *_pascontentMarker;
+	RleBlock *_pascontentMarker = nullptr;
 	/** Shared walking animation used by the 17 decorative actors. */
-	Animation *_walkingAnimation;
+	Animation *_walkingAnimation = nullptr;
 	/** Shared waiting animation used by the 17 decorative actors. */
-	Animation *_waitingAnimation;
+	Animation *_waitingAnimation = nullptr;
 
 	/** Looping Booliewood music identifier. */
-	int _musicId;
+	int _musicId = -1;
 	/** First-visit narration identifier. */
-	int _introSpeechId;
+	int _introSpeechId = -1;
 	/** Random crowd speech identifiers. */
-	int _ambientSpeechIds[kAmbientSpeechCount];
+	int _ambientSpeechIds[kAmbientSpeechCount] = {-1, -1, -1, -1, -1, -1};
 	/** Deadline for the next random crowd speech. */
-	uint32 _nextAmbientSpeechTime;
+	uint32 _nextAmbientSpeechTime = 0;
 	/** Whether progress enables the random crowd speech loop. */
-	bool _ambientSpeechEnabled;
+	bool _ambientSpeechEnabled = false;
 };
 
 } // End of namespace Zoombini2

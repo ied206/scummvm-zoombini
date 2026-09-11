@@ -1,38 +1,41 @@
 MODULE := engines/zoombini2
 
 MODULE_OBJS := \
+	zoombini2.o \
 	dialogs.o \
 	graphics.o \
-	pages/dialog_help.o \
 	metaengine.o \
+	random.o \
+	scripts.o \
 	sound.o \
 	state.o \
-	pages/page_base.o \
+	pages/dialog_help.o \
+	pages/dialog_msgbox.o \
 	pages/interactive_base.o \
-	pages/transition_video.o \
-	pages/transition_title.o \
-	pages/shelter_zombiniville.o \
-	pages/transition_maptrans.o \
+	pages/interactive_map.o \
+	pages/interactive_menu.o \
+	pages/page_base.o \
 	pages/puzzle_base.o \
 	pages/puzzle_aquacube.o \
-	pages/shelter_booliewood.o \
-	pages/shelter_final.o \
 	pages/puzzle_boolies.o \
 	pages/puzzle_cheznorf.o \
 	pages/puzzle_crazyturtle.o \
 	pages/puzzle_magicwall.o \
 	pages/puzzle_mysticmarsh.o \
 	pages/puzzle_snowboard.o \
-	pages/puzzle_waterslide.o \
 	pages/puzzle_walloffleens.o \
-	pages/interactive_map.o \
+	pages/puzzle_waterslide.o \
 	pages/save_file_list.o \
-	pages/interactive_menu.o \
 	pages/shelter_base.o \
+	pages/shelter_booliewood.o \
+	pages/shelter_final.o \
 	pages/shelter_rescue1.o \
 	pages/shelter_rescue2.o \
+	pages/shelter_zombiniville.o \
 	pages/transition_credits.o \
-	zoombini2.o
+	pages/transition_maptrans.o \
+	pages/transition_title.o \
+	pages/transition_video.o
 
 MODULE_DIRS += \
 	engines/zoombini2 \

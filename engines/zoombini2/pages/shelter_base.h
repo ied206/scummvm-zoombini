@@ -34,8 +34,8 @@ class ShelterBase : public InteractiveBase {
 public:
 	/** Bind a shelter page to @p vm. */
 	explicit ShelterBase(Zoombini2Engine *vm) : InteractiveBase(vm) {}
-	/** Return whether the shared three-button controls are visible. */
-	bool hasThreeButtons() const override { return true; }
+	/** Return whether the shared sidebar is visible. */
+	bool hasSidebar() const override { return true; }
 	/** Identify this page as a shelter for global page policy. */
 	bool isShelter() const override { return true; }
 };
@@ -68,8 +68,7 @@ protected:
 	/** Load and draw the persistent site background. */
 	void loadBackground(const char *path);
 	/** Configure the site-specific roster and scroll-control geometry. */
-	void configureRosterLayout(const Common::Point32 &gridBasePos, const Common::Rect &scrollUpRect, const Common::Rect &scrollDownRect,
-							   const Common::Point32 &buttonUpPos, const Common::Point32 &buttonDownPos);
+	void configureRosterLayout(const Common::Point32 &gridBasePos, const Common::Rect32 &scrollUpRect, const Common::Rect32 &scrollDownRect, const Common::Point32 &buttonUpPos, const Common::Point32 &buttonDownPos);
 	/** Load the selection marker used by the waiting roster. */
 	void loadSelector(const char *path);
 	/** Load the door-selection overlay retained by the site. */
@@ -111,41 +110,41 @@ private:
 	static const int kSlotHeight = 57;
 
 	/** Selection marker for a visible Zoombini slot. */
-	RleBlock *_selector;
+	RleBlock *_selector = nullptr;
 	/** Door-selection overlay retained by both rescue sites. */
-	RleBlock *_porteSelect;
+	RleBlock *_porteSelect = nullptr;
 	/** Upward roster scroll animation. */
-	Animation *_buttonUp;
+	Animation *_buttonUp = nullptr;
 	/** Downward roster scroll animation. */
-	Animation *_buttonDown;
+	Animation *_buttonDown = nullptr;
 
 	/** Signed screen origin of the visible roster grid. */
-	Common::Point32 _gridBasePos;
+	Common::Point32 _gridBasePos = Common::Point32();
 	/** Hit-test rectangles for the visible roster page. */
-	Common::Rect _slotRects[kGridCols * kGridRows];
+	Common::Rect32 _slotRects[kGridCols * kGridRows] = {};
 	/** Hit-test rectangle for scrolling toward earlier roster entries. */
-	Common::Rect _scrollUpRect;
+	Common::Rect32 _scrollUpRect = Common::Rect32();
 	/** Hit-test rectangle for scrolling toward later roster entries. */
-	Common::Rect _scrollDownRect;
+	Common::Rect32 _scrollDownRect = Common::Rect32();
 	/** Draw position for the earlier-entry scroll animation. */
-	Common::Point32 _buttonUpPos;
+	Common::Point32 _buttonUpPos = Common::Point32();
 	/** Draw position for the later-entry scroll animation. */
-	Common::Point32 _buttonDownPos;
+	Common::Point32 _buttonDownPos = Common::Point32();
 
 	/** First waiting-roster entry shown in the visible grid. */
-	int _scrollOffset;
+	int _scrollOffset = 0;
 	/** Selected waiting-roster entry, or `-1` when none is selected. */
-	int _selectedZoombini;
+	int _selectedZoombini = -1;
 	/** Whether the departure roster contains exactly eight Zoombinis. */
-	bool _readyToDepart;
+	bool _readyToDepart = false;
 	/** Current site phase, with zero selecting and one departing. */
-	int _phase;
+	int _phase = 0;
 	/** Time at which the current phase began. */
-	uint32 _phaseTimer;
+	uint32 _phaseTimer = 0;
 	/** Music handle used while the rescue site is active. */
-	int _musicId;
+	int _musicId = -1;
 	/** Borrowed immutable sprite grid owned by the engine cache. */
-	const ZoombiniAnimation *_zoombiniAnimation;
+	const ZoombiniAnimation *_zoombiniAnimation = nullptr;
 	/** Runtime party chosen to leave this rescue site. */
 	Common::Array<ZoombiniState *> _departureRoster;
 };

@@ -94,25 +94,25 @@ private:
 		/** Clickable area. */
 		Common::Rect hitbox;
 		/** Current occupancy or feedback state. */
-		SlotState state;
+		SlotState state = kSlotEmpty;
 		/** Puzzle-roster index in this slot, or `-1` when empty. */
-		int zoombiniIdx;
+		int zoombiniIdx = -1;
 		/** Partner slot index, or `-1` when unpaired. */
-		int pairSlot;
+		int pairSlot = -1;
 	};
 
 	/** Correct pairing and its shared trait value. */
 	struct TraitPair {
 		/** First puzzle-roster index. */
-		int zoombiniA;
+		int zoombiniA = -1;
 		/** Second puzzle-roster index. */
-		int zoombiniB;
+		int zoombiniB = -1;
 		/** Trait index shared by the pair. */
 		ZmbTrait::TraitIndex traitAxis;
 		/** Trait value shared by the pair. */
 		int sharedValue;
 		/** Whether this pair has been placed correctly. */
-		bool matched;
+		bool matched = false;
 	};
 
 	/** Load pipe, indicator, and decoration resources. */
@@ -168,69 +168,69 @@ private:
 	void onRenderActors(ManagedSurface32 *screen) override;
 
 	/** Current interaction phase. */
-	PuzzleState _state;
+	PuzzleState _state = kStateInit;
 	/** Number of Zoombinis already released. */
-	int _freedCount;
+	int _freedCount = 0;
 	/** Selected puzzle-roster index, or `-1` when none is selected. */
-	int _selectedZoombini;
+	int _selectedZoombini = -1;
 	/** Selected slot index, or `-1` when none is selected. */
-	int _selectedSlot;
+	int _selectedSlot = -1;
 	/** Time at which the current phase began. */
-	uint32 _stateTimer;
+	uint32 _stateTimer = 0;
 
 	/** Maximum number of pipe slots. */
 	static const int kMaxSlots = 16;
 	/** Maximum number of generated pairs. */
 	static const int kMaxPairs = 8;
 	/** Pipe-slot runtime state. */
-	Slot _slots[kMaxSlots];
+	Slot _slots[kMaxSlots] = {};
 	/** Number of active entries in @ref WaterslidePuzzle::_slots. */
-	int _numSlots;
+	int _numSlots = 0;
 
 	/** Generated correct pair definitions. */
-	TraitPair _pairs[kMaxPairs];
+	TraitPair _pairs[kMaxPairs] = {};
 	/** Number of active entries in @ref WaterslidePuzzle::_pairs. */
-	int _numPairs;
+	int _numPairs = 0;
 	/** Number of generated pairs already matched. */
-	int _matchedPairs;
+	int _matchedPairs = 0;
 
 	/** Trait indicators indexed by trait axis. */
-	RleBlock *_traitImage[4];
+	RleBlock *_traitImage[4] = {};
 
 	/** Blue horizontal pipe segment. */
-	RleBlock *_pipeBlueHoriz;
+	RleBlock *_pipeBlueHoriz = nullptr;
 	/** Gray horizontal pipe segment. */
-	RleBlock *_pipeGreyHoriz;
+	RleBlock *_pipeGreyHoriz = nullptr;
 	/** Red horizontal pipe segment. */
-	RleBlock *_pipeRedHoriz;
+	RleBlock *_pipeRedHoriz = nullptr;
 	/** Blue large pipe segment. */
-	RleBlock *_pipeBlueBigone;
+	RleBlock *_pipeBlueBigone = nullptr;
 	/** Gray large pipe segment. */
-	RleBlock *_pipeGreyBigone;
+	RleBlock *_pipeGreyBigone = nullptr;
 	/** Red large pipe segment. */
-	RleBlock *_pipeRedBigone;
+	RleBlock *_pipeRedBigone = nullptr;
 
 	/** Blue match indicator. */
-	RleBlock *_pastilleBlue;
+	RleBlock *_pastilleBlue = nullptr;
 	/** Gray inactive match indicator. */
-	RleBlock *_pastilleGrey;
+	RleBlock *_pastilleGrey = nullptr;
 
 	/** Neutral edge visual. */
-	RleBlock *_edgeNeutre;
+	RleBlock *_edgeNeutre = nullptr;
 
 	/** Fountain decoration animation. */
-	Animation *_blueFountainAnim;
+	Animation *_blueFountainAnim = nullptr;
 	/** Tree decoration animation. */
-	Animation *_littleTreeAnim;
+	Animation *_littleTreeAnim = nullptr;
 	/** Valve Master animation. */
-	Animation *_valveAnim;
+	Animation *_valveAnim = nullptr;
 	/** First cascade animation. */
-	Animation *_cascade1Anim;
+	Animation *_cascade1Anim = nullptr;
 	/** Second cascade animation. */
-	Animation *_cascade2Anim;
+	Animation *_cascade2Anim = nullptr;
 
 	/** Music handle used while Pipes of Paloo is active. */
-	int _musicId;
+	int _musicId = -1;
 };
 
 } // End of namespace Zoombini2
