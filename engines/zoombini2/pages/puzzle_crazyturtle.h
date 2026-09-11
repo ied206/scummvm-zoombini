@@ -90,9 +90,9 @@ private:
 	static const Common::Point32 kSecondaryIconPos[kRuleSlotCount];
 
 	/** Load an animation from @p path and report whether it succeeded. */
-	static bool loadAnimationResource(Animation *&resource, const Common::Path &path);
+	bool loadAnimationResource(Animation *&resource, const Common::Path &path);
 	/** Load an RLE sprite from @p path and report whether it succeeded. */
-	static bool loadRleResource(RleBlock *&resource, const Common::Path &path);
+	bool loadRleResource(RleBlock *&resource, const Common::Path &path);
 
 	/** Load all turtle, dock, mother, and trait resources. */
 	void loadResources();
@@ -114,49 +114,49 @@ private:
 	void drawMother(ManagedSurface32 *screen) const;
 
 	/** Level in the range one through four. */
-	int _level;
+	int _level = 1;
 	/** Feature index used by the primary ordering rule. */
-	int _primaryFeature;
+	int _primaryFeature = 0;
 	/** Feature index used by the secondary ordering rule. */
-	int _secondaryFeature;
+	int _secondaryFeature = 1;
 	/** Feature-value ordering for each rule group. */
-	int _ruleValues[kRuleGroupCount][kRuleSlotCount];
+	int _ruleValues[kRuleGroupCount][kRuleSlotCount] = {};
 	/** Active hint positions in the primary rule. */
-	bool _primaryRuleActive[kRuleSlotCount];
+	bool _primaryRuleActive[kRuleSlotCount] = {};
 	/** Active hint positions in the secondary rule. */
-	bool _secondaryRuleActive[kRuleSlotCount];
+	bool _secondaryRuleActive[kRuleSlotCount] = {};
 	/** Incorrect placements still allowed before the dock collapses. */
-	int _remainingMistakes;
+	int _remainingMistakes = 0;
 	/** Initial incorrect-placement allowance for the selected level. */
-	int _initialMistakes;
+	int _initialMistakes = 0;
 
 	/** Idle turtle animations indexed by turtle type. */
-	Animation *_turtleIdleAnimations[kFeatureCount];
+	Animation *_turtleIdleAnimations[kFeatureCount] = {};
 	/** Feedback turtle animations indexed by turtle type. */
-	Animation *_turtleSpinAnimations[kFeatureCount];
+	Animation *_turtleSpinAnimations[kFeatureCount] = {};
 	/** Fixed turtle visuals indexed by turtle type. */
-	RleBlock *_turtleFixedImages[kFeatureCount];
+	RleBlock *_turtleFixedImages[kFeatureCount] = {};
 	/** Mother turtle animation. */
-	Animation *_motherAnimation;
+	Animation *_motherAnimation = nullptr;
 	/** Mother turtle speech animation. */
-	Animation *_motherSpeechAnimation;
+	Animation *_motherSpeechAnimation = nullptr;
 	/** Dock-damage smoke animation. */
-	Animation *_smokeAnimation;
+	Animation *_smokeAnimation = nullptr;
 	/** Mother turtle's starting visual. */
-	RleBlock *_motherStartImage;
+	RleBlock *_motherStartImage = nullptr;
 	/** Mother turtle's ending visual. */
-	RleBlock *_motherEndImage;
+	RleBlock *_motherEndImage = nullptr;
 	/** Intact dock visual. */
-	RleBlock *_bridgeImage;
+	RleBlock *_bridgeImage = nullptr;
 	/** Collapsed dock visual. */
-	RleBlock *_collapsedBridgeImage;
+	RleBlock *_collapsedBridgeImage = nullptr;
 	/** Individual dock-beam visual. */
-	RleBlock *_beamImage;
+	RleBlock *_beamImage = nullptr;
 	/** Feature-value hint visuals. */
-	RleBlock *_traitImages[kFeatureCount][kFeatureValueCount];
+	RleBlock *_traitImages[kFeatureCount][kFeatureValueCount] = {};
 
 	/** Music handle used while Turtle Hurdle is active. */
-	int _musicId;
+	int _musicId = -1;
 };
 
 } // End of namespace Zoombini2

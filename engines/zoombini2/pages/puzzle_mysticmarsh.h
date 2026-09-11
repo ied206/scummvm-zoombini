@@ -72,27 +72,27 @@ private:
 	/** One routing-grid cell. */
 	struct GridCell {
 		/** Cell role identifying empty, symbol, crater, or marker cells. */
-		int type;
+		int type = 0;
 		/** Index into @ref PuzzleMysticMarsh::_symbolImage for symbol cells. */
-		int symbolIdx;
+		int symbolIdx = 0;
 		/** Screen position. */
-		Common::Point32 pos;
+		Common::Point32 pos = Common::Point32();
 	};
 
 	/** One bubble-crater launch position. */
 	struct Slot {
 		/** Grid column. */
-		int cellCol;
+		int cellCol = 0;
 		/** Grid row. */
-		int cellRow;
+		int cellRow = 0;
 		/** Screen position. */
-		Common::Point32 pos;
+		Common::Point32 pos = Common::Point32();
 		/** Clickable launch area. */
-		Common::Rect hitbox;
+		Common::Rect hitbox = Common::Rect();
 		/** Assigned puzzle-roster index, or `-1` when empty. */
-		int zoombiniIdx;
+		int zoombiniIdx = -1;
 		/** Whether a Zoombini currently occupies this slot. */
-		bool occupied;
+		bool occupied = false;
 	};
 
 	/** Runtime phase of the Bubble Bumpers interaction. */
@@ -114,15 +114,15 @@ private:
 	/** Grid position and timing for the currently moving Zoombini. */
 	struct ActiveZoombini {
 		/** Index into @ref Puzzle::_puzzleZoombinis. */
-		int zoombiniIdx;
+		int zoombiniIdx = -1;
 		/** Current grid column. */
-		int cellCol;
+		int cellCol = 0;
 		/** Current grid row. */
-		int cellRow;
+		int cellRow = 0;
 		/** Interpolated screen position. */
-		Common::Point32 targetPos;
+		Common::Point32 targetPos = Common::Point32();
 		/** Time at which the current cell movement began. */
-		uint32 moveStartTime;
+		uint32 moveStartTime = 0;
 	};
 
 	/** Load all marsh resources. */
@@ -156,48 +156,48 @@ private:
 	void onRenderActors(ManagedSurface32 *screen) override;
 
 	/** Current interaction phase. */
-	State _state;
+	State _state = kStateInit;
 	/** Number of Zoombinis already released. */
-	int _freedCount;
+	int _freedCount = 0;
 	/** Selected puzzle-roster index, or `-1` when none is selected. */
-	int _selectedZoombini;
+	int _selectedZoombini = -1;
 	/** Level in the range one through four. */
-	int _level;
+	int _level = 1;
 	/** Selected background variant. */
-	int _bgIndex;
+	int _bgIndex = 1;
 	/** Number of launch slots populated in @ref PuzzleMysticMarsh::_slots. */
-	int _numSlots;
+	int _numSlots = 0;
 	/** Bubble-crater launch slots. */
-	Slot _slots[kMaxSlots];
+	Slot _slots[kMaxSlots] = {};
 
 	/** Index of the next Zoombini in the generated launch sequence. */
-	int _currentSequenceIdx;
+	int _currentSequenceIdx = 0;
 	/** Correct entrance index for each Zoombini in sequence. */
 	Common::Array<int> _targetSequence;
 
 	/** Runtime state of the currently moving Zoombini. */
 	ActiveZoombini _activeZ;
 	/** Whether @ref PuzzleMysticMarsh::_activeZ is currently valid. */
-	bool _hasActiveZ;
+	bool _hasActiveZ = false;
 
 	/** Routing-grid cells stored in row-major order. */
-	GridCell _grid[kMaxCells];
+	GridCell _grid[kMaxCells] = {};
 
 	/** Bubble-crater visual. */
-	RleBlock *_craterImage;
+	RleBlock *_craterImage = nullptr;
 	/** Grid-symbol visuals. */
-	RleBlock *_symbolImage[kNumSymbols];
+	RleBlock *_symbolImage[kNumSymbols] = {};
 	/** Feature icons indexed by feature and value. */
-	RleBlock *_traitImage[4][5];
+	RleBlock *_traitImage[4][5] = {};
 	/** Bubble visuals indexed by bubble type. */
-	RleBlock *_bubbleImage[3];
+	RleBlock *_bubbleImage[3] = {};
 	/** Bubble-crater animation. */
-	Animation *_bubbleCraterAnim;
+	Animation *_bubbleCraterAnim = nullptr;
 	/** Whirlpool animation. */
-	Animation *_tourbiAnim;
+	Animation *_tourbiAnim = nullptr;
 
 	/** Music handle used while Bubble Bumpers is active. */
-	int _musicId;
+	int _musicId = -1;
 };
 
 } // End of namespace Zoombini2

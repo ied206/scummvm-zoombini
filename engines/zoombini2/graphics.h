@@ -36,6 +36,7 @@
 
 namespace Zoombini2 {
 
+class Zoombini2Engine;
 class SoundManager;
 
 /**
@@ -119,8 +120,8 @@ private:
  */
 class BitBlock {
 public:
-	/** Construct an empty bitmap. */
-	BitBlock();
+	/** Construct an empty bitmap bound to @p vm. */
+	explicit BitBlock(Zoombini2Engine *vm);
 	/** Release the owned pixel and alpha buffers. */
 	~BitBlock();
 
@@ -174,18 +175,20 @@ public:
 	const byte *getAlpha() const { return _alphaMap; }
 
 private:
+	/** Borrowed vm used to resolve bitmap resources. */
+	Zoombini2Engine *_vm;
 	/** Bitmap width in pixels. */
-	int _width;
+	int _width = 0;
 	/** Bitmap height in pixels. */
-	int _height;
+	int _height = 0;
 	/** RGBA pixel storage held by this bitmap, with four bytes per pixel. */
-	byte *_pixels;
+	byte *_pixels = nullptr;
 	/** Optional one-byte-per-pixel alpha storage held by this bitmap, or nullptr. */
-	byte *_alphaMap;
+	byte *_alphaMap = nullptr;
 
-	/** Decode a 24-bit bottom-up BMP from @p stream. */
+	/** Decode a 24-bit BMP from @p stream through the shared image decoder. */
 	bool loadColorBMP(Common::SeekableReadStream *stream);
-	/** Decode an 8-bit alpha-mask BMP from @p stream. */
+	/** Decode an indexed alpha-mask BMP from @p stream through the shared image decoder. */
 	bool loadAlphaBMP(Common::SeekableReadStream *stream);
 	/** Exchange owned bitmap state with @p other. */
 	void swapData(BitBlock &other);
@@ -210,8 +213,8 @@ private:
  */
 class RleBlock {
 public:
-	/** Construct an empty RLE frame. */
-	RleBlock();
+	/** Construct an empty RLE frame bound to @p vm. */
+	explicit RleBlock(Zoombini2Engine *vm);
 	/** Release the owned RLE data. */
 	~RleBlock();
 
@@ -247,16 +250,18 @@ public:
 	bool isValid() const { return _rleData != nullptr; }
 
 private:
+	/** Borrowed vm used to resolve RLE resources. */
+	Zoombini2Engine *_vm;
 	/** Frame width in pixels. */
-	int32 _width;
+	int32 _width = 0;
 	/** Frame height in pixels. */
-	int32 _height;
+	int32 _height = 0;
 	/** Number of bytes in @ref RleBlock::_rleData after load-time expansion. */
-	uint32 _dataSize;
+	uint32 _dataSize = 0;
 	/** Expanded RLE span storage held by this frame, with four bytes per encoded pixel. */
-	byte *_rleData;
+	byte *_rleData = nullptr;
 	/** Trailing header value retained with the decoded frame. */
-	int32 _field20;
+	int32 _field20 = 0;
 
 	/** Expand complete encoded spans and report whether a malformed tail was discarded. */
 	static bool expand3to4bpp(const byte *srcData, uint32 srcSize, byte *&expandedData, uint32 &expandedSize, bool &salvaged);
@@ -275,8 +280,8 @@ private:
 /** Represents the ordered RLE frames decoded from one AN animation file. */
 class Animation {
 public:
-	/** Construct an animation without frames. */
-	Animation();
+	/** Construct an animation without frames, bound to @p vm. */
+	explicit Animation(Zoombini2Engine *vm);
 	/** Release all owned frames. */
 	~Animation();
 
@@ -289,263 +294,10 @@ public:
 	const RleBlock *getFrame(int index) const;
 
 private:
+	/** Borrowed vm passed to each decoded frame. */
+	Zoombini2Engine *_vm;
 	/** Ordered frame sequence owned by this animation. */
 	Common::Array<RleBlock *> _frames;
-};
-
-/** Native 32-bit floating-point scalar used by the optional path evaluator. */
-typedef float Float32;
-static_assert(sizeof(Float32) == 4, "Float32 must use four-byte native float storage.");
-
-/**
- * Q10 fixed point type
- * 
- * Stores one real number as signed 32-bit value, encoded as Q10 fixed-point.
- *
- * @par Q10 notation
- * `Q10` means that exactly 10 low bits are fractional bits. It does not name
- * the storage width; the `32` in `Fixed32` means that the complete raw word is
- * 32 bits. In Qm.n notation that excludes the sign bit from m, this layout is
- * Q21.10.
- *
- * @par Representation and range
- * The raw two's-complement word has this layout:
- * @code
- *  31             30                         10 9                  0
- * +----------------+----------------------------+--------------------+
- * | sign bit       | 21 remaining integer bits  | 10 fractional bits |
- * +----------------+----------------------------+--------------------+
- * @endcode
- *
- * The complete word represents `rawValue / 1024`, giving a resolution of
- * `1/1024`, or `0.0009765625`. Raw `0x00000400` is `1.0`, `0x00000001` is
- * `1/1024`, and `0xFFFFFC00` is `-1.0`. For negative values, the fractional
- * field is part of the complete two's-complement value rather than an
- * independently signed component.
- *
- * Every `int32` bit pattern represents a finite value. The inclusive range is
- * `-2097152.0` through `2097151.9990234375`; there are no NaN, infinity, or
- * denormal representations. Integer conversion is non-wrapping for inputs from
- * `-2097152` through `2097151`.
- *
- * @par Arithmetic and overflow
- * Arithmetic is not saturating. Addition and subtraction wrap modulo 2^32 when
- * the mathematical result leaves the representable range. Multiplication
- * deliberately retains the low 32 bits of the raw product before shifting
- * right by 10; it produces the expected non-wrapped Q10 result only when the
- * signed raw product fits in an `int32` before that shift. Division requires a
- * non-zero divisor, forms a 64-bit scaled numerator, truncates the raw quotient
- * toward zero, and wraps the quotient if it leaves the 32-bit raw range.
- * Compound operators use the same rules. Comparisons order the signed raw
- * values, and conversion to an integer uses an arithmetic right shift, which
- * rounds a negative fractional value toward negative infinity.
- *
- * Construct raw values with @ref Fixed32::fromRaw and integer values with
- * @ref Fixed32::fromInt.
- */
-class Fixed32 {
-public:
-	/** Construct zero. */
-	constexpr Fixed32() : _rawValue(0) {}
-
-	/** Construct a fixed-point value from its signed raw representation. */
-	static constexpr Fixed32 fromRaw(int32 rawValue) { return Fixed32(rawValue); }
-	/** Convert an integer to Q10, wrapping inputs outside `-2097152` through `2097151`. */
-	static Fixed32 fromInt(int32 value);
-	/** Quantize a finite in-range floating-point value to Q10 by truncating its scaled raw value toward zero. */
-	static Fixed32 fromFloat(Float32 value);
-	/** Convert to an integer with an arithmetic right shift toward negative infinity. */
-	int32 toInt() const;
-	/** Convert the exact Q10 value to native 32-bit floating point. */
-	Float32 toFloat() const;
-
-	/** Multiply by @p right, retain the low 32 product bits, and shift by 10. */
-	Fixed32 operator*(const Fixed32 &right) const;
-	/** Divide by non-zero @p right with a 64-bit numerator and truncate toward zero. */
-	Fixed32 operator/(const Fixed32 &right) const;
-	/** Subtract @p right with 32-bit wraparound. */
-	Fixed32 operator-(const Fixed32 &right) const;
-	/** Add @p right with 32-bit wraparound. */
-	Fixed32 operator+(const Fixed32 &right) const;
-	/** Add @p right with 32-bit wraparound. */
-	void operator+=(const Fixed32 &right);
-	/** Subtract @p right with 32-bit wraparound. */
-	void operator-=(const Fixed32 &right);
-	/** Multiply by @p right and assign the wrapped result. */
-	void operator*=(const Fixed32 &right);
-	/** Divide by @p right and assign the wrapped result. */
-	void operator/=(const Fixed32 &right);
-	/** Compare the signed raw values. */
-	bool operator>(const Fixed32 &right) const;
-	/** Compare the raw values for equality. */
-	bool operator==(const Fixed32 &right) const;
-	/** Compare the raw values for inequality. */
-	bool operator!=(const Fixed32 &right) const;
-	/** Format the exact fixed-point value without redundant trailing zeroes. */
-	Common::String toString() const;
-
-private:
-	constexpr explicit Fixed32(int32 rawValue) : _rawValue(rawValue) {}
-
-	static Fixed32 fromRawBits(uint32 value);
-	static int32 arithmeticShiftRight(uint32 value);
-	static constexpr int kFractionalBits = 10;
-	friend struct PointFixed32;
-
-	/** Signed 32-bit raw representation owned by this value. */
-	int32 _rawValue;
-};
-
-/**
- * A point struct comprised of two Fixed32 coordinate.
- *
- * Component arithmetic follows the wrapping rules of @ref Fixed32.
- * @ref PointFixed32::sqrDist widens both component squares to 64 bits before
- * reducing their sum to Q10, but its final result still wraps to a `Fixed32`.
- */
-struct PointFixed32 : public Common::PointBase<Fixed32, PointFixed32> {
-private:
-	typedef Common::PointBase<Fixed32, PointFixed32> Base;
-
-public:
-	/** Construct the fixed-point coordinate (0, 0). */
-	constexpr PointFixed32() : Base(Fixed32(), Fixed32()) {}
-	/** Construct a coordinate from two fixed-point values. */
-	constexpr PointFixed32(const Fixed32 &xValue, const Fixed32 &yValue) : Base(xValue, yValue) {}
-
-	/** Compare both components for equality. */
-	bool operator==(const PointFixed32 &right) const;
-	/** Compare either component for inequality. */
-	bool operator!=(const PointFixed32 &right) const;
-	/** Add @p right component by component. */
-	PointFixed32 operator+(const PointFixed32 &right) const;
-	/** Subtract @p right component by component. */
-	PointFixed32 operator-(const PointFixed32 &right) const;
-	/** Multiply both components by @p right. */
-	PointFixed32 operator*(const Fixed32 &right) const;
-	/** Multiply both components by the integer @p right. */
-	PointFixed32 operator*(int32 right) const;
-	/** Divide both components by @p right. */
-	PointFixed32 operator/(const Fixed32 &right) const;
-	/** Divide both components by the integer @p right. */
-	PointFixed32 operator/(int32 right) const;
-	/** Add @p right component by component. */
-	void operator+=(const PointFixed32 &right);
-	/** Subtract @p right component by component. */
-	void operator-=(const PointFixed32 &right);
-	/** Multiply both components by @p right. */
-	void operator*=(const Fixed32 &right);
-	/** Divide both components by @p right. */
-	void operator/=(const Fixed32 &right);
-
-	/** Return the squared distance using 64-bit intermediates and a wrapped Q10 result. */
-	Fixed32 sqrDist(const PointFixed32 &right) const;
-	/** Format both fixed-point components separated by a comma. */
-	Common::String toString() const;
-
-private:
-	/** Return the unsigned difference between two raw component values. */
-	static uint64 rawMagnitudeDifference(const Fixed32 &left, const Fixed32 &right);
-};
-
-/** Multiply both components of @p right by @p left. */
-PointFixed32 operator*(const Fixed32 &left, const PointFixed32 &right);
-/** Multiply both components of @p right by the integer @p left. */
-PointFixed32 operator*(int32 left, const PointFixed32 &right);
-
-/**
- * Runtime-selectable evaluator for one cubic Bezier segment.
- *
- * The original-compatible evaluator stores all scalar state in @ref Fixed32.
- * The optional gameplay-improvement evaluator instantiates the same template
- * with @ref Float32. @ref CurveSegment::evaluate advances either evaluator from
- * the stored start tick, step, and optional initial wait.
- */
-class CurveSegment : public Common::NonCopyable {
-public:
-	/** Construct an empty segment using the selected numeric representation. */
-	explicit CurveSegment(bool useFloatingPoint = false);
-	/** Release the selected numeric evaluator. */
-	~CurveSegment();
-	/** Initialize control points, timing values, and polynomial coefficients. */
-	void init(const Common::Point32 &start, const Common::Point32 &ctrl0, const Common::Point32 &ctrl1, const Common::Point32 &end, int stepVal, int waitVal);
-	/** Derive polynomial coefficients from the four control points. */
-	void computeCoeffs();
-	/** Evaluate the pos at @p tickCount and report whether the segment remains active. */
-	bool evaluate(uint32 tickCount, Common::Point32 &outPos);
-	/** Return the start coordinate in screen pixels. */
-	Common::Point32 getStartPosition() const;
-	/** Return the end coordinate in screen pixels. */
-	Common::Point32 getEndPosition() const;
-	/** Return the most recently evaluated coordinate in screen pixels. */
-	Common::Point32 getPosition() const;
-	/** Set the gameplay tick from which parameter advancement is measured. */
-	void setStartTime(uint32 tickCount);
-	/** Select the fixed- or floating-point template instance while preserving segment progress. */
-	void setFloatingPointMode(bool useFloatingPoint);
-
-private:
-	class Evaluator;
-	struct FixedNumeric;
-	struct FloatNumeric;
-	template<typename Numeric>
-	class TypedEvaluator;
-
-	Evaluator *_evaluator;
-	Common::Point32 _start;
-	Common::Point32 _control0;
-	Common::Point32 _control1;
-	Common::Point32 _end;
-	int _stepValue;
-	int _waitInitial;
-	bool _initialized;
-	bool _coefficientsReady;
-	bool _useFloatingPoint;
-
-	/** Allocate the template instance selected by @p useFloatingPoint. */
-	static Evaluator *createEvaluator(bool useFloatingPoint);
-	/** Rebuild the evaluator from the integer path descriptor while retaining runtime progress. */
-	void rebuildEvaluator();
-};
-
-/**
- * Advances through the chained segments loaded from one PAT path.
- *
- * Non-looping paths stop at their final endpoint. Looping paths return to the
- * first segment after the last segment completes.
- */
-struct PathObject {
-	/** Ordered segments owned by this path. */
-	Common::Array<CurveSegment *> segments;
-	/** Index of the segment currently being evaluated. */
-	int currentSegment;
-	/** Whether the path restarts after the last segment. */
-	bool looping;
-	/** Whether a non-looping path has reached its final endpoint. */
-	bool finished;
-	/** Final endpoint in screen pixels. */
-	Common::Point32 endPos;
-	/** Gameplay tick at which the path started. */
-	uint32 startTime;
-
-	/** Construct an empty, inactive path. */
-	PathObject();
-	/** Release every owned segment. */
-	~PathObject();
-
-	/** Parse and return a newly allocated path, or nullptr on failure. */
-	static PathObject *loadFromPAT(const Common::Path &path);
-	/** Append one owned segment using the engine's currently selected numeric representation. */
-	void appendSegment(const Common::Point32 &start, const Common::Point32 &ctrl0, const Common::Point32 &ctrl1, const Common::Point32 &end,
-					   int stepValue, int waitInitial);
-	/** Reset segment state and begin evaluation at @p tickCount. */
-	void start(uint32 tickCount);
-	/** Advance to @p tickCount and write the current screen pos. */
-	bool advance(uint32 tickCount, Common::Point32 &outPos);
-
-private:
-	/** Apply the live engine option to every already loaded segment. */
-	void synchronizeNumericMode();
 };
 
 /**
@@ -566,8 +318,8 @@ public:
 	/** Total number of independently framed grid entries. */
 	static const int kCellCount = kDim0 * kDim1 * kDim2;
 
-	/** Construct an empty sprite grid. */
-	ZoombiniAnimation();
+	/** Construct an empty sprite grid bound to @p vm. */
+	explicit ZoombiniAnimation(Zoombini2Engine *vm);
 	/** Release every frame owned by the sprite grid. */
 	~ZoombiniAnimation();
 
@@ -584,6 +336,8 @@ public:
 					  int cell, int frame, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip = nullptr) const;
 
 private:
+	/** Borrowed vm used to open the ANM resource and construct its frames. */
+	Zoombini2Engine *_vm;
 	/** Represents the frames assigned to one sprite-grid entry. */
 	struct Cell {
 		/** Ordered frames stored in this grid entry. */
@@ -605,8 +359,8 @@ private:
  */
 class UIButton {
 public:
-	/** Construct an enabled button with an empty rectangle and no images. */
-	UIButton();
+	/** Construct an enabled button bound to @p vm. */
+	explicit UIButton(Zoombini2Engine *vm);
 	/** Release every image owned by the button. */
 	~UIButton();
 
@@ -659,44 +413,46 @@ public:
 	bool isHovering() const { return _isHovering; }
 
 private:
+	/** Borrowed vm used to construct and load the button's images. */
+	Zoombini2Engine *_vm;
 	/** Button pos and hit-test bounds. */
-	Common::Rect _rect;
+	Common::Rect _rect = Common::Rect();
 	/** Whether the button responds to pointer input. */
-	bool _enabled;
+	bool _enabled = true;
 	/** Whether the normal state is drawn while the pointer is outside. */
-	bool _drawWhenNotHovered;
+	bool _drawWhenNotHovered = true;
 	/** Whether masked bitmap fallbacks use the RLE encoder's blend rule. */
-	bool _useRleMaskBlend;
+	bool _useRleMaskBlend = false;
 	/** Hover state retained from the preceding draw. */
-	bool _wasHovering;
+	bool _wasHovering = false;
 	/** Hover state computed during the current draw. */
-	bool _isHovering;
+	bool _isHovering = false;
 
 	/** Uncompressed normal-state image held by this button. */
-	BitBlock *_normalBB;
+	BitBlock *_normalBB = nullptr;
 	/** Uncompressed highlighted-state image held by this button. */
-	BitBlock *_hoverBB;
+	BitBlock *_hoverBB = nullptr;
 	/** Uncompressed disabled-state image held by this button. */
-	BitBlock *_disabledBB;
+	BitBlock *_disabledBB = nullptr;
 	/** RLE normal-state image held by this button. */
-	RleBlock *_normalRle;
+	RleBlock *_normalRle = nullptr;
 	/** RLE highlighted-state image held by this button. */
-	RleBlock *_hoverRle;
+	RleBlock *_hoverRle = nullptr;
 	/** RLE disabled-state image held by this button. */
-	RleBlock *_disabledRle;
+	RleBlock *_disabledRle = nullptr;
 	/** Borrowed overlay drawn after the selected button state. */
-	const RleBlock *_overlay;
+	const RleBlock *_overlay = nullptr;
 	/** Overlay offset relative to the button. */
-	Common::Point32 _overlayOffset;
+	Common::Point32 _overlayOffset = Common::Point32();
 	/** Borrowed absolute clipping coordinate for the overlay's right edge. */
-	const int *_overlayClipRight;
+	const int *_overlayClipRight = nullptr;
 
 	/** Release all owned state images. */
 	void clearImages();
 	/** Load one image, preferring the cached bitmap representation. */
-	static bool loadImage(const Common::Path &path, BitBlock *&bitmap, RleBlock *&rle);
+	bool loadImage(const Common::Path &path, BitBlock *&bitmap, RleBlock *&rle);
 	/** Load one masked state from its RLE cache or source bitmap pair. */
-	static bool loadMaskedImage(const Common::Path &colorPath, const Common::Path &maskPath, BitBlock *&bitmap, RleBlock *&rle);
+	bool loadMaskedImage(const Common::Path &colorPath, const Common::Path &maskPath, BitBlock *&bitmap, RleBlock *&rle);
 };
 
 /** Button indices used by the seven controls on the sign-in screen. */
@@ -725,8 +481,8 @@ public:
 	/** Horizontal advance used for spaces and unsupported characters. */
 	static const int kSpaceWidth = 10;
 
-	/** Construct an unloaded font. */
-	BitmapFont();
+	/** Construct an unloaded font bound to @p vm. */
+	explicit BitmapFont(Zoombini2Engine *vm);
 	/** Release every extracted glyph bitmap. */
 	~BitmapFont();
 
@@ -743,10 +499,12 @@ public:
 	bool isLoaded() const { return _loaded; }
 
 private:
+	/** Borrowed vm used to load the font strip and construct glyphs. */
+	Zoombini2Engine *_vm;
 	/** Whether the font strip has been processed. */
-	bool _loaded;
+	bool _loaded = false;
 	/** Glyph bitmaps held by this font in character-mapping order. */
-	BitBlock *_glyphs[kNumGlyphs];
+	BitBlock *_glyphs[kNumGlyphs] = {};
 };
 
 /** Result of one @ref VolumePanel input-and-draw pass. */
@@ -793,8 +551,8 @@ public:
 	/** Speech gauge Y coordinate. */
 	static const int kSpeechGaugeY = 374;
 
-	/** Construct a panel with all current and initial volumes set to 100 percent. */
-	VolumePanel();
+	/** Construct a panel bound to @p vm with all volumes set to 100 percent. */
+	explicit VolumePanel(Zoombini2Engine *vm);
 	/** Release the preview sounds and owned gauge image after the buttons stop borrowing it. */
 	~VolumePanel();
 
@@ -836,42 +594,44 @@ public:
 	static int volumeToPixel(int volume);
 
 private:
+	/** Borrowed vm used by the panel's gauge and button resources. */
+	Zoombini2Engine *_vm;
 	/** Current music volume percentage. */
-	int _musicVolume;
+	int _musicVolume = 100;
 	/** Current sound-effect volume percentage. */
-	int _sfxVolume;
+	int _sfxVolume = 100;
 	/** Current speech volume percentage. */
-	int _speechVolume;
+	int _speechVolume = 100;
 	/** Music volume restored when the caller cancels. */
-	int _initialMusicVolume;
+	int _initialMusicVolume = 100;
 	/** Sound-effect volume restored when the caller cancels. */
-	int _initialSfxVolume;
+	int _initialSfxVolume = 100;
 	/** Speech volume restored when the caller cancels. */
-	int _initialSpeechVolume;
+	int _initialSpeechVolume = 100;
 
 	/** Current music gauge endpoint. */
-	int _musicSliderX;
+	int _musicSliderX = kSliderMaxX;
 	/** Current sound-effect gauge endpoint. */
-	int _sfxSliderX;
+	int _sfxSliderX = kSliderMaxX;
 	/** Current speech gauge endpoint. */
-	int _speechSliderX;
+	int _speechSliderX = kSliderMaxX;
 	/** Dragged slider index, or -1 when no slider is captured. */
-	int _activeSlider;
+	int _activeSlider = -1;
 	/** Most recent mouse position observed while the primary button was held. */
-	Common::Point32 _heldMousePos;
+	Common::Point32 _heldMousePos = Common::Point32();
 	/** Whether held-mouse coordinates are available for the next release. */
-	bool _hasHeldMouse;
+	bool _hasHeldMouse = false;
 	/** Most recently released slider awaiting category-specific audio preview. */
-	int _lastAdjustedSlider;
+	int _lastAdjustedSlider = -1;
 	/** Borrowed sound manager that owns the panel's logical preview records. */
-	SoundManager *_soundManager;
+	SoundManager *_soundManager = nullptr;
 	/** Panel-owned speech preview sound identifier. */
-	int _speechPreviewSoundId;
+	int _speechPreviewSoundId = -1;
 	/** Panel-owned sound-effect preview identifier. */
-	int _sfxPreviewSoundId;
+	int _sfxPreviewSoundId = -1;
 
 	/** Gauge sprite held by this panel and shared by the three slider rows. */
-	RleBlock *_gaugeImage;
+	RleBlock *_gaugeImage = nullptr;
 	/** Music, sound-effect, and speech label buttons. */
 	UIButton _sliderLabels[3];
 	/** Apply button. */

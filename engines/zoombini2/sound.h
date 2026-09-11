@@ -29,6 +29,10 @@
 
 #include "audio/mixer.h"
 
+namespace Common {
+class SeekableReadStream;
+}
+
 namespace Audio {
 class AudioStream;
 class RewindableAudioStream;
@@ -57,6 +61,8 @@ struct SoundBuffer {
 	int id;
 	/** Original logical resource name, including any installed-root marker. */
 	Common::Path path;
+	/** Complete encoded file image retained for non-stream playback. */
+	Common::Array<byte> sampleData;
 	/** Whether the caller requested streaming playback. */
 	bool isStream;
 	/** Whether playback should restart after the final sample. */
@@ -69,15 +75,23 @@ struct SoundBuffer {
 	bool usesCategoryVolume;
 	/** Mixer handles reserved for overlapping sample playback. */
 	Audio::SoundHandle handles[kMaxSampleSlots];
+	/** Whether each active sample handle is paused. */
+	bool handlesPaused[kMaxSampleSlots] = {};
 	/** Mixer handle reserved for streamed playback. */
 	Audio::SoundHandle streamHandle;
+	/** Whether the active streamed handle is paused. */
+	bool streamPaused = false;
 };
 
 /**
- * Owns logical sound records and routes WAV playback through Audio::Mixer.
+ * Manages logical sound records and routes WAV playback through Audio::Mixer.
  *
- * Loading records a path and playback policy but does not decode audio.
- * Playback opens and decodes the WAV on demand through the engine resource
+ * The original engine uses Miles Sound System for digital audio. This class
+ * reproduces the sample and stream lifecycle required by the game on top of
+ * ScummVM's @ref Audio::Mixer.
+ *
+ * Loading retains non-stream file images for overlapping sample playback.
+ * Streamed sounds are opened and decoded on demand through the engine resource
  * resolver. Numbered installed-music paths may resolve to the extracted CD
  * sound-effects directory when that compatibility resource exists.
  */
@@ -85,10 +99,10 @@ class SoundManager {
 public:
 	/** Bind sound playback to the borrowed @p vm and @p mixer. */
 	SoundManager(Zoombini2Engine *vm, Audio::Mixer *mixer);
-	/** Stop playback and release every owned @ref SoundBuffer. */
+	/** Stop playback and release every retained @ref SoundBuffer. */
 	~SoundManager();
 
-	/** Record a sound path and return its manager-assigned identifier. */
+	/** Record a streamed sound or retain a non-stream file image and return its manager-assigned identifier. */
 	int load(bool isStream, const Common::Path &filename, bool loop);
 	/** Stop and release the sound identified by @p id. */
 	void unload(int id);
@@ -101,14 +115,14 @@ public:
 	void playWithVolume(int id, int volume);
 	/** Enable looping and start the sound identified by @p id. */
 	void playLoop(int id);
-	/** Stop every active handle belonging to @p id. */
+	/** Stop sample handles or preserve and pause the streamed handle belonging to @p id. */
 	void stop(int id);
 	/** Pause every active handle belonging to @p id. */
 	void pause(int id);
 	/** Resume every paused handle belonging to @p id. */
 	void resume(int id);
 
-	/** Return whether any mixer handle belonging to @p id is active. */
+	/** Return whether any handle belonging to @p id is actively playing rather than paused. */
 	bool isPlaying(int id) const;
 
 	/** Store and apply @p volume to every active handle belonging to @p id. */
@@ -121,9 +135,9 @@ public:
 	/** Decrement the nested mute count and unmute mixer sound categories when it reaches zero. */
 	void unmute();
 
-	/** Pause all mixer channels. */
+	/** Pause every active handle associated with a loaded sound. */
 	void pauseAll();
-	/** Resume all mixer channels. */
+	/** Resume every paused handle associated with a loaded sound. */
 	void resumeAll();
 
 	/** Synchronize the game-facing percentages with ScummVM's mixer settings. */
@@ -132,11 +146,11 @@ public:
 	void setStereoOutputEnabled(bool enabled) { _stereoOutputEnabled = enabled; }
 
 	/** Global sound-effect volume in the inclusive range 0 through 100. */
-	int _volumeSFX;
+	int _volumeSFX = 100;
 	/** Global music volume in the inclusive range 0 through 100. */
-	int _volumeMusic;
+	int _volumeMusic = 100;
 	/** Global speech volume in the inclusive range 0 through 100. */
-	int _volumeSpeech;
+	int _volumeSpeech = 100;
 
 private:
 	class MonoAudioStream;
@@ -145,17 +159,21 @@ private:
 	Zoombini2Engine *_vm;
 	/** Borrowed mixer used by every sound record. */
 	Audio::Mixer *_mixer;
-	/** Loaded sound records owned by this manager. */
+	/** Loaded sound records retained for the game instance. */
 	Common::Array<SoundBuffer *> _buffers;
 	/** Identifier assigned to the next loaded sound. */
-	int _nextId;
+	int _nextId = 1;
 	/** Nested mute-request count. */
-	int _muteRefCount;
+	int _muteRefCount = 0;
 	/** Whether newly started stereo WAV streams retain both channels. */
-	bool _stereoOutputEnabled;
+	bool _stereoOutputEnabled = false;
 
 	/** Return the borrowed sound record for @p id, or nullptr. */
 	SoundBuffer *findBuffer(int id) const;
+	/** Stop and release every mixer handle retained by @p buffer. */
+	void releasePlayback(SoundBuffer &buffer);
+	/** Decode a WAV while retaining only complete PCM sample frames. */
+	static Audio::RewindableAudioStream *makeAudioStream(Common::SeekableReadStream *stream, const Common::Path &path);
 	/** Select an optional extracted-data compatibility alternative without resolving a physical path. */
 	Common::Path resolveCompatibilityPath(const Common::Path &filename) const;
 	/** Classify @p filename before any music-path fallback is applied. */

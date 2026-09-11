@@ -43,7 +43,7 @@ enum GameFeatures {
 	 * - v1.1SE
 	 * - v1.1PL
 	 *
-	 * Gameplay is identical to the base v1.0 family.
+	 * Gameplay is identical to the base v1.0 family, except RNG reseeding on every puzzle loading.
 	 * No new puzzle rule or level change has been established.
 	 */
 	GF_Z2_V11 = (1 << 1),

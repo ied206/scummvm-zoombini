@@ -22,9 +22,8 @@
 #include <string.h>
 
 #include "common/debug.h"
-#include "common/random.h"
-
 #include "zoombini2/graphics.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/pages/shelter_zombiniville.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
@@ -33,20 +32,8 @@
 namespace Zoombini2 {
 
 ShelterZombiniville::ShelterZombiniville(Zoombini2Engine *vm)
-	: ShelterBase(vm), _background(nullptr), _quickFillButton(nullptr), _batchFillButton(nullptr), _goButton(nullptr), _bigZombAnimation(nullptr),
-	  _littleZombAnimation(nullptr), _pickupZombAnimation(nullptr), _idleZombAnimation(nullptr), _nameFont(nullptr), _musicId(-1), _sndFeatureSelect(-1),
-	  _sndQuickFill(-1), _sndBatchFill(-1),
-	  _sndValidZoombini(-1), _sndWrongZoombini(-1) {
+	: ShelterBase(vm) {
 	_pageId = kPageZombiniville;
-	memset(_featureCounts, 0, sizeof(_featureCounts));
-	for (int feature = 0; feature < ZmbTrait::kTraitCount; feature++) {
-		for (int value = 0; value < ZmbTrait::kTraitValueCount; value++) {
-			_stations[feature].buttonRects[value] = Common::Rect32();
-			_stations[feature].drawPos[value] = Common::Point32();
-			_featureButtons[feature][value] = nullptr;
-		}
-		_stations[feature].selectedValue = 0;
-	}
 }
 
 ShelterZombiniville::~ShelterZombiniville() {
@@ -166,24 +153,24 @@ void ShelterZombiniville::init() {
 	refreshFeatureCounts();
 	gameState->registerPageVisit(kPageZombiniville);
 
-	_background = new BitBlock();
+	_background = new BitBlock(_vm);
 	if (!_background->load(Common::Path("#bmp/zombiniville/zoombiniville")))
 		warning("ShelterZombiniville: Failed to load background");
 
 	for (int feature = 0; feature < ZmbTrait::kTraitCount; feature++) {
 		for (int value = 0; value < ZmbTrait::kTraitValueCount; value++) {
 			const Common::String path = Common::String::format("bmp/zombiniville/pikaroll/z1pi%d%d.an", feature + 1, value + 1);
-			_featureButtons[feature][value] = new Animation();
+			_featureButtons[feature][value] = new Animation(_vm);
 			if (!_featureButtons[feature][value]->loadFromFile(Common::Path(path)))
 				warning("ShelterZombiniville: Failed to load '%s'", path.c_str());
 		}
 	}
 
-	_quickFillButton = new Animation();
+	_quickFillButton = new Animation(_vm);
 	_quickFillButton->loadFromFile(Common::Path("bmp/zombiniville/BUMPER-1.AN"));
-	_batchFillButton = new Animation();
+	_batchFillButton = new Animation(_vm);
 	_batchFillButton->loadFromFile(Common::Path("bmp/zombiniville/bumper-16.an"));
-	_goButton = new Animation();
+	_goButton = new Animation(_vm);
 	_goButton->loadFromFile(Common::Path("bmp/zombiniville/bumper-Valid.an"));
 
 	_bigZombAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombiniville/BigZomb/BigZomb.anm"));
@@ -201,7 +188,7 @@ void ShelterZombiniville::init() {
 	for (uint i = 0; i < _boardingZoombinis.size(); i++)
 		_boardingZoombinis[i]->setDefaultAnimation(_littleZombAnimation, 66);
 
-	_nameFont = new BitmapFont();
+	_nameFont = new BitmapFont(_vm);
 	if (!_nameFont->load(Common::Path("bmp/typo"), 16, 16, 16))
 		warning("ShelterZombiniville: Failed to load name font");
 
@@ -241,7 +228,7 @@ void ShelterZombiniville::resetSelectedFeatures() {
 }
 
 void ShelterZombiniville::randomizeSelectedFeatures() {
-	Common::RandomSource *randomSrc = _vm->getRandom();
+	Zoombini2Random *randomSrc = _vm->getRandom();
 	for (int feature = 0; feature < ZmbTrait::kTraitCount; feature++) {
 		const int value = randomSrc->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1;
 		_stations[feature].selectedValue = value;
@@ -314,7 +301,7 @@ Common::String ShelterZombiniville::generateName() {
 		"bl", "br", "ch", "cl", "cr", "dr", "dw", "fl", "fr", "gh", "gl", "gr", "kl", "kn", "kr", "kw", "ld", "mp", "nd", "nh",
 		"nn", "ph", "pl", "pr", "qu", "qu", "rh", "rn", "sc", "sl", "sm", "sn", "sp", "sr", "st", "sw", "th", "tr", "tw"};
 
-	Common::RandomSource *randomSrc = _vm->getRandom();
+	Zoombini2Random *randomSrc = _vm->getRandom();
 	char name[8] = {};
 	const int targetLength = randomSrc->getRandomNumber(1) + 4;
 	bool useVowelPair = randomSrc->getRandomNumber(98) + 1 < 40;
@@ -356,7 +343,7 @@ Common::String ShelterZombiniville::generateName() {
 }
 
 PathObject *ShelterZombiniville::createEntrancePath(const Common::Point32 &dest) const {
-	PathObject *path = new PathObject();
+	PathObject *path = new PathObject(_vm);
 	path->appendSegment(Common::Point32(-70, 400), Common::Point32(dest.x / 3, 420), Common::Point32(2 * (dest.x / 3), 450), dest, 2, 0);
 	path->endPos = dest;
 	return path;

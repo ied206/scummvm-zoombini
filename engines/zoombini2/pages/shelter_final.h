@@ -57,8 +57,8 @@ public:
 	/** Return to the sign-in menu on any click. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 
-	/** Hide the shared shelter three-button controls on the final celebration. */
-	bool hasThreeButtons() const override { return false; }
+	/** Hide the shared shelter sidebar on the final celebration. */
+	bool hasSidebar() const override { return false; }
 	/** Suppress the shelter Go action on the final celebration. */
 	bool hasGoButton() const override { return false; }
 
@@ -74,14 +74,14 @@ private:
 
 	/** Runtime position, animation, and parabolic motion for one firework. */
 	struct FireworkState {
-		Animation *animation;
-		Common::Rect collisionRect;
+		Animation *animation = nullptr;
+		Common::Rect collisionRect = Common::Rect(1000, 1000, 1001, 1001);
 		/** Initial screen position used by the parabolic trajectory. */
-		Common::Point32 startPos;
-		int timeStep;
-		int frame;
-		uint32 nextFrameTime;
-		bool active;
+		Common::Point32 startPos = Common::Point32();
+		int timeStep = 0;
+		int frame = 0;
+		uint32 nextFrameTime = 0;
+		bool active = true;
 	};
 
 	/** Fixed locations of the three lower-edge dancers. */
@@ -118,51 +118,51 @@ private:
 	void drawZoombini(const ZoombiniState &zoombini, ManagedSurface32 *screen) const;
 
 	/** Fixed celebration background managed by this page. */
-	BitBlock *_background;
+	BitBlock *_background = nullptr;
 	/** Persistent Grand Boolie foreground managed by this page. */
-	BitBlock *_fullBigBool;
+	BitBlock *_fullBigBool = nullptr;
 	/** Dormant cell-reveal image managed by this page. */
-	RleBlock *_revealBigBool;
+	RleBlock *_revealBigBool = nullptr;
 	/** Lower-edge dancing Boolie animation managed by this page. */
-	Animation *_dancingBoolie;
+	Animation *_dancingBoolie = nullptr;
 	/** Upper Boolie dance animation managed by this page. */
-	Animation *_boolDance;
+	Animation *_boolDance = nullptr;
 	/** Dormant first reveal flare managed by this page. */
-	Animation *_revealFlare1;
+	Animation *_revealFlare1 = nullptr;
 	/** Dormant second reveal flare managed by this page. */
-	Animation *_revealFlare2;
+	Animation *_revealFlare2 = nullptr;
 	/** Borrowed immutable seated sprite grid owned by the engine cache. */
-	const ZoombiniAnimation *_zoombiniAnimation;
+	const ZoombiniAnimation *_zoombiniAnimation = nullptr;
 	/** Borrowed immutable walking sprite grid owned by the engine cache. */
-	const ZoombiniAnimation *_walkingZoombiniAnimation;
+	const ZoombiniAnimation *_walkingZoombiniAnimation = nullptr;
 	/** Firework states in blue, green, red order. */
-	FireworkState _fireworks[kFireworkCount];
+	FireworkState _fireworks[kFireworkCount] = {};
 
 	/** Gameplay tick at which looping dance animations started. */
-	uint32 _animationStartTime;
+	uint32 _animationStartTime = 0;
 	/** Whether the opening speech has completed once. */
-	bool _openingSpeechFinished;
+	bool _openingSpeechFinished = false;
 	/** Deadline for the one closing speech, or zero after it starts. */
-	uint32 _closingSpeechTime;
+	uint32 _closingSpeechTime = 0;
 	/** Dormant reveal gate retained by the matched celebration state. */
-	bool _revealStarted;
+	bool _revealStarted = false;
 	/** Dormant reveal callback-ready flag. */
-	bool _revealCellReady;
+	bool _revealCellReady = false;
 	/** Dormant reveal row. */
-	int _revealRow;
+	int _revealRow = 0;
 	/** Dormant reveal column. */
-	int _revealColumn;
+	int _revealColumn = 0;
 
 	/** Looping finale music identifier. */
-	int _musicId;
+	int _musicId = -1;
 	/** Opening FIN11 speech identifier. */
-	int _openingSpeechId;
+	int _openingSpeechId = -1;
 	/** Closing INT11.17 speech identifier. */
-	int _closingSpeechId;
+	int _closingSpeechId = -1;
 	/** Celebration ambience identifiers. */
-	int _ambientSoundIds[kAmbientSoundCount];
+	int _ambientSoundIds[kAmbientSoundCount] = {-1, -1, -1, -1, -1, -1, -1};
 	/** Deadline for the next randomized ambience clip. */
-	uint32 _nextAmbientTime;
+	uint32 _nextAmbientTime = 0;
 };
 
 } // End of namespace Zoombini2

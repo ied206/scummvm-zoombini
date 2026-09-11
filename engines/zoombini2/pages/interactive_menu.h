@@ -23,6 +23,7 @@
 #define ZOOMBINI2_PAGES_INTERACTIVE_MENU_H
 
 #include "common/rect.h"
+#include "common/str.h"
 
 #include "zoombini2/graphics.h"
 #include "zoombini2/pages/interactive_base.h"
@@ -32,23 +33,14 @@ namespace Zoombini2 {
 class BitBlock;
 class RleBlock;
 class SaveFileList;
+enum class DialogMsgBoxButton;
 
-enum SaveMenuState {
+/** Internal state of the original sign-in page owner. */
+enum class MenuScreenState {
 	/** Display the saved-game list and its primary actions. */
-	kSaveMenuMain = 0,
+	kMain00 = 0,
 	/** Display the volume options panel. */
-	kSaveMenuOptions = 1,
-	/** Display a destructive-action confirmation panel. */
-	kSaveMenuConfirm = 2
-};
-
-enum SaveMenuConfirmType {
-	/** No confirmation request is active. */
-	kSaveMenuConfirmNone = 0,
-	/** Confirm deletion of the selected profile. */
-	kSaveMenuConfirmDelete = 1,
-	/** Confirm leaving the game. */
-	kSaveMenuConfirmQuit = 2
+	kOptions01 = 1
 };
 
 /**
@@ -68,27 +60,21 @@ public:
 	void init() override;
 	/** Process text input and hover state for the active panel. */
 	void onUpdate() override;
-	/** Draw the saved-game list or the active modal panel. */
+	/** Draw the saved-game list or the owned volume panel. */
 	void onRenderScene(ManagedSurface32 *screen) override;
 	void onRenderForeground(ManagedSurface32 *screen) override;
-	/** Dispatch a click to the list, buttons, or active modal panel. */
+	/** Dispatch a click to the list, buttons, or owned volume panel. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
 	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
-	bool hasActiveDialog() const override { return _state != kSaveMenuMain; }
+	bool hasActiveDialog() const override { return _state == MenuScreenState::kOptions01; }
 
 private:
 	void updateButtonAvailability();
 	EventHandleResult handleVolumePanelInput(const Common::Point &pos, bool mouseReleased);
 	bool _volumePanelMouseDown = false;
 	int _hoveredButton = -1;
-	/** Control selected in the confirmation panel, or no control. */
-	enum class ConfirmButtonKind {
-		kNone = 0,
-		kOkay,
-		kCancel
-	};
 
 	/** Screen origin of the saved-profile list. */
 	static const Common::Point32 kFileListPos;
@@ -97,51 +83,35 @@ private:
 	static const char *const kValidNameCharacters;
 
 	/** Panel currently accepting input. */
-	SaveMenuState _state;
+	MenuScreenState _state = MenuScreenState::kMain00;
 	/** Full-screen sign-in background. */
-	BitBlock *_background;
+	BitBlock *_background = nullptr;
 	/** Normal saved-game list frame. */
-	BitBlock *_selectorNormal;
+	BitBlock *_selectorNormal = nullptr;
 	/** Highlighted saved-game list frame. */
-	BitBlock *_selectorHilite;
+	BitBlock *_selectorHilite = nullptr;
 	/** Bar drawn behind the selected save row. */
-	RleBlock *_selectionBar;
+	RleBlock *_selectionBar = nullptr;
 	/** Profile list and editor state managed by this menu screen. */
-	SaveFileList *_fileList;
+	SaveFileList *_fileList = nullptr;
 	/** Primary menu controls indexed by menu button ID. */
-	UIButton *_buttons[kMenuButtonCount];
+	UIButton *_buttons[kMenuButtonCount] = {};
 
 	/** Menu selection sound. */
-	int _blipSoundId;
+	int _blipSoundId = -1;
 	/** Profile-name typing sound. */
-	int _typeSoundId;
+	int _typeSoundId = -1;
 	/** Profile deletion sound. */
-	int _deleteSoundId;
+	int _deleteSoundId = -1;
 	/** Shared map music handle requested by this page. */
-	int _mapMusicId;
+	int _mapMusicId = -1;
 
 	/** Volume panel managed by this page while options are open. */
-	VolumePanel *_volumePanel;
-	/** Confirmation action currently being presented. */
-	SaveMenuConfirmType _confirmType;
-	/** Confirmation panel background without a highlighted button. */
-	RleBlock *_confirmPanelNothing;
-	/** Confirmation panel background with OK highlighted. */
-	RleBlock *_confirmPanelOk;
-	/** Confirmation panel background with Cancel highlighted. */
-	RleBlock *_confirmPanelCancel;
-	/** Delete-confirmation text. */
-	BitBlock *_confirmTextDelete;
-	/** Quit-confirmation text. */
-	BitBlock *_confirmTextQuit;
-	/** Hovered confirmation button, or @c kNone when neither is hovered. */
-	ConfirmButtonKind _confirmButtonHover;
-	/** Signed screen origin of the confirmation panel. */
-	Common::Point32 _confirmPos;
-	/** Saved pixels restored when the confirmation panel closes. */
-	Graphics::ManagedSurface *_confirmDialogBackground;
+	VolumePanel *_volumePanel = nullptr;
+	/** Selected profile retained while the shared delete confirmation is active. */
+	Common::String _pendingDeleteProfileName;
 
-	/** Load page graphics, sounds, and modal resources. */
+	/** Load page graphics and sounds. */
 	void loadResources();
 	/** Create the primary menu controls. */
 	void loadButtons();
@@ -164,6 +134,12 @@ private:
 	void startSelectedSave();
 	/** Open deletion confirmation for the selected profile. */
 	void requestDeleteConfirmation();
+	/** Open the shared quit confirmation. */
+	void requestQuitConfirmation();
+	/** Apply the shared delete-confirmation result. */
+	void handleDeleteConfirmation(DialogMsgBoxButton button);
+	/** Apply the shared quit-confirmation result. */
+	void handleQuitConfirmation(DialogMsgBoxButton button);
 
 	/** Open the volume options panel. */
 	void openOptionsDialog();
@@ -172,17 +148,7 @@ private:
 	/** Apply either panel or stored volume values, optionally persisting them for this target. */
 	void applyOptionVolumes(bool usePanelValues, bool persistChanges);
 
-	/** Open the confirmation panel for @p type. */
-	void openConfirmDialog(SaveMenuConfirmType type);
-	/** Close the active confirmation panel. */
-	void closeConfirmDialog();
-	/** Draw the active confirmation panel. */
-	void drawConfirmDialog(ManagedSurface32 *screen);
-	/** Return the confirmation control at @p pos, or @c kNone. */
-	ConfirmButtonKind hitTestConfirmDialog(const Common::Point &pos) const;
-	/** Dispatch @p button within the active confirmation panel. */
-	void handleConfirmClick(ConfirmButtonKind button);
-	/** Delete the selected profile and refresh the list. */
+	/** Delete the profile retained for the active confirmation. */
 	void deleteSelectedSave();
 	/** Play @p soundId when it names a loaded sound. */
 	void playSound(int soundId);

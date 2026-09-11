@@ -33,6 +33,7 @@ namespace Zoombini2 {
 
 class RleBlock;
 class Animation;
+class PathObject;
 
 /**
  * Beetle Bug Alley (Route2-1)
@@ -106,19 +107,19 @@ private:
 	/** One occupied or destination slot in the maze. */
 	struct ZoombiniSlot {
 		/** Index into @ref Puzzle::_puzzleZoombinis, or `-1` when empty. */
-		int zoombiniIdx;
+		int zoombiniIdx = -1;
 		/** Percentage progress along the active path. */
-		int pathProgress;
+		int pathProgress = 0;
 		/** Color required by this Zoombini's destination. */
-		int targetColor;
+		int targetColor = -1;
 		/** Whether the Zoombini has reached its destination. */
-		bool captured;
+		bool captured = false;
 		/** Current screen position. */
-		Common::Point32 pos;
+		Common::Point32 pos = Common::Point32();
 		/** Path currently being traversed. */
-		PathObject *path;
+		PathObject *path = nullptr;
 		/** Time at which path traversal began. */
-		uint32 pathStartTime;
+		uint32 pathStartTime = 0;
 	};
 
 	/** One colored destination marker in the maze. */
@@ -128,7 +129,7 @@ private:
 		/** Screen position. */
 		Common::Point32 pos;
 		/** Whether the corresponding door light is enabled. */
-		bool lightOn;
+		bool lightOn = false;
 	};
 
 	/** One colored beetle guide in the maze. */
@@ -150,7 +151,7 @@ private:
 		/** Slot to which the tablet moves a beetle. */
 		int destSlot;
 		/** Path followed during the transfer. */
-		PathObject *path;
+		PathObject *path = nullptr;
 	};
 
 	/** One destination gate and its animation state. */
@@ -160,9 +161,9 @@ private:
 		/** Screen position. */
 		Common::Point32 pos;
 		/** Whether this gate is open. */
-		bool open;
+		bool open = false;
 		/** Time at which the opening animation began. */
-		uint32 animStart;
+		uint32 animStart = 0;
 	};
 
 	/** Load all maze graphics, animations, paths, and sounds. */
@@ -209,15 +210,15 @@ private:
 	void onRenderActors(ManagedSurface32 *screen) override;
 
 	/** Current interaction phase. */
-	State _state;
+	State _state = kStateInit;
 	/** Level-selected maze variant. */
-	int _currentLevel;
+	int _currentLevel = 0;
 	/** Currently moving slot, or `-1` when none is active. */
-	int _activeSlot;
+	int _activeSlot = -1;
 	/** Destination slot for the current movement. */
-	int _destSlot;
+	int _destSlot = -1;
 	/** Number of Zoombinis already captured by their matching gates. */
-	int _capturedCount;
+	int _capturedCount = 0;
 
 	/** Four entrance slots followed by four destination slots. */
 	ZoombiniSlot _slots[8];
@@ -232,48 +233,48 @@ private:
 	/** Stone tablet controls. */
 	Common::Array<Tablet> _tablets;
 	/** Glowworm lever hit-test area. */
-	Common::Rect _wallLever;
+	Common::Rect _wallLever = Common::Rect();
 	/** Four destination gates. */
 	Gate _gates[4];
 
 	/** Destination-dot visuals indexed by color. */
-	RleBlock *_dotImage[kColorCount];
+	RleBlock *_dotImage[kColorCount] = {};
 	/** Beetle visuals indexed by color. */
-	RleBlock *_bugImage[kColorCount];
+	RleBlock *_bugImage[kColorCount] = {};
 	/** Minimap background. */
-	RleBlock *_miniMapImage;
+	RleBlock *_miniMapImage = nullptr;
 	/** Minimap position marker. */
-	RleBlock *_miniMapDotImage;
+	RleBlock *_miniMapDotImage = nullptr;
 	/** Minimap lights indexed by color. */
-	RleBlock *_miniLightImage[kColorCount];
+	RleBlock *_miniLightImage[kColorCount] = {};
 	/** Static glowworm lever visual. */
-	RleBlock *_glowwormImage;
+	RleBlock *_glowwormImage = nullptr;
 	/** Animated glowworm lever visual. */
-	Animation *_glowwormAnim;
+	Animation *_glowwormAnim = nullptr;
 	/** Gate-opening animations. */
-	Animation *_gateAnims[4];
+	Animation *_gateAnims[4] = {};
 	/** Crystal feedback animations. */
-	Animation *_crystalAnims[5];
+	Animation *_crystalAnims[5] = {};
 
 	/** Paths from matching gates to the maze exits. */
-	PathObject *_exitPaths[4];
+	PathObject *_exitPaths[4] = {};
 	/** Internal movement paths connecting maze slots. */
-	PathObject *_bougePaths[4];
+	PathObject *_bougePaths[4] = {};
 
 	/** Music handle used while Beetle Bug Alley is active. */
-	int _musicId;
+	int _musicId = -1;
 	/** Approval sounds cycled after successful moves. */
-	int _sndApproval[4];
+	int _sndApproval[4] = {-1, -1, -1, -1};
 	/** Error sounds selected after invalid moves. */
-	int _sndError[2];
+	int _sndError[2] = {-1, -1};
 	/** Hint sounds associated with the four gates. */
-	int _sndHint[4];
+	int _sndHint[4] = {-1, -1, -1, -1};
 	/** Gate-opening sound. */
-	int _sndGateOpen;
+	int _sndGateOpen = -1;
 	/** Zoombini movement sound. */
-	int _sndZoombiniMove;
+	int _sndZoombiniMove = -1;
 	/** Index of the next approval sound to play. */
-	int _nextApprovalIdx;
+	int _nextApprovalIdx = 0;
 };
 
 } // End of namespace Zoombini2

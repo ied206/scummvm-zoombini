@@ -23,6 +23,7 @@
 #include "common/str.h"
 
 #include "zoombini2/graphics.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/pages/shelter_booliewood.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
@@ -87,26 +88,8 @@ const char *const ShelterBooliewood::kCrowdPattern[27] = {
 };
 
 ShelterBooliewood::ShelterBooliewood(Zoombini2Engine *vm)
-	: ShelterBase(vm), _scrollX(0), _developmentStage(1), _background(nullptr), _zoombiniAnimation(nullptr), _walkingZoombiniAnimation(nullptr),
-	  _contentMarker(nullptr), _pascontentMarker(nullptr), _walkingAnimation(nullptr), _waitingAnimation(nullptr), _musicId(-1), _introSpeechId(-1),
-	  _nextAmbientSpeechTime(0), _ambientSpeechEnabled(false) {
+	: ShelterBase(vm) {
 	_pageId = kPageBooliewood;
-	for (int i = 0; i < kAttractionCount; i++) {
-		_attractions[i].animation = nullptr;
-		_attractions[i].pos = Common::Point32();
-		_attractions[i].frame = 0;
-		_attractions[i].nextFrameTime = 0;
-		_attractions[i].active = false;
-	}
-	for (int i = 0; i < kCrowdActorCount; i++) {
-		_crowdActors[i].path = nullptr;
-		_crowdActors[i].nextWalkTime = 0;
-		_crowdActors[i].nextFrameTime = 0;
-		_crowdActors[i].frame = 0;
-		_crowdActors[i].walking = false;
-	}
-	for (int i = 0; i < kAmbientSpeechCount; i++)
-		_ambientSpeechIds[i] = -1;
 	resetSeats();
 }
 
@@ -155,7 +138,7 @@ void ShelterBooliewood::init() {
 	if (rescuedTotal < 50)
 		_developmentStage = 1;
 
-	_background = new BitBlock();
+	_background = new BitBlock(_vm);
 	if (!_background->load(Common::Path("#bmp/booliewood/background"))) {
 		warning("BooliewoodPage: Failed to load background");
 		delete _background;
@@ -169,12 +152,12 @@ void ShelterBooliewood::init() {
 	if (!_walkingZoombiniAnimation)
 		warning("BooliewoodPage: Failed to load attenteZomb.anm");
 
-	_contentMarker = new RleBlock();
+	_contentMarker = new RleBlock(_vm);
 	if (!_contentMarker->loadFromFile(Common::Path("bmp/booliewood/piti_bool/content.rb"))) {
 		delete _contentMarker;
 		_contentMarker = nullptr;
 	}
-	_pascontentMarker = new RleBlock();
+	_pascontentMarker = new RleBlock(_vm);
 	if (!_pascontentMarker->loadFromFile(Common::Path("bmp/booliewood/piti_bool/pascontent.rb"))) {
 		delete _pascontentMarker;
 		_pascontentMarker = nullptr;
@@ -344,7 +327,7 @@ void ShelterBooliewood::loadAttractions(uint32 now) {
 		attraction.frame = 0;
 		attraction.active = minimumStages[i] <= _developmentStage && (i == 0 || 3 <= i);
 		if (minimumStages[i] <= _developmentStage) {
-			attraction.animation = new Animation();
+			attraction.animation = new Animation(_vm);
 			if (!attraction.animation->loadFromFile(Common::Path(paths[i]))) {
 				delete attraction.animation;
 				attraction.animation = nullptr;
@@ -388,12 +371,12 @@ uint32 ShelterBooliewood::getAttractionFrameDelay(int attractionIndex, int frame
 }
 
 void ShelterBooliewood::loadCrowdActors(uint32 now) {
-	_walkingAnimation = new Animation();
+	_walkingAnimation = new Animation(_vm);
 	if (!_walkingAnimation->loadFromFile(Common::Path("bmp/boolies/marche.an"))) {
 		delete _walkingAnimation;
 		_walkingAnimation = nullptr;
 	}
-	_waitingAnimation = new Animation();
+	_waitingAnimation = new Animation(_vm);
 	if (!_waitingAnimation->loadFromFile(Common::Path("bmp/boolies/attend.an"))) {
 		delete _waitingAnimation;
 		_waitingAnimation = nullptr;
@@ -402,7 +385,7 @@ void ShelterBooliewood::loadCrowdActors(uint32 now) {
 	for (int i = 0; i < kCrowdActorCount; i++) {
 		CrowdActorState &actor = _crowdActors[i];
 		const Common::String path = Common::String::format("bmp/booliewood/path%d.pat", i + 1);
-		actor.path = PathObject::loadFromPAT(Common::Path(path));
+		actor.path = PathObject::loadFromPAT(_vm, Common::Path(path));
 		if (actor.path && !actor.path->segments.empty()) {
 			const CurveSegment *first = actor.path->segments[0];
 			const Common::Point32 pathPos = first->getStartPosition();

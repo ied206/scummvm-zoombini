@@ -20,11 +20,11 @@
  */
 
 #include "common/debug.h"
-#include "common/random.h"
 #include "common/system.h"
 #include "graphics/managed_surface.h"
 
 #include "zoombini2/graphics.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/pages/puzzle_walloffleens.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
@@ -85,31 +85,7 @@ static const int kMirrorsPerLevel[] = {0, 12, 8, 6, 6};
 // ============================================================================
 
 PuzzleWallOfFleens::PuzzleWallOfFleens(Zoombini2Engine *vm)
-	: PuzzleBase(vm, kPageWallOfFleens),
-	  _level(1), _gridCols(3), _gridRows(2), _numFleens(6),
-	  _initialZoombiniCount(0), _freedCount(0),
-	  _currentZoombini(0), _selectedFleen(-1),
-	  _gameState(kStateIdle00), _actionTimer(0),
-	  _gridPage(0), _gridOrigin(380, 200),
-	  _cannonAngle(4), _targetAngle(4),
-	  _targetCol(0), _targetRow(0),
-	  _cannonballPos(0, 0),
-	  _cannonballStartPos(0, 0),
-	  _cannonballEndPos(0, 0),
-	  _cannonballProgress(0),
-	  _mirrorsLeft(12), _mirrorsTotal(12),
-	  _cannonCache(nullptr), _slotActiveImage(nullptr),
-	  _slotEmptyImage(nullptr), _slotCursorImage(nullptr),
-	  _tuyereImage(nullptr), _highlightImage(nullptr),
-	  _lavaBubbleAnim(nullptr), _mirrorExplodeAnim(nullptr),
-	  _musicId(-1) {
-
-	for (int i = 0; i < kNumCannonAngles; i++)
-		_cannonImage[i] = nullptr;
-	for (int i = 0; i < kNumMirrorStates; i++)
-		_mirrorImage[i] = nullptr;
-	for (int i = 0; i < kNumLevelIndicators; i++)
-		_levelRedImage[i] = nullptr;
+	: PuzzleBase(vm, kPageWallOfFleens) {
 }
 
 PuzzleWallOfFleens::~PuzzleWallOfFleens() {
@@ -142,44 +118,44 @@ void PuzzleWallOfFleens::loadResources() {
 	// Cannon angle sprites (canon00-08.rb)
 	for (int i = 0; i < kNumCannonAngles; i++) {
 		Common::Path path(Common::String::format("bmp/wall_of_fleens/canon0%d", i));
-		_cannonImage[i] = new RleBlock();
+		_cannonImage[i] = new RleBlock(_vm);
 		_cannonImage[i]->loadFromFile(path);
 	}
 
 	// Cannon cache/cover sprite
-	_cannonCache = new RleBlock();
+	_cannonCache = new RleBlock(_vm);
 	_cannonCache->loadFromFile(Common::Path("bmp/wall_of_fleens/canon_cache"));
 
 	// Mirror state sprites
-	_mirrorImage[kMirrorNormal00] = new RleBlock();
+	_mirrorImage[kMirrorNormal00] = new RleBlock(_vm);
 	_mirrorImage[kMirrorNormal00]->loadFromFile(Common::Path("bmp/wall_of_fleens/mirror_nomal"));
 
-	_mirrorImage[kMirrorGris01] = new RleBlock();
+	_mirrorImage[kMirrorGris01] = new RleBlock(_vm);
 	_mirrorImage[kMirrorGris01]->loadFromFile(Common::Path("bmp/wall_of_fleens/mirror_GRIS"));
 
-	_mirrorImage[kMirrorNoir02] = new RleBlock();
+	_mirrorImage[kMirrorNoir02] = new RleBlock(_vm);
 	_mirrorImage[kMirrorNoir02]->loadFromFile(Common::Path("bmp/wall_of_fleens/mirror_NOIR"));
 
-	_mirrorImage[kMirrorFelure03] = new RleBlock();
+	_mirrorImage[kMirrorFelure03] = new RleBlock(_vm);
 	_mirrorImage[kMirrorFelure03]->loadFromFile(Common::Path("bmp/wall_of_fleens/mirror_felure"));
 
-	_mirrorImage[kMirrorEmpty05] = new RleBlock();
+	_mirrorImage[kMirrorEmpty05] = new RleBlock(_vm);
 	_mirrorImage[kMirrorEmpty05]->loadFromFile(Common::Path("bmp/wall_of_fleens/mirror_empty_tunnel"));
 
 	// Nozzle sprite
-	_tuyereImage = new RleBlock();
+	_tuyereImage = new RleBlock(_vm);
 	_tuyereImage->loadFromFile(Common::Path("bmp/wall_of_fleens/tuyere"));
 
 	// Level indicator sprites (LevelRED0-4)
 	for (int i = 0; i < kNumLevelIndicators; i++) {
 		Common::Path path(Common::String::format("bmp/wall_of_fleens/LevelRED%d", i));
-		_levelRedImage[i] = new RleBlock();
+		_levelRedImage[i] = new RleBlock(_vm);
 		_levelRedImage[i]->loadFromFile(path);
 	}
 
 	// Lava bubble animation (background decoration)
 	Common::Path lavaBubblePath("bmp/wall_of_fleens/lava_bubble");
-	_lavaBubbleAnim = new Animation();
+	_lavaBubbleAnim = new Animation(_vm);
 	if (!_lavaBubbleAnim->loadFromFile(lavaBubblePath)) {
 		delete _lavaBubbleAnim;
 		_lavaBubbleAnim = nullptr;
@@ -188,7 +164,7 @@ void PuzzleWallOfFleens::loadResources() {
 
 	// Mirror explode animation (breaking effect)
 	Common::Path mirrorExplodePath("bmp/wall_of_fleens/mirror_explode");
-	_mirrorExplodeAnim = new Animation();
+	_mirrorExplodeAnim = new Animation(_vm);
 	if (!_mirrorExplodeAnim->loadFromFile(mirrorExplodePath)) {
 		delete _mirrorExplodeAnim;
 		_mirrorExplodeAnim = nullptr;
@@ -246,6 +222,8 @@ void PuzzleWallOfFleens::init() {
 // ============================================================================
 
 void PuzzleWallOfFleens::buildGrid() {
+	_vm->reseedRandomForV10();
+
 	// Set grid dimensions based on level.
 	switch (_level) {
 	case 1:
@@ -297,7 +275,7 @@ void PuzzleWallOfFleens::buildGrid() {
 void PuzzleWallOfFleens::generateFleenTraits() {
 	// Each Fleen gets four random trait values in the range one through five.
 	// No two Fleens should have identical trait tuples.
-	Common::RandomSource *rng = _vm->getRandom();
+	Zoombini2Random *rng = _vm->getRandom();
 
 	for (int i = 0; i < _numFleens; i++) {
 		bool unique;

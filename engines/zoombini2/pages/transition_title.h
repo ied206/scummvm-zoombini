@@ -49,13 +49,13 @@ public:
 private:
 	EventHandleResult dismiss();
 	/** Title-screen background bitmap. */
-	BitBlock *_background;
+	BitBlock *_background = nullptr;
 	/** Whether the player clicked to dismiss the title screen. */
-	bool _clicked;
+	bool _clicked = false;
 	/** Gameplay deadline for automatic dismissal. */
-	uint32 _deadline;
+	uint32 _deadline = 0;
 	/** Title music sound identifier. */
-	int _musicId;
+	int _musicId = -1;
 };
 
 } // End of namespace Zoombini2

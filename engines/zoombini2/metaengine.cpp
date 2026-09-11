@@ -56,6 +56,7 @@ void Zoombini2MetaEngine::registerDefaultSettings(const Common::String &target) 
 	ConfMan.registerDefault(Zoombini2::kConfigGreedyWaterslidePairing, false);
 	ConfMan.registerDefault(Zoombini2::kConfigCachedFrameTime, false);
 	ConfMan.registerDefault(Zoombini2::kConfigUseFloatingPointPaths, false);
+	ConfMan.registerDefault(Zoombini2::kConfigOriginalPRNG, true);
 }
 
 GUI::OptionsContainerWidget *Zoombini2MetaEngine::buildEngineOptionsWidget(GUI::GuiObject *boss, const Common::String &name,
