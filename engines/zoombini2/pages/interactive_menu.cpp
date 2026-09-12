@@ -147,7 +147,7 @@ void InteractiveMenu::onUpdate() {
 	onMouseMove(Common::Point(mousePos.x, mousePos.y));
 }
 
-void InteractiveMenu::onRenderScene(ManagedSurface32 *screen) {
+void InteractiveMenu::onRenderContent(ManagedSurface32 *screen) {
 	if (_state == MenuScreenState::kOptions01) {
 		if (_background)
 			_background->drawToSurface(screen, Common::Point32(0, 0));

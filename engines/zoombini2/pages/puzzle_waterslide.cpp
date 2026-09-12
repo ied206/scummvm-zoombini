@@ -57,7 +57,7 @@ static const uint32 kRejectAnimDuration = 1000;
 // Slot hitbox size
 static const int kSlotHitSize = 50;
 
-byte PuzzleWaterslide::getTrait(const ZoombiniState *z, ZmbTrait::TraitIndex axis) {
+byte PuzzleWaterslide::getTrait(const ZoombiniRunner *z, ZmbTrait::TraitIndex axis) {
 	return z ? z->_traits.getValue(axis) : 0;
 }
 
@@ -344,7 +344,7 @@ void PuzzleWaterslide::addPair(int zoombiniA, int zoombiniB, ZmbTrait::TraitInde
 bool PuzzleWaterslide::findSharedTrait(int zoombiniA, int zoombiniB, ZmbTrait::TraitIndex &traitAxis, int &sharedValue) {
 	int traitOrder[ZmbTrait::kTraitCount] = {0, 1, 2, 3};
 	for (int i = ZmbTrait::kTraitCount - 1; 0 < i; i--) {
-		const int swapIndex = _vm->getRandom()->getRandomNumber(i);
+		const int swapIndex = _vm->_rnd->getRandomNumber(i);
 		SWAP(traitOrder[i], traitOrder[swapIndex]);
 	}
 
@@ -434,7 +434,7 @@ void PuzzleWaterslide::computePairsLevel1Greedy() {
 			available.push_back(static_cast<int>(i));
 		if (0 < attempt) {
 			for (int i = static_cast<int>(available.size()) - 1; 0 < i; i--) {
-				const int swapIndex = _vm->getRandom()->getRandomNumber(i);
+				const int swapIndex = _vm->_rnd->getRandomNumber(i);
 				SWAP(available[i], available[swapIndex]);
 			}
 		}
@@ -681,13 +681,11 @@ void PuzzleWaterslide::onUpdate() {
 }
 
 void PuzzleWaterslide::onRenderBackground(ManagedSurface32 *screen) {
-	// Draw background
-	if (_background)
-		_background->drawToSurface(screen, Common::Point32(0, 0));
+	drawPrimaryPageLayer(screen);
 
 }
 
-void PuzzleWaterslide::onRenderScene(ManagedSurface32 *screen) {
+void PuzzleWaterslide::onRenderContent(ManagedSurface32 *screen) {
 	// Draw decorations
 	drawDecorations(screen);
 
@@ -819,7 +817,7 @@ void PuzzleWaterslide::onRenderActors(ManagedSurface32 *screen) {
 		if (slot.zoombiniIdx < 0)
 			continue;
 
-		const ZoombiniState *z = _puzzleZoombinis[slot.zoombiniIdx];
+		const ZoombiniRunner *z = _puzzleZoombinis[slot.zoombiniIdx];
 		const Common::Point32 pos(slot.pos.x - 15, slot.pos.y - 20);
 
 		// Draw zoombini
@@ -842,7 +840,7 @@ void PuzzleWaterslide::onRenderActors(ManagedSurface32 *screen) {
 
 		if (!inSlot && _puzzleZoombinis[i]->_puzzleStatus != 0) {
 			// Draw in staging area
-			const ZoombiniState *z = _puzzleZoombinis[i];
+			const ZoombiniRunner *z = _puzzleZoombinis[i];
 			const Common::Point32 pos(kStagePos.x + (idx % 8) * 25, kStagePos.y);
 
 			// Highlight if selected

@@ -50,7 +50,7 @@ public:
 	/** Advance aiming, projectile, feedback, and completion phases. */
 	void onUpdate() override;
 	/** Draw the grid, cannon, projectile, mirrors, and active Zoombini. */
-	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderContent(ManagedSurface32 *screen) override;
 	/** Draw the level indicator above the actors. */
 	void onRenderForeground(ManagedSurface32 *screen) override;
 	/** Aim the cannon at the selected uncaught Fleen. */

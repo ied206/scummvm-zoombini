@@ -63,7 +63,7 @@ public:
 	bool isActive() const override { return _isActive; }
 
 	/** Draw the frame, current help sheet, and navigation controls. */
-	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderContent(ManagedSurface32 *screen) override;
 
 	/** Handle navigation or close-button input while the modal is active. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
