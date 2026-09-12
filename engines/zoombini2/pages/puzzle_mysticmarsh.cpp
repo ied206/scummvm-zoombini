@@ -152,13 +152,9 @@ void PuzzleMysticMarsh::init() {
 	}
 
 	// Reload background with level-appropriate variant
-	delete _background;
-	_background = new BitBlock(_vm);
-	Common::Path bgPath(Common::String::format("#bmp/mystic_marsh/background%d", _bgIndex));
-	if (!_background->load(bgPath)) {
+	const Common::Path bgPath(Common::String::format("#bmp/mystic_marsh/background%d", _bgIndex));
+	if (!loadPrimaryLayerBackground(bgPath)) {
 		debug(1, "PuzzleMysticMarsh: Failed to load background%d", _bgIndex);
-		delete _background;
-		_background = nullptr;
 	}
 
 	// Load puzzle resources
@@ -178,10 +174,9 @@ void PuzzleMysticMarsh::init() {
 	// Generate a target launch sequence for this puzzle
 	if (_level == 3)
 		_vm->reseedRandomForV10();
-	Zoombini2Random *rnd = _vm->getRandom();
 	_targetSequence.clear();
 	for (int i = 0; i < (int)_puzzleZoombinis.size(); i++) {
-		_targetSequence.push_back(rnd->getRandomNumber(4)); // 4 possible entrances
+		_targetSequence.push_back(_vm->_rnd->getRandomNumber(4)); // 4 possible entrances
 	}
 }
 
@@ -315,7 +310,6 @@ void PuzzleMysticMarsh::generateRules() {
 
 	// Place some decorative symbols between craters
 	_vm->reseedRandomForV10();
-	Zoombini2Random *rnd = _vm->getRandom();
 	for (int col = 0; col < kGridCols; col++) {
 		for (int row = 0; row < kGridRows; row++) {
 			int idx = col * kGridRows + row;
@@ -323,9 +317,9 @@ void PuzzleMysticMarsh::generateRules() {
 				continue;
 
 			// Sparse symbol placement (about 30% of empty cells)
-			if (rnd->getRandomNumber(99) < 30) {
+			if (_vm->_rnd->getRandomNumber(99) < 30) {
 				// Pick a random symbol type (2-47, excluding tourbi/edge/entry)
-				int symType = rnd->getRandomNumber(43) + 2;
+				int symType = _vm->_rnd->getRandomNumber(43) + 2;
 				_grid[idx].type = symType;
 				_grid[idx].symbolIdx = symType - 2;
 			}
@@ -506,13 +500,11 @@ void PuzzleMysticMarsh::onUpdate() {
 }
 
 void PuzzleMysticMarsh::onRenderBackground(ManagedSurface32 *screen) {
-	// Draw background
-	if (_background)
-		_background->drawToSurface(screen, Common::Point32(0, 0));
+	drawPrimaryPageLayer(screen);
 
 }
 
-void PuzzleMysticMarsh::onRenderScene(ManagedSurface32 *screen) {
+void PuzzleMysticMarsh::onRenderContent(ManagedSurface32 *screen) {
 	// Draw grid elements
 	drawGrid(screen);
 
@@ -566,7 +558,7 @@ void PuzzleMysticMarsh::onRenderActors(ManagedSurface32 *screen) {
 	// Draw the currently active zoombini at its interpolated position
 	int zIdx = _activeZ.zoombiniIdx;
 	if (zIdx >= 0 && zIdx < (int)_puzzleZoombinis.size()) {
-		const ZoombiniState *z = _puzzleZoombinis[zIdx];
+		const ZoombiniRunner *z = _puzzleZoombinis[zIdx];
 		const Common::Point32 pos = _activeZ.targetPos;
 
 		_zoombiniAnimation->drawZoombini(screen, z->_traits, pos, 0, 0, lut);

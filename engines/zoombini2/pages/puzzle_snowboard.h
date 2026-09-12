@@ -49,7 +49,7 @@ public:
 	/** Advance the current snowboarder and completion state. */
 	void onUpdate() override;
 	/** Draw the board, scenery, decision hints, and current snowboarder. */
-	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderContent(ManagedSurface32 *screen) override;
 	/** Draw lane occupants and the current sliding actor. */
 	void onRenderActors(ManagedSurface32 *screen) override;
 	/** Restore the page background. */
@@ -72,7 +72,7 @@ private:
 	void generateTree();
 
 	/** Classify @p z and return its destination lane. */
-	int classifyZoombini(const ZoombiniState *z) const;
+	int classifyZoombini(const ZoombiniRunner *z) const;
 
 	/** Classify every puzzle-roster entry and store its lane. */
 	void assignZoombinisToLanes();

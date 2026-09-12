@@ -103,7 +103,7 @@ void TransitionCredits::onUpdate() {
 		Engine::quitGame();
 }
 
-void TransitionCredits::onRenderScene(ManagedSurface32 *screen) {
+void TransitionCredits::onRenderContent(ManagedSurface32 *screen) {
 	if (!_redrawNeeded)
 		return;
 	_redrawNeeded = false;

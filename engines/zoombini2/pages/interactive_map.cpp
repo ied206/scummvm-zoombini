@@ -19,15 +19,15 @@
  *
  */
 
+#include "common/callback.h"
 #include "common/debug.h"
 #include "common/path.h"
 #include "common/str.h"
-#include "common/callback.h"
 
 #include "zoombini2/graphics.h"
 #include "zoombini2/pages/dialog_msgbox.h"
-#include "zoombini2/scripts.h"
 #include "zoombini2/pages/interactive_map.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
@@ -380,7 +380,7 @@ bool InteractiveMap::practiceCandidateFitsPack(const ZmbTrait &traits) const {
 	const uint16 candidateHash = traits.calculateHash();
 	int matchingCombinations = 0;
 	for (uint i = 0; i < _vm->_globalZoombinis.size(); i++) {
-		const ZoombiniState *zoombini = _vm->_globalZoombinis[i];
+		const ZoombiniRunner *zoombini = _vm->_globalZoombinis[i];
 		for (int traitOrdinal = 0; traitOrdinal < ZmbTrait::kTraitCount; traitOrdinal++) {
 			const ZmbTrait::TraitIndex traitIndex = static_cast<ZmbTrait::TraitIndex>(traitOrdinal);
 			const byte value = zoombini->_traits.getValue(traitIndex);
@@ -478,16 +478,15 @@ Common::String InteractiveMap::generatePracticeZoombiniName() const {
 		"tw",
 	};
 
-	Zoombini2Random *randomSrc = _vm->getRandom();
 	char name[8] = {};
-	const int targetLength = randomSrc->getRandomNumber(1) + 4;
-	bool useVowelPair = randomSrc->getRandomNumber(98) + 1 < 40;
+	const int targetLength = _vm->_rnd->getRandomNumber(1) + 4;
+	bool useVowelPair = _vm->_rnd->getRandomNumber(98) + 1 < 40;
 	int length = 0;
 	while (length < targetLength) {
 		bool usedConsonantPair = false;
 		if (useVowelPair) {
 			useVowelPair = false;
-			const char *pair = kVowelPairs[randomSrc->getRandomNumber(29)];
+			const char *pair = kVowelPairs[_vm->_rnd->getRandomNumber(29)];
 			if (pair[1] != ' ') {
 				name[length] = pair[0];
 				length += 1;
@@ -500,20 +499,20 @@ Common::String InteractiveMap::generatePracticeZoombiniName() const {
 			}
 		} else {
 			useVowelPair = true;
-			if (1 < length || randomSrc->getRandomNumber(98) + 1 <= 33) {
-				const char *pair = kConsonantPairs[randomSrc->getRandomNumber(38)];
+			if (1 < length || _vm->_rnd->getRandomNumber(98) + 1 <= 33) {
+				const char *pair = kConsonantPairs[_vm->_rnd->getRandomNumber(38)];
 				name[length] = pair[0];
 				length += 1;
 				name[length] = pair[1];
 				length += 1;
 				usedConsonantPair = true;
 			} else {
-				name[length] = kSingleConsonants[randomSrc->getRandomNumber(30)];
+				name[length] = kSingleConsonants[_vm->_rnd->getRandomNumber(30)];
 				length += 1;
 			}
 		}
 		if (usedConsonantPair && targetLength <= length)
-			name[length - 1] = kEndings[randomSrc->getRandomNumber(4)];
+			name[length - 1] = kEndings[_vm->_rnd->getRandomNumber(4)];
 		if (length == 2 && name[0] == name[1])
 			length = 1;
 	}
@@ -526,17 +525,16 @@ void InteractiveMap::createPracticeParty(int pageId) {
 	if (partySize == 0)
 		return;
 
-	Zoombini2Random *randomSrc = _vm->getRandom();
 	while (static_cast<int>(_vm->_globalZoombinis.size()) < partySize) {
-		const byte hair = static_cast<byte>(randomSrc->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
-		const byte eyes = static_cast<byte>(randomSrc->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
-		const byte nose = static_cast<byte>(randomSrc->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
-		const byte feet = static_cast<byte>(randomSrc->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
+		const byte hair = static_cast<byte>(_vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
+		const byte eyes = static_cast<byte>(_vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
+		const byte nose = static_cast<byte>(_vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
+		const byte feet = static_cast<byte>(_vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
 		const ZmbTrait traits(feet, nose, hair, eyes);
 		if (!practiceCandidateFitsPack(traits))
 			continue;
 
-		ZoombiniState *zoombini = new ZoombiniState();
+		ZoombiniRunner *zoombini = new ZoombiniRunner();
 		zoombini->setTraits(traits);
 		zoombini->_inputEnabled = 1;
 		zoombini->_puzzleStatus = 0;
@@ -709,7 +707,7 @@ void InteractiveMap::onUpdate() {
 // Draw
 // ============================================================================
 
-void InteractiveMap::onRenderScene(ManagedSurface32 *screen) {
+void InteractiveMap::onRenderContent(ManagedSurface32 *screen) {
 	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	GameState *gs = _vm->getGameState();
 
@@ -1094,7 +1092,7 @@ void InteractiveMap::applyVolumePanelVolumes(bool usePanelValues, bool persistCh
 
 void InteractiveMap::requestQuitConfirmation() {
 	_vm->getMsgBoxDialog()->request(Common::Path("bmp/menu/Quit_panel_text_quit"),
-		new Common::Callback<InteractiveMap, DialogMsgBoxButton>(this, &InteractiveMap::handleQuitConfirmation));
+									new Common::Callback<InteractiveMap, DialogMsgBoxButton>(this, &InteractiveMap::handleQuitConfirmation));
 }
 
 void InteractiveMap::handleQuitConfirmation(DialogMsgBoxButton button) {

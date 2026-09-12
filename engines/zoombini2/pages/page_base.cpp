@@ -21,13 +21,353 @@
 
 #include "zoombini2/pages/page_base.h"
 #include "zoombini2/graphics.h"
+#include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
-PageBase::PageBase(Zoombini2Engine *vm, PageCategory pageCategory) : _vm(vm), _pageCategory(pageCategory) {
+PageLayer::PageLayer(Zoombini2Engine *vm, byte scrollDirection, const Common::Path &backgroundPath)
+	: _vm(vm), _scrollDirection(scrollDirection) {
+	if (!backgroundPath.empty())
+		loadBackground(backgroundPath);
+}
+
+PageLayer::~PageLayer() {
+	for (uint index = 0; index < _animationRunners.size(); index++)
+		delete _animationRunners[index];
+	delete _background;
+}
+
+bool PageLayer::loadBackground(const Common::Path &path) {
+	BitBlock *background = new BitBlock(_vm);
+	if (!background->load(path)) {
+		delete background;
+		return false;
+	}
+
+	delete _background;
+	_background = background;
+	_backgroundWidth = background->getWidth();
+	_backgroundHeight = background->getHeight();
+	_backgroundless = false;
+	_backgroundDrawn = false;
+	wrapScrollX();
+	return true;
+}
+
+AnimationRunner *PageLayer::createAnimationRunner(const Common::Point32 &position, AnimationRunnerMode mode) {
+	AnimationRunner *runner = new AnimationRunner(_vm, position, mode);
+	runner->setLayerIndex(_animationRunners.size());
+	_animationRunners.push_back(runner);
+	return runner;
+}
+
+AnimationRunner *PageLayer::getAnimationRunner(int runnerIndex) const {
+	if (runnerIndex < 0 || static_cast<int>(_animationRunners.size()) <= runnerIndex)
+		return nullptr;
+	return _animationRunners[runnerIndex];
+}
+
+void PageLayer::invokeInteractionCallback(int runnerIndex) {
+	AnimationRunner *runner = getAnimationRunner(runnerIndex);
+	if (runner)
+		runner->invokeInteractionCallback();
+}
+
+void PageLayer::resetRunner(int runnerIndex) {
+	AnimationRunner *runner = getAnimationRunner(runnerIndex);
+	if (runner)
+		runner->reset(_vm->getGameTickCount());
+}
+
+void PageLayer::setRunnerMode(int runnerIndex, AnimationRunnerMode mode) {
+	AnimationRunner *runner = getAnimationRunner(runnerIndex);
+	if (runner)
+		runner->setMode(mode);
+}
+
+void PageLayer::setRunnerPosition(int runnerIndex, const Common::Point32 &position) {
+	AnimationRunner *runner = getAnimationRunner(runnerIndex);
+	if (runner)
+		runner->setPosition(position);
+}
+
+void PageLayer::stopRunner(int runnerIndex) {
+	AnimationRunner *runner = getAnimationRunner(runnerIndex);
+	if (runner)
+		runner->stop();
+}
+
+int PageLayer::getRunnerX(int runnerIndex) const {
+	AnimationRunner *runner = getAnimationRunner(runnerIndex);
+	return runner ? runner->getPosition().x : 0;
+}
+
+int PageLayer::getRunnerY(int runnerIndex) const {
+	AnimationRunner *runner = getAnimationRunner(runnerIndex);
+	return runner ? runner->getPosition().y : 0;
+}
+
+void PageLayer::setRunnerCompletionCallback(int runnerIndex, AnimationRunner::Callback callback, void *context) {
+	AnimationRunner *runner = getAnimationRunner(runnerIndex);
+	if (runner)
+		runner->setCompletionCallback(callback, context);
+}
+
+Common::Rect32 PageLayer::getRunnerRect(int runnerIndex) const {
+	AnimationRunner *runner = getAnimationRunner(runnerIndex);
+	return runner ? runner->getHitRect() : Common::Rect32();
+}
+
+const Animation *PageLayer::getRunnerAnimation(int runnerIndex) const {
+	AnimationRunner *runner = getAnimationRunner(runnerIndex);
+	return runner ? runner->getAnimation() : nullptr;
+}
+
+void PageLayer::setRunnerAnimation(int runnerIndex, const Animation *animation) {
+	AnimationRunner *runner = getAnimationRunner(runnerIndex);
+	if (runner)
+		runner->setAnimation(animation);
+}
+
+const RleBlock *PageLayer::getRunnerFrame(int runnerIndex, int frameIndex) const {
+	const Animation *animation = getRunnerAnimation(runnerIndex);
+	return animation ? animation->getFrame(frameIndex) : nullptr;
+}
+
+bool PageLayer::isRunnerActive(int runnerIndex) const {
+	AnimationRunner *runner = getAnimationRunner(runnerIndex);
+	return runner && runner->isActive();
+}
+
+bool PageLayer::hasActiveRunner() const {
+	for (uint index = 0; index < _animationRunners.size(); index++) {
+		if (_animationRunners[index]->isActive())
+			return true;
+	}
+	return false;
+}
+
+void PageLayer::startRunnerAt(int runnerIndex, const Common::Point32 &position) {
+	AnimationRunner *runner = getAnimationRunner(runnerIndex);
+	if (runner)
+		runner->startAt(position, _vm->getGameTickCount());
+}
+
+void PageLayer::setScrollX(int16 scrollX) {
+	_scrollX = scrollX;
+	wrapScrollX();
+}
+
+void PageLayer::scrollBy(int16 delta) {
+	_scrollX = static_cast<int16>(_scrollX + delta * _scrollDirection);
+	wrapScrollX();
+}
+
+void PageLayer::restoreRunnerBackgrounds(ManagedSurface32 *screen) const {
+	for (uint index = 0; index < _animationRunners.size(); index++)
+		_animationRunners[index]->restoreBackgroundIfInactive(screen);
+}
+
+bool PageLayer::hasInteractiveRunnerAt(const Common::Point32 &point) const {
+	const Common::Point32 worldPoint(getWorldX(point.x), point.y);
+	for (uint index = 0; index < _animationRunners.size(); index++) {
+		const AnimationRunner *runner = _animationRunners[index];
+		if (runner->isInputEnabled() && runner->isHitTestEnabled() && runner->containsHitPoint(worldPoint))
+			return true;
+	}
+	return false;
+}
+
+bool PageLayer::activateRunnersAt(const Common::Point32 &point) {
+	const Common::Point32 worldPoint(getWorldX(point.x), point.y);
+	bool hit = false;
+	for (uint index = 0; index < _animationRunners.size(); index++) {
+		AnimationRunner *runner = _animationRunners[index];
+		if (!runner->containsHitPoint(worldPoint))
+			continue;
+		hit = true;
+		if (!runner->isActive())
+			runner->invokeInteractionCallback();
+		if (index < _animationRunners.size())
+			runner = _animationRunners[index];
+		if (!runner->isActive() && runner->getMode() != AnimationRunnerMode::kDisabled04) {
+			runner->start(_vm->getGameTickCount());
+			runner->captureBackground(_vm->getCurrentScreen(), _scrollX, _backgroundWidth);
+		}
+	}
+	return hit;
+}
+
+void PageLayer::drawBackgroundRegion(ManagedSurface32 *screen, int sourceX, int sourceY) const {
+	if (!_background || !screen)
+		return;
+	const Common::Rect sourceRect(sourceX, sourceY, sourceX + ManagedSurface32::kScreenWidth, sourceY + ManagedSurface32::kScreenHeight);
+	_background->drawSubRect(screen, Common::Point32(0, 0), sourceRect);
+}
+
+void PageLayer::drawAndUpdate(ManagedSurface32 *screen) {
+	if (!screen)
+		return;
+
+	if (_background) {
+		if (_backgroundWidth <= ManagedSurface32::kScreenWidth) {
+			if (!_backgroundDrawn) {
+				drawBackgroundRegion(screen, 0, 0);
+				_backgroundDrawn = true;
+			}
+		} else if (!_backgroundless) {
+			if (0 < _scrollX && _scrollX < _backgroundWidth - ManagedSurface32::kScreenWidth) {
+				drawBackgroundRegion(screen, _scrollX, 0);
+			} else if (0 < _scrollX) {
+				const int tailWidth = _backgroundWidth - _scrollX;
+				_background->drawSubRect(screen, Common::Point32(0, 0), Common::Rect(_scrollX, 0, _backgroundWidth, ManagedSurface32::kScreenHeight));
+				_background->drawSubRect(screen, Common::Point32(tailWidth, 0), Common::Rect(0, 0, ManagedSurface32::kScreenWidth - tailWidth, ManagedSurface32::kScreenHeight));
+			} else {
+				const int tailStart = _backgroundWidth + _scrollX;
+				const int tailWidth = -_scrollX;
+				_background->drawSubRect(screen, Common::Point32(0, 0), Common::Rect(tailStart, 0, _backgroundWidth, ManagedSurface32::kScreenHeight));
+				_background->drawSubRect(screen, Common::Point32(tailWidth, 0), Common::Rect(0, 0, ManagedSurface32::kScreenWidth - tailWidth, ManagedSurface32::kScreenHeight));
+			}
+		}
+	}
+
+	const uint32 tickCount = _vm->getGameTickCount();
+	for (uint index = 0; index < _animationRunners.size(); index++) {
+		AnimationRunner *runner = _animationRunners[index];
+		if (runner->getMode() != AnimationRunnerMode::kDisabled04)
+			runner->drawAndUpdate(screen, _vm->getAlphaLUT(), tickCount, _scrollX, _backgroundWidth);
+	}
+}
+
+void PageLayer::setBackgroundDimensions(int width, int height) {
+	if (!_backgroundless)
+		return;
+	_backgroundWidth = width;
+	_backgroundHeight = height;
+	wrapScrollX();
+}
+
+int PageLayer::getWorldX(int screenX) const {
+	if (_backgroundWidth == ManagedSurface32::kScreenWidth)
+		return screenX;
+	const int backgroundOrigin = 0 < _scrollX ? _scrollX : _backgroundWidth + _scrollX;
+	return backgroundOrigin + screenX;
+}
+
+void PageLayer::wrapScrollX() {
+	if (_backgroundWidth <= 0)
+		return;
+	if (_scrollX < -ManagedSurface32::kScreenWidth)
+		_scrollX = static_cast<int16>(_scrollX + _backgroundWidth);
+	if (_backgroundWidth - 1 < _scrollX)
+		_scrollX = static_cast<int16>(_scrollX - _backgroundWidth + 1);
+}
+
+PageLayerStack::PageLayerStack(Zoombini2Engine *vm) : _vm(vm) {
+}
+
+PageLayerStack::~PageLayerStack() {
+	clear();
+}
+
+void PageLayerStack::clear() {
+	for (uint index = 0; index < _layers.size(); index++)
+		delete _layers[index];
+	_layers.clear();
+	delete _areaMask;
+	_areaMask = nullptr;
+	_pointerPressLatched = false;
+	_scrollLocked = false;
+}
+
+PageLayer *PageLayerStack::addLayer(byte scrollDirection, const Common::Path &backgroundPath) {
+	PageLayer *layer = new PageLayer(_vm, scrollDirection, backgroundPath);
+	_layers.push_back(layer);
+	propagateFirstLayerDimensions();
+	return layer;
+}
+
+PageLayer *PageLayerStack::getLayer(int layerIndex) const {
+	if (layerIndex < 0 || static_cast<int>(_layers.size()) <= layerIndex)
+		return nullptr;
+	return _layers[layerIndex];
+}
+
+bool PageLayerStack::loadLayerBackground(int layerIndex, const Common::Path &path) {
+	PageLayer *layer = getLayer(layerIndex);
+	if (!layer || !layer->loadBackground(path))
+		return false;
+	if (layerIndex == 0)
+		propagateFirstLayerDimensions();
+	return true;
+}
+
+bool PageLayerStack::handlePointerButton(const Common::Point32 &point, bool pressed) {
+	if (!pressed) {
+		_pointerPressLatched = false;
+		return false;
+	}
+	if (_pointerPressLatched)
+		return false;
+
+	bool hit = false;
+	for (uint index = 0; index < _layers.size(); index++)
+		hit = _layers[index]->activateRunnersAt(point) || hit;
+	_pointerPressLatched = true;
+	return hit;
+}
+
+bool PageLayerStack::hasInteractiveRunnerAt(const Common::Point32 &point) const {
+	for (uint index = 0; index < _layers.size(); index++) {
+		if (_layers[index]->hasInteractiveRunnerAt(point))
+			return true;
+	}
+	return false;
+}
+
+bool PageLayerStack::loadAreaMask(const Common::Path &path) {
+	AreaMask *areaMask = new AreaMask(_vm);
+	if (!areaMask->loadFromFile(path)) {
+		delete areaMask;
+		return false;
+	}
+	delete _areaMask;
+	_areaMask = areaMask;
+	return true;
+}
+
+void PageLayerStack::scrollBy(int16 delta) {
+	if (_scrollLocked)
+		return;
+	for (uint index = 0; index < _layers.size(); index++)
+		_layers[index]->scrollBy(delta);
+}
+
+void PageLayerStack::setScrollX(int16 scrollX) {
+	for (uint index = 0; index < _layers.size(); index++)
+		_layers[index]->setScrollX(scrollX);
+}
+
+void PageLayerStack::drawFirstLayer(ManagedSurface32 *screen) {
+	PageLayer *layer = getLayer(0);
+	if (layer)
+		layer->drawAndUpdate(screen);
+}
+
+void PageLayerStack::propagateFirstLayerDimensions() {
+	PageLayer *firstLayer = getLayer(0);
+	if (!firstLayer)
+		return;
+	for (uint index = 1; index < _layers.size(); index++)
+		_layers[index]->setBackgroundDimensions(firstLayer->getBackgroundWidth(), firstLayer->getBackgroundHeight());
+}
+
+PageBase::PageBase(Zoombini2Engine *vm, PageCategory pageCategory)
+	: _vm(vm), _pageCategory(pageCategory), _pageLayerStack(new PageLayerStack(vm)) {
 }
 
 PageBase::~PageBase() {
+	delete _pageLayerStack;
 }
 
 EventHandleResult PageEventHandler::handleEvent(const Common::Event &event) {
@@ -47,6 +387,22 @@ EventHandleResult PageEventHandler::handleEvent(const Common::Event &event) {
 	}
 }
 
+EventHandleResult PageBase::handleEvent(const Common::Event &event) {
+	const EventHandleResult pageResult = PageEventHandler::handleEvent(event);
+	bool layerHandled = false;
+	switch (event.type) {
+	case Common::EVENT_LBUTTONDOWN:
+		layerHandled = _pageLayerStack->handlePointerButton(Common::Point32(event.mouse), true);
+		break;
+	case Common::EVENT_LBUTTONUP:
+		_pageLayerStack->handlePointerButton(Common::Point32(event.mouse), false);
+		break;
+	default:
+		break;
+	}
+	return layerHandled ? EventHandleResult::kConsumed : pageResult;
+}
+
 void PageBase::onFrame(ManagedSurface32 *screen, bool advanceState) {
 	if (advanceState)
 		onUpdate();
@@ -61,7 +417,7 @@ void PageBase::renderFrame(ManagedSurface32 *screen, bool advanceState) {
 	if (needsScreenClear())
 		screen->fillRect(Common::Rect32(screen->w, screen->h), 0);
 	onRenderBackground(screen);
-	onRenderScene(screen);
+	onRenderContent(screen);
 	onRenderActors(screen);
 	if (advanceState)
 		onActorsRendered();

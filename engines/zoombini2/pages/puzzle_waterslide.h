@@ -52,7 +52,7 @@ public:
 	/** Draw pipes, slots, trait indicators, decorations, and Zoombinis. */
 	void onRenderBackground(ManagedSurface32 *screen) override;
 	/** Draw scene decorations and slot indicators. */
-	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderContent(ManagedSurface32 *screen) override;
 	/** Move the selected Zoombini into the clicked slot. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 
@@ -118,7 +118,7 @@ private:
 	/** Load pipe, indicator, and decoration resources. */
 	void loadResources();
 	/** Return trait @p axis from @p zoombini. */
-	static byte getTrait(const ZoombiniState *zoombini, ZmbTrait::TraitIndex axis);
+	static byte getTrait(const ZoombiniRunner *zoombini, ZmbTrait::TraitIndex axis);
 	/** Initialize slot geometry and partner relationships. */
 	void setupSlots();
 	/** Select the level-specific pairing algorithm. */

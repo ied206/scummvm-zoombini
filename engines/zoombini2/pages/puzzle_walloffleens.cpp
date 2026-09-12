@@ -275,17 +275,15 @@ void PuzzleWallOfFleens::buildGrid() {
 void PuzzleWallOfFleens::generateFleenTraits() {
 	// Each Fleen gets four random trait values in the range one through five.
 	// No two Fleens should have identical trait tuples.
-	Zoombini2Random *rng = _vm->getRandom();
-
 	for (int i = 0; i < _numFleens; i++) {
 		bool unique;
 		do {
 			unique = true;
 			ZmbTrait &traits = _fleens[i].traits;
-			traits._feet = rng->getRandomNumber(kMaxTraitValue - 1) + 1;
-			traits._nose = rng->getRandomNumber(kMaxTraitValue - 1) + 1;
-			traits._hair = rng->getRandomNumber(kMaxTraitValue - 1) + 1;
-			traits._eyes = rng->getRandomNumber(kMaxTraitValue - 1) + 1;
+			traits._feet = _vm->_rnd->getRandomNumber(kMaxTraitValue - 1) + 1;
+			traits._nose = _vm->_rnd->getRandomNumber(kMaxTraitValue - 1) + 1;
+			traits._hair = _vm->_rnd->getRandomNumber(kMaxTraitValue - 1) + 1;
+			traits._eyes = _vm->_rnd->getRandomNumber(kMaxTraitValue - 1) + 1;
 			// Check uniqueness against all previously generated Fleens.
 			for (int j = 0; j < i; j++) {
 				if (traits == _fleens[j].traits) {
@@ -422,7 +420,7 @@ int PuzzleWallOfFleens::countMatchingTraits(int fleenIdx) const {
 		return 0;
 
 	const FleenCell &cell = _fleens[fleenIdx];
-	const ZoombiniState *z = _puzzleZoombinis[_currentZoombini];
+	const ZoombiniRunner *z = _puzzleZoombinis[_currentZoombini];
 
 	int matches = 0;
 	for (int traitOrdinal = 0; traitOrdinal < ZmbTrait::kTraitCount; traitOrdinal++) {
@@ -579,10 +577,8 @@ EventHandleResult PuzzleWallOfFleens::onLButtonDown(const Common::Point &pos) {
 // Draw
 // ============================================================================
 
-void PuzzleWallOfFleens::onRenderScene(ManagedSurface32 *screen) {
-	if (_background) {
-		_background->drawToSurface(screen, Common::Point32(0, 0));
-	}
+void PuzzleWallOfFleens::onRenderContent(ManagedSurface32 *screen) {
+	drawPrimaryPageLayer(screen);
 
 	// Draw lava bubble decoration (lower left area)
 	if (_lavaBubbleAnim) {
@@ -742,7 +738,7 @@ void PuzzleWallOfFleens::onRenderActors(ManagedSurface32 *screen) {
 
 	// Draw the current Zoombini beside the cannon.
 	if (_currentZoombini < (int)_puzzleZoombinis.size()) {
-		const ZoombiniState *z = _puzzleZoombinis[_currentZoombini];
+		const ZoombiniRunner *z = _puzzleZoombinis[_currentZoombini];
 		Common::Point32 zoombiniPos(kCannonDrawPos.x - 60, kCannonDrawPos.y + 10);
 		_zoombiniAnimation->drawZoombini(screen, z->_traits, zoombiniPos, 0, 0, lut);
 	}
@@ -752,7 +748,7 @@ void PuzzleWallOfFleens::onRenderActors(ManagedSurface32 *screen) {
 	int spacing = 35;
 	int count = MIN((int)_puzzleZoombinis.size(), 16);
 	for (int i = _currentZoombini + 1; i < count; i++) {
-		const ZoombiniState *z = _puzzleZoombinis[i];
+		const ZoombiniRunner *z = _puzzleZoombinis[i];
 		Common::Point32 zoombiniPos(queueStartPos.x + (i - _currentZoombini - 1) * spacing, queueStartPos.y);
 		_zoombiniAnimation->drawZoombini(screen, z->_traits, zoombiniPos, 0, 0, lut);
 	}

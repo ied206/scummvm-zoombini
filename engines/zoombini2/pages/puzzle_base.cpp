@@ -22,8 +22,8 @@
 #include "common/debug.h"
 
 #include "zoombini2/graphics.h"
-#include "zoombini2/scripts.h"
 #include "zoombini2/pages/puzzle_base.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
 
@@ -71,7 +71,6 @@ PuzzleBase::PuzzleBase(Zoombini2Engine *vm, int puzzleId)
 }
 
 PuzzleBase::~PuzzleBase() {
-	delete _background;
 }
 
 void PuzzleBase::init() {
@@ -87,17 +86,17 @@ void PuzzleBase::init() {
 		}
 	}
 
+	_pageLayerStack->clear();
+	_pageLayerStack->addLayer(1);
 	if (bgName) {
-		Common::Path bgPath(Common::String::format("#bmp/%s", bgName));
-		_background = new BitBlock(_vm);
-		if (!_background->load(bgPath)) {
+		const Common::Path bgPath(Common::String::format("#bmp/%s", bgName));
+		if (!loadPrimaryLayerBackground(bgPath)) {
 			debug(1, "Puzzle: Failed to load background for %s", name);
-			delete _background;
-			_background = nullptr;
 		}
 	}
+	_pageLayerStack->addLayer(1);
 
-	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/littleZomb.anm"));
+	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/littleZomb.anm"), 50);
 	if (!_zoombiniAnimation)
 		debug(1, "Puzzle: Failed to load zoombini graphics");
 
@@ -110,11 +109,22 @@ void PuzzleBase::init() {
 	_stateTimer = _vm->getGameTickCount();
 }
 
+bool PuzzleBase::loadPrimaryLayerBackground(const Common::Path &path) {
+	const bool loaded = _pageLayerStack->loadLayerBackground(0, path);
+	PageLayer *primaryLayer = _pageLayerStack->getLayer(0);
+	_background = primaryLayer ? primaryLayer->getBackground() : nullptr;
+	return loaded;
+}
+
+void PuzzleBase::drawPrimaryPageLayer(ManagedSurface32 *screen) {
+	_pageLayerStack->drawFirstLayer(screen);
+}
+
 void PuzzleBase::renderZoombinis(ManagedSurface32 *screen) const {
 	Common::Array<uint> order;
-	const ZoombiniState *draggedZoombini = nullptr;
+	const ZoombiniRunner *draggedZoombini = nullptr;
 	for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
-		const ZoombiniState *zoombini = _puzzleZoombinis[index];
+		const ZoombiniRunner *zoombini = _puzzleZoombinis[index];
 		if (!zoombini)
 			continue;
 		if (zoombini->_dragging) {

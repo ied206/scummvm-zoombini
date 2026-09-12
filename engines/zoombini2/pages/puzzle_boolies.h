@@ -49,7 +49,7 @@ public:
 	/** Advance the ball, pins, released Zoombini, and boat phases. */
 	void onUpdate() override;
 	/** Draw the launch spots, obstacles, pins, actors, and boat. */
-	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderContent(ManagedSurface32 *screen) override;
 	/** Restore the page background. */
 	void onRenderBackground(ManagedSurface32 *screen) override;
 	/** Launch the current ball from the selected active spot. */

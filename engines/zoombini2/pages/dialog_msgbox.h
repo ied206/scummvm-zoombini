@@ -80,7 +80,7 @@ public:
 	void close() override;
 
 	/** Open a pending request and draw its current panel. */
-	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderContent(ManagedSurface32 *screen) override;
 	/** Consume button presses; activation occurs on release. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 	/** Invoke the hovered button's callback on release. */

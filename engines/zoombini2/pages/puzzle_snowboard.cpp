@@ -161,14 +161,12 @@ void PuzzleSnowboard::generateTree() {
 	_tree.clear();
 	_tree.resize(_treeDepth);
 
-	Zoombini2Random *rnd = _vm->getRandom();
-
 	// For each internal node, pick a random trait and a random match value.
 	for (int i = 0; i < _treeDepth; i++) {
 		TreeNode &node = _tree[i];
-		node.traitIndex = static_cast<ZmbTrait::TraitIndex>(rnd->getRandomNumber(ZmbTrait::kTraitCount - 1));
-		node.matchVal1 = rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1);  // 0-4 = trait variants
-		node.matchVal2 = rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1);  // For level 3
+		node.traitIndex = static_cast<ZmbTrait::TraitIndex>(_vm->_rnd->getRandomNumber(ZmbTrait::kTraitCount - 1));
+		node.matchVal1 = _vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1);  // 0-4 = trait variants
+		node.matchVal2 = _vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1);  // For level 3
 	}
 
 	debug(2, "PuzzleSnowboard: Generated tree with %d internal nodes", _treeDepth);
@@ -178,7 +176,7 @@ void PuzzleSnowboard::generateTree() {
 	}
 }
 
-int PuzzleSnowboard::classifyZoombini(const ZoombiniState *z) const {
+int PuzzleSnowboard::classifyZoombini(const ZoombiniRunner *z) const {
 	// Traverse the binary decision tree to determine the destination lane.
 	// Algorithm:
 	//   v = 0 (root)
@@ -264,11 +262,10 @@ void PuzzleSnowboard::onUpdate() {
 }
 
 void PuzzleSnowboard::onRenderBackground(ManagedSurface32 *screen) {
-	if (_background)
-		_background->drawToSurface(screen, Common::Point32(0, 0));
+	drawPrimaryPageLayer(screen);
 }
 
-void PuzzleSnowboard::onRenderScene(ManagedSurface32 *screen) {
+void PuzzleSnowboard::onRenderContent(ManagedSurface32 *screen) {
 
 	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	uint32 now = _vm->getGameTickCount();
@@ -373,7 +370,7 @@ void PuzzleSnowboard::onRenderActors(ManagedSurface32 *screen) {
 				}
 
 				if (zoombiniIdx >= 0 && zoombiniIdx < (int)_puzzleZoombinis.size()) {
-					const ZoombiniState *zb = _puzzleZoombinis[zoombiniIdx];
+					const ZoombiniRunner *zb = _puzzleZoombinis[zoombiniIdx];
 					const Common::Point32 pos(lanePos.x + (z % 2) * 25, lanePos.y + (z / 2) * 30);
 
 					_zoombiniAnimation->drawZoombini(screen, zb->_traits, pos, 0, 0, lut);
@@ -384,7 +381,7 @@ void PuzzleSnowboard::onRenderActors(ManagedSurface32 *screen) {
 
 	// Draw current zoombini being processed
 	if (_state == kStateSliding && _currentZoombini < (int)_puzzleZoombinis.size()) {
-		const ZoombiniState *z = _puzzleZoombinis[_currentZoombini];
+		const ZoombiniRunner *z = _puzzleZoombinis[_currentZoombini];
 		static const Common::Point32 kCurrentZoombiniPos(400, 200);
 
 		if (_zoombiniAnimation) {

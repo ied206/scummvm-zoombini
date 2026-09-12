@@ -33,6 +33,233 @@
 namespace Zoombini2 {
 
 // ============================================================================
+// AnimationRunner
+// ============================================================================
+
+AnimationRunner::AnimationRunner(Zoombini2Engine *vm, const Common::Point32 &position, AnimationRunnerMode mode)
+	: _vm(vm), _position(position), _mode(mode) {
+	const uint32 tickCount = _vm ? _vm->getGameTickCount() : 0;
+	if (_mode == AnimationRunnerMode::kLoop01) {
+		_currentTimedEntryIndex = 0;
+		_cycleStartTime = tickCount;
+	} else if (_mode == AnimationRunnerMode::kRandomIdle05) {
+		_randomIdleGateTime = tickCount + getRandomDelay(6999);
+	}
+}
+
+AnimationRunner::~AnimationRunner() {
+	delete _backBuffer;
+}
+
+bool AnimationRunner::addTimedFrame(int frameIndex, uint32 durationMs) {
+	if (kMaxTimedFrameCount <= static_cast<int>(_timedFrames.size())) {
+		warning("AnimationRunner: cannot append more than %d timed frames", kMaxTimedFrameCount);
+		return false;
+	}
+	if (frameIndex < -1 || 32767 < frameIndex) {
+		warning("AnimationRunner: frame index %d is outside the signed 16-bit timing format", frameIndex);
+		return false;
+	}
+
+	_totalDurationMs += durationMs;
+	TimedFrame timedFrame;
+	timedFrame.frameIndex = static_cast<int16>(frameIndex);
+	timedFrame.cumulativeEndMs = _totalDurationMs;
+	_timedFrames.push_back(timedFrame);
+	return true;
+}
+
+void AnimationRunner::clearTimedFrames() {
+	_timedFrames.clear();
+	_totalDurationMs = 0;
+	_nextTimedEntryIndex = -1;
+}
+
+void AnimationRunner::initBackBuffer(int width, int height) {
+	delete _backBuffer;
+	_backBuffer = nullptr;
+	_backBufferWidth = MAX(0, width);
+	_backBufferHeight = MAX(0, height);
+	_backBufferValid = false;
+}
+
+void AnimationRunner::start(uint32 tickCount) {
+	_currentTimedEntryIndex = 0;
+	_cycleStartTime = tickCount;
+}
+
+void AnimationRunner::startAt(const Common::Point32 &position, uint32 tickCount) {
+	_position = position;
+	start(tickCount);
+}
+
+void AnimationRunner::reset(uint32 tickCount) {
+	start(tickCount);
+}
+
+void AnimationRunner::stop() {
+	_currentTimedEntryIndex = -1;
+	_mode = AnimationRunnerMode::kPlayOnce00;
+}
+
+bool AnimationRunner::setNextTimedEntry(int timedEntryIndex) {
+	if (timedEntryIndex < 0 || static_cast<int>(_timedFrames.size()) <= timedEntryIndex) {
+		warning("AnimationRunner: timed-entry redirect %d is outside the table", timedEntryIndex);
+		return false;
+	}
+	_nextTimedEntryIndex = timedEntryIndex;
+	return true;
+}
+
+void AnimationRunner::setInteractionCallback(Callback callback, void *context) {
+	_interactionCallback = callback;
+	_interactionCallbackContext = context;
+}
+
+void AnimationRunner::setCompletionCallback(Callback callback, void *context) {
+	_completionCallback = callback;
+	_completionCallbackContext = context;
+}
+
+void AnimationRunner::invokeInteractionCallback() {
+	if (_interactionCallback)
+		_interactionCallback(_interactionCallbackContext, this);
+}
+
+void AnimationRunner::prepareForDraw(uint32 tickCount) {
+	if (_mode != AnimationRunnerMode::kRandomIdle05 || isActive() || !(_randomIdleGateTime < tickCount))
+		return;
+
+	_currentTimedEntryIndex = 0;
+	_cycleStartTime = tickCount;
+	_randomIdleGateTime = tickCount + getRandomDelay(5999) + 2000;
+}
+
+void AnimationRunner::draw(Graphics::ManagedSurface *screen, const AlphaBlendLUT &alphaLUT, int scrollX, int backgroundWidth) {
+	if (!screen || _mode == AnimationRunnerMode::kDisabled04)
+		return;
+	const int frameIndex = getCurrentFrameIndex();
+	if (!_animation || frameIndex == -1)
+		return;
+	const RleBlock *frame = _animation->getFrame(frameIndex);
+	if (!frame) {
+		_backBufferValid = false;
+		return;
+	}
+	const Common::Point32 drawPosition(getScrolledX(scrollX, backgroundWidth), _position.y);
+	saveBackground(screen, drawPosition);
+	frame->drawToScreen(screen, drawPosition, alphaLUT);
+}
+
+void AnimationRunner::advanceAfterDraw(uint32 tickCount) {
+	if (_mode == AnimationRunnerMode::kDisabled04 || !isActive())
+		return;
+
+	bool selectedTimedEntry = false;
+	const uint32 elapsed = tickCount - _cycleStartTime;
+	for (int index = static_cast<int>(_timedFrames.size()) - 1; 0 <= index; index -= 1) {
+		if (elapsed < _timedFrames[index].cumulativeEndMs) {
+			_currentTimedEntryIndex = index;
+			selectedTimedEntry = true;
+		}
+	}
+	if (selectedTimedEntry)
+		return;
+
+	if (_nextTimedEntryIndex != -1) {
+		_currentTimedEntryIndex = _nextTimedEntryIndex;
+		return;
+	}
+
+	switch (_mode) {
+	case AnimationRunnerMode::kPlayOnce00:
+		_currentTimedEntryIndex = -1;
+		if (_linkedRunner)
+			_linkedRunner->_currentTimedEntryIndex = 0;
+		break;
+	case AnimationRunnerMode::kLoop01:
+	case AnimationRunnerMode::kLoopAfterStart03:
+		_currentTimedEntryIndex = 0;
+		_cycleStartTime = tickCount;
+		break;
+	case AnimationRunnerMode::kPlayOnceAndHide02:
+	case AnimationRunnerMode::kRandomIdle05:
+		_currentTimedEntryIndex = -1;
+		break;
+	case AnimationRunnerMode::kDisabled04:
+		return;
+	}
+
+	if (_completionCallback)
+		_completionCallback(_completionCallbackContext, this);
+}
+
+void AnimationRunner::restoreBackgroundIfInactive(Graphics::ManagedSurface *screen) const {
+	if (!screen || isActive() || !_backBuffer || !_backBufferValid)
+		return;
+	const int sourceX = _backBufferScreenRect.left - _backBufferDrawPosition.x;
+	const int sourceY = _backBufferScreenRect.top - _backBufferDrawPosition.y;
+	const Common::Rect sourceRect(sourceX, sourceY, sourceX + _backBufferScreenRect.width(), sourceY + _backBufferScreenRect.height());
+	screen->copyRectToSurface(*_backBuffer, _backBufferScreenRect.left, _backBufferScreenRect.top, sourceRect);
+}
+
+void AnimationRunner::captureBackground(Graphics::ManagedSurface *screen, int scrollX, int backgroundWidth) {
+	if (!screen)
+		return;
+	saveBackground(screen, Common::Point32(getScrolledX(scrollX, backgroundWidth), _position.y));
+}
+
+void AnimationRunner::drawAndUpdate(Graphics::ManagedSurface *screen, const AlphaBlendLUT &alphaLUT, uint32 tickCount, int scrollX, int backgroundWidth) {
+	prepareForDraw(tickCount);
+	draw(screen, alphaLUT, scrollX, backgroundWidth);
+	advanceAfterDraw(tickCount);
+	restoreBackgroundIfInactive(screen);
+}
+
+int AnimationRunner::getCurrentFrameIndex() const {
+	if (_currentTimedEntryIndex < 0 || static_cast<int>(_timedFrames.size()) <= _currentTimedEntryIndex)
+		return -1;
+	return _timedFrames[_currentTimedEntryIndex].frameIndex;
+}
+
+bool AnimationRunner::containsHitPoint(const Common::Point32 &point) const {
+	return _hitRect.left < point.x && point.x < _hitRect.right && _hitRect.top < point.y && point.y < _hitRect.bottom;
+}
+
+uint32 AnimationRunner::getRandomDelay(uint32 maximumInclusive) const {
+	if (!_vm || !_vm->_rnd)
+		return 0;
+	return static_cast<uint32>(_vm->_rnd->getRandomNumber(static_cast<int32>(maximumInclusive)));
+}
+
+int AnimationRunner::getScrolledX(int scrollX, int backgroundWidth) const {
+	if (backgroundWidth == ManagedSurface32::kScreenWidth)
+		return _position.x;
+	int screenX = _position.x - scrollX;
+	if (backgroundWidth - ManagedSurface32::kScreenWidth < scrollX)
+		screenX += backgroundWidth;
+	return screenX;
+}
+
+void AnimationRunner::saveBackground(Graphics::ManagedSurface *screen, const Common::Point32 &drawPosition) {
+	_backBufferValid = false;
+	if (_backBufferWidth <= 0 || _backBufferHeight <= 0)
+		return;
+	if (!_backBuffer)
+		_backBuffer = new Graphics::ManagedSurface(_backBufferWidth, _backBufferHeight, screen->format);
+
+	_backBufferDrawPosition = drawPosition;
+	_backBufferScreenRect = Common::Rect(drawPosition.x, drawPosition.y, drawPosition.x + _backBufferWidth, drawPosition.y + _backBufferHeight);
+	_backBufferScreenRect.clip(screen->w, screen->h);
+	if (_backBufferScreenRect.isEmpty())
+		return;
+	const int destinationX = _backBufferScreenRect.left - drawPosition.x;
+	const int destinationY = _backBufferScreenRect.top - drawPosition.y;
+	_backBuffer->copyRectToSurface(*screen, destinationX, destinationY, _backBufferScreenRect);
+	_backBufferValid = true;
+}
+
+// ============================================================================
 // Fixed32
 // ============================================================================
 
@@ -326,6 +553,7 @@ public:
 
 		if (0 < _waitRemaining) {
 			_waitRemaining -= 1;
+			outPosition = getPosition();
 			return true;
 		}
 
@@ -414,6 +642,13 @@ Common::Point32 CurveSegment::getPosition() const {
 
 void CurveSegment::setStartTime(uint32 tickCount) {
 	_evaluator->setStartTime(tickCount);
+}
+
+void CurveSegment::setStepValue(int stepValue) {
+	if (_stepValue == stepValue)
+		return;
+	_stepValue = stepValue;
+	rebuildEvaluator();
 }
 
 void CurveSegment::setFloatingPointMode(bool useFloatingPoint) {
@@ -548,6 +783,11 @@ void PathObject::start(uint32 tickCount) {
 		segments[0]->computeCoeffs();
 }
 
+void PathObject::setStepValueForAllSegments(int stepValue) {
+	for (uint i = 0; i < segments.size(); i++)
+		segments[i]->setStepValue(stepValue);
+}
+
 /**
  * Advance the path evaluation. Returns true if still walking,
  * false if the entire path is complete.
@@ -573,10 +813,18 @@ bool PathObject::advance(uint32 tickCount, Common::Point32 &outPos) {
 	// Advance after the current segment completes.
 	currentSegment += 1;
 	if (static_cast<int>(segments.size()) <= currentSegment) {
-		// All segments done
-		finished = true;
-		outPos = endPos;
-		return false;
+		if (looping && 1 < segments.size()) {
+			currentSegment = 1;
+			CurveSegment *next = segments[currentSegment];
+			next->computeCoeffs();
+			next->setStartTime(tickCount);
+			next->evaluate(tickCount, outPos);
+			return true;
+		} else {
+			finished = true;
+			outPos = endPos;
+			return false;
+		}
 	}
 
 	// Compute coefficients for the next segment and evaluate it
@@ -593,30 +841,22 @@ void PathObject::synchronizeNumericMode() {
 		segments[i]->setFloatingPointMode(useFloatingPoint);
 }
 
-ZoombiniState::ZoombiniState() {
+ZoombiniRunner::ZoombiniRunner() {
 }
 
-ZoombiniState::~ZoombiniState() {
+ZoombiniRunner::~ZoombiniRunner() {
 	clearMovement();
 }
 
-void ZoombiniState::randomize(uint32 seed) {
-	Zoombini2Random randomSrc(seed);
-	setTraits(ZmbTrait(randomSrc.getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1,
-					   randomSrc.getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1,
-					   randomSrc.getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1,
-					   randomSrc.getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1));
-}
-
-void ZoombiniState::setTraits(const ZmbTrait &traits) {
-	_traits._feet = traits._feet;
-	_traits._nose = traits._nose;
-	_traits._hair = traits._hair;
-	_traits._eyes = traits._eyes;
+void ZoombiniRunner::setTraits(const ZmbTrait &other) {
+	_traits._feet = other._feet;
+	_traits._nose = other._nose;
+	_traits._hair = other._hair;
+	_traits._eyes = other._eyes;
 	_traitHash = _traits.calculateHash();
 }
 
-void ZoombiniState::setDefaultAnimation(const ZoombiniAnimation *animation, int cellIndex) {
+void ZoombiniRunner::setDefaultAnimation(const ZoombiniAnimation *animation, int cellIndex) {
 	_activeAnimation = animation;
 	_savedAnimation = animation;
 	_animationCell = cellIndex;
@@ -624,10 +864,17 @@ void ZoombiniState::setDefaultAnimation(const ZoombiniAnimation *animation, int 
 	_animationActive = false;
 	_idleAnimationEnabled = true;
 	_tracksMovementDirection = false;
+	_animationAdvancePending = false;
+	_bypassAnimationCompletionWork = false;
 	updateSpriteSize();
 }
 
-void ZoombiniState::setPosition(const Common::Point32 &pos) {
+void ZoombiniRunner::setActiveAnimation(const ZoombiniAnimation *animation) {
+	_activeAnimation = animation;
+	updateSpriteSize();
+}
+
+void ZoombiniRunner::setPosition(const Common::Point32 &pos) {
 	if (_screenPos == pos)
 		return;
 
@@ -655,34 +902,32 @@ void ZoombiniState::setPosition(const Common::Point32 &pos) {
 	updateSpriteSize();
 }
 
-void ZoombiniState::startMovement(PathObject *path, uint32 tickCount) {
+void ZoombiniRunner::startMovement(PathObject *path, uint32 tickCount) {
 	clearMovement();
 	_movementPath = path;
 	if (_movementPath)
 		_movementPath->start(tickCount);
 }
 
-bool ZoombiniState::advanceMovement(uint32 tickCount, const Common::Point32 &spriteOffset, bool hideAtEnd) {
+bool ZoombiniRunner::advanceMovement(uint32 tickCount, const Common::Point32 &spriteOffset) {
 	if (!_movementPath)
 		return false;
 
-	Common::Point32 pathPos;
+	Common::Point32 pathPos = _movementPath->currentSegment < static_cast<int>(_movementPath->segments.size())
+								  ? _movementPath->segments[_movementPath->currentSegment]->getPosition()
+								  : _movementPath->endPos;
 	const bool active = _movementPath->advance(tickCount, pathPos);
 	setPosition(Common::Point32(pathPos.x - spriteOffset.x, pathPos.y - spriteOffset.y));
-	if (!active) {
-		clearMovement();
-		_hidden = hideAtEnd;
-	}
 	return active;
 }
 
-void ZoombiniState::clearMovement() {
+void ZoombiniRunner::clearMovement() {
 	delete _movementPath;
 	_movementPath = nullptr;
 }
 
-void ZoombiniState::startAnimation(const ZoombiniAnimation *animation, int cellIndex, uint32 tickCount, uint32 frameDelay, bool loop,
-								   AnimationCompleteCallback callback) {
+void ZoombiniRunner::startAnimation(const ZoombiniAnimation *animation, int cellIndex, uint32 tickCount,
+									AnimationCompletionPolicy completionPolicy) {
 	_savedAnimation = _activeAnimation;
 	if (animation)
 		_activeAnimation = animation;
@@ -690,130 +935,282 @@ void ZoombiniState::startAnimation(const ZoombiniAnimation *animation, int cellI
 	_animationActive = true;
 	_animationCell = cellIndex;
 	_animationFrame = 1;
-	_animationFrameDelay = frameDelay;
-	_nextAnimationFrameTime = tickCount + frameDelay;
-	_animationLoops = loop;
-	_animationCompleteCallback = callback;
-	_preservePositionOnAnimationEnd = false;
+	_nextAnimationFrameTime = tickCount + (_activeAnimation ? _activeAnimation->getFrameDelay() : 0);
+	_stopAnimationOnCompletion = false;
 	_completionVerticalOffset = 0;
+	_animationAdvancePending = false;
+	_bypassAnimationCompletionWork = completionPolicy == AnimationCompletionPolicy::kBypassCallbackAndCorrection01;
 	updateSpriteSize();
 }
 
-void ZoombiniState::startDirectionTrackedAnimation(uint32 tickCount, uint32 frameDelay) {
-	_directionUpdateCooldown = 0;
-	_tracksMovementDirection = true;
-	startAnimation(nullptr, 33, tickCount, frameDelay, true);
+void ZoombiniRunner::setAnimationCompleteCallback(AnimationCompleteCallback callback, void *context) {
+	_animationCompleteCallback = callback;
+	_animationCompleteCallbackContext = context;
 }
 
-bool ZoombiniState::tryStartIdleAnimation(const ZoombiniAnimation *animation, Zoombini2Random &randomSrc, uint32 tickCount, uint32 frameDelay) {
-	if (!animation || !_idleAnimationEnabled || _animationActive || _movementPath || _dragging)
+void ZoombiniRunner::startDirectionTrackedAnimation(uint32 tickCount) {
+	_directionUpdateCooldown = 0;
+	_tracksMovementDirection = true;
+	startAnimation(nullptr, 33, tickCount);
+}
+
+bool ZoombiniRunner::tryStartIdleAnimation(const ZoombiniAnimation *animation, Random &randomSrc, uint32 tickCount) {
+	if (!animation || _hidden || !_idleAnimationEnabled || _animationActive || _movementPath || _dragging)
 		return false;
 	if (randomSrc.getRandomNumber(249) != 1)
 		return false;
-	startAnimation(animation, 33, tickCount, frameDelay);
+	startAnimation(animation, 33, tickCount, AnimationCompletionPolicy::kBypassCallbackAndCorrection01);
 	return true;
 }
 
-void ZoombiniState::resetAnimation() {
+void ZoombiniRunner::resetAnimation() {
 	_animationActive = false;
 	_animationCell = 33;
-	_animationFrame = 0;
 	_idleAnimationEnabled = true;
 	if (_savedAnimation)
 		_activeAnimation = _savedAnimation;
 	_savedAnimation = _activeAnimation;
 	_nextAnimationFrameTime = 0;
-	_animationLoops = false;
-	_animationFrameDelay = 0;
-	_animationCompleteCallback = nullptr;
 	_tracksMovementDirection = false;
-	_preservePositionOnAnimationEnd = false;
+	_stopAnimationOnCompletion = false;
 	_completionVerticalOffset = 0;
+	_animationAdvancePending = false;
+	_bypassAnimationCompletionWork = false;
 	updateSpriteSize();
 }
 
-void ZoombiniState::updateAnimation(uint32 tickCount) {
-	if (!_animationActive || !_activeAnimation || _animationFrameDelay == 0)
+void ZoombiniRunner::updateAnimation(uint32 tickCount) {
+	if (_hidden || _animationAdvancePending)
+		return;
+	if ((!_animationActive && !_movementPath) || !_activeAnimation)
 		return;
 
 	if (_nextAnimationFrameTime < tickCount) {
-		_animationFrame += 1;
-		_nextAnimationFrameTime = tickCount + _animationFrameDelay;
-		const int entry = _animationCell * ZoombiniAnimation::kDim1 * ZoombiniAnimation::kDim2;
-		const int frameCount = _activeAnimation->getFrameCount(entry);
-		if (frameCount <= _animationFrame && _animationLoops && 1 < frameCount) {
-			_animationFrame = 1;
-		} else if (frameCount <= _animationFrame) {
-			AnimationCompleteCallback callback = _animationCompleteCallback;
-			if (!_preservePositionOnAnimationEnd) {
-				_screenPos.y -= _completionVerticalOffset;
-				_previousScreenPos.y = _screenPos.y;
-			}
-			resetAnimation();
-			if (callback)
-				callback(this);
-		}
+		_nextAnimationFrameTime = tickCount + _activeAnimation->getFrameDelay();
+		_animationAdvancePending = true;
 	}
 	updateSpriteSize();
 }
 
-bool ZoombiniState::hitTest(const Common::Point32 &point) const {
+void ZoombiniRunner::advanceAnimationAfterDraw() {
+	if (_animationAdvancePending)
+		commitAnimationAdvance();
+}
+
+void ZoombiniRunner::commitAnimationAdvance() {
+	_animationAdvancePending = false;
+	if (!_animationActive && !_movementPath)
+		return;
+
+	_animationFrame += 1;
+	if (_animationFrame < kAnimationCompletionFrame) {
+		updateSpriteSize();
+		return;
+	}
+
+	if (_bypassAnimationCompletionWork) {
+		resetAnimation();
+		return;
+	}
+
+	if (_animationCompleteCallback) {
+		AnimationCompleteCallback callback = _animationCompleteCallback;
+		void *callbackContext = _animationCompleteCallbackContext;
+		_animationCompleteCallback = nullptr;
+		_animationCompleteCallbackContext = nullptr;
+		resetAnimation();
+		callback(callbackContext, this);
+		return;
+	}
+
+	if (_stopAnimationOnCompletion) {
+		resetAnimation();
+		return;
+	}
+
+	_screenPos.y -= _completionVerticalOffset;
+	_previousScreenPos.y = _screenPos.y;
+	_animationFrame = 1;
+	_completionVerticalOffset = 0;
+	updateSpriteSize();
+}
+
+bool ZoombiniRunner::hitTest(const Common::Point32 &point) const {
 	return _screenPos.x + 13 < point.x && point.x < _screenPos.x + 44 &&
 		   _screenPos.y + 11 < point.y && point.y < _screenPos.y + 42;
 }
 
-bool ZoombiniState::beginDrag(const Common::Point32 &pointerPos, const ZoombiniAnimation *pickupAnimation, uint32 tickCount, uint32 frameDelay) {
-	const Common::Point32 adjustedHitPoint(pointerPos.x + 2, pointerPos.y - 3);
-	if (!_inputEnabled || _dragging || !hitTest(adjustedHitPoint))
+bool ZoombiniRunner::beginDrag(const Common::Point32 &pointerPos, const ZoombiniAnimation *pickupAnimation, uint32 tickCount) {
+	if (!canBeginDrag(pointerPos))
 		return false;
+	startDrag(pointerPos, pickupAnimation, tickCount);
+	return true;
+}
+
+bool ZoombiniRunner::canBeginDrag(const Common::Point32 &pointerPos) const {
+	const Common::Point32 adjustedHitPoint(pointerPos.x + 2, pointerPos.y - 3);
+	return _inputEnabled && !_dragging && hitTest(adjustedHitPoint);
+}
+
+void ZoombiniRunner::startDrag(const Common::Point32 &pointerPos, const ZoombiniAnimation *pickupAnimation, uint32 tickCount) {
 	_dragging = true;
 	_dragOrigin = _screenPos;
 	_dragOffset = Common::Point32(pointerPos.x - _screenPos.x - 3, pointerPos.y - _screenPos.y - 10);
 	setPosition(Common::Point32(pointerPos.x - 3, pointerPos.y - 10));
 	resetAnimation();
-	startAnimation(pickupAnimation, 33, tickCount, frameDelay, true);
-	return true;
+	startAnimation(pickupAnimation, 33, tickCount);
 }
 
-void ZoombiniState::updateDrag(const Common::Point32 &pointerPos) {
+void ZoombiniRunner::updateDrag(const Common::Point32 &pointerPos) {
 	if (!_dragging)
 		return;
 	setPosition(Common::Point32(pointerPos.x - 3, pointerPos.y - 10));
 }
 
-void ZoombiniState::endDrag(const Common::Point32 *dropPos) {
+void ZoombiniRunner::endDrag(bool applyGrabOffset) {
 	if (!_dragging)
 		return;
-	const Common::Point32 settledPos = dropPos ? *dropPos : getDrawPosition();
 	_dragging = false;
-	setPosition(settledPos);
+	if (applyGrabOffset) {
+		_screenPos.x -= _dragOffset.x;
+		_screenPos.y -= _dragOffset.y;
+	}
 	_overDropTarget = false;
 	_hoveredDropTargetIndex = -1;
 	resetAnimation();
 }
 
-Common::Point32 ZoombiniState::getDrawPosition() const {
-	if (!_dragging)
-		return _screenPos;
-	return Common::Point32(_screenPos.x - _dragOffset.x, _screenPos.y - _dragOffset.y);
+bool ZoombiniRunner::isStrictlyInside(const Common::Point32 &point, const Common::Rect32 &rect) {
+	return rect.left < point.x && point.x < rect.right && rect.top < point.y && point.y < rect.bottom;
 }
 
-void ZoombiniState::draw(Graphics::ManagedSurface *screen, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip) const {
+int ZoombiniRunner::findHoveredDropTarget(const ZoombiniRunner &zoombini, const Common::Point32 &pointerPos,
+										  const Common::Array<ZoombiniDropTarget> &targets) {
+	const Common::Point32 footPoint(pointerPos.x - zoombini._dragOffset.x + 17, pointerPos.y - zoombini._dragOffset.y + 46);
+	int targetIndex = -1;
+	for (uint i = 0; i < targets.size(); i++) {
+		if (!targets[i].occupied && isStrictlyInside(footPoint, targets[i].rect))
+			targetIndex = static_cast<int>(i);
+	}
+	return targetIndex;
+}
+
+int ZoombiniRunner::findReleaseDropTarget(const ZoombiniRunner &zoombini, const Common::Point32 &pointerPos,
+										  const Common::Array<ZoombiniDropTarget> &targets, int scrollX, int backgroundWidth) {
+	Common::Point32 footPoint(pointerPos.x - zoombini._dragOffset.x + 17, pointerPos.y - zoombini._dragOffset.y + 46);
+	if (backgroundWidth != AnimationRunner::kDefaultBackgroundWidth) {
+		footPoint.x += scrollX;
+		if (backgroundWidth <= footPoint.x)
+			footPoint.x -= backgroundWidth;
+	}
+
+	for (uint i = 0; i < targets.size(); i++) {
+		if (!targets[i].occupied && isStrictlyInside(footPoint, targets[i].rect))
+			return static_cast<int>(i);
+	}
+	return -1;
+}
+
+ZoombiniInputResult ZoombiniRunner::handlePointerInput(const Common::Array<ZoombiniRunner *> &zoombinis, const Common::Point32 &pointerPos,
+													   bool clickReleased, const ZoombiniAnimation *pickupAnimation, uint32 tickCount,
+													   Common::Array<ZoombiniDropTarget> *dropTargets, const AreaMask *areaMask,
+													   int scrollX, int backgroundWidth) {
+	ZoombiniRunner *dragged = nullptr;
+	int draggedIndex = -1;
+	for (uint i = 0; i < zoombinis.size(); i++) {
+		if (zoombinis[i] && zoombinis[i]->_dragging) {
+			if (!dragged) {
+				dragged = zoombinis[i];
+				draggedIndex = static_cast<int>(i);
+			}
+		} else if (zoombinis[i]) {
+			zoombinis[i]->_overDropTarget = false;
+			zoombinis[i]->_hoveredDropTargetIndex = -1;
+		}
+	}
+
+	if (dragged) {
+		dragged->updateDrag(pointerPos);
+		dragged->_overDropTarget = false;
+		dragged->_hoveredDropTargetIndex = -1;
+		if (dropTargets) {
+			dragged->_hoveredDropTargetIndex = findHoveredDropTarget(*dragged, pointerPos, *dropTargets);
+			dragged->_overDropTarget = dragged->_hoveredDropTargetIndex != -1;
+		}
+
+		if (!clickReleased)
+			return ZoombiniInputResult::kStillHeld04;
+		const int targetIndex = dropTargets ? findReleaseDropTarget(*dragged, pointerPos, *dropTargets, scrollX, backgroundWidth) : -1;
+		if (dropTargets && targetIndex != -1) {
+			ZoombiniDropTarget &target = (*dropTargets)[targetIndex];
+			dragged->endDrag(false);
+			target.occupied = true;
+			target.zoombiniIndex = draggedIndex;
+			if (target.callback)
+				target.callback(target.callbackContext, targetIndex, draggedIndex);
+			return ZoombiniInputResult::kDroppedOnTarget02;
+		}
+		if (areaMask && areaMask->hasMarkedByteAt(Common::Point32(pointerPos.x, pointerPos.y))) {
+			dragged->endDrag(true);
+			return ZoombiniInputResult::kDroppedOnArea03;
+		}
+		return ZoombiniInputResult::kStillHeld04;
+	}
+
+	if (!clickReleased)
+		return ZoombiniInputResult::kIgnored00;
+	for (uint i = 0; i < zoombinis.size(); i++) {
+		ZoombiniRunner *zoombini = zoombinis[i];
+		if (!zoombini || !zoombini->canBeginDrag(pointerPos))
+			continue;
+		if (dropTargets) {
+			for (uint targetIndex = 0; targetIndex < dropTargets->size(); targetIndex++) {
+				ZoombiniDropTarget &target = (*dropTargets)[targetIndex];
+				if (!target.occupied || target.zoombiniIndex != static_cast<int>(i))
+					continue;
+				target.occupied = false;
+				if (target.callback)
+					target.callback(target.callbackContext, static_cast<int>(targetIndex), static_cast<int>(i));
+			}
+		}
+		zoombini->startDrag(pointerPos, pickupAnimation, tickCount);
+		return ZoombiniInputResult::kPickedUp01;
+	}
+	return ZoombiniInputResult::kIgnored00;
+}
+
+Common::Point32 ZoombiniRunner::getDrawPosition(int scrollX, int backgroundWidth) const {
+	if (_dragging)
+		return Common::Point32(_screenPos.x - _dragOffset.x, _screenPos.y - _dragOffset.y);
+	if (backgroundWidth == kUnscrolledBackgroundWidth || backgroundWidth == AnimationRunner::kDefaultBackgroundWidth)
+		return _screenPos;
+
+	Common::Point32 drawPos(_screenPos.x - scrollX, _screenPos.y);
+	if (backgroundWidth - AnimationRunner::kDefaultBackgroundWidth < scrollX)
+		drawPos.x += backgroundWidth;
+	return drawPos;
+}
+
+void ZoombiniRunner::draw(Graphics::ManagedSurface *screen, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip,
+						  int scrollX, int backgroundWidth, const RleBlock *dropTargetIndicator) const {
 	if (!screen || !_activeAnimation || _hidden)
 		return;
-	const Common::Rect32 spriteRect = getSpriteRect();
+	const Common::Rect32 spriteRect = getSpriteRect(scrollX, backgroundWidth);
 	if (spriteRect.right <= 0 || spriteRect.bottom <= 0 || screen->w <= spriteRect.left || screen->h <= spriteRect.top)
 		return;
+	const Common::Point32 drawPos = getDrawPosition(scrollX, backgroundWidth);
+	if (_dragging && _hoveredDropTargetIndex != -1 && dropTargetIndicator)
+		dropTargetIndicator->drawToScreen(screen, drawPos, alphaLUT);
 	const int frame = _animationActive ? _animationFrame : 0;
-	_activeAnimation->drawZoombini(screen, _traits, getDrawPosition(), _animationCell, frame, alphaLUT, clip);
+	_activeAnimation->drawZoombini(screen, _traits, drawPos, _animationCell, frame, alphaLUT, clip);
 }
 
-Common::Rect32 ZoombiniState::getSpriteRect() const {
-	const Common::Point32 pos = getDrawPosition();
+Common::Rect32 ZoombiniRunner::getSpriteRect(int scrollX, int backgroundWidth) const {
+	const Common::Point32 pos = getDrawPosition(scrollX, backgroundWidth);
 	return Common::Rect32(pos.x, pos.y, pos.x + _spriteSize.x, pos.y + _spriteSize.y);
 }
 
-void ZoombiniState::updateSpriteSize() {
+void ZoombiniRunner::updateSpriteSize() {
 	_spriteSize = _activeAnimation ? _activeAnimation->getSpriteSize(_animationCell, _animationActive ? _animationFrame : 0) : Common::Point();
 }
 

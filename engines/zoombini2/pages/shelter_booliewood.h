@@ -33,7 +33,7 @@ class BitBlock;
 class PathObject;
 class RleBlock;
 class ZoombiniAnimation;
-class ZoombiniState;
+class ZoombiniRunner;
 
 /** 
  * Booliewood - In its normal state
@@ -56,9 +56,10 @@ public:
 	void onUpdate() override;
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 	/** Draw the current cyclic viewport of the Booliewood panorama. */
-	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderContent(ManagedSurface32 *screen) override;
 	void onRenderBackground(ManagedSurface32 *screen) override;
 	void onRenderActors(ManagedSurface32 *screen) override;
+	void onActorsRendered() override;
 	void onRenderForeground(ManagedSurface32 *screen) override;
 	/** Report that Booliewood has no forward Go action. */
 	bool hasGoButton() const override { return false; }
@@ -75,7 +76,7 @@ private:
 	/** Number of randomized Booliewood crowd clips. */
 	static const int kAmbientSpeechCount = 6;
 	/** Width of the cyclic panorama in pixels. */
-	static const int kSceneWidth = 4000;
+	static const int kPanoramaWidth = 4000;
 	/** Little-Zoombini cell used by seated community members. */
 	static const int kSeatedZoombiniCell = 33;
 
@@ -135,7 +136,7 @@ private:
 	/** Seat incoming and historical Zoombinis from the active profile. */
 	void buildSeatedCommunity(uint32 now);
 	/** Reconstruct one historical Zoombini from @p traitHash. */
-	static ZoombiniState *createHistoricalZoombini(int32 traitHash);
+	static ZoombiniRunner *createHistoricalZoombini(int32 traitHash);
 	/** Advance the looping attenteZomb frames assigned to historical Zoombinis. */
 	void updateSeatedAnimations(uint32 now);
 
@@ -163,9 +164,9 @@ private:
 	/** Draw the cyclic background window at the current scroll offset. */
 	void drawBackground(ManagedSurface32 *screen) const;
 	/** Draw one animation frame at a cyclic scene-space position. */
-	void drawAnimationInScene(const Animation *animation, int frameIndex, const Common::Point32 &pos, ManagedSurface32 *screen) const;
+	void drawAnimationInPanorama(const Animation *animation, int frameIndex, const Common::Point32 &pos, ManagedSurface32 *screen) const;
 	/** Draw one RLE marker at a cyclic scene-space position. */
-	void drawRleInScene(const RleBlock *frame, const Common::Point32 &pos, ManagedSurface32 *screen) const;
+	void drawRleInPanorama(const RleBlock *frame, const Common::Point32 &pos, ManagedSurface32 *screen) const;
 	/** Draw the stage-gated attractions. */
 	void drawAttractions(ManagedSurface32 *screen) const;
 	/** Draw the rescued-total marker crowd. */
@@ -175,7 +176,7 @@ private:
 	/** Draw all waiting and walking decorative Boolies. */
 	void drawCrowdActors(ManagedSurface32 *screen) const;
 	/** Draw one Little-Zoombini state from @p animation at a cyclic scene position. */
-	void drawZoombiniInScene(const ZoombiniState &zoombini, const ZoombiniAnimation *animation, int cell, int animationFrame,
+	void drawZoombiniInPanorama(const ZoombiniRunner &zoombini, const ZoombiniAnimation *animation, int cell, int animationFrame,
 							 const Common::Point32 &pos, ManagedSurface32 *screen) const;
 
 	/** Current horizontal origin within the cyclic panorama. */

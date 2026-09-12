@@ -185,8 +185,7 @@ void PuzzleCrazyTurtle::loadResources() {
 }
 
 void PuzzleCrazyTurtle::generateRules() {
-	Zoombini2Random *randomSrc = _vm->getRandom();
-	_primaryFeature = randomSrc->getRandomNumber(kFeatureCount - 1);
+	_primaryFeature = _vm->_rnd->getRandomNumber(kFeatureCount - 1);
 	int remainingFeatures[kFeatureCount - 1];
 	int remainingCount = 0;
 	for (int feature = 0; feature < kFeatureCount; feature++) {
@@ -195,7 +194,7 @@ void PuzzleCrazyTurtle::generateRules() {
 			remainingCount += 1;
 		}
 	}
-	_secondaryFeature = remainingFeatures[randomSrc->getRandomNumber(remainingCount - 1)];
+	_secondaryFeature = remainingFeatures[_vm->_rnd->getRandomNumber(remainingCount - 1)];
 
 	for (int group = 0; group < kRuleGroupCount; group++)
 		generateFeatureOrder(group);
@@ -209,7 +208,7 @@ void PuzzleCrazyTurtle::generateRules() {
 			_primaryRuleActive[slot] = true;
 		break;
 	case 2: {
-		const int visibleRuleCount = randomSrc->getRandomNumber(1) + 1;
+		const int visibleRuleCount = _vm->_rnd->getRandomNumber(1) + 1;
 		_remainingMistakes = visibleRuleCount == 1 ? 5 : 4;
 		activateRandomRuleSlots(_primaryRuleActive, visibleRuleCount);
 		break;
@@ -231,9 +230,8 @@ void PuzzleCrazyTurtle::generateRules() {
 void PuzzleCrazyTurtle::generateFeatureOrder(int group) {
 	int values[kFeatureValueCount] = {1, 2, 3, 4, 5};
 	int remainingCount = kFeatureValueCount;
-	Zoombini2Random *randomSrc = _vm->getRandom();
 	for (int slot = 0; slot < kRuleSlotCount; slot++) {
-		const int selected = randomSrc->getRandomNumber(remainingCount - 1);
+		const int selected = _vm->_rnd->getRandomNumber(remainingCount - 1);
 		_ruleValues[group][slot] = values[selected];
 		for (int value = selected; value + 1 < remainingCount; value++)
 			values[value] = values[value + 1];
@@ -244,9 +242,8 @@ void PuzzleCrazyTurtle::generateFeatureOrder(int group) {
 void PuzzleCrazyTurtle::activateRandomRuleSlots(bool *slots, int count) {
 	int available[kRuleSlotCount] = {0, 1, 2, 3, 4};
 	int availableCount = kRuleSlotCount;
-	Zoombini2Random *randomSrc = _vm->getRandom();
 	for (int selectedCount = 0; selectedCount < count; selectedCount++) {
-		const int selected = randomSrc->getRandomNumber(availableCount - 1);
+		const int selected = _vm->_rnd->getRandomNumber(availableCount - 1);
 		slots[available[selected]] = true;
 		for (int slot = selected; slot + 1 < availableCount; slot++)
 			available[slot] = available[slot + 1];
@@ -257,7 +254,7 @@ void PuzzleCrazyTurtle::activateRandomRuleSlots(bool *slots, int count) {
 void PuzzleCrazyTurtle::placeZoombinis() {
 	const uint count = MIN(static_cast<uint>(kZoombiniCount), _puzzleZoombinis.size());
 	for (uint index = 0; index < count; index++) {
-		ZoombiniState *zoombini = _puzzleZoombinis[index];
+		ZoombiniRunner *zoombini = _puzzleZoombinis[index];
 		zoombini->setPosition(kZoombiniPos[index]);
 		zoombini->setDefaultAnimation(_zoombiniAnimation, 66);
 		zoombini->_inputEnabled = true;
@@ -271,11 +268,10 @@ void PuzzleCrazyTurtle::onUpdate() {
 }
 
 void PuzzleCrazyTurtle::onRenderBackground(ManagedSurface32 *screen) {
-	if (_background)
-		_background->drawToSurface(screen, Common::Point32(0, 0));
+	drawPrimaryPageLayer(screen);
 }
 
-void PuzzleCrazyTurtle::onRenderScene(ManagedSurface32 *screen) {
+void PuzzleCrazyTurtle::onRenderContent(ManagedSurface32 *screen) {
 	drawBridgeState(screen);
 	drawMother(screen);
 	drawTurtles(screen);

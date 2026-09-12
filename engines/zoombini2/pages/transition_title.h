@@ -41,7 +41,7 @@ public:
 	/** Request the sign-in page after input or timeout. */
 	void onUpdate() override;
 	/** Draw the title background. */
-	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderContent(ManagedSurface32 *screen) override;
 	/** Mark the title screen as dismissed by the player. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;

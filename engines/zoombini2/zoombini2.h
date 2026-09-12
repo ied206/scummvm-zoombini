@@ -52,26 +52,7 @@ class RleBlock;
 class SoundManager;
 class Sidebar;
 class ZoombiniAnimation;
-class ZoombiniState;
-
-/** Width of the fixed internal game screen. */
-const int kScreenWidth = 800;
-
-/** Height of the fixed internal game screen. */
-const int kScreenHeight = 600;
-
-/** Target configuration key enabling the developer hotkeys. */
-extern const char *const kConfigDebugHotkeys;
-/** Target configuration key selecting stereo game-audio streams. */
-extern const char *const kConfigStereoOutput;
-/** Target configuration key selecting the alternate level-one Waterslide pairing. */
-extern const char *const kConfigGreedyWaterslidePairing;
-/** Target configuration key selecting the once-per-frame gameplay clock snapshot. */
-extern const char *const kConfigCachedFrameTime;
-/** Target configuration key selecting floating-point Bezier path calculations. */
-extern const char *const kConfigUseFloatingPointPaths;
-/** Target configuration key selecting the original Windows random-number generator. */
-extern const char *const kConfigOriginalPRNG;
+class ZoombiniRunner;
 
 /** Numeric page identifiers accepted by the engine dispatcher. */
 enum PageId {
@@ -150,8 +131,6 @@ public:
 	/** Detected release descriptor retained for the engine lifetime. */
 	const Zoombini2GameDescription *_gameDescription;
 
-	/** Return the gameplay random generator for this game instance. */
-	Zoombini2Random *getRandom() { return _rnd; }
 	/** Apply the v1.0 release-family puzzle-generation reseed from the current gameplay tick. */
 	void reseedRandomForV10();
 	/** Return the most recently processed game-space mouse position. */
@@ -199,8 +178,8 @@ public:
 	BitBlock *loadBitBlock(const Common::String &path);
 	/** Load an RLE block through the engine resource resolver. */
 	RleBlock *loadRleBlock(const Common::String &path);
-	/** Load or return an immutable Zoombini animation set cached by this game instance. */
-	const ZoombiniAnimation *loadZoombiniAnimation(const Common::Path &path);
+	/** Load or return a shared Zoombini sprite grid and select its page-configured frame delay. */
+	const ZoombiniAnimation *loadZoombiniAnimation(const Common::Path &path, uint32 frameDelay);
 	/** Open an original logical resource name through the engine's CD/installed-root resolver. */
 	Common::SeekableReadStream *openResourceFile(const Common::String &path) const;
 	/** Return whether @p path resolves through the engine's CD/installed-root resolver. */
@@ -221,7 +200,7 @@ public:
 	void clearGlobalZoombinis();
 
 	/** Party entries retained for active gameplay outside @ref GameState. */
-	Common::Array<ZoombiniState *> _globalZoombinis;
+	Common::Array<ZoombiniRunner *> _globalZoombinis;
 
 	/** Request that the main loop replace the active page with @p pageId. */
 	void requestPageChange(int pageId) { _nextPageId = pageId; }
@@ -236,6 +215,9 @@ public:
 
 	/** Return elapsed gameplay milliseconds with accumulated pause time removed. */
 	uint32 getGameTickCount() const;
+
+	/** Gameplay random generator for this game instance. */
+	Random *_rnd;
 
 	/** Whether the next puzzle entry restores the profile's party. */
 	bool _returningFromPuzzle = false;
@@ -281,8 +263,6 @@ private:
 	/** Return the unique child directory whose name matches @p name without case. */
 	static Common::FSNode findChildDirectoryIgnoreCase(const Common::FSNode &directory, const char *name);
 
-	/** Gameplay random generator for this game instance. */
-	Zoombini2Random *_rnd;
 	/** Original logical resource-name resolver for the CD and installed roots. */
 	ResourceFileResolver *_resourceFileResolver = nullptr;
 	/** Fixed-size drawing surface for this game instance. */

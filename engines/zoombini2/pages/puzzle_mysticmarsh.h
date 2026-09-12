@@ -51,7 +51,7 @@ public:
 	/** Draw the grid, launch slots, and Zoombinis. */
 	void onRenderBackground(ManagedSurface32 *screen) override;
 	/** Draw the grid behind active actors. */
-	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderContent(ManagedSurface32 *screen) override;
 	/** Launch the next Zoombini from the selected entrance. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 
