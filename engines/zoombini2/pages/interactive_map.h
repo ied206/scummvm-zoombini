@@ -64,7 +64,7 @@ public:
 	/** Update icon, legend, button, and volume-panel hover state. */
 	void onUpdate() override;
 	/** Draw the map, route progress, statistics, and owned volume panel. */
-	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderContent(ManagedSurface32 *screen) override;
 	void onRenderForeground(ManagedSurface32 *screen) override;
 	/** Dispatch a click to a map icon, control, legend tab, or volume panel. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;

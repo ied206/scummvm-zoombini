@@ -37,7 +37,7 @@ namespace Zoombini2 {
  * The "original_prng" configuration option selects this compatibility stream
  * or ScummVM's default @ref Common::RandomSource stream at construction time.
  */
-class Zoombini2Random {
+class Random {
 private:
 	/** Complete unsigned 32-bit MSVC 6.0 CRT linear-congruential state. */
 	uint32 _randState = 0;
@@ -47,23 +47,23 @@ private:
 	bool _useOriginal;
 
 	/** Advance the compatibility state and return an inclusive value from zero through @p max, including when @p max is zero. */
-	int getOriginalRandomNumber(int max);
+	int32 getOriginalRandomNumber(int32 max);
 
 public:
 	/** Construct the shared game stream and select its algorithm from "original_prng". */
-	explicit Zoombini2Random(const Common::String &name);
-	/** Construct an independent deterministic stream from @p seed using the configured algorithm. */
-	explicit Zoombini2Random(uint32 seed);
+	explicit Random(const Common::String &name);
 
 	/** Seed both backing streams. The compatibility stream preserves zero exactly. */
 	void setSeed(uint32 seed);
 	/** Return the current state of the selected stream. */
 	uint32 getSeed() const { return _useOriginal ? _randState : _scummRnd.getSeed(); }
+	/** Generates new seed based on the current date/time */
+	static uint32 generateNewSeed();
 
 	/** Advance the stream and return an inclusive value in the range zero through @p max. */
-	int getRandomNumber(int max);
+	int32 getRandomNumber(int32 max);
 	/** Advance the stream and return an inclusive signed value in the range @p min through @p max. */
-	int getRandomNumberRng(int min, int max);
+	int32 getRandomNumberRng(int32 min, int32 max);
 };
 
 } // End of namespace Zoombini2

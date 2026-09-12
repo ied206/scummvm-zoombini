@@ -520,11 +520,10 @@ void PuzzleBoolies::onUpdate() {
 }
 
 void PuzzleBoolies::onRenderBackground(ManagedSurface32 *screen) {
-	if (_background)
-		_background->drawToSurface(screen, Common::Point32(0, 0));
+	drawPrimaryPageLayer(screen);
 }
 
-void PuzzleBoolies::onRenderScene(ManagedSurface32 *screen) {
+void PuzzleBoolies::onRenderContent(ManagedSurface32 *screen) {
 
 	// Draw game elements
 	drawPins(screen);
@@ -652,7 +651,7 @@ void PuzzleBoolies::onRenderActors(ManagedSurface32 *screen) {
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
 		if (_puzzleZoombinis[i]->_puzzleStatus == 0) {
 			// This zoombini is free - draw on boat
-			const ZoombiniState *z = _puzzleZoombinis[i];
+			const ZoombiniRunner *z = _puzzleZoombinis[i];
 			Common::Point32 pos(_boatPos.x + 10 + (freeIdx % 4) * 18, _boatPos.y + 10 + (freeIdx / 4) * 20);
 
 			_zoombiniAnimation->drawZoombini(screen, z->_traits, pos, 0, 0, lut);

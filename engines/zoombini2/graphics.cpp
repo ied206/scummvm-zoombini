@@ -952,6 +952,61 @@ const RleBlock *Animation::getFrame(int index) const {
 }
 
 // ============================================================================
+// AreaMask
+// ============================================================================
+
+AreaMask::AreaMask(Zoombini2Engine *vm) : _vm(vm) {
+}
+
+bool AreaMask::loadFromFile(const Common::Path &path) {
+	Common::ScopedPtr<Common::SeekableReadStream> stream(_vm->openResourceFile(path.toString('/')));
+	if (!stream) {
+		warning("AreaMask: cannot open '%s'", path.toString().c_str());
+		return false;
+	}
+
+	Image::BitmapDecoder decoder;
+	if (!decoder.loadStream(*stream)) {
+		warning("AreaMask: failed to decode '%s'", path.toString().c_str());
+		return false;
+	}
+	const Graphics::Surface *surface = decoder.getSurface();
+	if (!surface || !surface->format.isCLUT8() || surface->w <= 0 || surface->h <= 0) {
+		warning("AreaMask: '%s' is not a valid indexed bitmap", path.toString().c_str());
+		return false;
+	}
+
+	const uint64 pixelCount = static_cast<uint64>(surface->w) * static_cast<uint64>(surface->h);
+	if (0xFFFFFFFFU < pixelCount) {
+		warning("AreaMask: dimensions are too large in '%s'", path.toString().c_str());
+		return false;
+	}
+
+	Common::Array<byte> pixels;
+	pixels.resize(static_cast<uint32>(pixelCount));
+	for (int row = 0; row < surface->h; row++)
+		memcpy(&pixels[row * surface->w], surface->getBasePtr(0, row), surface->w);
+
+	_width = surface->w;
+	_height = surface->h;
+	_pixels.swap(pixels);
+	return true;
+}
+
+bool AreaMask::hasMarkedByteAt(const Common::Point32 &point) const {
+	if (point.x <= 0 || point.y <= 0 || _width <= point.x || _height <= point.y || _pixels.empty())
+		return false;
+
+	const int byteStartX = point.x & ~7;
+	const int byteEndX = MIN(byteStartX + 8, _width);
+	for (int x = byteStartX; x < byteEndX; x++) {
+		if (_pixels[point.y * _width + x] != 0)
+			return true;
+	}
+	return false;
+}
+
+// ============================================================================
 // ZoombiniAnimation
 // ============================================================================
 
@@ -1606,7 +1661,6 @@ void VolumePanel::setInitialVolumes(int music, int sfx, int speech) {
 	_initialSfxVolume = _sfxVolume;
 	_initialSpeechVolume = _speechVolume;
 }
-
 
 VolumePanelResult VolumePanel::handleMouseInput(const Common::Point32 &mousePos, bool mouseDown, bool mouseReleased) {
 	Common::Point32 effectivePos = mousePos;

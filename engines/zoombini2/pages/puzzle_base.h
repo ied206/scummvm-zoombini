@@ -23,13 +23,14 @@
 #define ZOOMBINI2_PAGES_PUZZLE_BASE_H
 
 #include "common/array.h"
+#include "common/path.h"
 
 #include "zoombini2/pages/interactive_base.h"
 
 namespace Zoombini2 {
 
 class BitBlock;
-class ZoombiniState;
+class ZoombiniRunner;
 class ZoombiniAnimation;
 
 /**
@@ -54,16 +55,20 @@ public:
 	static const char *getPuzzleDir(int puzzleId);
 
 protected:
+	/** Replace the first page layer's background and refresh the borrowed compatibility pointer. */
+	bool loadPrimaryLayerBackground(const Common::Path &path);
+	/** Draw the first page layer and advance its general-object animation runners. */
+	void drawPrimaryPageLayer(ManagedSurface32 *screen);
 	/** Render active roster entries in stable ascending logical-Y order, with the held entry last. */
 	void renderZoombinis(ManagedSurface32 *screen) const;
 	/** Numeric dispatcher identifier for the concrete puzzle. */
 	int _puzzleId;
-	/** Shared full-screen puzzle background. */
+	/** Borrowed first-layer background exposed while puzzle drawing is migrated to page layers. */
 	BitBlock *_background = nullptr;
-	/** Borrowed immutable sprite grid owned by the engine cache. */
+	/** Borrowed immutable sprite grid retained by the engine cache. */
 	const ZoombiniAnimation *_zoombiniAnimation = nullptr;
 	/** Active party entries mirrored from the engine's roster for this puzzle. */
-	Common::Array<ZoombiniState *> _puzzleZoombinis;
+	Common::Array<ZoombiniRunner *> _puzzleZoombinis;
 	/** Gameplay deadline used by the concrete puzzle state machine. */
 	uint32 _stateTimer = 0;
 };

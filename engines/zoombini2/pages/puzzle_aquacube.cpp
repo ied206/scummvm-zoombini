@@ -283,8 +283,6 @@ void PuzzleAquacube::loadGraph() {
 void PuzzleAquacube::placeZoombinis() {
 	// Pick random vertices and build binary coordinates from their direction labels.
 	_vm->reseedRandomForV10();
-	Zoombini2Random *rnd = _vm->getRandom();
-
 	// Track which nodes are used for zoombinis
 	bool usedNodes[16];
 	memset(usedNodes, 0, sizeof(usedNodes));
@@ -299,7 +297,7 @@ void PuzzleAquacube::placeZoombinis() {
 		int nodeIdx;
 		int attempts = 50;
 		do {
-			nodeIdx = rnd->getRandomNumber(_numNodes - 1);
+			nodeIdx = _vm->_rnd->getRandomNumber(_numNodes - 1);
 			attempts--;
 		} while (attempts > 0 && usedNodes[nodeIdx]);
 
@@ -307,7 +305,7 @@ void PuzzleAquacube::placeZoombinis() {
 			break;
 
 		usedNodes[nodeIdx] = true;
-		dirChoices[z] = rnd->getRandomNumber(1); // 0 or 1
+		dirChoices[z] = _vm->_rnd->getRandomNumber(1); // 0 or 1
 
 		// Place zoombini at this node
 		GraphNode &node = _nodes[nodeIdx];
@@ -392,13 +390,12 @@ void PuzzleAquacube::placeFleens() {
 		}
 
 		// Place additional fleens at other high-value positions
-		Zoombini2Random *rnd = _vm->getRandom();
 		for (int f = 1; f < _numFleens && f < 3; f++) {
 			// Find another node that is empty (state=1) to place a fleen
 			int attempts = 50;
 			int nodeIdx;
 			do {
-				nodeIdx = rnd->getRandomNumber(_numNodes - 1);
+				nodeIdx = _vm->_rnd->getRandomNumber(_numNodes - 1);
 				attempts--;
 			} while (attempts > 0 && _nodes[nodeIdx].state != 1);
 
@@ -418,13 +415,12 @@ void PuzzleAquacube::placeBallStart() {
 	// Level 3: dirValues = (0,0,0,0)
 	// Level 4: random pattern, avoid fleens
 
-	Zoombini2Random *rnd = _vm->getRandom();
 	int startNode = -1;
 
 	if (_level == 1) {
 		startNode = findNodeByDirValues3(0, 0, 0);
 	} else if (_level == 2) {
-		int pattern = rnd->getRandomNumber(2);
+		int pattern = _vm->_rnd->getRandomNumber(2);
 		switch (pattern) {
 		case 0:
 			startNode = findNodeByDirValues3(0, 0, 1);
@@ -442,7 +438,7 @@ void PuzzleAquacube::placeBallStart() {
 		// Level 4: random empty node
 		int attempts = 50;
 		do {
-			startNode = rnd->getRandomNumber(_numNodes - 1);
+			startNode = _vm->_rnd->getRandomNumber(_numNodes - 1);
 			attempts--;
 		} while (attempts > 0 && _nodes[startNode].state == 3);
 	}
@@ -815,12 +811,10 @@ void PuzzleAquacube::onUpdate() {
 // ============================================================================
 
 void PuzzleAquacube::onRenderBackground(ManagedSurface32 *screen) {
-	// Draw background
-	if (_background)
-		_background->drawToSurface(screen, Common::Point32(0, 0));
+	drawPrimaryPageLayer(screen);
 }
 
-void PuzzleAquacube::onRenderScene(ManagedSurface32 *screen) {
+void PuzzleAquacube::onRenderContent(ManagedSurface32 *screen) {
 	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 
 	// Draw the three overlapping cube layers at their shared origin.
