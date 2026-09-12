@@ -56,7 +56,7 @@ private:
 	/** Restore the dock background. */
 	void onRenderBackground(ManagedSurface32 *screen) override;
 	/** Draw dock condition, rule hints, turtles, and mother. */
-	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderContent(ManagedSurface32 *screen) override;
 	/** Draw the party in common depth order. */
 	void onRenderActors(ManagedSurface32 *screen) override;
 	/** Turtle resource type and draw position. */

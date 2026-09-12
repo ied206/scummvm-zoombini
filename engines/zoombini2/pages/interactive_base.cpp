@@ -21,9 +21,9 @@
 
 #include "zoombini2/pages/interactive_base.h"
 #include "zoombini2/graphics.h"
-#include "zoombini2/scripts.h"
 #include "zoombini2/pages/dialog_help.h"
 #include "zoombini2/pages/dialog_msgbox.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
@@ -115,7 +115,7 @@ bool Sidebar::isPointStrictlyInside(const Common::Rect &rect, const Common::Poin
 
 bool Sidebar::isInButtonRegion(const Common::Point &pos) const {
 	return isPointStrictlyInside(_helpButtonRect, pos) || isPointStrictlyInside(_mapButtonRect, pos) ||
-		isPointStrictlyInside(_goButtonRect, pos);
+		   isPointStrictlyInside(_goButtonRect, pos);
 }
 
 void Sidebar::updateHoverState(const Common::Point &pos, bool inputAllowed) {
@@ -274,7 +274,7 @@ void Sidebar::onMapClick() {
 	const PageBase *page = _vm->getCurrentPage();
 	bool hasActive = false;
 	for (uint i = 0; i < _vm->_globalZoombinis.size(); i++) {
-		const ZoombiniState *zoombini = _vm->_globalZoombinis[i];
+		const ZoombiniRunner *zoombini = _vm->_globalZoombinis[i];
 		hasActive = hasActive || zoombini->_puzzleStatus == 1 || zoombini->_inputEnabled == 1;
 	}
 	if ((page && page->isShelter()) ||
@@ -303,7 +303,7 @@ void Sidebar::returnToMap() {
 
 void Sidebar::requestAbandonConfirmation() {
 	_vm->getMsgBoxDialog()->request(Common::Path("bmp/menu/Quit_panel_text_abandon"),
-		new Common::Callback<Sidebar, DialogMsgBoxButton>(this, &Sidebar::handleAbandonConfirmation));
+									new Common::Callback<Sidebar, DialogMsgBoxButton>(this, &Sidebar::handleAbandonConfirmation));
 }
 
 void Sidebar::handleAbandonConfirmation(DialogMsgBoxButton button) {

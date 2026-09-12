@@ -34,6 +34,7 @@
 #include "gui/widgets/scrollcontainer.h"
 
 #include "zoombini2/dialogs.h"
+#include "zoombini2/metaengine.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
 
@@ -493,23 +494,23 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 }
 
 void Zoombini2OptionsWidget::load() {
-	_debugHotkeysCheckbox->setState(ConfMan.getBool(kConfigDebugHotkeys, _domain));
-	_stereoOutputCheckbox->setState(ConfMan.getBool(kConfigStereoOutput, _domain));
-	_greedyWaterslideCheckbox->setState(ConfMan.getBool(kConfigGreedyWaterslidePairing, _domain));
-	_cachedFrameTimeCheckbox->setState(ConfMan.getBool(kConfigCachedFrameTime, _domain));
-	_originalPrngCheckbox->setState(ConfMan.getBool(kConfigOriginalPRNG, _domain));
-	_floatingPointPathsCheckbox->setState(ConfMan.getBool(kConfigUseFloatingPointPaths, _domain));
+	_debugHotkeysCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigDebugHotkeys, _domain));
+	_stereoOutputCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigStereoOutput, _domain));
+	_greedyWaterslideCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _domain));
+	_cachedFrameTimeCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigCachedFrameTime, _domain));
+	_originalPrngCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _domain));
+	_floatingPointPathsCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths, _domain));
 }
 
 bool Zoombini2OptionsWidget::save() {
-	const bool originalPrngChanged = ConfMan.getBool(kConfigOriginalPRNG, _domain) != _originalPrngCheckbox->getState();
+	const bool originalPrngChanged = ConfMan.getBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _domain) != _originalPrngCheckbox->getState();
 
-	ConfMan.setBool(kConfigDebugHotkeys, _debugHotkeysCheckbox->getState(), _domain);
-	ConfMan.setBool(kConfigStereoOutput, _stereoOutputCheckbox->getState(), _domain);
-	ConfMan.setBool(kConfigGreedyWaterslidePairing, _greedyWaterslideCheckbox->getState(), _domain);
-	ConfMan.setBool(kConfigCachedFrameTime, _cachedFrameTimeCheckbox->getState(), _domain);
-	ConfMan.setBool(kConfigOriginalPRNG, _originalPrngCheckbox->getState(), _domain);
-	ConfMan.setBool(kConfigUseFloatingPointPaths, _floatingPointPathsCheckbox->getState(), _domain);
+	ConfMan.setBool(::Zoombini2MetaEngine::kConfigDebugHotkeys, _debugHotkeysCheckbox->getState(), _domain);
+	ConfMan.setBool(::Zoombini2MetaEngine::kConfigStereoOutput, _stereoOutputCheckbox->getState(), _domain);
+	ConfMan.setBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _greedyWaterslideCheckbox->getState(), _domain);
+	ConfMan.setBool(::Zoombini2MetaEngine::kConfigCachedFrameTime, _cachedFrameTimeCheckbox->getState(), _domain);
+	ConfMan.setBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _originalPrngCheckbox->getState(), _domain);
+	ConfMan.setBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths, _floatingPointPathsCheckbox->getState(), _domain);
 	if (originalPrngChanged && g_engine) {
 		GUI::MessageDialog dialog(Common::U32String("The random number generator change will take effect after restarting the game."));
 		dialog.runModal();

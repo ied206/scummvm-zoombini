@@ -32,12 +32,13 @@
 namespace Zoombini2 {
 
 class AlphaBlendLUT;
+class AreaMask;
 class BitBlock;
 class Animation;
 class BitmapFont;
 class PathObject;
 class ZoombiniAnimation;
-class ZoombiniState;
+class ZoombiniRunner;
 
 /**
  * Zoombiniville is the starting shelter, where a party of 16 is assembled.
@@ -56,8 +57,9 @@ public:
 	/** Advance feature controls and active entrance paths. */
 	void onUpdate() override;
 	/** Draw the shelter, feature stations, and boarding party. */
-	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderContent(ManagedSurface32 *screen) override;
 	void onRenderActors(ManagedSurface32 *screen) override;
+	void onActorsRendered() override;
 	void onRenderForeground(ManagedSurface32 *screen) override;
 	/** Dispatch a click to a feature station or party action. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
@@ -71,6 +73,8 @@ public:
 private:
 	/** Starting-shelter background. */
 	BitBlock *_background = nullptr;
+	/** Decoded picker-area bitmap used to validate free-form drops. */
+	AreaMask *_areaMask = nullptr;
 
 	/** Feature selection controls indexed by feature and value. */
 	Animation *_featureButtons[ZmbTrait::kTraitCount][ZmbTrait::kTraitValueCount] = {};
@@ -81,13 +85,13 @@ private:
 	/** Control that starts the route when the party is full. */
 	Animation *_goButton = nullptr;
 
-	/** Borrowed immutable large-sprite grid owned by the engine cache. */
+	/** Borrowed immutable large-sprite grid retained in the engine cache. */
 	const ZoombiniAnimation *_bigZombAnimation = nullptr;
-	/** Borrowed immutable small-sprite grid owned by the engine cache. */
+	/** Borrowed immutable small-sprite grid retained in the engine cache. */
 	const ZoombiniAnimation *_littleZombAnimation = nullptr;
-	/** Borrowed immutable pickup-sprite grid owned by the engine cache. */
+	/** Borrowed immutable pickup-sprite grid retained in the engine cache. */
 	const ZoombiniAnimation *_pickupZombAnimation = nullptr;
-	/** Borrowed immutable random-idle sprite grid owned by the engine cache. */
+	/** Borrowed immutable random-idle sprite grid retained in the engine cache. */
 	const ZoombiniAnimation *_idleZombAnimation = nullptr;
 	/** Font used for the generated Zoombini name. */
 	BitmapFont *_nameFont = nullptr;
@@ -114,7 +118,7 @@ private:
 	Common::Rect32 _goRect = Common::Rect32();
 
 	/** Zoombini states assigned to departure slots. */
-	Common::Array<ZoombiniState *> _boardingZoombinis;
+	Common::Array<ZoombiniRunner *> _boardingZoombinis;
 
 	/** Shelter music handle. */
 	int _musicId = -1;
@@ -156,10 +160,12 @@ private:
 	static Common::Point32 getSlotPosition(uint index);
 	/** Draw one animation frame with the supplied alpha lookup table. */
 	static void drawAnimFrame(ManagedSurface32 *screen, const Animation *animation, int frameIndex, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT);
+	/** Build the stable-Y actor order and separate the dragged Zoombini drawn last. */
+	void buildBoardingZoombiniDrawOrder(Common::Array<uint> &order, ZoombiniRunner *&draggedZoombini) const;
 	/** Draw all Zoombinis currently in the boarding area. */
 	void drawBoardingZoombinis(ManagedSurface32 *screen) const;
 	/** Return the currently dragged boarding Zoombini, or nullptr. */
-	ZoombiniState *getDraggedZoombini() const;
+	ZoombiniRunner *getDraggedZoombini() const;
 };
 
 } // End of namespace Zoombini2

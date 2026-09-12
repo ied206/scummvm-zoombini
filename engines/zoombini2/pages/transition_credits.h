@@ -45,7 +45,7 @@ public:
 	/** Advance initial hold, vertical scrolling, and final hold. */
 	void onUpdate() override;
 	/** Redraw the credits only when their scroll position changes. */
-	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderContent(ManagedSurface32 *screen) override;
 	/** Finish the credits when the player clicks. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 

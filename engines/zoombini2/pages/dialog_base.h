@@ -42,7 +42,7 @@ public:
 	/** Close the dialog and restore any retained page state. */
 	virtual void close() = 0;
 	/** Draw the dialog over @p screen. */
-	virtual void onRenderScene(ManagedSurface32 *screen) override = 0;
+	virtual void onRenderContent(ManagedSurface32 *screen) override = 0;
 	/** Handle a game-space click while the modal blocks its underlying page. */
 	virtual EventHandleResult onLButtonDown(const Common::Point &pos) override = 0;
 	/** Update dialog hover state for @p pos. */
