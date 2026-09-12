@@ -145,10 +145,10 @@ void ShelterBooliewood::init() {
 		_background = nullptr;
 	}
 
-	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/littleZomb.anm"));
+	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/littleZomb.anm"), 50);
 	if (!_zoombiniAnimation)
 		warning("BooliewoodPage: Failed to load littleZomb.anm");
-	_walkingZoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/attente/attenteZomb.anm"));
+	_walkingZoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/attente/attenteZomb.anm"), 50);
 	if (!_walkingZoombiniAnimation)
 		warning("BooliewoodPage: Failed to load attenteZomb.anm");
 
@@ -209,13 +209,21 @@ void ShelterBooliewood::onRenderBackground(ManagedSurface32 *screen) {
 	drawBackground(screen);
 }
 
-void ShelterBooliewood::onRenderScene(ManagedSurface32 *screen) {
+void ShelterBooliewood::onRenderContent(ManagedSurface32 *screen) {
 	drawAttractions(screen);
 	drawRescuedCrowd(screen);
 }
 
 void ShelterBooliewood::onRenderActors(ManagedSurface32 *screen) {
 	drawSeatedCommunity(screen);
+}
+
+void ShelterBooliewood::onActorsRendered() {
+	int count = static_cast<int>(_vm->_globalZoombinis.size());
+	if (kMaximumVisibleZoombinis < count)
+		count = kMaximumVisibleZoombinis;
+	for (int i = 0; i < count; i++)
+		_vm->_globalZoombinis[i]->advanceAnimationAfterDraw();
 }
 
 void ShelterBooliewood::onRenderForeground(ManagedSurface32 *screen) {
@@ -241,8 +249,8 @@ bool ShelterBooliewood::assignSeat(Common::Point32 &pos) {
 
 	int successfulSwaps = 0;
 	while (successfulSwaps < 100) {
-		const int first = _vm->getRandom()->getRandomNumber(kNumSeats - 1);
-		const int second = _vm->getRandom()->getRandomNumber(kNumSeats - 1);
+		const int first = _vm->_rnd->getRandomNumber(kNumSeats - 1);
+		const int second = _vm->_rnd->getRandomNumber(kNumSeats - 1);
 		if (first == second)
 			continue;
 		const int temporary = order[first];
@@ -268,7 +276,7 @@ void ShelterBooliewood::buildSeatedCommunity(uint32 now) {
 	GameState *state = _vm->getGameState();
 	const int incomingCount = static_cast<int>(_vm->_globalZoombinis.size());
 	for (int i = 0; i < incomingCount; i++) {
-		ZoombiniState *zoombini = _vm->_globalZoombinis[i];
+		ZoombiniRunner *zoombini = _vm->_globalZoombinis[i];
 		Common::Point32 pos;
 		if (assignSeat(pos))
 			zoombini->setPosition(pos);
@@ -286,13 +294,13 @@ void ShelterBooliewood::buildSeatedCommunity(uint32 now) {
 		Common::Point32 pos;
 		if (!assignSeat(pos))
 			break;
-		ZoombiniState *zoombini = createHistoricalZoombini(state->_completedTraitHashes[i]);
+		ZoombiniRunner *zoombini = createHistoricalZoombini(state->_completedTraitHashes[i]);
 		zoombini->setPosition(pos);
 		zoombini->setDefaultAnimation(_zoombiniAnimation, kSeatedZoombiniCell);
 		zoombini->_inputEnabled = false;
 		_vm->_globalZoombinis.push_back(zoombini);
-		if (walkingQuota != 0 && _vm->getRandom()->getRandomNumber(1) != 0) {
-			zoombini->startAnimation(_walkingZoombiniAnimation, kSeatedZoombiniCell, now, 50, true);
+		if (walkingQuota != 0 && _vm->_rnd->getRandomNumber(1) != 0) {
+			zoombini->startAnimation(_walkingZoombiniAnimation, kSeatedZoombiniCell, now);
 			walkingQuota -= 1;
 		}
 	}
@@ -306,8 +314,8 @@ void ShelterBooliewood::updateSeatedAnimations(uint32 now) {
 		_vm->_globalZoombinis[i]->updateAnimation(now);
 }
 
-ZoombiniState *ShelterBooliewood::createHistoricalZoombini(int32 traitHash) {
-	ZoombiniState *zoombini = new ZoombiniState();
+ZoombiniRunner *ShelterBooliewood::createHistoricalZoombini(int32 traitHash) {
+	ZoombiniRunner *zoombini = new ZoombiniRunner();
 	zoombini->setTraits(ZmbTrait::fromHash(static_cast<uint16>(traitHash)));
 	return zoombini;
 }
@@ -394,7 +402,7 @@ void ShelterBooliewood::loadCrowdActors(uint32 now) {
 			actor.waitPos = Common::Point32();
 		}
 		actor.pos = actor.waitPos;
-		actor.nextWalkTime = now + _vm->getRandom()->getRandomNumber(3999);
+		actor.nextWalkTime = now + _vm->_rnd->getRandomNumber(3999);
 		actor.nextFrameTime = now + getWaitingFrameDelay(0);
 		actor.frame = 0;
 		actor.walking = false;
@@ -429,7 +437,7 @@ void ShelterBooliewood::updateCrowdActors(uint32 now) {
 				actor.pos = actor.waitPos;
 				actor.frame = 0;
 				actor.nextFrameTime = now + getWaitingFrameDelay(0);
-				actor.nextWalkTime = now + 1000 + _vm->getRandom()->getRandomNumber(3999);
+				actor.nextWalkTime = now + 1000 + _vm->_rnd->getRandomNumber(3999);
 			}
 		} else if (_waitingAnimation && actor.nextFrameTime <= now) {
 			actor.frame += 1;
@@ -467,20 +475,20 @@ void ShelterBooliewood::updateScroll() {
 	}
 	_scrollX += delta;
 	while (_scrollX < 0)
-		_scrollX += kSceneWidth;
-	while (kSceneWidth <= _scrollX)
-		_scrollX -= kSceneWidth;
+		_scrollX += kPanoramaWidth;
+	while (kPanoramaWidth <= _scrollX)
+		_scrollX -= kPanoramaWidth;
 }
 
 void ShelterBooliewood::scheduleAmbientSpeech(uint32 now) {
-	_nextAmbientSpeechTime = now + 8000 + _vm->getRandom()->getRandomNumber(29999);
+	_nextAmbientSpeechTime = now + 8000 + _vm->_rnd->getRandomNumber(29999);
 }
 
 void ShelterBooliewood::playAmbientSpeech() {
 	SoundManager *sound = _vm->getSoundManager();
 	if (!sound)
 		return;
-	const int index = _vm->getRandom()->getRandomNumber(kAmbientSpeechCount - 1);
+	const int index = _vm->_rnd->getRandomNumber(kAmbientSpeechCount - 1);
 	if (0 <= _ambientSpeechIds[index])
 		sound->playWithVolume(_ambientSpeechIds[index], sound->_volumeSpeech);
 }
@@ -489,42 +497,42 @@ void ShelterBooliewood::drawBackground(ManagedSurface32 *screen) const {
 	if (!_background)
 		return;
 	const int width = _background->getWidth();
-	if (width <= kScreenWidth) {
+	if (width <= ManagedSurface32::kScreenWidth) {
 		_background->drawToSurface(screen, Common::Point32(0, 0));
 		return;
 	}
 	const int origin = _scrollX % width;
 	const int tailWidth = width - origin;
-	if (kScreenWidth <= tailWidth) {
-		_background->drawSubRect(screen, Common::Point32(0, 0), Common::Rect(origin, 0, origin + kScreenWidth, kScreenHeight));
+	if (ManagedSurface32::kScreenWidth <= tailWidth) {
+		_background->drawSubRect(screen, Common::Point32(0, 0), Common::Rect(origin, 0, origin + ManagedSurface32::kScreenWidth, ManagedSurface32::kScreenHeight));
 	} else {
-		_background->drawSubRect(screen, Common::Point32(0, 0), Common::Rect(origin, 0, width, kScreenHeight));
-		_background->drawSubRect(screen, Common::Point32(tailWidth, 0), Common::Rect(0, 0, kScreenWidth - tailWidth, kScreenHeight));
+		_background->drawSubRect(screen, Common::Point32(0, 0), Common::Rect(origin, 0, width, ManagedSurface32::kScreenHeight));
+		_background->drawSubRect(screen, Common::Point32(tailWidth, 0), Common::Rect(0, 0, ManagedSurface32::kScreenWidth - tailWidth, ManagedSurface32::kScreenHeight));
 	}
 }
 
-void ShelterBooliewood::drawAnimationInScene(const Animation *animation, int frameIndex, const Common::Point32 &pos, ManagedSurface32 *screen) const {
+void ShelterBooliewood::drawAnimationInPanorama(const Animation *animation, int frameIndex, const Common::Point32 &pos, ManagedSurface32 *screen) const {
 	if (!animation || animation->getFrameCount() <= 0)
 		return;
 	const int normalizedFrame = frameIndex % animation->getFrameCount();
-	drawRleInScene(animation->getFrame(normalizedFrame), pos, screen);
+	drawRleInPanorama(animation->getFrame(normalizedFrame), pos, screen);
 }
 
-void ShelterBooliewood::drawRleInScene(const RleBlock *frame, const Common::Point32 &pos, ManagedSurface32 *screen) const {
+void ShelterBooliewood::drawRleInPanorama(const RleBlock *frame, const Common::Point32 &pos, ManagedSurface32 *screen) const {
 	if (!frame)
 		return;
 	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	const int baseX = pos.x - _scrollX;
-	frame->drawToScreen(screen, Common::Point32(baseX - kSceneWidth, pos.y), lut);
+	frame->drawToScreen(screen, Common::Point32(baseX - kPanoramaWidth, pos.y), lut);
 	frame->drawToScreen(screen, Common::Point32(baseX, pos.y), lut);
-	frame->drawToScreen(screen, Common::Point32(baseX + kSceneWidth, pos.y), lut);
+	frame->drawToScreen(screen, Common::Point32(baseX + kPanoramaWidth, pos.y), lut);
 }
 
 void ShelterBooliewood::drawAttractions(ManagedSurface32 *screen) const {
 	for (int i = 0; i < kAttractionCount; i++) {
 		const AttractionState &attraction = _attractions[i];
 		if (attraction.active)
-			drawAnimationInScene(attraction.animation, attraction.frame, attraction.pos, screen);
+			drawAnimationInPanorama(attraction.animation, attraction.frame, attraction.pos, screen);
 	}
 }
 
@@ -538,7 +546,7 @@ void ShelterBooliewood::drawRescuedCrowd(ManagedSurface32 *screen) const {
 			if (marker == '0')
 				continue;
 			const RleBlock *frame = marker == '1' ? _contentMarker : _pascontentMarker;
-			drawRleInScene(frame, Common::Point32(3450 + column * 16, y), screen);
+			drawRleInPanorama(frame, Common::Point32(3450 + column * 16, y), screen);
 			drawn += 1;
 		}
 	}
@@ -563,9 +571,9 @@ void ShelterBooliewood::drawSeatedCommunity(ManagedSurface32 *screen) const {
 	}
 	for (int i = 0; i < count; i++) {
 		const int visibleIndex = order[i];
-		const ZoombiniState &zoombini = *_vm->_globalZoombinis[visibleIndex];
+		const ZoombiniRunner &zoombini = *_vm->_globalZoombinis[visibleIndex];
 		const int animationFrame = zoombini._animationActive ? zoombini._animationFrame : 0;
-		drawZoombiniInScene(zoombini, zoombini._activeAnimation, zoombini._animationCell, animationFrame, zoombini._screenPos, screen);
+		drawZoombiniInPanorama(zoombini, zoombini._activeAnimation, zoombini._animationCell, animationFrame, zoombini._screenPos, screen);
 	}
 }
 
@@ -573,17 +581,17 @@ void ShelterBooliewood::drawCrowdActors(ManagedSurface32 *screen) const {
 	for (int i = 0; i < kCrowdActorCount; i++) {
 		const CrowdActorState &actor = _crowdActors[i];
 		const Animation *animation = actor.walking ? _walkingAnimation : _waitingAnimation;
-		drawAnimationInScene(animation, actor.frame, actor.pos, screen);
+		drawAnimationInPanorama(animation, actor.frame, actor.pos, screen);
 	}
 }
 
-void ShelterBooliewood::drawZoombiniInScene(const ZoombiniState &zoombini, const ZoombiniAnimation *animation, int cell, int animationFrame,
+void ShelterBooliewood::drawZoombiniInPanorama(const ZoombiniRunner &zoombini, const ZoombiniAnimation *animation, int cell, int animationFrame,
 										 const Common::Point32 &pos, ManagedSurface32 *screen) const {
 	if (!animation)
 		return;
 	const int baseX = pos.x - _scrollX;
 	for (int copy = -1; copy <= 1; copy++)
-		animation->drawZoombini(screen, zoombini._traits, Common::Point32(baseX + copy * kSceneWidth, pos.y), cell, animationFrame, _vm->getAlphaLUT());
+		animation->drawZoombini(screen, zoombini._traits, Common::Point32(baseX + copy * kPanoramaWidth, pos.y), cell, animationFrame, _vm->getAlphaLUT());
 }
 
 } // End of namespace Zoombini2

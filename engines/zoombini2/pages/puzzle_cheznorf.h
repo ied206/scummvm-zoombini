@@ -50,7 +50,7 @@ public:
 	/** Advance serving and answer-feedback phases. */
 	void onUpdate() override;
 	/** Draw the clue board, tables, meals, Norf, and seated Zoombinis. */
-	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderContent(ManagedSurface32 *screen) override;
 	/** Draw feedback above table occupants. */
 	void onRenderForeground(ManagedSurface32 *screen) override;
 	/** Select food or serve the pending order to a table. */

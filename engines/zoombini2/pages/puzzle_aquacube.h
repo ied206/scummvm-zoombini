@@ -51,7 +51,7 @@ public:
 	/** Draw the cube graph, actors, controls, and remaining-step display. */
 	void onRenderBackground(ManagedSurface32 *screen) override;
 	/** Draw the layered cube and node sprites. */
-	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderContent(ManagedSurface32 *screen) override;
 	/** Draw the moving ball. */
 	void onRenderActors(ManagedSurface32 *screen) override;
 	/** Draw direction controls, indicators, and visual effects. */

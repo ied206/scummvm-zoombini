@@ -36,6 +36,7 @@
 
 #include "zoombini2/dialogs.h"
 #include "zoombini2/graphics.h"
+#include "zoombini2/metaengine.h"
 #include "zoombini2/pages/dialog_msgbox.h"
 #include "zoombini2/pages/interactive_base.h"
 #include "zoombini2/pages/interactive_map.h"
@@ -66,13 +67,6 @@
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
-
-const char *const kConfigDebugHotkeys = "debug_hotkeys";
-const char *const kConfigStereoOutput = "stereo_output";
-const char *const kConfigGreedyWaterslidePairing = "greedy_waterslide_pairing";
-const char *const kConfigCachedFrameTime = "cached_frame_time";
-const char *const kConfigUseFloatingPointPaths = "use_floating_point_paths";
-const char *const kConfigOriginalPRNG = "original_prng";
 
 /** Resolve original logical resource names against their distinct physical roots. */
 class Zoombini2Engine::ResourceFileResolver {
@@ -171,7 +165,7 @@ void Zoombini2Engine::initializePath(const Common::FSNode &gamePath) {
 Zoombini2Engine::Zoombini2Engine(OSystem *syst, const Zoombini2GameDescription *desc)
 	: Engine(syst), _gameDescription(desc) {
 
-	_rnd = new Zoombini2Random("zoombini2");
+	_rnd = new Random("zoombini2");
 	_mainMenuDialog = new Zoombini2MenuDialog(this);
 
 	refreshEngineSettings();
@@ -213,16 +207,19 @@ void Zoombini2Engine::recordBooliesCompletion() {
 	}
 }
 
-const ZoombiniAnimation *Zoombini2Engine::loadZoombiniAnimation(const Common::Path &path) {
+const ZoombiniAnimation *Zoombini2Engine::loadZoombiniAnimation(const Common::Path &path, uint32 frameDelay) {
 	ZoombiniAnimationCache::const_iterator cached = _zoombiniAnimationCache.find(path);
-	if (cached != _zoombiniAnimationCache.end())
+	if (cached != _zoombiniAnimationCache.end()) {
+		cached->_value->setFrameDelay(frameDelay);
 		return cached->_value;
+	}
 
 	ZoombiniAnimation *animation = new ZoombiniAnimation(this);
 	if (!animation->loadFromFile(path)) {
 		delete animation;
 		return nullptr;
 	}
+	animation->setFrameDelay(frameDelay);
 	_zoombiniAnimationCache[path] = animation;
 	return animation;
 }
@@ -329,9 +326,9 @@ Common::Error Zoombini2Engine::run() {
 	// Initialize 800x600 32-bit graphics
 	// Use RGBA8888 format (same as internal surfaces)
 	Graphics::PixelFormat format32(4, 8, 8, 8, 8, 16, 8, 0, 24);
-	::initGraphics(kScreenWidth, kScreenHeight, &format32);
+	::initGraphics(ManagedSurface32::kScreenWidth, ManagedSurface32::kScreenHeight, &format32);
 
-	_screen = new ManagedSurface32(kScreenWidth, kScreenHeight, format32);
+	_screen = new ManagedSurface32(ManagedSurface32::kScreenWidth, ManagedSurface32::kScreenHeight, format32);
 
 	// Initialize cursor system
 	initCursor();
@@ -497,11 +494,11 @@ int Zoombini2Engine::percentToMixerVolume(int volume) {
 }
 
 void Zoombini2Engine::refreshEngineSettings() {
-	_debugHotkeysEnabled = ConfMan.getBool(kConfigDebugHotkeys);
-	_stereoOutputEnabled = ConfMan.getBool(kConfigStereoOutput);
-	_useGreedyWaterslidePairing = ConfMan.getBool(kConfigGreedyWaterslidePairing);
-	_useCachedFrameTime = ConfMan.getBool(kConfigCachedFrameTime);
-	_useFloatingPointPaths = ConfMan.getBool(kConfigUseFloatingPointPaths);
+	_debugHotkeysEnabled = ConfMan.getBool(::Zoombini2MetaEngine::kConfigDebugHotkeys);
+	_stereoOutputEnabled = ConfMan.getBool(::Zoombini2MetaEngine::kConfigStereoOutput);
+	_useGreedyWaterslidePairing = ConfMan.getBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing);
+	_useCachedFrameTime = ConfMan.getBool(::Zoombini2MetaEngine::kConfigCachedFrameTime);
+	_useFloatingPointPaths = ConfMan.getBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths);
 	if (!_debugHotkeysEnabled) {
 		_debugCompletionKeyDown = false;
 		_debugOverlayKeyDown = false;
@@ -519,7 +516,7 @@ void Zoombini2Engine::exportZoombiniSet() const {
 
 	output->writeString(Common::String::format("%u\n", _globalZoombinis.size()));
 	for (uint i = 0; i < _globalZoombinis.size(); i++) {
-		const ZoombiniState *zoombini = _globalZoombinis[i];
+		const ZoombiniRunner *zoombini = _globalZoombinis[i];
 		if (!zoombini)
 			continue;
 		output->writeString(Common::String::format("%u %u %u %u\n", zoombini->_traits._feet, zoombini->_traits._nose, zoombini->_traits._hair,
@@ -688,7 +685,7 @@ bool Zoombini2Engine::dispatchPageEvents() {
 
 void Zoombini2Engine::drawFrame() {
 	if (!_currentPage) {
-		_screen->fillRect(Common::Rect32(kScreenWidth, kScreenHeight), 0);
+		_screen->fillRect(Common::Rect32(ManagedSurface32::kScreenWidth, ManagedSurface32::kScreenHeight), 0);
 		return;
 	}
 
@@ -707,7 +704,7 @@ void Zoombini2Engine::drawFrame() {
 }
 
 void Zoombini2Engine::presentFrame() {
-	g_system->copyRectToScreen(_screen->getPixels(), _screen->pitch, 0, 0, kScreenWidth, kScreenHeight);
+	g_system->copyRectToScreen(_screen->getPixels(), _screen->pitch, 0, 0, ManagedSurface32::kScreenWidth, ManagedSurface32::kScreenHeight);
 	g_system->updateScreen();
 }
 
@@ -748,7 +745,7 @@ void Zoombini2Engine::destroyCurrentPage() {
 	// Clear screen on page destroy to prevent stale content showing
 	// when transitioning to a new page that uses double buffering.
 	if (_screen)
-		_screen->fillRect(Common::Rect32(kScreenWidth, kScreenHeight), 0);
+		_screen->fillRect(Common::Rect32(ManagedSurface32::kScreenWidth, ManagedSurface32::kScreenHeight), 0);
 }
 
 /**

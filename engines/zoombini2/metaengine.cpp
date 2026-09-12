@@ -20,25 +20,12 @@
  */
 
 #include "base/plugins.h"
+
 #include "common/config-manager.h"
-#include "engines/advancedDetector.h"
 
-#include "zoombini2/detection.h"
 #include "zoombini2/dialogs.h"
+#include "zoombini2/metaengine.h"
 #include "zoombini2/zoombini2.h"
-
-class Zoombini2MetaEngine : public AdvancedMetaEngine<Zoombini2::Zoombini2GameDescription> {
-public:
-	const char *getName() const override {
-		return "zoombini2";
-	}
-
-	Common::Error createInstance(OSystem *syst, Engine **engine, const Zoombini2::Zoombini2GameDescription *desc) const override;
-
-	bool hasFeature(MetaEngineFeature f) const override;
-	void registerDefaultSettings(const Common::String &target) const override;
-	GUI::OptionsContainerWidget *buildEngineOptionsWidget(GUI::GuiObject *boss, const Common::String &name, const Common::String &target) const override;
-};
 
 Common::Error Zoombini2MetaEngine::createInstance(OSystem *syst, Engine **engine, const Zoombini2::Zoombini2GameDescription *desc) const {
 	*engine = new Zoombini2::Zoombini2Engine(syst, desc);
@@ -51,12 +38,12 @@ bool Zoombini2MetaEngine::hasFeature(MetaEngineFeature f) const {
 
 void Zoombini2MetaEngine::registerDefaultSettings(const Common::String &target) const {
 	(void)target;
-	ConfMan.registerDefault(Zoombini2::kConfigDebugHotkeys, false);
-	ConfMan.registerDefault(Zoombini2::kConfigStereoOutput, false);
-	ConfMan.registerDefault(Zoombini2::kConfigGreedyWaterslidePairing, false);
-	ConfMan.registerDefault(Zoombini2::kConfigCachedFrameTime, false);
-	ConfMan.registerDefault(Zoombini2::kConfigUseFloatingPointPaths, false);
-	ConfMan.registerDefault(Zoombini2::kConfigOriginalPRNG, true);
+	ConfMan.registerDefault(kConfigDebugHotkeys, false);
+	ConfMan.registerDefault(kConfigStereoOutput, false);
+	ConfMan.registerDefault(kConfigGreedyWaterslidePairing, false);
+	ConfMan.registerDefault(kConfigCachedFrameTime, false);
+	ConfMan.registerDefault(kConfigUseFloatingPointPaths, false);
+	ConfMan.registerDefault(kConfigOriginalPRNG, true);
 }
 
 GUI::OptionsContainerWidget *Zoombini2MetaEngine::buildEngineOptionsWidget(GUI::GuiObject *boss, const Common::String &name,

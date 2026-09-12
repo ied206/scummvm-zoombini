@@ -62,7 +62,7 @@ ZmbTrait ZmbTrait::fromHash(uint16 traitHash) {
 	return ZmbTrait(feet, nose, hair, eyes);
 }
 
-void BoardRecord::store(const ZoombiniState &zoombini) {
+void BoardRecord::store(const ZoombiniRunner &zoombini) {
 	memcpy(_name, zoombini._name, sizeof(_name));
 	_traits = zoombini._traits;
 }
@@ -71,8 +71,8 @@ ZmbTrait BoardRecord::getTraits() const {
 	return _traits;
 }
 
-ZoombiniState *BoardRecord::restore() const {
-	ZoombiniState *zoombini = new ZoombiniState();
+ZoombiniRunner *BoardRecord::restore() const {
+	ZoombiniRunner *zoombini = new ZoombiniRunner();
 	memcpy(zoombini->_name, _name, sizeof(zoombini->_name));
 	zoombini->setTraits(getTraits());
 	zoombini->_inputEnabled = 1;
@@ -87,7 +87,7 @@ void GameState::clearBoard(BoardRecord **board) {
 	}
 }
 
-bool GameState::storeInBoard(BoardRecord **board, ZoombiniState &zoombini) {
+bool GameState::storeInBoard(BoardRecord **board, ZoombiniRunner &zoombini) {
 	int startRow = 62;
 	for (int i = 0; i < kBoardRows * kBoardCols; i++) {
 		if (board[i]) {
@@ -111,7 +111,7 @@ bool GameState::storeInBoard(BoardRecord **board, ZoombiniState &zoombini) {
 	return false;
 }
 
-void GameState::refillFromBoard(BoardRecord **board, Common::Array<ZoombiniState *> &roster, uint count) {
+void GameState::refillFromBoard(BoardRecord **board, Common::Array<ZoombiniRunner *> &roster, uint count) {
 	for (int col = 0; col < kBoardCols && roster.size() < count; col++) {
 		for (int row = 0; row < kBoardRows && roster.size() < count; row++) {
 			BoardRecord *&cell = board[row * kBoardCols + col];
@@ -173,7 +173,7 @@ bool GameState::registerTraits(const ZmbTrait &traits) {
 	return true;
 }
 
-bool GameState::recordCompletedZoombini(const ZoombiniState &zoombini) {
+bool GameState::recordCompletedZoombini(const ZoombiniRunner &zoombini) {
 	if (_completedZoombiniCount < 0)
 		return false;
 	if (_completedZoombiniCount < kCompletedTraitHashCount) {
@@ -277,11 +277,11 @@ bool GameState::load(Common::SeekableReadStream *stream) {
 	return true;
 }
 
-void GameState::transferSavedRoster(Common::Array<ZoombiniState *> &src, Common::Array<ZoombiniState *> &dest) {
+void GameState::transferSavedRoster(Common::Array<ZoombiniRunner *> &src, Common::Array<ZoombiniRunner *> &dest) {
 	assert(&src != &dest);
 	for (uint i = 0; i < src.size(); i++) {
-		const ZoombiniState *previous = src[i];
-		ZoombiniState *restored = new ZoombiniState();
+		const ZoombiniRunner *previous = src[i];
+		ZoombiniRunner *restored = new ZoombiniRunner();
 		restored->_traits = previous->_traits;
 		restored->_traitHash = restored->_traits.calculateHash();
 		memcpy(restored->_name, previous->_name, sizeof(restored->_name));
@@ -367,7 +367,7 @@ bool GameState::readState(Common::SeekableReadStream *stream) {
 		return false;
 	// The party is stored in two passes, unlike the interleaved sparse board records.
 	for (int32 i = 0; i < count; i++) {
-		ZoombiniState *zoombini = new ZoombiniState();
+		ZoombiniRunner *zoombini = new ZoombiniRunner();
 		_savedRoster.push_back(zoombini);
 		const byte unusedSlot0 = stream->readByte();
 		const byte feet = stream->readByte();
@@ -428,7 +428,7 @@ Zoombini2PopulationSummary GameState::getPopulationSummary() const {
 	return summary;
 }
 
-bool GameState::save(Common::WriteStream *stream, const Common::Array<ZoombiniState *> *globalRoster) const {
+bool GameState::save(Common::WriteStream *stream, const Common::Array<ZoombiniRunner *> *globalRoster) const {
 	if (!stream || stream->err())
 		return false;
 	const uint32 globalCount = globalRoster && 0 <= _currentGameplayPageId && _currentGameplayPageId <= 3 ? globalRoster->size() : 0;
@@ -466,7 +466,7 @@ bool GameState::save(Common::WriteStream *stream, const Common::Array<ZoombiniSt
 	const int rescue2BoardCount = writeBoard(stream, _rescue2Board);
 	stream->writeUint32LE(static_cast<uint32>(count));
 	for (uint64 i = 0; i < count; i++) {
-		const ZoombiniState *zoombini = i < _savedRoster.size() ? _savedRoster[i] : (*globalRoster)[i - _savedRoster.size()];
+		const ZoombiniRunner *zoombini = i < _savedRoster.size() ? _savedRoster[i] : (*globalRoster)[i - _savedRoster.size()];
 		if (!zoombini)
 			return false;
 		const ZmbTrait &traits = zoombini->_traits;
@@ -477,7 +477,7 @@ bool GameState::save(Common::WriteStream *stream, const Common::Array<ZoombiniSt
 		stream->writeByte(traits._eyes);
 	}
 	for (uint64 i = 0; i < count; i++) {
-		const ZoombiniState *zoombini = i < _savedRoster.size() ? _savedRoster[i] : (*globalRoster)[i - _savedRoster.size()];
+		const ZoombiniRunner *zoombini = i < _savedRoster.size() ? _savedRoster[i] : (*globalRoster)[i - _savedRoster.size()];
 		stream->write(zoombini->_name, sizeof(zoombini->_name));
 	}
 	const int64 expectedSize = 2822 + static_cast<int64>(nameLength) + (rescue1BoardCount + rescue2BoardCount) * 28 + count * 20;
@@ -583,7 +583,7 @@ bool Zoombini2SavegameManager::verifySaveData(const Common::String &saveFileName
 }
 
 bool Zoombini2SavegameManager::saveProfile(const Common::String &profileName, const GameState &state,
-										   const Common::Array<ZoombiniState *> *globalRoster) const {
+										   const Common::Array<ZoombiniRunner *> *globalRoster) const {
 	if (!_saveFileManager || !isValidProfileName(profileName))
 		return false;
 

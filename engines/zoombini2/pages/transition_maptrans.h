@@ -48,10 +48,11 @@ public:
 	/** Start and advance staggered walkers until the transition completes. */
 	void onUpdate() override;
 	/** Draw the composited map and active walkers. */
-	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderContent(ManagedSurface32 *screen) override;
 	void onRenderActors(ManagedSurface32 *screen) override;
-	/** Skip the remaining walking animation and enter the resolved destination. */
-	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	void onActorsRendered() override;
+	/** Skip the remaining walking animation and enter the resolved destination on button release. */
+	EventHandleResult onLButtonUp(const Common::Point &pos) override;
 	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
 	/** Resolve the next route page from the source page, Rescue Site I branch, and rescue progress. */
 	static PageId getDestPage(PageId src, RouteBranch routeBranch, int rescuedBoolies);
@@ -65,6 +66,18 @@ private:
 	void walkZoombinis();
 	/** Clear the paths and walking state assigned to the walking Zoombinis. */
 	void cleanupPaths();
+	/** Load and append one logical speech clip name. */
+	void queueSpeech(const Common::String &name);
+	/** Reproduce the source-world first-visit or revisit speech selection. */
+	void queueTravelSpeech(PageId sourcePage);
+	/** Finish a completed clip and start the next queued speech clip. */
+	void updateSpeechQueue();
+	/** Return whether queued travel speech is playing or waiting to start. */
+	bool hasPendingSpeech() const;
+	/** Stop and release every travel speech handle retained by this page. */
+	void cleanupSpeech();
+	/** Return the original even-to-variant-two, odd-to-variant-one random choice. */
+	int getRandomBinarySpeechVariant();
 	/** Return the page entered after this transition. */
 	PageId getPostTransitionPage() const;
 	/** Commit the destination page after the last walker finishes. */
@@ -89,8 +102,14 @@ private:
 	bool _transitionFinished = false;
 	/** Music handle used during the map transition. */
 	int _musicId = -1;
+	/** Serial destination-speech handles in original enqueue order. */
+	Common::Array<int> _speechIds;
+	/** Index of the next queued speech handle to start. */
+	uint _nextSpeechIndex = 0;
+	/** Index of the currently playing speech handle, or -1. */
+	int _activeSpeechIndex = -1;
 
-	/** Borrowed immutable sprite grid owned by the engine cache. */
+	/** Borrowed immutable sprite grid retained in the engine cache. */
 	const ZoombiniAnimation *_zoombiniAnimation = nullptr;
 };
 

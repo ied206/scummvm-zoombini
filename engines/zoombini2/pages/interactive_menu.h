@@ -61,7 +61,7 @@ public:
 	/** Process text input and hover state for the active panel. */
 	void onUpdate() override;
 	/** Draw the saved-game list or the owned volume panel. */
-	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderContent(ManagedSurface32 *screen) override;
 	void onRenderForeground(ManagedSurface32 *screen) override;
 	/** Dispatch a click to the list, buttons, or owned volume panel. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;

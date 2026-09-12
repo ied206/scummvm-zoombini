@@ -48,8 +48,7 @@ DialogHelp::DialogHelp(Zoombini2Engine *vm)
 
 	// Create saved screen buffer
 	// Must match screen format to avoid assert in copyRectToSurface
-	_savedScreen = new Graphics::ManagedSurface(kScreenWidth, kScreenHeight,
-												_vm->getCurrentScreen()->format);
+	_savedScreen = new Graphics::ManagedSurface(ManagedSurface32::kScreenWidth, ManagedSurface32::kScreenHeight, _vm->getCurrentScreen()->format);
 }
 
 DialogHelp::~DialogHelp() {
@@ -174,7 +173,7 @@ void DialogHelp::freePage() {
 	_helpPage = nullptr;
 }
 
-void DialogHelp::onRenderScene(ManagedSurface32 *screen) {
+void DialogHelp::onRenderContent(ManagedSurface32 *screen) {
 	if (!_isActive) {
 		return;
 	}

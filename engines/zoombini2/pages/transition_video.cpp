@@ -25,6 +25,7 @@
 
 #include "video/bink_decoder.h"
 
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/transition_video.h"
 #include "zoombini2/zoombini2.h"
 
@@ -111,7 +112,7 @@ void TransitionVideo::onUpdate() {
 	if (_decoder->needsUpdate()) {
 		const Graphics::Surface *frame = _decoder->decodeNextFrame();
 		if (frame) {
-			_framePos = Common::Point32((kScreenWidth - frame->w) / 2, (kScreenHeight - frame->h) / 2);
+			_framePos = Common::Point32((ManagedSurface32::kScreenWidth - frame->w) / 2, (ManagedSurface32::kScreenHeight - frame->h) / 2);
 
 			// Cache the decoded frame in screen format
 			if (!_lastFrame || _lastFrame->w != frame->w || _lastFrame->h != frame->h) {
@@ -123,7 +124,7 @@ void TransitionVideo::onUpdate() {
 	}
 }
 
-void TransitionVideo::onRenderScene(ManagedSurface32 *screen) {
+void TransitionVideo::onRenderContent(ManagedSurface32 *screen) {
 	if (_lastFrame)
 		screen->blitFrom(*_lastFrame, _framePos);
 }

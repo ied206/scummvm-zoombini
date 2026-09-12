@@ -77,9 +77,9 @@ bool DialogMsgBox::openDialog(ManagedSurface32 *screen) {
 	const int panelWidth = _panels[1]->getWidth();
 	const int panelHeight = _panels[1]->getHeight();
 	if (_position.x == -1)
-		_position.x = kScreenWidth / 2 - panelWidth / 2;
+		_position.x = ManagedSurface32::kScreenWidth / 2 - panelWidth / 2;
 	if (_position.y == -1)
-		_position.y = kScreenHeight / 2 - panelHeight / 2;
+		_position.y = ManagedSurface32::kScreenHeight / 2 - panelHeight / 2;
 
 	_savedBackground = new Graphics::ManagedSurface(panelWidth, panelHeight, screen->format);
 	_savedBackground->copyRectToSurface(*screen, 0, 0,
@@ -147,7 +147,7 @@ void DialogMsgBox::activateButton(DialogMsgBoxButton button) {
 	}
 }
 
-void DialogMsgBox::onRenderScene(ManagedSurface32 *screen) {
+void DialogMsgBox::onRenderContent(ManagedSurface32 *screen) {
 	if (!isActive() || !openDialog(screen))
 		return;
 

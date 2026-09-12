@@ -34,7 +34,7 @@ class SaveFileManager;
 
 namespace Zoombini2 {
 
-class ZoombiniState;
+class ZoombiniRunner;
 
 /** Save-file version accepted by @ref GameState. */
 const int kSaveFileMagic = 262;
@@ -165,11 +165,11 @@ struct BoardRecord {
 	/** Initialize the record to an empty name and unset stored traits. */
 	BoardRecord() = default;
 	/** Copy the persistent fields from @p zoombini into this record. */
-	void store(const ZoombiniState &zoombini);
+	void store(const ZoombiniRunner &zoombini);
 	/** Return the complete trait tuple stored in this record. */
 	ZmbTrait getTraits() const;
 	/** Restore a newly allocated active Zoombini from this record. */
-	ZoombiniState *restore() const;
+	ZoombiniRunner *restore() const;
 };
 
 /** Aggregate counters and per-combination usage retained by the profile. */
@@ -207,15 +207,15 @@ public:
 	/** Load and validate a complete profile from @p stream. */
 	bool load(Common::SeekableReadStream *stream);
 	/** Serialize this profile and, when supplied, the active party roster to @p stream. */
-	bool save(Common::WriteStream *stream, const Common::Array<ZoombiniState *> *globalRoster = nullptr) const;
+	bool save(Common::WriteStream *stream, const Common::Array<ZoombiniRunner *> *globalRoster = nullptr) const;
 	/** Move saved Zoombini state from @p src into newly allocated entries in @p dest. */
-	static void transferSavedRoster(Common::Array<ZoombiniState *> &src, Common::Array<ZoombiniState *> &dest);
+	static void transferSavedRoster(Common::Array<ZoombiniRunner *> &src, Common::Array<ZoombiniRunner *> &dest);
 	/** Delete every record in @p board and clear its cells. */
 	static void clearBoard(BoardRecord **board);
 	/** Store @p zoombini in the first available cell of @p board. */
-	static bool storeInBoard(BoardRecord **board, ZoombiniState &zoombini);
+	static bool storeInBoard(BoardRecord **board, ZoombiniRunner &zoombini);
 	/** Restore up to @p count Zoombinis from @p board into @p roster. */
-	static void refillFromBoard(BoardRecord **board, Common::Array<ZoombiniState *> &roster, uint count);
+	static void refillFromBoard(BoardRecord **board, Common::Array<ZoombiniRunner *> &roster, uint count);
 	/** Return the board row used to initialize the shelter scroll position. */
 	static int findBoardScrollRow(BoardRecord *const *board);
 	/** Return the four shelter-stage counts and serialized active-party count. */
@@ -227,7 +227,7 @@ public:
 	/** Register one trait combination if its per-combination limit has not been reached. */
 	bool registerTraits(const ZmbTrait &traits);
 	/** Append one Booliewood completion snapshot while history capacity remains. */
-	bool recordCompletedZoombini(const ZoombiniState &zoombini);
+	bool recordCompletedZoombini(const ZoombiniRunner &zoombini);
 	/** Return whether the profile has accepted its 625th Zoombini registration. */
 	bool hasReachedZoombiniRegistrationLimit() const { return _traitRegistrations._totalCount == kZoombiniCombinationCount; }
 	/** Return whether accumulated progress has unlocked relaxed party trait limits. */
@@ -314,7 +314,7 @@ public:
 	/** Trait-combination usage and aggregate registration totals. */
 	TraitRegistrationState _traitRegistrations;
 	/** Zoombini roster stored in this profile. */
-	Common::Array<ZoombiniState *> _savedRoster;
+	Common::Array<ZoombiniRunner *> _savedRoster;
 
 private:
 	/** Disallow copying pointers stored in this profile. */
@@ -365,7 +365,7 @@ public:
 	/** Return every listed profile with counts parsed directly from its independent .mk file. */
 	Common::Array<Zoombini2ProfileSummary> listProfileSummaries() const;
 	/** Serialize @p state to @p profileName and, when supplied, its active party roster. */
-	bool saveProfile(const Common::String &profileName, const GameState &state, const Common::Array<ZoombiniState *> *globalRoster = nullptr) const;
+	bool saveProfile(const Common::String &profileName, const GameState &state, const Common::Array<ZoombiniRunner *> *globalRoster = nullptr) const;
 	/** Load @p profileName transactionally into @p state. */
 	bool loadProfile(const Common::String &profileName, GameState &state) const;
 	/** Validate an external Z2 stream and store it under @p profileName. */

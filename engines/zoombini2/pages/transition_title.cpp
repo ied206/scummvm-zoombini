@@ -72,7 +72,7 @@ void TransitionTitle::onUpdate() {
 		dismiss();
 }
 
-void TransitionTitle::onRenderScene(ManagedSurface32 *screen) {
+void TransitionTitle::onRenderContent(ManagedSurface32 *screen) {
 	if (_background) {
 		_background->drawToSurface(screen, Common::Point32(0, 0));
 	}

@@ -45,7 +45,7 @@ ShelterRescueSiteBase::~ShelterRescueSiteBase() {
 }
 
 void ShelterRescueSiteBase::loadBackground(const char *path) {
-	_vm->getScreen()->fillRect(Common::Rect32(kScreenWidth, kScreenHeight), 0);
+	_vm->getScreen()->fillRect(Common::Rect32(ManagedSurface32::kScreenWidth, ManagedSurface32::kScreenHeight), 0);
 	BitBlock background(_vm);
 	if (background.load(Common::Path(path)))
 		background.drawToSurface(_vm->getScreen(), Common::Point32(0, 0));
@@ -110,7 +110,7 @@ void ShelterRescueSiteBase::refillDepartureRoster(BoardRecord **board) {
 	GameState::refillFromBoard(board, _vm->_globalZoombinis, 8);
 	_departureRoster.clear();
 	for (uint i = 0; i < _vm->_globalZoombinis.size(); i++) {
-		ZoombiniState *zoombini = _vm->_globalZoombinis[i];
+		ZoombiniRunner *zoombini = _vm->_globalZoombinis[i];
 		zoombini->_puzzleStatus = 0;
 		zoombini->_inputEnabled = 1;
 		if (i < 8)
@@ -121,9 +121,9 @@ void ShelterRescueSiteBase::refillDepartureRoster(BoardRecord **board) {
 
 void ShelterRescueSiteBase::saveRescueRoster(BoardRecord **board) {
 	GameState *state = _vm->getGameState();
-	Common::Array<ZoombiniState *> &roster = _vm->_globalZoombinis;
+	Common::Array<ZoombiniRunner *> &roster = _vm->_globalZoombinis;
 	for (uint i = 0; i < roster.size();) {
-		ZoombiniState *zoombini = roster[i];
+		ZoombiniRunner *zoombini = roster[i];
 		bool departing = false;
 		if (_vm->isStartingMapTransition()) {
 			for (uint slot = 0; slot < _departureRoster.size(); slot++)
@@ -142,7 +142,7 @@ void ShelterRescueSiteBase::saveRescueRoster(BoardRecord **board) {
 }
 
 void ShelterRescueSiteBase::loadRosterAnimation() {
-	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/littleZomb.anm"));
+	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/littleZomb.anm"), 50);
 	if (!_zoombiniAnimation)
 		warning("RescueSite: Failed to load littleZomb.anm");
 }
@@ -164,7 +164,7 @@ void ShelterRescueSiteBase::onUpdate() {
 	}
 }
 
-void ShelterRescueSiteBase::onRenderScene(ManagedSurface32 *screen) {
+void ShelterRescueSiteBase::onRenderContent(ManagedSurface32 *screen) {
 	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	onRenderSite(screen);
 
@@ -199,7 +199,7 @@ void ShelterRescueSiteBase::onRenderScene(ManagedSurface32 *screen) {
 
 			const int x = _gridBasePos.x + col * kSlotWidth + 18;
 			const int y = _gridBasePos.y + row * kSlotHeight + 30;
-			const Common::Rect32 clip(_gridBasePos.x, 0, clipRight, kScreenHeight);
+			const Common::Rect32 clip(_gridBasePos.x, 0, clipRight, ManagedSurface32::kScreenHeight);
 			_zoombiniAnimation->drawZoombini(screen, record->getTraits(), Common::Point32(x, y), kStandingCell, 0, lut, &clip);
 			if (slotIdx == _selectedZoombini && _selector)
 				_selector->drawToScreen(screen, Common::Point32(x - 10, y - 10), lut);

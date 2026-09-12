@@ -48,6 +48,11 @@ class SoundManager;
  */
 class ManagedSurface32 : public Graphics::ManagedSurface {
 public:
+	/** Width of the fixed internal game screen. */
+	static constexpr int kScreenWidth = 800;
+	/** Height of the fixed internal game screen. */
+	static constexpr int kScreenHeight = 600;
+
 	/** Create a screen surface with the supplied dimensions and pixel format. */
 	ManagedSurface32(int width, int height, const Graphics::PixelFormat &pixelFormat)
 		: Graphics::ManagedSurface(width, height, pixelFormat) {}
@@ -122,7 +127,7 @@ class BitBlock {
 public:
 	/** Construct an empty bitmap bound to @p vm. */
 	explicit BitBlock(Zoombini2Engine *vm);
-	/** Release the owned pixel and alpha buffers. */
+	/** Release the member pixel and alpha buffers. */
 	~BitBlock();
 
 	/** Load a mandatory color BMP and mandatory alpha-mask BMP. */
@@ -190,7 +195,7 @@ private:
 	bool loadColorBMP(Common::SeekableReadStream *stream);
 	/** Decode an indexed alpha-mask BMP from @p stream through the shared image decoder. */
 	bool loadAlphaBMP(Common::SeekableReadStream *stream);
-	/** Exchange owned bitmap state with @p other. */
+	/** Exchange bitmap buffer state with @p other. */
 	void swapData(BitBlock &other);
 	/**
 	 * Blend one bitmap channel with the destination through a separate mask.
@@ -215,7 +220,7 @@ class RleBlock {
 public:
 	/** Construct an empty RLE frame bound to @p vm. */
 	explicit RleBlock(Zoombini2Engine *vm);
-	/** Release the owned RLE data. */
+	/** Release the member RLE data. */
 	~RleBlock();
 
 	/** Load the recoverable prefix of an RB or AN frame record from @p stream. */
@@ -273,7 +278,7 @@ private:
 	 * The sum is saturated at 255.
 	 */
 	static byte blendChannel(byte src, byte dest, byte inverseAlpha, const AlphaBlendLUT &alphaLUT);
-	/** Exchange owned frame state with @p other. */
+	/** Exchange frame buffer state with @p other. */
 	void swapData(RleBlock &other);
 };
 
@@ -282,7 +287,7 @@ class Animation {
 public:
 	/** Construct an animation without frames, bound to @p vm. */
 	explicit Animation(Zoombini2Engine *vm);
-	/** Release all owned frames. */
+	/** Release all retained frames. */
 	~Animation();
 
 	/** Load every recoverable frame from @p path. */
@@ -296,8 +301,31 @@ public:
 private:
 	/** Borrowed vm passed to each decoded frame. */
 	Zoombini2Engine *_vm;
-	/** Ordered frame sequence owned by this animation. */
+	/** Ordered frame sequence released with this animation. */
 	Common::Array<RleBlock *> _frames;
+};
+
+/**
+ * Decoded 1-bit page-area bitmap used by common Zoombini drop handling.
+ *
+ * The original tests the packed source byte containing a point rather than an
+ * individual bit. The decoder keeps the pixel row and reproduces that byte-wide
+ * acceptance rule explicitly.
+ */
+class AreaMask : public Common::NonCopyable {
+public:
+	/** Construct an empty mask bound to @p vm. */
+	explicit AreaMask(Zoombini2Engine *vm);
+	/** Load a 1-bit BMP mask through the engine resource resolver. */
+	bool loadFromFile(const Common::Path &path);
+	/** Return whether the source byte containing @p point has any marked bit. */
+	bool hasMarkedByteAt(const Common::Point32 &point) const;
+
+private:
+	Zoombini2Engine *_vm;
+	int _width = 0;
+	int _height = 0;
+	Common::Array<byte> _pixels;
 };
 
 /**
@@ -320,11 +348,15 @@ public:
 
 	/** Construct an empty sprite grid bound to @p vm. */
 	explicit ZoombiniAnimation(Zoombini2Engine *vm);
-	/** Release every frame owned by the sprite grid. */
+	/** Release every frame retained by the sprite grid. */
 	~ZoombiniAnimation();
 
 	/** Load every recoverable grid entry from @p path. */
 	bool loadFromFile(const Common::Path &path);
+	/** Set the page-configured delay shared by every Zoombini using this grid. */
+	void setFrameDelay(uint32 frameDelay) { _frameDelay = frameDelay; }
+	/** Return the page-configured delay shared by every Zoombini using this grid. */
+	uint32 getFrameDelay() const { return _frameDelay; }
 	/** Return a borrowed frame, or nullptr when either index is invalid. */
 	const RleBlock *getFrame(int cellIndex, int frameIndex) const;
 	/** Return the number of frames in @p cellIndex, or zero for an invalid cell. */
@@ -338,11 +370,13 @@ public:
 private:
 	/** Borrowed vm used to open the ANM resource and construct its frames. */
 	Zoombini2Engine *_vm;
+	/** Page-configured delay retained beside the shared sprite grid. */
+	uint32 _frameDelay = 0;
 	/** Represents the frames assigned to one sprite-grid entry. */
 	struct Cell {
 		/** Ordered frames stored in this grid entry. */
 		Common::Array<RleBlock *> frames;
-		/** Release every owned frame. */
+		/** Release every retained frame. */
 		~Cell();
 	};
 
@@ -361,7 +395,7 @@ class UIButton {
 public:
 	/** Construct an enabled button bound to @p vm. */
 	explicit UIButton(Zoombini2Engine *vm);
-	/** Release every image owned by the button. */
+	/** Release every image retained by the button. */
 	~UIButton();
 
 	/**
@@ -447,7 +481,7 @@ private:
 	/** Borrowed absolute clipping coordinate for the overlay's right edge. */
 	const int *_overlayClipRight = nullptr;
 
-	/** Release all owned state images. */
+	/** Release all retained state images. */
 	void clearImages();
 	/** Load one image, preferring the cached bitmap representation. */
 	bool loadImage(const Common::Path &path, BitBlock *&bitmap, RleBlock *&rle);
@@ -553,7 +587,7 @@ public:
 
 	/** Construct a panel bound to @p vm with all volumes set to 100 percent. */
 	explicit VolumePanel(Zoombini2Engine *vm);
-	/** Release the preview sounds and owned gauge image after the buttons stop borrowing it. */
+	/** Release the preview sounds and retained gauge image after the buttons stop borrowing it. */
 	~VolumePanel();
 
 	/** Load gauge, button, and optional audio-preview resources. */
@@ -623,11 +657,11 @@ private:
 	bool _hasHeldMouse = false;
 	/** Most recently released slider awaiting category-specific audio preview. */
 	int _lastAdjustedSlider = -1;
-	/** Borrowed sound manager that owns the panel's logical preview records. */
+	/** Borrowed sound manager that retains the panel's logical preview records. */
 	SoundManager *_soundManager = nullptr;
-	/** Panel-owned speech preview sound identifier. */
+	/** Speech preview sound identifier retained by the panel. */
 	int _speechPreviewSoundId = -1;
-	/** Panel-owned sound-effect preview identifier. */
+	/** Sound-effect preview identifier retained by the panel. */
 	int _sfxPreviewSoundId = -1;
 
 	/** Gauge sprite held by this panel and shared by the three slider rows. */
