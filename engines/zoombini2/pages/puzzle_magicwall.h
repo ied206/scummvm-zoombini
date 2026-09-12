@@ -52,7 +52,7 @@ public:
 	/** Advance the active path, gates, and completion state. */
 	void onUpdate() override;
 	/** Draw the maze, controls, color guides, gates, and Zoombinis. */
-	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderContent(ManagedSurface32 *screen) override;
 	/** Restore the page background. */
 	void onRenderBackground(ManagedSurface32 *screen) override;
 	/** Activate the tablet or lever at @p pos. */

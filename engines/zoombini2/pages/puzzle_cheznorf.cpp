@@ -225,7 +225,7 @@ void PuzzleChezNorf::init() {
 	_vm->reseedRandomForV10();
 	generateFoodVals();
 	// Select one of four clue templates within the current level family.
-	_templateId = (_level * 10) + (_vm->getRandom()->getRandomNumber(3) + 1);
+	_templateId = (_level * 10) + (_vm->_rnd->getRandomNumber(3) + 1);
 	setTableAnswersByTemplate();
 	generateFoodGrid();
 
@@ -252,31 +252,29 @@ void PuzzleChezNorf::generateFoodVals() {
 	// Slurp (0-2): any 3 distinct values in [0,2]
 	// Miam  (3-5): any 3 distinct values in [3,5]
 	// Glouglou (6-8): any 3 distinct values in [6,8]
-	Zoombini2Random *rng = _vm->getRandom();
-
 	// Slurp
-	_foodVals[0] = rng->getRandomNumber(2);
+	_foodVals[0] = _vm->_rnd->getRandomNumber(2);
 	do {
-		_foodVals[1] = rng->getRandomNumber(2);
+		_foodVals[1] = _vm->_rnd->getRandomNumber(2);
 	} while (_foodVals[1] == _foodVals[0]);
 	do {
-		_foodVals[2] = rng->getRandomNumber(2);
+		_foodVals[2] = _vm->_rnd->getRandomNumber(2);
 	} while (_foodVals[2] == _foodVals[0] || _foodVals[2] == _foodVals[1]);
 	// Miam
-	_foodVals[3] = rng->getRandomNumber(2) + 3;
+	_foodVals[3] = _vm->_rnd->getRandomNumber(2) + 3;
 	do {
-		_foodVals[4] = rng->getRandomNumber(2) + 3;
+		_foodVals[4] = _vm->_rnd->getRandomNumber(2) + 3;
 	} while (_foodVals[4] == _foodVals[3]);
 	do {
-		_foodVals[5] = rng->getRandomNumber(2) + 3;
+		_foodVals[5] = _vm->_rnd->getRandomNumber(2) + 3;
 	} while (_foodVals[5] == _foodVals[3] || _foodVals[5] == _foodVals[4]);
 	// Glouglou
-	_foodVals[6] = rng->getRandomNumber(2) + 6;
+	_foodVals[6] = _vm->_rnd->getRandomNumber(2) + 6;
 	do {
-		_foodVals[7] = rng->getRandomNumber(2) + 6;
+		_foodVals[7] = _vm->_rnd->getRandomNumber(2) + 6;
 	} while (_foodVals[7] == _foodVals[6]);
 	do {
-		_foodVals[8] = rng->getRandomNumber(2) + 6;
+		_foodVals[8] = _vm->_rnd->getRandomNumber(2) + 6;
 	} while (_foodVals[8] == _foodVals[6] || _foodVals[8] == _foodVals[7]);
 }
 
@@ -403,12 +401,10 @@ void PuzzleChezNorf::generateFoodGrid() {
 	// Simplified: each food item in a category is placed across some cells.
 	// This board is decorative and does not own interaction state.
 	_vm->reseedRandomForV10();
-	Zoombini2Random *rng = _vm->getRandom();
-
 	for (int section = 0; section < 3; section++) {
 		for (int col = 0; col < 6; col++) {
 			for (int row = 0; row < 4; row++) {
-				_foodGrid[section][col][row] = rng->getRandomNumber(2) + 1;
+				_foodGrid[section][col][row] = _vm->_rnd->getRandomNumber(2) + 1;
 			}
 		}
 	}
@@ -573,7 +569,7 @@ void PuzzleChezNorf::freeZoombini(int tableIdx) {
 
 	TableSlot &slot = _tables[tableIdx];
 	if (slot.zoombiniIdx >= 0 && slot.zoombiniIdx < (int)_puzzleZoombinis.size()) {
-		ZoombiniState *z = _puzzleZoombinis[slot.zoombiniIdx];
+		ZoombiniRunner *z = _puzzleZoombinis[slot.zoombiniIdx];
 		z->_puzzleStatus = 1;
 		debug(2, "ChezNorf: freed zoombini %d from table %d", slot.zoombiniIdx, tableIdx);
 	}
@@ -670,11 +666,8 @@ int PuzzleChezNorf::findFoodAtPos(const Common::Point &pos) const {
 // Drawing
 // ============================================================================
 
-void PuzzleChezNorf::onRenderScene(ManagedSurface32 *screen) {
-	// Background (loaded by base class)
-	if (_background) {
-		_background->drawToSurface(screen, Common::Point32(0, 0));
-	}
+void PuzzleChezNorf::onRenderContent(ManagedSurface32 *screen) {
+	drawPrimaryPageLayer(screen);
 
 	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 
@@ -853,7 +846,7 @@ void PuzzleChezNorf::onRenderActors(ManagedSurface32 *screen) {
 		if (zIdx < 0 || zIdx >= (int)_puzzleZoombinis.size())
 			continue;
 
-		const ZoombiniState *z = _puzzleZoombinis[zIdx];
+		const ZoombiniRunner *z = _puzzleZoombinis[zIdx];
 		const Common::Point32 pos(_tables[i].pos.x, _tables[i].pos.y - 60);
 
 		_zoombiniAnimation->drawZoombini(screen, z->_traits, pos, 0, 0, lut);

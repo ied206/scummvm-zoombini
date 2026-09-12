@@ -32,7 +32,7 @@ class Animation;
 class BitBlock;
 class RleBlock;
 class ZoombiniAnimation;
-class ZoombiniState;
+class ZoombiniRunner;
 
 /** 
  * Booliewood - Celebration shown after 400 rescues.
@@ -52,8 +52,9 @@ public:
 	/** Advance dancers, decorative Zoombinis, fireworks, and speech deadlines. */
 	void onUpdate() override;
 	/** Draw the complete fixed celebration scene. */
-	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderContent(ManagedSurface32 *screen) override;
 	void onRenderActors(ManagedSurface32 *screen) override;
+	void onActorsRendered() override;
 	/** Return to the sign-in menu on any click. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 
@@ -93,8 +94,10 @@ private:
 
 	/** Allocate and initialize the two decorative Zoombinis. */
 	void createDecorativeZoombinis();
-	/** Apply the original randomized idle-to-walk and walk-to-idle tests. */
+	/** Schedule due decorative Zoombini frame advances before drawing. */
 	void updateDecorativeZoombinis(uint32 now);
+	/** Apply the original post-draw idle-to-walk and walk-to-idle random tests. */
+	void updateDecorativeZoombiniRunnersAfterDraw(uint32 now);
 	/** Advance firework animation activity, restart one completed firework, or move all active fireworks. */
 	void updateFireworks(uint32 now);
 	/** Advance one firework's 40-millisecond non-looping animation. */
@@ -115,7 +118,7 @@ private:
 	/** Draw one plain AN animation frame at a fixed position. */
 	void drawAnimation(const Animation *animation, int frameIndex, const Common::Point32 &pos, ManagedSurface32 *screen) const;
 	/** Draw one Little-Zoombini state at a fixed position. */
-	void drawZoombini(const ZoombiniState &zoombini, ManagedSurface32 *screen) const;
+	void drawZoombini(const ZoombiniRunner &zoombini, ManagedSurface32 *screen) const;
 
 	/** Fixed celebration background managed by this page. */
 	BitBlock *_background = nullptr;
@@ -131,9 +134,9 @@ private:
 	Animation *_revealFlare1 = nullptr;
 	/** Dormant second reveal flare managed by this page. */
 	Animation *_revealFlare2 = nullptr;
-	/** Borrowed immutable seated sprite grid owned by the engine cache. */
+	/** Borrowed immutable seated sprite grid retained in the engine cache. */
 	const ZoombiniAnimation *_zoombiniAnimation = nullptr;
-	/** Borrowed immutable walking sprite grid owned by the engine cache. */
+	/** Borrowed immutable walking sprite grid retained in the engine cache. */
 	const ZoombiniAnimation *_walkingZoombiniAnimation = nullptr;
 	/** Firework states in blue, green, red order. */
 	FireworkState _fireworks[kFireworkCount] = {};

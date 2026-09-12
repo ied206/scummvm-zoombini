@@ -43,7 +43,7 @@ public:
 class Animation;
 class RleBlock;
 class ZoombiniAnimation;
-class ZoombiniState;
+class ZoombiniRunner;
 struct BoardRecord;
 
 /** Common waiting-roster, scrolling, and departure lifecycle for both rescue sites. */
@@ -55,7 +55,7 @@ public:
 	/** Advance the departure phase. */
 	void onUpdate() override;
 	/** Draw the site-owned foreground followed by the common waiting roster. */
-	void onRenderScene(ManagedSurface32 *screen) override;
+	void onRenderContent(ManagedSurface32 *screen) override;
 	/** Dispatch common scrolling and roster selection around site-owned controls. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 	/** Return whether the departure roster contains exactly eight Zoombinis. */
@@ -146,7 +146,7 @@ private:
 	/** Borrowed immutable sprite grid owned by the engine cache. */
 	const ZoombiniAnimation *_zoombiniAnimation = nullptr;
 	/** Runtime party chosen to leave this rescue site. */
-	Common::Array<ZoombiniState *> _departureRoster;
+	Common::Array<ZoombiniRunner *> _departureRoster;
 };
 
 } // End of namespace Zoombini2

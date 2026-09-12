@@ -142,10 +142,10 @@ void ShelterFinal::init() {
 		firework.nextFrameTime = now + 40;
 	}
 
-	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/littleZomb.anm"));
+	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/littleZomb.anm"), 50);
 	if (!_zoombiniAnimation)
 		warning("BooliewoodFinalPage: Failed to load littleZomb.anm");
-	_walkingZoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/attente/attenteZomb.anm"));
+	_walkingZoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/attente/attenteZomb.anm"), 50);
 	if (!_walkingZoombiniAnimation)
 		warning("BooliewoodFinalPage: Failed to load attenteZomb.anm");
 	createDecorativeZoombinis();
@@ -199,7 +199,7 @@ void ShelterFinal::onUpdate() {
 	}
 }
 
-void ShelterFinal::onRenderScene(ManagedSurface32 *screen) {
+void ShelterFinal::onRenderContent(ManagedSurface32 *screen) {
 	if (_background)
 		_background->drawToSurface(screen, Common::Point32(0, 0));
 	if (_fullBigBool)
@@ -226,6 +226,12 @@ void ShelterFinal::onRenderActors(ManagedSurface32 *screen) {
 		drawZoombini(*_vm->_globalZoombinis[i], screen);
 }
 
+void ShelterFinal::onActorsRendered() {
+	for (int i = 0; i < kDecorativeZoombiniCount && i < static_cast<int>(_vm->_globalZoombinis.size()); i++)
+		_vm->_globalZoombinis[i]->advanceAnimationAfterDraw();
+	updateDecorativeZoombiniRunnersAfterDraw(_vm->getGameTickCount());
+}
+
 EventHandleResult ShelterFinal::onLButtonDown(const Common::Point &pos) {
 	(void)pos;
 	_vm->requestPageChange(kPageMenuOptions);
@@ -234,11 +240,11 @@ EventHandleResult ShelterFinal::onLButtonDown(const Common::Point &pos) {
 
 void ShelterFinal::createDecorativeZoombinis() {
 	for (int i = 0; i < kDecorativeZoombiniCount; i++) {
-		ZoombiniState *zoombini = new ZoombiniState();
-		zoombini->setTraits(ZmbTrait(static_cast<byte>(_vm->getRandom()->getRandomNumber(4) + 1),
-									 static_cast<byte>(_vm->getRandom()->getRandomNumber(4) + 1),
-									 static_cast<byte>(_vm->getRandom()->getRandomNumber(4) + 1),
-									 static_cast<byte>(_vm->getRandom()->getRandomNumber(4) + 1)));
+		ZoombiniRunner *zoombini = new ZoombiniRunner();
+		zoombini->setTraits(ZmbTrait(static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1),
+									 static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1),
+									 static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1),
+									 static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1)));
 		zoombini->setPosition(kDecorativeZoombiniPos[i]);
 		zoombini->setDefaultAnimation(_zoombiniAnimation, kDecorativeZoombiniCells[i]);
 		zoombini->_inputEnabled = false;
@@ -247,13 +253,19 @@ void ShelterFinal::createDecorativeZoombinis() {
 }
 
 void ShelterFinal::updateDecorativeZoombinis(uint32 now) {
+	for (int i = 0; i < kDecorativeZoombiniCount && i < static_cast<int>(_vm->_globalZoombinis.size()); i++)
+		_vm->_globalZoombinis[i]->updateAnimation(now);
+}
+
+void ShelterFinal::updateDecorativeZoombiniRunnersAfterDraw(uint32 now) {
 	for (int i = 0; i < kDecorativeZoombiniCount && i < static_cast<int>(_vm->_globalZoombinis.size()); i++) {
-		ZoombiniState *zoombini = _vm->_globalZoombinis[i];
-		zoombini->updateAnimation(now);
-		if (!zoombini->_animationActive && _vm->getRandom()->getRandomNumber(99) == 10)
-			zoombini->startAnimation(_walkingZoombiniAnimation, 33, now, 50, true);
-		if (zoombini->_animationActive && _vm->getRandom()->getRandomNumber(49) == 10)
+		ZoombiniRunner *zoombini = _vm->_globalZoombinis[i];
+		if (!zoombini->_animationActive && _vm->_rnd->getRandomNumber(99) == 10)
+			zoombini->startAnimation(_walkingZoombiniAnimation, 33, now);
+		if (zoombini->_animationActive && _vm->_rnd->getRandomNumber(49) == 10) {
 			zoombini->resetAnimation();
+			zoombini->_animationCell = kDecorativeZoombiniCells[i];
+		}
 	}
 }
 
@@ -296,8 +308,8 @@ void ShelterFinal::resetFirework(int fireworkIndex, uint32 now) {
 		return;
 	Common::Point32 pos;
 	do {
-		pos.x = _vm->getRandom()->getRandomNumber(749);
-		pos.y = _vm->getRandom()->getRandomNumber(299);
+		pos.x = _vm->_rnd->getRandomNumber(749);
+		pos.y = _vm->_rnd->getRandomNumber(299);
 	} while (!isFireworkPositionFree(pos));
 	firework.collisionRect = Common::Rect(pos.x, pos.y, pos.x + 60, pos.y + 59);
 	firework.startPos = pos;
@@ -345,14 +357,14 @@ bool ShelterFinal::pointInsidePaddedRect(const Common::Point32 &pos, const Commo
 }
 
 void ShelterFinal::scheduleNextAmbient(uint32 now) {
-	_nextAmbientTime = now + 1000 * (_vm->getRandom()->getRandomNumber(9) + 10);
+	_nextAmbientTime = now + 1000 * (_vm->_rnd->getRandomNumber(9) + 10);
 }
 
 void ShelterFinal::playRandomAmbient() {
 	SoundManager *sound = _vm->getSoundManager();
 	if (!sound)
 		return;
-	const int index = _vm->getRandom()->getRandomNumber(kAmbientSoundCount - 1);
+	const int index = _vm->_rnd->getRandomNumber(kAmbientSoundCount - 1);
 	if (0 <= _ambientSoundIds[index])
 		sound->playWithVolume(_ambientSoundIds[index], sound->_volumeSpeech);
 }
@@ -366,7 +378,7 @@ void ShelterFinal::drawAnimation(const Animation *animation, int frameIndex,
 		frame->drawToScreen(screen, pos, _vm->getAlphaLUT());
 }
 
-void ShelterFinal::drawZoombini(const ZoombiniState &zoombini, ManagedSurface32 *screen) const {
+void ShelterFinal::drawZoombini(const ZoombiniRunner &zoombini, ManagedSurface32 *screen) const {
 	zoombini.draw(screen, _vm->getAlphaLUT());
 }
 

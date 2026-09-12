@@ -340,15 +340,13 @@ void PuzzleMagicWall::placeColorBugs() {
 	_colorBugs.clear();
 
 	_vm->reseedRandomForV10();
-	Zoombini2Random *rnd = _vm->getRandom();
-
 	// Match bugs to dots
 	for (uint i = 0; i < _colorDots.size(); i++) {
 		ColorBug bug;
 		bug.colorIdx = _colorDots[i].colorIdx;
 		// Place bug near but not on top of dot
 		bug.pos = Common::Point32(
-			_colorDots[i].pos.x + rnd->getRandomNumberRng(-50, 50), _colorDots[i].pos.y + rnd->getRandomNumberRng(-30, 30));
+			_colorDots[i].pos.x + _vm->_rnd->getRandomNumberRng(-50, 50), _colorDots[i].pos.y + _vm->_rnd->getRandomNumberRng(-30, 30));
 		bug.active = true;
 		_colorBugs.push_back(bug);
 	}
@@ -611,11 +609,10 @@ void PuzzleMagicWall::onUpdate() {
 }
 
 void PuzzleMagicWall::onRenderBackground(ManagedSurface32 *screen) {
-	if (_background)
-		_background->drawToSurface(screen, Common::Point32(0, 0));
+	drawPrimaryPageLayer(screen);
 }
 
-void PuzzleMagicWall::onRenderScene(ManagedSurface32 *screen) {
+void PuzzleMagicWall::onRenderContent(ManagedSurface32 *screen) {
 
 	// Draw maze elements
 	drawMazeLevel(screen, _currentLevel);
@@ -783,7 +780,7 @@ void PuzzleMagicWall::onRenderActors(ManagedSurface32 *screen) {
 		if (slot.zoombiniIdx < 0 || (i >= 4 && slot.captured))
 			continue;
 
-		const ZoombiniState *z = _puzzleZoombinis[slot.zoombiniIdx];
+		const ZoombiniRunner *z = _puzzleZoombinis[slot.zoombiniIdx];
 
 		// Draw zoombini at current position
 		if (_zoombiniAnimation) {

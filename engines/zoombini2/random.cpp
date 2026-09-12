@@ -28,67 +28,61 @@
 
 #include "gui/EventRecorder.h"
 
+#include "zoombini2/metaengine.h"
 #include "zoombini2/random.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
-Zoombini2Random::Zoombini2Random(const Common::String &name)
-	: _scummRnd(name), _useOriginal(ConfMan.getBool(kConfigOriginalPRNG)) {
-	assert(g_system);
+Random::Random(const Common::String &name) : _scummRnd(name) {
+	_useOriginal = ConfMan.getBool(::Zoombini2MetaEngine::kConfigOriginalPRNG);
 
 #ifdef ENABLE_EVENTRECORDER
-	if (_useOriginal)
-		setSeed(g_eventRec.getRandomSeed(name));
+	setSeed(g_eventRec.getRandomSeed(name));
 #else
-	if (_useOriginal) {
-		if (ConfMan.hasKey("random_seed"))
-			setSeed(ConfMan.getInt("random_seed"));
-		else
-			setSeed(static_cast<uint32>(Common::DateTime::getTime()));
-	}
+	setSeed(generateNewSeed());
 #endif
 }
 
-Zoombini2Random::Zoombini2Random(uint32 seed)
-	: _scummRnd("zoombini2-seeded"), _useOriginal(ConfMan.getBool(kConfigOriginalPRNG)) {
-	setSeed(seed);
-}
-
-void Zoombini2Random::setSeed(uint32 seed) {
+void Random::setSeed(uint32 seed) {
 	_randState = seed;
 	_scummRnd.setSeed(seed);
 }
 
-int Zoombini2Random::getOriginalRandomNumber(int max) {
+uint32 Random::generateNewSeed() {
+	return Common::RandomSource::generateNewSeed();
+}
+
+int32 Random::getOriginalRandomNumber(int32 max) {
 	assert(0 <= max);
 
 	// MSVC 6.0 CRT rand() advances this unsigned 32-bit LCG and returns bits 16 through 30.
+	// The state is advanced even though the max limit is 0.
 	_randState = 214013u * _randState + 2531011u;
-	const int result = static_cast<int>((_randState >> 16) & 0x7FFFu);
+	const int32 result = static_cast<int32>((_randState >> 16) & 0x7FFFu);
 	if (max == INT_MAX)
 		return result;
 	return result % (max + 1);
 }
 
-int Zoombini2Random::getRandomNumber(int max) {
+int32 Random::getRandomNumber(int32 max) {
 	assert(0 <= max);
 
 	if (!_useOriginal)
-		return static_cast<int>(_scummRnd.getRandomNumber(static_cast<uint>(max)));
+		return static_cast<int32>(_scummRnd.getRandomNumber(static_cast<uint32>(max)));
 
 	return getOriginalRandomNumber(max);
 }
 
-int Zoombini2Random::getRandomNumberRng(int min, int max) {
+int32 Random::getRandomNumberRng(int32 min, int32 max) {
 	if (max < min) {
 		warning("Zoombini2Random::getRandomNumberRng: max(%d) is smaller than min(%d), swapping", max, min);
-		SWAP(min, max);
+		SWAP<int32>(min, max);
 	}
 
-	const uint32 span = static_cast<uint32>(max) - static_cast<uint32>(min);
+	const uint32 span = static_cast<uint32>(max - min);
 	assert(span <= static_cast<uint32>(INT_MAX));
-	return min + getRandomNumber(static_cast<int>(span));
+	return min + getRandomNumber(static_cast<int32>(span));
 }
 
 } // End of namespace Zoombini2
