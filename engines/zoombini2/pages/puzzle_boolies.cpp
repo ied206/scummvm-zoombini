@@ -534,18 +534,16 @@ void PuzzleBoolies::onRenderContent(ManagedSurface32 *screen) {
 }
 
 void PuzzleBoolies::drawSpots(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	for (int i = 0; i < 5; i++) {
 		if (!_spots[i].active)
 			continue;
 
 		RleBlock *image = _spotImage[i];
 		if (image) {
-			image->drawToScreen(screen, Common::Point32(_spots[i].pos.x - 25, _spots[i].pos.y - 25), lut);
+			_vm->_gfx->drawRleBlock(screen, image, Common::Point32(_spots[i].pos.x - 25, _spots[i].pos.y - 25));
 		} else {
 			// Fallback: draw circle
-			screen->fillRect(Common::Rect32(
+			_vm->_gfx->fillRect(screen, Common::Rect32(
 						 _spots[i].pos.x - 20, _spots[i].pos.y - 20,
 						 _spots[i].pos.x + 20, _spots[i].pos.y + 20),
 							 0x00FFFF);
@@ -554,8 +552,6 @@ void PuzzleBoolies::drawSpots(ManagedSurface32 *screen) {
 }
 
 void PuzzleBoolies::drawPins(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	for (uint i = 0; i < _pins.size(); i++) {
 		const Pin &pin = _pins[i];
 
@@ -564,13 +560,13 @@ void PuzzleBoolies::drawPins(ManagedSurface32 *screen) {
 
 		RleBlock *image = pin.lighted ? _pinLightedImage : _pinImage;
 		if (image) {
-			image->drawToScreen(screen, Common::Point32(pin.pos.x - 10, pin.pos.y - 20), lut);
+			_vm->_gfx->drawRleBlock(screen, image, Common::Point32(pin.pos.x - 10, pin.pos.y - 20));
 		} else {
 			// Fallback: draw triangle
 			uint32 color = pin.lighted ? 0xFFFF00 : 0xFFFFFF;
-			screen->drawLine(pin.pos.x, pin.pos.y - 20, pin.pos.x - 10, pin.pos.y, color);
-			screen->drawLine(pin.pos.x, pin.pos.y - 20, pin.pos.x + 10, pin.pos.y, color);
-		screen->drawLine(pin.pos.x - 10, pin.pos.y, pin.pos.x + 10, pin.pos.y, color);
+			_vm->_gfx->drawLine(screen, Common::Point32(pin.pos.x, pin.pos.y - 20), Common::Point32(pin.pos.x - 10, pin.pos.y), color);
+			_vm->_gfx->drawLine(screen, Common::Point32(pin.pos.x, pin.pos.y - 20), Common::Point32(pin.pos.x + 10, pin.pos.y), color);
+			_vm->_gfx->drawLine(screen, Common::Point32(pin.pos.x - 10, pin.pos.y), Common::Point32(pin.pos.x + 10, pin.pos.y), color);
 		}
 	}
 }
@@ -579,15 +575,13 @@ void PuzzleBoolies::drawBall(ManagedSurface32 *screen) {
 	if (_activeBall.type == kBallNone)
 		return;
 
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	RleBlock *image = (_activeBall.type == kBallPositive) ? _ballPosImage : _ballNegImage;
 	if (image) {
-		image->drawToScreen(screen, Common::Point32(_activeBall.pos.x - 15, _activeBall.pos.y - 15), lut);
+		_vm->_gfx->drawRleBlock(screen, image, Common::Point32(_activeBall.pos.x - 15, _activeBall.pos.y - 15));
 	} else {
 		// Fallback: draw circle
 		uint32 color = (_activeBall.type == kBallPositive) ? 0x00FF00 : 0xFF0000;
-		screen->fillRect(Common::Rect32(
+		_vm->_gfx->fillRect(screen, Common::Rect32(
 						 _activeBall.pos.x - 15, _activeBall.pos.y - 15,
 						 _activeBall.pos.x + 15, _activeBall.pos.y + 15),
 						 color);
@@ -598,17 +592,15 @@ void PuzzleBoolies::drawBoat(ManagedSurface32 *screen) {
 	if (!_boatVisible)
 		return;
 
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	if (_boatImage) {
-		_boatImage->drawToScreen(screen, _boatPos, lut);
+		_vm->_gfx->drawRleBlock(screen, _boatImage, _boatPos);
 	} else {
 		// Fallback: draw simple boat shape
-		screen->fillRect(Common::Rect32(
+		_vm->_gfx->fillRect(screen, Common::Rect32(
 						 _boatPos.x, _boatPos.y + 20,
 						 _boatPos.x + 80, _boatPos.y + 40),
 						 0x8B4513);
-		screen->fillRect(Common::Rect32(
+		_vm->_gfx->fillRect(screen, Common::Rect32(
 						 _boatPos.x + 30, _boatPos.y,
 						 _boatPos.x + 50, _boatPos.y + 30),
 						 0xFFFFFF);
@@ -616,7 +608,6 @@ void PuzzleBoolies::drawBoat(ManagedSurface32 *screen) {
 }
 
 void PuzzleBoolies::drawBlockers(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	uint32 now = _vm->getGameTickCount();
 
 	for (uint i = 0; i < _blockers.size(); i++) {
@@ -627,23 +618,19 @@ void PuzzleBoolies::drawBlockers(ManagedSurface32 *screen) {
 			int frameCount = _blockerAnim->getFrameCount();
 			if (frameCount > 0) {
 				int frameIdx = (now / 120) % frameCount; // ~8 fps animation
-				const RleBlock *frame = _blockerAnim->getFrame(frameIdx);
-				if (frame)
-					frame->drawToScreen(screen, pos, lut);
+				_vm->_gfx->drawAnimationFrame(screen, _blockerAnim, frameIdx, pos);
 			}
 		} else if (_blockerImage) {
-			_blockerImage->drawToScreen(screen, pos, lut);
+			_vm->_gfx->drawRleBlock(screen, _blockerImage, pos);
 		} else {
 			// Fallback: draw rectangle
-			screen->fillRect(Common::Rect32(pos.x, pos.y, pos.x + 30, pos.y + 60), 0x800000);
+			_vm->_gfx->fillRect(screen, Common::Rect32(pos.x, pos.y, pos.x + 30, pos.y + 60), 0x800000);
 		}
 	}
 }
 
 void PuzzleBoolies::onRenderActors(ManagedSurface32 *screen) {
 	// Draw zoombinis waiting on the boat (freed ones)
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	if (!_zoombiniAnimation)
 		return;
 
@@ -654,7 +641,7 @@ void PuzzleBoolies::onRenderActors(ManagedSurface32 *screen) {
 			const ZoombiniRunner *z = _puzzleZoombinis[i];
 			Common::Point32 pos(_boatPos.x + 10 + (freeIdx % 4) * 18, _boatPos.y + 10 + (freeIdx / 4) * 20);
 
-			_zoombiniAnimation->drawZoombini(screen, z->_traits, pos, 0, 0, lut);
+			_vm->_gfx->drawZoombini(screen, _zoombiniAnimation, z->_traits, pos, 0, 0);
 			freeIdx += 1;
 		}
 	}

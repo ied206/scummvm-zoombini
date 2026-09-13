@@ -26,10 +26,6 @@
 #include "common/rect.h"
 #include "common/str.h"
 
-namespace Graphics {
-class ManagedSurface;
-}
-
 namespace Zoombini2 {
 
 class AlphaBlendLUT;

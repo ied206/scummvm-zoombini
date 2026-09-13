@@ -52,7 +52,10 @@ void TransitionCredits::init() {
 		warning("TransitionCredits: Failed to load bmp/credits/credits");
 	}
 
-	_maxScrollY = (600 < _background->getHeight()) ? (_background->getHeight() - 600) : 0;
+	const Size32 backgroundSize = _background->getSize();
+	_maxScrollY = 0;
+	if (ManagedSurface32::kScreenSize.height < backgroundSize.height)
+		_maxScrollY = backgroundSize.height - ManagedSurface32::kScreenSize.height;
 
 	_scrollY = 0.0f;
 	_scrollActive = true;
@@ -112,13 +115,12 @@ void TransitionCredits::onRenderContent(ManagedSurface32 *screen) {
 		return;
 
 	const int y = static_cast<int>(_scrollY);
-	const int bmpW = _background->getWidth();
-	const int bmpH = _background->getHeight();
-	int srcBottom = y + 600;
-	if (bmpH < srcBottom)
-		srcBottom = bmpH;
+	const Size32 backgroundSize = _background->getSize();
+	int srcBottom = y + ManagedSurface32::kScreenSize.height;
+	if (backgroundSize.height < srcBottom)
+		srcBottom = backgroundSize.height;
 
-	_background->drawSubRect(screen, Common::Point32(0, 0), Common::Rect(0, y, bmpW, srcBottom));
+	_background->drawSubRect(screen, Common::Point32(0, 0), Common::Rect(0, y, backgroundSize.width, srcBottom));
 }
 
 EventHandleResult TransitionCredits::onLButtonDown(const Common::Point &pos) {
