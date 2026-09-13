@@ -140,9 +140,9 @@ void PuzzleBase::renderZoombinis(ManagedSurface32 *screen) const {
 		order[insertion] = index;
 	}
 	for (uint index : order)
-		_puzzleZoombinis[index]->draw(screen, _vm->getAlphaLUT());
+		_vm->_gfx->drawZoombiniRunner(screen, _puzzleZoombinis[index]);
 	if (draggedZoombini)
-		draggedZoombini->draw(screen, _vm->getAlphaLUT());
+		_vm->_gfx->drawZoombiniRunner(screen, draggedZoombini);
 }
 
 } // End of namespace Zoombini2

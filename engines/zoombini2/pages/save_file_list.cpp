@@ -97,9 +97,8 @@ bool SaveFileList::handleClick(const Common::Point &pos) {
 
 	const int left = _pos.x + kSelectionOffsetX;
 	const int top = _pos.y + kSelectionOffsetY;
-	const int width = _selectionBar->getWidth();
-	const int height = _selectionBar->getHeight() * kVisibleRows;
-	if (pos.x < left || left + width <= pos.x || pos.y < top || top + height <= pos.y)
+	const Size32 selectionSize(_selectionBar->getSize().width, _selectionBar->getSize().height * kVisibleRows);
+	if (pos.x < left || left + selectionSize.width <= pos.x || pos.y < top || top + selectionSize.height <= pos.y)
 		return false;
 
 	const int row = (pos.y - top) / kRowStride;

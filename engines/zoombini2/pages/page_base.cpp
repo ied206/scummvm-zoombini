@@ -46,8 +46,7 @@ bool PageLayer::loadBackground(const Common::Path &path) {
 
 	delete _background;
 	_background = background;
-	_backgroundWidth = background->getWidth();
-	_backgroundHeight = background->getHeight();
+	_backgroundSize = background->getSize();
 	_backgroundless = false;
 	_backgroundDrawn = false;
 	wrapScrollX();
@@ -192,7 +191,7 @@ bool PageLayer::activateRunnersAt(const Common::Point32 &point) {
 			runner = _animationRunners[index];
 		if (!runner->isActive() && runner->getMode() != AnimationRunnerMode::kDisabled04) {
 			runner->start(_vm->getGameTickCount());
-			runner->captureBackground(_vm->getCurrentScreen(), _scrollX, _backgroundWidth);
+			runner->captureBackground(_vm->getCurrentScreen(), _scrollX, _backgroundSize.width);
 		}
 	}
 	return hit;
@@ -201,8 +200,8 @@ bool PageLayer::activateRunnersAt(const Common::Point32 &point) {
 void PageLayer::drawBackgroundRegion(ManagedSurface32 *screen, int sourceX, int sourceY) const {
 	if (!_background || !screen)
 		return;
-	const Common::Rect sourceRect(sourceX, sourceY, sourceX + ManagedSurface32::kScreenWidth, sourceY + ManagedSurface32::kScreenHeight);
-	_background->drawSubRect(screen, Common::Point32(0, 0), sourceRect);
+	const Common::Rect sourceRect(sourceX, sourceY, sourceX + ManagedSurface32::kScreenSize.width, sourceY + ManagedSurface32::kScreenSize.height);
+	_vm->_gfx->drawBitBlockSubRect(screen, _background, Common::Point32(0, 0), sourceRect);
 }
 
 void PageLayer::drawAndUpdate(ManagedSurface32 *screen) {
@@ -210,23 +209,27 @@ void PageLayer::drawAndUpdate(ManagedSurface32 *screen) {
 		return;
 
 	if (_background) {
-		if (_backgroundWidth <= ManagedSurface32::kScreenWidth) {
+		if (_backgroundSize.width <= ManagedSurface32::kScreenSize.width) {
 			if (!_backgroundDrawn) {
 				drawBackgroundRegion(screen, 0, 0);
 				_backgroundDrawn = true;
 			}
 		} else if (!_backgroundless) {
-			if (0 < _scrollX && _scrollX < _backgroundWidth - ManagedSurface32::kScreenWidth) {
+			if (0 < _scrollX && _scrollX < _backgroundSize.width - ManagedSurface32::kScreenSize.width) {
 				drawBackgroundRegion(screen, _scrollX, 0);
 			} else if (0 < _scrollX) {
-				const int tailWidth = _backgroundWidth - _scrollX;
-				_background->drawSubRect(screen, Common::Point32(0, 0), Common::Rect(_scrollX, 0, _backgroundWidth, ManagedSurface32::kScreenHeight));
-				_background->drawSubRect(screen, Common::Point32(tailWidth, 0), Common::Rect(0, 0, ManagedSurface32::kScreenWidth - tailWidth, ManagedSurface32::kScreenHeight));
+				const int tailWidth = _backgroundSize.width - _scrollX;
+				_vm->_gfx->drawBitBlockSubRect(screen, _background, Common::Point32(0, 0),
+										  Common::Rect(_scrollX, 0, _backgroundSize.width, ManagedSurface32::kScreenSize.height));
+				_vm->_gfx->drawBitBlockSubRect(screen, _background, Common::Point32(tailWidth, 0),
+										  Common::Rect(0, 0, ManagedSurface32::kScreenSize.width - tailWidth, ManagedSurface32::kScreenSize.height));
 			} else {
-				const int tailStart = _backgroundWidth + _scrollX;
+				const int tailStart = _backgroundSize.width + _scrollX;
 				const int tailWidth = -_scrollX;
-				_background->drawSubRect(screen, Common::Point32(0, 0), Common::Rect(tailStart, 0, _backgroundWidth, ManagedSurface32::kScreenHeight));
-				_background->drawSubRect(screen, Common::Point32(tailWidth, 0), Common::Rect(0, 0, ManagedSurface32::kScreenWidth - tailWidth, ManagedSurface32::kScreenHeight));
+				_vm->_gfx->drawBitBlockSubRect(screen, _background, Common::Point32(0, 0),
+										  Common::Rect(tailStart, 0, _backgroundSize.width, ManagedSurface32::kScreenSize.height));
+				_vm->_gfx->drawBitBlockSubRect(screen, _background, Common::Point32(tailWidth, 0),
+										  Common::Rect(0, 0, ManagedSurface32::kScreenSize.width - tailWidth, ManagedSurface32::kScreenSize.height));
 			}
 		}
 	}
@@ -235,32 +238,31 @@ void PageLayer::drawAndUpdate(ManagedSurface32 *screen) {
 	for (uint index = 0; index < _animationRunners.size(); index++) {
 		AnimationRunner *runner = _animationRunners[index];
 		if (runner->getMode() != AnimationRunnerMode::kDisabled04)
-			runner->drawAndUpdate(screen, _vm->getAlphaLUT(), tickCount, _scrollX, _backgroundWidth);
+			_vm->_gfx->drawAndUpdateAnimationRunner(screen, runner, tickCount, _scrollX, _backgroundSize.width);
 	}
 }
 
-void PageLayer::setBackgroundDimensions(int width, int height) {
+void PageLayer::setBackgroundSize(const Size32 &size) {
 	if (!_backgroundless)
 		return;
-	_backgroundWidth = width;
-	_backgroundHeight = height;
+	_backgroundSize = size;
 	wrapScrollX();
 }
 
 int PageLayer::getWorldX(int screenX) const {
-	if (_backgroundWidth == ManagedSurface32::kScreenWidth)
+	if (_backgroundSize.width == ManagedSurface32::kScreenSize.width)
 		return screenX;
-	const int backgroundOrigin = 0 < _scrollX ? _scrollX : _backgroundWidth + _scrollX;
+	const int backgroundOrigin = 0 < _scrollX ? _scrollX : _backgroundSize.width + _scrollX;
 	return backgroundOrigin + screenX;
 }
 
 void PageLayer::wrapScrollX() {
-	if (_backgroundWidth <= 0)
+	if (_backgroundSize.width <= 0)
 		return;
-	if (_scrollX < -ManagedSurface32::kScreenWidth)
-		_scrollX = static_cast<int16>(_scrollX + _backgroundWidth);
-	if (_backgroundWidth - 1 < _scrollX)
-		_scrollX = static_cast<int16>(_scrollX - _backgroundWidth + 1);
+	if (_scrollX < -ManagedSurface32::kScreenSize.width)
+		_scrollX = static_cast<int16>(_scrollX + _backgroundSize.width);
+	if (_backgroundSize.width - 1 < _scrollX)
+		_scrollX = static_cast<int16>(_scrollX - _backgroundSize.width + 1);
 }
 
 PageLayerStack::PageLayerStack(Zoombini2Engine *vm) : _vm(vm) {
@@ -359,7 +361,7 @@ void PageLayerStack::propagateFirstLayerDimensions() {
 	if (!firstLayer)
 		return;
 	for (uint index = 1; index < _layers.size(); index++)
-		_layers[index]->setBackgroundDimensions(firstLayer->getBackgroundWidth(), firstLayer->getBackgroundHeight());
+		_layers[index]->setBackgroundSize(firstLayer->getBackgroundSize());
 }
 
 PageBase::PageBase(Zoombini2Engine *vm, PageCategory pageCategory)
@@ -415,7 +417,7 @@ void PageBase::render(ManagedSurface32 *screen) {
 
 void PageBase::renderFrame(ManagedSurface32 *screen, bool advanceState) {
 	if (needsScreenClear())
-		screen->fillRect(Common::Rect32(screen->w, screen->h), 0);
+		_vm->_gfx->fillRect(screen, Common::Rect32(screen->w, screen->h), 0);
 	onRenderBackground(screen);
 	onRenderContent(screen);
 	onRenderActors(screen);

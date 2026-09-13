@@ -21,8 +21,6 @@
 
 #include "common/debug.h"
 #include "common/system.h"
-#include "graphics/managed_surface.h"
-
 #include "zoombini2/graphics.h"
 #include "zoombini2/pages/dialog_msgbox.h"
 #include "zoombini2/sound.h"
@@ -55,7 +53,7 @@ bool DialogMsgBox::request(const Common::Path &textPath, Common::BaseCallback<Di
 	return true;
 }
 
-bool DialogMsgBox::openDialog(ManagedSurface32 *screen) {
+bool DialogMsgBox::openDialog() {
 	if (_state != DialogMsgBoxState::kPendingOpen01)
 		return _state == DialogMsgBoxState::kOpen02;
 
@@ -74,16 +72,15 @@ bool DialogMsgBox::openDialog(ManagedSurface32 *screen) {
 		return false;
 	}
 
-	const int panelWidth = _panels[1]->getWidth();
-	const int panelHeight = _panels[1]->getHeight();
+	const Size32 panelSize = _panels[1]->getSize();
 	if (_position.x == -1)
-		_position.x = ManagedSurface32::kScreenWidth / 2 - panelWidth / 2;
+		_position.x = ManagedSurface32::kScreenSize.width / 2 - panelSize.width / 2;
 	if (_position.y == -1)
-		_position.y = ManagedSurface32::kScreenHeight / 2 - panelHeight / 2;
+		_position.y = ManagedSurface32::kScreenSize.height / 2 - panelSize.height / 2;
 
-	_savedBackground = new Graphics::ManagedSurface(panelWidth, panelHeight, screen->format);
-	_savedBackground->copyRectToSurface(*screen, 0, 0,
-									 Common::Rect(_position.x, _position.y, _position.x + panelWidth, _position.y + panelHeight));
+	_savedBackground = _vm->_gfx->createSurface(panelSize);
+	_vm->_gfx->captureScreenRegion(_savedBackground,
+									 Common::Rect(_position.x, _position.y, _position.x + panelSize.width, _position.y + panelSize.height));
 
 	_pauseStartTime = g_system->getMillis();
 	_vm->_isPaused = true;
@@ -97,8 +94,7 @@ bool DialogMsgBox::openDialog(ManagedSurface32 *screen) {
 void DialogMsgBox::close() {
 	if (_state == DialogMsgBoxState::kOpen02) {
 		if (_savedBackground && _vm->getCurrentScreen()) {
-			_vm->getCurrentScreen()->copyRectToSurface(*_savedBackground, _position.x, _position.y,
-												Common::Rect(_savedBackground->w, _savedBackground->h));
+			_vm->_gfx->copyRegionToScreen(*_savedBackground, Common::Point(_position.x, _position.y));
 		}
 		_vm->addPauseTime(g_system->getMillis() - _pauseStartTime);
 		_vm->_isPaused = false;
@@ -148,7 +144,7 @@ void DialogMsgBox::activateButton(DialogMsgBoxButton button) {
 }
 
 void DialogMsgBox::onRenderContent(ManagedSurface32 *screen) {
-	if (!isActive() || !openDialog(screen))
+	if (!isActive() || !openDialog())
 		return;
 
 	const DialogMsgBoxButton hoveredButton = hitTest(Common::Point(_vm->getMousePos().x, _vm->getMousePos().y));

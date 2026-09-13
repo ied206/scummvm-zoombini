@@ -20,6 +20,7 @@
  */
 
 #include "base/plugins.h"
+#include "common/util.h"
 #include "engines/advancedDetector.h"
 #include "zoombini2/detection_tables.h"
 
@@ -57,6 +58,32 @@ public:
 	const char *getOriginalCopyright() const override {
 		return "Zoombinis: Mountain Rescue (C) 2001 The Learning Company";
 	}
+
+	DetectedGame toDetectedGame(const ADDetectedGame &adGame, ADDetectedGameExtraInfo *extraInfo) const override;
 };
+
+DetectedGame Zoombini2MetaEngineDetection::toDetectedGame(const ADDetectedGame &adGame, ADDetectedGameExtraInfo *extraInfo) const {
+	DetectedGame game = AdvancedMetaEngineDetection::toDetectedGame(adGame, extraInfo);
+	const Zoombini2::Zoombini2GameDescription *zoombini2Desc = reinterpret_cast<const Zoombini2::Zoombini2GameDescription *>(adGame.desc);
+
+	if ((zoombini2Desc->features & (Zoombini2::GF_Z2_V10 | Zoombini2::GF_Z2_V11)) && zoombini2Desc->desc.extra && *zoombini2Desc->desc.extra) {
+		// Keep each release target stable when multiple versions share the same platform and language.
+		Common::String versionTag;
+		for (const char *character = zoombini2Desc->desc.extra; *character; character++) {
+			if (Common::isAlnum(*character))
+				versionTag += *character;
+			else if (*character == '_')
+				versionTag += '-';
+		}
+		versionTag.toLowercase();
+
+		if (!versionTag.empty()) {
+			game.preferredTarget += '-';
+			game.preferredTarget += versionTag;
+		}
+	}
+
+	return game;
+}
 
 REGISTER_PLUGIN_STATIC(ZOOMBINI2_DETECTION, PLUGIN_TYPE_ENGINE_DETECTION, Zoombini2MetaEngineDetection);

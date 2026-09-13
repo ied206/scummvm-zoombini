@@ -25,6 +25,7 @@
 #include "common/array.h"
 #include "common/rect.h"
 
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/puzzle_base.h"
 #include "zoombini2/state.h"
 
@@ -70,10 +71,8 @@ public:
 	static const int kNumMirrorStates = 6;
 	/** Minimum number of released Zoombinis required for completion. */
 	static const int kMinFreed = 4;
-	/** Horizontal spacing between grid cells. */
-	static const int kCellWidth = 52;
-	/** Vertical spacing between grid cells. */
-	static const int kCellHeight = 68;
+	/** Spacing between grid cells. */
+	static const Size32 kCellSize;
 	/** Maximum value of a visible trait. */
 	static const int kMaxTraitValue = 5;
 	/** Number of level-progress indicator visuals. */

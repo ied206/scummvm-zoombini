@@ -345,8 +345,9 @@ void PuzzleMagicWall::placeColorBugs() {
 		ColorBug bug;
 		bug.colorIdx = _colorDots[i].colorIdx;
 		// Place bug near but not on top of dot
-		bug.pos = Common::Point32(
-			_colorDots[i].pos.x + _vm->_rnd->getRandomNumberRng(-50, 50), _colorDots[i].pos.y + _vm->_rnd->getRandomNumberRng(-30, 30));
+		const int32 offsetX = _vm->_rnd->getRandomNumberRng(-50, 50);
+		const int32 offsetY = _vm->_rnd->getRandomNumberRng(-30, 30);
+		bug.pos = Common::Point32(_colorDots[i].pos.x + offsetX, _colorDots[i].pos.y + offsetY);
 		bug.active = true;
 		_colorBugs.push_back(bug);
 	}
@@ -628,7 +629,7 @@ void PuzzleMagicWall::onRenderContent(ManagedSurface32 *screen) {
 #if 0
 	// Debug: Draw clickable regions
 	for (int i = 0; i < 4; i++) {
-		screen->frameRect(kPathButtons[i], 0xFFFF00);
+		_vm->_gfx->frameRect(screen, kPathButtons[i], 0xFFFF00);
 	}
 #endif
 }
@@ -641,25 +642,23 @@ void PuzzleMagicWall::drawMazeLevel(ManagedSurface32 *screen, int level) {
 	uint32 wallColor = 0x404040; // Dark grey
 
 	// Simple maze walls (horizontal)
-	screen->hLine(100, 200, 500, wallColor);
-	screen->hLine(100, 350, 500, wallColor);
-	screen->hLine(100, 500, 500, wallColor);
+	_vm->_gfx->drawLine(screen, Common::Point32(100, 200), Common::Point32(500, 200), wallColor);
+	_vm->_gfx->drawLine(screen, Common::Point32(100, 350), Common::Point32(500, 350), wallColor);
+	_vm->_gfx->drawLine(screen, Common::Point32(100, 500), Common::Point32(500, 500), wallColor);
 
 	// Simple maze walls (vertical)
-	screen->vLine(100, 200, 500, wallColor);
-	screen->vLine(300, 200, 500, wallColor);
-	screen->vLine(500, 200, 500, wallColor);
+	_vm->_gfx->drawLine(screen, Common::Point32(100, 200), Common::Point32(100, 500), wallColor);
+	_vm->_gfx->drawLine(screen, Common::Point32(300, 200), Common::Point32(300, 500), wallColor);
+	_vm->_gfx->drawLine(screen, Common::Point32(500, 200), Common::Point32(500, 500), wallColor);
 }
 
 void PuzzleMagicWall::drawColorDots(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	for (uint i = 0; i < _colorDots.size(); i++) {
 		const ColorDot &dot = _colorDots[i];
 		RleBlock *image = _dotImage[dot.colorIdx];
 
 		if (image) {
-			image->drawToScreen(screen, dot.pos, lut);
+			_vm->_gfx->drawRleBlock(screen, image, dot.pos);
 		} else {
 			// Fallback: draw colored circle
 			uint32 colors[] = {
@@ -674,7 +673,7 @@ void PuzzleMagicWall::drawColorDots(ManagedSurface32 *screen) {
 				0x8000FF, // violet
 				0xFFFF00  // yellow
 			};
-			screen->fillRect(
+			_vm->_gfx->fillRect(screen,
 				Common::Rect(
 					static_cast<int16>(dot.pos.x - 8), static_cast<int16>(dot.pos.y - 8),
 					static_cast<int16>(dot.pos.x + 8), static_cast<int16>(dot.pos.y + 8)),
@@ -683,7 +682,7 @@ void PuzzleMagicWall::drawColorDots(ManagedSurface32 *screen) {
 
 		if (dot.lightOn) {
 			// Draw light above dot
-			screen->fillRect(
+			_vm->_gfx->fillRect(screen,
 				Common::Rect(
 					static_cast<int16>(dot.pos.x - 4), static_cast<int16>(dot.pos.y - 20),
 					static_cast<int16>(dot.pos.x + 4), static_cast<int16>(dot.pos.y - 12)),
@@ -693,8 +692,6 @@ void PuzzleMagicWall::drawColorDots(ManagedSurface32 *screen) {
 }
 
 void PuzzleMagicWall::drawColorBugs(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	for (uint i = 0; i < _colorBugs.size(); i++) {
 		const ColorBug &bug = _colorBugs[i];
 		if (!bug.active)
@@ -702,7 +699,7 @@ void PuzzleMagicWall::drawColorBugs(ManagedSurface32 *screen) {
 
 		RleBlock *image = _bugImage[bug.colorIdx];
 		if (image) {
-			image->drawToScreen(screen, bug.pos, lut);
+			_vm->_gfx->drawRleBlock(screen, image, bug.pos);
 		}
 	}
 }
@@ -710,43 +707,39 @@ void PuzzleMagicWall::drawColorBugs(ManagedSurface32 *screen) {
 void PuzzleMagicWall::drawTablets(ManagedSurface32 *screen) {
 	for (uint i = 0; i < _tablets.size(); i++) {
 		const Tablet &t = _tablets[i];
-		screen->fillRect(t.rect, 0x808080); // Grey stone
-		screen->frameRect(t.rect, 0x000000);
+		_vm->_gfx->fillRect(screen, t.rect, 0x808080); // Grey stone
+		_vm->_gfx->frameRect(screen, t.rect, 0x000000);
 	}
 }
 
 void PuzzleMagicWall::drawWallLever(ManagedSurface32 *screen) {
-	screen->fillRect(_wallLever, 0xCCAA00); // Gold lever
-	screen->frameRect(_wallLever, 0x000000);
+	_vm->_gfx->fillRect(screen, _wallLever, 0xCCAA00); // Gold lever
+	_vm->_gfx->frameRect(screen, _wallLever, 0x000000);
 }
 
 void PuzzleMagicWall::drawMinimap(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	// Draw minimap background
 	if (_miniMapImage) {
-		_miniMapImage->drawToScreen(screen, kMinimapPos, lut);
+		_vm->_gfx->drawRleBlock(screen, _miniMapImage, kMinimapPos);
 	}
 
 	// Draw dots on minimap showing zoombini positions
 	for (int i = 0; i < 4; i++) {
 		const ZoombiniSlot &slot = _slots[i];
-		if (slot.zoombiniIdx >= 0 && !slot.captured) {
+		if (0 <= slot.zoombiniIdx && !slot.captured) {
 			int dotColor = slot.targetColor;
-			if (dotColor >= 0 && dotColor < kColorCount && _miniLightImage[dotColor]) {
+			if (0 <= dotColor && dotColor < kColorCount && _miniLightImage[dotColor]) {
 				// Scale slot position to minimap
 				const Common::Point32 miniPos(
 					kMinimapPos.x + 10 + (slot.pos.x * 80 / 640),
 					kMinimapPos.y + 10 + (slot.pos.y * 60 / 480));
-				_miniLightImage[dotColor]->drawToScreen(screen, miniPos, lut);
+				_vm->_gfx->drawRleBlock(screen, _miniLightImage[dotColor], miniPos);
 			}
 		}
 	}
 }
 
 void PuzzleMagicWall::drawGates(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	for (int i = 0; i < 4; i++) {
 		const Gate &gate = _gates[i];
 		Animation *anim = _gateAnims[i];
@@ -755,14 +748,11 @@ void PuzzleMagicWall::drawGates(ManagedSurface32 *screen) {
 			// Select animation frame based on gate state
 			// Open gates show frame 1, closed gates show frame 0
 			int frameIdx = gate.open ? 1 : 0;
-			const RleBlock *frame = anim->getFrame(frameIdx);
-			if (frame) {
-				frame->drawToScreen(screen, gate.pos, lut);
-			}
+			_vm->_gfx->drawAnimationFrame(screen, anim, frameIdx, gate.pos);
 		} else {
 			// Fallback: draw simple rectangle
 			uint32 color = gate.open ? 0x00FF00 : 0xFF0000;
-			screen->fillRect(
+			_vm->_gfx->fillRect(screen,
 				Common::Rect(
 					static_cast<int16>(gate.pos.x - 10), static_cast<int16>(gate.pos.y - 20),
 					static_cast<int16>(gate.pos.x + 10), static_cast<int16>(gate.pos.y + 20)),
@@ -772,19 +762,17 @@ void PuzzleMagicWall::drawGates(ManagedSurface32 *screen) {
 }
 
 void PuzzleMagicWall::onRenderActors(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	// Draw zoombinis in their slots
 	for (int i = 0; i < 8; i++) {
 		const ZoombiniSlot &slot = _slots[i];
-		if (slot.zoombiniIdx < 0 || (i >= 4 && slot.captured))
+		if (slot.zoombiniIdx < 0 || (4 <= i && slot.captured))
 			continue;
 
 		const ZoombiniRunner *z = _puzzleZoombinis[slot.zoombiniIdx];
 
 		// Draw zoombini at current position
 		if (_zoombiniAnimation) {
-			_zoombiniAnimation->drawZoombini(screen, z->_traits, slot.pos, 0, 0, lut);
+			_vm->_gfx->drawZoombini(screen, _zoombiniAnimation, z->_traits, slot.pos, 0, 0);
 		}
 	}
 }
