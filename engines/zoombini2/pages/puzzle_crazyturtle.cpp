@@ -283,53 +283,45 @@ void PuzzleCrazyTurtle::onRenderActors(ManagedSurface32 *screen) {
 }
 
 void PuzzleCrazyTurtle::drawBridgeState(ManagedSurface32 *screen) const {
-	const AlphaBlendLUT &alphaLUT = _vm->getAlphaLUT();
 	if (0 < _remainingMistakes) {
-		if (_bridgeImage)
-			_bridgeImage->drawToScreen(screen, Common::Point32(10, 220), alphaLUT);
+		_vm->_gfx->drawRleBlock(screen, _bridgeImage, Common::Point32(10, 220));
 	} else if (_collapsedBridgeImage) {
-		_collapsedBridgeImage->drawToScreen(screen, Common::Point32(10, 220), alphaLUT);
+		_vm->_gfx->drawRleBlock(screen, _collapsedBridgeImage, Common::Point32(10, 220));
 	}
 
 	if (!_beamImage)
 		return;
 	Common::Point32 beamPos(11 * _remainingMistakes + 9, 310 - 12 * _remainingMistakes);
 	for (int beam = 0; beam < _remainingMistakes; beam++) {
-		_beamImage->drawToScreen(screen, beamPos, alphaLUT);
+		_vm->_gfx->drawRleBlock(screen, _beamImage, beamPos);
 		beamPos.x -= 11;
 		beamPos.y += 12;
 	}
 }
 
 void PuzzleCrazyTurtle::drawRuleHints(ManagedSurface32 *screen) const {
-	const AlphaBlendLUT &alphaLUT = _vm->getAlphaLUT();
 	for (int slot = 0; slot < kRuleSlotCount; slot++) {
 		if (!_primaryRuleActive[slot])
 			continue;
 		const RleBlock *primary = _traitImages[_primaryFeature][_ruleValues[0][slot] - 1];
-		if (primary)
-			primary->drawToScreen(screen, Common::Point32(kPrimaryIconPos[slot].x - 5, kPrimaryIconPos[slot].y), alphaLUT);
+		_vm->_gfx->drawRleBlock(screen, primary, Common::Point32(kPrimaryIconPos[slot].x - 5, kPrimaryIconPos[slot].y));
 		if (3 <= _level) {
 			const RleBlock *secondary = _traitImages[_secondaryFeature][_ruleValues[1][slot] - 1];
-			if (secondary)
-				secondary->drawToScreen(screen, Common::Point32(kSecondaryIconPos[slot].x - 5, kSecondaryIconPos[slot].y), alphaLUT);
+			_vm->_gfx->drawRleBlock(screen, secondary, Common::Point32(kSecondaryIconPos[slot].x - 5, kSecondaryIconPos[slot].y));
 		}
 	}
 }
 
 void PuzzleCrazyTurtle::drawTurtles(ManagedSurface32 *screen) const {
-	const AlphaBlendLUT &alphaLUT = _vm->getAlphaLUT();
 	for (int index = 0; index < kTurtleCount; index++) {
 		const TurtlePlacement &placement = kTurtlePlacements[index];
 		const RleBlock *image = _turtleFixedImages[placement.type - 1];
-		if (image)
-			image->drawToScreen(screen, placement.pos, alphaLUT);
+		_vm->_gfx->drawRleBlock(screen, image, placement.pos);
 	}
 }
 
 void PuzzleCrazyTurtle::drawMother(ManagedSurface32 *screen) const {
-	if (_motherStartImage)
-		_motherStartImage->drawToScreen(screen, Common::Point32(488, 310), _vm->getAlphaLUT());
+	_vm->_gfx->drawRleBlock(screen, _motherStartImage, Common::Point32(488, 310));
 }
 
 EventHandleResult PuzzleCrazyTurtle::onLButtonDown(const Common::Point &pos) {

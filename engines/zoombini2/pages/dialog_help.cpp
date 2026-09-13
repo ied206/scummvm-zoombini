@@ -26,7 +26,6 @@
 
 #include "common/file.h"
 #include "common/system.h"
-#include "graphics/managed_surface.h"
 
 namespace Zoombini2 {
 
@@ -46,9 +45,8 @@ DialogHelp::DialogHelp(Zoombini2Engine *vm)
 	_rightArrowNormal = _vm->loadBitBlock("Bmp/MENU/help_screen_rightarro_norma.bb");
 	_rightArrowEmpty = _vm->loadBitBlock("Bmp/MENU/help_screen_rightarro_empty.bb");
 
-	// Create saved screen buffer
-	// Must match screen format to avoid assert in copyRectToSurface
-	_savedScreen = new Graphics::ManagedSurface(ManagedSurface32::kScreenWidth, ManagedSurface32::kScreenHeight, _vm->getCurrentScreen()->format);
+	// Create the saved screen buffer in the current game screen format.
+	_savedScreen = _vm->_gfx->createSurface(ManagedSurface32::kScreenSize);
 }
 
 DialogHelp::~DialogHelp() {
@@ -114,7 +112,7 @@ bool DialogHelp::open(int puzzleId, int level) {
 	_vm->getSoundManager()->pauseAll();
 
 	// Save current screen
-	_savedScreen->copyFrom(*_vm->getCurrentScreen());
+	_vm->_gfx->captureScreen(_savedScreen);
 
 	// Load first help page
 	if (!loadPage(puzzleId, level, 1)) {
@@ -137,7 +135,7 @@ void DialogHelp::close() {
 	freePage();
 
 	// Restore saved screen
-	_vm->getCurrentScreen()->copyFrom(*_savedScreen);
+	_vm->_gfx->copyToScreen(*_savedScreen);
 
 	// Resume audio
 	_vm->getSoundManager()->resumeAll();

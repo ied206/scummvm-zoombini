@@ -112,12 +112,14 @@ void TransitionVideo::onUpdate() {
 	if (_decoder->needsUpdate()) {
 		const Graphics::Surface *frame = _decoder->decodeNextFrame();
 		if (frame) {
-			_framePos = Common::Point32((ManagedSurface32::kScreenWidth - frame->w) / 2, (ManagedSurface32::kScreenHeight - frame->h) / 2);
+			const Size32 frameSize(frame->w, frame->h);
+			const Size32 frameOffset = (ManagedSurface32::kScreenSize - frameSize) / 2;
+			_framePos = Common::Point32(frameOffset.width, frameOffset.height);
 
 			// Cache the decoded frame in screen format
-			if (!_lastFrame || _lastFrame->w != frame->w || _lastFrame->h != frame->h) {
+			if (!_lastFrame || _lastFrame->w != frameSize.width || _lastFrame->h != frameSize.height) {
 				delete _lastFrame;
-				_lastFrame = new Graphics::ManagedSurface(frame->w, frame->h, _vm->getScreen()->format);
+				_lastFrame = _vm->_gfx->createSurface(frameSize);
 			}
 			_lastFrame->blitFrom(*frame);
 		}

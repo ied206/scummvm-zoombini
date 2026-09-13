@@ -29,8 +29,6 @@
 #include "common/rect.h"
 #include "common/scummsys.h"
 
-#include "graphics/managed_surface.h"
-
 #include "zoombini2/scripts.h"
 
 namespace Zoombini2 {
@@ -52,10 +50,8 @@ public:
 	bool loadBackground(const Common::Path &path);
 	/** Return the background retained by this layer, or nullptr for a backgroundless layer. */
 	BitBlock *getBackground() const { return _background; }
-	/** Return the background width copied from the first layer when this layer has no bitmap. */
-	int getBackgroundWidth() const { return _backgroundWidth; }
-	/** Return the background height copied from the first layer when this layer has no bitmap. */
-	int getBackgroundHeight() const { return _backgroundHeight; }
+	/** Return the background dimensions copied from the first layer when this layer has no bitmap. */
+	const Size32 &getBackgroundSize() const { return _backgroundSize; }
 	/** Return whether this layer was created without a background bitmap. */
 	bool isBackgroundless() const { return _backgroundless; }
 
@@ -119,7 +115,7 @@ private:
 	friend class PageLayerStack;
 
 	/** Replace dimensions copied from the stack's first layer. */
-	void setBackgroundDimensions(int width, int height);
+	void setBackgroundSize(const Size32 &size);
 	/** Convert a screen pointer X coordinate to the layer's background coordinate. */
 	int getWorldX(int screenX) const;
 	/** Apply the original single-step horizontal wrapping rules. */
@@ -129,10 +125,8 @@ private:
 	Zoombini2Engine *_vm;
 	/** Signed horizontal position applied to this layer. */
 	int16 _scrollX = 0;
-	/** Background width retained locally or copied from the first stack layer. */
-	int _backgroundWidth = 0;
-	/** Background height retained locally or copied from the first stack layer. */
-	int _backgroundHeight = 0;
+	/** Background dimensions retained locally or copied from the first stack layer. */
+	Size32 _backgroundSize = Size32();
 	/** Multiplier applied by @ref scrollBy. */
 	byte _scrollDirection;
 	/** Animation runners released with this layer. */
@@ -291,6 +285,8 @@ public:
 	virtual bool hasGoButton() const { return hasSidebar(); }
 	/** Return whether the visible Go button currently accepts input. */
 	virtual bool canUseGoButton() const { return hasGoButton(); }
+	/** Return whether page-local state prevents the sidebar from accepting pointer input. */
+	virtual bool blocksSidebarInteraction() const { return hasActiveDialog(); }
 	/** Return whether this page implements a shelter flow. */
 	virtual bool isShelter() const { return false; }
 	/** Apply any page-local state required by the global debug-completion hotkey. */
