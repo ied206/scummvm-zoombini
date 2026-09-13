@@ -31,8 +31,6 @@
 
 namespace Zoombini2 {
 
-class BitBlock;
-class RleBlock;
 class ZoombiniAnimation;
 
 /** Transition page that walks the current party along a route on the mountain map. */
@@ -58,10 +56,6 @@ public:
 	static PageId getDestPage(PageId src, RouteBranch routeBranch, int rescuedBoolies);
 
 private:
-	/** Draw one named overlay at @p pos. */
-	void drawOverlaySprite(Graphics::ManagedSurface *dst, const Common::String &name, const Common::Point32 &pos);
-	/** Compose overlays appropriate to @p src and @p mapRegion. */
-	void drawMapOverlays(Graphics::ManagedSurface *dst, PageId src, int mapRegion);
 	/** Start any due walkers and update all active party paths. */
 	void walkZoombinis();
 	/** Clear the paths and walking state assigned to the walking Zoombinis. */
@@ -84,7 +78,7 @@ private:
 	void finishTransition();
 
 	/** Background with route-specific overlays already applied. */
-	Graphics::ManagedSurface *_compositedBg = nullptr;
+	ManagedSurface32 *_compositedBg = nullptr;
 
 	/** Route shared as the template for each party member's path. */
 	Common::Path _patPath;

@@ -26,10 +26,6 @@
 #include "common/str.h"
 #include "zoombini2/pages/dialog_base.h"
 
-namespace Graphics {
-class ManagedSurface;
-}
-
 namespace Zoombini2 {
 
 class Zoombini2Engine;
@@ -88,7 +84,7 @@ private:
 	/** One-based help sheet currently displayed. */
 	int _currentPage = 1;
 	/** Screen snapshot restored when the overlay closes. */
-	Graphics::ManagedSurface *_savedScreen = nullptr;
+	ManagedSurface32 *_savedScreen = nullptr;
 	/** Help-window frame sprite. */
 	RleBlock *_helpFrame = nullptr;
 	/** Fallback sprite shown when no help sheet is available. */

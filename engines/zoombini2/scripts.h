@@ -29,11 +29,8 @@
 #include "common/scummsys.h"
 #include "common/str.h"
 
+#include "zoombini2/graphics.h"
 #include "zoombini2/state.h"
-
-namespace Graphics {
-class ManagedSurface;
-}
 
 namespace Zoombini2 {
 
@@ -90,7 +87,7 @@ public:
 	/** Remove every timed entry and the optional end-of-cycle redirect. */
 	void clearTimedFrames();
 	/** Configure a background snapshot restored when completion leaves this runner inactive. */
-	void initBackBuffer(int width, int height);
+	void initBackBuffer(const Size32 &size);
 
 	/** Start at the first timed entry without changing the playback mode or position. */
 	void start(uint32 tickCount);
@@ -146,15 +143,15 @@ public:
 	/** Enter a due random-idle cycle before the runner is drawn. */
 	void prepareForDraw(uint32 tickCount);
 	/** Draw the current timed entry without advancing or dispatching callbacks. */
-	void draw(Graphics::ManagedSurface *screen, const AlphaBlendLUT &alphaLUT, int scrollX = 0, int backgroundWidth = kDefaultBackgroundWidth);
+	void draw(ManagedSurface32 *screen, const AlphaBlendLUT &alphaLUT, int scrollX = 0, int backgroundWidth = kDefaultBackgroundWidth);
 	/** Select the next timed entry or complete the cycle after the current entry has been drawn. */
 	void advanceAfterDraw(uint32 tickCount);
 	/** Restore the latest configured background snapshot when the runner is inactive. */
-	void restoreBackgroundIfInactive(Graphics::ManagedSurface *screen) const;
+	void restoreBackgroundIfInactive(ManagedSurface32 *screen) const;
 	/** Capture the configured background rectangle at the current page-layer position. */
-	void captureBackground(Graphics::ManagedSurface *screen, int scrollX = 0, int backgroundWidth = kDefaultBackgroundWidth);
+	void captureBackground(ManagedSurface32 *screen, int scrollX = 0, int backgroundWidth = kDefaultBackgroundWidth);
 	/** Perform the original prepare, draw, and advance sequence in one call. */
-	void drawAndUpdate(Graphics::ManagedSurface *screen, const AlphaBlendLUT &alphaLUT, uint32 tickCount, int scrollX = 0,
+	void drawAndUpdate(ManagedSurface32 *screen, const AlphaBlendLUT &alphaLUT, uint32 tickCount, int scrollX = 0,
 					   int backgroundWidth = kDefaultBackgroundWidth);
 
 	/** Return the active timing-table index, or -1 while inactive. */
@@ -191,16 +188,15 @@ private:
 	void *_interactionCallbackContext = nullptr;
 	Callback _completionCallback = nullptr;
 	void *_completionCallbackContext = nullptr;
-	int _backBufferWidth = 0;
-	int _backBufferHeight = 0;
-	Graphics::ManagedSurface *_backBuffer = nullptr;
+	Size32 _backBufferSize = Size32();
+	ManagedSurface32 *_backBuffer = nullptr;
 	Common::Rect _backBufferScreenRect;
 	Common::Point32 _backBufferDrawPosition;
 	bool _backBufferValid = false;
 
 	uint32 getRandomDelay(uint32 maximumInclusive) const;
 	int getScrolledX(int scrollX, int backgroundWidth) const;
-	void saveBackground(Graphics::ManagedSurface *screen, const Common::Point32 &drawPosition);
+	void saveBackground(ManagedSurface32 *screen, const Common::Point32 &drawPosition);
 };
 
 /** Native 32-bit floating-point scalar used by the optional path evaluator. */
@@ -582,7 +578,7 @@ public:
 	/** Return the current drawing anchor after applying page scrolling or the active grab offset. */
 	Common::Point32 getDrawPosition(int scrollX = 0, int backgroundWidth = AnimationRunner::kDefaultBackgroundWidth) const;
 	/** Draw the active body and trait layers unless this Zoombini is hidden. */
-	void draw(Graphics::ManagedSurface *screen, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip = nullptr,
+	void draw(ManagedSurface32 *screen, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip = nullptr,
 			  int scrollX = 0, int backgroundWidth = AnimationRunner::kDefaultBackgroundWidth, const RleBlock *dropTargetIndicator = nullptr) const;
 	/** Return the sprite rectangle derived from the selected grid's base layer. */
 	Common::Rect32 getSpriteRect(int scrollX = 0, int backgroundWidth = AnimationRunner::kDefaultBackgroundWidth) const;
@@ -599,8 +595,8 @@ public:
 	Common::Point32 _screenPos = Common::Point32();
 	/** Screen position immediately before the most recent movement update. */
 	Common::Point32 _previousScreenPos = Common::Point32();
-	/** Width and height of the selected base sprite used by redraw bounds. */
-	Common::Point _spriteSize = Common::Point();
+	/** 16-bit width and height of the selected base sprite used by redraw bounds. */
+	Size16 _spriteSize = Size16();
 	/** Current movement path held by this Zoombini until movement ends. */
 	PathObject *_movementPath = nullptr;
 	/** Whether the current page allows this Zoombini to receive input. */

@@ -40,8 +40,7 @@ namespace Zoombini2 {
 // ============================================================================
 
 // Launch-slot hit-test dimensions.
-static const int kSlotHitWidth = 43;
-static const int kSlotHitHeight = 50;
+static const Size32 kSlotHitSize(43, 50);
 
 // Placement animation delay (ms)
 static const uint32 kPlaceDelay = 1000;
@@ -350,8 +349,8 @@ void PuzzleMysticMarsh::buildSlots() {
 			slot.hitbox = Common::Rect(
 				static_cast<int16>(cellPos.x - 8),                    // left
 				static_cast<int16>(cellPos.y + 52),                   // top
-				static_cast<int16>(cellPos.x - 8 + kSlotHitWidth),    // right
-				static_cast<int16>(cellPos.y + 52 + kSlotHitHeight)); // bottom
+				static_cast<int16>(cellPos.x - 8 + kSlotHitSize.width),    // right
+				static_cast<int16>(cellPos.y + 52 + kSlotHitSize.height)); // bottom
 
 			slot.zoombiniIdx = -1;
 			slot.occupied = false;
@@ -511,8 +510,6 @@ void PuzzleMysticMarsh::onRenderContent(ManagedSurface32 *screen) {
 }
 
 void PuzzleMysticMarsh::drawGrid(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	for (int col = 0; col < kGridCols; col++) {
 		for (int row = 0; row < kGridRows; row++) {
 			int idx = col * kGridRows + row;
@@ -526,24 +523,21 @@ void PuzzleMysticMarsh::drawGrid(ManagedSurface32 *screen) {
 
 			// Draw symbol sprite
 			int symIdx = cell.type - 2;
-			if (symIdx >= 0 && symIdx < kNumSymbols && _symbolImage[symIdx]) {
-				_symbolImage[symIdx]->drawToScreen(screen, cell.pos, lut);
+			if (0 <= symIdx && symIdx < kNumSymbols && _symbolImage[symIdx]) {
+				_vm->_gfx->drawRleBlock(screen, _symbolImage[symIdx], cell.pos);
 			}
 		}
 	}
 
 	// Draw tourbi animation if present
-	if (_tourbiAnim && _tourbiAnim->getFrameCount() > 0) {
+	if (_tourbiAnim && 0 < _tourbiAnim->getFrameCount()) {
 		uint32 now = _vm->getGameTickCount();
 		int frame = (now / 100) % _tourbiAnim->getFrameCount();
-		const RleBlock *frameImage = _tourbiAnim->getFrame(frame);
-		if (frameImage) {
-			// Draw the whirlpool at its fixed origin.
-			// Actual position depends on grid cell with TOURBI type
-			for (int i = 0; i < kMaxCells; i++) {
-				if (_grid[i].type == 46) { // TOURBI = symbol index 44, type = 44+2 = 46
-					frameImage->drawToScreen(screen, _grid[i].pos, lut);
-				}
+		// Draw the whirlpool at its fixed origin.
+		// Actual position depends on grid cell with TOURBI type
+		for (int i = 0; i < kMaxCells; i++) {
+			if (_grid[i].type == 46) { // TOURBI = symbol index 44, type = 44+2 = 46
+				_vm->_gfx->drawAnimationFrame(screen, _tourbiAnim, frame, _grid[i].pos);
 			}
 		}
 	}
@@ -553,15 +547,13 @@ void PuzzleMysticMarsh::onRenderActors(ManagedSurface32 *screen) {
 	if (!_zoombiniAnimation || !_hasActiveZ)
 		return;
 
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	// Draw the currently active zoombini at its interpolated position
 	int zIdx = _activeZ.zoombiniIdx;
-	if (zIdx >= 0 && zIdx < (int)_puzzleZoombinis.size()) {
+	if (0 <= zIdx && zIdx < static_cast<int>(_puzzleZoombinis.size())) {
 		const ZoombiniRunner *z = _puzzleZoombinis[zIdx];
 		const Common::Point32 pos = _activeZ.targetPos;
 
-		_zoombiniAnimation->drawZoombini(screen, z->_traits, pos, 0, 0, lut);
+		_vm->_gfx->drawZoombini(screen, _zoombiniAnimation, z->_traits, pos, 0, 0);
 	}
 }
 

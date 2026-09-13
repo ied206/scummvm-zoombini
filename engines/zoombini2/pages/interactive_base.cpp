@@ -30,7 +30,6 @@
 
 #include "common/callback.h"
 #include "common/keyboard.h"
-#include "graphics/managed_surface.h"
 
 namespace Zoombini2 {
 
@@ -50,9 +49,8 @@ Sidebar::Sidebar(Zoombini2Engine *vm)
 	// Create help screen modal system
 	_helpScreen = new DialogHelp(_vm);
 
-	// Create saved background buffer (34x102 for all 3 buttons)
-	// Must match screen format to avoid assert in copyRectToSurface
-	_savedBackground = new Graphics::ManagedSurface(34, 102, _vm->getCurrentScreen()->format);
+	// Create saved background buffer (34x102 for all 3 buttons).
+	_savedBackground = _vm->_gfx->createSurface(Size32(34, 102));
 }
 
 Sidebar::~Sidebar() {
@@ -118,6 +116,16 @@ bool Sidebar::isInButtonRegion(const Common::Point &pos) const {
 		   isPointStrictlyInside(_goButtonRect, pos);
 }
 
+bool Sidebar::isInteractionBlocked() const {
+	for (uint i = 0; i < _vm->_globalZoombinis.size(); i++) {
+		const ZoombiniRunner *zoombini = _vm->_globalZoombinis[i];
+		if (zoombini && zoombini->_dragging)
+			return true;
+	}
+	const PageBase *page = _vm->getCurrentPage();
+	return page && page->blocksSidebarInteraction();
+}
+
 void Sidebar::updateHoverState(const Common::Point &pos, bool inputAllowed) {
 	if (!inputAllowed) {
 		_helpHovered = false;
@@ -147,18 +155,24 @@ void Sidebar::consumePendingRelease() {
 }
 
 EventHandleResult Sidebar::onLButtonUp(const Common::Point &pos) {
-	if (_primaryButtonArmed) {
-		_primaryButtonArmed = false;
-		_pendingMouseRelease = true;
-	}
 	if (DialogBase *dialog = getActiveDialog()) {
+		_primaryButtonArmed = false;
 		_pendingMouseRelease = false;
 		dialog->onLButtonUp(pos);
 		return EventHandleResult::kConsumed;
 	}
-	if (!hasActiveDialog() && shouldShow() && isInButtonRegion(pos))
+	if (isInteractionBlocked()) {
+		_primaryButtonArmed = false;
+		_pendingMouseRelease = false;
+		return EventHandleResult::kPassthrough;
+	}
+	if (_primaryButtonArmed) {
+		_primaryButtonArmed = false;
+		_pendingMouseRelease = true;
+	}
+	if (shouldShow() && isInButtonRegion(pos))
 		return EventHandleResult::kConsumed;
-	return hasActiveDialog() ? EventHandleResult::kConsumed : EventHandleResult::kPassthrough;
+	return EventHandleResult::kPassthrough;
 }
 
 EventHandleResult Sidebar::onKeyDown(const Common::KeyState &key, bool repeat) {
@@ -188,16 +202,16 @@ void Sidebar::drawAndHandleInput(ManagedSurface32 *screen, bool inputAllowed) {
 	}
 
 	const PageBase *page = _vm->getCurrentPage();
-	if (inputAllowed)
-		updateGoBlink(page->hasGoButton() && page->canUseGoButton(), page->getPageId());
+	updateGoBlink(page->hasGoButton() && page->canUseGoButton(), page->getPageId());
+	const bool pointerInputAllowed = inputAllowed && !isInteractionBlocked();
 	const Common::Point32 mousePos = _vm->getMousePos();
-	updateHoverState(Common::Point(mousePos.x, mousePos.y), inputAllowed);
+	updateHoverState(Common::Point(mousePos.x, mousePos.y), pointerInputAllowed);
 
 	_savedBackground->copyRectToSurface(*screen,
 										0, 0,
 										Common::Rect(5, 480, 39, 582));
 
-	if (inputAllowed)
+	if (pointerInputAllowed)
 		consumePendingRelease();
 	else
 		_pendingMouseRelease = false;
@@ -240,10 +254,17 @@ EventHandleResult Sidebar::onMouseMove(const Common::Point &pos) {
 }
 
 EventHandleResult Sidebar::onLButtonDown(const Common::Point &pos) {
-	_primaryButtonArmed = true;
 	if (DialogBase *dialog = getActiveDialog()) {
+		_primaryButtonArmed = false;
+		_pendingMouseRelease = false;
 		return dialog->onLButtonDown(pos);
 	}
+	if (isInteractionBlocked()) {
+		_primaryButtonArmed = false;
+		_pendingMouseRelease = false;
+		return EventHandleResult::kPassthrough;
+	}
+	_primaryButtonArmed = true;
 
 	if (shouldShow() && isInButtonRegion(pos))
 		return EventHandleResult::kConsumed;

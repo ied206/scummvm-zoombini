@@ -75,11 +75,11 @@ void AnimationRunner::clearTimedFrames() {
 	_nextTimedEntryIndex = -1;
 }
 
-void AnimationRunner::initBackBuffer(int width, int height) {
+void AnimationRunner::initBackBuffer(const Size32 &size) {
 	delete _backBuffer;
 	_backBuffer = nullptr;
-	_backBufferWidth = MAX(0, width);
-	_backBufferHeight = MAX(0, height);
+	_backBufferSize.width = MAX(0, size.width);
+	_backBufferSize.height = MAX(0, size.height);
 	_backBufferValid = false;
 }
 
@@ -135,7 +135,7 @@ void AnimationRunner::prepareForDraw(uint32 tickCount) {
 	_randomIdleGateTime = tickCount + getRandomDelay(5999) + 2000;
 }
 
-void AnimationRunner::draw(Graphics::ManagedSurface *screen, const AlphaBlendLUT &alphaLUT, int scrollX, int backgroundWidth) {
+void AnimationRunner::draw(ManagedSurface32 *screen, const AlphaBlendLUT &alphaLUT, int scrollX, int backgroundWidth) {
 	if (!screen || _mode == AnimationRunnerMode::kDisabled04)
 		return;
 	const int frameIndex = getCurrentFrameIndex();
@@ -194,7 +194,7 @@ void AnimationRunner::advanceAfterDraw(uint32 tickCount) {
 		_completionCallback(_completionCallbackContext, this);
 }
 
-void AnimationRunner::restoreBackgroundIfInactive(Graphics::ManagedSurface *screen) const {
+void AnimationRunner::restoreBackgroundIfInactive(ManagedSurface32 *screen) const {
 	if (!screen || isActive() || !_backBuffer || !_backBufferValid)
 		return;
 	const int sourceX = _backBufferScreenRect.left - _backBufferDrawPosition.x;
@@ -203,13 +203,13 @@ void AnimationRunner::restoreBackgroundIfInactive(Graphics::ManagedSurface *scre
 	screen->copyRectToSurface(*_backBuffer, _backBufferScreenRect.left, _backBufferScreenRect.top, sourceRect);
 }
 
-void AnimationRunner::captureBackground(Graphics::ManagedSurface *screen, int scrollX, int backgroundWidth) {
+void AnimationRunner::captureBackground(ManagedSurface32 *screen, int scrollX, int backgroundWidth) {
 	if (!screen)
 		return;
 	saveBackground(screen, Common::Point32(getScrolledX(scrollX, backgroundWidth), _position.y));
 }
 
-void AnimationRunner::drawAndUpdate(Graphics::ManagedSurface *screen, const AlphaBlendLUT &alphaLUT, uint32 tickCount, int scrollX, int backgroundWidth) {
+void AnimationRunner::drawAndUpdate(ManagedSurface32 *screen, const AlphaBlendLUT &alphaLUT, uint32 tickCount, int scrollX, int backgroundWidth) {
 	prepareForDraw(tickCount);
 	draw(screen, alphaLUT, scrollX, backgroundWidth);
 	advanceAfterDraw(tickCount);
@@ -233,23 +233,24 @@ uint32 AnimationRunner::getRandomDelay(uint32 maximumInclusive) const {
 }
 
 int AnimationRunner::getScrolledX(int scrollX, int backgroundWidth) const {
-	if (backgroundWidth == ManagedSurface32::kScreenWidth)
+	if (backgroundWidth == ManagedSurface32::kScreenSize.width)
 		return _position.x;
 	int screenX = _position.x - scrollX;
-	if (backgroundWidth - ManagedSurface32::kScreenWidth < scrollX)
+	if (backgroundWidth - ManagedSurface32::kScreenSize.width < scrollX)
 		screenX += backgroundWidth;
 	return screenX;
 }
 
-void AnimationRunner::saveBackground(Graphics::ManagedSurface *screen, const Common::Point32 &drawPosition) {
+void AnimationRunner::saveBackground(ManagedSurface32 *screen, const Common::Point32 &drawPosition) {
 	_backBufferValid = false;
-	if (_backBufferWidth <= 0 || _backBufferHeight <= 0)
+	if (_backBufferSize.width <= 0 || _backBufferSize.height <= 0)
 		return;
 	if (!_backBuffer)
-		_backBuffer = new Graphics::ManagedSurface(_backBufferWidth, _backBufferHeight, screen->format);
+		_backBuffer = _vm->_gfx->createSurface(_backBufferSize);
 
 	_backBufferDrawPosition = drawPosition;
-	_backBufferScreenRect = Common::Rect(drawPosition.x, drawPosition.y, drawPosition.x + _backBufferWidth, drawPosition.y + _backBufferHeight);
+	_backBufferScreenRect = Common::Rect(drawPosition.x, drawPosition.y, drawPosition.x + _backBufferSize.width,
+									 drawPosition.y + _backBufferSize.height);
 	_backBufferScreenRect.clip(screen->w, screen->h);
 	if (_backBufferScreenRect.isEmpty())
 		return;
@@ -1191,7 +1192,7 @@ Common::Point32 ZoombiniRunner::getDrawPosition(int scrollX, int backgroundWidth
 	return drawPos;
 }
 
-void ZoombiniRunner::draw(Graphics::ManagedSurface *screen, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip,
+void ZoombiniRunner::draw(ManagedSurface32 *screen, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip,
 						  int scrollX, int backgroundWidth, const RleBlock *dropTargetIndicator) const {
 	if (!screen || !_activeAnimation || _hidden)
 		return;
@@ -1207,11 +1208,12 @@ void ZoombiniRunner::draw(Graphics::ManagedSurface *screen, const AlphaBlendLUT 
 
 Common::Rect32 ZoombiniRunner::getSpriteRect(int scrollX, int backgroundWidth) const {
 	const Common::Point32 pos = getDrawPosition(scrollX, backgroundWidth);
-	return Common::Rect32(pos.x, pos.y, pos.x + _spriteSize.x, pos.y + _spriteSize.y);
+	return Common::Rect32(pos.x, pos.y, pos.x + _spriteSize.width, pos.y + _spriteSize.height);
 }
 
 void ZoombiniRunner::updateSpriteSize() {
-	_spriteSize = _activeAnimation ? _activeAnimation->getSpriteSize(_animationCell, _animationActive ? _animationFrame : 0) : Common::Point();
+	const Size32 spriteSize = _activeAnimation ? _activeAnimation->getSpriteSize(_animationCell, _animationActive ? _animationFrame : 0) : Size32();
+	_spriteSize = Size16(static_cast<int16>(spriteSize.width), static_cast<int16>(spriteSize.height));
 }
 
 } // End of namespace Zoombini2

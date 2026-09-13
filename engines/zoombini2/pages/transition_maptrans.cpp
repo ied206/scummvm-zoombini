@@ -24,8 +24,8 @@
 #include "common/tokenizer.h"
 
 #include "zoombini2/graphics.h"
-#include "zoombini2/scripts.h"
 #include "zoombini2/pages/transition_maptrans.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
@@ -204,215 +204,6 @@ void TransitionMapTrans::cleanupPaths() {
 	}
 }
 
-/** Load, draw, and release one cached map-overlay RLE sprite. */
-void TransitionMapTrans::drawOverlaySprite(Graphics::ManagedSurface *dst, const Common::String &name, const Common::Point32 &pos) {
-	Common::Path overlayPath(Common::String::format("bmp/maptrans/%s.bmp", name.c_str()));
-
-	RleBlock overlay(_vm);
-	if (overlay.load(overlayPath)) {
-		overlay.drawToScreen(dst, pos, _vm->getAlphaLUT());
-	} else {
-		debug(2, "MapTransition: overlay '%s' not found", name.c_str());
-	}
-}
-
-/**
- * Draw map overlay segments and icons based on visited-page state.
- *
- * Key pattern for each overlay:
- *   Draw if dstPageId was already visited during the current game,
- *   or if the current transition starts at srcPageId and that page is visited
- *   but dstPageId has not been reached at this level yet.
- *
- * Route direction at the page-4 fork is tracked through @ref GameState::hasPageVisit.
- * Page 6 visit kind 1 selects the upper path and page 5 selects the lower path.
- */
-
-void TransitionMapTrans::drawMapOverlays(Graphics::ManagedSurface *dst, PageId src, int mapRegion) {
-	GameState *gs = _vm->getGameState();
-	const RouteBranch routeBranch = _vm->_routeDirection;
-
-	// Helper lambda: standard overlay visibility check.
-	// "Show this path piece if destination was previously visited,
-	// OR if we're currently transitioning and haven't arrived yet."
-	auto visible = [&](int srcPageId, int dstPageId) -> bool {
-		return gs->isPageVisited(dstPageId) || (src == srcPageId && gs->isPageVisited(srcPageId) && !gs->hasPageVisit(dstPageId, 1));
-	};
-
-	switch (mapRegion) {
-	case 1: {
-		// Map region one covers ShelterZombiniville through Rescue Site I.
-		bool seg01vis = visible(0, 1);
-		bool seg02vis = visible(1, 2);
-		bool seg03vis = visible(2, 3);
-		bool seg04vis = visible(3, 4);
-
-		if (seg01vis) {
-			drawOverlaySprite(dst, "bigmap_segment_01", Common::Point32(264, 206));
-		}
-		if (seg02vis) {
-			drawOverlaySprite(dst, "bigmap_segment_02", Common::Point32(369, 94));
-		}
-		if (seg03vis) {
-			drawOverlaySprite(dst, "bigmap_segment_03", Common::Point32(520, 74));
-		}
-		if (seg04vis) {
-			drawOverlaySprite(dst, "bigmap_segment_03", Common::Point32(632, 156));
-		}
-
-		// Icons
-		if (seg01vis) {
-			drawOverlaySprite(dst, "bigmap_icon_01", Common::Point32(259, 302));
-			drawOverlaySprite(dst, "bigmap_icon_02", Common::Point32(281, 131));
-		}
-		if (seg02vis) {
-			drawOverlaySprite(dst, "bigmap_icon_03", Common::Point32(421, 26));
-		}
-		if (seg03vis) {
-			drawOverlaySprite(dst, "bigmap_icon_04", Common::Point32(564, 99));
-		}
-		if (seg04vis) {
-			drawOverlaySprite(dst, "bigmap_icon_05", Common::Point32(653, 191));
-		}
-		break;
-	}
-
-	case 2: {
-		// Map region two covers both routes between the rescue sites.
-		bool northRoute = gs->hasPageVisit(6, 1) || routeBranch == RouteBranch::kLeft01;
-		bool southRoute = gs->hasPageVisit(5, 1) || routeBranch == RouteBranch::kRight02;
-
-		// Unconditional: start of route from Rescue1
-		drawOverlaySprite(dst, "bigmap_segment_03", Common::Point32(-18, 198));
-		drawOverlaySprite(dst, "bigmap_segment_04", Common::Point32(99, 280));
-
-		// Top path: fork, Magic Wall, Chez Norf, then Rescue Site II.
-		if (northRoute && visible(4, 6)) {
-			drawOverlaySprite(dst, "bigmap_segment_05a", Common::Point32(201, 260));
-		}
-
-		// Magic Wall to Chez Norf segment.
-		bool czNorfSeg = gs->isPageVisited(8) || (src == 6 && gs->isPageVisited(6) && !gs->hasPageVisit(8, 1));
-		if (czNorfSeg) {
-			drawOverlaySprite(dst, "bigmap_segment_06a", Common::Point32(310, 230));
-		}
-
-		// Chez Norf to Rescue Site II segment.
-		if (gs->hasPageVisit(8, 1)) {
-			if (gs->isPageVisited(9) || (src == 8 && gs->isPageVisited(8) && !gs->hasPageVisit(9, 1))) {
-				drawOverlaySprite(dst, "bigmap_segment_07a", Common::Point32(480, 233));
-			}
-		}
-
-		// Bottom path: fork, Mystic Marsh, Wall of Fleens, then Rescue Site II.
-		if (southRoute && visible(4, 5)) {
-			drawOverlaySprite(dst, "bigmap_segment_05b", Common::Point32(164, 376));
-		}
-
-		// Mystic Marsh to Wall of Fleens segment.
-		bool wofSeg = gs->isPageVisited(7) || (src == 5 && gs->isPageVisited(5) && !gs->hasPageVisit(7, 1));
-		if (wofSeg) {
-			drawOverlaySprite(dst, "bigmap_segment_06b", Common::Point32(339, 476));
-		}
-
-		// Wall of Fleens to Rescue Site II segment.
-		if (gs->hasPageVisit(7, 1)) {
-			if (gs->isPageVisited(9) || (src == 7 && gs->isPageVisited(7) && !gs->hasPageVisit(9, 1))) {
-				drawOverlaySprite(dst, "bigmap_segment_07b", Common::Point32(512, 360));
-			}
-		}
-
-		// These route icons are always visible in region two.
-		drawOverlaySprite(dst, "bigmap_icon_04", Common::Point32(27, 223));
-		drawOverlaySprite(dst, "bigmap_icon_05", Common::Point32(116, 315));
-
-		// Top route icons
-		if (northRoute && visible(4, 6)) {
-			drawOverlaySprite(dst, "bigmap_icon_06a", Common::Point32(259, 210));
-		}
-		if (czNorfSeg) {
-			drawOverlaySprite(dst, "bigmap_icon_07a", Common::Point32(440, 170));
-		}
-
-		// Rescue2 icon (reachable from either path)
-		if (gs->isPageVisited(9) ||
-			(src == 8 && gs->isPageVisited(8) && !gs->hasPageVisit(9, 1)) ||
-			(src == 7 && gs->isPageVisited(7) && !gs->hasPageVisit(9, 1))) {
-			drawOverlaySprite(dst, "bigmap_icon_08", Common::Point32(476, 271));
-		}
-
-		// Bottom route icons
-		if (southRoute && visible(4, 5)) {
-			drawOverlaySprite(dst, "bigmap_icon_06b", Common::Point32(290, 418));
-		}
-		if (visible(5, 7)) {
-			drawOverlaySprite(dst, "bigmap_icon_07b", Common::Point32(443, 430));
-		}
-		break;
-	}
-
-	case 3: {
-		// Map region three covers Rescue Site II through the finale.
-		bool northRouteVisited = gs->hasPageVisit(6, 1);
-		bool czNorfFlag = gs->hasPageVisit(8, 1);
-		bool wofFlag = gs->hasPageVisit(7, 1);
-
-		// Previous route segments (show which path was taken)
-		if (northRouteVisited) {
-			drawOverlaySprite(dst, "bigmap_segment_05a", Common::Point32(-27, 418));
-			drawOverlaySprite(dst, "bigmap_segment_06a", Common::Point32(87, 386));
-		}
-		if (czNorfFlag) {
-			drawOverlaySprite(dst, "bigmap_segment_07a", Common::Point32(251, 383));
-		}
-		if (wofFlag) {
-			drawOverlaySprite(dst, "bigmap_segment_07b", Common::Point32(293, 515));
-		}
-
-		// Rescue Site II to Snowboard Gulch is always visible.
-		drawOverlaySprite(dst, "bigmap_segment_08", Common::Point32(313, 407));
-
-		// Snowboard Gulch to Boolie Boggle.
-		if (visible(10, 11)) {
-			drawOverlaySprite(dst, "bigmap_segment_09", Common::Point32(434, 328));
-		}
-		// Boolie Boggle to the finale.
-		if (visible(11, 12)) {
-			drawOverlaySprite(dst, "bigmap_segment_10", Common::Point32(527, 111));
-		}
-
-		// Prior-route icons remain conditional on saved progress.
-		if (northRouteVisited) {
-			drawOverlaySprite(dst, "bigmap_icon_06a", Common::Point32(33, 366));
-		}
-		if (czNorfFlag) {
-			drawOverlaySprite(dst, "bigmap_icon_07a", Common::Point32(214, 326));
-		}
-
-		// Unconditional icons
-		drawOverlaySprite(dst, "bigmap_icon_08", Common::Point32(252, 426));
-		drawOverlaySprite(dst, "bigmap_icon_07b", Common::Point32(66, 574));
-		drawOverlaySprite(dst, "bigmap_icon_09", Common::Point32(367, 367));
-
-		// Conditional icons
-		if (visible(10, 11)) {
-			drawOverlaySprite(dst, "bigmap_icon_10", Common::Point32(469, 273));
-		}
-		if (visible(11, 12)) {
-			drawOverlaySprite(dst, "bigmap_icon_11", Common::Point32(608, -12));
-		}
-		break;
-	}
-
-	default:
-		// Use the first map region as a safe fallback.
-		drawOverlaySprite(dst, "bigmap_segment_01", Common::Point32(264, 206));
-		drawOverlaySprite(dst, "bigmap_icon_01", Common::Point32(259, 302));
-		drawOverlaySprite(dst, "bigmap_icon_02", Common::Point32(281, 131));
-		break;
-	}
-}
-
 void TransitionMapTrans::init() {
 	debug(1, "MapTransition::init (source=%d, route=%d)",
 		  static_cast<int>(_vm->_mapTransitionSourcePageId), static_cast<int>(_vm->_routeDirection));
@@ -434,7 +225,7 @@ void TransitionMapTrans::init() {
 
 	// Select the walking path from the source page.
 	Common::String patName;
-		switch (src) {
+	switch (src) {
 	case kPageZombiniville:
 		patName = "tr1 - map1.pat";
 		break;
@@ -488,23 +279,9 @@ void TransitionMapTrans::init() {
 		return;
 	}
 
-	// Load and composite the background
-	BitBlock bg(_vm);
-	Common::String bgPath = Common::String::format("#bmp/maptrans/bigmap_background_%d", mapRegion);
-
+	// Request the graphics interface to compose the background and overlays.
 	delete _compositedBg;
-	_compositedBg = new Graphics::ManagedSurface(ManagedSurface32::kScreenWidth, ManagedSurface32::kScreenHeight,
-												 Graphics::PixelFormat(4, 8, 8, 8, 8, 16, 8, 0, 24));
-
-	if (bg.load(Common::Path(bgPath))) {
-		bg.drawToSurface(_compositedBg, Common::Point32(0, 0));
-	} else {
-		warning("MapTransition: Failed to load background %s", bgPath.c_str());
-		_compositedBg->fillRect(Common::Rect(ManagedSurface32::kScreenWidth, ManagedSurface32::kScreenHeight), 0);
-	}
-
-	// Draw overlay sprites onto background
-	drawMapOverlays(_compositedBg, src, mapRegion);
+	_compositedBg = _vm->_gfx->createMapTransitionBackground(src, mapRegion, routeBranch);
 
 	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/transition1/PitiZomb3.anm"), 50);
 	if (!_zoombiniAnimation)

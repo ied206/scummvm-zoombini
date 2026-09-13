@@ -241,10 +241,11 @@ EventHandleResult ShelterFinal::onLButtonDown(const Common::Point &pos) {
 void ShelterFinal::createDecorativeZoombinis() {
 	for (int i = 0; i < kDecorativeZoombiniCount; i++) {
 		ZoombiniRunner *zoombini = new ZoombiniRunner();
-		zoombini->setTraits(ZmbTrait(static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1),
-									 static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1),
-									 static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1),
-									 static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1)));
+		const byte nose = static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1);
+		const byte eyes = static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1);
+		const byte hair = static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1);
+		const byte feet = static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1);
+		zoombini->setTraits(ZmbTrait(feet, nose, hair, eyes));
 		zoombini->setPosition(kDecorativeZoombiniPos[i]);
 		zoombini->setDefaultAnimation(_zoombiniAnimation, kDecorativeZoombiniCells[i]);
 		zoombini->_inputEnabled = false;
