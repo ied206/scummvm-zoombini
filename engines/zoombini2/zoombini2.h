@@ -31,7 +31,6 @@
 
 #include "engines/engine.h"
 
-#include "graphics/managed_surface.h"
 #include "graphics/surface.h"
 
 #include "zoombini2/detection.h"
@@ -55,7 +54,7 @@ class ZoombiniAnimation;
 class ZoombiniRunner;
 
 /** Numeric page identifiers accepted by the engine dispatcher. */
-enum PageId {
+enum PageId : int {
 	kPageMenuLoad = -4,         ///< Saved-adventure sign-in flow.
 	kPageMenuPractice = -3,     ///< Practice-map sign-in flow.
 	kPageMenuOptions = -2,      ///< Sign-in screen.
@@ -88,7 +87,7 @@ enum PageId {
 };
 
 /** Rescue Site I branch selected for the next map transition. */
-enum class RouteBranch {
+enum class RouteBranch : int {
 	kNone00 = 0, ///< No branch selected.
 	kLeft01 = 1, ///< Left branch.
 	kRight02 = 2 ///< Right branch.
@@ -218,6 +217,8 @@ public:
 
 	/** Gameplay random generator for this game instance. */
 	Random *_rnd;
+	/** Shared graphics interface used by pages and engine rendering. */
+	Gfx *_gfx = nullptr;
 
 	/** Whether the next puzzle entry restores the profile's party. */
 	bool _returningFromPuzzle = false;

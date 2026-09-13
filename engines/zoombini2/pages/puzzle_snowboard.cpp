@@ -238,11 +238,11 @@ void PuzzleSnowboard::onUpdate() {
 
 	case kStateSliding:
 		// Auto-advance each zoombini every 500ms
-		if (elapsed > 500) {
-			_currentZoombini++;
+		if (500 < elapsed) {
+			_currentZoombini += 1;
 			_stateTimer = now;
 
-			if (_currentZoombini >= (int)_puzzleZoombinis.size()) {
+			if (static_cast<int>(_puzzleZoombinis.size()) <= _currentZoombini) {
 				_state = kStateDone;
 				debug(1, "PuzzleSnowboard: All zoombinis assigned");
 			}
@@ -251,7 +251,7 @@ void PuzzleSnowboard::onUpdate() {
 
 	case kStateDone:
 		// Wait 2 seconds then exit
-		if (elapsed > 2000) {
+		if (2000 < elapsed) {
 			debug(1, "PuzzleSnowboard: Complete, returning to map");
 			_vm->_returningFromPuzzle = true;
 			_vm->_mapTransitionSourcePageId = kPageSnowboard;
@@ -266,8 +266,6 @@ void PuzzleSnowboard::onRenderBackground(ManagedSurface32 *screen) {
 }
 
 void PuzzleSnowboard::onRenderContent(ManagedSurface32 *screen) {
-
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	uint32 now = _vm->getGameTickCount();
 
 	// Draw decorative/scenery animations (positioned across the scene)
@@ -282,13 +280,11 @@ void PuzzleSnowboard::onRenderContent(ManagedSurface32 *screen) {
 	for (int i = 0; i < 5; i++) {
 		if (_decorAnims[i]) {
 			int frameCount = _decorAnims[i]->getFrameCount();
-			if (frameCount > 0) {
+			if (0 < frameCount) {
 				// Different timing for variety (80ms, 120ms, 90ms, 110ms, 100ms per frame)
 				int timings[] = {80, 120, 90, 110, 100};
 				int frameIdx = (now / timings[i]) % frameCount;
-				const RleBlock *frame = _decorAnims[i]->getFrame(frameIdx);
-				if (frame)
-					frame->drawToScreen(screen, decorPos[i], lut);
+				_vm->_gfx->drawAnimationFrame(screen, _decorAnims[i], frameIdx, decorPos[i]);
 			}
 		}
 	}
@@ -298,26 +294,22 @@ void PuzzleSnowboard::onRenderContent(ManagedSurface32 *screen) {
 	if (_boardAnim) {
 		// Cycle through board animation frames
 		int frameCount = _boardAnim->getFrameCount();
-		if (frameCount > 0) {
+		if (0 < frameCount) {
 			int frameIdx = (now / 100) % frameCount; // ~10 fps animation
-			const RleBlock *frame = _boardAnim->getFrame(frameIdx);
-			if (frame)
-				frame->drawToScreen(screen, kBoardPos, lut);
+			_vm->_gfx->drawAnimationFrame(screen, _boardAnim, frameIdx, kBoardPos);
 		}
 	} else if (_boardBitmap) {
 		// Fallback to static board sprite
-		_boardBitmap->drawToSurface(screen, kBoardPos);
+		_vm->_gfx->drawBitBlock(screen, _boardBitmap, kBoardPos);
 	}
 
 	// Draw engine animation (lift mechanism)
 	static const Common::Point32 kEnginePos(50, 400);
 	if (_engineAnim) {
 		int frameCount = _engineAnim->getFrameCount();
-		if (frameCount > 0) {
+		if (0 < frameCount) {
 			int frameIdx = (now / 100) % frameCount;
-			const RleBlock *frame = _engineAnim->getFrame(frameIdx);
-			if (frame)
-				frame->drawToScreen(screen, kEnginePos, lut);
+			_vm->_gfx->drawAnimationFrame(screen, _engineAnim, frameIdx, kEnginePos);
 		}
 	}
 
@@ -329,16 +321,12 @@ void PuzzleSnowboard::onRenderContent(ManagedSurface32 *screen) {
 		const TreeNode &node = _tree[i];
 		const int traitIndex = static_cast<int>(node.traitIndex);
 		// Draw the trait icon for this node's match value
-		if (_traitIcons[traitIndex][node.matchVal1]) {
-			_traitIcons[traitIndex][node.matchVal1]->drawToScreen(
-				screen, Common::Point32(kTreePos.x + i * 60, kTreePos.y), lut);
-		}
+		_vm->_gfx->drawRleBlock(screen, _traitIcons[traitIndex][node.matchVal1], Common::Point32(kTreePos.x + i * 60, kTreePos.y));
 	}
 
 }
 
 void PuzzleSnowboard::onRenderActors(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	// Draw lane indicators
 	int laneSpacing = 150;
 	const Common::Point32 laneStartPos((800 - (_numLanes - 1) * laneSpacing) / 2, 400);
@@ -348,9 +336,9 @@ void PuzzleSnowboard::onRenderActors(ManagedSurface32 *screen) {
 
 		// Count zoombinis in this lane
 		int count = 0;
-		for (uint i = 0; i < _laneAssignments.size() && (int)i <= _currentZoombini; i++) {
+		for (uint i = 0; i < _laneAssignments.size() && static_cast<int>(i) <= _currentZoombini; i++) {
 			if (_laneAssignments[i] == lane)
-				count++;
+				count += 1;
 		}
 
 		// Draw zoombinis in this lane
@@ -359,33 +347,33 @@ void PuzzleSnowboard::onRenderActors(ManagedSurface32 *screen) {
 				// Find the z-th zoombini assigned to this lane
 				int zoombiniIdx = -1;
 				int c = 0;
-				for (uint i = 0; i < _laneAssignments.size() && (int)i <= _currentZoombini; i++) {
+				for (uint i = 0; i < _laneAssignments.size() && static_cast<int>(i) <= _currentZoombini; i++) {
 					if (_laneAssignments[i] == lane) {
 						if (c == z) {
 							zoombiniIdx = i;
 							break;
 						}
-						c++;
+						c += 1;
 					}
 				}
 
-				if (zoombiniIdx >= 0 && zoombiniIdx < (int)_puzzleZoombinis.size()) {
+				if (0 <= zoombiniIdx && zoombiniIdx < static_cast<int>(_puzzleZoombinis.size())) {
 					const ZoombiniRunner *zb = _puzzleZoombinis[zoombiniIdx];
 					const Common::Point32 pos(lanePos.x + (z % 2) * 25, lanePos.y + (z / 2) * 30);
 
-					_zoombiniAnimation->drawZoombini(screen, zb->_traits, pos, 0, 0, lut);
+					_vm->_gfx->drawZoombini(screen, _zoombiniAnimation, zb->_traits, pos, 0, 0);
 				}
 			}
 		}
 	}
 
 	// Draw current zoombini being processed
-	if (_state == kStateSliding && _currentZoombini < (int)_puzzleZoombinis.size()) {
+	if (_state == kStateSliding && _currentZoombini < static_cast<int>(_puzzleZoombinis.size())) {
 		const ZoombiniRunner *z = _puzzleZoombinis[_currentZoombini];
 		static const Common::Point32 kCurrentZoombiniPos(400, 200);
 
 		if (_zoombiniAnimation) {
-			_zoombiniAnimation->drawZoombini(screen, z->_traits, kCurrentZoombiniPos, 0, 0, lut);
+			_vm->_gfx->drawZoombini(screen, _zoombiniAnimation, z->_traits, kCurrentZoombiniPos, 0, 0);
 		}
 	}
 }
@@ -393,10 +381,10 @@ void PuzzleSnowboard::onRenderActors(ManagedSurface32 *screen) {
 EventHandleResult PuzzleSnowboard::onLButtonDown(const Common::Point &pos) {
 	// Click to advance faster
 	if (_state == kStateSliding) {
-		_currentZoombini++;
+		_currentZoombini += 1;
 		_stateTimer = _vm->getGameTickCount();
 
-		if (_currentZoombini >= (int)_puzzleZoombinis.size()) {
+		if (static_cast<int>(_puzzleZoombinis.size()) <= _currentZoombini) {
 			_state = kStateDone;
 		}
 		return EventHandleResult::kConsumed;
@@ -417,10 +405,7 @@ void PuzzleSnowboard::drawTraitIcon(ManagedSurface32 *screen,
 		return;
 
 	RleBlock *icon = _traitIcons[traitOrdinal][value];
-	if (icon) {
-		const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-		icon->drawToScreen(screen, pos, lut);
-	}
+	_vm->_gfx->drawRleBlock(screen, icon, pos);
 }
 
 } // End of namespace Zoombini2

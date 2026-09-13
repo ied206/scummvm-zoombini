@@ -31,8 +31,8 @@
 
 namespace Zoombini2 {
 
-class AlphaBlendLUT;
 class AreaMask;
+class AnimationRunner;
 class BitBlock;
 class Animation;
 class BitmapFont;
@@ -61,6 +61,8 @@ public:
 	void onRenderActors(ManagedSurface32 *screen) override;
 	void onActorsRendered() override;
 	void onRenderForeground(ManagedSurface32 *screen) override;
+	/** Refresh button availability and restart the runner under the final frame pointer. */
+	void onPostRender() override;
 	/** Dispatch a click to a feature station or party action. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 	/** Finish dragging the held boarding Zoombini. */
@@ -78,12 +80,20 @@ private:
 
 	/** Feature selection controls indexed by feature and value. */
 	Animation *_featureButtons[ZmbTrait::kTraitCount][ZmbTrait::kTraitValueCount] = {};
+	/** Play-once hover overlays indexed by feature and value. */
+	AnimationRunner *_featureButtonRunners[ZmbTrait::kTraitCount][ZmbTrait::kTraitValueCount] = {};
 	/** Control that selects a random valid feature combination. */
 	Animation *_quickFillButton = nullptr;
+	/** Hover and pointer-exit sequence for Quick Fill. */
+	AnimationRunner *_quickFillButtonRunner = nullptr;
 	/** Control that fills the remaining party with valid Zoombinis. */
 	Animation *_batchFillButton = nullptr;
-	/** Control that starts the route when the party is full. */
-	Animation *_goButton = nullptr;
+	/** Hover and pointer-exit sequence for Batch Fill. */
+	AnimationRunner *_batchFillButtonRunner = nullptr;
+	/** Control that creates the currently selected Zoombini. */
+	Animation *_createButton = nullptr;
+	/** Hover and pointer-exit sequence for Create Selected. */
+	AnimationRunner *_createButtonRunner = nullptr;
 
 	/** Borrowed immutable large-sprite grid retained in the engine cache. */
 	const ZoombiniAnimation *_bigZombAnimation = nullptr;
@@ -114,8 +124,8 @@ private:
 	Common::Rect32 _quickFillRect = Common::Rect32();
 	/** 32-bit Batch Fill control hit-test area. */
 	Common::Rect32 _batchFillRect = Common::Rect32();
-	/** 32-bit Go control hit-test area. */
-	Common::Rect32 _goRect = Common::Rect32();
+	/** 32-bit Create Selected control hit-test area. */
+	Common::Rect32 _createRect = Common::Rect32();
 
 	/** Zoombini states assigned to departure slots. */
 	Common::Array<ZoombiniRunner *> _boardingZoombinis;
@@ -156,10 +166,14 @@ private:
 	PathObject *createEntrancePath(const Common::Point32 &dest) const;
 	/** Initialize station and action-control hit-test geometry. */
 	void setupFeatureRects();
+	/** Reconstruct the page-authored hover timing tables for all 23 controls. */
+	void setupHoverRunners();
+	/** Draw active hover overlays and advance their pointer-exit sequences. */
+	void drawHoverRunners(ManagedSurface32 *screen);
+	/** Apply availability gates and reset each runner under the final frame pointer. */
+	void updateHoverRunners();
 	/** Return the boarding-area pos for @p index. */
 	static Common::Point32 getSlotPosition(uint index);
-	/** Draw one animation frame with the supplied alpha lookup table. */
-	static void drawAnimFrame(ManagedSurface32 *screen, const Animation *animation, int frameIndex, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT);
 	/** Build the stable-Y actor order and separate the dragged Zoombini drawn last. */
 	void buildBoardingZoombiniDrawOrder(Common::Array<uint> &order, ZoombiniRunner *&draggedZoombini) const;
 	/** Draw all Zoombinis currently in the boarding area. */

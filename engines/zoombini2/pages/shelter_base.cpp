@@ -30,6 +30,8 @@
 
 namespace Zoombini2 {
 
+const Size32 ShelterRescueSiteBase::kSlotSize(40, 57);
+
 ShelterRescueSiteBase::ShelterRescueSiteBase(Zoombini2Engine *vm)
 	: ShelterBase(vm) {
 }
@@ -45,7 +47,7 @@ ShelterRescueSiteBase::~ShelterRescueSiteBase() {
 }
 
 void ShelterRescueSiteBase::loadBackground(const char *path) {
-	_vm->getScreen()->fillRect(Common::Rect32(ManagedSurface32::kScreenWidth, ManagedSurface32::kScreenHeight), 0);
+	_vm->getScreen()->fillRect(Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), 0);
 	BitBlock background(_vm);
 	if (background.load(Common::Path(path)))
 		background.drawToSurface(_vm->getScreen(), Common::Point32(0, 0));
@@ -87,7 +89,7 @@ void ShelterRescueSiteBase::resetRescueState() {
 	for (int col = 0; col < kGridCols; col++) {
 		for (int row = 0; row < kGridRows; row++) {
 			const int idx = col * kGridRows + row;
-			const Common::Point32 slotPos(_gridBasePos.x + col * kSlotWidth, _gridBasePos.y + row * kSlotHeight);
+			const Common::Point32 slotPos(_gridBasePos.x + col * kSlotSize.width, _gridBasePos.y + row * kSlotSize.height);
 			_slotRects[idx] = Common::Rect32(slotPos.x + 18, slotPos.y + 30, slotPos.x + 58, slotPos.y + 87);
 		}
 	}
@@ -197,9 +199,9 @@ void ShelterRescueSiteBase::onRenderContent(ManagedSurface32 *screen) {
 			if (!record)
 				continue;
 
-			const int x = _gridBasePos.x + col * kSlotWidth + 18;
-			const int y = _gridBasePos.y + row * kSlotHeight + 30;
-			const Common::Rect32 clip(_gridBasePos.x, 0, clipRight, ManagedSurface32::kScreenHeight);
+			const int x = _gridBasePos.x + col * kSlotSize.width + 18;
+			const int y = _gridBasePos.y + row * kSlotSize.height + 30;
+			const Common::Rect32 clip(_gridBasePos.x, 0, clipRight, ManagedSurface32::kScreenSize.height);
 			_zoombiniAnimation->drawZoombini(screen, record->getTraits(), Common::Point32(x, y), kStandingCell, 0, lut, &clip);
 			if (slotIdx == _selectedZoombini && _selector)
 				_selector->drawToScreen(screen, Common::Point32(x - 10, y - 10), lut);
@@ -232,7 +234,7 @@ EventHandleResult ShelterRescueSiteBase::onLButtonDown(const Common::Point &pos)
 
 	for (int col = 0; col < kGridCols; col++) {
 		for (int row = 0; row < kGridRows; row++) {
-			const Common::Point32 slotPos(_gridBasePos.x + col * kSlotWidth, _gridBasePos.y + row * kSlotHeight);
+			const Common::Point32 slotPos(_gridBasePos.x + col * kSlotSize.width, _gridBasePos.y + row * kSlotSize.height);
 			const Common::Rect slotHit(slotPos.x + 24, slotPos.y + 30, slotPos.x + 64, slotPos.y + 87);
 			if (slotHit.contains(pos)) {
 				const int slotIdx = (col + _scrollOffset) * kGridRows + row;

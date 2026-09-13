@@ -31,7 +31,6 @@
 #include "engines/util.h"
 
 #include "graphics/cursorman.h"
-#include "graphics/managed_surface.h"
 #include "graphics/pixelformat.h"
 
 #include "zoombini2/dialogs.h"
@@ -184,6 +183,7 @@ Zoombini2Engine::~Zoombini2Engine() {
 	delete _sidebar;
 	delete _msgBoxDialog;
 	delete _soundManager;
+	delete _gfx;
 	delete _screen;
 	delete _rnd;
 	delete _resourceFileResolver;
@@ -326,9 +326,10 @@ Common::Error Zoombini2Engine::run() {
 	// Initialize 800x600 32-bit graphics
 	// Use RGBA8888 format (same as internal surfaces)
 	Graphics::PixelFormat format32(4, 8, 8, 8, 8, 16, 8, 0, 24);
-	::initGraphics(ManagedSurface32::kScreenWidth, ManagedSurface32::kScreenHeight, &format32);
+	::initGraphics(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height, &format32);
 
-	_screen = new ManagedSurface32(ManagedSurface32::kScreenWidth, ManagedSurface32::kScreenHeight, format32);
+	_screen = new ManagedSurface32(ManagedSurface32::kScreenSize, format32);
+	_gfx = new Gfx(this);
 
 	// Initialize cursor system
 	initCursor();
@@ -387,16 +388,15 @@ void Zoombini2Engine::registerCursorWithCursorMan() {
 	if (!_cursorSprite || !_cursorSprite->isValid())
 		return;
 
-	int w = _cursorSprite->getWidth();
-	int h = _cursorSprite->getHeight();
-	if (w <= 0 || h <= 0)
+	const Size32 size = _cursorSprite->getSize();
+	if (size.width <= 0 || size.height <= 0)
 		return;
 
 	// Create BGRA buffer initialized to fully transparent
 	// Using the same pixel format as the engine: BGRA8888
 	// (bytesPerPixel=4, rBits=8, gBits=8, bBits=8, aBits=8,
 	//  rShift=16, gShift=8, bShift=0, aShift=24)
-	int bufSize = w * h * 4;
+	const int bufSize = size.width * size.height * 4;
 	byte *buf = new byte[bufSize](); // zero-initialized = transparent black
 
 	// Render RLE cursor sprite into the buffer.
@@ -410,13 +410,13 @@ void Zoombini2Engine::registerCursorWithCursorMan() {
 	// then extract the alpha channel by rendering to both black and white backgrounds.
 
 	// Render onto black background
-	Graphics::ManagedSurface blackSurf(w, h, Graphics::PixelFormat(4, 8, 8, 8, 8, 16, 8, 0, 24));
-	blackSurf.fillRect(Common::Rect(w, h), blackSurf.format.ARGBToColor(255, 0, 0, 0));
+	ManagedSurface32 blackSurf(size, Graphics::PixelFormat(4, 8, 8, 8, 8, 16, 8, 0, 24));
+	blackSurf.fillRect(Common::Rect(size.width, size.height), blackSurf.format.ARGBToColor(255, 0, 0, 0));
 	_cursorSprite->drawToScreen(&blackSurf, Common::Point32(0, 0), _alphaBlendLUT);
 
 	// Render onto white background
-	Graphics::ManagedSurface whiteSurf(w, h, Graphics::PixelFormat(4, 8, 8, 8, 8, 16, 8, 0, 24));
-	whiteSurf.fillRect(Common::Rect(w, h), whiteSurf.format.ARGBToColor(255, 255, 255, 255));
+	ManagedSurface32 whiteSurf(size, Graphics::PixelFormat(4, 8, 8, 8, 8, 16, 8, 0, 24));
+	whiteSurf.fillRect(Common::Rect(size.width, size.height), whiteSurf.format.ARGBToColor(255, 255, 255, 255));
 	_cursorSprite->drawToScreen(&whiteSurf, Common::Point32(0, 0), _alphaBlendLUT);
 
 	// Derive alpha from the two renders:
@@ -429,7 +429,7 @@ void Zoombini2Engine::registerCursorWithCursorMan() {
 	const byte *blackPixels = (const byte *)blackSurf.getPixels();
 	const byte *whitePixels = (const byte *)whiteSurf.getPixels();
 
-	for (int i = 0; i < w * h; i++) {
+	for (int i = 0; i < size.width * size.height; i++) {
 		int bBlack = blackPixels[i * 4 + 0];
 		int gBlack = blackPixels[i * 4 + 1];
 		int rBlack = blackPixels[i * 4 + 2];
@@ -459,7 +459,7 @@ void Zoombini2Engine::registerCursorWithCursorMan() {
 
 	// Register with CursorMan
 	Graphics::PixelFormat cursorFormat(4, 8, 8, 8, 8, 16, 8, 0, 24);
-	CursorMan.replaceCursor(buf, w, h, _cursorHotspot.x, _cursorHotspot.y,
+	CursorMan.replaceCursor(buf, size.width, size.height, _cursorHotspot.x, _cursorHotspot.y,
 							0, &cursorFormat);
 	CursorMan.showMouse(true);
 
@@ -685,7 +685,7 @@ bool Zoombini2Engine::dispatchPageEvents() {
 
 void Zoombini2Engine::drawFrame() {
 	if (!_currentPage) {
-		_screen->fillRect(Common::Rect32(ManagedSurface32::kScreenWidth, ManagedSurface32::kScreenHeight), 0);
+		_screen->fillRect(Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), 0);
 		return;
 	}
 
@@ -704,7 +704,7 @@ void Zoombini2Engine::drawFrame() {
 }
 
 void Zoombini2Engine::presentFrame() {
-	g_system->copyRectToScreen(_screen->getPixels(), _screen->pitch, 0, 0, ManagedSurface32::kScreenWidth, ManagedSurface32::kScreenHeight);
+	g_system->copyRectToScreen(_screen->getPixels(), _screen->pitch, 0, 0, ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height);
 	g_system->updateScreen();
 }
 
@@ -745,7 +745,7 @@ void Zoombini2Engine::destroyCurrentPage() {
 	// Clear screen on page destroy to prevent stale content showing
 	// when transitioning to a new page that uses double buffering.
 	if (_screen)
-		_screen->fillRect(Common::Rect32(ManagedSurface32::kScreenWidth, ManagedSurface32::kScreenHeight), 0);
+		_screen->fillRect(Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), 0);
 }
 
 /**

@@ -25,6 +25,7 @@
 #include "common/array.h"
 #include "common/rect.h"
 
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/interactive_base.h"
 
 namespace Zoombini2 {
@@ -104,10 +105,8 @@ private:
 	static const int kGridCols = 4;
 	/** Number of rows in the visible roster grid. */
 	static const int kGridRows = 5;
-	/** Width of one visible roster slot. */
-	static const int kSlotWidth = 40;
-	/** Height of one visible roster slot. */
-	static const int kSlotHeight = 57;
+	/** Dimensions of one visible roster slot. */
+	static const Size32 kSlotSize;
 
 	/** Selection marker for a visible Zoombini slot. */
 	RleBlock *_selector = nullptr;
