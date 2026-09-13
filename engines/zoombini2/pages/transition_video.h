@@ -69,7 +69,7 @@ private:
 	/** Whether decoder playback started successfully. */
 	bool _started = false;
 	/** Retain the most recently decoded frame. */
-	Graphics::ManagedSurface *_lastFrame = nullptr;
+	ManagedSurface32 *_lastFrame = nullptr;
 	/** Signed screen coordinate used to center @ref TransitionVideo::_lastFrame. */
 	Common::Point32 _framePos = Common::Point32();
 };

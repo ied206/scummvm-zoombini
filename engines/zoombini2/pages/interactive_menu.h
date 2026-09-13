@@ -46,24 +46,24 @@ enum class MenuScreenState {
 /**
  * Sign-in page containing a four-row sorted saved-game list.
  *
- * The page owns visual resources, buttons, sounds, the options panel, and a
- * @ref SaveFileList. The list owns filename selection and editing semantics.
+ * The page retains visual resources, buttons, sounds, the options panel, and a
+ * @ref SaveFileList. The list manages filename selection and editing semantics.
  */
 class InteractiveMenu : public InteractiveBase {
 public:
 	/** Construct the sign-in page for @p vm. */
 	explicit InteractiveMenu(Zoombini2Engine *vm);
-	/** Release the loaded resources and owned controls. */
+	/** Release the loaded resources and controls retained by this page. */
 	~InteractiveMenu() override;
 
 	/** Load sign-in resources and scan the available profiles. */
 	void init() override;
 	/** Process text input and hover state for the active panel. */
 	void onUpdate() override;
-	/** Draw the saved-game list or the owned volume panel. */
+	/** Draw the saved-game list or the volume panel managed by this page. */
 	void onRenderContent(ManagedSurface32 *screen) override;
 	void onRenderForeground(ManagedSurface32 *screen) override;
-	/** Dispatch a click to the list, buttons, or owned volume panel. */
+	/** Dispatch a click to the list, buttons, or the volume panel managed by this page. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
@@ -74,12 +74,10 @@ private:
 	void updateButtonAvailability();
 	EventHandleResult handleVolumePanelInput(const Common::Point &pos, bool mouseReleased);
 	bool _volumePanelMouseDown = false;
-	int _hoveredButton = -1;
 
 	/** Screen origin of the saved-profile list. */
 	static const Common::Point32 kFileListPos;
-	static const int kSelectorWidth = 520;
-	static const int kSelectorHeight = 201;
+	static const Size32 kSelectorSize;
 	static const char *const kValidNameCharacters;
 
 	/** Panel currently accepting input. */
@@ -119,8 +117,8 @@ private:
 	void scanSaveFiles();
 	/** Draw the main sign-in panel. */
 	void drawMain(ManagedSurface32 *screen);
-	/** Draw primary controls using the supplied mouse position. */
-	void drawButtons(ManagedSurface32 *screen, const Common::Point32 &mousePos);
+	/** Draw primary controls and update their retained hover transitions. */
+	void drawButtonsAndUpdateHover(ManagedSurface32 *screen, const Common::Point32 &mousePos);
 
 	/** Return the primary button at @p pos, or `-1` when none is hit. */
 	int hitTestButton(const Common::Point &pos) const;

@@ -34,6 +34,7 @@
 #include "gui/widgets/scrollcontainer.h"
 
 #include "zoombini2/dialogs.h"
+#include "zoombini2/graphics.h"
 #include "zoombini2/metaengine.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
@@ -90,10 +91,9 @@ Common::U32String Zoombini2ProfileNameDialog::getProfileName() const {
 }
 
 void Zoombini2ProfileNameDialog::reflowLayout() {
-	const int screenWidth = g_system->getOverlayWidth();
-	const int screenHeight = g_system->getOverlayHeight();
-	_x = MAX<int>(0, (screenWidth - _w) / 2);
-	_y = MAX<int>(0, (screenHeight - _h) / 2);
+	const Size32 screenSize(g_system->getOverlayWidth(), g_system->getOverlayHeight());
+	_x = MAX<int>(0, (screenSize.width - _w) / 2);
+	_y = MAX<int>(0, (screenSize.height - _h) / 2);
 	GUI::Dialog::reflowLayout();
 }
 
@@ -178,14 +178,12 @@ void Zoombini2SaveManagementDialog::open() {
 
 void Zoombini2SaveManagementDialog::reflowLayout() {
 	const int scrollbarWidth = g_gui.xmlEval()->getVar("Globals.Scrollbar.Width", 16);
-	const int width = scaleDialogValue(kTableWidth + 2 * kDialogMargin) + scrollbarWidth;
-	const int height = scaleDialogValue(kDialogHeight);
-	const int screenWidth = g_system->getOverlayWidth();
-	const int screenHeight = g_system->getOverlayHeight();
-	_x = MAX<int>(0, (screenWidth - width) / 2);
-	_y = MAX<int>(0, (screenHeight - height) / 2);
-	_w = width;
-	_h = height;
+	const Size32 dialogSize(scaleDialogValue(kTableWidth + 2 * kDialogMargin) + scrollbarWidth, scaleDialogValue(kDialogHeight));
+	const Size32 screenSize(g_system->getOverlayWidth(), g_system->getOverlayHeight());
+	_x = MAX<int>(0, (screenSize.width - dialogSize.width) / 2);
+	_y = MAX<int>(0, (screenSize.height - dialogSize.height) / 2);
+	_w = dialogSize.width;
+	_h = dialogSize.height;
 	GUI::Dialog::reflowLayout();
 }
 

@@ -43,9 +43,9 @@ public:
  *
  * The group polls the final frame mouse state to draw, hit-test, and consume
  * one pending mouse release for its three controls.
- * It also owns the help overlay, hover state, and saved screen region needed
- * to draw those controls. Map-return confirmation uses the engine-owned
- * shared confirmation dialog.
+ * It also retains the help overlay, per-frame hover results, and saved screen
+ * region needed to draw those controls. Map-return confirmation uses the
+ * shared engine confirmation dialog.
  */
 class Sidebar : public PageEventHandler {
 public:
@@ -62,7 +62,7 @@ public:
 	EventHandleResult onKeyUp(const Common::KeyState &key) override;
 	/** Return whether the active page exposes the sidebar. */
 	bool shouldShow() const;
-	/** Return whether the help overlay currently owns input. */
+	/** Return whether the help overlay currently handles input exclusively. */
 	bool hasActiveDialog() const;
 	/** Return the help overlay managed by the sidebar. */
 	DialogHelp *getHelpScreen() { return _helpScreen; }
@@ -88,12 +88,14 @@ private:
 	static bool isPointStrictlyInside(const Common::Rect &rect, const Common::Point &pos);
 	/** Return whether @p pos is in a fixed sidebar control region. */
 	bool isInButtonRegion(const Common::Point &pos) const;
+	/** Return whether a drag or page-local state must receive pointer events before the sidebar. */
+	bool isInteractionBlocked() const;
 	/** Update hover state from the final frame mouse position. */
 	void updateHoverState(const Common::Point &pos, bool inputAllowed);
 	/** Consume the release published by the input dispatcher. */
 	void consumePendingRelease();
 
-	/** Borrowed vm that owns these controls. */
+	/** Borrowed engine interface used by these controls. */
 	Zoombini2Engine *_vm;
 	/** Help overlay managed by the sidebar. */
 	DialogHelp *_helpScreen = nullptr;
@@ -146,7 +148,7 @@ private:
 	uint32 _goBlinkDeadline = 0;
 
 	/** Saved screen region beneath the sidebar. */
-	Graphics::ManagedSurface *_savedBackground = nullptr;
+	ManagedSurface32 *_savedBackground = nullptr;
 };
 
 } // End of namespace Zoombini2

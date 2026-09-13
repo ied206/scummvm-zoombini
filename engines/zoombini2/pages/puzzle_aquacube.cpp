@@ -815,25 +815,17 @@ void PuzzleAquacube::onRenderBackground(ManagedSurface32 *screen) {
 }
 
 void PuzzleAquacube::onRenderContent(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	// Draw the three overlapping cube layers at their shared origin.
 	if (_level <= 2) {
 		// Easy cube: draw layer 3, then 2, then 1 (back to front)
-		if (_cubeImage[2])
-			_cubeImage[2]->drawToScreen(screen, kCubeDrawPos, lut);
-		if (_cubeImage[1])
-			_cubeImage[1]->drawToScreen(screen, kCubeDrawPos, lut);
-		if (_cubeImage[0])
-			_cubeImage[0]->drawToScreen(screen, kCubeDrawPos, lut);
+		_vm->_gfx->drawRleBlock(screen, _cubeImage[2], kCubeDrawPos);
+		_vm->_gfx->drawRleBlock(screen, _cubeImage[1], kCubeDrawPos);
+		_vm->_gfx->drawRleBlock(screen, _cubeImage[0], kCubeDrawPos);
 	} else {
 		// Hard cube: draw in depth order for 3 node groups
-		if (_cubeImage[0])
-			_cubeImage[0]->drawToScreen(screen, kCubeDrawPos, lut);
-		if (_cubeImage[1])
-			_cubeImage[1]->drawToScreen(screen, kCubeDrawPos, lut);
-		if (_cubeImage[2])
-			_cubeImage[2]->drawToScreen(screen, kCubeDrawPos, lut);
+		_vm->_gfx->drawRleBlock(screen, _cubeImage[0], kCubeDrawPos);
+		_vm->_gfx->drawRleBlock(screen, _cubeImage[1], kCubeDrawPos);
+		_vm->_gfx->drawRleBlock(screen, _cubeImage[2], kCubeDrawPos);
 	}
 
 	// Draw node markers (ball circles at each vertex)
@@ -842,7 +834,7 @@ void PuzzleAquacube::onRenderContent(ManagedSurface32 *screen) {
 		for (int i = 0; i < _numNodes; i++) {
 			if (_nodes[i].state != 2) { // Don't draw at ball start position
 				Common::Point32 nodePos = _nodes[i].pos + _nodeOffset;
-				nodeImage->drawToScreen(screen, nodePos, lut);
+				_vm->_gfx->drawRleBlock(screen, nodeImage, nodePos);
 			}
 		}
 	}
@@ -853,34 +845,30 @@ void PuzzleAquacube::onRenderContent(ManagedSurface32 *screen) {
 			int fleenIdx = _nodes[i].fleenType - 1;
 			if (fleenIdx < 4 && _fleenImage[fleenIdx]) {
 				Common::Point32 fleenPos = _nodes[i].pos + _fleenOffset;
-				_fleenImage[fleenIdx]->drawToScreen(screen, fleenPos, lut);
+				_vm->_gfx->drawRleBlock(screen, _fleenImage[fleenIdx], fleenPos);
 			}
 		}
 	}
 }
 
 void PuzzleAquacube::onRenderActors(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	// Draw the ball at current position
 	if (_ballBigImage) {
-		_ballBigImage->drawToScreen(screen, _ballPos, lut);
+		_vm->_gfx->drawRleBlock(screen, _ballBigImage, _ballPos);
 	} else if (_ballImage) {
-		_ballImage->drawToScreen(screen, _ballPos, lut);
+		_vm->_gfx->drawRleBlock(screen, _ballImage, _ballPos);
 	}
 }
 
 void PuzzleAquacube::onRenderForeground(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	// Draw direction-arrow controls.
 	int numArrows = MIN(_numZoombinisToPlace, 4);
 	for (int i = 0; i < numArrows; i++) {
 		// Draw arrow connector
-		if (_manetteOnImage)
-			_manetteOnImage->drawToScreen(screen, kArrowPos[i], lut);
+		_vm->_gfx->drawRleBlock(screen, _manetteOnImage, kArrowPos[i]);
 
 		// Draw step arrow
-		if (_shotsOnImage)
-			_shotsOnImage->drawToScreen(screen, kStepArrowPos[i], lut);
+		_vm->_gfx->drawRleBlock(screen, _shotsOnImage, kStepArrowPos[i]);
 	}
 
 	// Draw step indicators
@@ -891,9 +879,8 @@ void PuzzleAquacube::onRenderForeground(ManagedSurface32 *screen) {
 		else
 			indicatorImage = _lightGreyImage; // Available step
 
-		if (indicatorImage && i < 11) {
-			indicatorImage->drawToScreen(screen, kStepIndicatorPos[i], lut);
-		}
+		if (i < 11)
+			_vm->_gfx->drawRleBlock(screen, indicatorImage, kStepIndicatorPos[i]);
 	}
 
 	// Draw warp button (level > 1)
@@ -906,8 +893,7 @@ void PuzzleAquacube::onRenderForeground(ManagedSurface32 *screen) {
 		else
 			warpImage = _warpDisableImage;
 
-		if (warpImage)
-			warpImage->drawToScreen(screen, kWarpOverlayPos, lut);
+		_vm->_gfx->drawRleBlock(screen, warpImage, kWarpOverlayPos);
 
 		// Draw animated warp timer
 		if (_warpTimerAnim) {
@@ -915,9 +901,7 @@ void PuzzleAquacube::onRenderForeground(ManagedSurface32 *screen) {
 			int frameCount = _warpTimerAnim->getFrameCount();
 			if (frameCount > 0) {
 				int frameIdx = (now / 80) % frameCount; // ~12.5 fps
-				const RleBlock *frame = _warpTimerAnim->getFrame(frameIdx);
-				if (frame)
-					frame->drawToScreen(screen, kWarpTimerPos, lut);
+				_vm->_gfx->drawAnimationFrame(screen, _warpTimerAnim, frameIdx, kWarpTimerPos);
 			}
 		}
 	}
@@ -936,9 +920,7 @@ void PuzzleAquacube::onRenderForeground(ManagedSurface32 *screen) {
 				// Different timing for variety
 				int timing = (i == 0) ? 90 : 110;
 				int frameIdx = (now / timing) % frameCount;
-				const RleBlock *frame = _flareAnims[i]->getFrame(frameIdx);
-				if (frame)
-					frame->drawToScreen(screen, flarePos[i], lut);
+				_vm->_gfx->drawAnimationFrame(screen, _flareAnims[i], frameIdx, flarePos[i]);
 			}
 		}
 	}

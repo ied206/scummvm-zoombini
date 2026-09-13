@@ -27,11 +27,15 @@
 #include "image/bmp.h"
 
 #include "zoombini2/graphics.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
+
+const Size32 ManagedSurface32::kScreenSize(800, 600);
+const Size32 VolumePanel::kLabelSize(520, 64);
 
 void ManagedSurface32::fillRect(const Common::Rect32 &rect, uint32 color) {
 	if (!rect.isValidRect())
@@ -45,7 +49,19 @@ void ManagedSurface32::fillRect(const Common::Rect32 &rect, uint32 color) {
 	Graphics::ManagedSurface::fillRect(clip16, color);
 }
 
-void ManagedSurface32::blitFrom(const Graphics::ManagedSurface &src, const Common::Point32 &destPos) {
+void ManagedSurface32::frameRect(const Common::Rect32 &rect, uint32 color) {
+	if (!rect.isValidRect())
+		return;
+
+	Common::Rect32 clip32 = rect;
+	clip32.clip(w, h);
+	if (clip32.isEmpty())
+		return;
+	Common::Rect clip16 = Common::Rect(clip32.left, clip32.top, clip32.right, clip32.bottom);
+	Graphics::ManagedSurface::frameRect(clip16, color);
+}
+
+void ManagedSurface32::blitFrom(const ManagedSurface32 &src, const Common::Point32 &destPos) {
 	const int32 srcRight = destPos.x + src.w;
 	const int32 srcBottom = destPos.y + src.h;
 	if (srcRight <= 0 || srcBottom <= 0 || w <= destPos.x || h <= destPos.y)
@@ -149,14 +165,15 @@ bool BitBlock::loadFromBB(const Common::Path &bbPath) {
 	const uint32 bufferSize = f.readUint32LE();
 	const int32 width = f.readSint32LE();
 	const int32 height = f.readSint32LE();
+	const Size32 size(width, height);
 	const uint32 dataSize = f.readUint32LE();
 
-	if (f.err() || f.eos() || width <= 0 || height <= 0) {
+	if (f.err() || f.eos() || size.width <= 0 || size.height <= 0) {
 		warning("BitBlock: invalid BB header in '%s'", bbPath.toString().c_str());
 		return false;
 	}
 
-	const uint64 pixelCount64 = static_cast<uint64>(width) * static_cast<uint64>(height);
+	const uint64 pixelCount64 = static_cast<uint64>(size.width) * static_cast<uint64>(size.height);
 	const uint64 expectedSize64 = pixelCount64 * 3;
 	if (0x7FFFFFFFU < pixelCount64 || 0xFFFFFFFFU < expectedSize64) {
 		warning("BitBlock: BB dimensions overflow in '%s'", bbPath.toString().c_str());
@@ -208,8 +225,7 @@ bool BitBlock::loadFromBB(const Common::Path &bbPath) {
 
 	delete[] _pixels;
 	delete[] _alphaMap;
-	_width = width;
-	_height = height;
+	_size = size;
 	_pixels = pixels;
 	_alphaMap = nullptr;
 
@@ -240,13 +256,12 @@ bool BitBlock::load(const Common::Path &basePath) {
 	return loadFromColorBMP(sourcePath);
 }
 
-void BitBlock::createEmpty(int width, int height, bool withAlpha) {
+void BitBlock::createEmpty(const Size32 &size, bool withAlpha) {
 	delete[] _pixels;
 	delete[] _alphaMap;
-	_width = width;
-	_height = height;
-	_pixels = new byte[width * height * 4]();
-	_alphaMap = withAlpha ? new byte[width * height]() : nullptr;
+	_size = size;
+	_pixels = new byte[size.width * size.height * 4]();
+	_alphaMap = withAlpha ? new byte[size.width * size.height]() : nullptr;
 }
 
 bool BitBlock::loadColorBMP(Common::SeekableReadStream *stream) {
@@ -262,9 +277,8 @@ bool BitBlock::loadColorBMP(Common::SeekableReadStream *stream) {
 		return false;
 	}
 
-	const int32 width = surface->w;
-	const int32 height = surface->h;
-	const uint64 pixelCount64 = static_cast<uint64>(width) * static_cast<uint64>(height);
+	const Size32 size(surface->w, surface->h);
+	const uint64 pixelCount64 = static_cast<uint64>(size.width) * static_cast<uint64>(size.height);
 	if (0x3FFFFFFFU < pixelCount64) {
 		warning("BitBlock: BMP dimensions are too large");
 		return false;
@@ -272,13 +286,12 @@ bool BitBlock::loadColorBMP(Common::SeekableReadStream *stream) {
 
 	Common::ScopedPtr<Graphics::Surface, Graphics::SurfaceDeleter> rgbaSurface(surface->convertTo(Graphics::PixelFormat::createFormatRGBA32()));
 	byte *pixels = new byte[static_cast<uint32>(pixelCount64) * 4];
-	for (int row = 0; row < height; row++)
-		memcpy(pixels + row * width * 4, rgbaSurface->getBasePtr(0, row), width * 4);
+	for (int row = 0; row < size.height; row++)
+		memcpy(pixels + row * size.width * 4, rgbaSurface->getBasePtr(0, row), size.width * 4);
 
 	delete[] _pixels;
 	delete[] _alphaMap;
-	_width = width;
-	_height = height;
+	_size = size;
 	_pixels = pixels;
 	_alphaMap = nullptr;
 
@@ -296,17 +309,16 @@ bool BitBlock::loadAlphaBMP(Common::SeekableReadStream *stream) {
 		return false;
 	}
 
-	const int alphaWidth = surface->w;
-	const int alphaHeight = surface->h;
-	if (alphaWidth != _width || alphaHeight != _height) {
+	const Size32 alphaSize(surface->w, surface->h);
+	if (alphaSize.width != _size.width || alphaSize.height != _size.height) {
 		warning("BitBlock: alpha BMP size %dx%d doesn't match color %dx%d",
-				alphaWidth, alphaHeight, _width, _height);
+				alphaSize.width, alphaSize.height, _size.width, _size.height);
 		return false;
 	}
 
-	byte *alphaMap = new byte[alphaWidth * alphaHeight];
-	for (int row = 0; row < alphaHeight; row++)
-		memcpy(alphaMap + row * alphaWidth, surface->getBasePtr(0, row), alphaWidth);
+	byte *alphaMap = new byte[alphaSize.width * alphaSize.height];
+	for (int row = 0; row < alphaSize.height; row++)
+		memcpy(alphaMap + row * alphaSize.width, surface->getBasePtr(0, row), alphaSize.width);
 
 	delete[] _alphaMap;
 	_alphaMap = alphaMap;
@@ -315,39 +327,38 @@ bool BitBlock::loadAlphaBMP(Common::SeekableReadStream *stream) {
 }
 
 void BitBlock::swapData(BitBlock &other) {
-	SWAP(_width, other._width);
-	SWAP(_height, other._height);
+	SWAP(_size, other._size);
 	SWAP(_pixels, other._pixels);
 	SWAP(_alphaMap, other._alphaMap);
 }
 
-byte BitBlock::blendChannel(byte src, byte destPtr, byte mask) {
+byte BitBlock::blendChannel(byte src, byte dest, byte mask) {
 	// This path uses the separate-mask bitmap rule, not the RLE LUT rule.
 	// The source bitmap already supplies the source contribution, while the
 	// destination is retained according to the mask's inverse.
-	const int result = src + (destPtr * (255 - mask)) / 255;
+	const int result = src + (dest * (255 - mask)) / 255;
 	return static_cast<byte>(MIN(result, 255));
 }
 
 /**
  * Draw the bitmap to a surface with opaque copying.
  */
-void BitBlock::drawToSurface(Graphics::ManagedSurface *dst, const Common::Point32 &pos) const {
+void BitBlock::drawToSurface(ManagedSurface32 *dst, const Common::Point32 &pos) const {
 	if (!_pixels)
 		return;
 
 	const Graphics::PixelFormat &fmt = dst->format;
-	for (int row = 0; row < _height; row++) {
+	for (int row = 0; row < _size.height; row++) {
 		int dy = pos.y + row;
 		if (dy < 0 || dst->h <= dy)
 			continue;
 
-		for (int col = 0; col < _width; col++) {
+		for (int col = 0; col < _size.width; col++) {
 			int dx = pos.x + col;
 			if (dx < 0 || dst->w <= dx)
 				continue;
 
-			const byte *src = _pixels + (row * _width + col) * 4;
+			const byte *src = _pixels + (row * _size.width + col) * 4;
 			uint32 color = fmt.ARGBToColor(255, src[0], src[1], src[2]);
 			*static_cast<uint32 *>(dst->getBasePtr(dx, dy)) = color;
 		}
@@ -357,23 +368,23 @@ void BitBlock::drawToSurface(Graphics::ManagedSurface *dst, const Common::Point3
 /**
  * Draw a source subrectangle to a surface.
  */
-void BitBlock::drawSubRect(Graphics::ManagedSurface *dst, const Common::Point32 &pos,
+void BitBlock::drawSubRect(ManagedSurface32 *dst, const Common::Point32 &pos,
 						   const Common::Rect &srcRect) const {
 	if (!_pixels)
 		return;
 
 	const Graphics::PixelFormat &fmt = dst->format;
-	for (int row = srcRect.top; row < srcRect.bottom && row < _height; row++) {
+	for (int row = srcRect.top; row < srcRect.bottom && row < _size.height; row++) {
 		int dy = pos.y + (row - srcRect.top);
 		if (dy < 0 || dst->h <= dy)
 			continue;
 
-		for (int col = srcRect.left; col < srcRect.right && col < _width; col++) {
+		for (int col = srcRect.left; col < srcRect.right && col < _size.width; col++) {
 			int dx = pos.x + (col - srcRect.left);
 			if (dx < 0 || dst->w <= dx)
 				continue;
 
-			const byte *src = _pixels + (row * _width + col) * 4;
+			const byte *src = _pixels + (row * _size.width + col) * 4;
 			uint32 color = fmt.ARGBToColor(255, src[0], src[1], src[2]);
 			*static_cast<uint32 *>(dst->getBasePtr(dx, dy)) = color;
 		}
@@ -383,25 +394,25 @@ void BitBlock::drawSubRect(Graphics::ManagedSurface *dst, const Common::Point32 
 /**
  * Draw with per-pixel alpha blending.
  */
-void BitBlock::drawAlphaBlend(Graphics::ManagedSurface *dst, const Common::Point32 &pos) const {
+void BitBlock::drawAlphaBlend(ManagedSurface32 *dst, const Common::Point32 &pos) const {
 	if (!_pixels || !_alphaMap)
 		return;
 
-	for (int row = 0; row < _height; row++) {
+	for (int row = 0; row < _size.height; row++) {
 		int dy = pos.y + row;
 		if (dy < 0 || dst->h <= dy)
 			continue;
 
-		for (int col = 0; col < _width; col++) {
+		for (int col = 0; col < _size.width; col++) {
 			int dx = pos.x + col;
 			if (dx < 0 || dst->w <= dx)
 				continue;
 
-			byte alpha = _alphaMap[row * _width + col];
+			byte alpha = _alphaMap[row * _size.width + col];
 			if (alpha == 0)
 				continue;
 
-			const byte *src = _pixels + (row * _width + col) * 4;
+			const byte *src = _pixels + (row * _size.width + col) * 4;
 			byte *dstPixel = static_cast<byte *>(dst->getBasePtr(dx, dy));
 
 			dstPixel[0] = blendChannel(src[2], dstPixel[0], alpha);
@@ -419,23 +430,23 @@ void BitBlock::drawAlphaBlend(Graphics::ManagedSurface *dst, const Common::Point
  * terms explicitly: `scale(mask, source)` and
  * `scale(255 - mask, destination)`.
  */
-void BitBlock::drawRleMaskBlend(Graphics::ManagedSurface *dst, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const {
+void BitBlock::drawRleMaskBlend(ManagedSurface32 *dst, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const {
 	if (!_pixels || !_alphaMap)
 		return;
 
-	for (int row = 0; row < _height; row++) {
+	for (int row = 0; row < _size.height; row++) {
 		const int destY = pos.y + row;
 		if (destY < 0 || dst->h <= destY)
 			continue;
-		for (int column = 0; column < _width; column++) {
+		for (int column = 0; column < _size.width; column++) {
 			const int destX = pos.x + column;
 			if (destX < 0 || dst->w <= destX)
 				continue;
 
-			const byte mask = _alphaMap[row * _width + column];
+			const byte mask = _alphaMap[row * _size.width + column];
 			if (mask == 0)
 				continue;
-			const byte *src = _pixels + (row * _width + column) * 4;
+			const byte *src = _pixels + (row * _size.width + column) * 4;
 			byte *destPtr = static_cast<byte *>(dst->getBasePtr(destX, destY));
 			if (mask == 255) {
 				destPtr[0] = src[2];
@@ -468,8 +479,7 @@ RleBlock::~RleBlock() {
 }
 
 void RleBlock::swapData(RleBlock &other) {
-	SWAP(_width, other._width);
-	SWAP(_height, other._height);
+	SWAP(_size, other._size);
 	SWAP(_dataSize, other._dataSize);
 	SWAP(_rleData, other._rleData);
 	SWAP(_field20, other._field20);
@@ -485,10 +495,11 @@ bool RleBlock::loadFromStream(Common::SeekableReadStream *stream) {
 	const uint32 headerSize = stream->readUint32LE();
 	const int32 width = stream->readSint32LE();
 	const int32 height = stream->readSint32LE();
+	const Size32 size(width, height);
 	const int32 field20 = stream->readSint32LE();
 	const uint32 externalSize = stream->readUint32LE();
 
-	if (stream->err() || headerSize != externalSize || width <= 0 || height <= 0 || headerSize < 2) {
+	if (stream->err() || headerSize != externalSize || size.width <= 0 || size.height <= 0 || headerSize < 2) {
 		warning("RleBlock: invalid RB header");
 		return false;
 	}
@@ -525,8 +536,7 @@ bool RleBlock::loadFromStream(Common::SeekableReadStream *stream) {
 		warning("RleBlock: discarded a malformed RLE tail after complete spans");
 
 	free(_rleData);
-	_width = width;
-	_height = height;
+	_size = size;
 	_dataSize = expandedSize;
 	_rleData = expandedData;
 	_field20 = field20;
@@ -568,9 +578,10 @@ bool RleBlock::loadAnmFrame(Common::SeekableReadStream *stream, uint32 outerSize
 	const uint32 headerSize = stream->readUint32LE();
 	const int32 width = stream->readSint32LE();
 	const int32 height = stream->readSint32LE();
+	const Size32 size(width, height);
 	const int32 field20 = stream->readSint32LE();
 
-	if (stream->err() || headerSize != outerSize || width <= 0 || height <= 0 || headerSize < 2) {
+	if (stream->err() || headerSize != outerSize || size.width <= 0 || size.height <= 0 || headerSize < 2) {
 		warning("RleBlock: invalid ANM frame header");
 		return false;
 	}
@@ -603,8 +614,7 @@ bool RleBlock::loadAnmFrame(Common::SeekableReadStream *stream, uint32 outerSize
 		warning("RleBlock: discarded a malformed ANM RLE tail after complete spans");
 
 	free(_rleData);
-	_width = width;
-	_height = height;
+	_size = size;
 	_dataSize = expandedSize;
 	_rleData = expandedData;
 	_field20 = field20;
@@ -703,7 +713,7 @@ byte RleBlock::blendChannel(byte src, byte dest, byte invAlpha, const AlphaBlend
  *
  * Span data begins after the two-byte resource prefix.
  */
-void RleBlock::drawToScreen(Graphics::ManagedSurface *dst, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const {
+void RleBlock::drawToScreen(ManagedSurface32 *dst, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const {
 	if (!_rleData || _dataSize < 2)
 		return;
 
@@ -791,7 +801,7 @@ void RleBlock::drawToScreen(Graphics::ManagedSurface *dst, const Common::Point32
 	}
 }
 
-void RleBlock::drawToScreenClipped(Graphics::ManagedSurface *dst, const Common::Point32 &pos, const Common::Rect32 &clip, const AlphaBlendLUT &alphaLUT) const {
+void RleBlock::drawToScreenClipped(ManagedSurface32 *dst, const Common::Point32 &pos, const Common::Rect32 &clip, const AlphaBlendLUT &alphaLUT) const {
 	if (!_rleData || _dataSize < 2)
 		return;
 
@@ -872,6 +882,303 @@ void RleBlock::drawToScreenClipped(Graphics::ManagedSurface *dst, const Common::
 			}
 		}
 		ptr += pixelCount * 4;
+	}
+}
+
+Gfx::Gfx(Zoombini2Engine *vm) : _vm(vm) {
+}
+
+Gfx::~Gfx() {
+}
+
+ManagedSurface32 *Gfx::createSurface(const Size32 &size) const {
+	return new ManagedSurface32(size, _vm->getScreen()->format);
+}
+
+void Gfx::captureScreen(ManagedSurface32 *destination) const {
+	assert(destination != nullptr);
+	destination->copyFrom(*_vm->getScreen());
+}
+
+void Gfx::copyToScreen(const ManagedSurface32 &source) const {
+	_vm->getScreen()->copyFrom(source);
+}
+
+void Gfx::captureScreenRegion(ManagedSurface32 *destination, const Common::Rect &sourceRect) const {
+	assert(destination != nullptr);
+	destination->copyRectToSurface(*_vm->getScreen(), 0, 0, sourceRect);
+}
+
+void Gfx::copyRegionToScreen(const ManagedSurface32 &source, const Common::Point &destination) const {
+	_vm->getScreen()->copyRectToSurface(source, destination.x, destination.y, Common::Rect(source.w, source.h));
+}
+
+void Gfx::drawBitBlock(ManagedSurface32 *destination, const BitBlock *bitmap, const Common::Point32 &position) const {
+	if (destination && bitmap)
+		bitmap->drawToSurface(destination, position);
+}
+
+void Gfx::drawBitBlockSubRect(ManagedSurface32 *destination, const BitBlock *bitmap, const Common::Point32 &position,
+							  const Common::Rect &sourceRect) const {
+	if (destination && bitmap)
+		bitmap->drawSubRect(destination, position, sourceRect);
+}
+
+void Gfx::drawRleBlock(ManagedSurface32 *destination, const RleBlock *sprite, const Common::Point32 &position) const {
+	if (destination && sprite)
+		sprite->drawToScreen(destination, position, _vm->getAlphaLUT());
+}
+
+void Gfx::drawAnimationFrame(ManagedSurface32 *destination, const Animation *animation, int frameIndex, const Common::Point32 &position) const {
+	if (!destination || !animation)
+		return;
+
+	drawRleBlock(destination, animation->getFrame(frameIndex), position);
+}
+
+void Gfx::drawAndUpdateAnimationRunner(ManagedSurface32 *destination, AnimationRunner *runner, uint32 tickCount, int scrollX,
+									   int backgroundWidth) const {
+	if (destination && runner)
+		runner->drawAndUpdate(destination, _vm->getAlphaLUT(), tickCount, scrollX, backgroundWidth);
+}
+
+void Gfx::drawZoombini(ManagedSurface32 *destination, const ZoombiniAnimation *animation, const ZmbTrait &traits, const Common::Point32 &position,
+					   int cell, int frame, const Common::Rect32 *clip) const {
+	if (destination && animation)
+		animation->drawZoombini(destination, traits, position, cell, frame, _vm->getAlphaLUT(), clip);
+}
+
+void Gfx::drawZoombiniRunner(ManagedSurface32 *destination, const ZoombiniRunner *runner) const {
+	if (destination && runner)
+		runner->draw(destination, _vm->getAlphaLUT());
+}
+
+int Gfx::drawString(ManagedSurface32 *destination, const BitmapFont *font, const Common::Point32 &position, const Common::String &text) const {
+	if (!destination || !font)
+		return 0;
+
+	return font->drawString(destination, position, text, _vm->getAlphaLUT());
+}
+
+void Gfx::fillRect(ManagedSurface32 *destination, const Common::Rect32 &rect, uint32 color) const {
+	if (destination)
+		destination->fillRect(rect, color);
+}
+
+void Gfx::fillRect(ManagedSurface32 *destination, const Common::Rect &rect, uint32 color) const {
+	if (destination)
+		destination->fillRect(rect, color);
+}
+
+void Gfx::frameRect(ManagedSurface32 *destination, const Common::Rect32 &rect, uint32 color) const {
+	if (destination)
+		destination->frameRect(rect, color);
+}
+
+void Gfx::frameRect(ManagedSurface32 *destination, const Common::Rect &rect, uint32 color) const {
+	if (destination)
+		destination->frameRect(rect, color);
+}
+
+void Gfx::drawLine(ManagedSurface32 *destination, const Common::Point32 &start, const Common::Point32 &end, uint32 color) const {
+	if (destination)
+		destination->drawLine(start.x, start.y, end.x, end.y, color);
+}
+
+ManagedSurface32 *Gfx::createMapTransitionBackground(PageId sourcePage, int mapRegion, RouteBranch routeBranch) {
+	ManagedSurface32 *background = createSurface(ManagedSurface32::kScreenSize);
+
+	const Common::String backgroundPath = Common::String::format("#bmp/maptrans/bigmap_background_%d", mapRegion);
+	BitBlock bitmap(_vm);
+	if (bitmap.load(Common::Path(backgroundPath))) {
+		drawBitBlock(background, &bitmap, Common::Point32(0, 0));
+	} else {
+		warning("MapTransition: Failed to load background %s", backgroundPath.c_str());
+		fillRect(background, Common::Rect32(0, 0, ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), 0);
+	}
+
+	drawMapOverlays(background, sourcePage, mapRegion, routeBranch);
+	return background;
+}
+
+/** Load, draw, and release one cached map-overlay RLE sprite. */
+void Gfx::drawOverlaySprite(ManagedSurface32 *dst, const Common::String &name, const Common::Point32 &pos) {
+	const Common::Path overlayPath(Common::String::format("bmp/maptrans/%s.bmp", name.c_str()));
+
+	RleBlock overlay(_vm);
+	if (overlay.load(overlayPath)) {
+		drawRleBlock(dst, &overlay, pos);
+	} else {
+		debug(2, "MapTransition: overlay '%s' not found", name.c_str());
+	}
+}
+
+/**
+ * Draw map overlay segments and icons based on visited-page state.
+ *
+ * Key pattern for each overlay:
+ *   Draw if dstPageId was already visited during the current game,
+ *   or if the current transition starts at srcPageId and that page is visited
+ *   but dstPageId has not been reached at this level yet.
+ *
+ * Route direction at the page-4 fork is tracked through @ref GameState::hasPageVisit.
+ * Page 6 visit kind 1 selects the upper path and page 5 selects the lower path.
+ */
+void Gfx::drawMapOverlays(ManagedSurface32 *dst, PageId sourcePage, int mapRegion, RouteBranch routeBranch) {
+	GameState *gs = _vm->getGameState();
+
+	// Helper lambda: standard overlay visibility check.
+	// "Show this path piece if destination was previously visited,
+	// OR if we're currently transitioning and haven't arrived yet."
+	auto visible = [&](int srcPageId, int dstPageId) -> bool {
+		return gs->isPageVisited(dstPageId) || (sourcePage == srcPageId && gs->isPageVisited(srcPageId) && !gs->hasPageVisit(dstPageId, 1));
+	};
+
+	switch (mapRegion) {
+	case 1: {
+		// Map region one covers ShelterZombiniville through Rescue Site I.
+		const bool seg01vis = visible(0, 1);
+		const bool seg02vis = visible(1, 2);
+		const bool seg03vis = visible(2, 3);
+		const bool seg04vis = visible(3, 4);
+
+		if (seg01vis)
+			drawOverlaySprite(dst, "bigmap_segment_01", Common::Point32(264, 206));
+		if (seg02vis)
+			drawOverlaySprite(dst, "bigmap_segment_02", Common::Point32(369, 94));
+		if (seg03vis)
+			drawOverlaySprite(dst, "bigmap_segment_03", Common::Point32(520, 74));
+		if (seg04vis)
+			drawOverlaySprite(dst, "bigmap_segment_03", Common::Point32(632, 156));
+
+		// Icons
+		if (seg01vis) {
+			drawOverlaySprite(dst, "bigmap_icon_01", Common::Point32(259, 302));
+			drawOverlaySprite(dst, "bigmap_icon_02", Common::Point32(281, 131));
+		}
+		if (seg02vis)
+			drawOverlaySprite(dst, "bigmap_icon_03", Common::Point32(421, 26));
+		if (seg03vis)
+			drawOverlaySprite(dst, "bigmap_icon_04", Common::Point32(564, 99));
+		if (seg04vis)
+			drawOverlaySprite(dst, "bigmap_icon_05", Common::Point32(653, 191));
+		break;
+	}
+
+	case 2: {
+		// Map region two covers both routes between the rescue sites.
+		const bool northRoute = gs->hasPageVisit(6, 1) || routeBranch == RouteBranch::kLeft01;
+		const bool southRoute = gs->hasPageVisit(5, 1) || routeBranch == RouteBranch::kRight02;
+
+		// Unconditional: start of route from Rescue1
+		drawOverlaySprite(dst, "bigmap_segment_03", Common::Point32(-18, 198));
+		drawOverlaySprite(dst, "bigmap_segment_04", Common::Point32(99, 280));
+
+		// Top path: fork, Magic Wall, Chez Norf, then Rescue Site II.
+		if (northRoute && visible(4, 6))
+			drawOverlaySprite(dst, "bigmap_segment_05a", Common::Point32(201, 260));
+
+		// Magic Wall to Chez Norf segment.
+		const bool czNorfSeg = gs->isPageVisited(8) || (sourcePage == 6 && gs->isPageVisited(6) && !gs->hasPageVisit(8, 1));
+		if (czNorfSeg)
+			drawOverlaySprite(dst, "bigmap_segment_06a", Common::Point32(310, 230));
+
+		// Chez Norf to Rescue Site II segment.
+		if (gs->hasPageVisit(8, 1)) {
+			if (gs->isPageVisited(9) || (sourcePage == 8 && gs->isPageVisited(8) && !gs->hasPageVisit(9, 1)))
+				drawOverlaySprite(dst, "bigmap_segment_07a", Common::Point32(480, 233));
+		}
+
+		// Bottom path: fork, Mystic Marsh, Wall of Fleens, then Rescue Site II.
+		if (southRoute && visible(4, 5))
+			drawOverlaySprite(dst, "bigmap_segment_05b", Common::Point32(164, 376));
+
+		// Mystic Marsh to Wall of Fleens segment.
+		const bool wofSeg = gs->isPageVisited(7) || (sourcePage == 5 && gs->isPageVisited(5) && !gs->hasPageVisit(7, 1));
+		if (wofSeg)
+			drawOverlaySprite(dst, "bigmap_segment_06b", Common::Point32(339, 476));
+
+		// Wall of Fleens to Rescue Site II segment.
+		if (gs->hasPageVisit(7, 1)) {
+			if (gs->isPageVisited(9) || (sourcePage == 7 && gs->isPageVisited(7) && !gs->hasPageVisit(9, 1)))
+				drawOverlaySprite(dst, "bigmap_segment_07b", Common::Point32(512, 360));
+		}
+
+		// These route icons are always visible in region two.
+		drawOverlaySprite(dst, "bigmap_icon_04", Common::Point32(27, 223));
+		drawOverlaySprite(dst, "bigmap_icon_05", Common::Point32(116, 315));
+
+		// Top route icons
+		if (northRoute && visible(4, 6))
+			drawOverlaySprite(dst, "bigmap_icon_06a", Common::Point32(259, 210));
+		if (czNorfSeg)
+			drawOverlaySprite(dst, "bigmap_icon_07a", Common::Point32(440, 170));
+
+		// Rescue2 icon (reachable from either path)
+		if (gs->isPageVisited(9) ||
+			(sourcePage == 8 && gs->isPageVisited(8) && !gs->hasPageVisit(9, 1)) ||
+			(sourcePage == 7 && gs->isPageVisited(7) && !gs->hasPageVisit(9, 1)))
+			drawOverlaySprite(dst, "bigmap_icon_08", Common::Point32(476, 271));
+
+		// Bottom route icons
+		if (southRoute && visible(4, 5))
+			drawOverlaySprite(dst, "bigmap_icon_06b", Common::Point32(290, 418));
+		if (visible(5, 7))
+			drawOverlaySprite(dst, "bigmap_icon_07b", Common::Point32(443, 430));
+		break;
+	}
+
+	case 3: {
+		// Map region three covers Rescue Site II through the finale.
+		const bool northRouteVisited = gs->hasPageVisit(6, 1);
+		const bool czNorfFlag = gs->hasPageVisit(8, 1);
+		const bool wofFlag = gs->hasPageVisit(7, 1);
+
+		// Previous route segments (show which path was taken)
+		if (northRouteVisited) {
+			drawOverlaySprite(dst, "bigmap_segment_05a", Common::Point32(-27, 418));
+			drawOverlaySprite(dst, "bigmap_segment_06a", Common::Point32(87, 386));
+		}
+		if (czNorfFlag)
+			drawOverlaySprite(dst, "bigmap_segment_07a", Common::Point32(251, 383));
+		if (wofFlag)
+			drawOverlaySprite(dst, "bigmap_segment_07b", Common::Point32(293, 515));
+
+		// Rescue Site II to Snowboard Gulch is always visible.
+		drawOverlaySprite(dst, "bigmap_segment_08", Common::Point32(313, 407));
+
+		// Snowboard Gulch to Boolie Boggle.
+		if (visible(10, 11))
+			drawOverlaySprite(dst, "bigmap_segment_09", Common::Point32(434, 328));
+		// Boolie Boggle to the finale.
+		if (visible(11, 12))
+			drawOverlaySprite(dst, "bigmap_segment_10", Common::Point32(527, 111));
+
+		// Prior-route icons remain conditional on saved progress.
+		if (northRouteVisited)
+			drawOverlaySprite(dst, "bigmap_icon_06a", Common::Point32(33, 366));
+		if (czNorfFlag)
+			drawOverlaySprite(dst, "bigmap_icon_07a", Common::Point32(214, 326));
+
+		// Unconditional icons
+		drawOverlaySprite(dst, "bigmap_icon_08", Common::Point32(252, 426));
+		drawOverlaySprite(dst, "bigmap_icon_07b", Common::Point32(66, 574));
+		drawOverlaySprite(dst, "bigmap_icon_09", Common::Point32(367, 367));
+
+		// Conditional icons
+		if (visible(10, 11))
+			drawOverlaySprite(dst, "bigmap_icon_10", Common::Point32(469, 273));
+		if (visible(11, 12))
+			drawOverlaySprite(dst, "bigmap_icon_11", Common::Point32(608, -12));
+		break;
+	}
+
+	default:
+		// Use the first map region as a safe fallback.
+		drawOverlaySprite(dst, "bigmap_segment_01", Common::Point32(264, 206));
+		drawOverlaySprite(dst, "bigmap_icon_01", Common::Point32(259, 302));
+		drawOverlaySprite(dst, "bigmap_icon_02", Common::Point32(281, 131));
+		break;
 	}
 }
 
@@ -976,7 +1283,8 @@ bool AreaMask::loadFromFile(const Common::Path &path) {
 		return false;
 	}
 
-	const uint64 pixelCount = static_cast<uint64>(surface->w) * static_cast<uint64>(surface->h);
+	const Size32 size(surface->w, surface->h);
+	const uint64 pixelCount = static_cast<uint64>(size.width) * static_cast<uint64>(size.height);
 	if (0xFFFFFFFFU < pixelCount) {
 		warning("AreaMask: dimensions are too large in '%s'", path.toString().c_str());
 		return false;
@@ -984,23 +1292,22 @@ bool AreaMask::loadFromFile(const Common::Path &path) {
 
 	Common::Array<byte> pixels;
 	pixels.resize(static_cast<uint32>(pixelCount));
-	for (int row = 0; row < surface->h; row++)
-		memcpy(&pixels[row * surface->w], surface->getBasePtr(0, row), surface->w);
+	for (int row = 0; row < size.height; row++)
+		memcpy(&pixels[row * size.width], surface->getBasePtr(0, row), size.width);
 
-	_width = surface->w;
-	_height = surface->h;
+	_size = size;
 	_pixels.swap(pixels);
 	return true;
 }
 
 bool AreaMask::hasMarkedByteAt(const Common::Point32 &point) const {
-	if (point.x <= 0 || point.y <= 0 || _width <= point.x || _height <= point.y || _pixels.empty())
+	if (point.x <= 0 || point.y <= 0 || _size.width <= point.x || _size.height <= point.y || _pixels.empty())
 		return false;
 
 	const int byteStartX = point.x & ~7;
-	const int byteEndX = MIN(byteStartX + 8, _width);
+	const int byteEndX = MIN(byteStartX + 8, _size.width);
 	for (int x = byteStartX; x < byteEndX; x++) {
-		if (_pixels[point.y * _width + x] != 0)
+		if (_pixels[point.y * _size.width + x] != 0)
 			return true;
 	}
 	return false;
@@ -1106,18 +1413,18 @@ int ZoombiniAnimation::getFrameCount(int cellIndex) const {
 	return _cells[cellIndex].frames.size();
 }
 
-Common::Point ZoombiniAnimation::getSpriteSize(int cell, int frame) const {
+Size32 ZoombiniAnimation::getSpriteSize(int cell, int frame) const {
 	if (cell < 0 || kDim0 <= cell || frame < 0)
-		return Common::Point();
+		return Size32();
 	const int entry = cell * kDim1 * kDim2;
 	const int selectedFrame = getFrameCount(entry) == 1 ? 0 : frame;
 	const RleBlock *sprite = getFrame(entry, selectedFrame);
 	if (!sprite)
-		return Common::Point();
-	return Common::Point(sprite->getWidth(), sprite->getHeight());
+		return Size32();
+	return sprite->getSize();
 }
 
-void ZoombiniAnimation::drawZoombini(Graphics::ManagedSurface *screen, const ZmbTrait &traits, const Common::Point32 &pos,
+void ZoombiniAnimation::drawZoombini(ManagedSurface32 *screen, const ZmbTrait &traits, const Common::Point32 &pos,
 									 int cell, int frame, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip) const {
 	if (cell < 0 || kDim0 <= cell || frame < 0)
 		return;
@@ -1179,11 +1486,13 @@ bool UIButton::loadImages(const Common::Path &normalPath,
 
 	if (_rect.width() == 0) {
 		if (_normalBB) {
-			_rect.setWidth(_normalBB->getWidth());
-			_rect.setHeight(_normalBB->getHeight());
+			const Size32 size = _normalBB->getSize();
+			_rect.setWidth(size.width);
+			_rect.setHeight(size.height);
 		} else if (_normalRle) {
-			_rect.setWidth(_normalRle->getWidth());
-			_rect.setHeight(_normalRle->getHeight());
+			const Size32 size = _normalRle->getSize();
+			_rect.setWidth(size.width);
+			_rect.setHeight(size.height);
 		}
 	}
 
@@ -1207,11 +1516,13 @@ bool UIButton::loadImagesWithMask(const Common::Path &normalPath, const Common::
 
 	if (_rect.width() == 0) {
 		if (_normalRle) {
-			_rect.setWidth(_normalRle->getWidth());
-			_rect.setHeight(_normalRle->getHeight());
+			const Size32 size = _normalRle->getSize();
+			_rect.setWidth(size.width);
+			_rect.setHeight(size.height);
 		} else if (_normalBB) {
-			_rect.setWidth(_normalBB->getWidth());
-			_rect.setHeight(_normalBB->getHeight());
+			const Size32 size = _normalBB->getSize();
+			_rect.setWidth(size.width);
+			_rect.setHeight(size.height);
 		}
 	}
 
@@ -1260,8 +1571,8 @@ bool UIButton::loadMaskedImage(const Common::Path &colorPath, const Common::Path
 	return false;
 }
 
-void UIButton::setRect(const Common::Point32 &pos, int width, int height) {
-	_rect = Common::Rect(pos.x, pos.y, pos.x + width, pos.y + height);
+void UIButton::setRect(const Common::Point32 &pos, const Size32 &size) {
+	_rect = Common::Rect(pos.x, pos.y, pos.x + size.width, pos.y + size.height);
 }
 
 void UIButton::setRect(const Common::Rect &rect) {
@@ -1278,7 +1589,7 @@ void UIButton::setOverlay(const RleBlock *overlay, const Common::Point32 &offset
 	_overlayClipRight = clipRight;
 }
 
-int UIButton::drawAndHitTest(Graphics::ManagedSurface *dst, const Common::Point32 &mousePos,
+int UIButton::drawAndHitTest(ManagedSurface32 *dst, const Common::Point32 &mousePos,
 							 const AlphaBlendLUT &alphaLUT) {
 	_wasHovering = _isHovering;
 	_isHovering = false;
@@ -1324,7 +1635,7 @@ int UIButton::drawAndHitTest(Graphics::ManagedSurface *dst, const Common::Point3
 		rleToDraw->drawToScreen(dst, Common::Point32(_rect.left, _rect.top), alphaLUT);
 	}
 	if (_overlay && _overlayClipRight) {
-		const Common::Rect32 clip(0, 0, *_overlayClipRight, MIN(static_cast<int>(dst->h), 600));
+		const Common::Rect32 clip(0, 0, *_overlayClipRight, MIN(static_cast<int>(dst->h), ManagedSurface32::kScreenSize.height));
 		_overlay->drawToScreenClipped(dst, Common::Point32(_rect.left + _overlayOffset.x, _rect.top + _overlayOffset.y), clip, alphaLUT);
 	}
 
@@ -1366,18 +1677,17 @@ bool BitmapFont::load(const Common::Path &basePath, byte r, byte g, byte b) {
 		return false;
 	}
 
-	const int width = alphaBB.getWidth();
-	const int height = alphaBB.getHeight();
+	const Size32 size = alphaBB.getSize();
 
 	BitBlock *loadedGlyphs[kNumGlyphs] = {};
 	int glyphIndex = 0;
 	int col = 1;
 
-	while (col < width && glyphIndex < kNumGlyphs) {
-		while (col < width) {
+	while (col < size.width && glyphIndex < kNumGlyphs) {
+		while (col < size.width) {
 			bool blank = true;
-			for (int row = 0; row < height; row++) {
-				if (srcAlpha[row * width + col] != 0) {
+			for (int row = 0; row < size.height; row++) {
+				if (srcAlpha[row * size.width + col] != 0) {
 					blank = false;
 					break;
 				}
@@ -1387,14 +1697,14 @@ bool BitmapFont::load(const Common::Path &basePath, byte r, byte g, byte b) {
 			col += 1;
 		}
 
-		if (col >= width)
+		if (col >= size.width)
 			break;
 
 		const int startCol = col;
-		while (col < width) {
+		while (col < size.width) {
 			bool blank = true;
-			for (int row = 0; row < height; row++) {
-				if (srcAlpha[row * width + col] != 0) {
+			for (int row = 0; row < size.height; row++) {
+				if (srcAlpha[row * size.width + col] != 0) {
 					blank = false;
 					break;
 				}
@@ -1407,16 +1717,16 @@ bool BitmapFont::load(const Common::Path &basePath, byte r, byte g, byte b) {
 		const int glyphWidth = col - startCol + 2;
 
 		BitBlock *glyph = new BitBlock(_vm);
-		glyph->createEmpty(glyphWidth, height, true);
+		glyph->createEmpty(Size32(glyphWidth, size.height), true);
 
 		byte *dstAlpha = const_cast<byte *>(glyph->getAlpha());
-		const int copyWidth = MIN(glyphWidth, width - startCol);
-		for (int row = 0; row < height; row++) {
-			memcpy(dstAlpha + row * glyphWidth, srcAlpha + row * width + startCol, copyWidth);
+		const int copyWidth = MIN(glyphWidth, size.width - startCol);
+		for (int row = 0; row < size.height; row++) {
+			memcpy(dstAlpha + row * glyphWidth, srcAlpha + row * size.width + startCol, copyWidth);
 		}
 
 		byte *dstPixels = const_cast<byte *>(glyph->getPixels());
-		const int totalPixels = glyphWidth * height;
+		const int totalPixels = glyphWidth * size.height;
 		for (int i = 0; i < totalPixels; i++) {
 			dstPixels[i * 4 + 0] = r;
 			dstPixels[i * 4 + 1] = g;
@@ -1499,7 +1809,7 @@ int BitmapFont::charToGlyphIndex(char c) {
 	}
 }
 
-int BitmapFont::drawString(Graphics::ManagedSurface *dst, const Common::Point32 &pos,
+int BitmapFont::drawString(ManagedSurface32 *dst, const Common::Point32 &pos,
 						   const Common::String &text, const AlphaBlendLUT &alphaLUT) const {
 	if (!_loaded) {
 		return 0;
@@ -1590,23 +1900,23 @@ bool VolumePanel::init(SoundManager *soundManager) {
 		loaded = false;
 	}
 
-	_okButton.setRect(Common::Point32(294, 487), 76, 74);
+	_okButton.setRect(Common::Point32(294, 487), Size32(76, 74));
 	if (!_okButton.loadImages(Common::Path("bmp/menu/MENU - Valid - OK"), Common::Path("bmp/menu/MENU - Valid - OK highlight")))
 		loaded = false;
 
-	_noButton.setRect(Common::Point32(468, 487), 76, 74);
+	_noButton.setRect(Common::Point32(468, 487), Size32(76, 74));
 	if (!_noButton.loadImages(Common::Path("bmp/menu/MENU - Valid - NO"), Common::Path("bmp/menu/MENU - Valid - NO highlight")))
 		loaded = false;
 
-	_sliderLabels[0].setRect(Common::Point32(kLabelX, kMusicLabelY), kLabelW, kLabelH);
+	_sliderLabels[0].setRect(Common::Point32(kLabelX, kMusicLabelY), kLabelSize);
 	if (!_sliderLabels[0].loadImages(Common::Path("bmp/menu/OPTION - Musique NORMAL"), Common::Path("bmp/menu/OPTION - Musique HIGHLIGHT")))
 		loaded = false;
 
-	_sliderLabels[1].setRect(Common::Point32(kLabelX, kSfxLabelY), kLabelW, kLabelH);
+	_sliderLabels[1].setRect(Common::Point32(kLabelX, kSfxLabelY), kLabelSize);
 	if (!_sliderLabels[1].loadImages(Common::Path("bmp/menu/OPTION - Bruitages NORMAL"), Common::Path("bmp/menu/OPTION - Bruitages HILITE")))
 		loaded = false;
 
-	_sliderLabels[2].setRect(Common::Point32(kLabelX, kSpeechLabelY), kLabelW, kLabelH);
+	_sliderLabels[2].setRect(Common::Point32(kLabelX, kSpeechLabelY), kLabelSize);
 	if (!_sliderLabels[2].loadImages(Common::Path("bmp/menu/OPTION - Dialogues NORMAL"), Common::Path("bmp/menu/OPTION - Dialogues HILITE")))
 		loaded = false;
 
@@ -1743,7 +2053,7 @@ void VolumePanel::playPreviewSound() {
 	}
 }
 
-void VolumePanel::draw(Graphics::ManagedSurface *dst, const Common::Point32 &mousePos, const AlphaBlendLUT &alphaLUT) {
+void VolumePanel::draw(ManagedSurface32 *dst, const Common::Point32 &mousePos, const AlphaBlendLUT &alphaLUT) {
 	for (int i = 0; i < 3; i++)
 		_sliderLabels[i].drawAndHitTest(dst, mousePos, alphaLUT);
 	_okButton.drawAndHitTest(dst, mousePos, alphaLUT);

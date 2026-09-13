@@ -213,7 +213,7 @@ private:
 	void freeZoombini(int nodeIdx);
 	/** Return the number of puzzle-roster entries already released. */
 	int countFreeZoombinis() const;
-	/** Load all graphics and animations owned by the puzzle. */
+	/** Load all graphics and animations retained until the puzzle is released. */
 	void loadResources();
 
 	/** Music handle used while Aqua Cube is active. */

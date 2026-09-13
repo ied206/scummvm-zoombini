@@ -19,10 +19,10 @@
  *
  */
 
+#include "zoombini2/pages/puzzle_cheznorf.h"
 #include "common/debug.h"
 #include "zoombini2/graphics.h"
 #include "zoombini2/scripts.h"
-#include "zoombini2/pages/puzzle_cheznorf.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
@@ -203,11 +203,10 @@ void PuzzleChezNorf::init() {
 		_tables[i].pos = Common::Point32(kFirstTablePos.x + i * kTableSpacing, kFirstTablePos.y);
 
 		// Use the loaded plate dimensions for its clickable table area.
-		int plateW = _plato ? _plato->getWidth() : 85;
-		int plateH = _plato ? _plato->getHeight() : 80;
+		const Size32 plateSize = _plato ? _plato->getSize() : Size32(85, 80);
 		_tables[i].hitbox = Common::Rect(
 			static_cast<int16>(_tables[i].pos.x), static_cast<int16>(_tables[i].pos.y),
-			static_cast<int16>(_tables[i].pos.x + plateW), static_cast<int16>(_tables[i].pos.y + plateH));
+			static_cast<int16>(_tables[i].pos.x + plateSize.width), static_cast<int16>(_tables[i].pos.y + plateSize.height));
 
 		_tables[i].zoombiniIdx = -1;
 		_tables[i].foodSlurp = -1;
@@ -669,8 +668,6 @@ int PuzzleChezNorf::findFoodAtPos(const Common::Point &pos) const {
 void PuzzleChezNorf::onRenderContent(ManagedSurface32 *screen) {
 	drawPrimaryPageLayer(screen);
 
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	// Select the order-panel background for the current level.
 	RleBlock *bgOverlay = nullptr;
 	switch (_level) {
@@ -687,7 +684,7 @@ void PuzzleChezNorf::onRenderContent(ManagedSurface32 *screen) {
 		break;
 	}
 	if (bgOverlay && bgOverlay->isValid()) {
-		bgOverlay->drawToScreen(screen, Common::Point32(0, 0), lut);
+		_vm->_gfx->drawRleBlock(screen, bgOverlay, Common::Point32(0, 0));
 	}
 
 	drawFoodBoard(screen);
@@ -697,16 +694,15 @@ void PuzzleChezNorf::onRenderContent(ManagedSurface32 *screen) {
 }
 
 void PuzzleChezNorf::onRenderForeground(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	// Draw feedback overlay for current state
 	if (_currentTable >= 0) {
 		const Common::Point32 feedbackPos(
 			_tables[_currentTable].pos.x, _tables[_currentTable].pos.y - 40);
 
 		if (_state == kStateCorrect && _symbOK && _symbOK->isValid()) {
-			_symbOK->drawToScreen(screen, feedbackPos, lut);
+			_vm->_gfx->drawRleBlock(screen, _symbOK, feedbackPos);
 		} else if (_state == kStateWrong && _symbNO && _symbNO->isValid()) {
-			_symbNO->drawToScreen(screen, feedbackPos, lut);
+			_vm->_gfx->drawRleBlock(screen, _symbNO, feedbackPos);
 		}
 	}
 	if (_vm->showChezNorfDebugOverlay())
@@ -728,25 +724,22 @@ void PuzzleChezNorf::drawDebugOverlay(ManagedSurface32 *screen) {
 		}
 	}
 
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	const Common::String header = Common::String::format("%d - %d %d %d - %d %d %d - %d %d %d", _templateId, _foodVals[0], _foodVals[1],
-														 _foodVals[2], _foodVals[3], _foodVals[4], _foodVals[5], _foodVals[6], _foodVals[7], _foodVals[8]);
-	_debugFont->drawString(screen, Common::Point32(100, 0), header, lut);
+													 _foodVals[2], _foodVals[3], _foodVals[4], _foodVals[5], _foodVals[6], _foodVals[7], _foodVals[8]);
+	_vm->_gfx->drawString(screen, _debugFont, Common::Point32(100, 0), header);
 
 	for (int tableIndex = 0; tableIndex < _numTables; tableIndex++) {
 		const FoodAnswer &answer = _answers[tableIndex];
 		const int x = 205 + tableIndex * kTableSpacing;
-		_debugFont->drawString(screen, Common::Point32(x, 50), getDebugFoodName(answer.slurp), lut);
-		_debugFont->drawString(screen, Common::Point32(x, 80), getDebugFoodName(answer.miam), lut);
-		_debugFont->drawString(screen, Common::Point32(x, 110), getDebugFoodName(answer.glouglou), lut);
+		_vm->_gfx->drawString(screen, _debugFont, Common::Point32(x, 50), getDebugFoodName(answer.slurp));
+		_vm->_gfx->drawString(screen, _debugFont, Common::Point32(x, 80), getDebugFoodName(answer.miam));
+		_vm->_gfx->drawString(screen, _debugFont, Common::Point32(x, 110), getDebugFoodName(answer.glouglou));
 		const int assignmentCount = static_cast<int>(answer.slurp != 9) + static_cast<int>(answer.miam != 9) + static_cast<int>(answer.glouglou != 9);
-		_debugFont->drawString(screen, Common::Point32(x, 140), Common::String::format("%d", assignmentCount), lut);
+		_vm->_gfx->drawString(screen, _debugFont, Common::Point32(x, 140), Common::String::format("%d", assignmentCount));
 	}
 }
 
 void PuzzleChezNorf::drawFoodBoard(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	// Draw 3 sections of food grid dots from DrawBoard_40F9B0
 	// Section 1: y starts at 47, step 15; Section 2: 104; Section 3: 164
 	static const int kSectionStartY[] = {47, 104, 164};
@@ -760,8 +753,8 @@ void PuzzleChezNorf::drawFoodBoard(ManagedSurface32 *screen) {
 			int gridY = kSectionStartY[section];
 			for (int row = 0; row < 3; row++) {
 				int val = _foodGrid[section][col][row];
-				if (val >= 1 && val <= 3 && symbByType[val] && symbByType[val]->isValid()) {
-					symbByType[val]->drawToScreen(screen, Common::Point32(baseX, gridY), lut);
+				if (1 <= val && val <= 3 && symbByType[val] && symbByType[val]->isValid()) {
+					_vm->_gfx->drawRleBlock(screen, symbByType[val], Common::Point32(baseX, gridY));
 				}
 				gridY += 15;
 			}
@@ -771,27 +764,23 @@ void PuzzleChezNorf::drawFoodBoard(ManagedSurface32 *screen) {
 }
 
 void PuzzleChezNorf::drawTables(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	// Draw highlight on non-completed tables
 	for (int i = 0; i < _numTables; i++) {
 		if (!_tables[i].completed && _highlightImage && _highlightImage->isValid()) {
 			// Highlight drawn at norf slot position (y=205 area from Init)
-			_highlightImage->drawToScreen(screen, Common::Point32(_tables[i].pos.x, 205), lut);
+			_vm->_gfx->drawRleBlock(screen, _highlightImage, Common::Point32(_tables[i].pos.x, 205));
 		}
 	}
 }
 
 void PuzzleChezNorf::drawPlates(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	for (int i = 0; i < _numTables; i++) {
 		if (_tables[i].completed)
 			continue;
 
 		// Draw plate at table position
 		if (_plato && _plato->isValid()) {
-			_plato->drawToScreen(screen, _tables[i].pos, lut);
+			_vm->_gfx->drawRleBlock(screen, _plato, _tables[i].pos);
 		}
 
 		// Draw food items on served plates
@@ -802,32 +791,30 @@ void PuzzleChezNorf::drawPlates(ManagedSurface32 *screen) {
 			if (_tables[i].foodSlurp >= 0 && _tables[i].foodSlurp < 3) {
 				RleBlock *image = _slurpImage[_tables[i].foodSlurp];
 				if (image && image->isValid())
-					image->drawToScreen(screen, foodPos, lut);
+					_vm->_gfx->drawRleBlock(screen, image, foodPos);
 			}
 
 			// Draw miam
 			if (_tables[i].foodMiam >= 0 && _tables[i].foodMiam < 3) {
 				RleBlock *image = _miamImage[_tables[i].foodMiam];
 				if (image && image->isValid())
-					image->drawToScreen(screen, Common::Point32(foodPos.x + 20, foodPos.y), lut);
+					_vm->_gfx->drawRleBlock(screen, image, Common::Point32(foodPos.x + 20, foodPos.y));
 			}
 
 			// Draw glouglou
 			if (_tables[i].foodGlouglou >= 0 && _tables[i].foodGlouglou < 3) {
 				RleBlock *image = _glouglouImage[_tables[i].foodGlouglou];
 				if (image && image->isValid())
-					image->drawToScreen(screen, Common::Point32(foodPos.x + 40, foodPos.y), lut);
+					_vm->_gfx->drawRleBlock(screen, image, Common::Point32(foodPos.x + 40, foodPos.y));
 			}
 		}
 	}
 }
 
 void PuzzleChezNorf::drawNorf(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	// Draw Norf default sprite at center area
 	if (_norfDefault && _norfDefault->isValid()) {
-		_norfDefault->drawToScreen(screen, Common::Point32(100, 350), lut);
+		_vm->_gfx->drawRleBlock(screen, _norfDefault, Common::Point32(100, 350));
 	}
 }
 
@@ -835,21 +822,19 @@ void PuzzleChezNorf::onRenderActors(ManagedSurface32 *screen) {
 	if (!_zoombiniAnimation)
 		return;
 
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	// Draw zoombinis at their table positions
 	for (int i = 0; i < _numTables; i++) {
 		if (_tables[i].completed)
 			continue;
 
 		int zIdx = _tables[i].zoombiniIdx;
-		if (zIdx < 0 || zIdx >= (int)_puzzleZoombinis.size())
+		if (zIdx < 0 || static_cast<int>(_puzzleZoombinis.size()) <= zIdx)
 			continue;
 
 		const ZoombiniRunner *z = _puzzleZoombinis[zIdx];
 		const Common::Point32 pos(_tables[i].pos.x, _tables[i].pos.y - 60);
 
-		_zoombiniAnimation->drawZoombini(screen, z->_traits, pos, 0, 0, lut);
+		_vm->_gfx->drawZoombini(screen, _zoombiniAnimation, z->_traits, pos, 0, 0);
 	}
 }
 

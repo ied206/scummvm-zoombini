@@ -34,6 +34,7 @@
 namespace Zoombini2 {
 
 const Common::Point32 InteractiveMenu::kFileListPos(157, 286);
+const Size32 InteractiveMenu::kSelectorSize(520, 201);
 
 const char *const InteractiveMenu::kValidNameCharacters =
 	"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ";
@@ -111,23 +112,22 @@ void InteractiveMenu::loadButtons() {
 		const char *hoverPath;
 		const char *disabledPath;
 		Common::Point32 pos;
-		int width;
-		int height;
+		Size32 size;
 	};
 
 	const ButtonDefinition definitions[kMenuButtonCount] = {
-		{"bmp/menu/PARTIEs - ArrowUP NORMAL", "bmp/menu/PARTIEs - ArrowUP HIGHLIGHT", nullptr, Common::Point32(613, 350), 46, 50},
-		{"bmp/menu/PARTIEs - ArrowDOWN NORMAL", "bmp/menu/PARTIEs - ArrowDOWN HILITE", nullptr, Common::Point32(613, 416), 46, 50},
-		{"bmp/menu/Start Normal", "bmp/menu/Start Highlight", "bmp/menu/Start Gray", Common::Point32(27, 561), 145, 39},
-		{"bmp/menu/PANEL - Options  NORMAL", "bmp/menu/PANEL - Options  HIGHLIGHT", nullptr, Common::Point32(175, 561), 145, 39},
-		{"bmp/menu/New Normal", "bmp/menu/New Highlight", "bmp/menu/New Gray", Common::Point32(321, 561), 145, 39},
-		{"bmp/menu/PANEL - Entrainement NORMAL", "bmp/menu/PANEL - Entraine HILITE", nullptr, Common::Point32(468, 561), 145, 39},
-		{"bmp/menu/PANEL - Quitter NORMAL", "bmp/menu/PANEL - Quitter HIGHLIGHT", nullptr, Common::Point32(613, 561), 145, 39}};
+		{"bmp/menu/PARTIEs - ArrowUP NORMAL", "bmp/menu/PARTIEs - ArrowUP HIGHLIGHT", nullptr, Common::Point32(613, 350), Size32(46, 50)},
+		{"bmp/menu/PARTIEs - ArrowDOWN NORMAL", "bmp/menu/PARTIEs - ArrowDOWN HILITE", nullptr, Common::Point32(613, 416), Size32(46, 50)},
+		{"bmp/menu/Start Normal", "bmp/menu/Start Highlight", "bmp/menu/Start Gray", Common::Point32(27, 561), Size32(145, 39)},
+		{"bmp/menu/PANEL - Options  NORMAL", "bmp/menu/PANEL - Options  HIGHLIGHT", nullptr, Common::Point32(175, 561), Size32(145, 39)},
+		{"bmp/menu/New Normal", "bmp/menu/New Highlight", "bmp/menu/New Gray", Common::Point32(321, 561), Size32(145, 39)},
+		{"bmp/menu/PANEL - Entrainement NORMAL", "bmp/menu/PANEL - Entraine HILITE", nullptr, Common::Point32(468, 561), Size32(145, 39)},
+		{"bmp/menu/PANEL - Quitter NORMAL", "bmp/menu/PANEL - Quitter HIGHLIGHT", nullptr, Common::Point32(613, 561), Size32(145, 39)}};
 
 	for (int i = 0; i < kMenuButtonCount; ++i) {
 		const ButtonDefinition &definition = definitions[i];
 		_buttons[i] = new UIButton(_vm);
-		_buttons[i]->setRect(definition.pos, definition.width, definition.height);
+		_buttons[i]->setRect(definition.pos, definition.size);
 		_buttons[i]->loadImages(Common::Path(definition.normalPath),
 								Common::Path(definition.hoverPath),
 								definition.disabledPath ? Common::Path(definition.disabledPath) : Common::Path());
@@ -142,9 +142,11 @@ void InteractiveMenu::scanSaveFiles() {
 }
 
 void InteractiveMenu::onUpdate() {
-	updateButtonAvailability();
-	const Common::Point32 mousePos = _vm->getMousePos();
-	onMouseMove(Common::Point(mousePos.x, mousePos.y));
+	if (_state == MenuScreenState::kMain00) {
+		updateButtonAvailability();
+	} else if (_volumePanel) {
+		_volumePanel->handleMouseInput(_vm->getMousePos(), _volumePanelMouseDown, false);
+	}
 }
 
 void InteractiveMenu::onRenderContent(ManagedSurface32 *screen) {
@@ -184,16 +186,8 @@ EventHandleResult InteractiveMenu::onLButtonUp(const Common::Point &pos) {
 }
 
 EventHandleResult InteractiveMenu::onMouseMove(const Common::Point &pos) {
-	if (_state == MenuScreenState::kOptions01) {
-		if (_volumePanel)
-			_volumePanel->handleMouseInput(Common::Point32(pos), _volumePanelMouseDown, false);
-		return EventHandleResult::kConsumed;
-	}
-	const int hovered = hitTestButton(pos);
-	if (hovered != _hoveredButton && 0 <= hovered)
-		playSound(_blipSoundId);
-	_hoveredButton = hovered;
-	return EventHandleResult::kPassthrough;
+	(void)pos;
+	return _state == MenuScreenState::kOptions01 ? EventHandleResult::kConsumed : EventHandleResult::kPassthrough;
 }
 
 EventHandleResult InteractiveMenu::onKeyDown(const Common::KeyState &key, bool repeat) {
@@ -216,7 +210,7 @@ void InteractiveMenu::drawMain(ManagedSurface32 *screen) {
 		selector->drawToSurface(screen, kFileListPos);
 	if (_fileList)
 		_fileList->draw(screen, _vm->getAlphaLUT());
-	drawButtons(screen, mousePos);
+	drawButtonsAndUpdateHover(screen, mousePos);
 }
 
 void InteractiveMenu::updateButtonAvailability() {
@@ -226,10 +220,10 @@ void InteractiveMenu::updateButtonAvailability() {
 	_buttons[kMenuButtonNew]->setEnabled(_fileList->canBeginNewEntry());
 }
 
-void InteractiveMenu::drawButtons(ManagedSurface32 *screen, const Common::Point32 &mousePos) {
+void InteractiveMenu::drawButtonsAndUpdateHover(ManagedSurface32 *screen, const Common::Point32 &mousePos) {
 	for (int i = 0; i < kMenuButtonCount; i++) {
-		if (_buttons[i])
-			_buttons[i]->drawAndHitTest(screen, mousePos, _vm->getAlphaLUT());
+		if (_buttons[i] && _buttons[i]->drawAndHitTest(screen, mousePos, _vm->getAlphaLUT()) == 2)
+			playSound(_blipSoundId);
 	}
 }
 
@@ -263,8 +257,8 @@ int InteractiveMenu::hitTestButton(const Common::Point &pos) const {
 }
 
 bool InteractiveMenu::isInSelectorArea(const Common::Point &pos) const {
-	return kFileListPos.x < pos.x && pos.x < kFileListPos.x + kSelectorWidth &&
-		   kFileListPos.y < pos.y && pos.y < kFileListPos.y + kSelectorHeight;
+	return kFileListPos.x < pos.x && pos.x < kFileListPos.x + kSelectorSize.width &&
+		   kFileListPos.y < pos.y && pos.y < kFileListPos.y + kSelectorSize.height;
 }
 
 void InteractiveMenu::handleButtonClick(int buttonId) {

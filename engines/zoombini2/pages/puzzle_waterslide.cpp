@@ -702,8 +702,6 @@ void PuzzleWaterslide::onRenderContent(ManagedSurface32 *screen) {
 }
 
 void PuzzleWaterslide::drawPipes(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	// Draw pipes connecting slot pairs
 	for (int i = 0; i < 8; i++) {
 		int leftSlot = i;
@@ -720,16 +718,12 @@ void PuzzleWaterslide::drawPipes(ManagedSurface32 *screen) {
 			pipeImage = _pipeGreyHoriz; // Grey for neutral
 		}
 
-		if (pipeImage) {
-			pipeImage->drawToScreen(screen, kPipePos[i], lut);
-		}
+		_vm->_gfx->drawRleBlock(screen, pipeImage, kPipePos[i]);
 	}
 }
 
 void PuzzleWaterslide::drawSlots(ManagedSurface32 *screen) {
 	// Draw slot indicators/pastilles
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	for (int i = 0; i < _numSlots; i++) {
 		const Slot &slot = _slots[i];
 
@@ -741,11 +735,11 @@ void PuzzleWaterslide::drawSlots(ManagedSurface32 *screen) {
 		}
 
 		if (image) {
-			image->drawToScreen(screen, Common::Point32(slot.pos.x - 15, slot.pos.y - 15), lut);
+			_vm->_gfx->drawRleBlock(screen, image, Common::Point32(slot.pos.x - 15, slot.pos.y - 15));
 		} else {
 			// Fallback: draw circle
 			uint32 color = (slot.state == kSlotEmpty) ? 0x808080 : 0x0000FF;
-			screen->fillRect(
+			_vm->_gfx->fillRect(screen,
 				Common::Rect(
 					static_cast<int16>(slot.pos.x - 10), static_cast<int16>(slot.pos.y - 10),
 					static_cast<int16>(slot.pos.x + 10), static_cast<int16>(slot.pos.y + 10)),
@@ -756,8 +750,6 @@ void PuzzleWaterslide::drawSlots(ManagedSurface32 *screen) {
 
 void PuzzleWaterslide::drawTraitIndicators(ManagedSurface32 *screen) {
 	// Draw trait icons near pairs to show which trait they match on.
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	for (int i = 0; i < _numPairs; i++) {
 		if (_pairs[i].matched)
 			continue;
@@ -772,42 +764,36 @@ void PuzzleWaterslide::drawTraitIndicators(ManagedSurface32 *screen) {
 
 		// Draw near the corresponding pipe
 		const Common::Point32 pipePos = kPipePos[i];
-		traitImage->drawToScreen(screen, Common::Point32(pipePos.x + 50, pipePos.y - 10), lut);
+		_vm->_gfx->drawRleBlock(screen, traitImage, Common::Point32(pipePos.x + 50, pipePos.y - 10));
 	}
 }
 
 void PuzzleWaterslide::drawDecorations(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	uint32 now = _vm->getGameTickCount();
 
 	// Draw fountain animation
 	if (_blueFountainAnim) {
-		int frame = (now / 100) % _blueFountainAnim->getFrameCount();
-		const RleBlock *frameImage = _blueFountainAnim->getFrame(frame);
-		if (frameImage)
-			frameImage->drawToScreen(screen, Common::Point32(550, 50), lut);
+		const int frameCount = _blueFountainAnim->getFrameCount();
+		if (0 < frameCount)
+			_vm->_gfx->drawAnimationFrame(screen, _blueFountainAnim, (now / 100) % frameCount, Common::Point32(550, 50));
 	}
 
 	// Draw tree animation
 	if (_littleTreeAnim) {
-		int frame = (now / 150) % _littleTreeAnim->getFrameCount();
-		const RleBlock *frameImage = _littleTreeAnim->getFrame(frame);
-		if (frameImage)
-			frameImage->drawToScreen(screen, Common::Point32(50, 100), lut);
+		const int frameCount = _littleTreeAnim->getFrameCount();
+		if (0 < frameCount)
+			_vm->_gfx->drawAnimationFrame(screen, _littleTreeAnim, (now / 150) % frameCount, Common::Point32(50, 100));
 	}
 
 	// Draw valve master
 	if (_valveAnim) {
-		int frame = (now / 120) % _valveAnim->getFrameCount();
-		const RleBlock *frameImage = _valveAnim->getFrame(frame);
-		if (frameImage)
-			frameImage->drawToScreen(screen, Common::Point32(300, 50), lut);
+		const int frameCount = _valveAnim->getFrameCount();
+		if (0 < frameCount)
+			_vm->_gfx->drawAnimationFrame(screen, _valveAnim, (now / 120) % frameCount, Common::Point32(300, 50));
 	}
 }
 
 void PuzzleWaterslide::onRenderActors(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-
 	if (!_zoombiniAnimation)
 		return;
 
@@ -821,7 +807,7 @@ void PuzzleWaterslide::onRenderActors(ManagedSurface32 *screen) {
 		const Common::Point32 pos(slot.pos.x - 15, slot.pos.y - 20);
 
 		// Draw zoombini
-		_zoombiniAnimation->drawZoombini(screen, z->_traits, pos, 0, 0, lut);
+		_vm->_gfx->drawZoombini(screen, _zoombiniAnimation, z->_traits, pos, 0, 0);
 	}
 
 	// Draw unplaced zoombinis in a staging area
@@ -832,7 +818,7 @@ void PuzzleWaterslide::onRenderActors(ManagedSurface32 *screen) {
 		// Check if this zoombini is in any slot
 		bool inSlot = false;
 		for (int s = 0; s < _numSlots; s++) {
-			if (_slots[s].zoombiniIdx == (int)i) {
+			if (_slots[s].zoombiniIdx == static_cast<int>(i)) {
 				inSlot = true;
 				break;
 			}
@@ -844,17 +830,17 @@ void PuzzleWaterslide::onRenderActors(ManagedSurface32 *screen) {
 			const Common::Point32 pos(kStagePos.x + (idx % 8) * 25, kStagePos.y);
 
 			// Highlight if selected
-			if ((int)i == _selectedZoombini) {
-				screen->fillRect(
+			if (static_cast<int>(i) == _selectedZoombini) {
+				_vm->_gfx->fillRect(screen,
 					Common::Rect(
 						static_cast<int16>(pos.x - 2), static_cast<int16>(pos.y - 2),
 						static_cast<int16>(pos.x + 22), static_cast<int16>(pos.y + 32)),
 					0xFFFF00);
 			}
 
-			_zoombiniAnimation->drawZoombini(screen, z->_traits, pos, 0, 0, lut);
+			_vm->_gfx->drawZoombini(screen, _zoombiniAnimation, z->_traits, pos, 0, 0);
 
-			idx++;
+			idx += 1;
 		}
 	}
 }

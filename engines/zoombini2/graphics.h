@@ -36,34 +36,177 @@
 
 namespace Zoombini2 {
 
+enum PageId : int;
+enum class RouteBranch : int;
+
+/** Signed width and height without positional semantics. */
+template<typename T, typename ConcreteSize>
+struct SizeBase {
+	T width;
+	T height;
+
+	constexpr SizeBase() : width(0), height(0) {}
+	constexpr SizeBase(T widthValue, T heightValue) : width(widthValue), height(heightValue) {}
+
+	/** Create a size by adding the @p delta dimensions to this size. */
+	ConcreteSize operator+(const ConcreteSize &delta) const {
+		return ConcreteSize(static_cast<T>(width + delta.width), static_cast<T>(height + delta.height));
+	}
+	/** Create a size by subtracting the @p delta dimensions from this size. */
+	ConcreteSize operator-(const ConcreteSize &delta) const {
+		return ConcreteSize(static_cast<T>(width - delta.width), static_cast<T>(height - delta.height));
+	}
+	/** Create a size by dividing both dimensions by the (int) @p divisor. */
+	ConcreteSize operator/(int divisor) const {
+		return ConcreteSize(static_cast<T>(width / divisor), static_cast<T>(height / divisor));
+	}
+	/** Create a size by multiplying both dimensions by the (int) @p multiplier. */
+	ConcreteSize operator*(int multiplier) const {
+		return ConcreteSize(static_cast<T>(width * multiplier), static_cast<T>(height * multiplier));
+	}
+	/** Create a size by dividing both dimensions by the (double) @p divisor. */
+	ConcreteSize operator/(double divisor) const {
+		return ConcreteSize(static_cast<T>(width / divisor), static_cast<T>(height / divisor));
+	}
+	/** Create a size by multiplying both dimensions by the (double) @p multiplier. */
+	ConcreteSize operator*(double multiplier) const {
+		return ConcreteSize(static_cast<T>(width * multiplier), static_cast<T>(height * multiplier));
+	}
+
+	/** Change this size by adding the @p delta dimensions. */
+	void operator+=(const ConcreteSize &delta) {
+		width += delta.width;
+		height += delta.height;
+	}
+
+	/** Change this size by subtracting the @p delta dimensions. */
+	void operator-=(const ConcreteSize &delta) {
+		width -= delta.width;
+		height -= delta.height;
+	}
+};
+
+/**
+ * Old GCC does not support constructor inheritance.
+ */
+#define BEGIN_SIZE_TYPE(T, Size) \
+	struct Size : public SizeBase<T, Size> {
+#define END_SIZE_TYPE(T, Size)                                                                          \
+	constexpr Size() : SizeBase() {}                                                                    \
+	constexpr Size(T widthValue, T heightValue) : SizeBase(widthValue, heightValue) {}                  \
+	}                                                                                                   \
+	;                                                                                                   \
+	static inline Size operator*(int multiplier, const Size &size) {                                    \
+		return Size(static_cast<T>(size.width * multiplier), static_cast<T>(size.height * multiplier)); \
+	}                                                                                                   \
+	static inline Size operator*(double multiplier, const Size &size) {                                 \
+		return Size(static_cast<T>(size.width * multiplier), static_cast<T>(size.height * multiplier)); \
+	}
+
+BEGIN_SIZE_TYPE(int16, Size16)
+END_SIZE_TYPE(int16, Size16)
+BEGIN_SIZE_TYPE(int32, Size32)
+constexpr Size32(const Size16 &size) : SizeBase(static_cast<int32>(size.width), static_cast<int32>(size.height)) {}
+END_SIZE_TYPE(int32, Size32)
+
 class Zoombini2Engine;
 class SoundManager;
+class Animation;
+class AnimationRunner;
+class BitBlock;
+class BitmapFont;
+class ManagedSurface32;
+class RleBlock;
+class ZoombiniRunner;
+class ZoombiniAnimation;
+
+/** Provides page-facing operations for composed game graphics. */
+class Gfx {
+public:
+	/** Construct the graphics interface for one game instance. */
+	explicit Gfx(Zoombini2Engine *vm);
+	/** Release the graphics interface for one game instance. */
+	~Gfx();
+
+	/** Create a managed surface in the current game screen format. */
+	ManagedSurface32 *createSurface(const Size32 &size) const;
+	/** Copy the current game screen into @p destination. */
+	void captureScreen(ManagedSurface32 *destination) const;
+	/** Copy @p source onto the current game screen. */
+	void copyToScreen(const ManagedSurface32 &source) const;
+	/** Capture a rectangle from the current game screen at the destination origin. */
+	void captureScreenRegion(ManagedSurface32 *destination, const Common::Rect &sourceRect) const;
+	/** Restore @p source onto the current game screen at @p destination. */
+	void copyRegionToScreen(const ManagedSurface32 &source, const Common::Point &destination) const;
+
+	/** Draw an uncompressed bitmap through the shared Z2 rendering boundary. */
+	void drawBitBlock(ManagedSurface32 *destination, const BitBlock *bitmap, const Common::Point32 &position) const;
+	/** Draw one bitmap sub-rectangle through the shared Z2 rendering boundary. */
+	void drawBitBlockSubRect(ManagedSurface32 *destination, const BitBlock *bitmap, const Common::Point32 &position,
+							 const Common::Rect &sourceRect) const;
+	/** Draw an RLE sprite through the shared Z2 rendering boundary. */
+	void drawRleBlock(ManagedSurface32 *destination, const RleBlock *sprite, const Common::Point32 &position) const;
+	/** Draw one frame from an animation through the shared Z2 rendering boundary. */
+	void drawAnimationFrame(ManagedSurface32 *destination, const Animation *animation, int frameIndex, const Common::Point32 &position) const;
+	/** Draw and advance one general-object animation runner. */
+	void drawAndUpdateAnimationRunner(ManagedSurface32 *destination, AnimationRunner *runner, uint32 tickCount, int scrollX, int backgroundWidth) const;
+	/** Draw a Zoombini body and trait stack through the shared Z2 rendering boundary. */
+	void drawZoombini(ManagedSurface32 *destination, const ZoombiniAnimation *animation, const ZmbTrait &traits, const Common::Point32 &position,
+					 int cell, int frame, const Common::Rect32 *clip = nullptr) const;
+	/** Draw one active Zoombini runner through the shared Z2 rendering boundary. */
+	void drawZoombiniRunner(ManagedSurface32 *destination, const ZoombiniRunner *runner) const;
+	/** Draw bitmap-font text and return its horizontal pixel advance. */
+	int drawString(ManagedSurface32 *destination, const BitmapFont *font, const Common::Point32 &position, const Common::String &text) const;
+	/** Fill a clipped rectangle through the shared Z2 rendering boundary. */
+	void fillRect(ManagedSurface32 *destination, const Common::Rect32 &rect, uint32 color) const;
+	/** Fill a 16-bit API-boundary rectangle through the shared Z2 rendering boundary. */
+	void fillRect(ManagedSurface32 *destination, const Common::Rect &rect, uint32 color) const;
+	/** Draw a clipped rectangular outline through the shared Z2 rendering boundary. */
+	void frameRect(ManagedSurface32 *destination, const Common::Rect32 &rect, uint32 color) const;
+	/** Draw a 16-bit API-boundary rectangular outline through the shared Z2 rendering boundary. */
+	void frameRect(ManagedSurface32 *destination, const Common::Rect &rect, uint32 color) const;
+	/** Draw a line through the shared Z2 rendering boundary. */
+	void drawLine(ManagedSurface32 *destination, const Common::Point32 &start, const Common::Point32 &end, uint32 color) const;
+
+	/** Create the route-map background with all state-dependent overlays applied. */
+	ManagedSurface32 *createMapTransitionBackground(PageId sourcePage, int mapRegion, RouteBranch routeBranch);
+
+private:
+	/** Load, draw, and release one cached map-overlay RLE sprite. */
+	void drawOverlaySprite(ManagedSurface32 *dst, const Common::String &name, const Common::Point32 &pos);
+	/** Compose the route-map overlays appropriate to the current progress. */
+	void drawMapOverlays(ManagedSurface32 *dst, PageId sourcePage, int mapRegion, RouteBranch routeBranch);
+
+	/** Borrowed game instance used for resource resolution and shared blend state. */
+	Zoombini2Engine *_vm;
+};
 
 /**
  * Screen surface with 32-bit coordinates.
  *
- * @remark Zoombini2 runs on 800x600, so 16-bit Point/Rect is enough.
- * But the original coordinates are encoded in 32-bit.
- * Make ManageSurface to take Point32/Rect32 as a parameter to simply the code.
+ * @remarks The game renders into a fixed 800x600 surface, while original
+ * resource coordinates use 32-bit values. This adapter accepts Point32 and
+ * Rect32 without exposing the ScummVM base surface to Z2 callers.
  */
 class ManagedSurface32 : public Graphics::ManagedSurface {
 public:
-	/** Width of the fixed internal game screen. */
-	static constexpr int kScreenWidth = 800;
-	/** Height of the fixed internal game screen. */
-	static constexpr int kScreenHeight = 600;
+	/** Dimensions of the fixed internal game screen. */
+	static const Size32 kScreenSize;
 
 	/** Create a screen surface with the supplied dimensions and pixel format. */
-	ManagedSurface32(int width, int height, const Graphics::PixelFormat &pixelFormat)
-		: Graphics::ManagedSurface(width, height, pixelFormat) {}
+	ManagedSurface32(const Size32 &size, const Graphics::PixelFormat &pixelFormat)
+		: Graphics::ManagedSurface(size.width, size.height, pixelFormat) {}
 
 	using Graphics::ManagedSurface::blitFrom;
 	using Graphics::ManagedSurface::fillRect;
+	using Graphics::ManagedSurface::frameRect;
 
 	/** Fill a 32-bit rectangle after clipping it to this surface. */
 	void fillRect(const Common::Rect32 &rect, uint32 color);
+	/** Draw a 32-bit rectangular outline after clipping it to this surface. */
+	void frameRect(const Common::Rect32 &rect, uint32 color);
 	/** Copy a managed surface at a 32-bit destination pos after clipping. */
-	void blitFrom(const Graphics::ManagedSurface &src, const Common::Point32 &destPos);
+	void blitFrom(const ManagedSurface32 &src, const Common::Point32 &destPos);
 };
 
 /**
@@ -146,12 +289,12 @@ public:
 	bool load(const Common::Path &basePath);
 
 	/** Allocate a zeroed bitmap and optionally a fully transparent alpha mask. */
-	void createEmpty(int width, int height, bool withAlpha);
+	void createEmpty(const Size32 &size, bool withAlpha);
 
 	/** Draw the full bitmap without alpha blending at @p pos. */
-	void drawToSurface(Graphics::ManagedSurface *dst, const Common::Point32 &pos) const;
+	void drawToSurface(ManagedSurface32 *dst, const Common::Point32 &pos) const;
 	/** Draw @p srcRect from this bitmap without alpha blending at @p pos. */
-	void drawSubRect(Graphics::ManagedSurface *dst, const Common::Point32 &pos, const Common::Rect &srcRect) const;
+	void drawSubRect(ManagedSurface32 *dst, const Common::Point32 &pos, const Common::Rect &srcRect) const;
 	/**
 	 * Draw the full bitmap with the separate-mask `/255` blend rule at @p pos.
 	 *
@@ -159,20 +302,22 @@ public:
 	 * scaled by `(255 - mask) / 255`; this path intentionally does not use the
 	 * RLE `/256` lookup table.
 	 */
-	void drawAlphaBlend(Graphics::ManagedSurface *dst, const Common::Point32 &pos) const;
+	void drawAlphaBlend(ManagedSurface32 *dst, const Common::Point32 &pos) const;
 	/**
 	 * Draw a bitmap-mask pair at @p pos using the RLE premultiplied blend rule.
 	 *
 	 * @p alphaLUT scales the raw source channel by the mask and the destination
 	 * channel by the mask's inverse, using the renderer's `/256` rule.
 	 */
-	void drawRleMaskBlend(Graphics::ManagedSurface *dst, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const;
+	void drawRleMaskBlend(ManagedSurface32 *dst, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const;
 
+	/** Return the bitmap dimensions in pixels. */
+	const Size32 &getSize() const { return _size; }
 	/** Return the bitmap width in pixels. */
-	int getWidth() const { return _width; }
+	int32 getWidth() const { return _size.width; }
 	/** Return the bitmap height in pixels. */
-	int getHeight() const { return _height; }
-	/** Return whether this bitmap owns a separate alpha mask. */
+	int32 getHeight() const { return _size.height; }
+	/** Return whether this bitmap has a separate alpha mask. */
 	bool hasAlpha() const { return _alphaMap != nullptr; }
 	/** Return the borrowed RGBA pixel buffer. */
 	const byte *getPixels() const { return _pixels; }
@@ -182,10 +327,8 @@ public:
 private:
 	/** Borrowed vm used to resolve bitmap resources. */
 	Zoombini2Engine *_vm;
-	/** Bitmap width in pixels. */
-	int _width = 0;
-	/** Bitmap height in pixels. */
-	int _height = 0;
+	/** Bitmap dimensions in pixels. */
+	Size32 _size = Size32();
 	/** RGBA pixel storage held by this bitmap, with four bytes per pixel. */
 	byte *_pixels = nullptr;
 	/** Optional one-byte-per-pixel alpha storage held by this bitmap, or nullptr. */
@@ -238,29 +381,29 @@ public:
 	 * Mode-1 spans use their premultiplied BGR channels and inverse-alpha byte
 	 * with @p alphaLUT.
 	 */
-	void drawToScreen(Graphics::ManagedSurface *dst, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const;
+	void drawToScreen(ManagedSurface32 *dst, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const;
 	/**
 	 * Draw this frame inside @p clip using opaque copies or lookup-table blending.
 	 *
 	 * Mode-1 spans use their premultiplied BGR channels and inverse-alpha byte
 	 * with @p alphaLUT.
 	 */
-	void drawToScreenClipped(Graphics::ManagedSurface *dst, const Common::Point32 &pos, const Common::Rect32 &clip, const AlphaBlendLUT &alphaLUT) const;
+	void drawToScreenClipped(ManagedSurface32 *dst, const Common::Point32 &pos, const Common::Rect32 &clip, const AlphaBlendLUT &alphaLUT) const;
 
+	/** Return the frame dimensions in pixels. */
+	const Size32 &getSize() const { return _size; }
 	/** Return the frame width in pixels. */
-	int getWidth() const { return _width; }
+	int32 getWidth() const { return _size.width; }
 	/** Return the frame height in pixels. */
-	int getHeight() const { return _height; }
+	int32 getHeight() const { return _size.height; }
 	/** Return whether encoded frame data has been loaded. */
 	bool isValid() const { return _rleData != nullptr; }
 
 private:
 	/** Borrowed vm used to resolve RLE resources. */
 	Zoombini2Engine *_vm;
-	/** Frame width in pixels. */
-	int32 _width = 0;
-	/** Frame height in pixels. */
-	int32 _height = 0;
+	/** Frame dimensions in pixels. */
+	Size32 _size = Size32();
 	/** Number of bytes in @ref RleBlock::_rleData after load-time expansion. */
 	uint32 _dataSize = 0;
 	/** Expanded RLE span storage held by this frame, with four bytes per encoded pixel. */
@@ -323,8 +466,7 @@ public:
 
 private:
 	Zoombini2Engine *_vm;
-	int _width = 0;
-	int _height = 0;
+	Size32 _size = Size32();
 	Common::Array<byte> _pixels;
 };
 
@@ -362,9 +504,9 @@ public:
 	/** Return the number of frames in @p cellIndex, or zero for an invalid cell. */
 	int getFrameCount(int cellIndex) const;
 	/** Return the base layer's dimensions for one Zoombini cell and frame. */
-	Common::Point getSpriteSize(int cell, int frame) const;
+	Size32 getSpriteSize(int cell, int frame) const;
 	/** Draw body and trait layers, retaining frame zero for single-frame entries and honoring an optional clip rectangle. */
-	void drawZoombini(Graphics::ManagedSurface *screen, const ZmbTrait &traits, const Common::Point32 &pos,
+	void drawZoombini(ManagedSurface32 *screen, const ZmbTrait &traits, const Common::Point32 &pos,
 					  int cell, int frame, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip = nullptr) const;
 
 private:
@@ -414,7 +556,7 @@ public:
 							const Common::Path &disabledPath = Common::Path(), const Common::Path &disabledMask = Common::Path());
 
 	/** Set the button rectangle from a screen position and size. */
-	void setRect(const Common::Point32 &pos, int width, int height);
+	void setRect(const Common::Point32 &pos, const Size32 &size);
 	/** Replace the button rectangle with @p rect. */
 	void setRect(const Common::Rect &rect);
 	/** Enable or disable pointer interaction. */
@@ -432,7 +574,7 @@ public:
 	 * @return Zero when not hovered, two when newly hovered, or one when the
 	 * pointer remains over the button from the preceding draw.
 	 */
-	int drawAndHitTest(Graphics::ManagedSurface *dst, const Common::Point32 &mousePos, const AlphaBlendLUT &alphaLUT);
+	int drawAndHitTest(ManagedSurface32 *dst, const Common::Point32 &mousePos, const AlphaBlendLUT &alphaLUT);
 
 	/** Return whether @p pos is inside the button rectangle. */
 	bool containsPoint(const Common::Point32 &pos) const;
@@ -523,7 +665,7 @@ public:
 	/** Load a BMT color-and-alpha pair and color its extracted glyphs. */
 	bool load(const Common::Path &basePath, byte red, byte green, byte blue);
 	/** Draw @p text at @p pos and return its horizontal pixel advance. */
-	int drawString(Graphics::ManagedSurface *dst, const Common::Point32 &pos, const Common::String &text,
+	int drawString(ManagedSurface32 *dst, const Common::Point32 &pos, const Common::String &text,
 				   const AlphaBlendLUT &alphaLUT) const;
 	/** Return the horizontal pixel advance for @p text without drawing it. */
 	int getStringWidth(const Common::String &text) const;
@@ -567,10 +709,8 @@ public:
 
 	/** Shared X coordinate of each slider label button. */
 	static const int kLabelX = 157;
-	/** Shared slider label width. */
-	static const int kLabelW = 520;
-	/** Shared slider label height. */
-	static const int kLabelH = 64;
+	/** Shared slider label dimensions. */
+	static const Size32 kLabelSize;
 	/** Music slider label Y coordinate. */
 	static const int kMusicLabelY = 224;
 	/** Sound-effect slider label Y coordinate. */
@@ -598,7 +738,7 @@ public:
 	/** Play the category-specific sample for the most recently released slider. */
 	void playPreviewSound();
 	/** Paint the panel without applying input or changing audio. */
-	void draw(Graphics::ManagedSurface *dst, const Common::Point32 &mousePos, const AlphaBlendLUT &alphaLUT);
+	void draw(ManagedSurface32 *dst, const Common::Point32 &mousePos, const AlphaBlendLUT &alphaLUT);
 
 	/** Return the current music volume percentage. */
 	int getMusicVolume() const { return _musicVolume; }

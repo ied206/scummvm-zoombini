@@ -497,17 +497,17 @@ void ShelterBooliewood::drawBackground(ManagedSurface32 *screen) const {
 	if (!_background)
 		return;
 	const int width = _background->getWidth();
-	if (width <= ManagedSurface32::kScreenWidth) {
+	if (width <= ManagedSurface32::kScreenSize.width) {
 		_background->drawToSurface(screen, Common::Point32(0, 0));
 		return;
 	}
 	const int origin = _scrollX % width;
 	const int tailWidth = width - origin;
-	if (ManagedSurface32::kScreenWidth <= tailWidth) {
-		_background->drawSubRect(screen, Common::Point32(0, 0), Common::Rect(origin, 0, origin + ManagedSurface32::kScreenWidth, ManagedSurface32::kScreenHeight));
+	if (ManagedSurface32::kScreenSize.width <= tailWidth) {
+		_background->drawSubRect(screen, Common::Point32(0, 0), Common::Rect(origin, 0, origin + ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height));
 	} else {
-		_background->drawSubRect(screen, Common::Point32(0, 0), Common::Rect(origin, 0, width, ManagedSurface32::kScreenHeight));
-		_background->drawSubRect(screen, Common::Point32(tailWidth, 0), Common::Rect(0, 0, ManagedSurface32::kScreenWidth - tailWidth, ManagedSurface32::kScreenHeight));
+		_background->drawSubRect(screen, Common::Point32(0, 0), Common::Rect(origin, 0, width, ManagedSurface32::kScreenSize.height));
+		_background->drawSubRect(screen, Common::Point32(tailWidth, 0), Common::Rect(0, 0, ManagedSurface32::kScreenSize.width - tailWidth, ManagedSurface32::kScreenSize.height));
 	}
 }
 

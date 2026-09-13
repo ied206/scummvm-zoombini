@@ -28,10 +28,6 @@
 
 #include "zoombini2/pages/dialog_base.h"
 
-namespace Graphics {
-class ManagedSurface;
-}
-
 namespace Zoombini2 {
 
 class BitBlock;
@@ -94,7 +90,7 @@ public:
 
 private:
 	/** Load request-specific resources and retain the covered screen rectangle. */
-	bool openDialog(ManagedSurface32 *screen);
+	bool openDialog();
 	/** Release all resources loaded for the current request. */
 	void releaseResources();
 	/** Return the dialog button under @p pos. */
@@ -121,7 +117,7 @@ private:
 	/** Request-specific text bitmap. */
 	BitBlock *_textImage = nullptr;
 	/** Saved pixels covered by the panel. */
-	Graphics::ManagedSurface *_savedBackground = nullptr;
+	ManagedSurface32 *_savedBackground = nullptr;
 	/** System tick captured when the open dialog paused gameplay. */
 	uint32 _pauseStartTime = 0;
 };
