@@ -53,6 +53,21 @@ public:
 	bool canUseGoButton() const override { return false; }
 
 private:
+	/** Resource paths and formats used by the turtle scene. */
+	static constexpr const char *kMusicPath = "#sounds/music/08-BS01.wav";
+	static constexpr const char *kTurtleIdleFormat = "Bmp/crazy_turtle/TORTUES/ATTENTE/%d/%d.AN";
+	static constexpr const char *kTurtleSpinFormat = "Bmp/crazy_turtle/TORTUES/tourbillonne/%d/%d.AN";
+	static constexpr const char *kTurtleFixedFormat = "Bmp/crazy_turtle/TORTUES/tourbillonne/%d/FIXE%d.RB";
+	static constexpr const char *kMotherPath = "Bmp/crazy_turtle/TORTUES/MERE/mere.an";
+	static constexpr const char *kMotherSpeechPath = "Bmp/crazy_turtle/TORTUES/MERE/PARLE/PARLE.AN";
+	static constexpr const char *kSmokePath = "Bmp/crazy_turtle/smokey.an";
+	static constexpr const char *kMotherStartPath = "Bmp/crazy_turtle/TORTUES/MERE/meredebut.rb";
+	static constexpr const char *kMotherEndPath = "Bmp/crazy_turtle/TORTUES/MERE/MEREFIN.RB";
+	static constexpr const char *kBridgePath = "Bmp/crazy_turtle/PONT.RB";
+	static constexpr const char *kCollapsedBridgePath = "Bmp/crazy_turtle/pontKC.rb";
+	static constexpr const char *kBeamPath = "Bmp/crazy_turtle/poutrelle.rb";
+	static constexpr const char *kTraitFormat = "Bmp/mystic_marsh/TRAITS/%d-%d.RB";
+
 	/** Restore the dock background. */
 	void onRenderBackground(ManagedSurface32 *screen) override;
 	/** Draw dock condition, rule hints, turtles, and mother. */
@@ -68,26 +83,72 @@ private:
 	};
 
 	/** Number of visible Zoombini features. */
-	static const int kFeatureCount = 4;
+	static constexpr int kFeatureCount = 4;
 	/** Number of values for each visible feature. */
-	static const int kFeatureValueCount = 5;
+	static constexpr int kFeatureValueCount = 5;
 	/** Number of simultaneous ordering-rule groups. */
-	static const int kRuleGroupCount = 2;
+	static constexpr int kRuleGroupCount = 2;
 	/** Number of positions in each ordering rule. */
-	static const int kRuleSlotCount = 5;
+	static constexpr int kRuleSlotCount = 5;
 	/** Number of turtles spanning the dock. */
-	static const int kTurtleCount = 16;
+	static constexpr int kTurtleCount = 16;
 	/** Maximum party size used by this puzzle. */
-	static const int kZoombiniCount = 16;
+	static constexpr int kZoombiniCount = 16;
 
 	/** Turtle types and screen positions. */
-	static const TurtlePlacement kTurtlePlacements[kTurtleCount];
+	static constexpr TurtlePlacement kTurtlePlacements[kTurtleCount] = {
+		{3, Common::Point32(0, 322)},
+		{3, Common::Point32(8, 383)},
+		{3, Common::Point32(29, 448)},
+		{4, Common::Point32(104, 482)},
+		{4, Common::Point32(178, 463)},
+		{2, Common::Point32(264, 444)},
+		{1, Common::Point32(245, 378)},
+		{3, Common::Point32(233, 308)},
+		{4, Common::Point32(248, 238)},
+		{4, Common::Point32(325, 196)},
+		{2, Common::Point32(412, 175)},
+		{1, Common::Point32(492, 165)},
+		{3, Common::Point32(576, 172)},
+		{2, Common::Point32(548, 245)},
+		{2, Common::Point32(461, 301)},
+		{3, Common::Point32(529, 346)},
+	};
 	/** Screen positions used for Zoombinis standing on turtles. */
-	static const Common::Point32 kZoombiniPos[kZoombiniCount];
+	static constexpr Common::Point32 kZoombiniPos[kZoombiniCount] = {
+		Common::Point32(247, 120),
+		Common::Point32(245, 74),
+		Common::Point32(202, 117),
+		Common::Point32(200, 64),
+		Common::Point32(166, 42),
+		Common::Point32(166, 87),
+		Common::Point32(146, 131),
+		Common::Point32(99, 120),
+		Common::Point32(131, 75),
+		Common::Point32(128, 30),
+		Common::Point32(86, 66),
+		Common::Point32(62, 105),
+		Common::Point32(49, 48),
+		Common::Point32(18, 135),
+		Common::Point32(25, 91),
+		Common::Point32(8, 55),
+	};
 	/** Draw positions for primary-rule feature icons. */
-	static const Common::Point32 kPrimaryIconPos[kRuleSlotCount];
+	static constexpr Common::Point32 kPrimaryIconPos[kRuleSlotCount] = {
+		Common::Point32(365, 15),
+		Common::Point32(395, 22),
+		Common::Point32(423, 28),
+		Common::Point32(450, 35),
+		Common::Point32(477, 42),
+	};
 	/** Draw positions for secondary-rule feature icons. */
-	static const Common::Point32 kSecondaryIconPos[kRuleSlotCount];
+	static constexpr Common::Point32 kSecondaryIconPos[kRuleSlotCount] = {
+		Common::Point32(365, 40),
+		Common::Point32(395, 47),
+		Common::Point32(423, 54),
+		Common::Point32(450, 60),
+		Common::Point32(477, 67),
+	};
 
 	/** Load an animation from @p path and report whether it succeeded. */
 	bool loadAnimationResource(Animation *&resource, const Common::Path &path);

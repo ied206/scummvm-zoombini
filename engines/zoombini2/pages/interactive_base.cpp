@@ -33,18 +33,29 @@
 
 namespace Zoombini2 {
 
+constexpr const char *Sidebar::kHelpNormalPath;
+constexpr const char *Sidebar::kHelpHighlightPath;
+constexpr const char *Sidebar::kMapNormalPath;
+constexpr const char *Sidebar::kMapHighlightPath;
+constexpr const char *Sidebar::kGoNormalPath;
+constexpr const char *Sidebar::kGoHighlightPath;
+constexpr const char *Sidebar::kGoDisabledPath;
+constexpr const char *Sidebar::kHelpClickSoundPath;
+constexpr const char *Sidebar::kMapClickSoundPath;
+constexpr const char *Sidebar::kAbandonConfirmationPath;
+
 Sidebar::Sidebar(Zoombini2Engine *vm)
 	: _vm(vm) {
 
-	_helpNormal = _vm->loadRleBlock("Bmp/BARRE/QUOI.RB");
-	_helpHighlight = _vm->loadRleBlock("Bmp/BARRE/QUOIROLL.RB");
-	_mapNormal = _vm->loadRleBlock("Bmp/BARRE/PATH.RB");
-	_mapHighlight = _vm->loadRleBlock("Bmp/BARRE/PATHROLL.RB");
-	_goNormal = _vm->loadRleBlock("Bmp/BARRE/Next.rb");
-	_goHighlight = _vm->loadRleBlock("Bmp/BARRE/NextRoll.rb");
-	_goDisabled = _vm->loadRleBlock("Bmp/BARRE/NextInvisible.rb");
-	_helpClickSoundId = _vm->getSoundManager()->load(false, Common::Path("sounds/fx/I-BS2.wav"), false);
-	_mapClickSoundId = _vm->getSoundManager()->load(false, Common::Path("sounds/fx/I-BS1.wav"), false);
+	_helpNormal = _vm->loadRleBlock(kHelpNormalPath);
+	_helpHighlight = _vm->loadRleBlock(kHelpHighlightPath);
+	_mapNormal = _vm->loadRleBlock(kMapNormalPath);
+	_mapHighlight = _vm->loadRleBlock(kMapHighlightPath);
+	_goNormal = _vm->loadRleBlock(kGoNormalPath);
+	_goHighlight = _vm->loadRleBlock(kGoHighlightPath);
+	_goDisabled = _vm->loadRleBlock(kGoDisabledPath);
+	_helpClickSoundId = _vm->getSoundManager()->load(false, Common::Path(kHelpClickSoundPath), false);
+	_mapClickSoundId = _vm->getSoundManager()->load(false, Common::Path(kMapClickSoundPath), false);
 
 	// Create help screen modal system
 	_helpScreen = new DialogHelp(_vm);
@@ -323,7 +334,7 @@ void Sidebar::returnToMap() {
 }
 
 void Sidebar::requestAbandonConfirmation() {
-	_vm->getMsgBoxDialog()->request(Common::Path("bmp/menu/Quit_panel_text_abandon"),
+	_vm->getMsgBoxDialog()->request(Common::Path(kAbandonConfirmationPath),
 									new Common::Callback<Sidebar, DialogMsgBoxButton>(this, &Sidebar::handleAbandonConfirmation));
 }
 

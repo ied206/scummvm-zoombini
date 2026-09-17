@@ -68,6 +68,27 @@ public:
 	DialogHelp *getHelpScreen() { return _helpScreen; }
 
 private:
+	/** Resource path. */
+	static constexpr const char *kHelpNormalPath = "Bmp/BARRE/QUOI.RB";
+	/** Resource path. */
+	static constexpr const char *kHelpHighlightPath = "Bmp/BARRE/QUOIROLL.RB";
+	/** Resource path. */
+	static constexpr const char *kMapNormalPath = "Bmp/BARRE/PATH.RB";
+	/** Resource path. */
+	static constexpr const char *kMapHighlightPath = "Bmp/BARRE/PATHROLL.RB";
+	/** Resource path. */
+	static constexpr const char *kGoNormalPath = "Bmp/BARRE/Next.rb";
+	/** Resource path. */
+	static constexpr const char *kGoHighlightPath = "Bmp/BARRE/NextRoll.rb";
+	/** Resource path. */
+	static constexpr const char *kGoDisabledPath = "Bmp/BARRE/NextInvisible.rb";
+	/** Resource path. */
+	static constexpr const char *kHelpClickSoundPath = "sounds/fx/I-BS2.wav";
+	/** Resource path. */
+	static constexpr const char *kMapClickSoundPath = "sounds/fx/I-BS1.wav";
+	/** Resource path. */
+	static constexpr const char *kAbandonConfirmationPath = "bmp/menu/Quit_panel_text_abandon";
+
 	/** Return the active modal overlay, or nullptr. */
 	DialogBase *getActiveDialog() const;
 	/** Open or close the help overlay. */

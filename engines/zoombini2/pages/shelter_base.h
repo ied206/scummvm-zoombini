@@ -61,13 +61,17 @@ public:
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 	/** Return whether the departure roster contains exactly eight Zoombinis. */
 	bool hasFullDepartureParty() const { return _readyToDepart; }
+	/**
+	 * Return whether @p zoombini leaves with the next departure.
+	 *
+	 * The base implementation keeps the refilled departure roster. Concrete
+	 * pages with player-arranged departure slots override this.
+	 */
+	virtual bool isDepartingMember(const ZoombiniRunner *zoombini) const;
 
-protected:
-	/** Bind a concrete rescue site to @p vm. */
+protected: /** Bind a concrete rescue site to @p vm. */
 	explicit ShelterRescueSiteBase(Zoombini2Engine *vm);
 
-	/** Load and draw the persistent site background. */
-	void loadBackground(const char *path);
 	/** Configure the site-specific roster and scroll-control geometry. */
 	void configureRosterLayout(const Common::Point32 &gridBasePos, const Common::Rect32 &scrollUpRect, const Common::Rect32 &scrollDownRect, const Common::Point32 &buttonUpPos, const Common::Point32 &buttonDownPos);
 	/** Load the selection marker used by the waiting roster. */
@@ -88,6 +92,14 @@ protected:
 	void saveRescueRoster(BoardRecord **board);
 	/** Load the shared little-Zoombini animation through the engine cache. */
 	void loadRosterAnimation();
+	/** Queue an arrival speech for sequential playback. */
+	void enqueueSpeech(const Common::String &path);
+	/** Start the next queued arrival speech once the current one finishes. */
+	void pumpSpeechQueue();
+	/** Stop arrival speech playback and discard the queue. */
+	void clearSpeechQueue();
+	/** Count the occupied cells of @p board. */
+	static int countBoardMembers(BoardRecord *const *board);
 	/** Begin the delayed map transition used by Rescue Site I's branch controls. */
 	void beginDeparture();
 	/** Return whether the delayed departure phase is active. */
@@ -100,22 +112,29 @@ protected:
 	/** Handle site-specific controls before common waiting-roster selection. */
 	virtual EventHandleResult onSiteLButtonDown(const Common::Point &pos);
 
+	/** Upward roster scroll animation. */
+	Animation *_buttonUp = nullptr;
+	/** Downward roster scroll animation. */
+	Animation *_buttonDown = nullptr;
+	/** Draw position for the earlier-entry scroll animation. */
+	Common::Point32 _buttonUpPos = Common::Point32();
+	/** Draw position for the later-entry scroll animation. */
+	Common::Point32 _buttonDownPos = Common::Point32();
+
 private:
 	/** Number of columns in the visible roster grid. */
-	static const int kGridCols = 4;
+	static constexpr int kGridCols = 4;
 	/** Number of rows in the visible roster grid. */
-	static const int kGridRows = 5;
+	static constexpr int kGridRows = 5;
 	/** Dimensions of one visible roster slot. */
-	static const Size32 kSlotSize;
+	static constexpr Size32 kSlotSize = Size32(40, 57);
+	/** Shared little-Zoombini animation loaded for the waiting roster. */
+	static constexpr const char *kRosterAnimationPath = "bmp/zombis/littleZomb.anm";
 
 	/** Selection marker for a visible Zoombini slot. */
 	RleBlock *_selector = nullptr;
 	/** Door-selection overlay retained by both rescue sites. */
 	RleBlock *_porteSelect = nullptr;
-	/** Upward roster scroll animation. */
-	Animation *_buttonUp = nullptr;
-	/** Downward roster scroll animation. */
-	Animation *_buttonDown = nullptr;
 
 	/** Signed screen origin of the visible roster grid. */
 	Common::Point32 _gridBasePos = Common::Point32();
@@ -125,10 +144,6 @@ private:
 	Common::Rect32 _scrollUpRect = Common::Rect32();
 	/** Hit-test rectangle for scrolling toward later roster entries. */
 	Common::Rect32 _scrollDownRect = Common::Rect32();
-	/** Draw position for the earlier-entry scroll animation. */
-	Common::Point32 _buttonUpPos = Common::Point32();
-	/** Draw position for the later-entry scroll animation. */
-	Common::Point32 _buttonDownPos = Common::Point32();
 
 	/** First waiting-roster entry shown in the visible grid. */
 	int _scrollOffset = 0;
@@ -142,7 +157,10 @@ private:
 	uint32 _phaseTimer = 0;
 	/** Music handle used while the rescue site is active. */
 	int _musicId = -1;
-	/** Borrowed immutable sprite grid owned by the engine cache. */
+	/** Arrival speech currently playing, or -1 when the queue is idle. */
+	int _speechSoundId = -1;
+	/** Arrival speech paths awaiting sequential playback. */
+	Common::Array<Common::String> _speechQueue; /** Borrowed immutable sprite grid owned by the engine cache. */
 	const ZoombiniAnimation *_zoombiniAnimation = nullptr;
 	/** Runtime party chosen to leave this rescue site. */
 	Common::Array<ZoombiniRunner *> _departureRoster;

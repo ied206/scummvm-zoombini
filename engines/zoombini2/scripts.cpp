@@ -20,7 +20,6 @@
  */
 
 #include <math.h>
-#include <string.h>
 
 #include "common/ptr.h"
 #include "common/textconsole.h"

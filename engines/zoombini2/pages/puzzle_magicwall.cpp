@@ -19,10 +19,10 @@
  *
  */
 
+#include "zoombini2/pages/puzzle_magicwall.h"
 #include "common/debug.h"
 #include "zoombini2/graphics.h"
 #include "zoombini2/scripts.h"
-#include "zoombini2/pages/puzzle_magicwall.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
@@ -49,26 +49,35 @@ namespace Zoombini2 {
 // ============================================================================
 
 // Color names matching resource file naming convention
-const char *PuzzleMagicWall::kColorNames[kColorCount] = {
-	"blue",
-	"green",
-	"navy",
-	"orange",
-	"purple",
-	"red",
-	"rose",
-	"turquoise",
-	"violet",
-	"yellow"};
+constexpr const char *PuzzleMagicWall::kColorNames[kColorCount];
+
+constexpr const char *PuzzleMagicWall::kMusicPath;
+constexpr const char *PuzzleMagicWall::kApprovalFormat;
+constexpr const char *PuzzleMagicWall::kErrorFormat;
+constexpr const char *PuzzleMagicWall::kHintFormat;
+constexpr const char *PuzzleMagicWall::kGateOpenPath;
+constexpr const char *PuzzleMagicWall::kZoombiniMovePath;
+constexpr const char *PuzzleMagicWall::kDotFormat;
+constexpr const char *PuzzleMagicWall::kBugFormat;
+constexpr const char *PuzzleMagicWall::kMiniMapPath;
+constexpr const char *PuzzleMagicWall::kMiniMapDotPath;
+constexpr const char *PuzzleMagicWall::kMiniLightFormat;
+constexpr const char *PuzzleMagicWall::kGlowwormPath;
+constexpr const char *PuzzleMagicWall::kGlowwormAnimPath;
+constexpr const char *PuzzleMagicWall::kGateFormat;
+constexpr const char *PuzzleMagicWall::kCrystalFormat;
+constexpr const char *PuzzleMagicWall::kExitPathFormat;
+constexpr const char *PuzzleMagicWall::kBougePathFormat;
+constexpr const char *PuzzleMagicWall::kGateNames[4];
 
 // Path animation duration (ms)
-static const uint32 kPathAnimDuration = 2000;
+static constexpr uint32 kPathAnimDuration = 2000;
 
 // Gate animation duration (ms)
-static const uint32 kGateAnimDuration = 500;
+static constexpr uint32 kGateAnimDuration = 500;
 
 // Minimap position
-static const Common::Point32 kMinimapPos(620, 40);
+static constexpr Common::Point32 kMinimapPos = Common::Point32(620, 40);
 
 // Maze clickable regions for directing zoombinis
 static const Common::Rect kPathButtons[4] = {
@@ -134,7 +143,7 @@ void PuzzleMagicWall::init() {
 
 	// Start the Beetle Bug Alley music.
 	if (SoundManager *snd = _vm->getSoundManager()) {
-		_musicId = snd->load(true, Common::Path("#sounds/music/06-BB01.wav"), true);
+		_musicId = snd->load(true, Common::Path(kMusicPath), true);
 		if (_musicId >= 0) {
 			snd->playLoop(_musicId);
 			snd->setVolume(_musicId, snd->_volumeMusic);
@@ -143,25 +152,25 @@ void PuzzleMagicWall::init() {
 		// Load sound effects
 		// Approval sounds (success): 6-A1.wav through 6-A4.wav
 		for (int i = 0; i < 4; i++) {
-			Common::Path path(Common::String::format("sounds/6-A%d.wav", i + 1));
+			Common::Path path(Common::String::format(kApprovalFormat, i + 1));
 			_sndApproval[i] = snd->load(false, path, false);
 		}
 
 		// Error sounds: 6-E1.wav, 6-E2.wav
 		for (int i = 0; i < 2; i++) {
-			Common::Path path(Common::String::format("sounds/6-E%d.wav", i + 1));
+			Common::Path path(Common::String::format(kErrorFormat, i + 1));
 			_sndError[i] = snd->load(false, path, false);
 		}
 
 		// Hint sounds: 6-H1.wav through 6-H4.wav
 		for (int i = 0; i < 4; i++) {
-			Common::Path path(Common::String::format("sounds/6-H%d.wav", i + 1));
+			Common::Path path(Common::String::format(kHintFormat, i + 1));
 			_sndHint[i] = snd->load(false, path, false);
 		}
 
 		// Sound effects: gate open, movement
-		_sndGateOpen = snd->load(false, Common::Path("sounds/fx/06-BS01.wav"), false);
-		_sndZoombiniMove = snd->load(false, Common::Path("sounds/fx/06-BS02.wav"), false);
+		_sndGateOpen = snd->load(false, Common::Path(kGateOpenPath), false);
+		_sndZoombiniMove = snd->load(false, Common::Path(kZoombiniMovePath), false);
 	}
 
 	int level = CLIP(_vm->getGameState()->_level, 1, 3);
@@ -195,7 +204,7 @@ void PuzzleMagicWall::init() {
 void PuzzleMagicWall::loadResources() {
 	// Load color dot sprites (DOT-{color}.rb)
 	for (int i = 0; i < kColorCount; i++) {
-		Common::Path dotPath(Common::String::format("bmp/magic_wall/DOT-%s", kColorNames[i]));
+		Common::Path dotPath(Common::String::format(kDotFormat, kColorNames[i]));
 		_dotImage[i] = new RleBlock(_vm);
 		if (!_dotImage[i]->loadFromFile(dotPath)) {
 			debug(2, "PuzzleMagicWall: Failed to load DOT-%s", kColorNames[i]);
@@ -206,7 +215,7 @@ void PuzzleMagicWall::loadResources() {
 
 	// Load color bug sprites (bug_c_{color}.rb)
 	for (int i = 0; i < kColorCount; i++) {
-		Common::Path bugPath(Common::String::format("bmp/magic_wall/bug_c_%s", kColorNames[i]));
+		Common::Path bugPath(Common::String::format(kBugFormat, kColorNames[i]));
 		_bugImage[i] = new RleBlock(_vm);
 		if (!_bugImage[i]->loadFromFile(bugPath)) {
 			debug(2, "PuzzleMagicWall: Failed to load bug_c_%s", kColorNames[i]);
@@ -216,14 +225,14 @@ void PuzzleMagicWall::loadResources() {
 	}
 
 	// Load minimap sprites
-	Common::Path miniMapPath("bmp/magic_wall/mini-map");
+	Common::Path miniMapPath(kMiniMapPath);
 	_miniMapImage = new RleBlock(_vm);
 	if (!_miniMapImage->loadFromFile(miniMapPath)) {
 		delete _miniMapImage;
 		_miniMapImage = nullptr;
 	}
 
-	Common::Path miniMapDotPath("bmp/magic_wall/mini-map-dot");
+	Common::Path miniMapDotPath(kMiniMapDotPath);
 	_miniMapDotImage = new RleBlock(_vm);
 	if (!_miniMapDotImage->loadFromFile(miniMapDotPath)) {
 		delete _miniMapDotImage;
@@ -232,7 +241,7 @@ void PuzzleMagicWall::loadResources() {
 
 	// Load minimap lights for each color
 	for (int i = 0; i < kColorCount; i++) {
-		Common::Path lightPath(Common::String::format("bmp/magic_wall/mini-light-%s", kColorNames[i]));
+		Common::Path lightPath(Common::String::format(kMiniLightFormat, kColorNames[i]));
 		_miniLightImage[i] = new RleBlock(_vm);
 		if (!_miniLightImage[i]->loadFromFile(lightPath)) {
 			delete _miniLightImage[i];
@@ -241,7 +250,7 @@ void PuzzleMagicWall::loadResources() {
 	}
 
 	// Load glowworm (le_vier_luisant.bb)
-	Common::Path glowwormPath("bmp/magic_wall/le_vier_luisant");
+	Common::Path glowwormPath(kGlowwormPath);
 	_glowwormImage = new RleBlock(_vm);
 	if (!_glowwormImage->loadFromFile(glowwormPath)) {
 		delete _glowwormImage;
@@ -249,7 +258,7 @@ void PuzzleMagicWall::loadResources() {
 	}
 
 	// Load glowworm animation (le_vier.an)
-	Common::Path glowwormAnimPath("bmp/magic_wall/le_vier");
+	Common::Path glowwormAnimPath(kGlowwormAnimPath);
 	_glowwormAnim = new Animation(_vm);
 	if (!_glowwormAnim->loadFromFile(glowwormAnimPath)) {
 		delete _glowwormAnim;
@@ -257,9 +266,8 @@ void PuzzleMagicWall::loadResources() {
 	}
 
 	// Load gate animations (porte-A/B/C/D.an)
-	const char *gateNames[] = {"porte-A", "porte-B", "porte-C", "porte-D"};
 	for (int i = 0; i < 4; i++) {
-		Common::Path gatePath(Common::String::format("bmp/magic_wall/%s", gateNames[i]));
+		Common::Path gatePath(Common::String::format(kGateFormat, kGateNames[i]));
 		_gateAnims[i] = new Animation(_vm);
 		if (!_gateAnims[i]->loadFromFile(gatePath)) {
 			delete _gateAnims[i];
@@ -269,8 +277,8 @@ void PuzzleMagicWall::loadResources() {
 
 	// Load crystal animations (Crystal1-5.an)
 	for (int i = 0; i < 5; i++) {
-		Common::Path crystalPath(Common::String::format("bmp/magic_wall/Crystal%d", i + 1));
-			_crystalAnims[i] = new Animation(_vm);
+		Common::Path crystalPath(Common::String::format(kCrystalFormat, i + 1));
+		_crystalAnims[i] = new Animation(_vm);
 		if (!_crystalAnims[i]->loadFromFile(crystalPath)) {
 			delete _crystalAnims[i];
 			_crystalAnims[i] = nullptr;
@@ -279,13 +287,13 @@ void PuzzleMagicWall::loadResources() {
 
 	// Load exit and internal movement paths.
 	for (int i = 0; i < 4; i++) {
-		Common::Path exitPath(Common::String::format("bmp/magic_wall/PAT/EXIT%d.PAT", i + 1));
+		Common::Path exitPath(Common::String::format(kExitPathFormat, i + 1));
 		_exitPaths[i] = PathObject::loadFromPAT(_vm, exitPath);
 		if (!_exitPaths[i]) {
 			debug(2, "PuzzleMagicWall: Failed to load EXIT%d.PAT", i + 1);
 		}
 
-		Common::Path bougePath(Common::String::format("bmp/magic_wall/PAT/BOUGE%d.PAT", i + 1));
+		Common::Path bougePath(Common::String::format(kBougePathFormat, i + 1));
 		_bougePaths[i] = PathObject::loadFromPAT(_vm, bougePath);
 		if (!_bougePaths[i]) {
 			debug(2, "PuzzleMagicWall: Failed to load BOUGE%d.PAT", i + 1);
@@ -318,8 +326,12 @@ void PuzzleMagicWall::placeColorDots() {
 	_colorDots.clear();
 
 	// Fixed marker positions for the beetles
-	static const Common::Point32 kColorDotPos[] = {
-		Common::Point32(150, 200), Common::Point32(350, 200), Common::Point32(150, 400), Common::Point32(350, 400)};
+	static constexpr Common::Point32 kColorDotPos[] = {
+		Common::Point32(150, 200),
+		Common::Point32(350, 200),
+		Common::Point32(150, 400),
+		Common::Point32(350, 400),
+	};
 	int colors[] = {kColorBlue, kColorGreen, kColorRed, kColorYellow};
 
 	for (int i = 0; i < 4; i++) {
@@ -624,7 +636,6 @@ void PuzzleMagicWall::onRenderContent(ManagedSurface32 *screen) {
 	drawGates(screen);
 	drawMinimap(screen);
 
-
 	// Draw debug info
 #if 0
 	// Debug: Draw clickable regions
@@ -673,20 +684,12 @@ void PuzzleMagicWall::drawColorDots(ManagedSurface32 *screen) {
 				0x8000FF, // violet
 				0xFFFF00  // yellow
 			};
-			_vm->_gfx->fillRect(screen,
-				Common::Rect(
-					static_cast<int16>(dot.pos.x - 8), static_cast<int16>(dot.pos.y - 8),
-					static_cast<int16>(dot.pos.x + 8), static_cast<int16>(dot.pos.y + 8)),
-				colors[dot.colorIdx % 10]);
+			_vm->_gfx->fillRect(screen, Common::Rect32(dot.pos.x - 8, dot.pos.y - 8, dot.pos.x + 8, dot.pos.y + 8), colors[dot.colorIdx % 10]);
 		}
 
 		if (dot.lightOn) {
 			// Draw light above dot
-			_vm->_gfx->fillRect(screen,
-				Common::Rect(
-					static_cast<int16>(dot.pos.x - 4), static_cast<int16>(dot.pos.y - 20),
-					static_cast<int16>(dot.pos.x + 4), static_cast<int16>(dot.pos.y - 12)),
-				0x00FFFF);
+			_vm->_gfx->fillRect(screen, Common::Rect32(dot.pos.x - 4, dot.pos.y - 20, dot.pos.x + 4, dot.pos.y - 12), 0x00FFFF);
 		}
 	}
 }
@@ -752,11 +755,7 @@ void PuzzleMagicWall::drawGates(ManagedSurface32 *screen) {
 		} else {
 			// Fallback: draw simple rectangle
 			uint32 color = gate.open ? 0x00FF00 : 0xFF0000;
-			_vm->_gfx->fillRect(screen,
-				Common::Rect(
-					static_cast<int16>(gate.pos.x - 10), static_cast<int16>(gate.pos.y - 20),
-					static_cast<int16>(gate.pos.x + 10), static_cast<int16>(gate.pos.y + 20)),
-				color);
+			_vm->_gfx->fillRect(screen, Common::Rect32(gate.pos.x - 10, gate.pos.y - 20, gate.pos.x + 10, gate.pos.y + 20), color);
 		}
 	}
 }
@@ -787,8 +786,7 @@ EventHandleResult PuzzleMagicWall::onLButtonDown(const Common::Point &pos) {
 		if (t.rect.contains(pos)) {
 			// Check if there is a beetle in the source slot
 			if (_slots[t.sourceSlot].zoombiniIdx >= 0) {
-				debug(2, "PuzzleMagicWall: Tablet %d clicked, moving beetle from %d to %d",
-					  i, t.sourceSlot, t.destSlot);
+				debug(2, "PuzzleMagicWall: Tablet %d clicked, moving beetle from %d to %d", i, t.sourceSlot, t.destSlot);
 
 				_destSlot = t.destSlot;
 				_slots[t.sourceSlot].path = t.path;

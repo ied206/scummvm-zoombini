@@ -35,11 +35,11 @@ class RleBlock;
 class ZoombiniAnimation;
 class ZoombiniRunner;
 
-/** 
+/**
  * Booliewood - In its normal state
- * 
+ *
  * Arrival shelter that presents the rescued community across a scrolling panorama.
- * 
+ *
  * @remark The save is considered complete after 400 Zoombinis arrive;
  * This page is only shown if the save is not complete.
  */
@@ -65,20 +65,44 @@ public:
 	bool hasGoButton() const override { return false; }
 
 private:
+	/** Scene artwork and actor resource paths. */
+	static constexpr const char *kBackgroundPath = "#bmp/booliewood/background";
+	static constexpr const char *kSeatedAnimationPath = "bmp/zombis/littleZomb.anm";
+	static constexpr const char *kWalkingZoombiniAnimationPath = "bmp/zombis/attente/attenteZomb.anm";
+	static constexpr const char *kContentMarkerPath = "bmp/booliewood/piti_bool/content.rb";
+	static constexpr const char *kPascontentMarkerPath = "bmp/booliewood/piti_bool/pascontent.rb";
+	static constexpr const char *kWalkingAnimationPath = "bmp/boolies/marche.an";
+	static constexpr const char *kWaitingAnimationPath = "bmp/boolies/attend.an";
+	static constexpr const char *kCrowdRouteFormat = "bmp/booliewood/path%d.pat";
+	/** Music and narration resource paths. */
+	static constexpr const char *kMusicPath = "#sounds/music/Booliewood_Level1.wav";
+	static constexpr const char *kIntroSpeechPath = "sounds/zbv21.2.wav";
+	static constexpr const char *kAmbientSpeechFormat = "sounds/blw22.%d.wav";
+	/** Attraction resources in scene order. */
+	static constexpr const char *kAttractionPaths[] = {
+		"bmp/booliewood/atraction_ourson_rail1.an",
+		"bmp/booliewood/atraction_ourson_rail2.an",
+		"bmp/booliewood/atraction_ourson_rail3.an",
+		"bmp/booliewood/atraction_horror_move_lev3.an",
+		"bmp/booliewood/atraction_horror_cils_lev3.an",
+		"bmp/booliewood/atraction_horror_fire_lev2.an",
+		"bmp/booliewood/atraction_mushroom_lights.an",
+	};
+
 	/** Number of horizontal seating rows distributed through the panorama. */
-	static const int kNumSeats = 23;
+	static constexpr int kNumSeats = 23;
 	/** Maximum number of seated Zoombinis shown by this page. */
-	static const int kMaximumVisibleZoombinis = 80;
+	static constexpr int kMaximumVisibleZoombinis = 80;
 	/** Number of independent decorative path actors. */
-	static const int kCrowdActorCount = 17;
+	static constexpr int kCrowdActorCount = 17;
 	/** Number of stage-gated attraction animations. */
-	static const int kAttractionCount = 7;
+	static constexpr int kAttractionCount = 7;
 	/** Number of randomized Booliewood crowd clips. */
-	static const int kAmbientSpeechCount = 6;
+	static constexpr int kAmbientSpeechCount = 6;
 	/** Width of the cyclic panorama in pixels. */
-	static const int kPanoramaWidth = 4000;
+	static constexpr int kPanoramaWidth = 4000;
 	/** Little-Zoombini cell used by seated community members. */
-	static const int kSeatedZoombiniCell = 33;
+	static constexpr int kSeatedZoombiniCell = 33;
 
 	/** Initial position, horizontal limit, and row kind for one seat row. */
 	struct SeatDefinition {
@@ -125,9 +149,61 @@ private:
 	};
 
 	/** Initial position, maximum X, and row kind for every seat row. */
-	static const SeatDefinition kSeatDefinitions[kNumSeats];
+	static constexpr SeatDefinition kSeatDefinitions[kNumSeats] = {
+		{Common::Point32(148, 459), 402, 0},
+		{Common::Point32(168, 479), 422, 1},
+		{Common::Point32(598, 490), 958, 1},
+		{Common::Point32(1014, 383), 1113, 1},
+		{Common::Point32(1060, 481), 1124, 2},
+		{Common::Point32(1123, 383), 1224, 0},
+		{Common::Point32(1144, 403), 1215, 1},
+		{Common::Point32(1246, 467), 1316, 2},
+		{Common::Point32(1283, 487), 1343, 5},
+		{Common::Point32(1440, 427), 1490, 1},
+		{Common::Point32(1543, 480), 1620, 2},
+		{Common::Point32(1623, 447), 1689, 1},
+		{Common::Point32(1856, 468), 2021, 2},
+		{Common::Point32(2101, 480), 2348, 2},
+		{Common::Point32(2468, 431), 2564, 1},
+		{Common::Point32(2620, 475), 2775, 1},
+		{Common::Point32(2764, 490), 2869, 1},
+		{Common::Point32(2888, 475), 2977, 2},
+		{Common::Point32(3047, 450), 3121, 0},
+		{Common::Point32(3121, 410), 3313, 1},
+		{Common::Point32(3254, 475), 3335, 0},
+		{Common::Point32(3416, 530), 3783, 1},
+		{Common::Point32(3854, 415), 3973, 0},
+	};
 	/** Rescued-crowd marker pattern, stored from top row to bottom row. */
-	static const char *const kCrowdPattern[27];
+	static constexpr const char *kCrowdPattern[27] = {
+		"00000111111111100000",
+		"00011111111111111000",
+		"00111111111111111100",
+		"01111111111111111100",
+		"01111111111111111100",
+		"11111222111222111000",
+		"11112222212222211000",
+		"11112212212212211000",
+		"01112212212212211000",
+		"01112222212222211000",
+		"00111222211222111100",
+		"00111111111111111100",
+		"00011111111112211110",
+		"00001222222222211110",
+		"00001122222222111111",
+		"00011112222221111111",
+		"00011111222211111111",
+		"00111111111111111111",
+		"00111111111111111110",
+		"00111111111111111100",
+		"00000222000222000000",
+		"00000222000222100000",
+		"00001111101111110000",
+		"00012211101112221000",
+		"00122211101112221100",
+		"01111111000111111110",
+		"01111110000001111110",
+	};
 
 	/** Reset all seat rows to their initial allocation state. */
 	void resetSeats();
@@ -177,7 +253,7 @@ private:
 	void drawCrowdActors(ManagedSurface32 *screen) const;
 	/** Draw one Little-Zoombini state from @p animation at a cyclic scene position. */
 	void drawZoombiniInPanorama(const ZoombiniRunner &zoombini, const ZoombiniAnimation *animation, int cell, int animationFrame,
-							 const Common::Point32 &pos, ManagedSurface32 *screen) const;
+								const Common::Point32 &pos, ManagedSurface32 *screen) const;
 
 	/** Current horizontal origin within the cyclic panorama. */
 	int _scrollX = 0;

@@ -56,19 +56,93 @@ public:
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 
 	/** Number of grid columns. */
-	static const int kGridCols = 16;
+	static constexpr int kGridCols = 16;
 	/** Number of grid rows. */
-	static const int kGridRows = 12;
+	static constexpr int kGridRows = 12;
 	/** Total cell capacity of the grid. */
-	static const int kMaxCells = kGridCols * kGridRows;
+	static constexpr int kMaxCells = kGridCols * kGridRows;
 	/** Maximum number of bubble-crater launch slots. */
-	static const int kMaxSlots = 10;
+	static constexpr int kMaxSlots = 10;
 	/** Number of symbol visuals available to grid cells. */
-	static const int kNumSymbols = 60;
+	static constexpr int kNumSymbols = 60;
 	/** Screen-space size of one grid cell. */
-	static const int kCellSize = 24;
+	static constexpr int kCellSize = 24;
 
 private:
+	/** Resource paths and formats used by the marsh scene. */
+	static constexpr const char *kMusicPath = "#sounds/music/04-BS01.wav";
+	static constexpr const char *kBackgroundFormat = "#bmp/mystic_marsh/background%d";
+	static constexpr const char *kCraterPath = "bmp/mystic_marsh/crater";
+	static constexpr const char *kBubbleCraterPath = "bmp/mystic_marsh/BubbleCrater";
+	static constexpr const char *kTourbiPath = "bmp/mystic_marsh/symbols/tourbi_anim";
+	static constexpr const char *kTraitFormat = "bmp/mystic_marsh/traits/%d-%d";
+	static constexpr const char *kSymbolFormat = "bmp/mystic_marsh/symbols/%s";
+	static constexpr const char *kBubbleFormat = "bmp/mystic_marsh/bubble%d";
+	/** Resource names for the symbol slots. */
+	static constexpr const char *kSymbolNames[kNumSymbols] = {
+		"S_DIV1",
+		"S_DIV2",
+		"S_DIV3",
+		"S_DIV4",
+		"C_DIV1",
+		"C_DIV2",
+		"C_DIV3",
+		"C_DIV4",
+		"RD_CY_DIV2",
+		"DR_CY_DIV2",
+		"UD_CY_DIV2",
+		"DU_CY_DIV2",
+		"LR_CY_DIV2",
+		"RL_CY_DIV2",
+		"LD_CONVERGER",
+		"TRIGGER1",
+		"TRIGGER2",
+		"TRIGGER3",
+		"TRIGGER4",
+		"TRIGGER5",
+		"TRIGGER6",
+		"TRIGGER7",
+		"UR_TCY_DIV2",
+		"RU_TCY_DIV2",
+		"RD_TCY_DIV2",
+		"DR_TCY_DIV2",
+		"LR_TCY_DIV2",
+		"RL_TCY_DIV2",
+		"LL_TCY_DIV3",
+		"LU_TCY_DIV3",
+		"LD_TCY_DIV3",
+		"RR_TCY_DIV3",
+		"RU_TCY_DIV3",
+		"RD_TCY_DIV3",
+		"UU_TCY_DIV3",
+		"UL_TCY_DIV3",
+		"UR_TCY_DIV3",
+		"TS_SPOT1",
+		"TS_SPOT2",
+		"TS_SPOT3",
+		"TS_SPOT4",
+		"TS_SPOT5",
+		"TS_SPOT6",
+		"TS_SPOT7",
+		"TOURBI",
+		"EDGE",
+		"ENTRY1",
+		"ENTRY2",
+		// The remaining resource slots intentionally reuse the straight divider.
+		"S_DIV1",
+		"S_DIV1",
+		"S_DIV1",
+		"S_DIV1",
+		"S_DIV1",
+		"S_DIV1",
+		"S_DIV1",
+		"S_DIV1",
+		"S_DIV1",
+		"S_DIV1",
+		"S_DIV1",
+		"S_DIV1",
+	};
+
 	/** One routing-grid cell. */
 	struct GridCell {
 		/** Cell role identifying empty, symbol, crater, or marker cells. */
@@ -88,7 +162,7 @@ private:
 		/** Screen position. */
 		Common::Point32 pos = Common::Point32();
 		/** Clickable launch area. */
-		Common::Rect hitbox = Common::Rect();
+		Common::Rect32 hitbox = Common::Rect32();
 		/** Assigned puzzle-roster index, or `-1` when empty. */
 		int zoombiniIdx = -1;
 		/** Whether a Zoombini currently occupies this slot. */

@@ -65,13 +65,34 @@ public:
 
 private:
 	/** Number of independent firework animations. */
-	static const int kFireworkCount = 3;
+	static constexpr int kFireworkCount = 3;
+	/** Resource paths used by the celebration scene and sound sequence. */
+	static constexpr const char *kBackgroundPath = "bmp/final/big BOOL";
+	static constexpr const char *kFullBigBoolPath = "bmp/final/thefullbigbool";
+	static constexpr const char *kRevealBigBoolPath = "bmp/final/therealbigbool.rb";
+	static constexpr const char *kDancingBooliePath = "bmp/final/dancing_boolie.an";
+	static constexpr const char *kBoolDancePath = "bmp/final/booldance.an";
+	static constexpr const char *kRevealFlare1Path = "bmp/aquacube/flare1.an";
+	static constexpr const char *kRevealFlare2Path = "bmp/aquacube/flare2.an";
+	static constexpr const char *kFireworkPaths[kFireworkCount] = {
+		"bmp/final/FWBLUE.an",
+		"bmp/final/FWGREEN.an",
+		"bmp/final/FWRED.an",
+	};
+	static constexpr const char *kZoombiniAnimationPath = "bmp/zombis/littleZomb.anm";
+	static constexpr const char *kWalkingZoombiniAnimationPath = "bmp/zombis/attente/attenteZomb.anm";
+	static constexpr const char *kMusicPath = "#sounds/music/Booliewood_Finale.wav";
+	static constexpr const char *kOpeningSpeechPath = "sounds/Fin11.wav";
+	static constexpr const char *kClosingSpeechPath = "sounds/INT11.17.wav";
+	static constexpr const char *kFirstAmbientSoundPath = "sounds/zbv42.5.wav";
+	static constexpr const char *kAmbientSoundFormat = "sounds/blw22.%d.wav";
+
 	/** Number of small dancing Boolies along the lower edge. */
-	static const int kDancingBoolieCount = 3;
+	static constexpr int kDancingBoolieCount = 3;
 	/** Number of randomized celebration ambience clips. */
-	static const int kAmbientSoundCount = 7;
+	static constexpr int kAmbientSoundCount = 7;
 	/** Number of decorative Zoombinis created for the celebration. */
-	static const int kDecorativeZoombiniCount = 2;
+	static constexpr int kDecorativeZoombiniCount = 2;
 
 	/** Runtime position, animation, and parabolic motion for one firework. */
 	struct FireworkState {
@@ -86,11 +107,18 @@ private:
 	};
 
 	/** Fixed locations of the three lower-edge dancers. */
-	static const Common::Point32 kDancingBooliePos[kDancingBoolieCount];
+	static constexpr Common::Point32 kDancingBooliePos[kDancingBoolieCount] = {
+		Common::Point32(100, 530),
+		Common::Point32(300, 530),
+		Common::Point32(400, 530),
+	};
 	/** Fixed locations of the two decorative Zoombinis in the celebration. */
-	static const Common::Point32 kDecorativeZoombiniPos[kDecorativeZoombiniCount];
+	static constexpr Common::Point32 kDecorativeZoombiniPos[kDecorativeZoombiniCount] = {
+		Common::Point32(500, 550),
+		Common::Point32(200, 550),
+	};
 	/** Resting cells restored after the two decorative Zoombinis finish walking. */
-	static const int kDecorativeZoombiniCells[kDecorativeZoombiniCount];
+	static constexpr int kDecorativeZoombiniCells[kDecorativeZoombiniCount] = {77, 99};
 
 	/** Allocate and initialize the two decorative Zoombinis. */
 	void createDecorativeZoombinis();

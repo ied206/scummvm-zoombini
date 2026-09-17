@@ -58,6 +58,14 @@ public:
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 
 private:
+	/** Resource paths and formats used by the snowboard scene. */
+	static constexpr const char *kMusicPath = "#sounds/music/01-BS06.wav";
+	static constexpr const char *kTraitFormat = "bmp/snowboard/traits/%d-%d";
+	static constexpr const char *kBoardPath = "bmp/snowboard/board01";
+	static constexpr const char *kBoardAnimPath = "bmp/snowboard/BOARD";
+	static constexpr const char *kEngineAnimPath = "bmp/snowboard/ENGINE";
+	static constexpr const char *kDecorFormat = "bmp/snowboard/N1So-%d";
+
 	/** One generated trait test in the lane-classification tree. */
 	struct TreeNode {
 		/** Trait index tested by this node. */

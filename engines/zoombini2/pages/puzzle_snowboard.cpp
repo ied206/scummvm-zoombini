@@ -19,15 +19,22 @@
  *
  */
 
+#include "zoombini2/pages/puzzle_snowboard.h"
 #include "common/debug.h"
 #include "zoombini2/graphics.h"
 #include "zoombini2/scripts.h"
-#include "zoombini2/pages/puzzle_snowboard.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
+
+constexpr const char *PuzzleSnowboard::kMusicPath;
+constexpr const char *PuzzleSnowboard::kTraitFormat;
+constexpr const char *PuzzleSnowboard::kBoardPath;
+constexpr const char *PuzzleSnowboard::kBoardAnimPath;
+constexpr const char *PuzzleSnowboard::kEngineAnimPath;
+constexpr const char *PuzzleSnowboard::kDecorFormat;
 
 // ============================================================================
 // PuzzleSnowboard - binary decision tree classifier.
@@ -40,7 +47,7 @@ namespace Zoombini2 {
 // ============================================================================
 
 // Number of lanes indexed by level, with index zero unused.
-static const int kLanesByLevel[] = {0, 2, 4, 4}; // level 0(unused), 1, 2, 3
+static constexpr int kLanesByLevel[] = {0, 2, 4, 4}; // level 0(unused), 1, 2, 3
 
 PuzzleSnowboard::PuzzleSnowboard(Zoombini2Engine *vm)
 	: PuzzleBase(vm, kPageSnowboard) {
@@ -71,7 +78,7 @@ void PuzzleSnowboard::init() {
 
 	// Start the Snowboard Gulch music.
 	if (SoundManager *snd = _vm->getSoundManager()) {
-		_musicId = snd->load(true, Common::Path("#sounds/music/01-BS06.wav"), true);
+		_musicId = snd->load(true, Common::Path(kMusicPath), true);
 		if (_musicId >= 0) {
 			snd->playLoop(_musicId);
 			snd->setVolume(_musicId, snd->_volumeMusic);
@@ -101,7 +108,7 @@ void PuzzleSnowboard::loadLaneGraphics() {
 	// Load trait icons: bmp/snowboard/traits/{trait}-{value}.rb
 	for (int f = 0; f < ZmbTrait::kTraitCount; f++) {
 		for (int v = 0; v < ZmbTrait::kTraitValueCount; v++) {
-			Common::Path path(Common::String::format("bmp/snowboard/traits/%d-%d", f + 1, v + 1));
+			Common::Path path(Common::String::format(kTraitFormat, f + 1, v + 1));
 			_traitIcons[f][v] = new RleBlock(_vm);
 			if (!_traitIcons[f][v]->loadFromFile(path)) {
 				debug(1, "PuzzleSnowboard: Failed to load trait %d-%d", f + 1, v + 1);
@@ -112,7 +119,7 @@ void PuzzleSnowboard::loadLaneGraphics() {
 	}
 
 	// Load board graphics
-	Common::Path boardPath("bmp/snowboard/board01");
+	Common::Path boardPath(kBoardPath);
 	_boardBitmap = new BitBlock(_vm);
 	if (!_boardBitmap->load(boardPath)) {
 		delete _boardBitmap;
@@ -120,7 +127,7 @@ void PuzzleSnowboard::loadLaneGraphics() {
 	}
 
 	// Load board animation (BOARD.AN)
-	Common::Path boardAnimPath("bmp/snowboard/BOARD");
+	Common::Path boardAnimPath(kBoardAnimPath);
 	_boardAnim = new Animation(_vm);
 	if (!_boardAnim->loadFromFile(boardAnimPath)) {
 		debug(1, "PuzzleSnowboard: Failed to load BOARD.AN");
@@ -129,7 +136,7 @@ void PuzzleSnowboard::loadLaneGraphics() {
 	}
 
 	// Load engine animation (ENGINE.AN)
-	Common::Path engineAnimPath("bmp/snowboard/ENGINE");
+	Common::Path engineAnimPath(kEngineAnimPath);
 	_engineAnim = new Animation(_vm);
 	if (!_engineAnim->loadFromFile(engineAnimPath)) {
 		debug(1, "PuzzleSnowboard: Failed to load ENGINE.AN");
@@ -139,9 +146,9 @@ void PuzzleSnowboard::loadLaneGraphics() {
 
 	// Load decoration/scenery animations (N1So-1, N1So-3, N1So-4, N1So-5, N1So-6)
 	// Note: N1So-2 doesn't exist in resources
-	static const int decorNumbers[] = {1, 3, 4, 5, 6};
+	static constexpr int decorNumbers[] = {1, 3, 4, 5, 6};
 	for (int i = 0; i < 5; i++) {
-		Common::Path decorPath(Common::String::format("bmp/snowboard/N1So-%d", decorNumbers[i]));
+		Common::Path decorPath(Common::String::format(kDecorFormat, decorNumbers[i]));
 		_decorAnims[i] = new Animation(_vm);
 		if (!_decorAnims[i]->loadFromFile(decorPath)) {
 			debug(2, "PuzzleSnowboard: Failed to load N1So-%d", decorNumbers[i]);
@@ -165,8 +172,8 @@ void PuzzleSnowboard::generateTree() {
 	for (int i = 0; i < _treeDepth; i++) {
 		TreeNode &node = _tree[i];
 		node.traitIndex = static_cast<ZmbTrait::TraitIndex>(_vm->_rnd->getRandomNumber(ZmbTrait::kTraitCount - 1));
-		node.matchVal1 = _vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1);  // 0-4 = trait variants
-		node.matchVal2 = _vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1);  // For level 3
+		node.matchVal1 = _vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1); // 0-4 = trait variants
+		node.matchVal2 = _vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1); // For level 3
 	}
 
 	debug(2, "PuzzleSnowboard: Generated tree with %d internal nodes", _treeDepth);
@@ -270,7 +277,7 @@ void PuzzleSnowboard::onRenderContent(ManagedSurface32 *screen) {
 
 	// Draw decorative/scenery animations (positioned across the scene)
 	// These add visual polish with animated background elements
-	static const Common::Point32 decorPos[5] = {
+	static constexpr Common::Point32 decorPos[5] = {
 		Common::Point32(50, 350),  // N1So-1 - bottom left
 		Common::Point32(450, 100), // N1So-3 - top right
 		Common::Point32(600, 200), // N1So-4 - right side
@@ -290,7 +297,7 @@ void PuzzleSnowboard::onRenderContent(ManagedSurface32 *screen) {
 	}
 
 	// Draw board animation or static sprite
-	static const Common::Point32 kBoardPos(150, 100);
+	static constexpr Common::Point32 kBoardPos = Common::Point32(150, 100);
 	if (_boardAnim) {
 		// Cycle through board animation frames
 		int frameCount = _boardAnim->getFrameCount();
@@ -304,7 +311,7 @@ void PuzzleSnowboard::onRenderContent(ManagedSurface32 *screen) {
 	}
 
 	// Draw engine animation (lift mechanism)
-	static const Common::Point32 kEnginePos(50, 400);
+	static constexpr Common::Point32 kEnginePos = Common::Point32(50, 400);
 	if (_engineAnim) {
 		int frameCount = _engineAnim->getFrameCount();
 		if (0 < frameCount) {
@@ -315,7 +322,7 @@ void PuzzleSnowboard::onRenderContent(ManagedSurface32 *screen) {
 
 	// Draw decision tree visualization
 	// Show which traits are being checked at each level.
-	static const Common::Point32 kTreePos(50, 50);
+	static constexpr Common::Point32 kTreePos = Common::Point32(50, 50);
 
 	for (int i = 0; i < _treeDepth; i++) {
 		const TreeNode &node = _tree[i];
@@ -323,7 +330,6 @@ void PuzzleSnowboard::onRenderContent(ManagedSurface32 *screen) {
 		// Draw the trait icon for this node's match value
 		_vm->_gfx->drawRleBlock(screen, _traitIcons[traitIndex][node.matchVal1], Common::Point32(kTreePos.x + i * 60, kTreePos.y));
 	}
-
 }
 
 void PuzzleSnowboard::onRenderActors(ManagedSurface32 *screen) {
@@ -370,7 +376,7 @@ void PuzzleSnowboard::onRenderActors(ManagedSurface32 *screen) {
 	// Draw current zoombini being processed
 	if (_state == kStateSliding && _currentZoombini < static_cast<int>(_puzzleZoombinis.size())) {
 		const ZoombiniRunner *z = _puzzleZoombinis[_currentZoombini];
-		static const Common::Point32 kCurrentZoombiniPos(400, 200);
+		static constexpr Common::Point32 kCurrentZoombiniPos = Common::Point32(400, 200);
 
 		if (_zoombiniAnimation) {
 			_vm->_gfx->drawZoombini(screen, _zoombiniAnimation, z->_traits, kCurrentZoombiniPos, 0, 0);
