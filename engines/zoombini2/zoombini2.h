@@ -45,7 +45,9 @@ class SeekableReadStream;
 namespace Zoombini2 {
 
 class BitBlock;
+class DialogDebug;
 class DialogMsgBox;
+enum class DialogMsgBoxButton;
 class PageBase;
 class RleBlock;
 class SoundManager;
@@ -134,6 +136,8 @@ public:
 	void reseedRandomForV10();
 	/** Return the most recently processed game-space mouse position. */
 	Common::Point32 getMousePos() const { return _mousePos; }
+	/** Present the interactive hover cursor instead of the default cursor. */
+	void setHoverCursorActive(bool active);
 	/** Return whether the primary mouse button is currently held. */
 	bool isMouseDown() const { return _mouseDown; }
 
@@ -154,6 +158,8 @@ public:
 	GameState *getGameState() { return _gameState; }
 	/** Return the engine-owned shared message-box dialog. */
 	DialogMsgBox *getMsgBoxDialog() { return _msgBoxDialog; }
+	/** Return the engine-owned debug area-mask dialog. */
+	DialogDebug *getDebugDialog() { return _debugDialog; }
 	/** Start or retain the shared map-music stream and return its sound identifier. */
 	int ensureMapMusic();
 	/** Return the game-facing music volume percentage. */
@@ -170,6 +176,8 @@ public:
 	bool useGreedyWaterslidePairing() const { return _useGreedyWaterslidePairing; }
 	/** Return whether Bezier paths use floating-point rather than original Q10 calculations. */
 	bool useFloatingPointPaths() const { return _useFloatingPointPaths; }
+	/** Return whether the enhanced keyboard shortcut set is enabled. */
+	bool useEnhancedKbdShortcuts() const { return _enhancedKbdShortcuts; }
 	/** Return whether the Chez Norf diagnostic overlay key is currently held. */
 	bool showChezNorfDebugOverlay() const { return _debugHotkeysEnabled && _debugOverlayKeyDown; }
 
@@ -273,6 +281,10 @@ private:
 
 	/** Cursor sprite registered for this game instance. */
 	RleBlock *_cursorSprite = nullptr;
+	/** Interactive hover cursor sprite, loaded on first use. */
+	RleBlock *_interactiveCursorSprite = nullptr;
+	/** Whether the interactive hover cursor is currently presented. */
+	bool _hoverCursorActive = false;
 	/** Signed 16-bit hotspot offset used by the active cursor image. */
 	Common::Point _cursorHotspot = Common::Point();
 	/** Whether CursorMan should present the game cursor. */
@@ -289,6 +301,8 @@ private:
 	Sidebar *_sidebar = nullptr;
 	/** Shared two-button message-box dialog for pages and controls. */
 	DialogMsgBox *_msgBoxDialog = nullptr;
+	/** Debug area-mask dialog opened from the console. */
+	DialogDebug *_debugDialog = nullptr;
 
 	/** Most recently processed game-space mouse position. */
 	Common::Point32 _mousePos = Common::Point32();
@@ -318,6 +332,8 @@ private:
 	bool _useCachedFrameTime = false;
 	/** Whether Bezier paths use the optional floating-point evaluator. */
 	bool _useFloatingPointPaths = false;
+	/** Whether the enhanced keyboard shortcut set is enabled. */
+	bool _enhancedKbdShortcuts = false;
 	/** Held state of the global puzzle-completion key. */
 	bool _debugCompletionKeyDown = false;
 	/** Held state of the Chez Norf diagnostic-overlay key. */
@@ -348,6 +364,18 @@ private:
 	void initCursor();
 	/** Register the loaded cursor sprite with CursorMan. */
 	void registerCursorWithCursorMan();
+	/** Register @p sprite with CursorMan using the shared conversion. */
+	void registerCursorSpriteWithCursorMan(const RleBlock *sprite);
+	/** Return the first held global Zoombini, or nullptr when none is held. */
+	const ZoombiniRunner *getDraggedGlobalZoombini() const;
+	/** Hide the cursor while held and draw the held name plate. */
+	void updateDragOverlay();
+	/** Open the shared quit confirmation unless the original close gates suppress it. */
+	void handleQuitRequest();
+	/** Open the shared quit confirmation through the message-box dialog. */
+	void requestQuitConfirmation();
+	/** Apply the shared quit-confirmation result. */
+	void handleQuitConfirmation(DialogMsgBoxButton button);
 	/** Consume pending backend events and update frame-local input state. */
 	void processEvents();
 	/** Apply a queued page replacement before the active frame is dispatched. */

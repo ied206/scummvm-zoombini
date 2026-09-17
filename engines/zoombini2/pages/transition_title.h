@@ -47,6 +47,10 @@ public:
 	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
 
 private:
+	/** Resource paths used by the title screen. */
+	static constexpr const char *kBackgroundPath = "bmp/story_intro/title_screen";
+	static constexpr const char *kMusicPath = "#sounds/music/Booliewood_Level1.wav";
+
 	EventHandleResult dismiss();
 	/** Title-screen background bitmap. */
 	BitBlock *_background = nullptr;

@@ -83,12 +83,19 @@ public:
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
 	/** Update the button highlight for @p pos. */
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
-	/** Consume keys while the modal is active. */
+	/** Handle enhanced keyboard shortcuts while the modal is active. */
 	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
 	/** Consume key releases while the modal is active. */
 	EventHandleResult onKeyUp(const Common::KeyState &key) override;
 
 private:
+	/** Confirmation panel resource paths indexed by button state. */
+	static constexpr const char *kPanelPaths[3] = {
+		"bmp/menu/QUIT_panel_nothing.rb",
+		"bmp/menu/QUIT_panel_ok.rb",
+		"bmp/menu/QUIT_panel_cancel.rb",
+	};
+
 	/** Load request-specific resources and retain the covered screen rectangle. */
 	bool openDialog();
 	/** Release all resources loaded for the current request. */

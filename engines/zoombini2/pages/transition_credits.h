@@ -50,6 +50,10 @@ public:
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 
 private:
+	/** Resource paths used by the credits presentation. */
+	static constexpr const char *kBackgroundPath = "#bmp/credits/credits";
+	static constexpr const char *kMusicPath = "#sounds/music/ZMR-Transition.wav";
+
 	/** Gameplay deadline for the active hold period. */
 	uint32 _endTime = 0;
 	/** Current vertical scroll offset. */

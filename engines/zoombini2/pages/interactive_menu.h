@@ -71,19 +71,68 @@ public:
 	bool hasActiveDialog() const override { return _state == MenuScreenState::kOptions01; }
 
 private:
+	/** Resource path. */
+	static constexpr const char *kBackgroundPath = "#bmp/menu/background";
+	/** Resource path. */
+	static constexpr const char *kSelectorNormalPath = "bmp/menu/PARTIEs - selector NORMAL";
+	/** Resource path. */
+	static constexpr const char *kSelectorHighlightPath = "bmp/menu/PARTIEs - selector HILITE";
+	/** Resource path. */
+	static constexpr const char *kSelectionBarPath = "bmp/menu/barre-cache.rb";
+	/** Resource path. */
+	static constexpr const char *kBlipSoundPath = "sounds/blip.wav";
+	/** Resource path. */
+	static constexpr const char *kTypeSoundPath = "sounds/fx/i-bs5.wav";
+	/** Resource path. */
+	static constexpr const char *kDeleteSoundPath = "sounds/fx/del.wav";
+	/** Resource path. */
+	static constexpr const char *kArrowUpNormalPath = "bmp/menu/PARTIEs - ArrowUP NORMAL";
+	/** Resource path. */
+	static constexpr const char *kArrowUpHighlightPath = "bmp/menu/PARTIEs - ArrowUP HIGHLIGHT";
+	/** Resource path. */
+	static constexpr const char *kArrowDownNormalPath = "bmp/menu/PARTIEs - ArrowDOWN NORMAL";
+	/** Resource path. */
+	static constexpr const char *kArrowDownHighlightPath = "bmp/menu/PARTIEs - ArrowDOWN HILITE";
+	/** Resource path. */
+	static constexpr const char *kStartNormalPath = "bmp/menu/Start Normal";
+	/** Resource path. */
+	static constexpr const char *kStartHighlightPath = "bmp/menu/Start Highlight";
+	/** Resource path. */
+	static constexpr const char *kStartDisabledPath = "bmp/menu/Start Gray";
+	/** Resource path. */
+	static constexpr const char *kOptionsNormalPath = "bmp/menu/PANEL - Options  NORMAL";
+	/** Resource path. */
+	static constexpr const char *kOptionsHighlightPath = "bmp/menu/PANEL - Options  HIGHLIGHT";
+	/** Resource path. */
+	static constexpr const char *kNewNormalPath = "bmp/menu/New Normal";
+	/** Resource path. */
+	static constexpr const char *kNewHighlightPath = "bmp/menu/New Highlight";
+	/** Resource path. */
+	static constexpr const char *kNewDisabledPath = "bmp/menu/New Gray";
+	/** Resource path. */
+	static constexpr const char *kPracticeNormalPath = "bmp/menu/PANEL - Entrainement NORMAL";
+	/** Resource path. */
+	static constexpr const char *kPracticeHighlightPath = "bmp/menu/PANEL - Entraine HILITE";
+	/** Resource path. */
+	static constexpr const char *kQuitNormalPath = "bmp/menu/PANEL - Quitter NORMAL";
+	/** Resource path. */
+	static constexpr const char *kQuitHighlightPath = "bmp/menu/PANEL - Quitter HIGHLIGHT";
+	/** Resource path. */
+	static constexpr const char *kDeleteConfirmationPath = "bmp/menu/Quit_panel_text_suppr";
+	/** Resource path. */
+	static constexpr const char *kQuitConfirmationPath = "bmp/menu/Quit_panel_text_quit";
+
 	void updateButtonAvailability();
 	EventHandleResult handleVolumePanelInput(const Common::Point &pos, bool mouseReleased);
 	bool _volumePanelMouseDown = false;
 
 	/** Screen origin of the saved-profile list. */
-	static const Common::Point32 kFileListPos;
-	static const Size32 kSelectorSize;
-	static const char *const kValidNameCharacters;
+	static constexpr Common::Point32 kFileListPos = Common::Point32(157, 286);
+	static constexpr Size32 kSelectorSize = Size32(520, 201);
+	static constexpr const char *kValidNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ";
 
 	/** Panel currently accepting input. */
 	MenuScreenState _state = MenuScreenState::kMain00;
-	/** Full-screen sign-in background. */
-	BitBlock *_background = nullptr;
 	/** Normal saved-game list frame. */
 	BitBlock *_selectorNormal = nullptr;
 	/** Highlighted saved-game list frame. */

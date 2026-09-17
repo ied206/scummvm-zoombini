@@ -33,11 +33,36 @@
 
 namespace Zoombini2 {
 
-const Common::Point32 InteractiveMenu::kFileListPos(157, 286);
-const Size32 InteractiveMenu::kSelectorSize(520, 201);
+constexpr const char *InteractiveMenu::kBackgroundPath;
+constexpr const char *InteractiveMenu::kSelectorNormalPath;
+constexpr const char *InteractiveMenu::kSelectorHighlightPath;
+constexpr const char *InteractiveMenu::kSelectionBarPath;
+constexpr const char *InteractiveMenu::kBlipSoundPath;
+constexpr const char *InteractiveMenu::kTypeSoundPath;
+constexpr const char *InteractiveMenu::kDeleteSoundPath;
+constexpr const char *InteractiveMenu::kArrowUpNormalPath;
+constexpr const char *InteractiveMenu::kArrowUpHighlightPath;
+constexpr const char *InteractiveMenu::kArrowDownNormalPath;
+constexpr const char *InteractiveMenu::kArrowDownHighlightPath;
+constexpr const char *InteractiveMenu::kStartNormalPath;
+constexpr const char *InteractiveMenu::kStartHighlightPath;
+constexpr const char *InteractiveMenu::kStartDisabledPath;
+constexpr const char *InteractiveMenu::kOptionsNormalPath;
+constexpr const char *InteractiveMenu::kOptionsHighlightPath;
+constexpr const char *InteractiveMenu::kNewNormalPath;
+constexpr const char *InteractiveMenu::kNewHighlightPath;
+constexpr const char *InteractiveMenu::kNewDisabledPath;
+constexpr const char *InteractiveMenu::kPracticeNormalPath;
+constexpr const char *InteractiveMenu::kPracticeHighlightPath;
+constexpr const char *InteractiveMenu::kQuitNormalPath;
+constexpr const char *InteractiveMenu::kQuitHighlightPath;
+constexpr const char *InteractiveMenu::kDeleteConfirmationPath;
+constexpr const char *InteractiveMenu::kQuitConfirmationPath;
 
-const char *const InteractiveMenu::kValidNameCharacters =
-	"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ";
+constexpr Common::Point32 InteractiveMenu::kFileListPos;
+constexpr Size32 InteractiveMenu::kSelectorSize;
+
+constexpr const char *InteractiveMenu::kValidNameCharacters;
 
 InteractiveMenu::InteractiveMenu(Zoombini2Engine *vm)
 	: InteractiveBase(vm) {
@@ -46,7 +71,6 @@ InteractiveMenu::InteractiveMenu(Zoombini2Engine *vm)
 
 InteractiveMenu::~InteractiveMenu() {
 	delete _fileList;
-	delete _background;
 	delete _selectorNormal;
 	delete _selectorHilite;
 	delete _selectionBar;
@@ -82,27 +106,26 @@ void InteractiveMenu::init() {
 }
 
 void InteractiveMenu::loadResources() {
-	_background = new BitBlock(_vm);
-	if (!_background->load(Common::Path("#bmp/menu/background")))
+	if (!_vm->_gfx->loadBackground(Common::Path(kBackgroundPath)))
 		warning("MenuScreenPage: Failed to load menu background");
 
 	_selectorNormal = new BitBlock(_vm);
-	if (!_selectorNormal->load(Common::Path("bmp/menu/PARTIEs - selector NORMAL")))
+	if (!_selectorNormal->load(Common::Path(kSelectorNormalPath)))
 		warning("MenuScreenPage: Failed to load normal selector");
 
 	_selectorHilite = new BitBlock(_vm);
-	if (!_selectorHilite->load(Common::Path("bmp/menu/PARTIEs - selector HILITE")))
+	if (!_selectorHilite->load(Common::Path(kSelectorHighlightPath)))
 		warning("MenuScreenPage: Failed to load highlighted selector");
 
 	_selectionBar = new RleBlock(_vm);
-	if (!_selectionBar->loadFromFile(Common::Path("bmp/menu/barre-cache.rb")))
+	if (!_selectionBar->loadFromFile(Common::Path(kSelectionBarPath)))
 		warning("MenuScreenPage: Failed to load save selection bar");
 
 	SoundManager *sound = _vm->getSoundManager();
 	if (sound) {
-		_blipSoundId = sound->load(false, Common::Path("sounds/blip.wav"), false);
-		_typeSoundId = sound->load(false, Common::Path("sounds/fx/i-bs5.wav"), false);
-		_deleteSoundId = sound->load(false, Common::Path("sounds/fx/del.wav"), false);
+		_blipSoundId = sound->load(false, Common::Path(kBlipSoundPath), false);
+		_typeSoundId = sound->load(false, Common::Path(kTypeSoundPath), false);
+		_deleteSoundId = sound->load(false, Common::Path(kDeleteSoundPath), false);
 	}
 }
 
@@ -116,13 +139,14 @@ void InteractiveMenu::loadButtons() {
 	};
 
 	const ButtonDefinition definitions[kMenuButtonCount] = {
-		{"bmp/menu/PARTIEs - ArrowUP NORMAL", "bmp/menu/PARTIEs - ArrowUP HIGHLIGHT", nullptr, Common::Point32(613, 350), Size32(46, 50)},
-		{"bmp/menu/PARTIEs - ArrowDOWN NORMAL", "bmp/menu/PARTIEs - ArrowDOWN HILITE", nullptr, Common::Point32(613, 416), Size32(46, 50)},
-		{"bmp/menu/Start Normal", "bmp/menu/Start Highlight", "bmp/menu/Start Gray", Common::Point32(27, 561), Size32(145, 39)},
-		{"bmp/menu/PANEL - Options  NORMAL", "bmp/menu/PANEL - Options  HIGHLIGHT", nullptr, Common::Point32(175, 561), Size32(145, 39)},
-		{"bmp/menu/New Normal", "bmp/menu/New Highlight", "bmp/menu/New Gray", Common::Point32(321, 561), Size32(145, 39)},
-		{"bmp/menu/PANEL - Entrainement NORMAL", "bmp/menu/PANEL - Entraine HILITE", nullptr, Common::Point32(468, 561), Size32(145, 39)},
-		{"bmp/menu/PANEL - Quitter NORMAL", "bmp/menu/PANEL - Quitter HIGHLIGHT", nullptr, Common::Point32(613, 561), Size32(145, 39)}};
+		{kArrowUpNormalPath, kArrowUpHighlightPath, nullptr, Common::Point32(613, 350), Size32(46, 50)},
+		{kArrowDownNormalPath, kArrowDownHighlightPath, nullptr, Common::Point32(613, 416), Size32(46, 50)},
+		{kStartNormalPath, kStartHighlightPath, kStartDisabledPath, Common::Point32(27, 561), Size32(145, 39)},
+		{kOptionsNormalPath, kOptionsHighlightPath, nullptr, Common::Point32(175, 561), Size32(145, 39)},
+		{kNewNormalPath, kNewHighlightPath, kNewDisabledPath, Common::Point32(321, 561), Size32(145, 39)},
+		{kPracticeNormalPath, kPracticeHighlightPath, nullptr, Common::Point32(468, 561), Size32(145, 39)},
+		{kQuitNormalPath, kQuitHighlightPath, nullptr, Common::Point32(613, 561), Size32(145, 39)},
+	};
 
 	for (int i = 0; i < kMenuButtonCount; ++i) {
 		const ButtonDefinition &definition = definitions[i];
@@ -151,8 +175,7 @@ void InteractiveMenu::onUpdate() {
 
 void InteractiveMenu::onRenderContent(ManagedSurface32 *screen) {
 	if (_state == MenuScreenState::kOptions01) {
-		if (_background)
-			_background->drawToSurface(screen, Common::Point32(0, 0));
+		_vm->_gfx->drawBackground(screen, Common::Point32(0, 0));
 	} else {
 		drawMain(screen);
 	}
@@ -200,8 +223,7 @@ EventHandleResult InteractiveMenu::onKeyDown(const Common::KeyState &key, bool r
 	return EventHandleResult::kConsumed;
 }
 void InteractiveMenu::drawMain(ManagedSurface32 *screen) {
-	if (_background)
-		_background->drawToSurface(screen, Common::Point32(0, 0));
+	_vm->_gfx->drawBackground(screen, Common::Point32(0, 0));
 
 	const Common::Point32 mousePos = _vm->getMousePos();
 	const Common::Point mouseEventPos(mousePos.x, mousePos.y);
@@ -364,13 +386,11 @@ void InteractiveMenu::requestDeleteConfirmation() {
 	_pendingDeleteProfileName = _fileList->getSelectedName();
 	if (_pendingDeleteProfileName.empty())
 		return;
-	_vm->getMsgBoxDialog()->request(Common::Path("bmp/menu/Quit_panel_text_suppr"),
-		new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleDeleteConfirmation));
+	_vm->getMsgBoxDialog()->request(Common::Path(kDeleteConfirmationPath), new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleDeleteConfirmation));
 }
 
 void InteractiveMenu::requestQuitConfirmation() {
-	_vm->getMsgBoxDialog()->request(Common::Path("bmp/menu/Quit_panel_text_quit"),
-		new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleQuitConfirmation));
+	_vm->getMsgBoxDialog()->request(Common::Path(kQuitConfirmationPath), new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleQuitConfirmation));
 }
 
 void InteractiveMenu::handleDeleteConfirmation(DialogMsgBoxButton button) {

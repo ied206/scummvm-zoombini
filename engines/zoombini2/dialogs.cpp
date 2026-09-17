@@ -41,12 +41,12 @@
 
 namespace Zoombini2 {
 
-const uint32 Zoombini2SaveManagementDialog::kEditProfileCommand = 'z2ed';
-const uint32 Zoombini2SaveManagementDialog::kDeleteProfileCommand = 'z2dl';
-const uint32 Zoombini2SaveManagementDialog::kImportProfileCommand = 'z2im';
-const uint32 Zoombini2SaveManagementDialog::kExportProfileCommand = 'z2ex';
-const uint32 Zoombini2SaveManagementDialog::kProfileSelectionChangedCommand = 'z2sl';
-const uint32 Zoombini2OptionsWidget::kManageProfilesCommand = 'z2mg';
+constexpr uint32 Zoombini2SaveManagementDialog::kEditProfileCommand;
+constexpr uint32 Zoombini2SaveManagementDialog::kDeleteProfileCommand;
+constexpr uint32 Zoombini2SaveManagementDialog::kImportProfileCommand;
+constexpr uint32 Zoombini2SaveManagementDialog::kExportProfileCommand;
+constexpr uint32 Zoombini2SaveManagementDialog::kProfileSelectionChangedCommand;
+constexpr uint32 Zoombini2OptionsWidget::kManageProfilesCommand;
 
 class Zoombini2OptionsWidget::SeparatorWidget : public GUI::Widget {
 public:
@@ -467,6 +467,9 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	_floatingPointPathsCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.FloatingPointPaths",
 														  Common::U32String("Use floating-point path calculations"),
 														  Common::U32String("Uses 32-bit floating point instead of the original signed Q10 fixed-point arithmetic for Bezier movement paths."));
+	_enhancedKbdShortcutsCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.EnhancedKbdShortcuts",
+															Common::U32String("Enable enhanced keyboard shortcuts"),
+															Common::U32String("Enables some ScummVM-only keyboard shortcuts for quality of life improvements."));
 
 	GUI::ButtonWidget *manageProfilesButton = new GUI::ButtonWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ManageProfiles", Common::U32String("Saved games"),
 																	Common::U32String(), kManageProfilesCommand);
@@ -487,6 +490,7 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 		.addWidget("GameplayImprovementsSeparator", "", -1, 2)
 		.addWidget("GameplayImprovements", "OptionsLabel")
 		.addWidget("FloatingPointPaths", "Checkbox")
+		.addWidget("EnhancedKbdShortcuts", "Checkbox")
 		.closeLayout()
 		.closeDialog();
 }
@@ -498,6 +502,7 @@ void Zoombini2OptionsWidget::load() {
 	_cachedFrameTimeCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigCachedFrameTime, _domain));
 	_originalPrngCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _domain));
 	_floatingPointPathsCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths, _domain));
+	_enhancedKbdShortcutsCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _domain));
 }
 
 bool Zoombini2OptionsWidget::save() {
@@ -509,6 +514,7 @@ bool Zoombini2OptionsWidget::save() {
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigCachedFrameTime, _cachedFrameTimeCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _originalPrngCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths, _floatingPointPathsCheckbox->getState(), _domain);
+	ConfMan.setBool(::Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _enhancedKbdShortcutsCheckbox->getState(), _domain);
 	if (originalPrngChanged && g_engine) {
 		GUI::MessageDialog dialog(Common::U32String("The random number generator change will take effect after restarting the game."));
 		dialog.runModal();

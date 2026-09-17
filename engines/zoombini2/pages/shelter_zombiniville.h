@@ -31,9 +31,7 @@
 
 namespace Zoombini2 {
 
-class AreaMask;
 class AnimationRunner;
-class BitBlock;
 class Animation;
 class BitmapFont;
 class PathObject;
@@ -73,10 +71,40 @@ public:
 	bool canUseGoButton() const override;
 
 private:
-	/** Starting-shelter background. */
-	BitBlock *_background = nullptr;
-	/** Decoded picker-area bitmap used to validate free-form drops. */
-	AreaMask *_areaMask = nullptr;
+	/** Resource path. */
+	static constexpr const char *kBackgroundPath = "#bmp/zombiniville/zoombiniville";
+	/** Resource path. */
+	static constexpr const char *kAreaMaskPath = "bmp/zombiniville/area.bmt";
+	/** Resource path format. */
+	static constexpr const char *kFeatureAnimationFormat = "bmp/zombiniville/pikaroll/z1pi%d%d.an";
+	/** Resource path. */
+	static constexpr const char *kQuickFillButtonPath = "bmp/zombiniville/BUMPER-1.AN";
+	/** Resource path. */
+	static constexpr const char *kBatchFillButtonPath = "bmp/zombiniville/bumper-16.an";
+	/** Resource path. */
+	static constexpr const char *kCreateButtonPath = "bmp/zombiniville/bumper-Valid.an";
+	/** Resource path. */
+	static constexpr const char *kBigZombAnimationPath = "bmp/zombiniville/BigZomb/BigZomb.anm";
+	/** Resource path. */
+	static constexpr const char *kLittleZombAnimationPath = "bmp/zombis/littleZomb.anm";
+	/** Resource path. */
+	static constexpr const char *kPickupZombAnimationPath = "bmp/zombis/pris/pris.anm";
+	/** Resource path. */
+	static constexpr const char *kIdleZombAnimationPath = "bmp/zombis/attente2/attenteZomb2.anm";
+	/** Resource path. */
+	static constexpr const char *kNameFontPath = "bmp/typo";
+	/** Resource path. */
+	static constexpr const char *kMusicPath = "#sounds/music/ZMR-PickerScreen.wav";
+	/** Resource path. */
+	static constexpr const char *kFeatureSelectSoundPath = "sounds/fx/Z-BS11.wav";
+	/** Resource path. */
+	static constexpr const char *kQuickFillSoundPath = "sounds/fx/Z-BS12.wav";
+	/** Resource path. */
+	static constexpr const char *kBatchFillSoundPath = "sounds/fx/Z-BS13.wav";
+	/** Resource path. */
+	static constexpr const char *kValidZoombiniSoundPath = "sounds/fx/Z-BS14.wav";
+	/** Resource path. */
+	static constexpr const char *kWrongZoombiniSoundPath = "sounds/fx/WrongZ.wav";
 
 	/** Feature selection controls indexed by feature and value. */
 	Animation *_featureButtons[ZmbTrait::kTraitCount][ZmbTrait::kTraitValueCount] = {};
