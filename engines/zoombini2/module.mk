@@ -2,6 +2,7 @@ MODULE := engines/zoombini2
 
 MODULE_OBJS := \
 	zoombini2.o \
+	console.o \
 	dialogs.o \
 	graphics.o \
 	metaengine.o \
@@ -9,6 +10,8 @@ MODULE_OBJS := \
 	scripts.o \
 	sound.o \
 	state.o \
+	pages/dialog_base.o \
+	pages/dialog_debug.o \
 	pages/dialog_help.o \
 	pages/dialog_msgbox.o \
 	pages/interactive_base.o \

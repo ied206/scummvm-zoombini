@@ -29,6 +29,28 @@
 
 namespace Zoombini2 {
 
+constexpr const char *PuzzleAquacube::kMusicPath;
+constexpr const char *PuzzleAquacube::kBallPath;
+constexpr const char *PuzzleAquacube::kBallBigPath;
+constexpr const char *PuzzleAquacube::kLightPath;
+constexpr const char *PuzzleAquacube::kCubeEasyPaths[3];
+constexpr const char *PuzzleAquacube::kCubeHardPaths[3];
+constexpr const char *PuzzleAquacube::kManetteOnPath;
+constexpr const char *PuzzleAquacube::kManetteOffPath;
+constexpr const char *PuzzleAquacube::kShotsOnPath;
+constexpr const char *PuzzleAquacube::kShotsOffPath;
+constexpr const char *PuzzleAquacube::kLightRedPath;
+constexpr const char *PuzzleAquacube::kLightGreyPath;
+constexpr const char *PuzzleAquacube::kWarpOnPath;
+constexpr const char *PuzzleAquacube::kWarpOffPath;
+constexpr const char *PuzzleAquacube::kWarpDisablePath;
+constexpr const char *PuzzleAquacube::kWarpTimerPath;
+constexpr const char *PuzzleAquacube::kFlareFormat;
+constexpr const char *PuzzleAquacube::kBubbleFormat;
+constexpr const char *PuzzleAquacube::kFleenFormat;
+
+constexpr uint32 PuzzleAquacube::kMoveAnimDuration;
+
 // ============================================================================
 // Graph one is an eight-node cube for levels one and two.
 // Graph two is a sixteen-node double cube for levels three and four.
@@ -41,7 +63,7 @@ struct GraphInitData {
 	Common::Point32 pos;
 };
 
-static const GraphInitData kGraph1Data[8] = {
+static constexpr GraphInitData kGraph1Data[8] = {
 	// Node 0: adj=(1,3,4,-1) pos=(162,530)
 	{{1, 3, 4, -1}, Common::Point32(162, 530)},
 	// Node 1: adj=(0,2,5,-1) pos=(524,530)
@@ -59,7 +81,7 @@ static const GraphInitData kGraph1Data[8] = {
 	// Node 7: adj=(6,4,3,-1) pos=(218,136)
 	{{6, 4, 3, -1}, Common::Point32(218, 136)}};
 
-static const GraphInitData kGraph2Data[16] = {
+static constexpr GraphInitData kGraph2Data[16] = {
 	// Node 0-3: Outer front face
 	{{1, 3, 12, -1}, Common::Point32(162, 530)},
 	{{0, 2, 13, -1}, Common::Point32(524, 530)},
@@ -82,35 +104,8 @@ static const GraphInitData kGraph2Data[16] = {
 	{{14, 12, 3, 11}, Common::Point32(109, 79)}};
 
 // Map each geometric vertex to one direction label per active dimension.
-const char PuzzleAquacube::kGraph1DirLabels[8][4] = {
-	{'D', 'L', 'F', 0}, // Node 0
-	{'D', 'R', 'F', 0}, // Node 1
-	{'U', 'R', 'F', 0}, // Node 2
-	{'U', 'L', 'F', 0}, // Node 3
-	{'D', 'L', 'B', 0}, // Node 4
-	{'D', 'R', 'B', 0}, // Node 5
-	{'U', 'R', 'B', 0}, // Node 6
-	{'U', 'L', 'B', 0}  // Node 7
-};
-
-const char PuzzleAquacube::kGraph2DirLabels[16][4] = {
-	{'D', 'L', 'F', 'X'}, // Node 0
-	{'D', 'R', 'F', 'X'}, // Node 1
-	{'U', 'R', 'F', 'X'}, // Node 2
-	{'U', 'L', 'F', 'X'}, // Node 3
-	{'D', 'L', 'F', 'C'}, // Node 4
-	{'D', 'R', 'F', 'C'}, // Node 5
-	{'U', 'R', 'F', 'C'}, // Node 6
-	{'U', 'L', 'F', 'C'}, // Node 7
-	{'D', 'L', 'B', 'C'}, // Node 8
-	{'D', 'R', 'B', 'C'}, // Node 9
-	{'U', 'R', 'B', 'C'}, // Node 10
-	{'U', 'L', 'B', 'C'}, // Node 11
-	{'D', 'L', 'B', 'X'}, // Node 12
-	{'D', 'R', 'B', 'X'}, // Node 13
-	{'U', 'R', 'B', 'X'}, // Node 14
-	{'U', 'L', 'B', 'X'}  // Node 15
-};
+constexpr char PuzzleAquacube::kGraph1DirLabels[8][4];
+constexpr char PuzzleAquacube::kGraph2DirLabels[16][4];
 
 // Level-specific actor and movement limits.
 struct LevelParams {
@@ -121,7 +116,7 @@ struct LevelParams {
 	int numFleens;
 };
 
-static const LevelParams kLevelParams[5] = {
+static constexpr LevelParams kLevelParams[5] = {
 	{0, 0, 0, 0, 0},   // Level 0 (unused)
 	{3, 7, 1, 6, 0},   // Level 1: 3 zoombinis, 6 steps, 0 fleens
 	{3, 7, 1, 6, 1},   // Level 2: 3 zoombinis, 6 steps, 1 fleen
@@ -130,29 +125,29 @@ static const LevelParams kLevelParams[5] = {
 };
 
 // Direction-arrow button positions.
-static const Common::Point32 kArrowPos[4] = {
+static constexpr Common::Point32 kArrowPos[4] = {
 	Common::Point32(649, 483), Common::Point32(674, 484), Common::Point32(698, 483), Common::Point32(725, 482)};
 
 // Step-arrow positions.
-static const Common::Point32 kStepArrowPos[4] = {
+static constexpr Common::Point32 kStepArrowPos[4] = {
 	Common::Point32(648, 526), Common::Point32(676, 527), Common::Point32(701, 526), Common::Point32(727, 525)};
 
 // Positions for up to eleven step indicators.
-static const Common::Point32 kStepIndicatorPos[11] = {
+static constexpr Common::Point32 kStepIndicatorPos[11] = {
 	Common::Point32(647, 565), Common::Point32(658, 565), Common::Point32(667, 565), Common::Point32(676, 565),
 	Common::Point32(685, 565), Common::Point32(695, 565), Common::Point32(705, 565), Common::Point32(713, 565),
 	Common::Point32(723, 565), Common::Point32(730, 565), Common::Point32(738, 565)};
 
 // Warp-control positions.
-static const Common::Point32 kWarpOverlayPos(641, 541);
-static const Common::Point32 kWarpTimerPos(666, 544);
+static constexpr Common::Point32 kWarpOverlayPos = Common::Point32(641, 541);
+static constexpr Common::Point32 kWarpTimerPos = Common::Point32(666, 544);
 
 // Cube background draw position.
-static const Common::Point32 kCubeDrawPos(96, 152);
+static constexpr Common::Point32 kCubeDrawPos = Common::Point32(96, 152);
 
 // Direction-arrow hit-test dimensions.
-static const int kArrowHitW = 17;
-static const int kArrowHitH = 41;
+static constexpr int kArrowHitW = 17;
+static constexpr int kArrowHitH = 41;
 
 // ============================================================================
 // Constructor / Destructor
@@ -200,7 +195,7 @@ void PuzzleAquacube::init() {
 
 	// Start the Aqua Cube music.
 	if (SoundManager *snd = _vm->getSoundManager()) {
-		_musicId = snd->load(true, Common::Path("#sounds/music/03-BB01.wav"), true);
+		_musicId = snd->load(true, Common::Path(kMusicPath), true);
 		if (_musicId >= 0) {
 			snd->playLoop(_musicId);
 			snd->setVolume(_musicId, snd->_volumeMusic);
@@ -494,29 +489,27 @@ int PuzzleAquacube::findNodeByDirValues4(int a, int b, int c, int d) const {
 void PuzzleAquacube::loadResources() {
 	// Ball sprites
 	_ballImage = new RleBlock(_vm);
-	if (!_ballImage->loadFromFile(Common::Path("bmp/aquacube/ball"))) {
+	if (!_ballImage->loadFromFile(Common::Path(kBallPath))) {
 		delete _ballImage;
 		_ballImage = nullptr;
 	}
 
 	_ballBigImage = new RleBlock(_vm);
-	if (!_ballBigImage->loadFromFile(Common::Path("bmp/aquacube/ballBIG"))) {
+	if (!_ballBigImage->loadFromFile(Common::Path(kBallBigPath))) {
 		delete _ballBigImage;
 		_ballBigImage = nullptr;
 	}
 
 	// Light sprite
 	_lightImage = new RleBlock(_vm);
-	if (!_lightImage->loadFromFile(Common::Path("bmp/aquacube/light"))) {
+	if (!_lightImage->loadFromFile(Common::Path(kLightPath))) {
 		delete _lightImage;
 		_lightImage = nullptr;
 	}
 
 	// Cube background layers (3 layers per level range)
 	if (_level <= 2) {
-		const char *names[] = {"bmp/aquacube/kub_easy_01",
-							   "bmp/aquacube/kub_easy_02",
-							   "bmp/aquacube/kub_easy_03"};
+		const char *const *names = kCubeEasyPaths;
 		for (int i = 0; i < 3; i++) {
 			_cubeImage[i] = new RleBlock(_vm);
 			if (!_cubeImage[i]->loadFromFile(Common::Path(names[i]))) {
@@ -525,9 +518,7 @@ void PuzzleAquacube::loadResources() {
 			}
 		}
 	} else {
-		const char *names[] = {"bmp/aquacube/kub_hard_01",
-							   "bmp/aquacube/kub_hard_02",
-							   "bmp/aquacube/kub_hard_03"};
+		const char *const *names = kCubeHardPaths;
 		for (int i = 0; i < 3; i++) {
 			_cubeImage[i] = new RleBlock(_vm);
 			if (!_cubeImage[i]->loadFromFile(Common::Path(names[i]))) {
@@ -539,65 +530,65 @@ void PuzzleAquacube::loadResources() {
 
 	// Joystick controls.
 	_manetteOnImage = new RleBlock(_vm);
-	if (!_manetteOnImage->loadFromFile(Common::Path("bmp/aquacube/control_manetteON"))) {
+	if (!_manetteOnImage->loadFromFile(Common::Path(kManetteOnPath))) {
 		delete _manetteOnImage;
 		_manetteOnImage = nullptr;
 	}
 
 	_manetteOffImage = new RleBlock(_vm);
-	if (!_manetteOffImage->loadFromFile(Common::Path("bmp/aquacube/control_manetteOFF"))) {
+	if (!_manetteOffImage->loadFromFile(Common::Path(kManetteOffPath))) {
 		delete _manetteOffImage;
 		_manetteOffImage = nullptr;
 	}
 
 	// Remaining-step controls.
 	_shotsOnImage = new RleBlock(_vm);
-	if (!_shotsOnImage->loadFromFile(Common::Path("bmp/aquacube/control_shotsON"))) {
+	if (!_shotsOnImage->loadFromFile(Common::Path(kShotsOnPath))) {
 		delete _shotsOnImage;
 		_shotsOnImage = nullptr;
 	}
 
 	_shotsOffImage = new RleBlock(_vm);
-	if (!_shotsOffImage->loadFromFile(Common::Path("bmp/aquacube/control_shotsOFF"))) {
+	if (!_shotsOffImage->loadFromFile(Common::Path(kShotsOffPath))) {
 		delete _shotsOffImage;
 		_shotsOffImage = nullptr;
 	}
 
 	// Direction lights
 	_lightRedImage = new RleBlock(_vm);
-	if (!_lightRedImage->loadFromFile(Common::Path("bmp/aquacube/control_manette_lightRED"))) {
+	if (!_lightRedImage->loadFromFile(Common::Path(kLightRedPath))) {
 		delete _lightRedImage;
 		_lightRedImage = nullptr;
 	}
 
 	_lightGreyImage = new RleBlock(_vm);
-	if (!_lightGreyImage->loadFromFile(Common::Path("bmp/aquacube/control_manette_lightGREY"))) {
+	if (!_lightGreyImage->loadFromFile(Common::Path(kLightGreyPath))) {
 		delete _lightGreyImage;
 		_lightGreyImage = nullptr;
 	}
 
 	// Warp buttons
 	_warpOnImage = new RleBlock(_vm);
-	if (!_warpOnImage->loadFromFile(Common::Path("bmp/aquacube/control_warpBUTTON_ON"))) {
+	if (!_warpOnImage->loadFromFile(Common::Path(kWarpOnPath))) {
 		delete _warpOnImage;
 		_warpOnImage = nullptr;
 	}
 
 	_warpOffImage = new RleBlock(_vm);
-	if (!_warpOffImage->loadFromFile(Common::Path("bmp/aquacube/control_warpBUTTON_OFF"))) {
+	if (!_warpOffImage->loadFromFile(Common::Path(kWarpOffPath))) {
 		delete _warpOffImage;
 		_warpOffImage = nullptr;
 	}
 
 	_warpDisableImage = new RleBlock(_vm);
-	if (!_warpDisableImage->loadFromFile(Common::Path("bmp/aquacube/control_warpBUTTON_DISABLE"))) {
+	if (!_warpDisableImage->loadFromFile(Common::Path(kWarpDisablePath))) {
 		delete _warpDisableImage;
 		_warpDisableImage = nullptr;
 	}
 
 	// Warp timer animation (replaces static empty timer)
 	_warpTimerAnim = new Animation(_vm);
-	if (!_warpTimerAnim->loadFromFile(Common::Path("bmp/aquacube/control_warpTIMER"))) {
+	if (!_warpTimerAnim->loadFromFile(Common::Path(kWarpTimerPath))) {
 		debug(2, "PuzzleAquacube: Failed to load warp timer animation");
 		delete _warpTimerAnim;
 		_warpTimerAnim = nullptr;
@@ -606,7 +597,7 @@ void PuzzleAquacube::loadResources() {
 	// Flare visual effects
 	for (int i = 0; i < 2; i++) {
 		_flareAnims[i] = new Animation(_vm);
-		Common::Path path(Common::String::format("bmp/aquacube/FLARE%d", i + 1));
+		Common::Path path(Common::String::format(kFlareFormat, i + 1));
 		if (!_flareAnims[i]->loadFromFile(path)) {
 			debug(2, "PuzzleAquacube: Failed to load FLARE%d.AN", i + 1);
 			delete _flareAnims[i];
@@ -617,7 +608,7 @@ void PuzzleAquacube::loadResources() {
 	// Bubbles
 	for (int i = 0; i < 3; i++) {
 		_bubbleImage[i] = new RleBlock(_vm);
-		Common::Path path(Common::String::format("bmp/aquacube/bubble%d", i + 1));
+		Common::Path path(Common::String::format(kBubbleFormat, i + 1));
 		if (!_bubbleImage[i]->loadFromFile(path)) {
 			delete _bubbleImage[i];
 			_bubbleImage[i] = nullptr;
@@ -627,7 +618,7 @@ void PuzzleAquacube::loadResources() {
 	// Fleen sprites (4 types)
 	for (int i = 0; i < 4; i++) {
 		_fleenImage[i] = new RleBlock(_vm);
-		Common::Path path(Common::String::format("bmp/aquacube/fleen/fixe/f%dfixe", i + 1));
+		Common::Path path(Common::String::format(kFleenFormat, i + 1));
 		if (!_fleenImage[i]->loadFromFile(path)) {
 			delete _fleenImage[i];
 			_fleenImage[i] = nullptr;
@@ -909,7 +900,7 @@ void PuzzleAquacube::onRenderForeground(ManagedSurface32 *screen) {
 	// Draw flare visual effects (decorative)
 	// Position flares at strategic points on the screen for visual polish
 	uint32 now = _vm->getGameTickCount();
-	static const Common::Point32 flarePos[2] = {
+	static constexpr Common::Point32 flarePos[2] = {
 		Common::Point32(50, 400), // FLARE1 - lower left
 		Common::Point32(650, 100) // FLARE2 - upper right
 	};

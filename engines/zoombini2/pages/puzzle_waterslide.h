@@ -57,6 +57,22 @@ public:
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 
 private:
+	/** Resource paths and formats used by the waterslide scene. */
+	static constexpr const char *kMusicPath = "#sounds/music/02-BS01.wav";
+	static constexpr const char *kTraitFormat = "bmp/waterslide/traits/%d";
+	static constexpr const char *kPipeBlueHorizontalPath = "bmp/waterslide/pipes - blue/pipe - horizontal";
+	static constexpr const char *kPipeBlueBigPath = "bmp/waterslide/pipes - blue/pipe - lev1_bigone";
+	static constexpr const char *kPipeGreyHorizontalPath = "bmp/waterslide/pipes - grey/pipe - horizontal";
+	static constexpr const char *kPipeRedHorizontalPath = "bmp/waterslide/pipes - red/pipe - horizontal";
+	static constexpr const char *kPastilleBluePath = "bmp/waterslide/pastilles blue";
+	static constexpr const char *kPastilleGreyPath = "bmp/waterslide/pastilles grey";
+	static constexpr const char *kEdgePath = "bmp/waterslide/edge neutre";
+	static constexpr const char *kFountainPath = "bmp/waterslide/blue fountain";
+	static constexpr const char *kTreePath = "bmp/waterslide/little tree";
+	static constexpr const char *kValvePath = "bmp/waterslide/mr valve master";
+	static constexpr const char *kCascade1Path = "bmp/waterslide/pipe - cascade 1";
+	static constexpr const char *kCascade2Path = "bmp/waterslide/pipe - cascade 2";
+
 	/** Occupancy and feedback state of one pipe slot. */
 	enum SlotState {
 		/** No Zoombini occupies this slot. */
@@ -179,9 +195,9 @@ private:
 	uint32 _stateTimer = 0;
 
 	/** Maximum number of pipe slots. */
-	static const int kMaxSlots = 16;
+	static constexpr int kMaxSlots = 16;
 	/** Maximum number of generated pairs. */
-	static const int kMaxPairs = 8;
+	static constexpr int kMaxPairs = 8;
 	/** Pipe-slot runtime state. */
 	Slot _slots[kMaxSlots] = {};
 	/** Number of active entries in @ref WaterslidePuzzle::_slots. */

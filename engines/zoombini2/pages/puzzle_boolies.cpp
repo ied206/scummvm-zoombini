@@ -29,6 +29,23 @@
 
 namespace Zoombini2 {
 
+constexpr const char *PuzzleBoolies::kMusicPath;
+constexpr const char *PuzzleBoolies::kBallPosPath;
+constexpr const char *PuzzleBoolies::kBallNegPath;
+constexpr const char *PuzzleBoolies::kPinPath;
+constexpr const char *PuzzleBoolies::kPinLightedPath;
+constexpr const char *PuzzleBoolies::kBoatPath;
+constexpr const char *PuzzleBoolies::kSpotFormat;
+constexpr const char *PuzzleBoolies::kBlockerPath;
+constexpr const char *PuzzleBoolies::kFixePath;
+constexpr const char *PuzzleBoolies::kFixe2Path;
+constexpr const char *PuzzleBoolies::kMarchePath;
+constexpr const char *PuzzleBoolies::kMarche2Path;
+constexpr const char *PuzzleBoolies::kAttendPath;
+constexpr const char *PuzzleBoolies::kAttend2Path;
+constexpr const char *PuzzleBoolies::kRollPath;
+constexpr const char *PuzzleBoolies::kRoll2Path;
+
 // ============================================================================
 // PuzzleBoolies - bowling puzzle.
 //
@@ -48,16 +65,16 @@ namespace Zoombini2 {
 // ============================================================================
 
 // Ball roll animation duration (ms)
-static const uint32 kBallRollDuration = 1500;
+static constexpr uint32 kBallRollDuration = 1500;
 
 // Pin knocked animation duration (ms)
-static const uint32 kPinKnockDuration = 500;
+static constexpr uint32 kPinKnockDuration = 500;
 
 // Boat departure delay (ms)
-static const uint32 kBoatDepartDelay = 2000;
+static constexpr uint32 kBoatDepartDelay = 2000;
 
 // Spot positions (approximate, based on typical bowling layout).
-static const Common::Point32 kSpotPos[5] = {
+static constexpr Common::Point32 kSpotPos[5] = {
 	Common::Point32(100, 500), // spot01
 	Common::Point32(200, 500), // spot02
 	Common::Point32(300, 500), // spot03 (center)
@@ -66,14 +83,14 @@ static const Common::Point32 kSpotPos[5] = {
 };
 
 // Spot hitbox size
-static const int kSpotHitSize = 50;
+static constexpr int kSpotHitSize = 50;
 
 // Pin grid layout (3 rows of pins)
-static const int kPinRows = 3;
-static const int kPinCols[] = {3, 4, 5}; // Pins per row
-static const int kPinRowSpacing = 60;
-static const int kPinColSpacing = 50;
-static const Common::Point32 kPinBasePos(200, 150);
+static constexpr int kPinRows = 3;
+static constexpr int kPinCols[] = {3, 4, 5}; // Pins per row
+static constexpr int kPinRowSpacing = 60;
+static constexpr int kPinColSpacing = 50;
+static constexpr Common::Point32 kPinBasePos(200, 150);
 
 PuzzleBoolies::PuzzleBoolies(Zoombini2Engine *vm)
 	: PuzzleBase(vm, kPageBoolies) {
@@ -111,7 +128,7 @@ void PuzzleBoolies::init() {
 
 	// Start the Boolie Boggle music.
 	if (SoundManager *snd = _vm->getSoundManager()) {
-		_musicId = snd->load(true, Common::Path("#sounds/music/09-BB01.wav"), true);
+		_musicId = snd->load(true, Common::Path(kMusicPath), true);
 		if (_musicId >= 0) {
 			snd->playLoop(_musicId);
 			snd->setVolume(_musicId, snd->_volumeMusic);
@@ -147,14 +164,14 @@ void PuzzleBoolies::init() {
 
 void PuzzleBoolies::loadResources() {
 	// Load ball sprites
-	Common::Path ballPosPath("bmp/boolies/ball_pos");
+	Common::Path ballPosPath(kBallPosPath);
 	_ballPosImage = new RleBlock(_vm);
 	if (!_ballPosImage->loadFromFile(ballPosPath)) {
 		delete _ballPosImage;
 		_ballPosImage = nullptr;
 	}
 
-	Common::Path ballNegPath("bmp/boolies/ball_neg");
+	Common::Path ballNegPath(kBallNegPath);
 	_ballNegImage = new RleBlock(_vm);
 	if (!_ballNegImage->loadFromFile(ballNegPath)) {
 		delete _ballNegImage;
@@ -162,14 +179,14 @@ void PuzzleBoolies::loadResources() {
 	}
 
 	// Load pin sprites
-	Common::Path pinPath("bmp/boolies/pin");
+	Common::Path pinPath(kPinPath);
 	_pinImage = new RleBlock(_vm);
 	if (!_pinImage->loadFromFile(pinPath)) {
 		delete _pinImage;
 		_pinImage = nullptr;
 	}
 
-	Common::Path pinLightedPath("bmp/boolies/pin_lighted");
+	Common::Path pinLightedPath(kPinLightedPath);
 	_pinLightedImage = new RleBlock(_vm);
 	if (!_pinLightedImage->loadFromFile(pinLightedPath)) {
 		delete _pinLightedImage;
@@ -177,7 +194,7 @@ void PuzzleBoolies::loadResources() {
 	}
 
 	// Load boat sprite
-	Common::Path boatPath("bmp/boolies/bateau");
+	Common::Path boatPath(kBoatPath);
 	_boatImage = new RleBlock(_vm);
 	if (!_boatImage->loadFromFile(boatPath)) {
 		delete _boatImage;
@@ -186,7 +203,7 @@ void PuzzleBoolies::loadResources() {
 
 	// Load spot sprites
 	for (int i = 0; i < 5; i++) {
-		Common::Path spotPath(Common::String::format("bmp/boolies/spot%02d", i + 1));
+		Common::Path spotPath(Common::String::format(kSpotFormat, i + 1));
 		_spotImage[i] = new RleBlock(_vm);
 		if (!_spotImage[i]->loadFromFile(spotPath)) {
 			delete _spotImage[i];
@@ -195,7 +212,7 @@ void PuzzleBoolies::loadResources() {
 	}
 
 	// Load blocker sprite
-	Common::Path blockerPath("bmp/boolies/blocker");
+	Common::Path blockerPath(kBlockerPath);
 	_blockerImage = new RleBlock(_vm);
 	if (!_blockerImage->loadFromFile(blockerPath)) {
 		delete _blockerImage;
@@ -210,14 +227,14 @@ void PuzzleBoolies::loadResources() {
 	}
 
 	// Load fixed position sprites
-	Common::Path fixePath("bmp/boolies/fixe");
+	Common::Path fixePath(kFixePath);
 	_fixeImage = new RleBlock(_vm);
 	if (!_fixeImage->loadFromFile(fixePath)) {
 		delete _fixeImage;
 		_fixeImage = nullptr;
 	}
 
-	Common::Path fixe2Path("bmp/boolies/fixe2");
+	Common::Path fixe2Path(kFixe2Path);
 	_fixe2Image = new RleBlock(_vm);
 	if (!_fixe2Image->loadFromFile(fixe2Path)) {
 		delete _fixe2Image;
@@ -225,42 +242,42 @@ void PuzzleBoolies::loadResources() {
 	}
 
 	// Load animations
-	Common::Path marchePath("bmp/boolies/marche");
+	Common::Path marchePath(kMarchePath);
 	_marcheAnim = new Animation(_vm);
 	if (!_marcheAnim->loadFromFile(marchePath)) {
 		delete _marcheAnim;
 		_marcheAnim = nullptr;
 	}
 
-	Common::Path marche2Path("bmp/boolies/marche2");
+	Common::Path marche2Path(kMarche2Path);
 	_marche2Anim = new Animation(_vm);
 	if (!_marche2Anim->loadFromFile(marche2Path)) {
 		delete _marche2Anim;
 		_marche2Anim = nullptr;
 	}
 
-	Common::Path attendPath("bmp/boolies/attend");
+	Common::Path attendPath(kAttendPath);
 	_attendAnim = new Animation(_vm);
 	if (!_attendAnim->loadFromFile(attendPath)) {
 		delete _attendAnim;
 		_attendAnim = nullptr;
 	}
 
-	Common::Path attend2Path("bmp/boolies/attend2");
+	Common::Path attend2Path(kAttend2Path);
 	_attend2Anim = new Animation(_vm);
 	if (!_attend2Anim->loadFromFile(attend2Path)) {
 		delete _attend2Anim;
 		_attend2Anim = nullptr;
 	}
 
-	Common::Path rollPath("bmp/boolies/roll");
+	Common::Path rollPath(kRollPath);
 	_rollAnim = new Animation(_vm);
 	if (!_rollAnim->loadFromFile(rollPath)) {
 		delete _rollAnim;
 		_rollAnim = nullptr;
 	}
 
-	Common::Path roll2Path("bmp/boolies/roll2");
+	Common::Path roll2Path(kRoll2Path);
 	_roll2Anim = new Animation(_vm);
 	if (!_roll2Anim->loadFromFile(roll2Path)) {
 		delete _roll2Anim;

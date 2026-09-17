@@ -29,13 +29,25 @@
 
 namespace Zoombini2 {
 
-static const struct {
+constexpr const char *PuzzleBase::kPuzzleBackgroundFormat;
+constexpr const char *PuzzleBase::kZoombiniAnimationPath;
+constexpr const char *PuzzleBase::kCrazyTurtleBackgroundPath;
+constexpr const char *PuzzleBase::kWaterslideBackgroundPath;
+constexpr const char *PuzzleBase::kAquacubeBackgroundPath;
+constexpr const char *PuzzleBase::kMysticMarshBackgroundPath;
+constexpr const char *PuzzleBase::kMagicWallBackgroundPath;
+constexpr const char *PuzzleBase::kWallOfFleensBackgroundPath;
+constexpr const char *PuzzleBase::kChezNorfBackgroundPath;
+constexpr const char *PuzzleBase::kSnowboardBackgroundPath;
+constexpr const char *PuzzleBase::kBooliesBackgroundPath;
+
+// Public activity names paired with their internal resource directories.
+static constexpr struct {
 	int id;
 	const char *name;
 	const char *dir;
 	const char *bgName; // Background BMP name (without bmp/ prefix or .bmp extension)
 } kPuzzleInfo[] = {
-	// Public activity names paired with their internal resource directories.
 	{kPageCrazyTurtle, "Turtle Hurdle", "crazy_turtle", "crazy_turtle/background"},
 	{kPageWaterslide, "Pipes of Paloo", "waterslide", "waterslide/waterslides"},
 	{kPageAquacube, "Aqua Cube", "aquacube", "aquacube/background"},
@@ -45,7 +57,8 @@ static const struct {
 	{kPageChezNorf, "Chez Norf", "chez_norf", "chez_norf/baquegund"},
 	{kPageSnowboard, "Snowboard Gulch", "snowboard", "snowboard/snowboard-EASY"},
 	{kPageBoolies, "Boolie Boggle", "boolies", "Boolies/background"},
-	{0, nullptr, nullptr, nullptr}};
+	{0, nullptr, nullptr, nullptr},
+};
 
 /* static */
 const char *PuzzleBase::getPuzzleName(int puzzleId) {
@@ -86,17 +99,17 @@ void PuzzleBase::init() {
 		}
 	}
 
-	_pageLayerStack->clear();
-	_pageLayerStack->addLayer(1);
+	_vm->_gfx->getPageLayerStack()->clear();
+	_vm->_gfx->getPageLayerStack()->addLayer(1);
 	if (bgName) {
-		const Common::Path bgPath(Common::String::format("#bmp/%s", bgName));
+		const Common::Path bgPath(Common::String::format(kPuzzleBackgroundFormat, bgName));
 		if (!loadPrimaryLayerBackground(bgPath)) {
 			debug(1, "Puzzle: Failed to load background for %s", name);
 		}
 	}
-	_pageLayerStack->addLayer(1);
+	_vm->_gfx->getPageLayerStack()->addLayer(1);
 
-	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/littleZomb.anm"), 50);
+	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path(kZoombiniAnimationPath), 50);
 	if (!_zoombiniAnimation)
 		debug(1, "Puzzle: Failed to load zoombini graphics");
 
@@ -110,14 +123,14 @@ void PuzzleBase::init() {
 }
 
 bool PuzzleBase::loadPrimaryLayerBackground(const Common::Path &path) {
-	const bool loaded = _pageLayerStack->loadLayerBackground(0, path);
-	PageLayer *primaryLayer = _pageLayerStack->getLayer(0);
+	const bool loaded = _vm->_gfx->getPageLayerStack()->loadLayerBackground(0, path);
+	PageLayer *primaryLayer = _vm->_gfx->getPageLayerStack()->getLayer(0);
 	_background = primaryLayer ? primaryLayer->getBackground() : nullptr;
 	return loaded;
 }
 
 void PuzzleBase::drawPrimaryPageLayer(ManagedSurface32 *screen) {
-	_pageLayerStack->drawFirstLayer(screen);
+	_vm->_gfx->getPageLayerStack()->drawFirstLayer(screen);
 }
 
 void PuzzleBase::renderZoombinis(ManagedSurface32 *screen) const {

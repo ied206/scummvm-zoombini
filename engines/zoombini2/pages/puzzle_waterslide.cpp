@@ -22,13 +22,28 @@
 #include "common/debug.h"
 
 #include "zoombini2/graphics.h"
-#include "zoombini2/scripts.h"
 #include "zoombini2/pages/puzzle_waterslide.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
+
+constexpr const char *PuzzleWaterslide::kMusicPath;
+constexpr const char *PuzzleWaterslide::kTraitFormat;
+constexpr const char *PuzzleWaterslide::kPipeBlueHorizontalPath;
+constexpr const char *PuzzleWaterslide::kPipeBlueBigPath;
+constexpr const char *PuzzleWaterslide::kPipeGreyHorizontalPath;
+constexpr const char *PuzzleWaterslide::kPipeRedHorizontalPath;
+constexpr const char *PuzzleWaterslide::kPastilleBluePath;
+constexpr const char *PuzzleWaterslide::kPastilleGreyPath;
+constexpr const char *PuzzleWaterslide::kEdgePath;
+constexpr const char *PuzzleWaterslide::kFountainPath;
+constexpr const char *PuzzleWaterslide::kTreePath;
+constexpr const char *PuzzleWaterslide::kValvePath;
+constexpr const char *PuzzleWaterslide::kCascade1Path;
+constexpr const char *PuzzleWaterslide::kCascade2Path;
 
 // ============================================================================
 // PuzzleWaterslide - trait pair matching puzzle.
@@ -50,12 +65,12 @@ namespace Zoombini2 {
 // ============================================================================
 
 // Animation timing (ms)
-static const uint32 kMoveAnimDuration = 500;
-static const uint32 kSlideAnimDuration = 1500;
-static const uint32 kRejectAnimDuration = 1000;
+static constexpr uint32 kMoveAnimDuration = 500;
+static constexpr uint32 kSlideAnimDuration = 1500;
+static constexpr uint32 kRejectAnimDuration = 1000;
 
 // Slot hitbox size
-static const int kSlotHitSize = 50;
+static constexpr int kSlotHitSize = 50;
 
 byte PuzzleWaterslide::getTrait(const ZoombiniRunner *z, ZmbTrait::TraitIndex axis) {
 	return z ? z->_traits.getValue(axis) : 0;
@@ -63,7 +78,7 @@ byte PuzzleWaterslide::getTrait(const ZoombiniRunner *z, ZmbTrait::TraitIndex ax
 
 // Slot positions (8 pairs = 16 slots, arranged in 2 columns)
 // Left column (slots 0-7), Right column (slots 8-15)
-static const Common::Point32 kSlotPos[16] = {
+static constexpr Common::Point32 kSlotPos[16] = {
 	// Left column
 	{150, 100},
 	{150, 150},
@@ -85,7 +100,7 @@ static const Common::Point32 kSlotPos[16] = {
 };
 
 // Pipe connection positions (between slot pairs)
-static const Common::Point32 kPipePos[8] = {
+static constexpr Common::Point32 kPipePos[8] = {
 	Common::Point32(250, 100),
 	Common::Point32(250, 150),
 	Common::Point32(250, 200),
@@ -138,7 +153,7 @@ void PuzzleWaterslide::init() {
 
 	// Start the Pipes of Paloo music.
 	if (SoundManager *snd = _vm->getSoundManager()) {
-		_musicId = snd->load(true, Common::Path("#sounds/music/02-BS01.wav"), true);
+		_musicId = snd->load(true, Common::Path(kMusicPath), true);
 		if (_musicId >= 0) {
 			snd->playLoop(_musicId);
 			snd->setVolume(_musicId, snd->_volumeMusic);
@@ -168,7 +183,7 @@ void PuzzleWaterslide::init() {
 void PuzzleWaterslide::loadResources() {
 	// Load trait icons (4 features)
 	for (int i = 0; i < 4; i++) {
-		Common::Path traitPath(Common::String::format("bmp/waterslide/traits/%d", i + 1));
+		Common::Path traitPath(Common::String::format(kTraitFormat, i + 1));
 		_traitImage[i] = new RleBlock(_vm);
 		if (!_traitImage[i]->loadFromFile(traitPath)) {
 			delete _traitImage[i];
@@ -177,14 +192,14 @@ void PuzzleWaterslide::loadResources() {
 	}
 
 	// Load pipe graphics - blue
-	Common::Path pipeBlueHPath("bmp/waterslide/pipes - blue/pipe - horizontal");
+	Common::Path pipeBlueHPath(kPipeBlueHorizontalPath);
 	_pipeBlueHoriz = new RleBlock(_vm);
 	if (!_pipeBlueHoriz->loadFromFile(pipeBlueHPath)) {
 		delete _pipeBlueHoriz;
 		_pipeBlueHoriz = nullptr;
 	}
 
-	Common::Path pipeBlueBPath("bmp/waterslide/pipes - blue/pipe - lev1_bigone");
+	Common::Path pipeBlueBPath(kPipeBlueBigPath);
 	_pipeBlueBigone = new RleBlock(_vm);
 	if (!_pipeBlueBigone->loadFromFile(pipeBlueBPath)) {
 		delete _pipeBlueBigone;
@@ -192,7 +207,7 @@ void PuzzleWaterslide::loadResources() {
 	}
 
 	// Load pipe graphics - grey
-	Common::Path pipeGreyHPath("bmp/waterslide/pipes - grey/pipe - horizontal");
+	Common::Path pipeGreyHPath(kPipeGreyHorizontalPath);
 	_pipeGreyHoriz = new RleBlock(_vm);
 	if (!_pipeGreyHoriz->loadFromFile(pipeGreyHPath)) {
 		delete _pipeGreyHoriz;
@@ -200,7 +215,7 @@ void PuzzleWaterslide::loadResources() {
 	}
 
 	// Load pipe graphics - red
-	Common::Path pipeRedHPath("bmp/waterslide/pipes - red/pipe - horizontal");
+	Common::Path pipeRedHPath(kPipeRedHorizontalPath);
 	_pipeRedHoriz = new RleBlock(_vm);
 	if (!_pipeRedHoriz->loadFromFile(pipeRedHPath)) {
 		delete _pipeRedHoriz;
@@ -208,14 +223,14 @@ void PuzzleWaterslide::loadResources() {
 	}
 
 	// Load pastilles
-	Common::Path pastilleBluePath("bmp/waterslide/pastilles blue");
+	Common::Path pastilleBluePath(kPastilleBluePath);
 	_pastilleBlue = new RleBlock(_vm);
 	if (!_pastilleBlue->loadFromFile(pastilleBluePath)) {
 		delete _pastilleBlue;
 		_pastilleBlue = nullptr;
 	}
 
-	Common::Path pastilleGreyPath("bmp/waterslide/pastilles grey");
+	Common::Path pastilleGreyPath(kPastilleGreyPath);
 	_pastilleGrey = new RleBlock(_vm);
 	if (!_pastilleGrey->loadFromFile(pastilleGreyPath)) {
 		delete _pastilleGrey;
@@ -223,7 +238,7 @@ void PuzzleWaterslide::loadResources() {
 	}
 
 	// Load edge
-	Common::Path edgePath("bmp/waterslide/edge neutre");
+	Common::Path edgePath(kEdgePath);
 	_edgeNeutre = new RleBlock(_vm);
 	if (!_edgeNeutre->loadFromFile(edgePath)) {
 		delete _edgeNeutre;
@@ -231,35 +246,35 @@ void PuzzleWaterslide::loadResources() {
 	}
 
 	// Load decorative animations
-	Common::Path fountainPath("bmp/waterslide/blue fountain");
+	Common::Path fountainPath(kFountainPath);
 	_blueFountainAnim = new Animation(_vm);
 	if (!_blueFountainAnim->loadFromFile(fountainPath)) {
 		delete _blueFountainAnim;
 		_blueFountainAnim = nullptr;
 	}
 
-	Common::Path treePath("bmp/waterslide/little tree");
+	Common::Path treePath(kTreePath);
 	_littleTreeAnim = new Animation(_vm);
 	if (!_littleTreeAnim->loadFromFile(treePath)) {
 		delete _littleTreeAnim;
 		_littleTreeAnim = nullptr;
 	}
 
-	Common::Path valvePath("bmp/waterslide/mr valve master");
+	Common::Path valvePath(kValvePath);
 	_valveAnim = new Animation(_vm);
 	if (!_valveAnim->loadFromFile(valvePath)) {
 		delete _valveAnim;
 		_valveAnim = nullptr;
 	}
 
-	Common::Path cascade1Path("bmp/waterslide/pipe - cascade 1");
+	Common::Path cascade1Path(kCascade1Path);
 	_cascade1Anim = new Animation(_vm);
 	if (!_cascade1Anim->loadFromFile(cascade1Path)) {
 		delete _cascade1Anim;
 		_cascade1Anim = nullptr;
 	}
 
-	Common::Path cascade2Path("bmp/waterslide/pipe - cascade 2");
+	Common::Path cascade2Path(kCascade2Path);
 	_cascade2Anim = new Animation(_vm);
 	if (!_cascade2Anim->loadFromFile(cascade2Path)) {
 		delete _cascade2Anim;
@@ -682,7 +697,6 @@ void PuzzleWaterslide::onUpdate() {
 
 void PuzzleWaterslide::onRenderBackground(ManagedSurface32 *screen) {
 	drawPrimaryPageLayer(screen);
-
 }
 
 void PuzzleWaterslide::onRenderContent(ManagedSurface32 *screen) {
@@ -697,8 +711,6 @@ void PuzzleWaterslide::onRenderContent(ManagedSurface32 *screen) {
 
 	// Draw trait indicators
 	drawTraitIndicators(screen);
-
-
 }
 
 void PuzzleWaterslide::drawPipes(ManagedSurface32 *screen) {
@@ -739,11 +751,7 @@ void PuzzleWaterslide::drawSlots(ManagedSurface32 *screen) {
 		} else {
 			// Fallback: draw circle
 			uint32 color = (slot.state == kSlotEmpty) ? 0x808080 : 0x0000FF;
-			_vm->_gfx->fillRect(screen,
-				Common::Rect(
-					static_cast<int16>(slot.pos.x - 10), static_cast<int16>(slot.pos.y - 10),
-					static_cast<int16>(slot.pos.x + 10), static_cast<int16>(slot.pos.y + 10)),
-				color);
+			_vm->_gfx->fillRect(screen, Common::Rect32(slot.pos.x - 10, slot.pos.y - 10, slot.pos.x + 10, slot.pos.y + 10), color);
 		}
 	}
 }
@@ -811,7 +819,7 @@ void PuzzleWaterslide::onRenderActors(ManagedSurface32 *screen) {
 	}
 
 	// Draw unplaced zoombinis in a staging area
-	static const Common::Point32 kStagePos(50, 450);
+	static constexpr Common::Point32 kStagePos = Common::Point32(50, 450);
 	int idx = 0;
 
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
@@ -831,11 +839,7 @@ void PuzzleWaterslide::onRenderActors(ManagedSurface32 *screen) {
 
 			// Highlight if selected
 			if (static_cast<int>(i) == _selectedZoombini) {
-				_vm->_gfx->fillRect(screen,
-					Common::Rect(
-						static_cast<int16>(pos.x - 2), static_cast<int16>(pos.y - 2),
-						static_cast<int16>(pos.x + 22), static_cast<int16>(pos.y + 32)),
-					0xFFFF00);
+				_vm->_gfx->fillRect(screen, Common::Rect32(pos.x - 2, pos.y - 2, pos.x + 22, pos.y + 32), 0xFFFF00);
 			}
 
 			_vm->_gfx->drawZoombini(screen, _zoombiniAnimation, z->_traits, pos, 0, 0);
@@ -859,7 +863,7 @@ EventHandleResult PuzzleWaterslide::onLButtonDown(const Common::Point &pos) {
 	}
 
 	// Check if clicked on staging area zoombini
-	static const Common::Point32 kStagePos(50, 450);
+	static constexpr Common::Point32 kStagePos = Common::Point32(50, 450);
 	int idx = 0;
 
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {

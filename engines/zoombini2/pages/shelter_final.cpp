@@ -31,16 +31,25 @@
 
 namespace Zoombini2 {
 
-const Common::Point32 ShelterFinal::kDancingBooliePos[kDancingBoolieCount] = {
-	Common::Point32(100, 530),
-	Common::Point32(300, 530),
-	Common::Point32(400, 530),
-};
-const Common::Point32 ShelterFinal::kDecorativeZoombiniPos[kDecorativeZoombiniCount] = {
-	Common::Point32(500, 550),
-	Common::Point32(200, 550),
-};
-const int ShelterFinal::kDecorativeZoombiniCells[kDecorativeZoombiniCount] = {77, 99};
+constexpr const char *ShelterFinal::kBackgroundPath;
+constexpr const char *ShelterFinal::kFullBigBoolPath;
+constexpr const char *ShelterFinal::kRevealBigBoolPath;
+constexpr const char *ShelterFinal::kDancingBooliePath;
+constexpr const char *ShelterFinal::kBoolDancePath;
+constexpr const char *ShelterFinal::kRevealFlare1Path;
+constexpr const char *ShelterFinal::kRevealFlare2Path;
+constexpr const char *ShelterFinal::kFireworkPaths[kFireworkCount];
+constexpr const char *ShelterFinal::kZoombiniAnimationPath;
+constexpr const char *ShelterFinal::kWalkingZoombiniAnimationPath;
+constexpr const char *ShelterFinal::kMusicPath;
+constexpr const char *ShelterFinal::kOpeningSpeechPath;
+constexpr const char *ShelterFinal::kClosingSpeechPath;
+constexpr const char *ShelterFinal::kFirstAmbientSoundPath;
+constexpr const char *ShelterFinal::kAmbientSoundFormat;
+
+constexpr Common::Point32 ShelterFinal::kDancingBooliePos[kDancingBoolieCount];
+constexpr Common::Point32 ShelterFinal::kDecorativeZoombiniPos[kDecorativeZoombiniCount];
+constexpr int ShelterFinal::kDecorativeZoombiniCells[kDecorativeZoombiniCount];
 
 ShelterFinal::ShelterFinal(Zoombini2Engine *vm)
 	: ShelterBase(vm) {
@@ -86,54 +95,49 @@ void ShelterFinal::init() {
 	_vm->clearGlobalZoombinis();
 
 	_background = new BitBlock(_vm);
-	if (!_background->load(Common::Path("bmp/final/big BOOL"))) {
+	if (!_background->load(Common::Path(kBackgroundPath))) {
 		warning("BooliewoodFinalPage: Failed to load big BOOL background");
 		delete _background;
 		_background = nullptr;
 	}
 	_fullBigBool = new BitBlock(_vm);
-	if (!_fullBigBool->load(Common::Path("bmp/final/thefullbigbool"))) {
+	if (!_fullBigBool->load(Common::Path(kFullBigBoolPath))) {
 		warning("BooliewoodFinalPage: Failed to load thefullbigbool overlay");
 		delete _fullBigBool;
 		_fullBigBool = nullptr;
 	}
 	_revealBigBool = new RleBlock(_vm);
-	if (!_revealBigBool->loadFromFile(Common::Path("bmp/final/therealbigbool.rb"))) {
+	if (!_revealBigBool->loadFromFile(Common::Path(kRevealBigBoolPath))) {
 		delete _revealBigBool;
 		_revealBigBool = nullptr;
 	}
 
 	_dancingBoolie = new Animation(_vm);
-	if (!_dancingBoolie->loadFromFile(Common::Path("bmp/final/dancing_boolie.an"))) {
+	if (!_dancingBoolie->loadFromFile(Common::Path(kDancingBooliePath))) {
 		delete _dancingBoolie;
 		_dancingBoolie = nullptr;
 	}
 	_boolDance = new Animation(_vm);
-	if (!_boolDance->loadFromFile(Common::Path("bmp/final/booldance.an"))) {
+	if (!_boolDance->loadFromFile(Common::Path(kBoolDancePath))) {
 		delete _boolDance;
 		_boolDance = nullptr;
 	}
 	_revealFlare1 = new Animation(_vm);
-	if (!_revealFlare1->loadFromFile(Common::Path("bmp/aquacube/flare1.an"))) {
+	if (!_revealFlare1->loadFromFile(Common::Path(kRevealFlare1Path))) {
 		delete _revealFlare1;
 		_revealFlare1 = nullptr;
 	}
 	_revealFlare2 = new Animation(_vm);
-	if (!_revealFlare2->loadFromFile(Common::Path("bmp/aquacube/flare2.an"))) {
+	if (!_revealFlare2->loadFromFile(Common::Path(kRevealFlare2Path))) {
 		delete _revealFlare2;
 		_revealFlare2 = nullptr;
 	}
 
-	const char *fireworkPaths[kFireworkCount] = {
-		"bmp/final/FWBLUE.an",
-		"bmp/final/FWGREEN.an",
-		"bmp/final/FWRED.an",
-	};
 	const uint32 now = _vm->getGameTickCount();
 	for (int i = 0; i < kFireworkCount; i++) {
 		FireworkState &firework = _fireworks[i];
 		firework.animation = new Animation(_vm);
-		if (!firework.animation->loadFromFile(Common::Path(fireworkPaths[i]))) {
+		if (!firework.animation->loadFromFile(Common::Path(kFireworkPaths[i]))) {
 			delete firework.animation;
 			firework.animation = nullptr;
 			firework.active = false;
@@ -142,10 +146,10 @@ void ShelterFinal::init() {
 		firework.nextFrameTime = now + 40;
 	}
 
-	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/littleZomb.anm"), 50);
+	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path(kZoombiniAnimationPath), 50);
 	if (!_zoombiniAnimation)
 		warning("BooliewoodFinalPage: Failed to load littleZomb.anm");
-	_walkingZoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/attente/attenteZomb.anm"), 50);
+	_walkingZoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path(kWalkingZoombiniAnimationPath), 50);
 	if (!_walkingZoombiniAnimation)
 		warning("BooliewoodFinalPage: Failed to load attenteZomb.anm");
 	createDecorativeZoombinis();
@@ -160,18 +164,18 @@ void ShelterFinal::init() {
 
 	SoundManager *sound = _vm->getSoundManager();
 	if (sound) {
-		_musicId = sound->load(true, Common::Path("#sounds/music/Booliewood_Finale.wav"), true);
+		_musicId = sound->load(true, Common::Path(kMusicPath), true);
 		if (0 <= _musicId) {
 			sound->playLoop(_musicId);
 			sound->setVolume(_musicId, sound->_volumeMusic);
 		}
-		_openingSpeechId = sound->load(false, Common::Path("sounds/Fin11.wav"), false);
+		_openingSpeechId = sound->load(false, Common::Path(kOpeningSpeechPath), false);
 		if (0 <= _openingSpeechId)
 			sound->playWithVolume(_openingSpeechId, sound->_volumeSpeech);
-		_closingSpeechId = sound->load(false, Common::Path("sounds/INT11.17.wav"), false);
-		_ambientSoundIds[0] = sound->load(true, Common::Path("sounds/zbv42.5.wav"), false);
+		_closingSpeechId = sound->load(false, Common::Path(kClosingSpeechPath), false);
+		_ambientSoundIds[0] = sound->load(true, Common::Path(kFirstAmbientSoundPath), false);
 		for (int i = 1; i < kAmbientSoundCount; i++) {
-			const Common::String path = Common::String::format("sounds/blw22.%d.wav", i);
+			const Common::String path = Common::String::format(kAmbientSoundFormat, i);
 			_ambientSoundIds[i] = sound->load(true, Common::Path(path), false);
 		}
 	}

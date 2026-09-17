@@ -19,31 +19,44 @@
  *
  */
 
+#include "zoombini2/pages/puzzle_walloffleens.h"
 #include "common/debug.h"
 #include "common/system.h"
 #include "zoombini2/graphics.h"
 #include "zoombini2/scripts.h"
-#include "zoombini2/pages/puzzle_walloffleens.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
-const Size32 PuzzleWallOfFleens::kCellSize(52, 68);
+constexpr const char *PuzzleWallOfFleens::kCannonFormat;
+constexpr const char *PuzzleWallOfFleens::kCannonCachePath;
+constexpr const char *PuzzleWallOfFleens::kMirrorNormalPath;
+constexpr const char *PuzzleWallOfFleens::kMirrorGrisPath;
+constexpr const char *PuzzleWallOfFleens::kMirrorNoirPath;
+constexpr const char *PuzzleWallOfFleens::kMirrorFelurePath;
+constexpr const char *PuzzleWallOfFleens::kMirrorEmptyPath;
+constexpr const char *PuzzleWallOfFleens::kTuyerePath;
+constexpr const char *PuzzleWallOfFleens::kLevelIndicatorFormat;
+constexpr const char *PuzzleWallOfFleens::kLavaBubblePath;
+constexpr const char *PuzzleWallOfFleens::kMirrorExplodePath;
+constexpr const char *PuzzleWallOfFleens::kMusicPath;
+
+constexpr Size32 PuzzleWallOfFleens::kCellSize;
 
 // ============================================================================
 // Interaction timing in milliseconds.
 // ============================================================================
-static const uint32 kAimStepDelay = 200; // Cannon rotation: 200ms per step
-static const uint32 kFireDuration = 600; // Cannonball flight time
-static const uint32 kHitDelay = 1200;    // Show hit result
-static const uint32 kMissDelay = 1200;   // Show miss result
-static const uint32 kNextDelay = 800;    // Before next zoombini
-static const uint32 kDoneDelay = 3000;   // Before page transition
+static constexpr uint32 kAimStepDelay = 200; // Cannon rotation: 200ms per step
+static constexpr uint32 kFireDuration = 600; // Cannonball flight time
+static constexpr uint32 kHitDelay = 1200;    // Show hit result
+static constexpr uint32 kMissDelay = 1200;   // Show miss result
+static constexpr uint32 kNextDelay = 800;    // Before next zoombini
+static constexpr uint32 kDoneDelay = 3000;   // Before page transition
 
 // Grid origins indexed by level.
-static const Common::Point32 kGridOrigins[] = {
+static constexpr Common::Point32 kGridOrigins[] = {
 	Common::Point32(0, 0),     // unused (level 0)
 	Common::Point32(380, 200), // Level one fallback; normal play cycles panel origins.
 	Common::Point32(200, 7),   // Level two uses a 9 by 6 grid.
@@ -52,7 +65,7 @@ static const Common::Point32 kGridOrigins[] = {
 };
 
 // Six panel origins cycled by level one.
-static const Common::Point32 kLevel1PanelOrigins[] = {
+static constexpr Common::Point32 kLevel1PanelOrigins[] = {
 	Common::Point32(182, 88),  // panel 0
 	Common::Point32(344, 88),  // panel 1
 	Common::Point32(506, 87),  // panel 2
@@ -62,7 +75,7 @@ static const Common::Point32 kLevel1PanelOrigins[] = {
 };
 
 // Cannon muzzle endpoint indexed by angle.
-static const Common::Point32 kCannonMuzzlePos[] = {
+static constexpr Common::Point32 kCannonMuzzlePos[] = {
 	Common::Point32(500, 432), // angle 0
 	Common::Point32(500, 432), // angle 1
 	Common::Point32(480, 421), // angle 2
@@ -74,11 +87,11 @@ static const Common::Point32 kCannonMuzzlePos[] = {
 	Common::Point32(379, 459), // angle 8
 };
 
-static const Common::Point32 kCannonDrawPos(385, 465);
-static const Common::Point32 kCannonCenterPos(470, 550);
+static constexpr Common::Point32 kCannonDrawPos = Common::Point32(385, 465);
+static constexpr Common::Point32 kCannonCenterPos = Common::Point32(470, 550);
 
 // Mirror allowances indexed by level.
-static const int kMirrorsPerLevel[] = {0, 12, 8, 6, 6};
+static constexpr int kMirrorsPerLevel[] = {0, 12, 8, 6, 6};
 
 // ============================================================================
 // Constructor / Destructor
@@ -117,44 +130,44 @@ PuzzleWallOfFleens::~PuzzleWallOfFleens() {
 void PuzzleWallOfFleens::loadResources() {
 	// Cannon angle sprites (canon00-08.rb)
 	for (int i = 0; i < kNumCannonAngles; i++) {
-		Common::Path path(Common::String::format("bmp/wall_of_fleens/canon0%d", i));
+		Common::Path path(Common::String::format(kCannonFormat, i));
 		_cannonImage[i] = new RleBlock(_vm);
 		_cannonImage[i]->loadFromFile(path);
 	}
 
 	// Cannon cache/cover sprite
 	_cannonCache = new RleBlock(_vm);
-	_cannonCache->loadFromFile(Common::Path("bmp/wall_of_fleens/canon_cache"));
+	_cannonCache->loadFromFile(Common::Path(kCannonCachePath));
 
 	// Mirror state sprites
 	_mirrorImage[kMirrorNormal00] = new RleBlock(_vm);
-	_mirrorImage[kMirrorNormal00]->loadFromFile(Common::Path("bmp/wall_of_fleens/mirror_nomal"));
+	_mirrorImage[kMirrorNormal00]->loadFromFile(Common::Path(kMirrorNormalPath));
 
 	_mirrorImage[kMirrorGris01] = new RleBlock(_vm);
-	_mirrorImage[kMirrorGris01]->loadFromFile(Common::Path("bmp/wall_of_fleens/mirror_GRIS"));
+	_mirrorImage[kMirrorGris01]->loadFromFile(Common::Path(kMirrorGrisPath));
 
 	_mirrorImage[kMirrorNoir02] = new RleBlock(_vm);
-	_mirrorImage[kMirrorNoir02]->loadFromFile(Common::Path("bmp/wall_of_fleens/mirror_NOIR"));
+	_mirrorImage[kMirrorNoir02]->loadFromFile(Common::Path(kMirrorNoirPath));
 
 	_mirrorImage[kMirrorFelure03] = new RleBlock(_vm);
-	_mirrorImage[kMirrorFelure03]->loadFromFile(Common::Path("bmp/wall_of_fleens/mirror_felure"));
+	_mirrorImage[kMirrorFelure03]->loadFromFile(Common::Path(kMirrorFelurePath));
 
 	_mirrorImage[kMirrorEmpty05] = new RleBlock(_vm);
-	_mirrorImage[kMirrorEmpty05]->loadFromFile(Common::Path("bmp/wall_of_fleens/mirror_empty_tunnel"));
+	_mirrorImage[kMirrorEmpty05]->loadFromFile(Common::Path(kMirrorEmptyPath));
 
 	// Nozzle sprite
 	_tuyereImage = new RleBlock(_vm);
-	_tuyereImage->loadFromFile(Common::Path("bmp/wall_of_fleens/tuyere"));
+	_tuyereImage->loadFromFile(Common::Path(kTuyerePath));
 
 	// Level indicator sprites (LevelRED0-4)
 	for (int i = 0; i < kNumLevelIndicators; i++) {
-		Common::Path path(Common::String::format("bmp/wall_of_fleens/LevelRED%d", i));
+		Common::Path path(Common::String::format(kLevelIndicatorFormat, i));
 		_levelRedImage[i] = new RleBlock(_vm);
 		_levelRedImage[i]->loadFromFile(path);
 	}
 
 	// Lava bubble animation (background decoration)
-	Common::Path lavaBubblePath("bmp/wall_of_fleens/lava_bubble");
+	Common::Path lavaBubblePath(kLavaBubblePath);
 	_lavaBubbleAnim = new Animation(_vm);
 	if (!_lavaBubbleAnim->loadFromFile(lavaBubblePath)) {
 		delete _lavaBubbleAnim;
@@ -163,7 +176,7 @@ void PuzzleWallOfFleens::loadResources() {
 	}
 
 	// Mirror explode animation (breaking effect)
-	Common::Path mirrorExplodePath("bmp/wall_of_fleens/mirror_explode");
+	Common::Path mirrorExplodePath(kMirrorExplodePath);
 	_mirrorExplodeAnim = new Animation(_vm);
 	if (!_mirrorExplodeAnim->loadFromFile(mirrorExplodePath)) {
 		delete _mirrorExplodeAnim;
@@ -182,7 +195,7 @@ void PuzzleWallOfFleens::init() {
 
 	// Start the Magic Mirrors music.
 	if (SoundManager *snd = _vm->getSoundManager()) {
-		_musicId = snd->load(true, Common::Path("#sounds/music/05-BB01.wav"), true);
+		_musicId = snd->load(true, Common::Path(kMusicPath), true);
 		if (_musicId >= 0) {
 			snd->playLoop(_musicId);
 			snd->setVolume(_musicId, snd->_volumeMusic);
@@ -349,10 +362,8 @@ void PuzzleWallOfFleens::onUpdate() {
 		} else {
 			// Interpolate cannonball position
 			_cannonballProgress = static_cast<int>(elapsed * 1000 / kFireDuration);
-			_cannonballPos.x = _cannonballStartPos.x
-				+ (_cannonballEndPos.x - _cannonballStartPos.x) * _cannonballProgress / 1000;
-			_cannonballPos.y = _cannonballStartPos.y
-				+ (_cannonballEndPos.y - _cannonballStartPos.y) * _cannonballProgress / 1000;
+			_cannonballPos.x = _cannonballStartPos.x + (_cannonballEndPos.x - _cannonballStartPos.x) * _cannonballProgress / 1000;
+			_cannonballPos.y = _cannonballStartPos.y + (_cannonballEndPos.y - _cannonballStartPos.y) * _cannonballProgress / 1000;
 		}
 		break;
 	}
@@ -594,8 +605,6 @@ void PuzzleWallOfFleens::onRenderContent(ManagedSurface32 *screen) {
 	drawMirrors(screen);
 	drawCannon(screen);
 	drawCannonball(screen);
-
-
 }
 
 void PuzzleWallOfFleens::onRenderForeground(ManagedSurface32 *screen) {

@@ -19,10 +19,10 @@
  *
  */
 
+#include "zoombini2/pages/puzzle_mysticmarsh.h"
 #include "common/debug.h"
 #include "zoombini2/graphics.h"
 #include "zoombini2/scripts.h"
-#include "zoombini2/pages/puzzle_mysticmarsh.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
@@ -40,40 +40,26 @@ namespace Zoombini2 {
 // ============================================================================
 
 // Launch-slot hit-test dimensions.
-static const Size32 kSlotHitSize(43, 50);
+static constexpr Size32 kSlotHitSize = Size32(43, 50);
 
 // Placement animation delay (ms)
-static const uint32 kPlaceDelay = 1000;
+static constexpr uint32 kPlaceDelay = 1000;
 
 // Completion delay before transitioning (ms)
-static const uint32 kDoneDelay = 2000;
+static constexpr uint32 kDoneDelay = 2000;
 
 // Minimum number of released Zoombinis required for success.
-static const int kMinFreed = 4;
+static constexpr int kMinFreed = 4;
 
-// Resource names for the 60 symbol slots.
-static const char *kSymbolNames[PuzzleMysticMarsh::kNumSymbols] = {
-	"S_DIV1", "S_DIV2", "S_DIV3", "S_DIV4",
-	"C_DIV1", "C_DIV2", "C_DIV3", "C_DIV4",
-	"RD_CY_DIV2", "DR_CY_DIV2", "UD_CY_DIV2",
-	"DU_CY_DIV2", "LR_CY_DIV2", "RL_CY_DIV2",
-	"LD_CONVERGER",
-	"TRIGGER1", "TRIGGER2", "TRIGGER3", "TRIGGER4",
-	"TRIGGER5", "TRIGGER6", "TRIGGER7",
-	"UR_TCY_DIV2", "RU_TCY_DIV2", "RD_TCY_DIV2",
-	"DR_TCY_DIV2", "LR_TCY_DIV2", "RL_TCY_DIV2",
-	"LL_TCY_DIV3", "LU_TCY_DIV3", "LD_TCY_DIV3",
-	"RR_TCY_DIV3", "RU_TCY_DIV3", "RD_TCY_DIV3",
-	"UU_TCY_DIV3", "UL_TCY_DIV3", "UR_TCY_DIV3",
-	"TS_SPOT1", "TS_SPOT2", "TS_SPOT3", "TS_SPOT4",
-	"TS_SPOT5", "TS_SPOT6", "TS_SPOT7",
-	"TOURBI",
-	"EDGE",
-	"ENTRY1", "ENTRY2",
-	// The remaining resource slots intentionally reuse the straight divider.
-	"S_DIV1", "S_DIV1", "S_DIV1", "S_DIV1",
-	"S_DIV1", "S_DIV1", "S_DIV1", "S_DIV1",
-	"S_DIV1", "S_DIV1", "S_DIV1", "S_DIV1"};
+constexpr const char *PuzzleMysticMarsh::kMusicPath;
+constexpr const char *PuzzleMysticMarsh::kBackgroundFormat;
+constexpr const char *PuzzleMysticMarsh::kCraterPath;
+constexpr const char *PuzzleMysticMarsh::kBubbleCraterPath;
+constexpr const char *PuzzleMysticMarsh::kTourbiPath;
+constexpr const char *PuzzleMysticMarsh::kTraitFormat;
+constexpr const char *PuzzleMysticMarsh::kSymbolFormat;
+constexpr const char *PuzzleMysticMarsh::kBubbleFormat;
+constexpr const char *PuzzleMysticMarsh::kSymbolNames[kNumSymbols];
 
 PuzzleMysticMarsh::PuzzleMysticMarsh(Zoombini2Engine *vm)
 	: PuzzleBase(vm, kPageMysticMarsh) {
@@ -106,7 +92,7 @@ void PuzzleMysticMarsh::init() {
 
 	// Start the Bubble Bumpers music.
 	if (SoundManager *snd = _vm->getSoundManager()) {
-		_musicId = snd->load(true, Common::Path("#sounds/music/04-BS01.wav"), true);
+		_musicId = snd->load(true, Common::Path(kMusicPath), true);
 		if (_musicId >= 0) {
 			snd->playLoop(_musicId);
 			snd->setVolume(_musicId, snd->_volumeMusic);
@@ -151,7 +137,7 @@ void PuzzleMysticMarsh::init() {
 	}
 
 	// Reload background with level-appropriate variant
-	const Common::Path bgPath(Common::String::format("#bmp/mystic_marsh/background%d", _bgIndex));
+	const Common::Path bgPath(Common::String::format(kBackgroundFormat, _bgIndex));
 	if (!loadPrimaryLayerBackground(bgPath)) {
 		debug(1, "PuzzleMysticMarsh: Failed to load background%d", _bgIndex);
 	}
@@ -185,7 +171,7 @@ void PuzzleMysticMarsh::loadResources() {
 	loadBubbles();
 
 	// Load crater sprite
-	Common::Path craterPath("bmp/mystic_marsh/crater");
+	Common::Path craterPath(kCraterPath);
 	_craterImage = new RleBlock(_vm);
 	if (!_craterImage->loadFromFile(craterPath)) {
 		delete _craterImage;
@@ -193,7 +179,7 @@ void PuzzleMysticMarsh::loadResources() {
 	}
 
 	// Load BubbleCrater animation
-	Common::Path bubbleCraterPath("bmp/mystic_marsh/BubbleCrater");
+	Common::Path bubbleCraterPath(kBubbleCraterPath);
 	_bubbleCraterAnim = new Animation(_vm);
 	if (!_bubbleCraterAnim->loadFromFile(bubbleCraterPath)) {
 		delete _bubbleCraterAnim;
@@ -201,7 +187,7 @@ void PuzzleMysticMarsh::loadResources() {
 	}
 
 	// Load tourbi (whirlpool) animation
-	Common::Path tourbiPath("bmp/mystic_marsh/symbols/tourbi_anim");
+	Common::Path tourbiPath(kTourbiPath);
 	_tourbiAnim = new Animation(_vm);
 	if (!_tourbiAnim->loadFromFile(tourbiPath)) {
 		delete _tourbiAnim;
@@ -216,7 +202,7 @@ void PuzzleMysticMarsh::loadTraits() {
 	for (int f = 0; f < 4; f++) {
 		for (int v = 0; v < 5; v++) {
 			Common::Path traitPath(Common::String::format(
-				"bmp/mystic_marsh/traits/%d-%d", f + 1, v + 1));
+				kTraitFormat, f + 1, v + 1));
 			_traitImage[f][v] = new RleBlock(_vm);
 			if (!_traitImage[f][v]->loadFromFile(traitPath)) {
 				delete _traitImage[f][v];
@@ -230,7 +216,7 @@ void PuzzleMysticMarsh::loadSymbols() {
 	// Load symbol sprites from bmp/mystic_marsh/symbols/%s.bmp
 	for (int i = 0; i < kNumSymbols; i++) {
 		Common::Path symPath(Common::String::format(
-			"bmp/mystic_marsh/symbols/%s", kSymbolNames[i]));
+			kSymbolFormat, kSymbolNames[i]));
 		_symbolImage[i] = new RleBlock(_vm);
 		if (!_symbolImage[i]->loadFromFile(symPath)) {
 			delete _symbolImage[i];
@@ -243,7 +229,7 @@ void PuzzleMysticMarsh::loadBubbles() {
 	// Load bubble sprites: bubble1.bmp through bubble3.bmp
 	for (int i = 0; i < 3; i++) {
 		Common::Path bubblePath(Common::String::format(
-			"bmp/mystic_marsh/bubble%d", i + 1));
+			kBubbleFormat, i + 1));
 		_bubbleImage[i] = new RleBlock(_vm);
 		if (!_bubbleImage[i]->loadFromFile(bubblePath)) {
 			delete _bubbleImage[i];
@@ -283,7 +269,7 @@ void PuzzleMysticMarsh::generateRules() {
 	int numCraters = MAX(numZoombinis, 4);
 
 	// Place craters in a staggered pattern across the grid
-	static const int craterPositions[][2] = {
+	static constexpr int craterPositions[][2] = {
 		// {column, row}, distributed across the full grid.
 		{2, 3},
 		{5, 2},
@@ -296,7 +282,8 @@ void PuzzleMysticMarsh::generateRules() {
 		{4, 10},
 		{7, 9},
 		{10, 11},
-		{13, 10}};
+		{13, 10},
+	};
 
 	int maxCraters = MIN(numCraters, 12);
 
@@ -346,11 +333,7 @@ void PuzzleMysticMarsh::buildSlots() {
 			const Common::Point32 cellPos = _grid[idx].pos;
 			slot.pos = Common::Point32(cellPos.x - 25, cellPos.y - 10);
 
-			slot.hitbox = Common::Rect(
-				static_cast<int16>(cellPos.x - 8),                    // left
-				static_cast<int16>(cellPos.y + 52),                   // top
-				static_cast<int16>(cellPos.x - 8 + kSlotHitSize.width),    // right
-				static_cast<int16>(cellPos.y + 52 + kSlotHitSize.height)); // bottom
+			slot.hitbox = Common::Rect32(cellPos.x - 8, cellPos.y + 52, cellPos.x - 8 + kSlotHitSize.width, cellPos.y + 52 + kSlotHitSize.height);
 
 			slot.zoombiniIdx = -1;
 			slot.occupied = false;
@@ -500,13 +483,11 @@ void PuzzleMysticMarsh::onUpdate() {
 
 void PuzzleMysticMarsh::onRenderBackground(ManagedSurface32 *screen) {
 	drawPrimaryPageLayer(screen);
-
 }
 
 void PuzzleMysticMarsh::onRenderContent(ManagedSurface32 *screen) {
 	// Draw grid elements
 	drawGrid(screen);
-
 }
 
 void PuzzleMysticMarsh::drawGrid(ManagedSurface32 *screen) {

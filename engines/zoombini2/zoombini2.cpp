@@ -19,6 +19,7 @@
  *
  */
 
+#include "common/callback.h"
 #include "common/config-manager.h"
 #include "common/debug.h"
 #include "common/error.h"
@@ -33,9 +34,11 @@
 #include "graphics/cursorman.h"
 #include "graphics/pixelformat.h"
 
+#include "zoombini2/console.h"
 #include "zoombini2/dialogs.h"
 #include "zoombini2/graphics.h"
 #include "zoombini2/metaengine.h"
+#include "zoombini2/pages/dialog_debug.h"
 #include "zoombini2/pages/dialog_msgbox.h"
 #include "zoombini2/pages/interactive_base.h"
 #include "zoombini2/pages/interactive_map.h"
@@ -179,9 +182,11 @@ Zoombini2Engine::~Zoombini2Engine() {
 	clearZoombiniAnimationCache();
 
 	delete _cursorSprite;
+	delete _interactiveCursorSprite;
 	delete _gameState;
 	delete _sidebar;
 	delete _msgBoxDialog;
+	delete _debugDialog;
 	delete _soundManager;
 	delete _gfx;
 	delete _screen;
@@ -304,8 +309,41 @@ void Zoombini2Engine::stopMapMusic() {
 	_mapMusicId = -1;
 }
 
+/**
+ * Gate an Alt+F4 or window-close request like the original WM_CLOSE handler.
+ * The original drains pending input, then swallows the close without a
+ * dialog while a Help modal is active, while the credits page is active, or
+ * while the shared message box is open; otherwise it opens the shared quit
+ * confirmation. Alt+F4 reaches this handler as EVENT_QUIT through the
+ * backend. The debug dialog has no original counterpart; it suppresses the
+ * confirmation like any other modal so two engine modals never stack.
+ */
+void Zoombini2Engine::handleQuitRequest() {
+	if (getCurrentPageId() == kPageCredits)
+		return;
+
+	g_system->getEventManager()->resetQuit();
+	_pendingPageEvents.clear();
+
+	if ((_sidebar && _sidebar->hasActiveDialog()) || (_msgBoxDialog && _msgBoxDialog->isActive()) ||
+		(_debugDialog && _debugDialog->isActive()))
+		return;
+
+	requestQuitConfirmation();
+}
+
+void Zoombini2Engine::requestQuitConfirmation() {
+	_msgBoxDialog->request(Common::Path("bmp/menu/Quit_panel_text_quit"),
+						   new Common::Callback<Zoombini2Engine, DialogMsgBoxButton>(this, &Zoombini2Engine::handleQuitConfirmation));
+}
+
+void Zoombini2Engine::handleQuitConfirmation(DialogMsgBoxButton button) {
+	if (button == DialogMsgBoxButton::kOkay01)
+		requestPageChange(kPageCredits);
+}
+
 bool Zoombini2Engine::hasFeature(EngineFeature f) const {
-	return f == kSupportsReturnToLauncher || f == kSupportsChangingOptionsDuringRuntime;
+	return f == kSupportsReturnToLauncher || f == kSupportsChangingOptionsDuringRuntime || f == kSupportsQuitDialogOverride;
 }
 
 void Zoombini2Engine::syncSoundSettings() {
@@ -345,6 +383,10 @@ Common::Error Zoombini2Engine::run() {
 	// Initialize the shared Help, Map, and Go controls.
 	_sidebar = new Sidebar(this);
 	_msgBoxDialog = new DialogMsgBox(this);
+	_debugDialog = new DialogDebug(this);
+
+	// Attach the debug console before the main loop starts.
+	setDebugger(new Zoombini2Console(this));
 
 	_startTime = g_system->getMillis();
 	_cachedGameTickCount = 0;
@@ -385,10 +427,30 @@ void Zoombini2Engine::initCursor() {
  * the game screen when the window is larger than 800x600.
  */
 void Zoombini2Engine::registerCursorWithCursorMan() {
-	if (!_cursorSprite || !_cursorSprite->isValid())
+	registerCursorSpriteWithCursorMan(_cursorSprite);
+}
+
+void Zoombini2Engine::setHoverCursorActive(bool active) {
+	if (active && !_interactiveCursorSprite) {
+		_interactiveCursorSprite = new RleBlock(this);
+		if (!_interactiveCursorSprite->loadFromFile(Common::Path("bmp/cursor/cursor02.rb"))) {
+			warning("Zoombini2Engine: Failed to load interactive cursor sprite");
+			delete _interactiveCursorSprite;
+			_interactiveCursorSprite = nullptr;
+			return;
+		}
+	}
+	if (!_interactiveCursorSprite || active == _hoverCursorActive)
+		return;
+	_hoverCursorActive = active;
+	registerCursorSpriteWithCursorMan(active ? _interactiveCursorSprite : _cursorSprite);
+}
+
+void Zoombini2Engine::registerCursorSpriteWithCursorMan(const RleBlock *sprite) {
+	if (!sprite || !sprite->isValid())
 		return;
 
-	const Size32 size = _cursorSprite->getSize();
+	const Size32 size = sprite->getSize();
 	if (size.width <= 0 || size.height <= 0)
 		return;
 
@@ -412,12 +474,12 @@ void Zoombini2Engine::registerCursorWithCursorMan() {
 	// Render onto black background
 	ManagedSurface32 blackSurf(size, Graphics::PixelFormat(4, 8, 8, 8, 8, 16, 8, 0, 24));
 	blackSurf.fillRect(Common::Rect(size.width, size.height), blackSurf.format.ARGBToColor(255, 0, 0, 0));
-	_cursorSprite->drawToScreen(&blackSurf, Common::Point32(0, 0), _alphaBlendLUT);
+	sprite->drawToScreen(&blackSurf, Common::Point32(0, 0), _alphaBlendLUT);
 
 	// Render onto white background
 	ManagedSurface32 whiteSurf(size, Graphics::PixelFormat(4, 8, 8, 8, 8, 16, 8, 0, 24));
 	whiteSurf.fillRect(Common::Rect(size.width, size.height), whiteSurf.format.ARGBToColor(255, 255, 255, 255));
-	_cursorSprite->drawToScreen(&whiteSurf, Common::Point32(0, 0), _alphaBlendLUT);
+	sprite->drawToScreen(&whiteSurf, Common::Point32(0, 0), _alphaBlendLUT);
 
 	// Derive alpha from the two renders:
 	// For premultiplied alpha compositing: result = src_premult + invAlpha * dst / 255
@@ -499,6 +561,7 @@ void Zoombini2Engine::refreshEngineSettings() {
 	_useGreedyWaterslidePairing = ConfMan.getBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing);
 	_useCachedFrameTime = ConfMan.getBool(::Zoombini2MetaEngine::kConfigCachedFrameTime);
 	_useFloatingPointPaths = ConfMan.getBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths);
+	_enhancedKbdShortcuts = ConfMan.getBool(::Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts);
 	if (!_debugHotkeysEnabled) {
 		_debugCompletionKeyDown = false;
 		_debugOverlayKeyDown = false;
@@ -576,6 +639,8 @@ void Zoombini2Engine::processEvents() {
 	while (g_system->getEventManager()->pollEvent(event)) {
 		switch (event.type) {
 		case Common::EVENT_QUIT:
+			handleQuitRequest();
+			break;
 		case Common::EVENT_RETURN_TO_LAUNCHER:
 			return;
 		case Common::EVENT_MAINMENU:
@@ -639,8 +704,9 @@ void Zoombini2Engine::applyPendingPageChange() {
 
 bool Zoombini2Engine::dispatchPageEvents() {
 	const bool msgBoxWasActive = _msgBoxDialog && _msgBoxDialog->isActive();
+	const bool debugDialogWasActive = _debugDialog && _debugDialog->isActive();
 	const bool sidebarDialogWasActive = _sidebar && _sidebar->hasActiveDialog();
-	const bool sharedDialogWasActive = msgBoxWasActive || sidebarDialogWasActive;
+	const bool sharedDialogWasActive = msgBoxWasActive || debugDialogWasActive || sidebarDialogWasActive;
 	bool modalInputBlocked = sharedDialogWasActive;
 
 	// Event dispatch temporarily replays each event's mouse state. The sidebar then polls the final backend state for this frame.
@@ -651,9 +717,10 @@ bool Zoombini2Engine::dispatchPageEvents() {
 			break;
 
 		const bool msgBoxEventWasActive = _msgBoxDialog && _msgBoxDialog->isActive();
+		const bool debugDialogEventWasActive = _debugDialog && _debugDialog->isActive();
 		const bool sidebarDialogEventWasActive = _sidebar && _sidebar->hasActiveDialog();
 		const bool pageDialogWasActive = _currentPage->hasActiveDialog();
-		modalInputBlocked = modalInputBlocked || msgBoxEventWasActive || sidebarDialogEventWasActive;
+		modalInputBlocked = modalInputBlocked || msgBoxEventWasActive || debugDialogEventWasActive || sidebarDialogEventWasActive;
 
 		if (event.type == Common::EVENT_LBUTTONDOWN || event.type == Common::EVENT_LBUTTONUP || event.type == Common::EVENT_MOUSEMOVE)
 			_mousePos = event.mouse;
@@ -665,15 +732,18 @@ bool Zoombini2Engine::dispatchPageEvents() {
 		EventHandleResult result = EventHandleResult::kPassthrough;
 		if (msgBoxEventWasActive)
 			result = _msgBoxDialog->handleEvent(event);
+		else if (debugDialogEventWasActive)
+			result = _debugDialog->handleEvent(event);
 		else if (_sidebar)
 			result = _sidebar->handleEvent(event);
 		if (result == EventHandleResult::kPassthrough && !modalInputBlocked)
 			_currentPage->handleEvent(event);
 
 		const bool msgBoxEventIsActive = _msgBoxDialog && _msgBoxDialog->isActive();
+		const bool debugDialogEventIsActive = _debugDialog && _debugDialog->isActive();
 		const bool sidebarDialogEventIsActive = _sidebar && _sidebar->hasActiveDialog();
-		modalInputBlocked = modalInputBlocked || msgBoxEventIsActive || sidebarDialogEventIsActive;
-		if ((msgBoxEventWasActive && !msgBoxEventIsActive) || (sidebarDialogEventWasActive && !sidebarDialogEventIsActive) ||
+		modalInputBlocked = modalInputBlocked || msgBoxEventIsActive || debugDialogEventIsActive || sidebarDialogEventIsActive;
+		if ((msgBoxEventWasActive && !msgBoxEventIsActive) || (debugDialogEventWasActive && !debugDialogEventIsActive) || (sidebarDialogEventWasActive && !sidebarDialogEventIsActive) ||
 			(pageDialogWasActive && !_currentPage->hasActiveDialog()))
 			break;
 	}
@@ -692,15 +762,47 @@ void Zoombini2Engine::drawFrame() {
 	applyDebugPuzzleCompletion();
 	const bool sharedDialogWasActive = dispatchPageEvents();
 	const bool msgBoxActive = _msgBoxDialog && _msgBoxDialog->isActive();
+	const bool debugDialogActive = _debugDialog && _debugDialog->isActive();
 	const bool sidebarDialogActive = _sidebar && _sidebar->hasActiveDialog();
-	if (!sharedDialogWasActive && !msgBoxActive && !sidebarDialogActive)
+	const bool pageRendered = !sharedDialogWasActive && !msgBoxActive && !debugDialogActive && !sidebarDialogActive;
+	if (pageRendered)
 		_currentPage->onFrame(_screen, _nextPageId == kPageNone);
 
 	// The shared sidebar polls the final frame mouse state before drawing its controls.
-	if (_sidebar && !msgBoxActive)
+	if (_sidebar && !msgBoxActive && !debugDialogActive)
 		_sidebar->drawAndHandleInput(_screen, _nextPageId == kPageNone);
 	if (msgBoxActive)
 		_msgBoxDialog->render(_screen);
+	if (debugDialogActive)
+		_debugDialog->render(_screen);
+	updateDragOverlay();
+}
+
+const ZoombiniRunner *Zoombini2Engine::getDraggedGlobalZoombini() const {
+	for (uint i = 0; i < _globalZoombinis.size(); i++) {
+		const ZoombiniRunner *zoombini = _globalZoombinis[i];
+		if (zoombini && zoombini->_dragging)
+			return zoombini;
+	}
+	return nullptr;
+}
+
+void Zoombini2Engine::updateDragOverlay() {
+	const ZoombiniRunner *dragged = getDraggedGlobalZoombini();
+	const bool dragging = dragged != nullptr;
+	if (_cursorVisible == dragging) {
+		_cursorVisible = !dragging;
+		CursorMan.showMouse(_cursorVisible);
+	}
+	if (!dragging || !_screen)
+		return;
+	if (_msgBoxDialog && _msgBoxDialog->isActive())
+		return;
+	if (_debugDialog && _debugDialog->isActive())
+		return;
+	if (!_gfx)
+		return;
+	_gfx->drawDragNameTooltip(_screen, Common::String(dragged->_name));
 }
 
 void Zoombini2Engine::presentFrame() {
@@ -738,10 +840,15 @@ void Zoombini2Engine::mainGameLoop() {
 void Zoombini2Engine::destroyCurrentPage() {
 	if (_msgBoxDialog)
 		_msgBoxDialog->close();
+	if (_debugDialog)
+		_debugDialog->close();
 	if (_currentPage) {
 		delete _currentPage;
 		_currentPage = nullptr;
 	}
+	// Reset the shared page-layer collection so the replacement page starts empty.
+	if (_gfx)
+		_gfx->clearPageLayers();
 	// Clear screen on page destroy to prevent stale content showing
 	// when transitioning to a new page that uses double buffering.
 	if (_screen)

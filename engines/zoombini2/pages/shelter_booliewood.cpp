@@ -23,69 +23,29 @@
 #include "common/str.h"
 
 #include "zoombini2/graphics.h"
-#include "zoombini2/scripts.h"
 #include "zoombini2/pages/shelter_booliewood.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
-const ShelterBooliewood::SeatDefinition ShelterBooliewood::kSeatDefinitions[kNumSeats] = {
-	{Common::Point32(148, 459), 402, 0},
-	{Common::Point32(168, 479), 422, 1},
-	{Common::Point32(598, 490), 958, 1},
-	{Common::Point32(1014, 383), 1113, 1},
-	{Common::Point32(1060, 481), 1124, 2},
-	{Common::Point32(1123, 383), 1224, 0},
-	{Common::Point32(1144, 403), 1215, 1},
-	{Common::Point32(1246, 467), 1316, 2},
-	{Common::Point32(1283, 487), 1343, 5},
-	{Common::Point32(1440, 427), 1490, 1},
-	{Common::Point32(1543, 480), 1620, 2},
-	{Common::Point32(1623, 447), 1689, 1},
-	{Common::Point32(1856, 468), 2021, 2},
-	{Common::Point32(2101, 480), 2348, 2},
-	{Common::Point32(2468, 431), 2564, 1},
-	{Common::Point32(2620, 475), 2775, 1},
-	{Common::Point32(2764, 490), 2869, 1},
-	{Common::Point32(2888, 475), 2977, 2},
-	{Common::Point32(3047, 450), 3121, 0},
-	{Common::Point32(3121, 410), 3313, 1},
-	{Common::Point32(3254, 475), 3335, 0},
-	{Common::Point32(3416, 530), 3783, 1},
-	{Common::Point32(3854, 415), 3973, 0},
-};
+constexpr const char *ShelterBooliewood::kAttractionPaths[];
+constexpr const char *ShelterBooliewood::kBackgroundPath;
+constexpr const char *ShelterBooliewood::kSeatedAnimationPath;
+constexpr const char *ShelterBooliewood::kWalkingZoombiniAnimationPath;
+constexpr const char *ShelterBooliewood::kContentMarkerPath;
+constexpr const char *ShelterBooliewood::kPascontentMarkerPath;
+constexpr const char *ShelterBooliewood::kWalkingAnimationPath;
+constexpr const char *ShelterBooliewood::kWaitingAnimationPath;
+constexpr const char *ShelterBooliewood::kCrowdRouteFormat;
+constexpr const char *ShelterBooliewood::kMusicPath;
+constexpr const char *ShelterBooliewood::kIntroSpeechPath;
+constexpr const char *ShelterBooliewood::kAmbientSpeechFormat;
 
-const char *const ShelterBooliewood::kCrowdPattern[27] = {
-	"00000111111111100000",
-	"00011111111111111000",
-	"00111111111111111100",
-	"01111111111111111100",
-	"01111111111111111100",
-	"11111222111222111000",
-	"11112222212222211000",
-	"11112212212212211000",
-	"01112212212212211000",
-	"01112222212222211000",
-	"00111222211222111100",
-	"00111111111111111100",
-	"00011111111112211110",
-	"00001222222222211110",
-	"00001122222222111111",
-	"00011112222221111111",
-	"00011111222211111111",
-	"00111111111111111111",
-	"00111111111111111110",
-	"00111111111111111100",
-	"00000222000222000000",
-	"00000222000222100000",
-	"00001111101111110000",
-	"00012211101112221000",
-	"00122211101112221100",
-	"01111111000111111110",
-	"01111110000001111110",
-};
+constexpr ShelterBooliewood::SeatDefinition ShelterBooliewood::kSeatDefinitions[kNumSeats];
+constexpr const char *ShelterBooliewood::kCrowdPattern[27];
 
 ShelterBooliewood::ShelterBooliewood(Zoombini2Engine *vm)
 	: ShelterBase(vm) {
@@ -139,26 +99,26 @@ void ShelterBooliewood::init() {
 		_developmentStage = 1;
 
 	_background = new BitBlock(_vm);
-	if (!_background->load(Common::Path("#bmp/booliewood/background"))) {
+	if (!_background->load(Common::Path(kBackgroundPath))) {
 		warning("BooliewoodPage: Failed to load background");
 		delete _background;
 		_background = nullptr;
 	}
 
-	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/littleZomb.anm"), 50);
+	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path(kSeatedAnimationPath), 50);
 	if (!_zoombiniAnimation)
 		warning("BooliewoodPage: Failed to load littleZomb.anm");
-	_walkingZoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/attente/attenteZomb.anm"), 50);
+	_walkingZoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path(kWalkingZoombiniAnimationPath), 50);
 	if (!_walkingZoombiniAnimation)
 		warning("BooliewoodPage: Failed to load attenteZomb.anm");
 
 	_contentMarker = new RleBlock(_vm);
-	if (!_contentMarker->loadFromFile(Common::Path("bmp/booliewood/piti_bool/content.rb"))) {
+	if (!_contentMarker->loadFromFile(Common::Path(kContentMarkerPath))) {
 		delete _contentMarker;
 		_contentMarker = nullptr;
 	}
 	_pascontentMarker = new RleBlock(_vm);
-	if (!_pascontentMarker->loadFromFile(Common::Path("bmp/booliewood/piti_bool/pascontent.rb"))) {
+	if (!_pascontentMarker->loadFromFile(Common::Path(kPascontentMarkerPath))) {
 		delete _pascontentMarker;
 		_pascontentMarker = nullptr;
 	}
@@ -171,19 +131,19 @@ void ShelterBooliewood::init() {
 
 	SoundManager *sound = _vm->getSoundManager();
 	if (sound) {
-		_musicId = sound->load(true, Common::Path("#sounds/music/Booliewood_Level1.wav"), true);
+		_musicId = sound->load(true, Common::Path(kMusicPath), true);
 		if (0 <= _musicId) {
 			sound->playLoop(_musicId);
 			sound->setVolume(_musicId, sound->_volumeMusic);
 		}
 		if (firstVisit) {
-			_introSpeechId = sound->load(false, Common::Path("sounds/zbv21.2.wav"), false);
+			_introSpeechId = sound->load(false, Common::Path(kIntroSpeechPath), false);
 			if (0 <= _introSpeechId) {
 				sound->playWithVolume(_introSpeechId, sound->_volumeSpeech);
 			}
 		}
 		for (int i = 0; i < kAmbientSpeechCount; i++) {
-			const Common::String path = Common::String::format("sounds/blw22.%d.wav", i + 1);
+			const Common::String path = Common::String::format(kAmbientSpeechFormat, i + 1);
 			_ambientSpeechIds[i] = sound->load(false, Common::Path(path), false);
 		}
 	}
@@ -321,10 +281,6 @@ ZoombiniRunner *ShelterBooliewood::createHistoricalZoombini(int32 traitHash) {
 }
 
 void ShelterBooliewood::loadAttractions(uint32 now) {
-	const char *paths[kAttractionCount] = {
-		"bmp/booliewood/atraction_ourson_rail1.an", "bmp/booliewood/atraction_ourson_rail2.an", "bmp/booliewood/atraction_ourson_rail3.an",
-		"bmp/booliewood/atraction_horror_move_lev3.an", "bmp/booliewood/atraction_horror_cils_lev3.an",
-		"bmp/booliewood/atraction_horror_fire_lev2.an", "bmp/booliewood/atraction_mushroom_lights.an"};
 	const Common::Point32 attractionPos[kAttractionCount] = {
 		Common::Point32(1734, 195), Common::Point32(1829, 79), Common::Point32(2197, 90), Common::Point32(670, 347),
 		Common::Point32(656, 231), Common::Point32(990, 271), Common::Point32(2639, 167)};
@@ -336,7 +292,7 @@ void ShelterBooliewood::loadAttractions(uint32 now) {
 		attraction.active = minimumStages[i] <= _developmentStage && (i == 0 || 3 <= i);
 		if (minimumStages[i] <= _developmentStage) {
 			attraction.animation = new Animation(_vm);
-			if (!attraction.animation->loadFromFile(Common::Path(paths[i]))) {
+			if (!attraction.animation->loadFromFile(Common::Path(kAttractionPaths[i]))) {
 				delete attraction.animation;
 				attraction.animation = nullptr;
 				attraction.active = false;
@@ -380,19 +336,19 @@ uint32 ShelterBooliewood::getAttractionFrameDelay(int attractionIndex, int frame
 
 void ShelterBooliewood::loadCrowdActors(uint32 now) {
 	_walkingAnimation = new Animation(_vm);
-	if (!_walkingAnimation->loadFromFile(Common::Path("bmp/boolies/marche.an"))) {
+	if (!_walkingAnimation->loadFromFile(Common::Path(kWalkingAnimationPath))) {
 		delete _walkingAnimation;
 		_walkingAnimation = nullptr;
 	}
 	_waitingAnimation = new Animation(_vm);
-	if (!_waitingAnimation->loadFromFile(Common::Path("bmp/boolies/attend.an"))) {
+	if (!_waitingAnimation->loadFromFile(Common::Path(kWaitingAnimationPath))) {
 		delete _waitingAnimation;
 		_waitingAnimation = nullptr;
 	}
 
 	for (int i = 0; i < kCrowdActorCount; i++) {
 		CrowdActorState &actor = _crowdActors[i];
-		const Common::String path = Common::String::format("bmp/booliewood/path%d.pat", i + 1);
+		const Common::String path = Common::String::format(kCrowdRouteFormat, i + 1);
 		actor.path = PathObject::loadFromPAT(_vm, Common::Path(path));
 		if (actor.path && !actor.path->segments.empty()) {
 			const CurveSegment *first = actor.path->segments[0];
@@ -585,8 +541,7 @@ void ShelterBooliewood::drawCrowdActors(ManagedSurface32 *screen) const {
 	}
 }
 
-void ShelterBooliewood::drawZoombiniInPanorama(const ZoombiniRunner &zoombini, const ZoombiniAnimation *animation, int cell, int animationFrame,
-										 const Common::Point32 &pos, ManagedSurface32 *screen) const {
+void ShelterBooliewood::drawZoombiniInPanorama(const ZoombiniRunner &zoombini, const ZoombiniAnimation *animation, int cell, int animationFrame, const Common::Point32 &pos, ManagedSurface32 *screen) const {
 	if (!animation)
 		return;
 	const int baseX = pos.x - _scrollX;

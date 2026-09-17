@@ -36,7 +36,7 @@ class RleBlock;
 
 /**
  * Magic Mirrors (Route3-2)
- * 
+ *
  * Find the real Fleens behind the strange mirrors.
  */
 class PuzzleWallOfFleens : public PuzzleBase {
@@ -60,25 +60,25 @@ public:
 	void applyDebugPuzzleCompletion() override;
 
 	/** Maximum number of grid columns. */
-	static const int kMaxGridCols = 12;
+	static constexpr int kMaxGridCols = 12;
 	/** Maximum number of grid rows. */
-	static const int kMaxGridRows = 6;
+	static constexpr int kMaxGridRows = 6;
 	/** Maximum Fleen capacity of the grid. */
-	static const int kMaxFleens = 72;
+	static constexpr int kMaxFleens = 72;
 	/** Number of cannon-angle visuals. */
-	static const int kNumCannonAngles = 9;
+	static constexpr int kNumCannonAngles = 9;
 	/** Number of mirror damage visuals. */
-	static const int kNumMirrorStates = 6;
+	static constexpr int kNumMirrorStates = 6;
 	/** Minimum number of released Zoombinis required for completion. */
-	static const int kMinFreed = 4;
+	static constexpr int kMinFreed = 4;
 	/** Spacing between grid cells. */
-	static const Size32 kCellSize;
+	static constexpr Size32 kCellSize = Size32(52, 68);
 	/** Maximum value of a visible trait. */
-	static const int kMaxTraitValue = 5;
+	static constexpr int kMaxTraitValue = 5;
 	/** Number of level-progress indicator visuals. */
-	static const int kNumLevelIndicators = 5;
+	static constexpr int kNumLevelIndicators = 5;
 	/** Number of grid panels cycled by level one. */
-	static const int kNumLevel1Panels = 6;
+	static constexpr int kNumLevel1Panels = 6;
 
 	/** Runtime phase of the Magic Mirrors interaction. */
 	enum GameState {
@@ -132,6 +132,20 @@ public:
 	};
 
 private:
+	/** Resource paths and formats used by the mirror scene. */
+	static constexpr const char *kCannonFormat = "bmp/wall_of_fleens/canon0%d";
+	static constexpr const char *kCannonCachePath = "bmp/wall_of_fleens/canon_cache";
+	static constexpr const char *kMirrorNormalPath = "bmp/wall_of_fleens/mirror_nomal";
+	static constexpr const char *kMirrorGrisPath = "bmp/wall_of_fleens/mirror_GRIS";
+	static constexpr const char *kMirrorNoirPath = "bmp/wall_of_fleens/mirror_NOIR";
+	static constexpr const char *kMirrorFelurePath = "bmp/wall_of_fleens/mirror_felure";
+	static constexpr const char *kMirrorEmptyPath = "bmp/wall_of_fleens/mirror_empty_tunnel";
+	static constexpr const char *kTuyerePath = "bmp/wall_of_fleens/tuyere";
+	static constexpr const char *kLevelIndicatorFormat = "bmp/wall_of_fleens/LevelRED%d";
+	static constexpr const char *kLavaBubblePath = "bmp/wall_of_fleens/lava_bubble";
+	static constexpr const char *kMirrorExplodePath = "bmp/wall_of_fleens/mirror_explode";
+	static constexpr const char *kMusicPath = "#sounds/music/05-BB01.wav";
+
 	/** Load cannon, grid, mirror, animation, and audio resources. */
 	void loadResources();
 
