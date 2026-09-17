@@ -28,6 +28,9 @@
 
 namespace Zoombini2 {
 
+constexpr const char *TransitionTitle::kBackgroundPath;
+constexpr const char *TransitionTitle::kMusicPath;
+
 TransitionTitle::TransitionTitle(Zoombini2Engine *vm)
 	: TransitionBase(vm) {
 	_pageId = kPageTitleScreen;
@@ -49,14 +52,14 @@ void TransitionTitle::init() {
 
 	// Load the static title background.
 	_background = new BitBlock(_vm);
-	if (!_background->load(Common::Path("bmp/story_intro/title_screen"))) {
+	if (!_background->load(Common::Path(kBackgroundPath))) {
 		warning("TitleScreen: Failed to load title background");
 	}
 
 	// Play the title music until the page is dismissed.
 	SoundManager *sound = _vm->getSoundManager();
 	if (sound) {
-		_musicId = sound->load(true, Common::Path("#sounds/music/Booliewood_Level1.wav"), true);
+		_musicId = sound->load(true, Common::Path(kMusicPath), true);
 		if (_musicId >= 0) {
 			sound->playLoop(_musicId);
 			sound->setVolume(_musicId, sound->_volumeMusic);

@@ -22,15 +22,17 @@
 #include "common/debug.h"
 
 #include "zoombini2/graphics.h"
-#include "zoombini2/scripts.h"
 #include "zoombini2/pages/shelter_base.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
-const Size32 ShelterRescueSiteBase::kSlotSize(40, 57);
+constexpr const char *ShelterRescueSiteBase::kRosterAnimationPath;
+
+constexpr Size32 ShelterRescueSiteBase::kSlotSize;
 
 ShelterRescueSiteBase::ShelterRescueSiteBase(Zoombini2Engine *vm)
 	: ShelterBase(vm) {
@@ -39,18 +41,12 @@ ShelterRescueSiteBase::ShelterRescueSiteBase(Zoombini2Engine *vm)
 ShelterRescueSiteBase::~ShelterRescueSiteBase() {
 	if (0 <= _musicId)
 		_vm->getSoundManager()->stop(_musicId);
+	clearSpeechQueue();
 
 	delete _selector;
 	delete _porteSelect;
 	delete _buttonUp;
 	delete _buttonDown;
-}
-
-void ShelterRescueSiteBase::loadBackground(const char *path) {
-	_vm->getScreen()->fillRect(Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), 0);
-	BitBlock background(_vm);
-	if (background.load(Common::Path(path)))
-		background.drawToSurface(_vm->getScreen(), Common::Point32(0, 0));
 }
 
 void ShelterRescueSiteBase::configureRosterLayout(const Common::Point32 &gridBasePos, const Common::Rect32 &scrollUpRect, const Common::Rect32 &scrollDownRect, const Common::Point32 &buttonUpPos, const Common::Point32 &buttonDownPos) {
@@ -127,10 +123,8 @@ void ShelterRescueSiteBase::saveRescueRoster(BoardRecord **board) {
 	for (uint i = 0; i < roster.size();) {
 		ZoombiniRunner *zoombini = roster[i];
 		bool departing = false;
-		if (_vm->isStartingMapTransition()) {
-			for (uint slot = 0; slot < _departureRoster.size(); slot++)
-				departing = departing || _departureRoster[slot] == zoombini;
-		}
+		if (_vm->isStartingMapTransition())
+			departing = isDepartingMember(zoombini);
 		zoombini->_puzzleStatus = 1;
 		if (departing) {
 			i += 1;
@@ -143,10 +137,56 @@ void ShelterRescueSiteBase::saveRescueRoster(BoardRecord **board) {
 	_vm->writeGameSave(state->_playerName);
 }
 
+bool ShelterRescueSiteBase::isDepartingMember(const ZoombiniRunner *zoombini) const {
+	for (uint slot = 0; slot < _departureRoster.size(); slot++) {
+		if (_departureRoster[slot] == zoombini)
+			return true;
+	}
+	return false;
+}
+
 void ShelterRescueSiteBase::loadRosterAnimation() {
-	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/littleZomb.anm"), 50);
+	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path(kRosterAnimationPath), 50);
 	if (!_zoombiniAnimation)
 		warning("RescueSite: Failed to load littleZomb.anm");
+}
+
+void ShelterRescueSiteBase::enqueueSpeech(const Common::String &path) {
+	_speechQueue.push_back(path);
+}
+
+void ShelterRescueSiteBase::pumpSpeechQueue() {
+	SoundManager *sound = _vm->getSoundManager();
+	if (0 <= _speechSoundId) {
+		if (sound->isPlaying(_speechSoundId))
+			return;
+		sound->unload(_speechSoundId);
+		_speechSoundId = -1;
+	}
+	if (_speechQueue.empty())
+		return;
+	const Common::String path = _speechQueue[0];
+	_speechQueue.remove_at(0);
+	_speechSoundId = sound->load(false, Common::Path(path), false);
+	if (0 <= _speechSoundId)
+		sound->play(_speechSoundId);
+}
+
+void ShelterRescueSiteBase::clearSpeechQueue() {
+	if (0 <= _speechSoundId) {
+		_vm->getSoundManager()->unload(_speechSoundId);
+		_speechSoundId = -1;
+	}
+	_speechQueue.clear();
+}
+
+int ShelterRescueSiteBase::countBoardMembers(BoardRecord *const *board) {
+	int count = 0;
+	for (int i = 0; i < kBoardRows * kBoardCols; i++) {
+		if (board[i])
+			count += 1;
+	}
+	return count;
 }
 
 void ShelterRescueSiteBase::beginDeparture() {

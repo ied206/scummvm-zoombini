@@ -59,11 +59,11 @@ public:
 	};
 
 	/** Maximum number of profile rows. */
-	static const int kMaximumItems = 99;
+	static constexpr int kMaximumItems = 99;
 	/** Maximum number of characters in one profile name. */
-	static const int kMaximumNameLength = 16;
+	static constexpr int kMaximumNameLength = 16;
 	/** Number of rows visible in the list viewport. */
-	static const int kVisibleRows = 4;
+	static constexpr int kVisibleRows = 4;
 
 	/** Construct a list for @p vm at @p pos using the borrowed @p selectionBar. */
 	SaveFileList(Zoombini2Engine *vm, const Common::Point32 &pos, RleBlock *selectionBar);
@@ -130,15 +130,15 @@ public:
 
 private:
 	/** Selection-bar horizontal offset from the list origin. */
-	static const int kSelectionOffsetX = 35;
+	static constexpr int kSelectionOffsetX = 35;
 	/** Selection-bar vertical offset from the list origin. */
-	static const int kSelectionOffsetY = 57;
+	static constexpr int kSelectionOffsetY = 57;
 	/** Vertical distance between adjacent visible rows. */
-	static const int kRowStride = 27;
+	static constexpr int kRowStride = 27;
 	/** Text horizontal offset from the list origin. */
-	static const int kTextOffsetX = 8;
+	static constexpr int kTextOffsetX = 8;
 	/** Text vertical offset from the list origin. */
-	static const int kTextOffsetY = 7;
+	static constexpr int kTextOffsetY = 7;
 
 	/** Borrowed vm used to construct the list's fonts. */
 	Zoombini2Engine *_vm;

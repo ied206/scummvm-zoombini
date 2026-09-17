@@ -34,6 +34,27 @@
 
 namespace Zoombini2 {
 
+constexpr const char *InteractiveMap::kBackgroundPath;
+constexpr const char *InteractiveMap::kPracticeStatsPath;
+constexpr const char *InteractiveMap::kSavedGameStatsPath;
+constexpr const char *InteractiveMap::kWhiteFontPath;
+constexpr const char *InteractiveMap::kBlipSoundPath;
+constexpr const char *InteractiveMap::kDisabledIconFormat;
+constexpr const char *InteractiveMap::kIconFormat;
+constexpr const char *InteractiveMap::kSegmentPathFormat;
+constexpr const char *InteractiveMap::kFilesNormalPath;
+constexpr const char *InteractiveMap::kFilesHighlightPath;
+constexpr const char *InteractiveMap::kOptionsNormalPath;
+constexpr const char *InteractiveMap::kOptionsHighlightPath;
+constexpr const char *InteractiveMap::kGameNormalPath;
+constexpr const char *InteractiveMap::kGameHighlightPath;
+constexpr const char *InteractiveMap::kGameDisabledPath;
+constexpr const char *InteractiveMap::kPracticeNormalPath;
+constexpr const char *InteractiveMap::kPracticeHighlightPath;
+constexpr const char *InteractiveMap::kQuitNormalPath;
+constexpr const char *InteractiveMap::kQuitHighlightPath;
+constexpr const char *InteractiveMap::kQuitConfirmationPath;
+
 // ============================================================================
 // Static map-screen geometry and resource tables.
 // ============================================================================
@@ -62,65 +83,22 @@ const Common::Rect InteractiveMap::kIconHitRects[kNumIcons] = {
  * Title sprite draw positions {x, y}.
  * Each entry supplies the title origin for one page icon.
  */
-const Common::Point32 InteractiveMap::kTitlePos[kNumTitles] = {
-	{35, 414},  //  0 ShelterZombiniville
-	{0, 222},   //  1 CrazyTurtle
-	{140, 96},  //  2 Waterslide
-	{224, 287}, //  3 Aquacube
-	{406, 299}, //  4 Rescue1
-	{358, 385}, //  5 MysticMarsh
-	{352, 96},  //  6 MagicWall
-	{545, 379}, //  7 WallOfFleens
-	{464, 91},  //  8 ChezNorf
-	{579, 307}, //  9 Rescue2
-	{642, 247}, // 10 Snowboard
-	{695, 192}, // 11 Boolies
-	{575, 44}   // 12 Booliewood
-};
+constexpr Common::Point32 InteractiveMap::kTitlePos[kNumTitles];
 
 /** Stat label Y positions. */
-const int InteractiveMap::kStatLabelY[4] = {15, 39, 63, 90};
+constexpr int InteractiveMap::kStatLabelY[4];
 
 /**
  * Title sprite filenames per page (0-12).
  */
-const char *const InteractiveMap::kTitleFiles[kNumTitles] = {
-	"bmp/map/Title01",  //  0 ShelterZombiniville
-	"bmp/map/Title02",  //  1 CrazyTurtle
-	"bmp/map/Title03",  //  2 Waterslide
-	"bmp/map/Title04",  //  3 Aquacube
-	"bmp/map/Title05",  //  4 Rescue1
-	"bmp/map/Title06a", //  5 MysticMarsh
-	"bmp/map/Title06b", //  6 MagicWall
-	"bmp/map/Title07a", //  7 WallOfFleens
-	"bmp/map/Title07b", //  8 ChezNorf
-	"bmp/map/Title08",  //  9 Rescue2
-	"bmp/map/Title09",  // 10 Snowboard
-	"bmp/map/Title10",  // 11 Boolies
-	"bmp/map/Title12"   // 12 Booliewood
-};
+constexpr const char *InteractiveMap::kTitleFiles[];
 
 /**
  * Segment draw positions {x, y}.
  * Slots 12 and 13 intentionally share a position.
  * Slot 13 duplicates slot 12 (both 661, 101).
  */
-const Common::Point32 InteractiveMap::kSegmentPos[kNumSegments] = {
-	{151, 285}, //  0 segment_01
-	{204, 230}, //  1 segment_02
-	{271, 222}, //  2 segment_03
-	{342, 266}, //  3 segment_04
-	{377, 314}, //  4 segment_05b
-	{386, 256}, //  5 segment_05a
-	{456, 361}, //  6 segment_06b
-	{442, 239}, //  7 segment_06a
-	{540, 289}, //  8 segment_07b
-	{529, 244}, //  9 segment_07a
-	{575, 249}, // 10 segment_08
-	{623, 212}, // 11 segment_09
-	{661, 101}, // 12 segment_10
-	{661, 101}  // 13 duplicate of segment_10
-};
+constexpr Common::Point32 InteractiveMap::kSegmentPos[kNumSegments];
 
 /**
  * Segment-to-page mapping for saved-game page-level drawing.
@@ -128,54 +106,14 @@ const Common::Point32 InteractiveMap::kSegmentPos[kNumSegments] = {
  * Index = segment slot, value = page ID (0-12).
  * Slot 12 is unused in saved-game mode.
  */
-const int InteractiveMap::kSegmentPageIds[kNumSegments] = {
-	1,  //  0: CrazyTurtle
-	2,  //  1: Waterslide
-	3,  //  2: Aquacube
-	3,  //  3: Aquacube
-	5,  //  4: MysticMarsh
-	6,  //  5: MagicWall
-	7,  //  6: WallOfFleens
-	8,  //  7: ChezNorf
-	7,  //  8: WallOfFleens
-	8,  //  9: ChezNorf
-	10, // 10: Snowboard
-	11, // 11: Boolies
-	11, // 12: unused in saved-game mode
-	11  // 13: Boolies duplicate
-};
+constexpr int InteractiveMap::kSegmentPageIds[kNumSegments];
 
-const char *const InteractiveMap::kSegmentDirs[kNumLevelTiers] = {
-	"bmp/map/04 neutral segments", // 0 = neutral (unvisited)
-	"bmp/map/01 Easy segments",    // 1 = easy level
-	"bmp/map/02 Medium segments",  // 2 = medium level
-	"bmp/map/03 Hard segments"     // 3 = hard level
-};
+constexpr const char *InteractiveMap::kSegmentDirs[];
 
 // Branch resources use b-before-a slot order rather than alphabetical suffix order.
-const char *const InteractiveMap::kSegmentFiles[kNumSegments] = {
-	"segment_01",  //  0
-	"segment_02",  //  1
-	"segment_03",  //  2
-	"segment_04",  //  3
-	"segment_05b", //  4
-	"segment_05a", //  5
-	"segment_06b", //  6
-	"segment_06a", //  7
-	"segment_07b", //  8
-	"segment_07a", //  9
-	"segment_08",  // 10
-	"segment_09",  // 11
-	"segment_10",  // 12
-	"segment_10"   // 13 (duplicate)
-};
+constexpr const char *InteractiveMap::kSegmentFiles[];
 
-const char *const InteractiveMap::kLegendFiles[kNumLegends] = {
-	"bmp/map/map_legend_off",    // 0
-	"bmp/map/map_legend_level1", // 1
-	"bmp/map/map_legend_level2", // 2
-	"bmp/map/map_legend_level3"  // 3
-};
+constexpr const char *InteractiveMap::kLegendFiles[];
 
 // ============================================================================
 // Construction / Destruction
@@ -187,7 +125,6 @@ InteractiveMap::InteractiveMap(Zoombini2Engine *vm, MapScreenMode mode)
 }
 
 InteractiveMap::~InteractiveMap() {
-	delete _background;
 	for (int i = 0; i < kNumIcons; i++) {
 		delete _icons[i];
 	}
@@ -240,8 +177,7 @@ void InteractiveMap::init() {
 	}
 
 	// --- Background ---
-	_background = new BitBlock(_vm);
-	if (!_background->load(Common::Path("#bmp/Map/background"))) {
+	if (!_vm->_gfx->loadBackground(Common::Path(kBackgroundPath))) {
 		warning("MapScreenPage: Failed to load map background");
 	}
 
@@ -262,9 +198,9 @@ void InteractiveMap::init() {
 	// --- Stats overlays (both always loaded) ---
 	// Practice and saved-game maps use different statistics panels.
 	_statsPractice = new RleBlock(_vm);
-	_statsPractice->load(Common::Path("bmp/map/stats_scr3"));
+	_statsPractice->load(Common::Path(kPracticeStatsPath));
 	_statsSavedGame = new RleBlock(_vm);
-	_statsSavedGame->load(Common::Path("bmp/map/stats_scr1"));
+	_statsSavedGame->load(Common::Path(kSavedGameStatsPath));
 
 	// --- Legend bitmaps (all 4: off, level1, level2, level3) ---
 	for (int i = 0; i < kNumLegends; i++) {
@@ -274,7 +210,7 @@ void InteractiveMap::init() {
 
 	// --- White bitmap font for stats ---
 	_whiteFont = new BitmapFont(_vm);
-	_whiteFont->load(Common::Path("bmp/typo"), 255, 255, 255);
+	_whiteFont->load(Common::Path(kWhiteFontPath), 255, 255, 255);
 
 	// --- Set initial level ---
 	if (isPracticeMode()) {
@@ -285,7 +221,7 @@ void InteractiveMap::init() {
 	}
 
 	// --- Audio ---
-	_blipSoundId = sm->load(false, Common::Path("sounds/blip.wav"), false);
+	_blipSoundId = sm->load(false, Common::Path(kBlipSoundPath), false);
 
 	_mapMusicId = _vm->ensureMapMusic();
 
@@ -314,9 +250,9 @@ void InteractiveMap::setupIcons() {
 
 			Common::String path;
 			if (isHub) {
-				path = Common::String::format("bmp/map/icon%02dgray", i);
+				path = Common::String::format(kDisabledIconFormat, i);
 			} else {
-				path = Common::String::format("bmp/map/icon%02d", i);
+				path = Common::String::format(kIconFormat, i);
 			}
 			_icons[i] = new RleBlock(_vm);
 			if (!_icons[i]->load(Common::Path(path))) {
@@ -333,11 +269,11 @@ void InteractiveMap::setupIcons() {
 
 				Common::String path;
 				if (i == 12) {
-					path = Common::String::format("bmp/map/icon%02d", i);
+					path = Common::String::format(kIconFormat, i);
 					_iconClickable[i] = true;
 					_iconColored[i] = true;
 				} else {
-					path = Common::String::format("bmp/map/icon%02dgray", i);
+					path = Common::String::format(kDisabledIconFormat, i);
 				}
 				_icons[i] = new RleBlock(_vm);
 				_icons[i]->load(Common::Path(path));
@@ -350,14 +286,14 @@ void InteractiveMap::setupIcons() {
 
 				Common::String path;
 				if (gs->hasPageVisit(i, 1)) {
-					path = Common::String::format("bmp/map/icon%02d", i);
+					path = Common::String::format(kIconFormat, i);
 					_iconColored[i] = true;
 					// Only hub icons become clickable when visited.
 					if (i == 0 || i == 4 || i == 9 || i == 12) {
 						_iconClickable[i] = true;
 					}
 				} else {
-					path = Common::String::format("bmp/map/icon%02dgray", i);
+					path = Common::String::format(kDisabledIconFormat, i);
 				}
 				_icons[i] = new RleBlock(_vm);
 				if (!_icons[i]->load(Common::Path(path))) {
@@ -402,7 +338,7 @@ bool InteractiveMap::practiceCandidateFitsPack(const ZmbTrait &traits) const {
 }
 
 Common::String InteractiveMap::generatePracticeZoombiniName() const {
-	static const char *const kVowelPairs[30] = {
+	static constexpr char *const kVowelPairs[30] = {
 		"a ",
 		"a ",
 		"a ",
@@ -434,9 +370,9 @@ Common::String InteractiveMap::generatePracticeZoombiniName() const {
 		"ou",
 		"ae",
 	};
-	static const char kSingleConsonants[] = "bbccdddfghjkkllmmnnprrssssttvwx";
-	static const char kEndings[] = "aeiou";
-	static const char *const kConsonantPairs[39] = {
+	static constexpr char kSingleConsonants[] = "bbccdddfghjkkllmmnnprrssssttvwx";
+	static constexpr char kEndings[] = "aeiou";
+	static constexpr char *const kConsonantPairs[39] = {
 		"bl",
 		"br",
 		"ch",
@@ -556,7 +492,7 @@ void InteractiveMap::loadSegments() {
 	for (int tier = 0; tier < kNumLevelTiers; tier++) {
 		for (int slot = 0; slot < kNumSegments; slot++) {
 			Common::String path = Common::String::format(
-				"%s/%s", kSegmentDirs[tier], kSegmentFiles[slot]);
+				kSegmentPathFormat, kSegmentDirs[tier], kSegmentFiles[slot]);
 			_segments[tier][slot] = new RleBlock(_vm);
 			if (!_segments[tier][slot]->load(Common::Path(path))) {
 				warning("MapScreenPage: Failed to load segment tier=%d slot=%d path=%s!",
@@ -582,25 +518,25 @@ void InteractiveMap::loadButtons() {
 	const ButtonSetup setup[kNumButtons] = {
 		// Button 0: Files / Parties
 		{Common::Rect(27, 561, 172, 600), false,
-		 "bmp/map/PANEL NL - Parties NORMAL",
-		 "bmp/map/PANEL NL - Parties HILITE", nullptr},
+		 kFilesNormalPath,
+		 kFilesHighlightPath, nullptr},
 		// Button 1: Options
 		{Common::Rect(175, 561, 320, 600), false,
-		 "bmp/map/PANEL NL - Options NORMAL",
-		 "bmp/map/PANEL NL - Options HILITE", nullptr},
+		 kOptionsNormalPath,
+		 kOptionsHighlightPath, nullptr},
 		// Button 2: Game in practice mode or Entraine in saved-game mode
 		isPracticeMode()
 			? ButtonSetup{Common::Rect(468, 561, 613, 600), true,
-						  "bmp/map/PANEL NL - Game NORMAL",
-						  "bmp/map/PANEL NL - Game HILITE",
-						  "bmp/map/PANEL NL - Game Gray"}
+						  kGameNormalPath,
+						  kGameHighlightPath,
+						  kGameDisabledPath}
 			: ButtonSetup{Common::Rect(468, 561, 613, 600), false,
-						  "bmp/map/PANEL NL - Entraine NORMAL",
-						  "bmp/map/PANEL NL - Entraine HILITE", nullptr},
+						  kPracticeNormalPath,
+						  kPracticeHighlightPath, nullptr},
 		// Button 3: Quitter
 		{Common::Rect(613, 561, 758, 600), true,
-		 "bmp/map/PANEL NL - Quitter NORMAL",
-		 "bmp/map/PANEL NL - Quitter HILITE", nullptr},
+		 kQuitNormalPath,
+		 kQuitHighlightPath, nullptr},
 	};
 
 	GameState *gs = _vm->getGameState();
@@ -712,9 +648,7 @@ void InteractiveMap::onRenderContent(ManagedSurface32 *screen) {
 	GameState *gs = _vm->getGameState();
 
 	// 1. Background
-	if (_background) {
-		_background->drawToSurface(screen, Common::Point32(0, 0));
-	}
+	_vm->_gfx->drawBackground(screen, Common::Point32(0, 0));
 
 	// 2. Path segments
 	if (isPracticeMode()) {
@@ -846,7 +780,7 @@ void InteractiveMap::drawSavedGameSegments(ManagedSurface32 *screen, const Alpha
 	// (Skips slot 12, draws slot 13 instead at same position.)
 	GameState *gs = _vm->getGameState();
 
-	static const int drawOrder[] = {10, 1, 2, 3, 5, 4, 7, 6, 9, 8, 0, 11, 13};
+	static constexpr int drawOrder[] = {10, 1, 2, 3, 5, 4, 7, 6, 9, 8, 0, 11, 13};
 	for (int idx = 0; idx < 13; idx++) {
 		int slot = drawOrder[idx];
 		int pageId = kSegmentPageIds[slot];
@@ -1091,7 +1025,7 @@ void InteractiveMap::applyVolumePanelVolumes(bool usePanelValues, bool persistCh
 }
 
 void InteractiveMap::requestQuitConfirmation() {
-	_vm->getMsgBoxDialog()->request(Common::Path("bmp/menu/Quit_panel_text_quit"),
+	_vm->getMsgBoxDialog()->request(Common::Path(kQuitConfirmationPath),
 									new Common::Callback<InteractiveMap, DialogMsgBoxButton>(this, &InteractiveMap::handleQuitConfirmation));
 }
 

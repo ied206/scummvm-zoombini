@@ -23,67 +23,32 @@
 #include "common/util.h"
 
 #include "zoombini2/graphics.h"
-#include "zoombini2/scripts.h"
 #include "zoombini2/pages/puzzle_crazyturtle.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
-const PuzzleCrazyTurtle::TurtlePlacement PuzzleCrazyTurtle::kTurtlePlacements[kTurtleCount] = {
-	{3, Common::Point32(0, 322)},
-	{3, Common::Point32(8, 383)},
-	{3, Common::Point32(29, 448)},
-	{4, Common::Point32(104, 482)},
-	{4, Common::Point32(178, 463)},
-	{2, Common::Point32(264, 444)},
-	{1, Common::Point32(245, 378)},
-	{3, Common::Point32(233, 308)},
-	{4, Common::Point32(248, 238)},
-	{4, Common::Point32(325, 196)},
-	{2, Common::Point32(412, 175)},
-	{1, Common::Point32(492, 165)},
-	{3, Common::Point32(576, 172)},
-	{2, Common::Point32(548, 245)},
-	{2, Common::Point32(461, 301)},
-	{3, Common::Point32(529, 346)},
-};
+constexpr const char *PuzzleCrazyTurtle::kMusicPath;
+constexpr const char *PuzzleCrazyTurtle::kTurtleIdleFormat;
+constexpr const char *PuzzleCrazyTurtle::kTurtleSpinFormat;
+constexpr const char *PuzzleCrazyTurtle::kTurtleFixedFormat;
+constexpr const char *PuzzleCrazyTurtle::kMotherPath;
+constexpr const char *PuzzleCrazyTurtle::kMotherSpeechPath;
+constexpr const char *PuzzleCrazyTurtle::kSmokePath;
+constexpr const char *PuzzleCrazyTurtle::kMotherStartPath;
+constexpr const char *PuzzleCrazyTurtle::kMotherEndPath;
+constexpr const char *PuzzleCrazyTurtle::kBridgePath;
+constexpr const char *PuzzleCrazyTurtle::kCollapsedBridgePath;
+constexpr const char *PuzzleCrazyTurtle::kBeamPath;
+constexpr const char *PuzzleCrazyTurtle::kTraitFormat;
 
-const Common::Point32 PuzzleCrazyTurtle::kZoombiniPos[kZoombiniCount] = {
-	Common::Point32(247, 120),
-	Common::Point32(245, 74),
-	Common::Point32(202, 117),
-	Common::Point32(200, 64),
-	Common::Point32(166, 42),
-	Common::Point32(166, 87),
-	Common::Point32(146, 131),
-	Common::Point32(99, 120),
-	Common::Point32(131, 75),
-	Common::Point32(128, 30),
-	Common::Point32(86, 66),
-	Common::Point32(62, 105),
-	Common::Point32(49, 48),
-	Common::Point32(18, 135),
-	Common::Point32(25, 91),
-	Common::Point32(8, 55),
-};
-
-const Common::Point32 PuzzleCrazyTurtle::kPrimaryIconPos[kRuleSlotCount] = {
-	Common::Point32(365, 15),
-	Common::Point32(395, 22),
-	Common::Point32(423, 28),
-	Common::Point32(450, 35),
-	Common::Point32(477, 42),
-};
-
-const Common::Point32 PuzzleCrazyTurtle::kSecondaryIconPos[kRuleSlotCount] = {
-	Common::Point32(365, 40),
-	Common::Point32(395, 47),
-	Common::Point32(423, 54),
-	Common::Point32(450, 60),
-	Common::Point32(477, 67),
-};
+constexpr PuzzleCrazyTurtle::TurtlePlacement PuzzleCrazyTurtle::kTurtlePlacements[kTurtleCount];
+constexpr Common::Point32 PuzzleCrazyTurtle::kZoombiniPos[kZoombiniCount];
+constexpr Common::Point32 PuzzleCrazyTurtle::kPrimaryIconPos[kRuleSlotCount];
+constexpr Common::Point32 PuzzleCrazyTurtle::kSecondaryIconPos[kRuleSlotCount];
 
 PuzzleCrazyTurtle::PuzzleCrazyTurtle(Zoombini2Engine *vm)
 	: PuzzleBase(vm, kPageCrazyTurtle) {
@@ -142,7 +107,7 @@ void PuzzleCrazyTurtle::init() {
 	placeZoombinis();
 
 	if (SoundManager *soundManager = _vm->getSoundManager()) {
-		_musicId = soundManager->load(true, Common::Path("#sounds/music/08-BS01.wav"), true);
+		_musicId = soundManager->load(true, Common::Path(kMusicPath), true);
 		if (0 <= _musicId) {
 			soundManager->playLoop(_musicId);
 			soundManager->setVolume(_musicId, soundManager->_volumeMusic);
@@ -160,26 +125,26 @@ void PuzzleCrazyTurtle::loadResources() {
 	for (int type = 0; type < kFeatureCount; type++) {
 		const int resourceNumber = type + 1;
 		loadAnimationResource(_turtleIdleAnimations[type],
-							  Common::Path(Common::String::format("Bmp/crazy_turtle/TORTUES/ATTENTE/%d/%d.AN", resourceNumber, resourceNumber)));
+							  Common::Path(Common::String::format(kTurtleIdleFormat, resourceNumber, resourceNumber)));
 		loadAnimationResource(_turtleSpinAnimations[type],
-							  Common::Path(Common::String::format("Bmp/crazy_turtle/TORTUES/tourbillonne/%d/%d.AN", resourceNumber, resourceNumber)));
+							  Common::Path(Common::String::format(kTurtleSpinFormat, resourceNumber, resourceNumber)));
 		loadRleResource(_turtleFixedImages[type],
-						Common::Path(Common::String::format("Bmp/crazy_turtle/TORTUES/tourbillonne/%d/FIXE%d.RB", resourceNumber, resourceNumber)));
+						Common::Path(Common::String::format(kTurtleFixedFormat, resourceNumber, resourceNumber)));
 	}
 
-	loadAnimationResource(_motherAnimation, Common::Path("Bmp/crazy_turtle/TORTUES/MERE/mere.an"));
-	loadAnimationResource(_motherSpeechAnimation, Common::Path("Bmp/crazy_turtle/TORTUES/MERE/PARLE/PARLE.AN"));
-	loadAnimationResource(_smokeAnimation, Common::Path("Bmp/crazy_turtle/smokey.an"));
-	loadRleResource(_motherStartImage, Common::Path("Bmp/crazy_turtle/TORTUES/MERE/meredebut.rb"));
-	loadRleResource(_motherEndImage, Common::Path("Bmp/crazy_turtle/TORTUES/MERE/MEREFIN.RB"));
-	loadRleResource(_bridgeImage, Common::Path("Bmp/crazy_turtle/PONT.RB"));
-	loadRleResource(_collapsedBridgeImage, Common::Path("Bmp/crazy_turtle/pontKC.rb"));
-	loadRleResource(_beamImage, Common::Path("Bmp/crazy_turtle/poutrelle.rb"));
+	loadAnimationResource(_motherAnimation, Common::Path(kMotherPath));
+	loadAnimationResource(_motherSpeechAnimation, Common::Path(kMotherSpeechPath));
+	loadAnimationResource(_smokeAnimation, Common::Path(kSmokePath));
+	loadRleResource(_motherStartImage, Common::Path(kMotherStartPath));
+	loadRleResource(_motherEndImage, Common::Path(kMotherEndPath));
+	loadRleResource(_bridgeImage, Common::Path(kBridgePath));
+	loadRleResource(_collapsedBridgeImage, Common::Path(kCollapsedBridgePath));
+	loadRleResource(_beamImage, Common::Path(kBeamPath));
 
 	for (int feature = 0; feature < kFeatureCount; feature++) {
 		for (int value = 0; value < kFeatureValueCount; value++) {
 			loadRleResource(_traitImages[feature][value],
-							Common::Path(Common::String::format("Bmp/mystic_marsh/TRAITS/%d-%d.RB", feature + 1, value + 1)));
+							Common::Path(Common::String::format(kTraitFormat, feature + 1, value + 1)));
 		}
 	}
 }

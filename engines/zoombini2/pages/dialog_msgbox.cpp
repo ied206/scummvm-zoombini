@@ -19,14 +19,16 @@
  *
  */
 
+#include "zoombini2/pages/dialog_msgbox.h"
 #include "common/debug.h"
 #include "common/system.h"
 #include "zoombini2/graphics.h"
-#include "zoombini2/pages/dialog_msgbox.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
+
+constexpr const char *DialogMsgBox::kPanelPaths[3];
 
 DialogMsgBox::DialogMsgBox(Zoombini2Engine *vm)
 	: DialogBase(vm) {
@@ -37,7 +39,7 @@ DialogMsgBox::~DialogMsgBox() {
 }
 
 bool DialogMsgBox::request(const Common::Path &textPath, Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &position,
-						 const Common::Point32 &textOffset) {
+						   const Common::Point32 &textOffset) {
 	if (isActive()) {
 		delete callback;
 		return false;
@@ -57,11 +59,6 @@ bool DialogMsgBox::openDialog() {
 	if (_state != DialogMsgBoxState::kPendingOpen01)
 		return _state == DialogMsgBoxState::kOpen02;
 
-	static constexpr const char *kPanelPaths[3] = {
-		"bmp/menu/QUIT_panel_nothing.rb",
-		"bmp/menu/QUIT_panel_ok.rb",
-		"bmp/menu/QUIT_panel_cancel.rb"
-	};
 	for (int i = 0; i < 3; i++)
 		_panels[i] = _vm->loadRleBlock(kPanelPaths[i]);
 	_textImage = _vm->loadBitBlock(_textPath.toString());
@@ -80,7 +77,7 @@ bool DialogMsgBox::openDialog() {
 
 	_savedBackground = _vm->_gfx->createSurface(panelSize);
 	_vm->_gfx->captureScreenRegion(_savedBackground,
-									 Common::Rect(_position.x, _position.y, _position.x + panelSize.width, _position.y + panelSize.height));
+								   Common::Rect(_position.x, _position.y, _position.x + panelSize.width, _position.y + panelSize.height));
 
 	_pauseStartTime = g_system->getMillis();
 	_vm->_isPaused = true;
@@ -190,9 +187,26 @@ EventHandleResult DialogMsgBox::onMouseMove(const Common::Point &pos) {
 }
 
 EventHandleResult DialogMsgBox::onKeyDown(const Common::KeyState &key, bool repeat) {
-	(void)key;
 	(void)repeat;
-	return isActive() ? EventHandleResult::kConsumed : EventHandleResult::kPassthrough;
+	if (!isActive())
+		return EventHandleResult::kPassthrough;
+
+	// ScummVM-only convenience shortcuts. The original message box is mouse-only.
+	EventHandleResult result = EventHandleResult::kConsumed;
+	if (_state == DialogMsgBoxState::kOpen02 && _vm->useEnhancedKbdShortcuts()) {
+		const DialogKeyAction keyAction = classifyDialogKey(key);
+		switch (keyAction) {
+		case kDialogKeyAccept:
+			activateButton(DialogMsgBoxButton::kOkay01);
+			break;
+		case kDialogKeyCancel:
+			activateButton(DialogMsgBoxButton::kCancel02);
+			break;
+		default:
+			break;
+		}
+	}
+	return result;
 }
 
 EventHandleResult DialogMsgBox::onKeyUp(const Common::KeyState &key) {

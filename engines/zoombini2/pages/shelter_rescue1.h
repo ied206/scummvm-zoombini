@@ -23,11 +23,13 @@
 #define ZOOMBINI2_PAGES_SHELTER_RESCUE1_H
 
 #include "zoombini2/pages/shelter_base.h"
+#include "zoombini2/scripts.h"
 
 namespace Zoombini2 {
 
 class BitBlock;
 class RleBlock;
+class ZoombiniAnimation;
 
 /** Rescue Site I waiting shelter and Route2/Route3 branch selector. */
 class ShelterRescueSite1 : public ShelterRescueSiteBase {
@@ -39,7 +41,17 @@ public:
 
 	/** Load Rescue Site I resources and restore its waiting roster. */
 	void init() override;
-	/** Require eight departing Zoombinis and a valid route branch. */
+	/** Advance the roster scroll animation and any prompted departure. */
+	void onUpdate() override;
+	/** Draw the site, scroll controls, waiting board, and boarding actives. */
+	void onRenderContent(ManagedSurface32 *screen) override;
+	/** Ignore button presses; the original acts on release clicks. */
+	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	/** Route common pickup and drop first, then branch, scroll, and boarding clicks. */
+	EventHandleResult onLButtonUp(const Common::Point &pos) override;
+	/** Follow a held Zoombini with the pointer. */
+	EventHandleResult onMouseMove(const Common::Point &pos) override;
+	/** Require eight seated Zoombinis and a valid route branch. */
 	bool canUseGoButton() const override;
 
 protected:
@@ -47,10 +59,83 @@ protected:
 	BoardRecord **getRescueBoard() const override;
 	/** Draw the Rescue Site I portal, foreground, and branch arrows. */
 	void onRenderSite(ManagedSurface32 *screen) override;
-	/** Handle the two Rescue Site I branch hotspots. */
-	EventHandleResult onSiteLButtonDown(const Common::Point &pos) override;
+	/** Return whether @p zoombini occupies a departure seat. */
+	bool isDepartingMember(const ZoombiniRunner *zoombini) const override;
 
 private:
+	/** Resource paths used by the scene and arrival speech. */
+	static constexpr const char *kBackgroundPath = "#bmp/rescue1/background";
+	static constexpr const char *kSelectorPath = "bmp/rescue1/SELECTOR.RB";
+	static constexpr const char *kPortalPath = "bmp/rescue1/PORTE.RB";
+	static constexpr const char *kPortalTopPath = "bmp/rescue1/portal_top.rb";
+	static constexpr const char *kPorteSelectorPath = "bmp/rescue1/porte_select.rb";
+	static constexpr const char *kCramurePath = "bmp/rescue1/CRAMURE.RB";
+	static constexpr const char *kArrowLeftOffPath = "bmp/rescue1/inside_arrow_left_off.bb";
+	static constexpr const char *kArrowLeftOnPath = "bmp/rescue1/inside_arrow_left_on.bb";
+	static constexpr const char *kArrowRightOffPath = "bmp/rescue1/inside_arrow_right_off.bb";
+	static constexpr const char *kArrowRightOnPath = "bmp/rescue1/inside_arrow_right_on.bb";
+	static constexpr const char *kScrollLeftPath = "bmp/rescue1/button_left.an";
+	static constexpr const char *kScrollRightPath = "bmp/rescue1/button_right.an";
+	static constexpr const char *kMusicPath = "#sounds/music/C1-BB02.wav";
+	static constexpr const char *kLittleZombAnimationPath = "bmp/zombis/littleZomb.anm";
+	static constexpr const char *kPickupZombAnimationPath = "bmp/zombis/pris/pris.anm";
+	static constexpr const char *kIdleZombAnimationPath = "bmp/zombis/attente2/attenteZomb2.anm";
+	static constexpr const char *kAreaMaskPath = "bmp/rescue1/area.bmt";
+	static constexpr const char *kMissingArrivalsSpeechFormat = "sounds/BC121.%d.wav";
+	static constexpr const char *kFirstArrivalSpeechPath = "sounds/BC111.wav";
+	static constexpr const char *kFirstArrivalFollowupSpeechPath = "sounds/BC111B.wav";
+	static constexpr const char *kFirstDepartureSpeechPath = "sounds/BC123.7.wav";
+	static constexpr const char *kReadyDepartureSpeechPath = "sounds/BC125.wav";
+	static constexpr const char *kIncompleteDepartureSpeechPath = "sounds/BC124.wav";
+
+	/** Number of waiting-grid drop records mirroring the visible board cells. */
+	static constexpr int kGridTargetCount = 20;
+	/** First drop-record index of the departure seats. */
+	static constexpr int kSeatTargetBase = 20;
+	/** Number of departure seats scanned by the gate. */
+	static constexpr int kDepartureSeatCount = 8;
+	/**
+	 * Drop records accepted by @ref ZoombiniRunner::handlePointerInput.
+	 *
+	 * Twenty waiting-grid records plus eight departure-seat rects built from
+	 * the original seat table, matching the 28-record original allocation.
+	 */
+	static constexpr int kDropTargetCount = 28;
+	/** Departure-seat screen positions from the original seat table. */
+	static constexpr Common::Point32 kSeatPositions[kDepartureSeatCount] = {
+		Common::Point32(517, 381),
+		Common::Point32(583, 387),
+		Common::Point32(652, 397),
+		Common::Point32(472, 409),
+		Common::Point32(539, 420),
+		Common::Point32(610, 427),
+		Common::Point32(439, 445),
+		Common::Point32(506, 446),
+	};
+	/** Waiting-floor screen positions from the original floor table. */
+	static constexpr Common::Point32 kFloorPositions[kDepartureSeatCount] = {
+		Common::Point32(127, 447),
+		Common::Point32(176, 461),
+		Common::Point32(232, 461),
+		Common::Point32(99, 487),
+		Common::Point32(151, 499),
+		Common::Point32(210, 497),
+		Common::Point32(117, 534),
+		Common::Point32(186, 540),
+	};
+	/** Resting scroll phase with no animation in progress. */
+	static constexpr int kScrollIdle = -1;
+	/** Scroll phase toward earlier board rows. */
+	static constexpr int kScrollPhaseUp04 = 4;
+	/** Scroll phase toward later board rows. */
+	static constexpr int kScrollPhaseDown06 = 6;
+	/** Scroll animation length in pixels, matching one grid column. */
+	static constexpr int kScrollPixelLength = 40;
+	/** Scroll animation step in pixels per frame. */
+	static constexpr int kScrollPixelStep = 4;
+	/** Pressed-button flash length in milliseconds. */
+	static constexpr uint32 kScrollFlashMilliseconds = 150;
+
 	/** Origin of the Rescue Site I waiting-roster grid. */
 	static constexpr Common::Point32 kRosterGridBasePos = Common::Point32(68, 95);
 	/** Position of the upward Rescue Site I roster-scroll animation. */
@@ -69,8 +154,44 @@ private:
 
 	/** Restore the Rescue Site I visit and departure-roster state. */
 	void initRescueRoster();
+	/** Refill boarding actives from the board and seat the first eight. */
+	void refillBoardingRoster();
+	/** Build the waiting-grid and departure-seat drop records. */
+	void buildDropTargets();
+	/** Refresh waiting-grid record occupancy from the visible board cells. */
+	void refreshGridOccupancy();
+	/** Return the board cell index for a grid record. */
+	int getGridRecordBoardIndex(int recordIndex) const;
+	/** Return whether all eight departure seats are occupied. */
+	bool seatsFullyOccupied() const;
+	/** Return the currently held Zoombini, if any. */
+	ZoombiniRunner *getDraggedZoombini() const;
+	/** Store a grid-dropped Zoombini in the board and remove its roster object. */
+	void captureToBoard(int recordIndex, int zoombiniIndex);
+	/** Materialize a held boarding active from a nonempty grid cell. */
+	bool materializeFromBoard(int gridCol, int gridRow, const Common::Point &pointerPos);
+	/** Attempt an upward roster scroll and flash the scroll button. */
+	void triggerScrollUp();
+	/** Attempt a downward roster scroll and flash the scroll button. */
+	void triggerScrollDown();
+	/** Return whether any board cell in rows @p firstRow through @p lastRow is occupied. */
+	bool hasBoardCellsInRows(int firstRow, int lastRow) const;
+	/** Advance the roster scroll animation by one frame. */
+	void stepScrollAnimation();
+	/** Present the interactive cursor while hovering a nonempty grid cell. */
+	void updateHoverCursor();
+	/** Draw the waiting-board pictures with the current scroll shift. */
+	void drawWaitingBoard(ManagedSurface32 *screen, int pixelShiftX) const;
+	/** Collect the visible boarding draw order with the held Zoombini last. */
+	void buildBoardingDrawOrder(Common::Array<uint> &order, ZoombiniRunner *&draggedZoombini) const;
+	/** Draw the seated and waiting boarding actives. */
+	void drawBoardingActives(ManagedSurface32 *screen) const;
+	/** Snap a dropped Zoombini into a waiting-grid cell. */
+	static void gridDropCallback(void *context, int targetIndex, int zoombiniIndex);
+	/** Snap a dropped Zoombini into a departure seat. */
+	static void seatDropCallback(void *context, int targetIndex, int zoombiniIndex);
 
-	/** Portal body. */
+	/** Portal body, drawn only once eight members have arrived in total. */
 	RleBlock *_portal = nullptr;
 	/** Portal foreground. */
 	RleBlock *_portalTop = nullptr;
@@ -94,6 +215,30 @@ private:
 	Common::Point32 _portalTopPos = Common::Point32();
 	/** Foreground-overlay draw position. */
 	Common::Point32 _cramurePos = Common::Point32();
+	/** Shared little-Zoombini grid borrowed for boarding actives. */
+	const ZoombiniAnimation *_littleZombAnimation = nullptr;
+	/** Shared pickup grid borrowed for boarding actives. */
+	const ZoombiniAnimation *_pickupZombAnimation = nullptr;
+	/** Shared idle grid borrowed for boarding actives. */
+	const ZoombiniAnimation *_idleZombAnimation = nullptr;
+	/** Waiting-grid and departure-seat drop records. */
+	Common::Array<ZoombiniDropTarget> _dropTargets;
+	/** First board row shown in the visible roster grid. */
+	int _scrollRow = 0;
+	/** Roster scroll phase: idle, scrolling up, or scrolling down. */
+	int _scrollPhase = kScrollIdle;
+	/** Background scroll pixel with original wraparound. */
+	int _scrollBgX = 0;
+	/** Remaining scroll animation pixels. */
+	int _scrollPixelsLeft = 0;
+	/** Game tick until which the upward scroll button shows its pressed frame. */
+	uint32 _scrollUpFlashUntil = 0;
+	/** Game tick until which the downward scroll button shows its pressed frame. */
+	uint32 _scrollDownFlashUntil = 0;
+	/** Whether eight members have arrived in total, showing the portal ship. */
+	bool _shipVisible = false;
+	/** Whether a branch click prompted departure on the next update. */
+	bool _departurePrompted = false;
 };
 
 } // End of namespace Zoombini2

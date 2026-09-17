@@ -29,6 +29,22 @@
 
 namespace Zoombini2 {
 
+constexpr const char *PuzzleChezNorf::kSymbolOkPath;
+constexpr const char *PuzzleChezNorf::kSymbolNoPath;
+constexpr const char *PuzzleChezNorf::kSymbolMaybePath;
+constexpr const char *PuzzleChezNorf::kPlatoLevel1Path;
+constexpr const char *PuzzleChezNorf::kPlatoPath;
+constexpr const char *PuzzleChezNorf::kPlatoMiniPath;
+constexpr const char *PuzzleChezNorf::kSlurpNames[3];
+constexpr const char *PuzzleChezNorf::kMiamNames[3];
+constexpr const char *PuzzleChezNorf::kGlouglouNames[3];
+constexpr const char *PuzzleChezNorf::kComandeNames[3];
+constexpr const char *PuzzleChezNorf::kFoodStemFormat;
+constexpr const char *PuzzleChezNorf::kNorfDefaultPath;
+constexpr const char *PuzzleChezNorf::kHighlightPath;
+constexpr const char *PuzzleChezNorf::kMusicPath;
+constexpr const char *PuzzleChezNorf::kDebugFontPath;
+
 // ============================================================================
 // PuzzleChezNorf - restaurant food-matching puzzle.
 //
@@ -48,26 +64,26 @@ namespace Zoombini2 {
 // ============================================================================
 
 // Delay constants
-static const uint32 kServeDelay = 1500;
-static const uint32 kMatchDelay = 1000;
-static const uint32 kRejectDelay = 2000;
-static const uint32 kDoneDelay = 3000;
+static constexpr uint32 kServeDelay = 1500;
+static constexpr uint32 kMatchDelay = 1000;
+static constexpr uint32 kRejectDelay = 2000;
+static constexpr uint32 kDoneDelay = 3000;
 
 // Minimum number of released Zoombinis required for success.
-static const int kMinFreed = 4;
+static constexpr int kMinFreed = 4;
 
 // Position of the first table plate.
-static const Common::Point32 kFirstTablePos(205, 500);
+static constexpr Common::Point32 kFirstTablePos(205, 500);
 
 // Tolerance thresholds per level (from CheckFoodMatch)
 // Level 1: 2 wrong guesses before reject, Level 2: 1, Level 3: 0
-static const int kWrongTolerance[] = {0, 2, 1, 0};
+static constexpr int kWrongTolerance[] = {0, 2, 1, 0};
 
 // Attempt limits indexed by level, with index zero unused.
-static const int kMaxAttempts[] = {0, 5, 4, 3};
+static constexpr int kMaxAttempts[] = {0, 5, 4, 3};
 
 // Visible clue-attribute counts indexed by level, with index zero unused.
-static const int kClueAttrCount[] = {0, 8, 7, 8};
+static constexpr int kClueAttrCount[] = {0, 8, 7, 8};
 
 // ============================================================================
 // Construction / Destruction
@@ -108,61 +124,57 @@ PuzzleChezNorf::~PuzzleChezNorf() {
 void PuzzleChezNorf::loadResources() {
 	// Food symbol sprites (feedback indicators)
 	_symbOK = new RleBlock(_vm);
-	_symbOK->loadFromFile(Common::Path("bmp/chez_norf/symb_OK"));
+	_symbOK->loadFromFile(Common::Path(kSymbolOkPath));
 
 	_symbNO = new RleBlock(_vm);
-	_symbNO->loadFromFile(Common::Path("bmp/chez_norf/symb_NO"));
+	_symbNO->loadFromFile(Common::Path(kSymbolNoPath));
 
 	_symbMaybe = new RleBlock(_vm);
-	_symbMaybe->loadFromFile(Common::Path("bmp/chez_norf/symb_MAYBE"));
+	_symbMaybe->loadFromFile(Common::Path(kSymbolMaybePath));
 
 	// Plate sprites
 	if (_level == 1) {
 		_plato = new RleBlock(_vm);
-		_plato->loadFromFile(Common::Path("bmp/chez_norf/plato2"));
+		_plato->loadFromFile(Common::Path(kPlatoLevel1Path));
 	} else {
 		_plato = new RleBlock(_vm);
-		_plato->loadFromFile(Common::Path("bmp/chez_norf/plato"));
+		_plato->loadFromFile(Common::Path(kPlatoPath));
 	}
 
 	_platoMini = new RleBlock(_vm);
-	_platoMini->loadFromFile(Common::Path("bmp/chez_norf/plato_mini"));
+	_platoMini->loadFromFile(Common::Path(kPlatoMiniPath));
 
 	// Slurp (dessert) items
-	static const char *slurpNames[] = {"slurp_glace", "slurp_pasteque", "slurp_tarte"};
 	for (int i = 0; i < 3; i++) {
 		_slurpImage[i] = new RleBlock(_vm);
-		_slurpImage[i]->loadFromFile(Common::Path(Common::String::format("bmp/chez_norf/%s", slurpNames[i])));
+		_slurpImage[i]->loadFromFile(Common::Path(Common::String::format(kFoodStemFormat, kSlurpNames[i])));
 	}
 
 	// Miam (main dish) items
-	static const char *miamNames[] = {"miam_poisson", "miam_salade", "miam_sandwitch"};
 	for (int i = 0; i < 3; i++) {
 		_miamImage[i] = new RleBlock(_vm);
-		_miamImage[i]->loadFromFile(Common::Path(Common::String::format("bmp/chez_norf/%s", miamNames[i])));
+		_miamImage[i]->loadFromFile(Common::Path(Common::String::format(kFoodStemFormat, kMiamNames[i])));
 	}
 
 	// Glouglou (drink) items
-	static const char *glouglouNames[] = {"glouglou_cafe", "glouglou_lait", "glouglou_orange"};
 	for (int i = 0; i < 3; i++) {
 		_glouglouImage[i] = new RleBlock(_vm);
-		_glouglouImage[i]->loadFromFile(Common::Path(Common::String::format("bmp/chez_norf/%s", glouglouNames[i])));
+		_glouglouImage[i]->loadFromFile(Common::Path(Common::String::format(kFoodStemFormat, kGlouglouNames[i])));
 	}
 
 	// Command/order background overlays
-	static const char *comandeNames[] = {"COMANDE1", "comande2", "comande3"};
 	for (int i = 0; i < 3; i++) {
 		_comandeImage[i] = new RleBlock(_vm);
-		_comandeImage[i]->loadFromFile(Common::Path(Common::String::format("bmp/chez_norf/%s", comandeNames[i])));
+		_comandeImage[i]->loadFromFile(Common::Path(Common::String::format(kFoodStemFormat, kComandeNames[i])));
 	}
 
 	// Norf default sprite
 	_norfDefault = new RleBlock(_vm);
-	_norfDefault->loadFromFile(Common::Path("bmp/chez_norf/norf/norfDeBaz"));
+	_norfDefault->loadFromFile(Common::Path(kNorfDefaultPath));
 
 	// Highlight
 	_highlightImage = new RleBlock(_vm);
-	_highlightImage->loadFromFile(Common::Path("bmp/chez_norf/highlight"));
+	_highlightImage->loadFromFile(Common::Path(kHighlightPath));
 }
 
 // ============================================================================
@@ -174,7 +186,7 @@ void PuzzleChezNorf::init() {
 
 	// Start the restaurant music.
 	if (SoundManager *snd = _vm->getSoundManager()) {
-		_musicId = snd->load(true, Common::Path("#sounds/music/07-BB02.wav"), true);
+		_musicId = snd->load(true, Common::Path(kMusicPath), true);
 		if (_musicId >= 0) {
 			snd->playLoop(_musicId);
 			snd->setVolume(_musicId, snd->_volumeMusic);
@@ -717,7 +729,7 @@ const char *PuzzleChezNorf::getDebugFoodName(int foodId) {
 void PuzzleChezNorf::drawDebugOverlay(ManagedSurface32 *screen) {
 	if (!_debugFont) {
 		_debugFont = new BitmapFont(_vm);
-		if (!_debugFont->load(Common::Path("bmp/typo"), 0, 255, 0)) {
+		if (!_debugFont->load(Common::Path(kDebugFontPath), 0, 255, 0)) {
 			delete _debugFont;
 			_debugFont = nullptr;
 			return;
@@ -725,7 +737,7 @@ void PuzzleChezNorf::drawDebugOverlay(ManagedSurface32 *screen) {
 	}
 
 	const Common::String header = Common::String::format("%d - %d %d %d - %d %d %d - %d %d %d", _templateId, _foodVals[0], _foodVals[1],
-													 _foodVals[2], _foodVals[3], _foodVals[4], _foodVals[5], _foodVals[6], _foodVals[7], _foodVals[8]);
+														 _foodVals[2], _foodVals[3], _foodVals[4], _foodVals[5], _foodVals[6], _foodVals[7], _foodVals[8]);
 	_vm->_gfx->drawString(screen, _debugFont, Common::Point32(100, 0), header);
 
 	for (int tableIndex = 0; tableIndex < _numTables; tableIndex++) {
@@ -742,7 +754,7 @@ void PuzzleChezNorf::drawDebugOverlay(ManagedSurface32 *screen) {
 void PuzzleChezNorf::drawFoodBoard(ManagedSurface32 *screen) {
 	// Draw 3 sections of food grid dots from DrawBoard_40F9B0
 	// Section 1: y starts at 47, step 15; Section 2: 104; Section 3: 164
-	static const int kSectionStartY[] = {47, 104, 164};
+	static constexpr int kSectionStartY[] = {47, 104, 164};
 
 	// Symbol values select incorrect, correct, or partial-match feedback.
 	RleBlock *symbByType[] = {nullptr, _symbNO, _symbOK, _symbMaybe};

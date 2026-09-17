@@ -57,18 +57,36 @@ public:
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 
 	/** Maximum table capacity used by the hardest layout. */
-	static const int kMaxTables = 6;
+	static constexpr int kMaxTables = 6;
 	/** Number of food categories. */
-	static const int kNumFoodCategories = 3;
+	static constexpr int kNumFoodCategories = 3;
 	/** Number of choices within each food category. */
-	static const int kFoodsPerCategory = 3;
+	static constexpr int kFoodsPerCategory = 3;
 	/** Total number of selectable food items. */
-	static const int kTotalFoods = 9;
+	static constexpr int kTotalFoods = 9;
 
 	/** Horizontal distance between adjacent tables. */
-	static const int kTableSpacing = 85;
+	static constexpr int kTableSpacing = 85;
 
 private:
+	/** Resource paths used by the Chez Norf restaurant. */
+	static constexpr const char *kSymbolOkPath = "bmp/chez_norf/symb_OK";
+	static constexpr const char *kSymbolNoPath = "bmp/chez_norf/symb_NO";
+	static constexpr const char *kSymbolMaybePath = "bmp/chez_norf/symb_MAYBE";
+	static constexpr const char *kPlatoLevel1Path = "bmp/chez_norf/plato2";
+	static constexpr const char *kPlatoPath = "bmp/chez_norf/plato";
+	static constexpr const char *kPlatoMiniPath = "bmp/chez_norf/plato_mini";
+	/** Dessert, main-dish, drink, and order-overlay name fragments. */
+	static constexpr const char *kSlurpNames[3] = {"slurp_glace", "slurp_pasteque", "slurp_tarte"};
+	static constexpr const char *kMiamNames[3] = {"miam_poisson", "miam_salade", "miam_sandwitch"};
+	static constexpr const char *kGlouglouNames[3] = {"glouglou_cafe", "glouglou_lait", "glouglou_orange"};
+	static constexpr const char *kComandeNames[3] = {"COMANDE1", "comande2", "comande3"};
+	static constexpr const char *kFoodStemFormat = "bmp/chez_norf/%s";
+	static constexpr const char *kNorfDefaultPath = "bmp/chez_norf/norf/norfDeBaz";
+	static constexpr const char *kHighlightPath = "bmp/chez_norf/highlight";
+	static constexpr const char *kMusicPath = "#sounds/music/07-BB02.wav";
+	static constexpr const char *kDebugFontPath = "bmp/typo";
+
 	/** Selectable food item IDs grouped by course. */
 	enum FoodItem {
 		/** No food item is selected. */

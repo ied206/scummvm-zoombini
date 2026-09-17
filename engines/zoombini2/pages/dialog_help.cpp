@@ -29,21 +29,31 @@
 
 namespace Zoombini2 {
 
+constexpr const char *DialogHelp::kHelpFramePath;
+constexpr const char *DialogHelp::kPlaceholderPath;
+constexpr const char *DialogHelp::kOkButtonNormalPath;
+constexpr const char *DialogHelp::kOkButtonPushedPath;
+constexpr const char *DialogHelp::kLeftArrowNormalPath;
+constexpr const char *DialogHelp::kLeftArrowEmptyPath;
+constexpr const char *DialogHelp::kRightArrowNormalPath;
+constexpr const char *DialogHelp::kRightArrowEmptyPath;
+constexpr const char *DialogHelp::kHelpPageFormat;
+
 DialogHelp::DialogHelp(Zoombini2Engine *vm)
 	: DialogBase(vm) {
 
 	// Load help screen UI elements
-	_helpFrame = _vm->loadRleBlock("Bmp/MENU/help_screen_main.rb");
-	_placeholder = _vm->loadRleBlock("Bmp/MENU/help_screen_placeholder.rb");
+	_helpFrame = _vm->loadRleBlock(kHelpFramePath);
+	_placeholder = _vm->loadRleBlock(kPlaceholderPath);
 
-	_okButtonNormal = _vm->loadBitBlock("Bmp/MENU/help_screen_okbutton_normal.bb");
-	_okButtonPushed = _vm->loadBitBlock("Bmp/MENU/help_screen_okbutton_pushed.bb");
+	_okButtonNormal = _vm->loadBitBlock(kOkButtonNormalPath);
+	_okButtonPushed = _vm->loadBitBlock(kOkButtonPushedPath);
 
-	_leftArrowNormal = _vm->loadBitBlock("Bmp/MENU/help_screen_leftarro_norma.bb");
-	_leftArrowEmpty = _vm->loadBitBlock("Bmp/MENU/help_screen_leftarro_empty.bb");
+	_leftArrowNormal = _vm->loadBitBlock(kLeftArrowNormalPath);
+	_leftArrowEmpty = _vm->loadBitBlock(kLeftArrowEmptyPath);
 
-	_rightArrowNormal = _vm->loadBitBlock("Bmp/MENU/help_screen_rightarro_norma.bb");
-	_rightArrowEmpty = _vm->loadBitBlock("Bmp/MENU/help_screen_rightarro_empty.bb");
+	_rightArrowNormal = _vm->loadBitBlock(kRightArrowNormalPath);
+	_rightArrowEmpty = _vm->loadBitBlock(kRightArrowEmptyPath);
 
 	// Create the saved screen buffer in the current game screen format.
 	_savedScreen = _vm->_gfx->createSurface(ManagedSurface32::kScreenSize);
@@ -78,7 +88,7 @@ const char *DialogHelp::getLevelString(int level) {
 
 bool DialogHelp::isPageValid(int puzzleId, int level, int page) {
 	// Construct help page path
-	Common::String path = Common::String::format("Bmp/help/%02d_help_%s_%02d.bb",
+	Common::String path = Common::String::format(kHelpPageFormat,
 												 puzzleId,
 												 getLevelString(level),
 												 page);
@@ -155,7 +165,7 @@ bool DialogHelp::loadPage(int puzzleId, int level, int page) {
 	freePage();
 
 	// Construct help page path
-	Common::String path = Common::String::format("Bmp/help/%02d_help_%s_%02d.bb",
+	Common::String path = Common::String::format(kHelpPageFormat,
 												 puzzleId,
 												 getLevelString(level),
 												 page);
