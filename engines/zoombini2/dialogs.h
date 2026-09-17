@@ -117,15 +117,15 @@ private:
 	static constexpr int kDialogHeight = 344;
 
 	/** Command used to rename the selected profile. */
-	static const uint32 kEditProfileCommand;
+	static constexpr uint32 kEditProfileCommand = 'z2ed';
 	/** Command used to delete the selected profile. */
-	static const uint32 kDeleteProfileCommand;
+	static constexpr uint32 kDeleteProfileCommand = 'z2dl';
 	/** Command used to import one independent Z2 save file. */
-	static const uint32 kImportProfileCommand;
+	static constexpr uint32 kImportProfileCommand = 'z2im';
 	/** Command used to export the selected independent Z2 save file. */
-	static const uint32 kExportProfileCommand;
+	static constexpr uint32 kExportProfileCommand = 'z2ex';
 	/** Command emitted when a profile-table radio button changes selection. */
-	static const uint32 kProfileSelectionChangedCommand;
+	static constexpr uint32 kProfileSelectionChangedCommand = 'z2sl';
 
 	/** Reload the sorted profile table and optionally reselect @p selectedProfile. */
 	void refreshProfiles(const Common::String &selectedProfile = Common::String());
@@ -203,7 +203,7 @@ private:
 	/** Thin themed separator used to divide option groups. */
 	class SeparatorWidget;
 	/** Command used to open @ref Zoombini2SaveManagementDialog. */
-	static const uint32 kManageProfilesCommand;
+	static constexpr uint32 kManageProfilesCommand = 'z2mg';
 	/** Toggle for the F2, F3, P, and Chez Norf C developer keys. */
 	GUI::CheckboxWidget *_debugHotkeysCheckbox = nullptr;
 	/** Toggle selecting stereo rather than mono game-audio streams. */
@@ -216,6 +216,8 @@ private:
 	GUI::CheckboxWidget *_originalPrngCheckbox = nullptr;
 	/** Toggle selecting floating-point rather than original Q10 Bezier calculations. */
 	GUI::CheckboxWidget *_floatingPointPathsCheckbox = nullptr;
+	/** Toggle enabling the enhanced keyboard shortcut set. */
+	GUI::CheckboxWidget *_enhancedKbdShortcutsCheckbox = nullptr;
 
 	/** Define this widget's overlay-compatible GUI layout. */
 	void defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const override;

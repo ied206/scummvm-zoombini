@@ -35,7 +35,7 @@ class String;
 namespace GUI {
 class GuiObject;
 class OptionsContainerWidget;
-}
+} // namespace GUI
 
 class Engine;
 class OSystem;
@@ -55,6 +55,8 @@ public:
 	static constexpr const char *kConfigUseFloatingPointPaths = "use_floating_point_paths";
 	/** Target configuration key selecting the original Windows random-number generator. */
 	static constexpr const char *kConfigOriginalPRNG = "original_prng";
+	/** Target configuration key enabling the enhanced keyboard shortcut set. */
+	static constexpr const char *kConfigEnhancedKbdShortcuts = "enhanced_kbd_shortcuts";
 
 	const char *getName() const override {
 		return "zoombini2";
@@ -64,8 +66,7 @@ public:
 
 	bool hasFeature(MetaEngineFeature f) const override;
 	void registerDefaultSettings(const Common::String &target) const override;
-	GUI::OptionsContainerWidget *buildEngineOptionsWidget(GUI::GuiObject *boss, const Common::String &name,
-															 const Common::String &target) const override;
+	GUI::OptionsContainerWidget *buildEngineOptionsWidget(GUI::GuiObject *boss, const Common::String &name, const Common::String &target) const override;
 };
 
 #endif // ZOOMBINI2_METAENGINE_H

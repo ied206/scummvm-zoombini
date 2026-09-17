@@ -113,9 +113,11 @@ class Zoombini2Engine;
 class SoundManager;
 class Animation;
 class AnimationRunner;
+class AreaMask;
 class BitBlock;
 class BitmapFont;
 class ManagedSurface32;
+class PageLayerStack;
 class RleBlock;
 class ZoombiniRunner;
 class ZoombiniAnimation;
@@ -142,8 +144,21 @@ public:
 	/** Draw an uncompressed bitmap through the shared Z2 rendering boundary. */
 	void drawBitBlock(ManagedSurface32 *destination, const BitBlock *bitmap, const Common::Point32 &position) const;
 	/** Draw one bitmap sub-rectangle through the shared Z2 rendering boundary. */
-	void drawBitBlockSubRect(ManagedSurface32 *destination, const BitBlock *bitmap, const Common::Point32 &position,
-							 const Common::Rect &sourceRect) const;
+	void drawBitBlockSubRect(ManagedSurface32 *destination, const BitBlock *bitmap, const Common::Point32 &position, const Common::Rect &sourceRect) const;
+	/** Load the active page background, replacing any previous one. */
+	bool loadBackground(const Common::Path &path);
+	/** Release the active page background. */
+	void clearBackground();
+	/** Return whether a page background is loaded. */
+	bool hasBackground() const { return _background != nullptr; }
+	/** Draw the loaded page background at @p position. */
+	void drawBackground(ManagedSurface32 *destination, const Common::Point32 &position) const;
+	/** Draw a sub-rectangle of the loaded page background at @p position. */
+	void drawBackgroundSubRect(ManagedSurface32 *destination, const Common::Point32 &position, const Common::Rect &sourceRect) const;
+	/** Return the page layer collection released with the graphics interface. */
+	PageLayerStack *getPageLayerStack() const { return _pageLayerStack; }
+	/** Remove every page layer and reset transient stack state. */
+	void clearPageLayers();
 	/** Draw an RLE sprite through the shared Z2 rendering boundary. */
 	void drawRleBlock(ManagedSurface32 *destination, const RleBlock *sprite, const Common::Point32 &position) const;
 	/** Draw one frame from an animation through the shared Z2 rendering boundary. */
@@ -151,12 +166,15 @@ public:
 	/** Draw and advance one general-object animation runner. */
 	void drawAndUpdateAnimationRunner(ManagedSurface32 *destination, AnimationRunner *runner, uint32 tickCount, int scrollX, int backgroundWidth) const;
 	/** Draw a Zoombini body and trait stack through the shared Z2 rendering boundary. */
-	void drawZoombini(ManagedSurface32 *destination, const ZoombiniAnimation *animation, const ZmbTrait &traits, const Common::Point32 &position,
-					 int cell, int frame, const Common::Rect32 *clip = nullptr) const;
+	void drawZoombini(ManagedSurface32 *destination, const ZoombiniAnimation *animation, const ZmbTrait &traits, const Common::Point32 &position, int cell, int frame, const Common::Rect32 *clip = nullptr) const;
 	/** Draw one active Zoombini runner through the shared Z2 rendering boundary. */
 	void drawZoombiniRunner(ManagedSurface32 *destination, const ZoombiniRunner *runner) const;
 	/** Draw bitmap-font text and return its horizontal pixel advance. */
 	int drawString(ManagedSurface32 *destination, const BitmapFont *font, const Common::Point32 &position, const Common::String &text) const;
+	/** Draw the held Zoombini name plate centered at the bottom of @p destination. */
+	void drawDragNameTooltip(ManagedSurface32 *destination, const Common::String &name);
+	/** Black out @p destination where @p areaMask rejects drops, or everywhere when @p areaMask is nullptr. */
+	void maskRejectedArea(ManagedSurface32 *destination, const AreaMask *areaMask);
 	/** Fill a clipped rectangle through the shared Z2 rendering boundary. */
 	void fillRect(ManagedSurface32 *destination, const Common::Rect32 &rect, uint32 color) const;
 	/** Fill a 16-bit API-boundary rectangle through the shared Z2 rendering boundary. */
@@ -177,6 +195,15 @@ private:
 	/** Compose the route-map overlays appropriate to the current progress. */
 	void drawMapOverlays(ManagedSurface32 *dst, PageId sourcePage, int mapRegion, RouteBranch routeBranch);
 
+	/** Name-plate sprite drawn under the held Zoombini name. */
+	RleBlock *_nameBoxSprite = nullptr;
+	/** Shared tooltip font drawn over the name plate. */
+	BitmapFont *_tooltipFont = nullptr;
+	/** Active page background released with the graphics interface. */
+	BitBlock *_background = nullptr;
+	/** Page layer collection released with the graphics interface. */
+	PageLayerStack *_pageLayerStack = nullptr;
+
 	/** Borrowed game instance used for resource resolution and shared blend state. */
 	Zoombini2Engine *_vm;
 };
@@ -191,7 +218,7 @@ private:
 class ManagedSurface32 : public Graphics::ManagedSurface {
 public:
 	/** Dimensions of the fixed internal game screen. */
-	static const Size32 kScreenSize;
+	static constexpr Size32 kScreenSize = Size32(800, 600);
 
 	/** Create a screen surface with the supplied dimensions and pixel format. */
 	ManagedSurface32(const Size32 &size, const Graphics::PixelFormat &pixelFormat)
@@ -241,7 +268,7 @@ public:
 class AlphaBlendLUT : Common::NonCopyable {
 public:
 	/** Number of values in each byte-sized lookup dimension, from 0 through 255. */
-	static const int kValueCount = 256;
+	static constexpr int kValueCount = 256;
 
 	/** Populate every factor-and-value combination used by @ref scale. */
 	AlphaBlendLUT();
@@ -461,6 +488,10 @@ public:
 	explicit AreaMask(Zoombini2Engine *vm);
 	/** Load a 1-bit BMP mask through the engine resource resolver. */
 	bool loadFromFile(const Common::Path &path);
+	/** Return the decoded mask dimensions, or an empty size when unloaded. */
+	Size32 getSize() const { return _size; }
+	/** Return the number of marked pixels in the decoded mask. */
+	uint32 countMarkedPixels() const;
 	/** Return whether the source byte containing @p point has any marked bit. */
 	bool hasMarkedByteAt(const Common::Point32 &point) const;
 
@@ -468,6 +499,9 @@ private:
 	Zoombini2Engine *_vm;
 	Size32 _size = Size32();
 	Common::Array<byte> _pixels;
+
+	/** Decode an uncompressed 1-bit BMP into palette indices, or return false. */
+	bool loadOneBitBitmap(Common::SeekableReadStream &stream, const Common::Path &path);
 };
 
 /**
@@ -480,13 +514,13 @@ private:
 class ZoombiniAnimation {
 public:
 	/** Number of movement and animation cells. */
-	static const int kDim0 = 100;
+	static constexpr int kDim0 = 100;
 	/** Number of sprite layers per cell. */
-	static const int kDim1 = ZmbTrait::kTraitCount + 1;
+	static constexpr int kDim1 = ZmbTrait::kTraitCount + 1;
 	/** Number of base-or-feature variants per layer. */
-	static const int kDim2 = ZmbTrait::kTraitValueCount + 1;
+	static constexpr int kDim2 = ZmbTrait::kTraitValueCount + 1;
 	/** Total number of independently framed grid entries. */
-	static const int kCellCount = kDim0 * kDim1 * kDim2;
+	static constexpr int kCellCount = kDim0 * kDim1 * kDim2;
 
 	/** Construct an empty sprite grid bound to @p vm. */
 	explicit ZoombiniAnimation(Zoombini2Engine *vm);
@@ -653,9 +687,9 @@ enum MenuButtonId {
 class BitmapFont {
 public:
 	/** Number of glyphs in the fixed font-strip mapping. */
-	static const int kNumGlyphs = 81;
+	static constexpr int kNumGlyphs = 81;
 	/** Horizontal advance used for spaces and unsupported characters. */
-	static const int kSpaceWidth = 10;
+	static constexpr int kSpaceWidth = 10;
 
 	/** Construct an unloaded font bound to @p vm. */
 	explicit BitmapFont(Zoombini2Engine *vm);
@@ -701,29 +735,29 @@ enum VolumePanelResult {
 class VolumePanel {
 public:
 	/** Leftmost selectable gauge coordinate. */
-	static const int kSliderMinX = 350;
+	static constexpr int kSliderMinX = 350;
 	/** Rightmost selectable gauge coordinate. */
-	static const int kSliderMaxX = 638;
+	static constexpr int kSliderMaxX = 638;
 	/** Number of pixels in the selectable gauge interval. */
-	static const int kSliderRange = 288;
+	static constexpr int kSliderRange = 288;
 
 	/** Shared X coordinate of each slider label button. */
-	static const int kLabelX = 157;
+	static constexpr int kLabelX = 157;
 	/** Shared slider label dimensions. */
-	static const Size32 kLabelSize;
+	static constexpr Size32 kLabelSize = Size32(520, 64);
 	/** Music slider label Y coordinate. */
-	static const int kMusicLabelY = 224;
+	static constexpr int kMusicLabelY = 224;
 	/** Sound-effect slider label Y coordinate. */
-	static const int kSfxLabelY = 286;
+	static constexpr int kSfxLabelY = 286;
 	/** Speech slider label Y coordinate. */
-	static const int kSpeechLabelY = 351;
+	static constexpr int kSpeechLabelY = 351;
 
 	/** Music gauge Y coordinate. */
-	static const int kMusicGaugeY = 240;
+	static constexpr int kMusicGaugeY = 240;
 	/** Sound-effect gauge Y coordinate. */
-	static const int kSfxGaugeY = 305;
+	static constexpr int kSfxGaugeY = 305;
 	/** Speech gauge Y coordinate. */
-	static const int kSpeechGaugeY = 374;
+	static constexpr int kSpeechGaugeY = 374;
 
 	/** Construct a panel bound to @p vm with all volumes set to 100 percent. */
 	explicit VolumePanel(Zoombini2Engine *vm);

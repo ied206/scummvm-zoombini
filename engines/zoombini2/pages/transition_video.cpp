@@ -31,33 +31,44 @@
 
 namespace Zoombini2 {
 
+constexpr const char *TransitionVideo::kLogoTlcPath;
+constexpr const char *TransitionVideo::kLogoTlcHalfPath;
+constexpr const char *TransitionVideo::kLogoPolygonPath;
+constexpr const char *TransitionVideo::kCutsceneFirstPath;
+constexpr const char *TransitionVideo::kCutsceneFirstHalfPath;
+constexpr const char *TransitionVideo::kCutsceneSecondPath;
+constexpr const char *TransitionVideo::kCutsceneSecondHalfPath;
+constexpr const char *TransitionVideo::kCutsceneThirdPath;
+constexpr const char *TransitionVideo::kCutsceneThirdHalfPath;
+constexpr const char *TransitionVideo::kLogoArisuPath;
+
 TransitionVideo::TransitionVideo(Zoombini2Engine *vm, int pageId)
 	: TransitionBase(vm) {
 	_pageId = pageId;
 
 	switch (pageId) {
 	case kPageLogoTLC:
-		_videoPath = selectMoviePath("movies/tlclogo.bik", "movies/tlclogo50%.bik");
+		_videoPath = selectMoviePath(kLogoTlcPath, kLogoTlcHalfPath);
 		_nextPageId = kPageLogoPolygon;
 		break;
 	case kPageLogoPolygon:
-		_videoPath = Common::Path("movies/logopoly.bik");
+		_videoPath = Common::Path(kLogoPolygonPath);
 		_nextPageId = kPageTitleScreen;
 		break;
 	case kPageCutsceneFirst:
-		_videoPath = selectMoviePath("movies/zoom_movie1_100%.bik", "movies/zoom_movie1_50%.bik");
+		_videoPath = selectMoviePath(kCutsceneFirstPath, kCutsceneFirstHalfPath);
 		_nextPageId = kPageZombiniville;
 		break;
 	case kPageCutsceneSecond:
-		_videoPath = selectMoviePath("movies/zoom_movie2_100%.bik", "movies/zoom_movie2_50%.bik");
+		_videoPath = selectMoviePath(kCutsceneSecondPath, kCutsceneSecondHalfPath);
 		_nextPageId = kPageRescue1;
 		break;
 	case kPageCutsceneThird:
-		_videoPath = selectMoviePath("movies/zoom_movie3_100%.bik", "movies/zoom_movie3_50%.bik");
+		_videoPath = selectMoviePath(kCutsceneThirdPath, kCutsceneThirdHalfPath);
 		_nextPageId = kPageRescue2;
 		break;
 	case kPageLogoArisuMedia:
-		_videoPath = Common::Path("movies/arisu.bik");
+		_videoPath = Common::Path(kLogoArisuPath);
 		_nextPageId = kPageLogoTLC;
 		break;
 	default:
