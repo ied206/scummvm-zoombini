@@ -23,6 +23,8 @@
 #include "zoombini2/graphics.h"
 #include "zoombini2/zoombini2.h"
 
+#include "common/debug.h"
+
 namespace Zoombini2 {
 
 PageLayer::PageLayer(Zoombini2Engine *vm, byte scrollDirection, const Common::Path &backgroundPath)
@@ -219,17 +221,13 @@ void PageLayer::drawAndUpdate(ManagedSurface32 *screen) {
 				drawBackgroundRegion(screen, _scrollX, 0);
 			} else if (0 < _scrollX) {
 				const int tailWidth = _backgroundSize.width - _scrollX;
-				_vm->_gfx->drawBitBlockSubRect(screen, _background, Common::Point32(0, 0),
-										  Common::Rect(_scrollX, 0, _backgroundSize.width, ManagedSurface32::kScreenSize.height));
-				_vm->_gfx->drawBitBlockSubRect(screen, _background, Common::Point32(tailWidth, 0),
-										  Common::Rect(0, 0, ManagedSurface32::kScreenSize.width - tailWidth, ManagedSurface32::kScreenSize.height));
+				_vm->_gfx->drawBitBlockSubRect(screen, _background, Common::Point32(0, 0), Common::Rect(_scrollX, 0, _backgroundSize.width, ManagedSurface32::kScreenSize.height));
+				_vm->_gfx->drawBitBlockSubRect(screen, _background, Common::Point32(tailWidth, 0), Common::Rect(0, 0, ManagedSurface32::kScreenSize.width - tailWidth, ManagedSurface32::kScreenSize.height));
 			} else {
 				const int tailStart = _backgroundSize.width + _scrollX;
 				const int tailWidth = -_scrollX;
-				_vm->_gfx->drawBitBlockSubRect(screen, _background, Common::Point32(0, 0),
-										  Common::Rect(tailStart, 0, _backgroundSize.width, ManagedSurface32::kScreenSize.height));
-				_vm->_gfx->drawBitBlockSubRect(screen, _background, Common::Point32(tailWidth, 0),
-										  Common::Rect(0, 0, ManagedSurface32::kScreenSize.width - tailWidth, ManagedSurface32::kScreenSize.height));
+				_vm->_gfx->drawBitBlockSubRect(screen, _background, Common::Point32(0, 0), Common::Rect(tailStart, 0, _backgroundSize.width, ManagedSurface32::kScreenSize.height));
+				_vm->_gfx->drawBitBlockSubRect(screen, _background, Common::Point32(tailWidth, 0), Common::Rect(0, 0, ManagedSurface32::kScreenSize.width - tailWidth, ManagedSurface32::kScreenSize.height));
 			}
 		}
 	}
@@ -276,8 +274,6 @@ void PageLayerStack::clear() {
 	for (uint index = 0; index < _layers.size(); index++)
 		delete _layers[index];
 	_layers.clear();
-	delete _areaMask;
-	_areaMask = nullptr;
 	_pointerPressLatched = false;
 	_scrollLocked = false;
 }
@@ -327,17 +323,6 @@ bool PageLayerStack::hasInteractiveRunnerAt(const Common::Point32 &point) const 
 	return false;
 }
 
-bool PageLayerStack::loadAreaMask(const Common::Path &path) {
-	AreaMask *areaMask = new AreaMask(_vm);
-	if (!areaMask->loadFromFile(path)) {
-		delete areaMask;
-		return false;
-	}
-	delete _areaMask;
-	_areaMask = areaMask;
-	return true;
-}
-
 void PageLayerStack::scrollBy(int16 delta) {
 	if (_scrollLocked)
 		return;
@@ -365,11 +350,28 @@ void PageLayerStack::propagateFirstLayerDimensions() {
 }
 
 PageBase::PageBase(Zoombini2Engine *vm, PageCategory pageCategory)
-	: _vm(vm), _pageCategory(pageCategory), _pageLayerStack(new PageLayerStack(vm)) {
+	: _vm(vm), _pageCategory(pageCategory) {
 }
 
 PageBase::~PageBase() {
-	delete _pageLayerStack;
+	clearAreaMask();
+}
+
+bool PageBase::loadAreaMask(const Common::Path &path) {
+	AreaMask *areaMask = new AreaMask(_vm);
+	if (!areaMask->loadFromFile(path)) {
+		warning("PageBase: Failed to load area mask '%s'", path.toString().c_str());
+		delete areaMask;
+		return false;
+	}
+	clearAreaMask();
+	_areaMask = areaMask;
+	return true;
+}
+
+void PageBase::clearAreaMask() {
+	delete _areaMask;
+	_areaMask = nullptr;
 }
 
 EventHandleResult PageEventHandler::handleEvent(const Common::Event &event) {
@@ -391,13 +393,17 @@ EventHandleResult PageEventHandler::handleEvent(const Common::Event &event) {
 
 EventHandleResult PageBase::handleEvent(const Common::Event &event) {
 	const EventHandleResult pageResult = PageEventHandler::handleEvent(event);
+	// Modal dialogs share the graphics page-layer collection with the page beneath them, so
+	// only non-dialog pages dispatch pointer input to the layer runners.
+	if (_pageCategory == PageCategory::kDialog)
+		return pageResult;
 	bool layerHandled = false;
 	switch (event.type) {
 	case Common::EVENT_LBUTTONDOWN:
-		layerHandled = _pageLayerStack->handlePointerButton(Common::Point32(event.mouse), true);
+		layerHandled = _vm->_gfx->getPageLayerStack()->handlePointerButton(Common::Point32(event.mouse), true);
 		break;
 	case Common::EVENT_LBUTTONUP:
-		_pageLayerStack->handlePointerButton(Common::Point32(event.mouse), false);
+		_vm->_gfx->getPageLayerStack()->handlePointerButton(Common::Point32(event.mouse), false);
 		break;
 	default:
 		break;

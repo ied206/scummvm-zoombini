@@ -27,6 +27,7 @@
 #include "image/bmp.h"
 
 #include "zoombini2/graphics.h"
+#include "zoombini2/pages/page_base.h"
 #include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
@@ -34,8 +35,8 @@
 
 namespace Zoombini2 {
 
-const Size32 ManagedSurface32::kScreenSize(800, 600);
-const Size32 VolumePanel::kLabelSize(520, 64);
+constexpr Size32 ManagedSurface32::kScreenSize;
+constexpr Size32 VolumePanel::kLabelSize;
 
 void ManagedSurface32::fillRect(const Common::Rect32 &rect, uint32 color) {
 	if (!rect.isValidRect())
@@ -885,10 +886,19 @@ void RleBlock::drawToScreenClipped(ManagedSurface32 *dst, const Common::Point32 
 	}
 }
 
-Gfx::Gfx(Zoombini2Engine *vm) : _vm(vm) {
+Gfx::Gfx(Zoombini2Engine *vm) : _vm(vm), _pageLayerStack(new PageLayerStack(vm)) {
 }
 
 Gfx::~Gfx() {
+	delete _background;
+	delete _pageLayerStack;
+	delete _nameBoxSprite;
+	delete _tooltipFont;
+}
+
+void Gfx::clearPageLayers() {
+	if (_pageLayerStack)
+		_pageLayerStack->clear();
 }
 
 ManagedSurface32 *Gfx::createSurface(const Size32 &size) const {
@@ -922,6 +932,33 @@ void Gfx::drawBitBlockSubRect(ManagedSurface32 *destination, const BitBlock *bit
 							  const Common::Rect &sourceRect) const {
 	if (destination && bitmap)
 		bitmap->drawSubRect(destination, position, sourceRect);
+}
+
+bool Gfx::loadBackground(const Common::Path &path) {
+	BitBlock *background = new BitBlock(_vm);
+	if (!background->load(path)) {
+		delete background;
+		return false;
+	}
+
+	delete _background;
+	_background = background;
+	return true;
+}
+
+void Gfx::clearBackground() {
+	delete _background;
+	_background = nullptr;
+}
+
+void Gfx::drawBackground(ManagedSurface32 *destination, const Common::Point32 &position) const {
+	if (destination && _background)
+		_background->drawToSurface(destination, position);
+}
+
+void Gfx::drawBackgroundSubRect(ManagedSurface32 *destination, const Common::Point32 &position, const Common::Rect &sourceRect) const {
+	if (destination && _background)
+		_background->drawSubRect(destination, position, sourceRect);
 }
 
 void Gfx::drawRleBlock(ManagedSurface32 *destination, const RleBlock *sprite, const Common::Point32 &position) const {
@@ -958,6 +995,55 @@ int Gfx::drawString(ManagedSurface32 *destination, const BitmapFont *font, const
 		return 0;
 
 	return font->drawString(destination, position, text, _vm->getAlphaLUT());
+}
+
+void Gfx::drawDragNameTooltip(ManagedSurface32 *destination, const Common::String &name) {
+	if (!destination)
+		return;
+	if (!_nameBoxSprite) {
+		_nameBoxSprite = _vm->loadRleBlock("bmp/menu/name_box.rb");
+		if (!_nameBoxSprite)
+			return;
+	}
+	if (!_tooltipFont) {
+		_tooltipFont = new BitmapFont(_vm);
+		if (!_tooltipFont->load(Common::Path("bmp/typo"), 16, 16, 16))
+			return;
+	}
+	if (!_tooltipFont->isLoaded())
+		return;
+	static constexpr int kPlateX = 310;
+	static constexpr int kPlateY = 565;
+	static constexpr int kTextCenterX = 400;
+	static constexpr int kTextY = 570;
+	drawRleBlock(destination, _nameBoxSprite, Common::Point32(kPlateX, kPlateY));
+	const int width = _tooltipFont->getStringWidth(name);
+	drawString(destination, _tooltipFont, Common::Point32(kTextCenterX - width / 2, kTextY), name);
+}
+
+void Gfx::maskRejectedArea(ManagedSurface32 *destination, const AreaMask *areaMask) {
+	if (!destination)
+		return;
+	if (!areaMask) {
+		fillRect(destination, Common::Rect32(destination->w, destination->h), 0);
+		return;
+	}
+	const int width = MIN<int>(destination->w, 800);
+	const int height = MIN<int>(destination->h, 600);
+	for (int y = 0; y < height; y++) {
+		int runStart = -1;
+		for (int groupX = 0; groupX < width; groupX += 8) {
+			if (!areaMask->hasMarkedByteAt(Common::Point32(groupX, y))) {
+				if (runStart < 0)
+					runStart = groupX;
+			} else if (0 <= runStart) {
+				fillRect(destination, Common::Rect32(runStart, y, groupX, y + 1), 0);
+				runStart = -1;
+			}
+		}
+		if (0 <= runStart)
+			fillRect(destination, Common::Rect32(runStart, y, width, y + 1), 0);
+	}
 }
 
 void Gfx::fillRect(ManagedSurface32 *destination, const Common::Rect32 &rect, uint32 color) const {
@@ -1265,12 +1351,76 @@ const RleBlock *Animation::getFrame(int index) const {
 AreaMask::AreaMask(Zoombini2Engine *vm) : _vm(vm) {
 }
 
+bool AreaMask::loadOneBitBitmap(Common::SeekableReadStream &stream, const Common::Path &path) {
+	stream.seek(0);
+	if (stream.size() < 62)
+		return false;
+	byte header[62];
+	if (stream.read(header, sizeof(header)) != sizeof(header))
+		return false;
+	if (header[0] != 'B' || header[1] != 'M')
+		return false;
+	const uint32 pixelOffset = static_cast<uint32>(header[10]) | (static_cast<uint32>(header[11]) << 8) |
+							   (static_cast<uint32>(header[12]) << 16) | (static_cast<uint32>(header[13]) << 24);
+	const int32 width = static_cast<int32>(static_cast<uint32>(header[18]) | (static_cast<uint32>(header[19]) << 8) |
+										   (static_cast<uint32>(header[20]) << 16) | (static_cast<uint32>(header[21]) << 24));
+	int32 height = static_cast<int32>(static_cast<uint32>(header[22]) | (static_cast<uint32>(header[23]) << 8) |
+									  (static_cast<uint32>(header[24]) << 16) | (static_cast<uint32>(header[25]) << 24));
+	const uint32 bitsPerPixel = static_cast<uint32>(header[28]) | (static_cast<uint32>(header[29]) << 8);
+	const uint32 compression = static_cast<uint32>(header[30]) | (static_cast<uint32>(header[31]) << 8) |
+							   (static_cast<uint32>(header[32]) << 16) | (static_cast<uint32>(header[33]) << 24);
+	if (bitsPerPixel != 1 || compression != 0 || width <= 0 || height == 0) {
+		stream.seek(0);
+		return false;
+	}
+	bool bottomUp = true;
+	if (height < 0) {
+		bottomUp = false;
+		height = -height;
+	}
+	const uint64 pixelCount = static_cast<uint64>(width) * static_cast<uint64>(height);
+	if (0xFFFFFFFFU < pixelCount)
+		return false;
+	const uint32 stride = (static_cast<uint32>(width) + 31) / 32 * 4;
+	if (static_cast<uint64>(pixelOffset) + static_cast<uint64>(stride) * static_cast<uint64>(height) > static_cast<uint64>(stream.size())) {
+		warning("AreaMask: truncated 1-bit bitmap '%s'", path.toString().c_str());
+		stream.seek(0);
+		return false;
+	}
+	Common::Array<byte> pixels;
+	pixels.resize(static_cast<uint32>(pixelCount));
+	for (int32 row = 0; row < height; row++) {
+		const int32 sourceRow = bottomUp ? height - 1 - row : row;
+		stream.seek(static_cast<int64>(pixelOffset) + static_cast<int64>(sourceRow) * stride);
+		byte packed = 0;
+		for (int32 col = 0; col < width; col++) {
+			if (col % 8 == 0)
+				packed = stream.readByte();
+			pixels[static_cast<uint32>(row) * static_cast<uint32>(width) + static_cast<uint32>(col)] =
+				static_cast<byte>((packed >> (7 - (col % 8))) & 1);
+		}
+	}
+	_size = Size32(width, height);
+	_pixels.swap(pixels);
+	uint32 markedCount = 0;
+	for (uint32 i = 0; i < static_cast<uint32>(pixelCount); i++) {
+		if (_pixels[i])
+			markedCount += 1;
+	}
+	debug(1, "AreaMask: decoded 1-bit mask '%s' as %dx%d with %u marked pixels", path.toString().c_str(), width, height, markedCount);
+	return true;
+}
+
 bool AreaMask::loadFromFile(const Common::Path &path) {
 	Common::ScopedPtr<Common::SeekableReadStream> stream(_vm->openResourceFile(path.toString('/')));
 	if (!stream) {
 		warning("AreaMask: cannot open '%s'", path.toString().c_str());
 		return false;
 	}
+
+	if (loadOneBitBitmap(*stream, path))
+		return true;
+	stream->seek(0);
 
 	Image::BitmapDecoder decoder;
 	if (!decoder.loadStream(*stream)) {
@@ -1298,6 +1448,15 @@ bool AreaMask::loadFromFile(const Common::Path &path) {
 	_size = size;
 	_pixels.swap(pixels);
 	return true;
+}
+
+uint32 AreaMask::countMarkedPixels() const {
+	uint32 markedCount = 0;
+	for (uint i = 0; i < _pixels.size(); i++) {
+		if (_pixels[i] != 0)
+			markedCount += 1;
+	}
+	return markedCount;
 }
 
 bool AreaMask::hasMarkedByteAt(const Common::Point32 &point) const {

@@ -163,11 +163,6 @@ public:
 	/** Return whether any layer has an input-enabled animation runner under @p point. */
 	bool hasInteractiveRunnerAt(const Common::Point32 &point) const;
 
-	/** Load or replace the 1-bit area mask used by Zoombini drop handling. */
-	bool loadAreaMask(const Common::Path &path);
-	/** Return the optional area mask retained by this stack. */
-	const AreaMask *getAreaMask() const { return _areaMask; }
-
 	/** Lock or unlock group scrolling. */
 	void setScrollLocked(bool locked) { _scrollLocked = locked; }
 	/** Return whether group scrolling is locked. */
@@ -192,8 +187,6 @@ private:
 	bool _pointerPressLatched = false;
 	/** Whether @ref scrollBy is currently suppressed. */
 	bool _scrollLocked = false;
-	/** Optional page-area mask released with this collection. */
-	AreaMask *_areaMask = nullptr;
 };
 
 /** Page lifecycle categories used by engine and sidebar policy. */
@@ -291,8 +284,14 @@ public:
 	virtual bool isShelter() const { return false; }
 	/** Apply any page-local state required by the global debug-completion hotkey. */
 	virtual void applyDebugPuzzleCompletion() {}
-	/** Return the page-level background, scrolling, input, and animation-runner collection. */
-	PageLayerStack *getPageLayerStack() const { return _pageLayerStack; }
+	/** Load or replace the 1-bit area mask used by Zoombini drop handling. */
+	bool loadAreaMask(const Common::Path &path);
+	/** Release the area mask retained by this page. */
+	void clearAreaMask();
+	/** Return whether this page has an area mask loaded. */
+	bool hasAreaMask() const { return _areaMask != nullptr; }
+	/** Return the drop-acceptance area mask, or nullptr when the page has none. */
+	const AreaMask *getAreaMask() const { return _areaMask; }
 
 protected:
 	/** Advance this page's simulation before rendering. */
@@ -316,8 +315,8 @@ protected:
 	PageCategory _pageCategory;
 	/** Numeric dispatcher identifier for this page. */
 	int _pageId = -1;
-	/** Page-level layer collection released when this page is destroyed. */
-	PageLayerStack *_pageLayerStack;
+	/** Optional page-area mask released with this page. */
+	AreaMask *_areaMask = nullptr;
 
 private:
 	/** Run visual hooks and, when requested, the two completion boundaries. */

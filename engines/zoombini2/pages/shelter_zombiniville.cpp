@@ -23,13 +23,31 @@
 
 #include "common/debug.h"
 #include "zoombini2/graphics.h"
-#include "zoombini2/scripts.h"
 #include "zoombini2/pages/shelter_zombiniville.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
+
+constexpr const char *ShelterZombiniville::kBackgroundPath;
+constexpr const char *ShelterZombiniville::kAreaMaskPath;
+constexpr const char *ShelterZombiniville::kFeatureAnimationFormat;
+constexpr const char *ShelterZombiniville::kQuickFillButtonPath;
+constexpr const char *ShelterZombiniville::kBatchFillButtonPath;
+constexpr const char *ShelterZombiniville::kCreateButtonPath;
+constexpr const char *ShelterZombiniville::kBigZombAnimationPath;
+constexpr const char *ShelterZombiniville::kLittleZombAnimationPath;
+constexpr const char *ShelterZombiniville::kPickupZombAnimationPath;
+constexpr const char *ShelterZombiniville::kIdleZombAnimationPath;
+constexpr const char *ShelterZombiniville::kNameFontPath;
+constexpr const char *ShelterZombiniville::kMusicPath;
+constexpr const char *ShelterZombiniville::kFeatureSelectSoundPath;
+constexpr const char *ShelterZombiniville::kQuickFillSoundPath;
+constexpr const char *ShelterZombiniville::kBatchFillSoundPath;
+constexpr const char *ShelterZombiniville::kValidZoombiniSoundPath;
+constexpr const char *ShelterZombiniville::kWrongZoombiniSoundPath;
 
 ShelterZombiniville::ShelterZombiniville(Zoombini2Engine *vm)
 	: ShelterBase(vm) {
@@ -39,8 +57,6 @@ ShelterZombiniville::ShelterZombiniville(Zoombini2Engine *vm)
 ShelterZombiniville::~ShelterZombiniville() {
 	if (_vm->isReturningToMap())
 		GameState::transferSavedRoster(_vm->_globalZoombinis, _vm->getGameState()->_savedRoster);
-	delete _background;
-	delete _areaMask;
 	delete _quickFillButtonRunner;
 	delete _batchFillButtonRunner;
 	delete _createButtonRunner;
@@ -136,6 +152,9 @@ void ShelterZombiniville::setupHoverRunners() {
 	_quickFillButtonRunner->addTimedFrame(2, 100);
 	_quickFillButtonRunner->addTimedFrame(1, 40);
 	_quickFillButtonRunner->setHitRect(_quickFillRect);
+	// The original enables hit testing in SetRect and never refreshes the
+	// bumper flags, so the hover cursor stays available over these buttons.
+	_quickFillButtonRunner->setHitTestEnabled(true);
 
 	_batchFillButtonRunner = new AnimationRunner(_vm, Common::Point32(230, 412), AnimationRunnerMode::kPlayOnceAndHide02);
 	_batchFillButtonRunner->setAnimation(_batchFillButton);
@@ -143,6 +162,7 @@ void ShelterZombiniville::setupHoverRunners() {
 	_batchFillButtonRunner->addTimedFrame(2, 100);
 	_batchFillButtonRunner->addTimedFrame(0, 100);
 	_batchFillButtonRunner->setHitRect(_batchFillRect);
+	_batchFillButtonRunner->setHitTestEnabled(true);
 
 	_createButtonRunner = new AnimationRunner(_vm, Common::Point32(395, 429), AnimationRunnerMode::kPlayOnceAndHide02);
 	_createButtonRunner->setAnimation(_createButton);
@@ -153,7 +173,7 @@ void ShelterZombiniville::setupHoverRunners() {
 }
 
 Common::Point32 ShelterZombiniville::getSlotPosition(uint index) {
-	static const Common::Point32 kSlotPos[kMaxPackSize] = {
+	static constexpr Common::Point32 kSlotPos[kMaxPackSize] = {
 		Common::Point32(490, 524),
 		Common::Point32(500, 485),
 		Common::Point32(452, 526),
@@ -192,19 +212,13 @@ void ShelterZombiniville::init() {
 	refreshFeatureCounts();
 	gameState->registerPageVisit(kPageZombiniville);
 
-	_background = new BitBlock(_vm);
-	if (!_background->load(Common::Path("#bmp/zombiniville/zoombiniville")))
+	if (!_vm->_gfx->loadBackground(Common::Path(kBackgroundPath)))
 		warning("ShelterZombiniville: Failed to load background");
-	_areaMask = new AreaMask(_vm);
-	if (!_areaMask->loadFromFile(Common::Path("bmp/zombiniville/area.bmt"))) {
-		warning("ShelterZombiniville: Failed to load area.bmt");
-		delete _areaMask;
-		_areaMask = nullptr;
-	}
+	loadAreaMask(Common::Path(kAreaMaskPath));
 
 	for (int feature = 0; feature < ZmbTrait::kTraitCount; feature++) {
 		for (int value = 0; value < ZmbTrait::kTraitValueCount; value++) {
-			const Common::String path = Common::String::format("bmp/zombiniville/pikaroll/z1pi%d%d.an", feature + 1, value + 1);
+			const Common::String path = Common::String::format(kFeatureAnimationFormat, feature + 1, value + 1);
 			_featureButtons[feature][value] = new Animation(_vm);
 			if (!_featureButtons[feature][value]->loadFromFile(Common::Path(path)))
 				warning("ShelterZombiniville: Failed to load '%s'", path.c_str());
@@ -212,46 +226,46 @@ void ShelterZombiniville::init() {
 	}
 
 	_quickFillButton = new Animation(_vm);
-	_quickFillButton->loadFromFile(Common::Path("bmp/zombiniville/BUMPER-1.AN"));
+	_quickFillButton->loadFromFile(Common::Path(kQuickFillButtonPath));
 	_batchFillButton = new Animation(_vm);
-	_batchFillButton->loadFromFile(Common::Path("bmp/zombiniville/bumper-16.an"));
+	_batchFillButton->loadFromFile(Common::Path(kBatchFillButtonPath));
 	_createButton = new Animation(_vm);
-	_createButton->loadFromFile(Common::Path("bmp/zombiniville/bumper-Valid.an"));
+	_createButton->loadFromFile(Common::Path(kCreateButtonPath));
 
-	_bigZombAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombiniville/BigZomb/BigZomb.anm"), 0);
+	_bigZombAnimation = _vm->loadZoombiniAnimation(Common::Path(kBigZombAnimationPath), 0);
 	if (!_bigZombAnimation)
 		warning("ShelterZombiniville: Failed to load BigZomb.anm");
-	_littleZombAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/littleZomb.anm"), 50);
+	_littleZombAnimation = _vm->loadZoombiniAnimation(Common::Path(kLittleZombAnimationPath), 50);
 	if (!_littleZombAnimation)
 		warning("ShelterZombiniville: Failed to load littleZomb.anm");
-	_pickupZombAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/pris/pris.anm"), 100);
+	_pickupZombAnimation = _vm->loadZoombiniAnimation(Common::Path(kPickupZombAnimationPath), 100);
 	if (!_pickupZombAnimation)
 		warning("ShelterZombiniville: Failed to load pris.anm");
-	_idleZombAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/zombis/attente2/attenteZomb2.anm"), 50);
+	_idleZombAnimation = _vm->loadZoombiniAnimation(Common::Path(kIdleZombAnimationPath), 50);
 	if (!_idleZombAnimation)
 		warning("ShelterZombiniville: Failed to load attenteZomb2.anm");
 	for (uint i = 0; i < _boardingZoombinis.size(); i++)
 		_boardingZoombinis[i]->setDefaultAnimation(_littleZombAnimation, 66);
 
 	_nameFont = new BitmapFont(_vm);
-	if (!_nameFont->load(Common::Path("bmp/typo"), 16, 16, 16))
+	if (!_nameFont->load(Common::Path(kNameFontPath), 16, 16, 16))
 		warning("ShelterZombiniville: Failed to load name font");
 
 	setupFeatureRects();
 	setupHoverRunners();
-	_pageLayerStack->setScrollLocked(true);
+	_vm->_gfx->getPageLayerStack()->setScrollLocked(true);
 	resetSelectedFeatures();
 	_currentName.clear();
 
 	SoundManager *sound = _vm->getSoundManager();
-	_musicId = sound->load(true, Common::Path("#sounds/music/ZMR-PickerScreen.wav"), true);
+	_musicId = sound->load(true, Common::Path(kMusicPath), true);
 	if (0 <= _musicId)
 		sound->playLoop(_musicId);
-	_sndFeatureSelect = sound->load(false, Common::Path("sounds/fx/Z-BS11.wav"), false);
-	_sndQuickFill = sound->load(false, Common::Path("sounds/fx/Z-BS12.wav"), false);
-	_sndBatchFill = sound->load(false, Common::Path("sounds/fx/Z-BS13.wav"), false);
-	_sndValidZoombini = sound->load(false, Common::Path("sounds/fx/Z-BS14.wav"), false);
-	_sndWrongZoombini = sound->load(false, Common::Path("sounds/fx/WrongZ.wav"), false);
+	_sndFeatureSelect = sound->load(false, Common::Path(kFeatureSelectSoundPath), false);
+	_sndQuickFill = sound->load(false, Common::Path(kQuickFillSoundPath), false);
+	_sndBatchFill = sound->load(false, Common::Path(kBatchFillSoundPath), false);
+	_sndValidZoombini = sound->load(false, Common::Path(kValidZoombiniSoundPath), false);
+	_sndWrongZoombini = sound->load(false, Common::Path(kWrongZoombiniSoundPath), false);
 }
 
 void ShelterZombiniville::refreshFeatureCounts() {
@@ -338,14 +352,81 @@ bool ShelterZombiniville::passesPackTraitLimits(const ZmbTrait &traits) const {
 }
 
 Common::String ShelterZombiniville::generateName() {
-	static const char *const kVowelPairs[30] = {
-		"a ", "a ", "a ", "e ", "e ", "e ", "e ", "i ", "i ", "i ", "o ", "o ", "o ", "u ", "u ",
-		"y ", "ee", "oo", "yo", "ya", "ye", "ei", "ie", "ai", "ia", "au", "ua", "uo", "ou", "ae"};
-	static const char kSingleConsonants[] = "bbccdddfghjkkllmmnnprrssssttvwx";
-	static const char kEndings[] = "aeiou";
-	static const char *const kConsonantPairs[39] = {
-		"bl", "br", "ch", "cl", "cr", "dr", "dw", "fl", "fr", "gh", "gl", "gr", "kl", "kn", "kr", "kw", "ld", "mp", "nd", "nh",
-		"nn", "ph", "pl", "pr", "qu", "qu", "rh", "rn", "sc", "sl", "sm", "sn", "sp", "sr", "st", "sw", "th", "tr", "tw"};
+	static constexpr char *const kVowelPairs[30] = {
+		"a ",
+		"a ",
+		"a ",
+		"e ",
+		"e ",
+		"e ",
+		"e ",
+		"i ",
+		"i ",
+		"i ",
+		"o ",
+		"o ",
+		"o ",
+		"u ",
+		"u ",
+		"y ",
+		"ee",
+		"oo",
+		"yo",
+		"ya",
+		"ye",
+		"ei",
+		"ie",
+		"ai",
+		"ia",
+		"au",
+		"ua",
+		"uo",
+		"ou",
+		"ae",
+	};
+	static constexpr char kSingleConsonants[] = "bbccdddfghjkkllmmnnprrssssttvwx";
+	static constexpr char kEndings[] = "aeiou";
+	static constexpr char *const kConsonantPairs[39] = {
+		"bl",
+		"br",
+		"ch",
+		"cl",
+		"cr",
+		"dr",
+		"dw",
+		"fl",
+		"fr",
+		"gh",
+		"gl",
+		"gr",
+		"kl",
+		"kn",
+		"kr",
+		"kw",
+		"ld",
+		"mp",
+		"nd",
+		"nh",
+		"nn",
+		"ph",
+		"pl",
+		"pr",
+		"qu",
+		"qu",
+		"rh",
+		"rn",
+		"sc",
+		"sl",
+		"sm",
+		"sn",
+		"sp",
+		"sr",
+		"st",
+		"sw",
+		"th",
+		"tr",
+		"tw",
+	};
 
 	char name[8] = {};
 	const int targetLength = _vm->_rnd->getRandomNumber(1) + 4;
@@ -491,8 +572,7 @@ ZoombiniRunner *ShelterZombiniville::getDraggedZoombini() const {
 }
 
 void ShelterZombiniville::onRenderContent(ManagedSurface32 *screen) {
-	if (_background)
-		_background->drawToSurface(screen, Common::Point32(0, 0));
+	_vm->_gfx->drawBackground(screen, Common::Point32(0, 0));
 	drawHoverRunners(screen);
 
 	if (hasActiveEntrance() && _nameFont && _nameFont->isLoaded()) {
@@ -554,16 +634,15 @@ void ShelterZombiniville::drawHoverRunners(ManagedSurface32 *screen) {
 }
 
 void ShelterZombiniville::updateHoverRunners() {
-	const bool partyFull = static_cast<int>(_boardingZoombinis.size()) == kMaxPackSize;
 	for (int feature = 0; feature < ZmbTrait::kTraitCount; feature++) {
 		for (int value = 0; value < ZmbTrait::kTraitValueCount; value++)
 			_featureButtonRunners[feature][value]->setHitTestEnabled(_featureCounts[feature][value + 1] < 5);
 	}
-	_quickFillButtonRunner->setHitTestEnabled(!partyFull);
-	_batchFillButtonRunner->setHitTestEnabled(!partyFull);
+	// Quick Fill and Batch Fill keep the enabled flag from setup, mirroring
+	// the original, which never refreshes them after SetRect.
 	_createButtonRunner->setHitTestEnabled(canCreateSelectedZoombini());
 
-	if (!_pageLayerStack->isScrollLocked() || getDraggedZoombini())
+	if (!_vm->_gfx->getPageLayerStack()->isScrollLocked() || getDraggedZoombini())
 		return;
 
 	const Common::Point32 mousePos = _vm->getMousePos();
@@ -575,11 +654,10 @@ void ShelterZombiniville::updateHoverRunners() {
 				runner->reset(tick);
 		}
 	}
-	AnimationRunner *const actionRunners[] = {_quickFillButtonRunner, _batchFillButtonRunner, _createButtonRunner};
-	for (uint i = 0; i < ARRAYSIZE(actionRunners); i++) {
-		if (actionRunners[i]->isHitTestEnabled() && actionRunners[i]->containsHitPoint(mousePos))
-			actionRunners[i]->reset(tick);
-	}
+	// The quick/batch/create overlays are deliberately excluded here. In the
+	// original (ShelterZombiniville__Update_43C880) the hover loop covers only
+	// the 20 trait runners; the bumper overlays start exclusively on press
+	// through PageLayer__ActivateRunnersAt_459E70.
 }
 
 void ShelterZombiniville::onPostRender() {
@@ -605,6 +683,9 @@ EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
 	}
 
 	if (_createButtonRunner->containsHitPoint(Common::Point32(pos))) {
+		// The bumper overlays are not layer-registered, so start them here: the
+		// original starts them on every press through ActivateRunnersAt.
+		_createButtonRunner->start(_vm->getGameTickCount());
 		if (!canCreateSelectedZoombini() || !createZoombini(false)) {
 			if (0 <= _sndWrongZoombini)
 				_vm->getSoundManager()->playWithVolume(_sndWrongZoombini, _vm->getSoundManager()->_volumeSFX);
@@ -615,36 +696,42 @@ EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
 		return EventHandleResult::kConsumed;
 	}
 
-	if (_quickFillButtonRunner->containsHitPoint(Common::Point32(pos)) && static_cast<int>(_boardingZoombinis.size()) < kMaxPackSize && !hasActiveEntrance()) {
-		if (0 <= _sndQuickFill)
-			_vm->getSoundManager()->playWithVolume(_sndQuickFill, _vm->getSoundManager()->_volumeSFX);
-		if (_vm->getGameState()->hasReachedZoombiniRegistrationLimit()) {
-			return EventHandleResult::kConsumed;
+	if (_quickFillButtonRunner->containsHitPoint(Common::Point32(pos))) {
+		_quickFillButtonRunner->start(_vm->getGameTickCount());
+		if (static_cast<int>(_boardingZoombinis.size()) < kMaxPackSize && !hasActiveEntrance()) {
+			if (0 <= _sndQuickFill)
+				_vm->getSoundManager()->playWithVolume(_sndQuickFill, _vm->getSoundManager()->_volumeSFX);
+			if (_vm->getGameState()->hasReachedZoombiniRegistrationLimit()) {
+				return EventHandleResult::kConsumed;
+			}
+			do {
+				randomizeSelectedFeatures();
+			} while (!createZoombini(false));
 		}
-		do {
-			randomizeSelectedFeatures();
-		} while (!createZoombini(false));
 		return EventHandleResult::kConsumed;
 	}
 
-	if (_batchFillButtonRunner->containsHitPoint(Common::Point32(pos)) && static_cast<int>(_boardingZoombinis.size()) < kMaxPackSize && !hasActiveEntrance()) {
-		if (0 <= _sndBatchFill)
-			_vm->getSoundManager()->playWithVolume(_sndBatchFill, _vm->getSoundManager()->_volumeSFX);
-		randomizeSelectedFeatures();
-		while (static_cast<int>(_boardingZoombinis.size()) < kMaxPackSize) {
-			if (_vm->getGameState()->hasReachedZoombiniRegistrationLimit())
-				break;
-			do {
-				randomizeSelectedFeatures();
-			} while (!createZoombini(true));
-		}
-		if (!_boardingZoombinis.empty()) {
-			const ZoombiniRunner *last = _boardingZoombinis.back();
-			for (int feature = 0; feature < ZmbTrait::kTraitCount; feature++) {
-				const ZmbTrait::TraitIndex traitIndex = static_cast<ZmbTrait::TraitIndex>(feature);
-				const byte value = last->_traits.getValue(traitIndex);
-				_stations[feature].selectedValue = value;
-				_vm->_selectedFeatures[feature] = value;
+	if (_batchFillButtonRunner->containsHitPoint(Common::Point32(pos))) {
+		_batchFillButtonRunner->start(_vm->getGameTickCount());
+		if (static_cast<int>(_boardingZoombinis.size()) < kMaxPackSize && !hasActiveEntrance()) {
+			if (0 <= _sndBatchFill)
+				_vm->getSoundManager()->playWithVolume(_sndBatchFill, _vm->getSoundManager()->_volumeSFX);
+			randomizeSelectedFeatures();
+			while (static_cast<int>(_boardingZoombinis.size()) < kMaxPackSize) {
+				if (_vm->getGameState()->hasReachedZoombiniRegistrationLimit())
+					break;
+				do {
+					randomizeSelectedFeatures();
+				} while (!createZoombini(true));
+			}
+			if (!_boardingZoombinis.empty()) {
+				const ZoombiniRunner *last = _boardingZoombinis.back();
+				for (int feature = 0; feature < ZmbTrait::kTraitCount; feature++) {
+					const ZmbTrait::TraitIndex traitIndex = static_cast<ZmbTrait::TraitIndex>(feature);
+					const byte value = last->_traits.getValue(traitIndex);
+					_stations[feature].selectedValue = value;
+					_vm->_selectedFeatures[feature] = value;
+				}
 			}
 		}
 		return EventHandleResult::kConsumed;
@@ -654,13 +741,13 @@ EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
 
 EventHandleResult ShelterZombiniville::onLButtonUp(const Common::Point &pos) {
 	const ZoombiniInputResult result = ZoombiniRunner::handlePointerInput(_boardingZoombinis, Common::Point32(pos.x, pos.y), true,
-																 _pickupZombAnimation, _vm->getGameTickCount(), nullptr, _areaMask);
+																		  _pickupZombAnimation, _vm->getGameTickCount(), nullptr, getAreaMask());
 	return result == ZoombiniInputResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 
 EventHandleResult ShelterZombiniville::onMouseMove(const Common::Point &pos) {
 	const ZoombiniInputResult result = ZoombiniRunner::handlePointerInput(_boardingZoombinis, Common::Point32(pos.x, pos.y), false,
-																 _pickupZombAnimation, _vm->getGameTickCount(), nullptr, _areaMask);
+																		  _pickupZombAnimation, _vm->getGameTickCount(), nullptr, getAreaMask());
 	return result == ZoombiniInputResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 

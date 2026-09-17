@@ -68,6 +68,17 @@ public:
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
 
 private:
+	/** Resource paths and formats used by the help overlay. */
+	static constexpr const char *kHelpFramePath = "Bmp/MENU/help_screen_main.rb";
+	static constexpr const char *kPlaceholderPath = "Bmp/MENU/help_screen_placeholder.rb";
+	static constexpr const char *kOkButtonNormalPath = "Bmp/MENU/help_screen_okbutton_normal.bb";
+	static constexpr const char *kOkButtonPushedPath = "Bmp/MENU/help_screen_okbutton_pushed.bb";
+	static constexpr const char *kLeftArrowNormalPath = "Bmp/MENU/help_screen_leftarro_norma.bb";
+	static constexpr const char *kLeftArrowEmptyPath = "Bmp/MENU/help_screen_leftarro_empty.bb";
+	static constexpr const char *kRightArrowNormalPath = "Bmp/MENU/help_screen_rightarro_norma.bb";
+	static constexpr const char *kRightArrowEmptyPath = "Bmp/MENU/help_screen_rightarro_empty.bb";
+	static constexpr const char *kHelpPageFormat = "Bmp/help/%02d_help_%s_%02d.bb";
+
 	/** Replace the active help bitmap with the requested sheet. */
 	bool loadPage(int puzzleId, int level, int page);
 	/** Release the active help-sheet bitmap. */

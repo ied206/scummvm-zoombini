@@ -40,13 +40,26 @@ public:
 	/** Return whether this dialog currently owns drawing and input. */
 	virtual bool isActive() const = 0;
 	/** Close the dialog and restore any retained page state. */
-	virtual void close() = 0;
-	/** Draw the dialog over @p screen. */
+	virtual void close() = 0;	/** Draw the dialog over @p screen. */
 	virtual void onRenderContent(ManagedSurface32 *screen) override = 0;
 	/** Handle a game-space click while the modal blocks its underlying page. */
 	virtual EventHandleResult onLButtonDown(const Common::Point &pos) override = 0;
 	/** Update dialog hover state for @p pos. */
 	virtual EventHandleResult onMouseMove(const Common::Point &pos) override = 0;
+
+protected:
+	/** Semantic action represented by the common dialog completion keys. */
+	enum DialogKeyAction {
+		kDialogKeyNone,
+		kDialogKeyAccept,
+		kDialogKeyCancel
+	};
+
+	/**
+	 * Classify Return, keypad Enter, and Escape without choosing a button.
+	 * Concrete dialogs retain ownership of action mapping and dialog state.
+	 */
+	static DialogKeyAction classifyDialogKey(const Common::KeyState &kbd);
 };
 
 } // End of namespace Zoombini2

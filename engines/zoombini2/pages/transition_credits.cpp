@@ -29,6 +29,9 @@
 
 namespace Zoombini2 {
 
+constexpr const char *TransitionCredits::kBackgroundPath;
+constexpr const char *TransitionCredits::kMusicPath;
+
 TransitionCredits::TransitionCredits(Zoombini2Engine *vm)
 	: TransitionBase(vm) {
 	_pageId = kPageCredits;
@@ -48,7 +51,7 @@ void TransitionCredits::init() {
 	static constexpr uint32 kInitialHoldMilliseconds = 4000;
 
 	_background = new BitBlock(_vm);
-	if (!_background->load(Common::Path("#bmp/credits/credits"))) {
+	if (!_background->load(Common::Path(kBackgroundPath))) {
 		warning("TransitionCredits: Failed to load bmp/credits/credits");
 	}
 
@@ -66,7 +69,7 @@ void TransitionCredits::init() {
 	_lastUpdateTime = _vm->getGameTickCount();
 
 	SoundManager *sm = _vm->getSoundManager();
-	_musicId = sm->load(true, Common::Path("#sounds/music/ZMR-Transition.wav"), true);
+	_musicId = sm->load(true, Common::Path(kMusicPath), true);
 	if (_musicId >= 0) {
 		sm->playLoop(_musicId);
 		sm->setVolume(_musicId, sm->_volumeMusic);

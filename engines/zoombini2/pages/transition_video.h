@@ -57,6 +57,18 @@ public:
 	bool needsScreenClear() const override { return true; }
 
 private:
+	/** Bink movie resources for the intro, cutscenes, and studio logos. */
+	static constexpr const char *kLogoTlcPath = "movies/tlclogo.bik";
+	static constexpr const char *kLogoTlcHalfPath = "movies/tlclogo50%.bik";
+	static constexpr const char *kLogoPolygonPath = "movies/logopoly.bik";
+	static constexpr const char *kCutsceneFirstPath = "movies/zoom_movie1_100%.bik";
+	static constexpr const char *kCutsceneFirstHalfPath = "movies/zoom_movie1_50%.bik";
+	static constexpr const char *kCutsceneSecondPath = "movies/zoom_movie2_100%.bik";
+	static constexpr const char *kCutsceneSecondHalfPath = "movies/zoom_movie2_50%.bik";
+	static constexpr const char *kCutsceneThirdPath = "movies/zoom_movie3_100%.bik";
+	static constexpr const char *kCutsceneThirdHalfPath = "movies/zoom_movie3_50%.bik";
+	static constexpr const char *kLogoArisuPath = "movies/arisu.bik";
+
 	EventHandleResult skip();
 	/** Select the full-size movie when present, otherwise use the half-size path. */
 	Common::Path selectMoviePath(const char *fullSizePath, const char *halfSizePath) const;

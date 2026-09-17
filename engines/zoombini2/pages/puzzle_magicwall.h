@@ -85,8 +85,40 @@ private:
 		kColorCount
 	};
 
-	/** Resource-name fragments indexed by @ref MagicWallPuzzle::Color. */
-	static const char *kColorNames[kColorCount];
+	/** Resource-name fragments indexed by @ref PuzzleMagicWall::Color. */
+	static constexpr const char *kColorNames[kColorCount] = {
+		"blue",
+		"green",
+		"navy",
+		"orange",
+		"purple",
+		"red",
+		"rose",
+		"turquoise",
+		"violet",
+		"yellow",
+	};
+
+	/** Resource paths and formats used by the Beetle Bug Alley scene. */
+	static constexpr const char *kMusicPath = "#sounds/music/06-BB01.wav";
+	static constexpr const char *kApprovalFormat = "sounds/6-A%d.wav";
+	static constexpr const char *kErrorFormat = "sounds/6-E%d.wav";
+	static constexpr const char *kHintFormat = "sounds/6-H%d.wav";
+	static constexpr const char *kGateOpenPath = "sounds/fx/06-BS01.wav";
+	static constexpr const char *kZoombiniMovePath = "sounds/fx/06-BS02.wav";
+	static constexpr const char *kDotFormat = "bmp/magic_wall/DOT-%s";
+	static constexpr const char *kBugFormat = "bmp/magic_wall/bug_c_%s";
+	static constexpr const char *kMiniMapPath = "bmp/magic_wall/mini-map";
+	static constexpr const char *kMiniMapDotPath = "bmp/magic_wall/mini-map-dot";
+	static constexpr const char *kMiniLightFormat = "bmp/magic_wall/mini-light-%s";
+	static constexpr const char *kGlowwormPath = "bmp/magic_wall/le_vier_luisant";
+	static constexpr const char *kGlowwormAnimPath = "bmp/magic_wall/le_vier";
+	static constexpr const char *kGateFormat = "bmp/magic_wall/%s";
+	static constexpr const char *kCrystalFormat = "bmp/magic_wall/Crystal%d";
+	static constexpr const char *kExitPathFormat = "bmp/magic_wall/PAT/EXIT%d.PAT";
+	static constexpr const char *kBougePathFormat = "bmp/magic_wall/PAT/BOUGE%d.PAT";
+	/** Gate animation name fragments consumed by @ref kGateFormat. */
+	static constexpr const char *kGateNames[4] = {"porte-A", "porte-B", "porte-C", "porte-D"};
 
 	/** Runtime phase of the Beetle Bug Alley interaction. */
 	enum State {

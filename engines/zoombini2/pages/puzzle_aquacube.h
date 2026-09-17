@@ -60,6 +60,35 @@ public:
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 
 private:
+	/** Resource paths used by the Aqua Cube scene. */
+	static constexpr const char *kMusicPath = "#sounds/music/03-BB01.wav";
+	static constexpr const char *kBallPath = "bmp/aquacube/ball";
+	static constexpr const char *kBallBigPath = "bmp/aquacube/ballBIG";
+	static constexpr const char *kLightPath = "bmp/aquacube/light";
+	static constexpr const char *kCubeEasyPaths[3] = {
+		"bmp/aquacube/kub_easy_01",
+		"bmp/aquacube/kub_easy_02",
+		"bmp/aquacube/kub_easy_03",
+	};
+	static constexpr const char *kCubeHardPaths[3] = {
+		"bmp/aquacube/kub_hard_01",
+		"bmp/aquacube/kub_hard_02",
+		"bmp/aquacube/kub_hard_03",
+	};
+	static constexpr const char *kManetteOnPath = "bmp/aquacube/control_manetteON";
+	static constexpr const char *kManetteOffPath = "bmp/aquacube/control_manetteOFF";
+	static constexpr const char *kShotsOnPath = "bmp/aquacube/control_shotsON";
+	static constexpr const char *kShotsOffPath = "bmp/aquacube/control_shotsOFF";
+	static constexpr const char *kLightRedPath = "bmp/aquacube/control_manette_lightRED";
+	static constexpr const char *kLightGreyPath = "bmp/aquacube/control_manette_lightGREY";
+	static constexpr const char *kWarpOnPath = "bmp/aquacube/control_warpBUTTON_ON";
+	static constexpr const char *kWarpOffPath = "bmp/aquacube/control_warpBUTTON_OFF";
+	static constexpr const char *kWarpDisablePath = "bmp/aquacube/control_warpBUTTON_DISABLE";
+	static constexpr const char *kWarpTimerPath = "bmp/aquacube/control_warpTIMER";
+	static constexpr const char *kFlareFormat = "bmp/aquacube/FLARE%d";
+	static constexpr const char *kBubbleFormat = "bmp/aquacube/bubble%d";
+	static constexpr const char *kFleenFormat = "bmp/aquacube/fleen/fixe/f%dfixe";
+
 	/** One cube-graph vertex with adjacency, display, and occupant state. */
 	struct GraphNode {
 		/** Adjacent vertex indices, with `-1` marking a missing edge. */
@@ -119,7 +148,7 @@ private:
 	/** Time at which the current ball movement began. */
 	uint32 _moveStartTime = 0;
 	/** Duration of one graph-edge movement in milliseconds. */
-	static const uint32 kMoveAnimDuration = 680;
+	static constexpr uint32 kMoveAnimDuration = 680;
 
 	/** Number of Zoombinis placed on the graph for this level. */
 	int _numZoombinisToPlace = 3;
@@ -189,9 +218,35 @@ private:
 	int _freedCount = 0;
 
 	/** Direction labels for the eight-node cube. */
-	static const char kGraph1DirLabels[8][4];
+	static constexpr char kGraph1DirLabels[8][4] = {
+		{'D', 'L', 'F', 0}, // Node 0
+		{'D', 'R', 'F', 0}, // Node 1
+		{'U', 'R', 'F', 0}, // Node 2
+		{'U', 'L', 'F', 0}, // Node 3
+		{'D', 'L', 'B', 0}, // Node 4
+		{'D', 'R', 'B', 0}, // Node 5
+		{'U', 'R', 'B', 0}, // Node 6
+		{'U', 'L', 'B', 0}  // Node 7
+	};
 	/** Direction labels for the sixteen-node cube. */
-	static const char kGraph2DirLabels[16][4];
+	static constexpr char kGraph2DirLabels[16][4] = {
+		{'D', 'L', 'F', 'X'}, // Node 0
+		{'D', 'R', 'F', 'X'}, // Node 1
+		{'U', 'R', 'F', 'X'}, // Node 2
+		{'U', 'L', 'F', 'X'}, // Node 3
+		{'D', 'L', 'F', 'C'}, // Node 4
+		{'D', 'R', 'F', 'C'}, // Node 5
+		{'U', 'R', 'F', 'C'}, // Node 6
+		{'U', 'L', 'F', 'C'}, // Node 7
+		{'D', 'L', 'B', 'C'}, // Node 8
+		{'D', 'R', 'B', 'C'}, // Node 9
+		{'U', 'R', 'B', 'C'}, // Node 10
+		{'U', 'L', 'B', 'C'}, // Node 11
+		{'D', 'L', 'B', 'X'}, // Node 12
+		{'D', 'R', 'B', 'X'}, // Node 13
+		{'U', 'R', 'B', 'X'}, // Node 14
+		{'U', 'L', 'B', 'X'}  // Node 15
+	};
 
 	/** Populate the graph topology selected by level. */
 	void loadGraph();

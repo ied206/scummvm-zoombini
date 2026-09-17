@@ -54,6 +54,30 @@ public:
 	/** Return the resource-directory name belonging to @p puzzleId. */
 	static const char *getPuzzleDir(int puzzleId);
 
+private:
+	/** Resource path format. */
+	static constexpr const char *kPuzzleBackgroundFormat = "#bmp/%s";
+	/** Resource path. */
+	static constexpr const char *kZoombiniAnimationPath = "bmp/zombis/littleZomb.anm";
+	/** Resource path. */
+	static constexpr const char *kCrazyTurtleBackgroundPath = "crazy_turtle/background";
+	/** Resource path. */
+	static constexpr const char *kWaterslideBackgroundPath = "waterslide/waterslides";
+	/** Resource path. */
+	static constexpr const char *kAquacubeBackgroundPath = "aquacube/background";
+	/** Resource path. */
+	static constexpr const char *kMysticMarshBackgroundPath = "mystic_marsh/background1";
+	/** Resource path. */
+	static constexpr const char *kMagicWallBackgroundPath = "magic_wall/magic wall";
+	/** Resource path. */
+	static constexpr const char *kWallOfFleensBackgroundPath = "wall_of_fleens/background";
+	/** Resource path. */
+	static constexpr const char *kChezNorfBackgroundPath = "chez_norf/baquegund";
+	/** Resource path. */
+	static constexpr const char *kSnowboardBackgroundPath = "snowboard/snowboard-EASY";
+	/** Resource path. */
+	static constexpr const char *kBooliesBackgroundPath = "Boolies/background";
+
 protected:
 	/** Replace the first page layer's background and refresh the borrowed compatibility pointer. */
 	bool loadPrimaryLayerBackground(const Common::Path &path);

@@ -58,6 +58,24 @@ public:
 	static int getRescuedBooliesPerZoombini(int level);
 
 private:
+	/** Resource paths and formats used by the bowling scene. */
+	static constexpr const char *kMusicPath = "#sounds/music/09-BB01.wav";
+	static constexpr const char *kBallPosPath = "bmp/boolies/ball_pos";
+	static constexpr const char *kBallNegPath = "bmp/boolies/ball_neg";
+	static constexpr const char *kPinPath = "bmp/boolies/pin";
+	static constexpr const char *kPinLightedPath = "bmp/boolies/pin_lighted";
+	static constexpr const char *kBoatPath = "bmp/boolies/bateau";
+	static constexpr const char *kSpotFormat = "bmp/boolies/spot%02d";
+	static constexpr const char *kBlockerPath = "bmp/boolies/blocker";
+	static constexpr const char *kFixePath = "bmp/boolies/fixe";
+	static constexpr const char *kFixe2Path = "bmp/boolies/fixe2";
+	static constexpr const char *kMarchePath = "bmp/boolies/marche";
+	static constexpr const char *kMarche2Path = "bmp/boolies/marche2";
+	static constexpr const char *kAttendPath = "bmp/boolies/attend";
+	static constexpr const char *kAttend2Path = "bmp/boolies/attend2";
+	static constexpr const char *kRollPath = "bmp/boolies/roll";
+	static constexpr const char *kRoll2Path = "bmp/boolies/roll2";
+
 	/** Polarity assigned to a rolling Zoombini. */
 	enum BallType {
 		/** No ball is currently assigned. */

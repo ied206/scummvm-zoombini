@@ -32,7 +32,12 @@
 
 namespace Zoombini2 {
 
-static const int kRescue1MovieMinimumZoombinis = 8;
+constexpr const char *TransitionMapTrans::kSpeechFormat;
+constexpr const char *TransitionMapTrans::kRouteFormat;
+constexpr const char *TransitionMapTrans::kZoombiniAnimationPath;
+constexpr const char *TransitionMapTrans::kMusicPath;
+
+static constexpr int kRescue1MovieMinimumZoombinis = 8;
 
 // ============================================================================
 // TransitionMapTrans - route-map transition.
@@ -58,7 +63,7 @@ void TransitionMapTrans::queueSpeech(const Common::String &name) {
 	SoundManager *sound = _vm->getSoundManager();
 	if (!sound)
 		return;
-	const Common::Path path(Common::String::format("sounds/%s.wav", name.c_str()));
+	const Common::Path path(Common::String::format(kSpeechFormat, name.c_str()));
 	_speechIds.push_back(sound->load(true, path, false));
 }
 
@@ -269,7 +274,7 @@ void TransitionMapTrans::init() {
 		patName = "Transition02.pat";
 		break;
 	}
-	_patPath = Common::Path(Common::String::format("bmp/maptrans/%s", patName.c_str()));
+	_patPath = Common::Path(Common::String::format(kRouteFormat, patName.c_str()));
 
 	_targetPageId = getDestPage(src, routeBranch, _vm->getGameState()->_rescuedBoolieCount);
 	if (_targetPageId == kPageNone) {
@@ -283,7 +288,7 @@ void TransitionMapTrans::init() {
 	delete _compositedBg;
 	_compositedBg = _vm->_gfx->createMapTransitionBackground(src, mapRegion, routeBranch);
 
-	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path("bmp/transition1/PitiZomb3.anm"), 50);
+	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path(kZoombiniAnimationPath), 50);
 	if (!_zoombiniAnimation)
 		warning("MapTransition: Failed to load PitiZomb3.anm");
 
@@ -308,7 +313,7 @@ void TransitionMapTrans::init() {
 
 	// Play transition music
 	_musicId = _vm->getSoundManager()->load(true,
-											Common::Path("#sounds/music/ZMR-Transition.wav"), true);
+											Common::Path(kMusicPath), true);
 	if (_musicId >= 0)
 		_vm->getSoundManager()->play(_musicId);
 	updateSpeechQueue();

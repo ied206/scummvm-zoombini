@@ -24,12 +24,12 @@
 #include "engines/advancedDetector.h"
 #include "zoombini2/detection_tables.h"
 
-static const PlainGameDescriptor zoombini2Games[] = {
+static constexpr PlainGameDescriptor zoombini2Games[] = {
 	{"zoombini2", "Zoombinis: Mountain Rescue"},
 	{nullptr, nullptr},
 };
 
-static const char *const directoryGlobs[] = {
+static constexpr char *const directoryGlobs[] = {
 	"Data",
 	"INSTALL",
 	"HD",
@@ -37,7 +37,8 @@ static const char *const directoryGlobs[] = {
 	"ZOMBIS",
 	"Sounds",
 	"movies",
-	nullptr};
+	nullptr,
+};
 
 class Zoombini2MetaEngineDetection : public AdvancedMetaEngineDetection<Zoombini2::Zoombini2GameDescription> {
 public:

@@ -56,6 +56,12 @@ public:
 	static PageId getDestPage(PageId src, RouteBranch routeBranch, int rescuedBoolies);
 
 private:
+	/** Resource paths and formats used by the map transition. */
+	static constexpr const char *kSpeechFormat = "sounds/%s.wav";
+	static constexpr const char *kRouteFormat = "bmp/maptrans/%s";
+	static constexpr const char *kZoombiniAnimationPath = "bmp/transition1/PitiZomb3.anm";
+	static constexpr const char *kMusicPath = "#sounds/music/ZMR-Transition.wav";
+
 	/** Start any due walkers and update all active party paths. */
 	void walkZoombinis();
 	/** Clear the paths and walking state assigned to the walking Zoombinis. */
