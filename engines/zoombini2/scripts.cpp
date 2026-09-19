@@ -1193,16 +1193,7 @@ Common::Point32 ZoombiniRunner::getDrawPosition(int scrollX, int backgroundWidth
 
 void ZoombiniRunner::draw(ManagedSurface32 *screen, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip,
 						  int scrollX, int backgroundWidth, const RleBlock *dropTargetIndicator) const {
-	if (!screen || !_activeAnimation || _hidden)
-		return;
-	const Common::Rect32 spriteRect = getSpriteRect(scrollX, backgroundWidth);
-	if (spriteRect.right <= 0 || spriteRect.bottom <= 0 || screen->w <= spriteRect.left || screen->h <= spriteRect.top)
-		return;
-	const Common::Point32 drawPos = getDrawPosition(scrollX, backgroundWidth);
-	if (_dragging && _hoveredDropTargetIndex != -1 && dropTargetIndicator)
-		dropTargetIndicator->drawToScreen(screen, drawPos, alphaLUT);
-	const int frame = _animationActive ? _animationFrame : 0;
-	_activeAnimation->drawZoombini(screen, _traits, drawPos, _animationCell, frame, alphaLUT, clip);
+	Gfx::drawZoombiniRunner(screen, this, alphaLUT, clip, scrollX, backgroundWidth, dropTargetIndicator);
 }
 
 Common::Rect32 ZoombiniRunner::getSpriteRect(int scrollX, int backgroundWidth) const {

@@ -21,12 +21,12 @@
 
 #include <string.h>
 
+#include "common/algorithm.h"
 #include "common/callback.h"
 #include "common/debug.h"
 #include "zoombini2/graphics.h"
 #include "zoombini2/pages/dialog_msgbox.h"
 #include "zoombini2/pages/interactive_menu.h"
-#include "zoombini2/pages/save_file_list.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
@@ -448,6 +448,350 @@ void InteractiveMenu::playSound(int soundId) {
 	SoundManager *sound = _vm->getSoundManager();
 	if (sound && 0 <= soundId)
 		sound->playWithVolume(soundId, sound->_volumeSFX);
+}
+
+InteractiveMenu::SaveFileList::SaveFileList(Zoombini2Engine *vm, const Common::Point32 &pos, RleBlock *selectionBar)
+	: _vm(vm), _pos(pos), _selectionBar(selectionBar) {
+}
+
+bool InteractiveMenu::SaveFileList::init() {
+	return _vm->_gfx->loadTextFont(Gfx::TextColor::kDark00) &&
+		   _vm->_gfx->loadTextFont(Gfx::TextColor::kBlue01) &&
+		   _vm->_gfx->loadTextFont(Gfx::TextColor::kGreen02);
+}
+
+void InteractiveMenu::SaveFileList::clear() {
+	_items.clear();
+	_editBuffer.clear();
+	_editState = kEditIdle00;
+	_selectedIndex = 0;
+	_scrollOffset = 0;
+	_validSelection = false;
+}
+
+bool InteractiveMenu::SaveFileList::addItemSorted(const Common::String &name) {
+	if (kMaximumItems <= static_cast<int>(_items.size()) || name.empty() ||
+		kMaximumNameLength < static_cast<int>(name.size()))
+		return false;
+
+	insertItem(findInsertionPoint(name), name);
+	_selectedIndex = 0;
+	_scrollOffset = 0;
+	_validSelection = true;
+	return true;
+}
+
+void InteractiveMenu::SaveFileList::draw(ManagedSurface32 *screen, const AlphaBlendLUT &alphaLUT) const {
+	for (int row = 0; row < kVisibleRows; ++row) {
+		const int itemIndex = _scrollOffset + row;
+		if (static_cast<int>(_items.size()) <= itemIndex)
+			break;
+
+		const bool selected = itemIndex == _selectedIndex;
+		if (selected && _selectionBar && _selectionBar->isValid()) {
+			_selectionBar->drawToScreen(screen, Common::Point32(_pos.x + kSelectionOffsetX, _pos.y + kSelectionOffsetY + row * kRowStride), alphaLUT);
+		}
+
+		Gfx::TextColor color = Gfx::TextColor::kDark00;
+		if (selected && _editState == kEditPrefixMatch01)
+			color = Gfx::TextColor::kBlue01;
+		else if (selected && kEditProvisional02 <= _editState)
+			color = Gfx::TextColor::kGreen02;
+
+		const Common::Point32 textPos(_pos.x + kSelectionOffsetX + kTextOffsetX, _pos.y + kSelectionOffsetY + kTextOffsetY + row * kRowStride);
+		_vm->_gfx->drawText(screen, color, textPos, _items[itemIndex]);
+	}
+}
+
+bool InteractiveMenu::SaveFileList::handleClick(const Common::Point &pos) {
+	if (kEditPrefixMatch01 < _editState || !_selectionBar || !_selectionBar->isValid())
+		return false;
+
+	const int left = _pos.x + kSelectionOffsetX;
+	const int top = _pos.y + kSelectionOffsetY;
+	const Size32 selectionSize(_selectionBar->getSize().width, _selectionBar->getSize().height * kVisibleRows);
+	if (pos.x < left || left + selectionSize.width <= pos.x || pos.y < top || top + selectionSize.height <= pos.y)
+		return false;
+
+	const int row = (pos.y - top) / kRowStride;
+	const int itemIndex = _scrollOffset + row;
+	if (row < 0 || kVisibleRows <= row || static_cast<int>(_items.size()) <= itemIndex)
+		return false;
+
+	_selectedIndex = itemIndex;
+	_editBuffer.clear();
+	_editState = kEditIdle00;
+	_validSelection = true;
+	return true;
+}
+
+InteractiveMenu::SaveFileList::TextInputResult InteractiveMenu::SaveFileList::handleCharacter(char c) {
+	if (!canAppendCharacter(c))
+		return kTextRejected00;
+
+	c = normalizeCharacter(c);
+	_editBuffer += c;
+
+	if (_editState <= kEditPrefixMatch01) {
+		const int matchingIndex = findPrefix(_editBuffer);
+		if (0 <= matchingIndex) {
+			_selectedIndex = matchingIndex;
+			_editState = kEditPrefixMatch01;
+		} else {
+			if (kMaximumItems <= static_cast<int>(_items.size())) {
+				_editBuffer.deleteLastChar();
+				return kTextListFull02;
+			}
+
+			_selectedIndex = findInsertionPoint(_editBuffer);
+			insertItem(_selectedIndex, _editBuffer);
+			_editState = kEditProvisional02;
+		}
+		_validSelection = true;
+	} else if (_editState == kEditProvisional02) {
+		_items[_selectedIndex] = _editBuffer;
+		_validSelection = true;
+	} else {
+		_items[_selectedIndex] = _editBuffer;
+		_validSelection = !isDuplicate(_editBuffer, _selectedIndex);
+	}
+
+	revealSelection();
+	return kTextAccepted01;
+}
+
+bool InteractiveMenu::SaveFileList::handleBackspace() {
+	if (_editBuffer.empty() && _editState != kEditExplicit03)
+		return false;
+	if (_editBuffer.empty()) {
+		removeItem(_selectedIndex);
+		_editState = kEditIdle00;
+		clampSelection();
+		_validSelection = !_items.empty();
+		revealSelection();
+		return true;
+	}
+
+	_editBuffer.deleteLastChar();
+
+	if (_editState == kEditPrefixMatch01) {
+		if (_editBuffer.empty()) {
+			_editState = kEditIdle00;
+			_validSelection = !_items.empty();
+		} else {
+			const int matchingIndex = findPrefix(_editBuffer);
+			if (0 <= matchingIndex)
+				_selectedIndex = matchingIndex;
+			_validSelection = 0 <= matchingIndex;
+		}
+	} else if (_editState == kEditProvisional02) {
+		if (_editBuffer.empty()) {
+			removeItem(_selectedIndex);
+			_editState = kEditIdle00;
+			_selectedIndex = 0;
+			_scrollOffset = 0;
+			_validSelection = !_items.empty();
+		} else {
+			const int provisionalIndex = _selectedIndex;
+			const int matchingIndex = findPrefix(_editBuffer, provisionalIndex);
+			if (0 <= matchingIndex) {
+				removeItem(provisionalIndex);
+				_selectedIndex = matchingIndex;
+				if (provisionalIndex < matchingIndex)
+					_selectedIndex -= 1;
+				_editState = kEditPrefixMatch01;
+			} else {
+				_items[_selectedIndex] = _editBuffer;
+			}
+			_validSelection = true;
+		}
+	} else if (_editState == kEditExplicit03) {
+		if (_editBuffer.empty()) {
+			removeItem(_selectedIndex);
+			_editState = kEditIdle00;
+			clampSelection();
+			_validSelection = !_items.empty();
+		} else {
+			_items[_selectedIndex] = _editBuffer;
+			_validSelection = !isDuplicate(_editBuffer, _selectedIndex);
+		}
+	}
+
+	revealSelection();
+	return true;
+}
+
+void InteractiveMenu::SaveFileList::beginOrConfirmNewEntry() {
+	if (!canBeginNewEntry())
+		return;
+
+	if (_editState == kEditIdle00) {
+		insertItem(0, Common::String());
+		_selectedIndex = 0;
+		_scrollOffset = 0;
+		_editBuffer.clear();
+		_editState = kEditExplicit03;
+		_validSelection = false;
+	} else if (_editState == kEditPrefixMatch01) {
+		insertItem(_selectedIndex, _editBuffer);
+		_editState = kEditExplicit03;
+		_validSelection = !isDuplicate(_editBuffer, _selectedIndex);
+	} else if (_editState == kEditProvisional02) {
+		_editState = kEditExplicit03;
+		_validSelection = !isDuplicate(_editBuffer, _selectedIndex);
+	}
+
+	revealSelection();
+}
+
+void InteractiveMenu::SaveFileList::moveSelectionUp() {
+	if (!canMoveUp())
+		return;
+	_selectedIndex -= 1;
+	_editBuffer.clear();
+	revealSelection();
+}
+
+void InteractiveMenu::SaveFileList::moveSelectionDown() {
+	if (!canMoveDown())
+		return;
+	_selectedIndex += 1;
+	_editBuffer.clear();
+	revealSelection();
+}
+
+void InteractiveMenu::SaveFileList::scrollPageUp() {
+	if (!canPageUp())
+		return;
+	_scrollOffset = MAX(0, _scrollOffset - kVisibleRows);
+	if (_scrollOffset + kVisibleRows <= _selectedIndex)
+		_selectedIndex = _scrollOffset + kVisibleRows - 1;
+}
+
+void InteractiveMenu::SaveFileList::scrollPageDown() {
+	if (!canPageDown())
+		return;
+	_scrollOffset = MIN(static_cast<int>(_items.size()) - kVisibleRows,
+						_scrollOffset + kVisibleRows);
+	if (_selectedIndex < _scrollOffset)
+		_selectedIndex = _scrollOffset;
+}
+
+bool InteractiveMenu::SaveFileList::canMoveUp() const {
+	return _editState == kEditIdle00 && 0 < _selectedIndex;
+}
+
+bool InteractiveMenu::SaveFileList::canMoveDown() const {
+	return _editState == kEditIdle00 && _selectedIndex + 1 < static_cast<int>(_items.size());
+}
+
+bool InteractiveMenu::SaveFileList::canPageUp() const {
+	return _editState == kEditIdle00 && 0 < _scrollOffset;
+}
+
+bool InteractiveMenu::SaveFileList::canPageDown() const {
+	return _editState == kEditIdle00 && _scrollOffset + kVisibleRows < static_cast<int>(_items.size());
+}
+
+bool InteractiveMenu::SaveFileList::canBeginNewEntry() const {
+	return _items.size() < kMaximumItems && !isEditing();
+}
+
+Common::String InteractiveMenu::SaveFileList::getSelectedName() const {
+	if (!_validSelection || _selectedIndex < 0 || static_cast<int>(_items.size()) <= _selectedIndex)
+		return Common::String();
+	return _items[_selectedIndex];
+}
+
+void InteractiveMenu::SaveFileList::deleteSelected() {
+	if (_selectedIndex < 0 || static_cast<int>(_items.size()) <= _selectedIndex)
+		return;
+
+	removeItem(_selectedIndex);
+	_editBuffer.clear();
+	_editState = kEditIdle00;
+	clampSelection();
+	_validSelection = !_items.empty();
+}
+
+int InteractiveMenu::SaveFileList::findInsertionPoint(const Common::String &name) const {
+	int index = 0;
+	while (index < static_cast<int>(_items.size()) && _items[index].compareToIgnoreCase(name) < 0)
+		index += 1;
+	return index;
+}
+
+int InteractiveMenu::SaveFileList::findPrefix(const Common::String &prefix, int ignoredIndex) const {
+	for (int i = 0; i < static_cast<int>(_items.size()); ++i) {
+		if (i != ignoredIndex && _items[i].hasPrefixIgnoreCase(prefix))
+			return i;
+	}
+	return -1;
+}
+
+bool InteractiveMenu::SaveFileList::isDuplicate(const Common::String &name, int ignoredIndex) const {
+	for (int i = 0; i < static_cast<int>(_items.size()); ++i) {
+		if (i != ignoredIndex && _items[i].equalsIgnoreCase(name))
+			return true;
+	}
+	return false;
+}
+
+bool InteractiveMenu::SaveFileList::canAppendCharacter(char c) const {
+	if (kMaximumNameLength <= static_cast<int>(_editBuffer.size()))
+		return false;
+	if (c == ' ' && (_editBuffer.empty() || _editBuffer.lastChar() == ' '))
+		return false;
+
+	Common::String prospective = _editBuffer;
+	prospective += normalizeCharacter(c);
+	if (!_vm->_gfx->hasTextFont(Gfx::TextColor::kDark00) || !_selectionBar || !_selectionBar->isValid())
+		return true;
+	return _vm->_gfx->getTextWidth(prospective, Gfx::TextColor::kDark00) <= _selectionBar->getWidth() - 5;
+}
+
+char InteractiveMenu::SaveFileList::normalizeCharacter(char c) const {
+	const bool capitalize = _editBuffer.empty() || _editBuffer.lastChar() == ' ';
+	if ('a' <= c && c <= 'z')
+		return capitalize ? c - 'a' + 'A' : c;
+	if ('A' <= c && c <= 'Z')
+		return capitalize ? c : c - 'A' + 'a';
+	return c;
+}
+
+void InteractiveMenu::SaveFileList::insertItem(int index, const Common::String &name) {
+	_items.insert_at(index, name);
+}
+
+void InteractiveMenu::SaveFileList::removeItem(int index) {
+	if (0 <= index && index < static_cast<int>(_items.size()))
+		_items.remove_at(index);
+}
+
+void InteractiveMenu::SaveFileList::revealSelection() {
+	if (_items.empty()) {
+		_selectedIndex = 0;
+		_scrollOffset = 0;
+		return;
+	}
+
+	clampSelection();
+	if (_selectedIndex < _scrollOffset || _scrollOffset + kVisibleRows <= _selectedIndex) {
+		_scrollOffset = _selectedIndex - kVisibleRows / 2;
+		_scrollOffset = MAX(0, _scrollOffset);
+		_scrollOffset = MIN(_scrollOffset, MAX(0, static_cast<int>(_items.size()) - kVisibleRows));
+	}
+}
+
+void InteractiveMenu::SaveFileList::clampSelection() {
+	if (_items.empty()) {
+		_selectedIndex = 0;
+		_scrollOffset = 0;
+		return;
+	}
+
+	_selectedIndex = CLIP(_selectedIndex, 0, static_cast<int>(_items.size()) - 1);
+	_scrollOffset = CLIP(_scrollOffset, 0, MAX(0, static_cast<int>(_items.size()) - kVisibleRows));
 }
 
 } // End of namespace Zoombini2

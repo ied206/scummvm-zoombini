@@ -118,6 +118,12 @@ void Sidebar::updateGoBlink(bool goEnabled, int pageId) {
 	}
 }
 
+void Sidebar::restartGoBlink() {
+	_goBlinkHighlighted = false;
+	_goBlinkTogglesRemaining = 30;
+	_goBlinkDeadline = _vm->getGameTickCount() + 150;
+}
+
 bool Sidebar::isPointStrictlyInside(const Common::Rect &rect, const Common::Point &pos) {
 	return rect.left < pos.x && pos.x < rect.right && rect.top < pos.y && pos.y < rect.bottom;
 }
@@ -201,8 +207,13 @@ EventHandleResult Sidebar::onKeyUp(const Common::KeyState &key) {
 }
 void Sidebar::drawAndHandleInput(ManagedSurface32 *screen, bool inputAllowed) {
 	if (DialogBase *dialog = getActiveDialog()) {
+		// The original frame routine keeps painting the Help, Map, and Go
+		// controls while the help overlay owns input. Rollover and release
+		// handling stay gated off, so every control keeps its normal sprite.
 		_pendingMouseRelease = false;
+		updateHoverState(Common::Point(), false);
 		dialog->render(screen);
+		drawControls(screen);
 		return;
 	}
 
@@ -212,8 +223,6 @@ void Sidebar::drawAndHandleInput(ManagedSurface32 *screen, bool inputAllowed) {
 		return;
 	}
 
-	const PageBase *page = _vm->getCurrentPage();
-	updateGoBlink(page->hasGoButton() && page->canUseGoButton(), page->getPageId());
 	const bool pointerInputAllowed = inputAllowed && !isInteractionBlocked();
 	const Common::Point32 mousePos = _vm->getMousePos();
 	updateHoverState(Common::Point(mousePos.x, mousePos.y), pointerInputAllowed);
@@ -229,8 +238,18 @@ void Sidebar::drawAndHandleInput(ManagedSurface32 *screen, bool inputAllowed) {
 
 	if (DialogBase *dialog = getActiveDialog()) {
 		dialog->render(screen);
+		drawControls(screen);
 		return;
 	}
+
+	drawControls(screen);
+}
+
+void Sidebar::drawControls(ManagedSurface32 *screen) {
+	const PageBase *page = _vm->getCurrentPage();
+	if (!page)
+		return;
+	updateGoBlink(page->hasGoButton() && page->canUseGoButton(), page->getPageId());
 
 	if (_helpHovered && _helpHighlight) {
 		_helpHighlight->drawToScreen(screen, Common::Point32(_helpButtonRect.left, _helpButtonRect.top), _vm->getAlphaLUT());
