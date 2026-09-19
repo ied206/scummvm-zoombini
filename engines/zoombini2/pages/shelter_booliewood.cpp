@@ -546,7 +546,7 @@ void ShelterBooliewood::drawZoombiniInPanorama(const ZoombiniRunner &zoombini, c
 		return;
 	const int baseX = pos.x - _scrollX;
 	for (int copy = -1; copy <= 1; copy++)
-		animation->drawZoombini(screen, zoombini._traits, Common::Point32(baseX + copy * kPanoramaWidth, pos.y), cell, animationFrame, _vm->getAlphaLUT());
+		_vm->_gfx->drawZoombini(screen, animation, zoombini._traits, Common::Point32(baseX + copy * kPanoramaWidth, pos.y), cell, animationFrame);
 }
 
 } // End of namespace Zoombini2

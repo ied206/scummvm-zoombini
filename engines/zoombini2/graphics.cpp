@@ -24,6 +24,7 @@
 #include "common/ptr.h"
 #include "common/textconsole.h"
 
+#include "graphics/blit.h"
 #include "image/bmp.h"
 
 #include "zoombini2/graphics.h"
@@ -287,8 +288,7 @@ bool BitBlock::loadColorBMP(Common::SeekableReadStream *stream) {
 
 	Common::ScopedPtr<Graphics::Surface, Graphics::SurfaceDeleter> rgbaSurface(surface->convertTo(Graphics::PixelFormat::createFormatRGBA32()));
 	byte *pixels = new byte[static_cast<uint32>(pixelCount64) * 4];
-	for (int row = 0; row < size.height; row++)
-		memcpy(pixels + row * size.width * 4, rgbaSurface->getBasePtr(0, row), size.width * 4);
+	Graphics::copyBlit(pixels, static_cast<const byte *>(rgbaSurface->getPixels()), size.width * 4, rgbaSurface->pitch, size.width, size.height, 4);
 
 	delete[] _pixels;
 	delete[] _alphaMap;
@@ -318,8 +318,7 @@ bool BitBlock::loadAlphaBMP(Common::SeekableReadStream *stream) {
 	}
 
 	byte *alphaMap = new byte[alphaSize.width * alphaSize.height];
-	for (int row = 0; row < alphaSize.height; row++)
-		memcpy(alphaMap + row * alphaSize.width, surface->getBasePtr(0, row), alphaSize.width);
+	Graphics::copyBlit(alphaMap, static_cast<const byte *>(surface->getPixels()), alphaSize.width, surface->pitch, alphaSize.width, alphaSize.height, 1);
 
 	delete[] _alphaMap;
 	_alphaMap = alphaMap;
@@ -334,66 +333,61 @@ void BitBlock::swapData(BitBlock &other) {
 }
 
 byte BitBlock::blendChannel(byte src, byte dest, byte mask) {
-	// This path uses the separate-mask bitmap rule, not the RLE LUT rule.
-	// The source bitmap already supplies the source contribution, while the
-	// destination is retained according to the mask's inverse.
+	// The bitmap supplies the source contribution without further scaling.
+	// Only the destination is scaled by the inverse mask, using integer division by 255.
 	const int result = src + (dest * (255 - mask)) / 255;
 	return static_cast<byte>(MIN(result, 255));
 }
 
-/**
- * Draw the bitmap to a surface with opaque copying.
- */
-void BitBlock::drawToSurface(ManagedSurface32 *dst, const Common::Point32 &pos) const {
-	if (!_pixels)
+void BitBlock::drawToSurface(ManagedSurface32 *destSurface, const Common::Point32 &pos) const {
+	drawOpaque(destSurface, pos, Common::Rect32(_size.width, _size.height));
+}
+
+void BitBlock::drawSubRect(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect &srcRect) const {
+	drawOpaque(destSurface, pos, Common::Rect32(srcRect.left, srcRect.top, srcRect.right, srcRect.bottom));
+}
+
+void BitBlock::drawOpaque(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &srcRect) const {
+	if (!_pixels || srcRect.isEmpty())
 		return;
 
-	const Graphics::PixelFormat &fmt = dst->format;
-	for (int row = 0; row < _size.height; row++) {
-		int dy = pos.y + row;
-		if (dy < 0 || dst->h <= dy)
-			continue;
+	const Common::Rect32 source = srcRect.findIntersectingRect(Common::Rect32(_size.width, _size.height));
+	if (source.isEmpty())
+		return;
 
-		for (int col = 0; col < _size.width; col++) {
-			int dx = pos.x + col;
-			if (dx < 0 || dst->w <= dx)
-				continue;
+	// Widen before translating so off-screen 32-bit positions cannot overflow.
+	const int64 left = static_cast<int64>(pos.x) + source.left - srcRect.left;
+	const int64 top = static_cast<int64>(pos.y) + source.top - srcRect.top;
+	const int64 right = left + source.width();
+	const int64 bottom = top + source.height();
+	if (right <= 0 || bottom <= 0 || destSurface->w <= left || destSurface->h <= top)
+		return;
 
-			const byte *src = _pixels + (row * _size.width + col) * 4;
-			uint32 color = fmt.ARGBToColor(255, src[0], src[1], src[2]);
-			*static_cast<uint32 *>(dst->getBasePtr(dx, dy)) = color;
-		}
+	const Common::Rect destination(MAX<int64>(0, left), MAX<int64>(0, top),
+		MIN<int64>(destSurface->w, right), MIN<int64>(destSurface->h, bottom));
+	const int sourceX = source.left + static_cast<int>(destination.left - left);
+	const int sourceY = source.top + static_cast<int>(destination.top - top);
+	const uint sourcePitch = static_cast<uint>(_size.width) * 4;
+	const byte *sourcePixels = _pixels + static_cast<size_t>(sourceY) * sourcePitch + static_cast<size_t>(sourceX) * 4;
+	byte *destinationPixels = static_cast<byte *>(destSurface->getBasePtr(destination.left, destination.top));
+	// Ignore the stored fourth byte, including zero-filled bitmaps, and produce opaque output.
+	static constexpr Graphics::PixelFormat kSourceFormat = Graphics::PixelFormat::createFormatRGBA32(false);
+	if (!Graphics::crossBlit(destinationPixels, sourcePixels, destSurface->pitch, sourcePitch,
+			destination.width(), destination.height(), destSurface->format, kSourceFormat)) {
+		warning("BitBlock: unsupported opaque pixel conversion");
+		return;
 	}
+	destSurface->addDirtyRect(destination);
 }
 
 /**
- * Draw a source subrectangle to a surface.
- */
-void BitBlock::drawSubRect(ManagedSurface32 *dst, const Common::Point32 &pos,
-						   const Common::Rect &srcRect) const {
-	if (!_pixels)
-		return;
-
-	const Graphics::PixelFormat &fmt = dst->format;
-	for (int row = srcRect.top; row < srcRect.bottom && row < _size.height; row++) {
-		int dy = pos.y + (row - srcRect.top);
-		if (dy < 0 || dst->h <= dy)
-			continue;
-
-		for (int col = srcRect.left; col < srcRect.right && col < _size.width; col++) {
-			int dx = pos.x + (col - srcRect.left);
-			if (dx < 0 || dst->w <= dx)
-				continue;
-
-			const byte *src = _pixels + (row * _size.width + col) * 4;
-			uint32 color = fmt.ARGBToColor(255, src[0], src[1], src[2]);
-			*static_cast<uint32 *>(dst->getBasePtr(dx, dy)) = color;
-		}
-	}
-}
-
-/**
- * Draw with per-pixel alpha blending.
+ * Draw with the separate-mask bitmap blend rule.
+ *
+ * @ref Graphics::alphaMaskBlit is the usual shared primitive for a separate alpha mask.
+ * It scales the source by opacity, whereas this path adds the supplied source unchanged:
+ * `min(255, source + floor(destination * (255 - mask) / 255))`.
+ * Keep the custom blend to preserve that source contribution, saturation, and /255 rounding.
+ * Zero masks leave the destination untouched; other masks produce opaque output.
  */
 void BitBlock::drawAlphaBlend(ManagedSurface32 *dst, const Common::Point32 &pos) const {
 	if (!_pixels || !_alphaMap)
@@ -427,9 +421,12 @@ void BitBlock::drawAlphaBlend(ManagedSurface32 *dst, const Common::Point32 &pos)
 /**
  * Draw a separate bitmap and alpha mask with the RLE encoder's blend rule.
  *
- * The bitmap is not premultiplied in memory, so this method creates the two
- * terms explicitly: `scale(mask, source)` and
- * `scale(255 - mask, destination)`.
+ * @ref Graphics::alphaMaskBlit would normally handle this unpremultiplied bitmap and mask.
+ * Its partial-opacity path modulates the mask and rounds the combined weighted sum once.
+ * This path instead keeps the mask unchanged and rounds each /256 product separately:
+ * `floor(source * mask / 256) + floor(destination * (255 - mask) / 256)`.
+ * The rounding order can change a channel by one, so retain @ref AlphaBlendLUT for exact pixels.
+ * Zero masks skip the pixel, full masks copy RGB exactly, and every written pixel has alpha 255.
  */
 void BitBlock::drawRleMaskBlend(ManagedSurface32 *dst, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const {
 	if (!_pixels || !_alphaMap)
@@ -454,8 +451,7 @@ void BitBlock::drawRleMaskBlend(ManagedSurface32 *dst, const Common::Point32 &po
 				destPtr[1] = src[1];
 				destPtr[2] = src[0];
 			} else {
-				// `_pixels` is an unpremultiplied bitmap. Scale its source
-				// channels by the mask, and scale the destination by its inverse.
+				// Round the source and destination contributions separately through the LUT.
 				const byte invAlpha = 255 - mask;
 				const int srcBlue = alphaLUT.scale(mask, src[2]);
 				const int srcGreen = alphaLUT.scale(mask, src[1]);
@@ -564,7 +560,7 @@ bool RleBlock::loadFromFile(const Common::Path &path) {
 	if (!loaded.loadFromStream(&f))
 		return false;
 	if (f.pos() != f.size())
-		warning("RleBlock: ignoring %u trailing bytes in '%s'", static_cast<uint32>(f.size() - f.pos()), resolvedPath.toString().c_str());
+		warning("RleBlock: ignoring %" PRIu64 " trailing bytes in '%s'", f.size() - f.pos(), resolvedPath.toString().c_str());
 	swapData(loaded);
 	return true;
 }
@@ -573,7 +569,7 @@ bool RleBlock::load(const Common::Path &basePath) {
 	return loadFromFile(basePath);
 }
 
-bool RleBlock::loadAnmFrame(Common::SeekableReadStream *stream, uint32 outerSize) {
+bool RleBlock::loadAnimationFrame(Common::SeekableReadStream *stream, uint32 outerSize) {
 	/* uint32 effectiveHeight = */ stream->readUint32LE();
 	/* uint32 dataPlaceholder = */ stream->readUint32LE();
 	const uint32 headerSize = stream->readUint32LE();
@@ -702,9 +698,10 @@ bool RleBlock::expand3to4bpp(const byte *srcData, uint32 srcSize, byte *&expande
 }
 
 byte RleBlock::blendChannel(byte src, byte dest, byte invAlpha, const AlphaBlendLUT &alphaLUT) {
-	// Mode-1 RLE source channels are already premultiplied by opacity. The
-	// fourth byte is inverse alpha, so the LUT supplies only the destination
-	// contribution before the two terms are added and clamped.
+	// @ref Graphics::alphaBlit normally handles per-pixel opacity, but expects straight RGB and forward alpha.
+	// Mode-1 RLE stores premultiplied BGR and inverse alpha, so that blitter would scale the source again.
+	// Keep `min(255, source + floor(destination * inverseAlpha / 256))` via @ref AlphaBlendLUT.
+	// Unpremultiplying first would lose integer precision and would not preserve the saturated sum.
 	const int destPart = alphaLUT.scale(invAlpha, dest);
 	return static_cast<byte>(MIN(static_cast<int>(src) + destPart, 255));
 }
@@ -714,164 +711,61 @@ byte RleBlock::blendChannel(byte src, byte dest, byte invAlpha, const AlphaBlend
  *
  * Span data begins after the two-byte resource prefix.
  */
-void RleBlock::drawToScreen(ManagedSurface32 *dst, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const {
-	if (!_rleData || _dataSize < 2)
-		return;
-
-	const byte *ptr = _rleData + 2; // Skip effectiveHeight
-	const byte *end = _rleData + _dataSize;
-
-	while (ptr < end) {
-		if (ptr + 7 > end)
-			break;
-
-		int16 xOff = READ_LE_INT16(ptr);
-		int16 yOff = READ_LE_INT16(ptr + 2);
-		int16 pixelCount = READ_LE_INT16(ptr + 4);
-		byte mode = ptr[6];
-		ptr += 7;
-		if (pixelCount < 0 || 1 < mode || static_cast<uint32>(end - ptr) < static_cast<uint32>(pixelCount) * 4)
-			return;
-
-		int screenX = pos.x + xOff;
-		int screenY = pos.y + yOff;
-
-		if (screenY < 0 || dst->h <= screenY) {
-			ptr += pixelCount * 4;
-			continue;
-		}
-
-		if (mode == 0) {
-			// Opaque mode: direct copy (4bpp after expand)
-			int startCol = 0;
-			int endCol = pixelCount;
-
-			// Clip left
-			if (screenX < 0) {
-				startCol = -1 * screenX;
-				screenX = 0;
-			}
-			// Clip right
-			if (screenX + (endCol - startCol) > dst->w) {
-				endCol = startCol + (dst->w - screenX);
-			}
-
-			if (startCol < endCol) {
-				const byte *srcPixel = ptr + startCol * 4;
-				byte *dstPixel = static_cast<byte *>(dst->getBasePtr(screenX, screenY));
-
-				for (int i = startCol; i < endCol; i++) {
-					dstPixel[0] = srcPixel[0]; // B (ScummVM BGRA)
-					dstPixel[1] = srcPixel[1]; // G
-					dstPixel[2] = srcPixel[2]; // R
-					dstPixel[3] = 255;         // A
-					srcPixel += 4;
-					dstPixel += 4;
-				}
-			}
-			ptr += pixelCount * 4;
-		} else {
-			// Mode 1 stores premultiplied BGR followed by inverse alpha.
-			int startCol = 0;
-			int endCol = pixelCount;
-
-			if (screenX < 0) {
-				startCol = -screenX;
-				screenX = 0;
-			}
-			if (screenX + (endCol - startCol) > dst->w) {
-				endCol = startCol + (dst->w - screenX);
-			}
-
-			if (startCol < endCol) {
-				const byte *srcPixel = ptr + startCol * 4;
-				byte *dstPixel = static_cast<byte *>(dst->getBasePtr(screenX, screenY));
-
-				for (int i = startCol; i < endCol; i++) {
-					const byte invAlpha = srcPixel[3];
-					dstPixel[0] = blendChannel(srcPixel[0], dstPixel[0], invAlpha, alphaLUT);
-					dstPixel[1] = blendChannel(srcPixel[1], dstPixel[1], invAlpha, alphaLUT);
-					dstPixel[2] = blendChannel(srcPixel[2], dstPixel[2], invAlpha, alphaLUT);
-					dstPixel[3] = 255;
-					srcPixel += 4;
-					dstPixel += 4;
-				}
-			}
-			ptr += pixelCount * 4;
-		}
-	}
+void RleBlock::drawToScreen(ManagedSurface32 *destSurface, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const {
+	drawToScreenClipped(destSurface, pos, Common::Rect32(destSurface->w, destSurface->h), alphaLUT);
 }
 
-void RleBlock::drawToScreenClipped(ManagedSurface32 *dst, const Common::Point32 &pos, const Common::Rect32 &clip, const AlphaBlendLUT &alphaLUT) const {
-	if (!_rleData || _dataSize < 2)
+void RleBlock::drawToScreenClipped(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &clip, const AlphaBlendLUT &alphaLUT) const {
+	if (!_rleData || _dataSize < 2 || !clip.isValidRect())
 		return;
+
+	const Common::Rect32 destinationClip = clip.findIntersectingRect(Common::Rect32(destSurface->w, destSurface->h));
+	if (destinationClip.isEmpty())
+		return;
+	assert(destSurface->format.bytesPerPixel == 4);
 
 	const byte *ptr = _rleData + 2;
 	const byte *end = _rleData + _dataSize;
 
 	while (ptr < end) {
-		if (ptr + 7 > end)
+		if (end - ptr < 7)
 			break;
 
-		int16 xOff = READ_LE_INT16(ptr);
-		int16 yOff = READ_LE_INT16(ptr + 2);
-		int16 pixelCount = READ_LE_INT16(ptr + 4);
-		byte mode = ptr[6];
+		const int16 xOff = READ_LE_INT16(ptr);
+		const int16 yOff = READ_LE_INT16(ptr + 2);
+		const int16 pixelCount = READ_LE_INT16(ptr + 4);
+		const byte mode = ptr[6];
 		ptr += 7;
 		if (pixelCount < 0 || 1 < mode || static_cast<uint32>(end - ptr) < static_cast<uint32>(pixelCount) * 4)
 			return;
 
-		int screenX = pos.x + xOff;
-		int screenY = pos.y + yOff;
-
-		// Clip vertically against clip rect and screen bounds
-		if (screenY < clip.top || clip.bottom <= screenY || screenY < 0 || dst->h <= screenY) {
+		// Widen before translating so off-screen 32-bit positions cannot overflow.
+		const int64 screenX = static_cast<int64>(pos.x) + xOff;
+		const int64 screenY = static_cast<int64>(pos.y) + yOff;
+		if (screenY < destinationClip.top || destinationClip.bottom <= screenY) {
 			ptr += pixelCount * 4;
 			continue;
 		}
 
-		// Clip horizontally against clip rect
-		int startCol = 0;
-		int endCol = pixelCount;
-
-		if (screenX + endCol <= clip.left || clip.right <= screenX) {
-			ptr += pixelCount * 4;
-			continue;
-		}
-
-		if (screenX < clip.left) {
-			startCol = clip.left - screenX;
-			screenX = clip.left;
-		}
-		if (screenX + (endCol - startCol) > clip.right) {
-			endCol = startCol + (clip.right - screenX);
-		}
-
-		// Also clip to screen bounds
-		if (screenX < 0) {
-			startCol += -screenX;
-			screenX = 0;
-		}
-		if (screenX + (endCol - startCol) > dst->w) {
-			endCol = startCol + (dst->w - screenX);
-		}
-
-		if (startCol < endCol) {
+		const int64 left = MAX<int64>(screenX, destinationClip.left);
+		const int64 right = MIN<int64>(screenX + pixelCount, destinationClip.right);
+		if (left < right) {
+			const int x = static_cast<int>(left);
+			const int y = static_cast<int>(screenY);
+			const int count = static_cast<int>(right - left);
+			const int startCol = static_cast<int>(left - screenX);
 			const byte *srcPixel = ptr + startCol * 4;
-			byte *dstPixel = static_cast<byte *>(dst->getBasePtr(screenX, screenY));
+			byte *dstPixel = static_cast<byte *>(destSurface->getBasePtr(x, y));
 
 			if (mode == 0) {
-				for (int i = startCol; i < endCol; i++) {
-					dstPixel[0] = srcPixel[0];
-					dstPixel[1] = srcPixel[1];
-					dstPixel[2] = srcPixel[2];
-					dstPixel[3] = 255;
-					srcPixel += 4;
-					dstPixel += 4;
-				}
+				// Copy potentially unaligned payload bytes before applying typed alpha writes in place.
+				// Preserve raw BGRA byte order independently of the destination format.
+				static constexpr Graphics::PixelFormat kByteFormat = Graphics::PixelFormat::createFormatBGRA32();
+				destSurface->copyRectToSurface(srcPixel, count * 4, x, y, count, 1);
+				Graphics::setAlpha(dstPixel, dstPixel, destSurface->pitch, destSurface->pitch, count, 1, kByteFormat, false, 255);
 			} else {
 				// Mode 1 stores premultiplied BGR followed by inverse alpha.
-				for (int i = startCol; i < endCol; i++) {
+				for (int i = 0; i < count; i++) {
 					const byte invAlpha = srcPixel[3];
 					dstPixel[0] = blendChannel(srcPixel[0], dstPixel[0], invAlpha, alphaLUT);
 					dstPixel[1] = blendChannel(srcPixel[1], dstPixel[1], invAlpha, alphaLUT);
@@ -880,11 +774,14 @@ void RleBlock::drawToScreenClipped(ManagedSurface32 *dst, const Common::Point32 
 					srcPixel += 4;
 					dstPixel += 4;
 				}
+				destSurface->addDirtyRect(Common::Rect(x, y, x + count, y + 1));
 			}
 		}
 		ptr += pixelCount * 4;
 	}
 }
+
+constexpr const char *Gfx::kTextFontPath;
 
 Gfx::Gfx(Zoombini2Engine *vm) : _vm(vm), _pageLayerStack(new PageLayerStack(vm)) {
 }
@@ -893,7 +790,7 @@ Gfx::~Gfx() {
 	delete _background;
 	delete _pageLayerStack;
 	delete _nameBoxSprite;
-	delete _tooltipFont;
+	delete _textFont;
 }
 
 void Gfx::clearPageLayers() {
@@ -905,33 +802,32 @@ ManagedSurface32 *Gfx::createSurface(const Size32 &size) const {
 	return new ManagedSurface32(size, _vm->getScreen()->format);
 }
 
-void Gfx::captureScreen(ManagedSurface32 *destination) const {
-	assert(destination != nullptr);
-	destination->copyFrom(*_vm->getScreen());
+void Gfx::captureScreen(ManagedSurface32 *destSurface) const {
+	assert(destSurface != nullptr);
+	destSurface->copyFrom(*_vm->getScreen());
 }
 
-void Gfx::copyToScreen(const ManagedSurface32 &source) const {
-	_vm->getScreen()->copyFrom(source);
+void Gfx::copyToScreen(const ManagedSurface32 &srcSurface) const {
+	_vm->getScreen()->copyFrom(srcSurface);
 }
 
-void Gfx::captureScreenRegion(ManagedSurface32 *destination, const Common::Rect &sourceRect) const {
-	assert(destination != nullptr);
-	destination->copyRectToSurface(*_vm->getScreen(), 0, 0, sourceRect);
+void Gfx::captureScreenRegion(ManagedSurface32 *destSurface, const Common::Rect &srcRect) const {
+	assert(destSurface != nullptr);
+	destSurface->copyRectToSurface(*_vm->getScreen(), 0, 0, srcRect);
 }
 
-void Gfx::copyRegionToScreen(const ManagedSurface32 &source, const Common::Point &destination) const {
-	_vm->getScreen()->copyRectToSurface(source, destination.x, destination.y, Common::Rect(source.w, source.h));
+void Gfx::copyRegionToScreen(const ManagedSurface32 &srcSurface, const Common::Point &destSurface) const {
+	_vm->getScreen()->copyRectToSurface(srcSurface, destSurface.x, destSurface.y, Common::Rect(srcSurface.w, srcSurface.h));
 }
 
-void Gfx::drawBitBlock(ManagedSurface32 *destination, const BitBlock *bitmap, const Common::Point32 &position) const {
-	if (destination && bitmap)
-		bitmap->drawToSurface(destination, position);
+void Gfx::drawBitBlock(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos) const {
+	if (destSurface && bitmap)
+		bitmap->drawToSurface(destSurface, pos);
 }
 
-void Gfx::drawBitBlockSubRect(ManagedSurface32 *destination, const BitBlock *bitmap, const Common::Point32 &position,
-							  const Common::Rect &sourceRect) const {
-	if (destination && bitmap)
-		bitmap->drawSubRect(destination, position, sourceRect);
+void Gfx::drawBitBlockSubRect(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos, const Common::Rect &srcRect) const {
+	if (destSurface && bitmap)
+		bitmap->drawSubRect(destSurface, pos, srcRect);
 }
 
 bool Gfx::loadBackground(const Common::Path &path) {
@@ -951,85 +847,179 @@ void Gfx::clearBackground() {
 	_background = nullptr;
 }
 
-void Gfx::drawBackground(ManagedSurface32 *destination, const Common::Point32 &position) const {
-	if (destination && _background)
-		_background->drawToSurface(destination, position);
+void Gfx::drawBackground(ManagedSurface32 *destSurface, const Common::Point32 &pos) const {
+	if (destSurface && _background)
+		_background->drawToSurface(destSurface, pos);
 }
 
-void Gfx::drawBackgroundSubRect(ManagedSurface32 *destination, const Common::Point32 &position, const Common::Rect &sourceRect) const {
-	if (destination && _background)
-		_background->drawSubRect(destination, position, sourceRect);
+void Gfx::drawBackgroundSubRect(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect &srcRect) const {
+	if (destSurface && _background)
+		_background->drawSubRect(destSurface, pos, srcRect);
 }
 
-void Gfx::drawRleBlock(ManagedSurface32 *destination, const RleBlock *sprite, const Common::Point32 &position) const {
-	if (destination && sprite)
-		sprite->drawToScreen(destination, position, _vm->getAlphaLUT());
+void Gfx::drawRleBlock(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos) const {
+	if (destSurface && sprite)
+		sprite->drawToScreen(destSurface, pos, _vm->getAlphaLUT());
 }
 
-void Gfx::drawAnimationFrame(ManagedSurface32 *destination, const Animation *animation, int frameIndex, const Common::Point32 &position) const {
-	if (!destination || !animation)
+void Gfx::drawAnimationFrame(ManagedSurface32 *destSurface, const Animation *animation, int frameIndex, const Common::Point32 &pos) const {
+	if (!destSurface || !animation)
 		return;
 
-	drawRleBlock(destination, animation->getFrame(frameIndex), position);
+	drawRleBlock(destSurface, animation->getFrame(frameIndex), pos);
 }
 
-void Gfx::drawAndUpdateAnimationRunner(ManagedSurface32 *destination, AnimationRunner *runner, uint32 tickCount, int scrollX,
-									   int backgroundWidth) const {
-	if (destination && runner)
-		runner->drawAndUpdate(destination, _vm->getAlphaLUT(), tickCount, scrollX, backgroundWidth);
+void Gfx::drawAndUpdateAnimationRunner(ManagedSurface32 *destSurface, AnimationRunner *runner, uint32 tickCount, int scrollX, int backgroundWidth) const {
+	if (destSurface && runner)
+		runner->drawAndUpdate(destSurface, _vm->getAlphaLUT(), tickCount, scrollX, backgroundWidth);
 }
 
-void Gfx::drawZoombini(ManagedSurface32 *destination, const ZoombiniAnimation *animation, const ZmbTrait &traits, const Common::Point32 &position,
-					   int cell, int frame, const Common::Rect32 *clip) const {
-	if (destination && animation)
-		animation->drawZoombini(destination, traits, position, cell, frame, _vm->getAlphaLUT(), clip);
+void Gfx::drawZoombini(ManagedSurface32 *screen, const ZoombiniAnimation *animation, const ZmbTrait &traits,
+					   const Common::Point32 &pos, int cell, int frame, const Common::Rect32 *clip) const {
+	drawZoombini(screen, animation, traits, pos, cell, frame, _vm->getAlphaLUT(), clip);
 }
 
-void Gfx::drawZoombiniRunner(ManagedSurface32 *destination, const ZoombiniRunner *runner) const {
-	if (destination && runner)
-		runner->draw(destination, _vm->getAlphaLUT());
+void Gfx::drawZoombini(ManagedSurface32 *screen, const ZoombiniAnimation *animation, const ZmbTrait &traits,
+					   const Common::Point32 &pos, int cell, int frame, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip) {
+	if (!screen || !animation || cell < 0 || ZoombiniAnimation::kDim0 <= cell || frame < 0)
+		return;
+	const int baseIndex = cell * ZoombiniAnimation::kDim1 * ZoombiniAnimation::kDim2;
+	for (int layer = 0; layer < ZoombiniAnimation::kDim1; layer++) {
+		int variant = 0;
+		if (0 < layer)
+			variant = traits.getValue(static_cast<ZmbTrait::TraitIndex>(layer - 1));
+		if (variant < 0 || ZoombiniAnimation::kDim2 <= variant)
+			continue;
+		const int entry = baseIndex + layer * ZoombiniAnimation::kDim2 + variant;
+		const int selectedFrame = animation->getFrameCount(entry) == 1 ? 0 : frame;
+		const RleBlock *sprite = animation->getFrame(entry, selectedFrame);
+		if (!sprite)
+			continue;
+		if (clip)
+			sprite->drawToScreenClipped(screen, pos, *clip, alphaLUT);
+		else
+			sprite->drawToScreen(screen, pos, alphaLUT);
+	}
 }
 
-int Gfx::drawString(ManagedSurface32 *destination, const BitmapFont *font, const Common::Point32 &position, const Common::String &text) const {
-	if (!destination || !font)
+void Gfx::drawZoombiniPreview(ManagedSurface32 *screen, const ZoombiniAnimation *animation,
+							const int (&selectedValues)[ZmbTrait::kTraitCount], const Common::Point32 &pos) const {
+	drawZoombiniPreview(screen, animation, selectedValues, pos, _vm->getAlphaLUT());
+}
+
+void Gfx::drawZoombiniPreview(ManagedSurface32 *screen, const ZoombiniAnimation *animation,
+							const int (&selectedValues)[ZmbTrait::kTraitCount], const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) {
+	if (!screen || !animation)
+		return;
+	static constexpr int kBaseCell = 990;
+	static constexpr int kFeatureCellBases[ZmbTrait::kTraitCount] = {996, 1002, 1008, 1014};
+	static constexpr int kFeatureDrawOrder[ZmbTrait::kTraitCount] = {0, 2, 3, 1};
+	const RleBlock *frame = animation->getFrame(kBaseCell, 0);
+	if (frame)
+		frame->drawToScreen(screen, pos, alphaLUT);
+	for (int i = 0; i < ZmbTrait::kTraitCount; i++) {
+		const int feature = kFeatureDrawOrder[i];
+		const int value = selectedValues[feature];
+		if (1 <= value && value <= ZmbTrait::kTraitValueCount) {
+			frame = animation->getFrame(kFeatureCellBases[feature] + value, 0);
+			if (frame)
+				frame->drawToScreen(screen, pos, alphaLUT);
+		}
+	}
+}
+
+void Gfx::drawZoombiniRunner(ManagedSurface32 *screen, const ZoombiniRunner *runner, const Common::Rect32 *clip,
+							 int scrollX, int backgroundWidth, const RleBlock *dropTargetIndicator) const {
+	drawZoombiniRunner(screen, runner, _vm->getAlphaLUT(), clip, scrollX, backgroundWidth, dropTargetIndicator);
+}
+
+void Gfx::drawZoombiniRunner(ManagedSurface32 *screen, const ZoombiniRunner *runner, const AlphaBlendLUT &alphaLUT,
+							 const Common::Rect32 *clip, int scrollX, int backgroundWidth, const RleBlock *dropTargetIndicator) {
+	if (!screen || !runner || !runner->_activeAnimation || runner->_hidden)
+		return;
+	const Common::Rect32 spriteRect = runner->getSpriteRect(scrollX, backgroundWidth);
+	if (spriteRect.right <= 0 || spriteRect.bottom <= 0 || screen->w <= spriteRect.left || screen->h <= spriteRect.top)
+		return;
+	const Common::Point32 drawPos = runner->getDrawPosition(scrollX, backgroundWidth);
+	if (runner->_dragging && runner->_hoveredDropTargetIndex != -1 && dropTargetIndicator)
+		dropTargetIndicator->drawToScreen(screen, drawPos, alphaLUT);
+	const int frame = runner->_animationActive ? runner->_animationFrame : 0;
+	drawZoombini(screen, runner->_activeAnimation, runner->_traits, drawPos, runner->_animationCell, frame, alphaLUT, clip);
+}
+
+void Gfx::textColorRGB(TextColor color, byte &red, byte &green, byte &blue) {
+	static constexpr byte kColors[4][3] = {
+		{16, 16, 16},
+		{0, 0, 255},
+		{0, 255, 0},
+		{255, 255, 255},
+	};
+	const int index = static_cast<int>(color);
+	red = kColors[index][0];
+	green = kColors[index][1];
+	blue = kColors[index][2];
+}
+
+bool Gfx::loadTextFont(TextColor color) {
+	const int index = static_cast<int>(color);
+	if (index < 0 || 4 <= index)
+		return false;
+	if (hasTextFont(color))
+		return true;
+	if (!_textFont)
+		_textFont = new BitmapFont(_vm);
+	return _textFont->load(Common::Path(kTextFontPath));
+}
+
+bool Gfx::hasTextFont(TextColor color) const {
+	const int index = static_cast<int>(color);
+	return 0 <= index && index < 4 && _textFont && _textFont->isLoaded();
+}
+
+int Gfx::drawText(ManagedSurface32 *destSurface, TextColor color, const Common::Point32 &pos, const Common::String &text) const {
+	if (!destSurface || !hasTextFont(color))
 		return 0;
-
-	return font->drawString(destination, position, text, _vm->getAlphaLUT());
+	byte red, green, blue;
+	textColorRGB(color, red, green, blue);
+	return _textFont->drawString(destSurface, pos, text, red, green, blue, _vm->getAlphaLUT());
 }
 
-void Gfx::drawDragNameTooltip(ManagedSurface32 *destination, const Common::String &name) {
-	if (!destination)
+int Gfx::getTextWidth(const Common::String &text, TextColor color) const {
+	if (!hasTextFont(color))
+		return 0;
+	return _textFont->getStringWidth(text);
+}
+
+void Gfx::drawDragNameTooltip(ManagedSurface32 *destSurface, const Common::String &name) {
+	if (!destSurface)
 		return;
 	if (!_nameBoxSprite) {
 		_nameBoxSprite = _vm->loadRleBlock("bmp/menu/name_box.rb");
 		if (!_nameBoxSprite)
 			return;
 	}
-	if (!_tooltipFont) {
-		_tooltipFont = new BitmapFont(_vm);
-		if (!_tooltipFont->load(Common::Path("bmp/typo"), 16, 16, 16))
-			return;
-	}
-	if (!_tooltipFont->isLoaded())
+	if (!loadTextFont(TextColor::kDark00))
 		return;
 	static constexpr int kPlateX = 310;
 	static constexpr int kPlateY = 565;
 	static constexpr int kTextCenterX = 400;
 	static constexpr int kTextY = 570;
-	drawRleBlock(destination, _nameBoxSprite, Common::Point32(kPlateX, kPlateY));
-	const int width = _tooltipFont->getStringWidth(name);
-	drawString(destination, _tooltipFont, Common::Point32(kTextCenterX - width / 2, kTextY), name);
+	drawRleBlock(destSurface, _nameBoxSprite, Common::Point32(kPlateX, kPlateY));
+	const int width = _textFont->getStringWidth(name);
+	byte red, green, blue;
+	textColorRGB(TextColor::kDark00, red, green, blue);
+	_textFont->drawString(destSurface, Common::Point32(kTextCenterX - width / 2, kTextY), name, red, green, blue, _vm->getAlphaLUT());
 }
 
-void Gfx::maskRejectedArea(ManagedSurface32 *destination, const AreaMask *areaMask) {
-	if (!destination)
+void Gfx::maskRejectedArea(ManagedSurface32 *destSurface, const AreaMask *areaMask) {
+	if (!destSurface)
 		return;
 	if (!areaMask) {
-		fillRect(destination, Common::Rect32(destination->w, destination->h), 0);
+		fillRect(destSurface, Common::Rect32(destSurface->w, destSurface->h), 0);
 		return;
 	}
-	const int width = MIN<int>(destination->w, 800);
-	const int height = MIN<int>(destination->h, 600);
+	const int width = MIN<int>(destSurface->w, 800);
+	const int height = MIN<int>(destSurface->h, 600);
 	for (int y = 0; y < height; y++) {
 		int runStart = -1;
 		for (int groupX = 0; groupX < width; groupX += 8) {
@@ -1037,38 +1027,38 @@ void Gfx::maskRejectedArea(ManagedSurface32 *destination, const AreaMask *areaMa
 				if (runStart < 0)
 					runStart = groupX;
 			} else if (0 <= runStart) {
-				fillRect(destination, Common::Rect32(runStart, y, groupX, y + 1), 0);
+				fillRect(destSurface, Common::Rect32(runStart, y, groupX, y + 1), 0);
 				runStart = -1;
 			}
 		}
 		if (0 <= runStart)
-			fillRect(destination, Common::Rect32(runStart, y, width, y + 1), 0);
+			fillRect(destSurface, Common::Rect32(runStart, y, width, y + 1), 0);
 	}
 }
 
-void Gfx::fillRect(ManagedSurface32 *destination, const Common::Rect32 &rect, uint32 color) const {
-	if (destination)
-		destination->fillRect(rect, color);
+void Gfx::fillRect(ManagedSurface32 *destSurface, const Common::Rect32 &rect, uint32 color) const {
+	if (destSurface)
+		destSurface->fillRect(rect, color);
 }
 
-void Gfx::fillRect(ManagedSurface32 *destination, const Common::Rect &rect, uint32 color) const {
-	if (destination)
-		destination->fillRect(rect, color);
+void Gfx::fillRect(ManagedSurface32 *destSurface, const Common::Rect &rect, uint32 color) const {
+	if (destSurface)
+		destSurface->fillRect(rect, color);
 }
 
-void Gfx::frameRect(ManagedSurface32 *destination, const Common::Rect32 &rect, uint32 color) const {
-	if (destination)
-		destination->frameRect(rect, color);
+void Gfx::frameRect(ManagedSurface32 *destSurface, const Common::Rect32 &rect, uint32 color) const {
+	if (destSurface)
+		destSurface->frameRect(rect, color);
 }
 
-void Gfx::frameRect(ManagedSurface32 *destination, const Common::Rect &rect, uint32 color) const {
-	if (destination)
-		destination->frameRect(rect, color);
+void Gfx::frameRect(ManagedSurface32 *destSurface, const Common::Rect &rect, uint32 color) const {
+	if (destSurface)
+		destSurface->frameRect(rect, color);
 }
 
-void Gfx::drawLine(ManagedSurface32 *destination, const Common::Point32 &start, const Common::Point32 &end, uint32 color) const {
-	if (destination)
-		destination->drawLine(start.x, start.y, end.x, end.y, color);
+void Gfx::drawLine(ManagedSurface32 *destSurface, const Common::Point32 &start, const Common::Point32 &end, uint32 color) const {
+	if (destSurface)
+		destSurface->drawLine(start.x, start.y, end.x, end.y, color);
 }
 
 ManagedSurface32 *Gfx::createMapTransitionBackground(PageId sourcePage, int mapRegion, RouteBranch routeBranch) {
@@ -1114,7 +1104,7 @@ void Gfx::drawMapOverlays(ManagedSurface32 *dst, PageId sourcePage, int mapRegio
 	GameState *gs = _vm->getGameState();
 
 	// Helper lambda: standard overlay visibility check.
-	// "Show this path piece if destination was previously visited,
+	// "Show this path piece if destSurface was previously visited,
 	// OR if we're currently transitioning and haven't arrived yet."
 	auto visible = [&](int srcPageId, int dstPageId) -> bool {
 		return gs->isPageVisited(dstPageId) || (sourcePage == srcPageId && gs->isPageVisited(srcPageId) && !gs->hasPageVisit(dstPageId, 1));
@@ -1442,8 +1432,7 @@ bool AreaMask::loadFromFile(const Common::Path &path) {
 
 	Common::Array<byte> pixels;
 	pixels.resize(static_cast<uint32>(pixelCount));
-	for (int row = 0; row < size.height; row++)
-		memcpy(&pixels[row * size.width], surface->getBasePtr(0, row), size.width);
+	Graphics::copyBlit(&pixels[0], static_cast<const byte *>(surface->getPixels()), size.width, surface->pitch, size.width, size.height, 1);
 
 	_size = size;
 	_pixels.swap(pixels);
@@ -1521,7 +1510,7 @@ bool ZoombiniAnimation::loadFromFile(const Common::Path &path) {
 					}
 
 					RleBlock *frame = new RleBlock(_vm);
-					if (!frame->loadAnmFrame(&f, outerSize)) {
+					if (!frame->loadAnimationFrame(&f, outerSize)) {
 						warning("ZoombiniAnimation: failed cell %d frame %u", cellIndex, fr);
 						delete frame;
 						complete = false;
@@ -1585,25 +1574,7 @@ Size32 ZoombiniAnimation::getSpriteSize(int cell, int frame) const {
 
 void ZoombiniAnimation::drawZoombini(ManagedSurface32 *screen, const ZmbTrait &traits, const Common::Point32 &pos,
 									 int cell, int frame, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip) const {
-	if (cell < 0 || kDim0 <= cell || frame < 0)
-		return;
-	const int baseIndex = cell * kDim1 * kDim2;
-	for (int layer = 0; layer < kDim1; layer++) {
-		int variant = 0;
-		if (0 < layer)
-			variant = traits.getValue(static_cast<ZmbTrait::TraitIndex>(layer - 1));
-		if (variant < 0 || kDim2 <= variant)
-			continue;
-		const int entry = baseIndex + layer * kDim2 + variant;
-		const int selectedFrame = getFrameCount(entry) == 1 ? 0 : frame;
-		const RleBlock *sprite = getFrame(entry, selectedFrame);
-		if (!sprite)
-			continue;
-		if (clip)
-			sprite->drawToScreenClipped(screen, pos, *clip, alphaLUT);
-		else
-			sprite->drawToScreen(screen, pos, alphaLUT);
-	}
+	Gfx::drawZoombini(screen, this, traits, pos, cell, frame, alphaLUT, clip);
 }
 
 // ============================================================================
@@ -1810,13 +1781,15 @@ int UIButton::drawAndHitTest(ManagedSurface32 *dst, const Common::Point32 &mouse
 BitmapFont::BitmapFont(Zoombini2Engine *vm) : _vm(vm) {
 }
 
-BitmapFont::~BitmapFont() {
+bool BitmapFont::load(const Common::Path &basePath) {
 	for (int i = 0; i < kNumGlyphs; i++) {
-		delete _glyphs[i];
+		delete[] _glyphs[i].mask;
+		_glyphs[i].mask = nullptr;
+		_glyphs[i].width = 0;
+		_glyphs[i].height = 0;
 	}
-}
+	_loaded = false;
 
-bool BitmapFont::load(const Common::Path &basePath, byte r, byte g, byte b) {
 	Common::Path colorPath(basePath);
 	if (!basePath.toString().hasSuffixIgnoreCase(".bmt"))
 		colorPath = colorPath.append(".bmt");
@@ -1838,7 +1811,6 @@ bool BitmapFont::load(const Common::Path &basePath, byte r, byte g, byte b) {
 
 	const Size32 size = alphaBB.getSize();
 
-	BitBlock *loadedGlyphs[kNumGlyphs] = {};
 	int glyphIndex = 0;
 	int col = 1;
 
@@ -1875,42 +1847,25 @@ bool BitmapFont::load(const Common::Path &basePath, byte r, byte g, byte b) {
 
 		const int glyphWidth = col - startCol + 2;
 
-		BitBlock *glyph = new BitBlock(_vm);
-		glyph->createEmpty(Size32(glyphWidth, size.height), true);
-
-		byte *dstAlpha = const_cast<byte *>(glyph->getAlpha());
+		Glyph &glyph = _glyphs[glyphIndex];
+		glyph.width = glyphWidth;
+		glyph.height = size.height;
+		glyph.mask = new byte[glyphWidth * size.height]();
 		const int copyWidth = MIN(glyphWidth, size.width - startCol);
 		for (int row = 0; row < size.height; row++) {
-			memcpy(dstAlpha + row * glyphWidth, srcAlpha + row * size.width + startCol, copyWidth);
+			memcpy(glyph.mask + row * glyphWidth, srcAlpha + row * size.width + startCol, copyWidth);
 		}
 
-		byte *dstPixels = const_cast<byte *>(glyph->getPixels());
-		const int totalPixels = glyphWidth * size.height;
-		for (int i = 0; i < totalPixels; i++) {
-			dstPixels[i * 4 + 0] = r;
-			dstPixels[i * 4 + 1] = g;
-			dstPixels[i * 4 + 2] = b;
-			dstPixels[i * 4 + 3] = 255;
-		}
-
-		loadedGlyphs[glyphIndex] = glyph;
 		glyphIndex += 1;
 	}
 
 	if (glyphIndex != kNumGlyphs) {
-		for (int i = 0; i < kNumGlyphs; i++)
-			delete loadedGlyphs[i];
 		warning("BitmapFont: expected %d glyphs but found %d in '%s'", kNumGlyphs, glyphIndex, colorPath.toString().c_str());
 		return false;
 	}
 
-	for (int i = 0; i < kNumGlyphs; i++) {
-		delete _glyphs[i];
-		_glyphs[i] = loadedGlyphs[i];
-	}
 	_loaded = true;
-	debug(1, "BitmapFont: Loaded %d glyphs from %s (color %d,%d,%d)",
-		  glyphIndex, basePath.toString().c_str(), r, g, b);
+	debug(1, "BitmapFont: Loaded %d glyphs from %s", glyphIndex, basePath.toString().c_str());
 
 	return true;
 }
@@ -1968,8 +1923,50 @@ int BitmapFont::charToGlyphIndex(char c) {
 	}
 }
 
+void BitmapFont::drawGlyph(ManagedSurface32 *dst, const Glyph &glyph, const Common::Point32 &pos,
+						   byte red, byte green, byte blue, const AlphaBlendLUT &alphaLUT) const {
+	if (!glyph.mask)
+		return;
+
+	for (int row = 0; row < glyph.height; row++) {
+		const int destY = pos.y + row;
+		if (destY < 0 || dst->h <= destY)
+			continue;
+		for (int column = 0; column < glyph.width; column++) {
+			const int destX = pos.x + column;
+			if (destX < 0 || dst->w <= destX)
+				continue;
+
+			const byte mask = glyph.mask[row * glyph.width + column];
+			if (mask == 0)
+				continue;
+			byte *destPtr = static_cast<byte *>(dst->getBasePtr(destX, destY));
+			if (mask == 255) {
+				destPtr[0] = blue;
+				destPtr[1] = green;
+				destPtr[2] = red;
+			} else {
+				// The tint is uniform across the glyph, so scale it by the
+				// coverage and scale the destination by the coverage's inverse.
+				const byte invAlpha = 255 - mask;
+				const int srcBlue = alphaLUT.scale(mask, blue);
+				const int srcGreen = alphaLUT.scale(mask, green);
+				const int srcRed = alphaLUT.scale(mask, red);
+				const int destBlue = alphaLUT.scale(invAlpha, destPtr[0]);
+				const int destGreen = alphaLUT.scale(invAlpha, destPtr[1]);
+				const int destRed = alphaLUT.scale(invAlpha, destPtr[2]);
+				destPtr[0] = static_cast<byte>(MIN(srcBlue + destBlue, 255));
+				destPtr[1] = static_cast<byte>(MIN(srcGreen + destGreen, 255));
+				destPtr[2] = static_cast<byte>(MIN(srcRed + destRed, 255));
+			}
+			destPtr[3] = 255;
+		}
+	}
+}
+
 int BitmapFont::drawString(ManagedSurface32 *dst, const Common::Point32 &pos,
-						   const Common::String &text, const AlphaBlendLUT &alphaLUT) const {
+						   const Common::String &text, byte red, byte green, byte blue,
+						   const AlphaBlendLUT &alphaLUT) const {
 	if (!_loaded) {
 		return 0;
 	}
@@ -1985,13 +1982,13 @@ int BitmapFont::drawString(ManagedSurface32 *dst, const Common::Point32 &pos,
 		}
 
 		int glyphIdx = charToGlyphIndex(c);
-		if (glyphIdx < 0 || glyphIdx >= kNumGlyphs || !_glyphs[glyphIdx]) {
+		if (glyphIdx < 0 || glyphIdx >= kNumGlyphs || !_glyphs[glyphIdx].mask) {
 			curX += kSpaceWidth; // Unknown character, treat as space
 			continue;
 		}
 
-		_glyphs[glyphIdx]->drawRleMaskBlend(dst, Common::Point32(curX, pos.y), alphaLUT);
-		curX += _glyphs[glyphIdx]->getWidth() + 2;
+		drawGlyph(dst, _glyphs[glyphIdx], Common::Point32(curX, pos.y), red, green, blue, alphaLUT);
+		curX += _glyphs[glyphIdx].width + 2;
 	}
 
 	return curX - pos.x;
@@ -2013,12 +2010,12 @@ int BitmapFont::getStringWidth(const Common::String &text) const {
 		}
 
 		int glyphIdx = charToGlyphIndex(c);
-		if (glyphIdx < 0 || glyphIdx >= kNumGlyphs || !_glyphs[glyphIdx]) {
+		if (glyphIdx < 0 || glyphIdx >= kNumGlyphs || !_glyphs[glyphIdx].mask) {
 			width += kSpaceWidth;
 			continue;
 		}
 
-		width += _glyphs[glyphIdx]->getWidth() + 2;
+		width += _glyphs[glyphIdx].width + 2;
 	}
 
 	return width;
@@ -2079,9 +2076,9 @@ bool VolumePanel::init(SoundManager *soundManager) {
 	if (!_sliderLabels[2].loadImages(Common::Path("bmp/menu/OPTION - Dialogues NORMAL"), Common::Path("bmp/menu/OPTION - Dialogues HILITE")))
 		loaded = false;
 
-	_musicSliderX = volumeToPixel(_musicVolume);
-	_sfxSliderX = volumeToPixel(_sfxVolume);
-	_speechSliderX = volumeToPixel(_speechVolume);
+	_musicSliderX = volumeToPixel(_settings._music);
+	_sfxSliderX = volumeToPixel(_settings._sfx);
+	_speechSliderX = volumeToPixel(_settings._speech);
 	_sliderLabels[0].setOverlay(_gaugeImage, Common::Point32(kSliderMinX - kLabelX, kMusicGaugeY - kMusicLabelY), &_musicSliderX);
 	_sliderLabels[1].setOverlay(_gaugeImage, Common::Point32(kSliderMinX - kLabelX, kSfxGaugeY - kSfxLabelY), &_sfxSliderX);
 	_sliderLabels[2].setOverlay(_gaugeImage, Common::Point32(kSliderMinX - kLabelX, kSpeechGaugeY - kSpeechLabelY), &_speechSliderX);
@@ -2108,27 +2105,25 @@ int VolumePanel::volumeToPixel(int volume) {
 }
 
 void VolumePanel::setMusicVolume(int vol) {
-	_musicVolume = CLIP(vol, 0, 100);
-	_musicSliderX = volumeToPixel(_musicVolume);
+	_settings.setMusic(vol);
+	_musicSliderX = volumeToPixel(_settings._music);
 }
 
 void VolumePanel::setSfxVolume(int vol) {
-	_sfxVolume = CLIP(vol, 0, 100);
-	_sfxSliderX = volumeToPixel(_sfxVolume);
+	_settings.setSfx(vol);
+	_sfxSliderX = volumeToPixel(_settings._sfx);
 }
 
 void VolumePanel::setSpeechVolume(int vol) {
-	_speechVolume = CLIP(vol, 0, 100);
-	_speechSliderX = volumeToPixel(_speechVolume);
+	_settings.setSpeech(vol);
+	_speechSliderX = volumeToPixel(_settings._speech);
 }
 
 void VolumePanel::setInitialVolumes(int music, int sfx, int speech) {
-	setMusicVolume(music);
-	setSfxVolume(sfx);
-	setSpeechVolume(speech);
-	_initialMusicVolume = _musicVolume;
-	_initialSfxVolume = _sfxVolume;
-	_initialSpeechVolume = _speechVolume;
+	_settings.setInitialVolumes(music, sfx, speech);
+	_musicSliderX = volumeToPixel(_settings._music);
+	_sfxSliderX = volumeToPixel(_settings._sfx);
+	_speechSliderX = volumeToPixel(_settings._speech);
 }
 
 VolumePanelResult VolumePanel::handleMouseInput(const Common::Point32 &mousePos, bool mouseDown, bool mouseReleased) {
@@ -2205,10 +2200,10 @@ void VolumePanel::playPreviewSound() {
 		return;
 
 	if (adjustedSlider == 1 && 0 <= _sfxPreviewSoundId) {
-		_soundManager->playWithVolume(_sfxPreviewSoundId, _sfxVolume);
+		_soundManager->playWithVolume(_sfxPreviewSoundId, _settings._sfx);
 	} else if (adjustedSlider == 2 && 0 <= _speechPreviewSoundId) {
 		_soundManager->stop(_speechPreviewSoundId);
-		_soundManager->playWithVolume(_speechPreviewSoundId, _speechVolume);
+		_soundManager->playWithVolume(_speechPreviewSoundId, _settings._speech);
 	}
 }
 

@@ -182,7 +182,8 @@ void ShelterRescueSite1::refillBoardingRoster() {
 		zoombini->_hidden = false;
 		zoombini->setDefaultAnimation(_littleZombAnimation, 33);
 		if (i < kDepartureSeatCount) {
-			zoombini->setPosition(kSeatPositions[i]);
+			// Seated members stand 36 pixels above the seat-rect origin, matching the seat drop snap.
+			zoombini->setPosition(Common::Point32(kSeatPositions[i].x, kSeatPositions[i].y - 36));
 			_dropTargets[kSeatTargetBase + i].occupied = true;
 			_dropTargets[kSeatTargetBase + i].zoombiniIndex = static_cast<int>(i);
 		} else if (i - kDepartureSeatCount < kDepartureSeatCount) {
@@ -276,7 +277,7 @@ void ShelterRescueSite1::seatDropCallback(void *context, int targetIndex, int zo
 	ShelterRescueSite1 *page = static_cast<ShelterRescueSite1 *>(context);
 	if (!page || targetIndex < kSeatTargetBase || kDropTargetCount <= targetIndex)
 		return;
-	if (zoombiniIndex < 0 || static_cast<uint>(zoombiniIndex) < page->_vm->_globalZoombinis.size())
+	if (zoombiniIndex < 0 || page->_vm->_globalZoombinis.size() <= static_cast<uint>(zoombiniIndex))
 		return;
 	const ZoombiniDropTarget &target = page->_dropTargets[targetIndex];
 	page->_vm->_globalZoombinis[zoombiniIndex]->setPosition(Common::Point32(target.rect.left, target.rect.top - 36));
@@ -339,7 +340,6 @@ bool ShelterRescueSite1::materializeFromBoard(int gridCol, int gridRow, const Co
 }
 
 void ShelterRescueSite1::triggerScrollUp() {
-	_scrollUpFlashUntil = _vm->getGameTickCount() + kScrollFlashMilliseconds;
 	if (0 < _scrollRow && hasBoardCellsInRows(0, _scrollRow)) {
 		_scrollPhase = kScrollPhaseUp04;
 		_scrollPixelsLeft = kScrollPixelLength;
@@ -347,7 +347,6 @@ void ShelterRescueSite1::triggerScrollUp() {
 }
 
 void ShelterRescueSite1::triggerScrollDown() {
-	_scrollDownFlashUntil = _vm->getGameTickCount() + kScrollFlashMilliseconds;
 	if (_scrollRow + 4 < kBoardRows && hasBoardCellsInRows(_scrollRow + 3, kBoardRows - 1)) {
 		_scrollPhase = kScrollPhaseDown06;
 		_scrollPixelsLeft = kScrollPixelLength;
@@ -441,11 +440,11 @@ void ShelterRescueSite1::drawBoardingActives(ManagedSurface32 *screen) const {
 		if (zoombini->_hidden)
 			continue;
 		zoombini->tryStartIdleAnimation(_idleZombAnimation, *_vm->_rnd, _vm->getGameTickCount());
-		zoombini->draw(screen, _vm->getAlphaLUT());
+		_vm->_gfx->drawZoombiniRunner(screen, zoombini);
 		zoombini->advanceAnimationAfterDraw();
 	}
 	if (draggedZoombini && !draggedZoombini->_hidden) {
-		draggedZoombini->draw(screen, _vm->getAlphaLUT());
+		_vm->_gfx->drawZoombiniRunner(screen, draggedZoombini);
 		draggedZoombini->advanceAnimationAfterDraw();
 	}
 }
@@ -453,7 +452,6 @@ void ShelterRescueSite1::drawBoardingActives(ManagedSurface32 *screen) const {
 void ShelterRescueSite1::drawWaitingBoard(ManagedSurface32 *screen, int pixelShiftX) const {
 	if (!_littleZombAnimation)
 		return;
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	BoardRecord *const *board = getRescueBoard();
 	int startCol = 0;
 	if (0 < _scrollRow)
@@ -469,30 +467,17 @@ void ShelterRescueSite1::drawWaitingBoard(ManagedSurface32 *screen, int pixelShi
 			const int boardIndex = (_scrollRow + col) * kBoardCols + row;
 			if (boardIndex < 0 || kBoardRows * kBoardCols <= boardIndex || !board[boardIndex])
 				continue;
-			_littleZombAnimation->drawZoombini(screen, board[boardIndex]->getTraits(),
-											   Common::Point32(kRosterGridBasePos.x + col * 40 + 18 + pixelShiftX, kRosterGridBasePos.y + row * 57 + 30),
-											   33, 0, lut, &clip);
+			_vm->_gfx->drawZoombini(screen, _littleZombAnimation, board[boardIndex]->getTraits(),
+								   Common::Point32(kRosterGridBasePos.x + col * 40 + 18 + pixelShiftX, kRosterGridBasePos.y + row * 57 + 30), 33, 0, &clip);
 		}
 	}
 }
 
 void ShelterRescueSite1::onRenderContent(ManagedSurface32 *screen) {
+	// Recompose every frame because the site and actors are redrawn even when unchanged.
+	// Restore their underlying pixels before blending translucent edges or moving sprites.
+	_vm->_gfx->drawBackground(screen, Common::Point32(0, 0));
 	onRenderSite(screen);
-
-	const uint32 tick = _vm->getGameTickCount();
-	if (_buttonUp && 0 < _buttonUp->getFrameCount()) {
-		const int frame = (tick < _scrollUpFlashUntil && 1 < _buttonUp->getFrameCount()) ? 1 : 0;
-		const RleBlock *frameBlock = _buttonUp->getFrame(frame);
-		if (frameBlock)
-			frameBlock->drawToScreen(screen, _buttonUpPos, _vm->getAlphaLUT());
-	}
-
-	if (_buttonDown && 0 < _buttonDown->getFrameCount()) {
-		const int frame = (tick < _scrollDownFlashUntil && 1 < _buttonDown->getFrameCount()) ? 1 : 0;
-		const RleBlock *frameBlock = _buttonDown->getFrame(frame);
-		if (frameBlock)
-			frameBlock->drawToScreen(screen, _buttonDownPos, _vm->getAlphaLUT());
-	}
 
 	if (_scrollPhase != kScrollIdle && _vm->_gfx->hasBackground()) {
 		const int shift = (_scrollPhase == kScrollPhaseUp04 ? 1 : -1) * (kScrollPixelLength - _scrollPixelsLeft);
@@ -502,18 +487,42 @@ void ShelterRescueSite1::onRenderContent(ManagedSurface32 *screen) {
 	} else {
 		drawWaitingBoard(screen, 0);
 	}
+	// The original draws the door-selection overlay over the waiting grid on every grid update, beneath the scroll controls.
+	if (RleBlock *porteSelect = getPorteSelector())
+		porteSelect->drawToScreen(screen, kRosterGridBasePos, _vm->getAlphaLUT());
+
+	// The original shows frame 1 on an idle button and frame 0 only while that
+	// button's own scroll animation is running.
+	if (_buttonUp && 0 < _buttonUp->getFrameCount()) {
+		const int frame = (1 < _buttonUp->getFrameCount()) ? ((_scrollPhase == kScrollPhaseUp04) ? 0 : 1) : 0;
+		const RleBlock *frameBlock = _buttonUp->getFrame(frame);
+		if (frameBlock)
+			frameBlock->drawToScreen(screen, _buttonUpPos, _vm->getAlphaLUT());
+	}
+
+	if (_buttonDown && 0 < _buttonDown->getFrameCount()) {
+		const int frame = (1 < _buttonDown->getFrameCount()) ? ((_scrollPhase == kScrollPhaseDown06) ? 0 : 1) : 0;
+		const RleBlock *frameBlock = _buttonDown->getFrame(frame);
+		if (frameBlock)
+			frameBlock->drawToScreen(screen, _buttonDownPos, _vm->getAlphaLUT());
+	}
+
 	drawBoardingActives(screen);
 }
 
 void ShelterRescueSite1::onRenderSite(ManagedSurface32 *screen) {
 	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-	if (_shipVisible && _portal && _portal->isValid())
-		_portal->drawToScreen(screen, _portalPos, lut);
+	// The original draws the closed stone door at the portal position, and slides it up off-screen once the ship arrives.
+	if (_portal && _portal->isValid()) {
+		if (_shipVisible)
+			_portal->drawToScreenClipped(screen, Common::Point32(_portalPos.x, -130), Common::Rect32(0, 100, 800, 600), lut);
+		else
+			_portal->drawToScreen(screen, _portalPos, lut);
+	}
 
 	if (_portalTop && _portalTop->isValid())
 		_portalTop->drawToScreen(screen, _portalTopPos, lut);
-	if (_cramure && _cramure->isValid())
-		_cramure->drawToScreen(screen, _cramurePos, lut);
+	// The original never draws the cramure sprite; it only sizes a background snapshot. Drawing it here would smear smoke streaks over the machine.
 
 	if (_vm->_routeDirection == RouteBranch::kLeft01) {
 		if (_arrowLeftOn)
@@ -523,8 +532,8 @@ void ShelterRescueSite1::onRenderSite(ManagedSurface32 *screen) {
 	} else if (_vm->_routeDirection == RouteBranch::kRight02) {
 		if (_arrowLeftOff)
 			_arrowLeftOff->drawToSurface(screen, _arrowLeftPos);
-		if (_arrowRightOff)
-			_arrowRightOff->drawToSurface(screen, _arrowRightPos);
+		if (_arrowRightOn)
+			_arrowRightOn->drawToSurface(screen, _arrowRightPos);
 	} else {
 		if (_arrowLeftOff)
 			_arrowLeftOff->drawToSurface(screen, _arrowLeftPos);
@@ -534,8 +543,11 @@ void ShelterRescueSite1::onRenderSite(ManagedSurface32 *screen) {
 }
 
 EventHandleResult ShelterRescueSite1::onLButtonDown(const Common::Point &pos) {
-	(void)pos;
-	return EventHandleResult::kPassthrough;
+	// The original picks members up on the pressed frame, so start the drag here.
+	// Releases only finish a drag already in progress through onLButtonUp.
+	const ZoombiniInputResult inputResult = ZoombiniRunner::handlePointerInput(_vm->_globalZoombinis, Common::Point32(pos.x, pos.y), true,
+																			   _pickupZombAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
+	return inputResult != ZoombiniInputResult::kIgnored00 ? EventHandleResult::kConsumed : EventHandleResult::kPassthrough;
 }
 
 EventHandleResult ShelterRescueSite1::onLButtonUp(const Common::Point &pos) {

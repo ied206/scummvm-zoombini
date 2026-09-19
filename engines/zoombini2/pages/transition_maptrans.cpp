@@ -422,7 +422,7 @@ void TransitionMapTrans::onRenderActors(ManagedSurface32 *screen) {
 
 	// Draw each zoombini in Y-sorted order
 	for (uint i = 0; i < drawOrder.size(); i++)
-		_vm->_globalZoombinis[drawOrder[i]]->draw(screen, _vm->getAlphaLUT());
+		_vm->_gfx->drawZoombiniRunner(screen, _vm->_globalZoombinis[drawOrder[i]]);
 }
 
 void TransitionMapTrans::onActorsRendered() {

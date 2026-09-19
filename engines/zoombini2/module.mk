@@ -28,7 +28,6 @@ MODULE_OBJS := \
 	pages/puzzle_snowboard.o \
 	pages/puzzle_walloffleens.o \
 	pages/puzzle_waterslide.o \
-	pages/save_file_list.o \
 	pages/shelter_base.o \
 	pages/shelter_booliewood.o \
 	pages/shelter_final.o \

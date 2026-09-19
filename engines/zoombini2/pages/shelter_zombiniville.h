@@ -33,7 +33,6 @@ namespace Zoombini2 {
 
 class AnimationRunner;
 class Animation;
-class BitmapFont;
 class PathObject;
 class ZoombiniAnimation;
 class ZoombiniRunner;
@@ -92,8 +91,6 @@ private:
 	/** Resource path. */
 	static constexpr const char *kIdleZombAnimationPath = "bmp/zombis/attente2/attenteZomb2.anm";
 	/** Resource path. */
-	static constexpr const char *kNameFontPath = "bmp/typo";
-	/** Resource path. */
 	static constexpr const char *kMusicPath = "#sounds/music/ZMR-PickerScreen.wav";
 	/** Resource path. */
 	static constexpr const char *kFeatureSelectSoundPath = "sounds/fx/Z-BS11.wav";
@@ -131,8 +128,6 @@ private:
 	const ZoombiniAnimation *_pickupZombAnimation = nullptr;
 	/** Borrowed immutable random-idle sprite grid retained in the engine cache. */
 	const ZoombiniAnimation *_idleZombAnimation = nullptr;
-	/** Font used for the generated Zoombini name. */
-	BitmapFont *_nameFont = nullptr;
 
 	/** Geometry and current value for one feature station. */
 	struct FeatureStation {

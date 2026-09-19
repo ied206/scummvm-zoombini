@@ -30,7 +30,6 @@
 namespace Zoombini2 {
 
 class Animation;
-class BitmapFont;
 class RleBlock;
 
 /**
@@ -85,7 +84,6 @@ private:
 	static constexpr const char *kNorfDefaultPath = "bmp/chez_norf/norf/norfDeBaz";
 	static constexpr const char *kHighlightPath = "bmp/chez_norf/highlight";
 	static constexpr const char *kMusicPath = "#sounds/music/07-BB02.wav";
-	static constexpr const char *kDebugFontPath = "bmp/typo";
 
 	/** Selectable food item IDs grouped by course. */
 	enum FoodItem {
@@ -272,8 +270,6 @@ private:
 	RleBlock *_norfDefault = nullptr;
 	/** Selection highlight visual. */
 	RleBlock *_highlightImage = nullptr;
-	/** Lazily loaded green bitmap font for the developer overlay. */
-	BitmapFont *_debugFont = nullptr;
 
 	/** Music handle used while Chez Norf is active. */
 	int _musicId = -1;

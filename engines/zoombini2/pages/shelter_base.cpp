@@ -242,7 +242,7 @@ void ShelterRescueSiteBase::onRenderContent(ManagedSurface32 *screen) {
 			const int x = _gridBasePos.x + col * kSlotSize.width + 18;
 			const int y = _gridBasePos.y + row * kSlotSize.height + 30;
 			const Common::Rect32 clip(_gridBasePos.x, 0, clipRight, ManagedSurface32::kScreenSize.height);
-			_zoombiniAnimation->drawZoombini(screen, record->getTraits(), Common::Point32(x, y), kStandingCell, 0, lut, &clip);
+			_vm->_gfx->drawZoombini(screen, _zoombiniAnimation, record->getTraits(), Common::Point32(x, y), kStandingCell, 0, &clip);
 			if (slotIdx == _selectedZoombini && _selector)
 				_selector->drawToScreen(screen, Common::Point32(x - 10, y - 10), lut);
 		}

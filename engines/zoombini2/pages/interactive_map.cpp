@@ -37,7 +37,6 @@ namespace Zoombini2 {
 constexpr const char *InteractiveMap::kBackgroundPath;
 constexpr const char *InteractiveMap::kPracticeStatsPath;
 constexpr const char *InteractiveMap::kSavedGameStatsPath;
-constexpr const char *InteractiveMap::kWhiteFontPath;
 constexpr const char *InteractiveMap::kBlipSoundPath;
 constexpr const char *InteractiveMap::kDisabledIconFormat;
 constexpr const char *InteractiveMap::kIconFormat;
@@ -141,7 +140,6 @@ InteractiveMap::~InteractiveMap() {
 	for (int i = 0; i < kNumLegends; i++) {
 		delete _legends[i];
 	}
-	delete _whiteFont;
 
 	for (int i = 0; i < kNumButtons; i++) {
 		delete _buttons[i].normalRle;
@@ -209,8 +207,7 @@ void InteractiveMap::init() {
 	}
 
 	// --- White bitmap font for stats ---
-	_whiteFont = new BitmapFont(_vm);
-	_whiteFont->load(Common::Path(kWhiteFontPath), 255, 255, 255);
+	_vm->_gfx->loadTextFont(Gfx::TextColor::kWhite03);
 
 	// --- Set initial level ---
 	if (isPracticeMode()) {
@@ -338,7 +335,7 @@ bool InteractiveMap::practiceCandidateFitsPack(const ZmbTrait &traits) const {
 }
 
 Common::String InteractiveMap::generatePracticeZoombiniName() const {
-	static constexpr char *const kVowelPairs[30] = {
+	static constexpr const char *kVowelPairs[30] = {
 		"a ",
 		"a ",
 		"a ",
@@ -372,7 +369,7 @@ Common::String InteractiveMap::generatePracticeZoombiniName() const {
 	};
 	static constexpr char kSingleConsonants[] = "bbccdddfghjkkllmmnnprrssssttvwx";
 	static constexpr char kEndings[] = "aeiou";
-	static constexpr char *const kConsonantPairs[39] = {
+	static constexpr const char *kConsonantPairs[39] = {
 		"bl",
 		"br",
 		"ch",
@@ -671,21 +668,20 @@ void InteractiveMap::onRenderContent(ManagedSurface32 *screen) {
 			_statsSavedGame->drawToScreen(screen, Common::Point32(10, 10), lut);
 		}
 
-		if (_whiteFont && _whiteFont->isLoaded()) {
+		if (_vm->_gfx->hasTextFont(Gfx::TextColor::kWhite03)) {
 			// Player name centered at Y=10, min X=240
 			const Common::String &name = gs->_playerName;
-			int nameWidth = _whiteFont->getStringWidth(name);
+			int nameWidth = _vm->_gfx->getTextWidth(name, Gfx::TextColor::kWhite03);
 			int nameX = 400 - nameWidth / 2;
 			if (nameX < 240)
 				nameX = 240;
-			_whiteFont->drawString(screen, Common::Point32(nameX, 10), name, lut);
+			_vm->_gfx->drawText(screen, Gfx::TextColor::kWhite03, Common::Point32(nameX, 10), name);
 
 			// Stat numbers (right-aligned at x=226, Y from kStatLabelY)
 			for (int i = 0; i < 4; i++) {
 				Common::String valStr = Common::String::format("%d", _stats[i]);
-				int valWidth = _whiteFont->getStringWidth(valStr);
-				_whiteFont->drawString(screen, Common::Point32(226 - valWidth, kStatLabelY[i]),
-									   valStr, lut);
+				int valWidth = _vm->_gfx->getTextWidth(valStr, Gfx::TextColor::kWhite03);
+				_vm->_gfx->drawText(screen, Gfx::TextColor::kWhite03, Common::Point32(226 - valWidth, kStatLabelY[i]), valStr);
 			}
 		}
 	}
