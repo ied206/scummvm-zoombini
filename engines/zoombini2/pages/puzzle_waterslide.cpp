@@ -116,11 +116,6 @@ PuzzleWaterslide::PuzzleWaterslide(Zoombini2Engine *vm)
 }
 
 PuzzleWaterslide::~PuzzleWaterslide() {
-	if (_musicId >= 0) {
-		SoundManager *snd = _vm->getSoundManager();
-		snd->stop(_musicId);
-		snd->unload(_musicId);
-	}
 	// Free trait graphics
 	for (int i = 0; i < 4; i++) {
 		delete _traitImage[i];
@@ -145,6 +140,7 @@ PuzzleWaterslide::~PuzzleWaterslide() {
 	delete _valveAnim;
 	delete _cascade1Anim;
 	delete _cascade2Anim;
+	finishPuzzleRoster(nullptr);
 }
 
 void PuzzleWaterslide::init() {
@@ -152,15 +148,9 @@ void PuzzleWaterslide::init() {
 	PuzzleBase::init();
 
 	// Start the Pipes of Paloo music.
-	if (SoundManager *snd = _vm->getSoundManager()) {
-		_musicId = snd->load(true, Common::Path(kMusicPath), true);
-		if (_musicId >= 0) {
-			snd->playLoop(_musicId);
-			snd->setVolume(_musicId, snd->_volumeMusic);
-		}
-	}
+	startPageMusic(Common::Path(kMusicPath));
 
-	int level = CLIP(_vm->getGameState()->_level, 1, 3);
+	int level = CLIP(_vm->_state->_level, 1, 3);
 	debug(1, "WaterslidePuzzle::init - level %d", level);
 
 	// Load resources
@@ -310,7 +300,7 @@ void PuzzleWaterslide::setupSlots() {
 }
 
 void PuzzleWaterslide::computePairs() {
-	int level = CLIP(_vm->getGameState()->_level, 1, 3);
+	int level = CLIP(_vm->_state->_level, 1, 3);
 
 	switch (level) {
 	case 1:
@@ -445,12 +435,15 @@ void PuzzleWaterslide::computePairsLevel1Greedy() {
 	for (int attempt = 0; attempt < 10 && bestPairCount < requiredPairCount; attempt++) {
 		clearPairs();
 		Common::Array<int> available;
-		for (uint i = 0; i < _puzzleZoombinis.size() && i < static_cast<uint>(kMaxPairs * 2); i++)
+		const uint maxAvailableCount = kMaxPairs * 2;
+		for (uint i = 0; i < _puzzleZoombinis.size() && i < maxAvailableCount; i++)
 			available.push_back(static_cast<int>(i));
 		if (0 < attempt) {
-			for (int i = static_cast<int>(available.size()) - 1; 0 < i; i--) {
-				const int swapIndex = _vm->_rnd->getRandomNumber(i);
-				SWAP(available[i], available[swapIndex]);
+			if (1 < available.size()) {
+				for (uint i = available.size() - 1; 0 < i; i--) {
+					const uint swapIndex = _vm->_rnd->getRandomNumber(i);
+					SWAP(available[i], available[swapIndex]);
+				}
 			}
 		}
 

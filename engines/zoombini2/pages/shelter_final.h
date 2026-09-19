@@ -92,7 +92,7 @@ private:
 	/** Number of randomized celebration ambience clips. */
 	static constexpr int kAmbientSoundCount = 7;
 	/** Number of decorative Zoombinis created for the celebration. */
-	static constexpr int kDecorativeZoombiniCount = 2;
+	static constexpr uint kDecorativeZoombiniCount = 2;
 
 	/** Runtime position, animation, and parabolic motion for one firework. */
 	struct FireworkState {
@@ -184,8 +184,6 @@ private:
 	/** Dormant reveal column. */
 	int _revealColumn = 0;
 
-	/** Looping finale music identifier. */
-	int _musicId = -1;
 	/** Opening FIN11 speech identifier. */
 	int _openingSpeechId = -1;
 	/** Closing INT11.17 speech identifier. */

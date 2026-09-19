@@ -300,8 +300,6 @@ private:
 	/** Feature-value hint visuals. */
 	RleBlock *_traitImages[kFeatureCount][kFeatureValueCount] = {};
 
-	/** Music handle used while Turtle Hurdle is active. */
-	int _musicId = -1;
 
 	/** Zoombini grid for walking in place on a settled turtle. */
 	const ZoombiniAnimation *_idleZombAnimation = nullptr;

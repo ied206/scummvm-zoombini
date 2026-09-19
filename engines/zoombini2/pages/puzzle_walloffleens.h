@@ -191,11 +191,11 @@ private:
 	/** Number of active Fleens. */
 	int _numFleens = 6;
 	/** Puzzle-roster size before any Zoombinis are released. */
-	int _initialZoombiniCount = 0;
+	uint _initialZoombiniCount = 0;
 	/** Number of Zoombinis already released. */
 	int _freedCount = 0;
 	/** Puzzle-roster index currently at the cannon. */
-	int _currentZoombini = 0;
+	uint _currentZoombini = 0;
 	/** Selected Fleen index, or `-1` when none is selected. */
 	int _selectedFleen = -1;
 	/** Current interaction phase. */
@@ -259,8 +259,6 @@ private:
 	/** Mirror-breaking animation. */
 	Animation *_mirrorExplodeAnim = nullptr;
 
-	/** Music handle used while Magic Mirrors is active. */
-	int _musicId = -1;
 };
 
 } // End of namespace Zoombini2

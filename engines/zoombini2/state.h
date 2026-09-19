@@ -242,10 +242,16 @@ public:
 
 	/** Load and validate a complete profile from @p stream. */
 	bool load(Common::SeekableReadStream *stream);
-	/** Serialize this profile and, when supplied, the active party roster to @p stream. */
-	bool save(Common::WriteStream *stream, const Common::Array<ZoombiniRunner *> *globalRoster = nullptr) const;
-	/** Move saved Zoombini state from @p src into newly allocated entries in @p dest. */
-	static void transferSavedRoster(Common::Array<ZoombiniRunner *> &src, Common::Array<ZoombiniRunner *> &dest);
+	/** Serialize this profile and the eligible active party to @p stream. */
+	bool save(Common::WriteStream *stream) const;
+	/** Delete and clear the live party retained by this profile. */
+	void clearActiveZoombinis();
+	/** Restore the profile's saved party as live runners. */
+	void restoreSavedZoombinis();
+	/** Retain the live party as saved roster entries on return to the map. */
+	void stashActiveZoombinis();
+	/** Retain puzzle leavers in the saved roster or @p board and keep successful route members active. */
+	void finishPuzzleRoster(int pageId, BoardRecord **board, bool advancing, bool savedGame);
 	/** Delete every record in @p board and clear its cells. */
 	static void clearBoard(BoardRecord **board);
 	/** Store @p zoombini in the first available cell of @p board. */
@@ -264,6 +270,8 @@ public:
 	bool registerTraits(const ZmbTrait &traits);
 	/** Append one Booliewood completion snapshot while history capacity remains. */
 	bool recordCompletedZoombini(const ZoombiniRunner &zoombini);
+	/** Apply one completed Booliewood trip to this profile and its active party. */
+	void recordBooliesCompletion();
 	/** Return whether the profile has accepted its 625th Zoombini registration. */
 	bool hasReachedZoombiniRegistrationLimit() const { return _traitRegistrations._totalCount == kZoombiniCombinationCount; }
 	/** Return whether accumulated progress has unlocked relaxed party trait limits. */
@@ -351,6 +359,8 @@ public:
 	TraitRegistrationState _traitRegistrations;
 	/** Zoombini roster stored in this profile. */
 	Common::Array<ZoombiniRunner *> _savedRoster;
+	/** Live party for the current page, separate from the serialized saved roster. */
+	Common::Array<ZoombiniRunner *> _activeZoombinis;
 
 private:
 	/** Disallow copying pointers stored in this profile. */
@@ -360,6 +370,10 @@ private:
 
 	/** Delete all owned board and roster entries. */
 	void clearOwnedData();
+	/** Copy runner identity into another roster and release the source entries. */
+	static void transferRoster(Common::Array<ZoombiniRunner *> &src, Common::Array<ZoombiniRunner *> &dest);
+	/** Copy the persistent identity of one live runner into a new roster entry. */
+	static ZoombiniRunner *cloneRosterMember(const ZoombiniRunner &src);
 	/** Exchange all owned and scalar state with @p other. */
 	void swapState(GameState &other);
 	/** Parse the complete state body from @p stream. */
@@ -400,8 +414,8 @@ public:
 	Common::StringArray listProfiles() const;
 	/** Return every listed profile with counts parsed directly from its independent .mk file. */
 	Common::Array<Zoombini2ProfileSummary> listProfileSummaries() const;
-	/** Serialize @p state to @p profileName and, when supplied, its active party roster. */
-	bool saveProfile(const Common::String &profileName, const GameState &state, const Common::Array<ZoombiniRunner *> *globalRoster = nullptr) const;
+	/** Serialize @p state and its eligible active party under @p profileName. */
+	bool saveProfile(const Common::String &profileName, const GameState &state) const;
 	/** Load @p profileName transactionally into @p state. */
 	bool loadProfile(const Common::String &profileName, GameState &state) const;
 	/** Validate an external Z2 stream and store it under @p profileName. */
@@ -412,6 +426,8 @@ public:
 	bool deleteProfile(const Common::String &profileName) const;
 	/** Rename a profile without overwriting another profile. */
 	bool renameProfile(const Common::String &oldProfileName, const Common::String &newProfileName) const;
+	/** Create a distinct copy of one profile without overwriting another profile. */
+	bool duplicateProfile(const Common::String &srcProfileName, const Common::String &newProfileName) const;
 	/** Return whether a valid profile has a target-scoped save file. */
 	bool profileExists(const Common::String &profileName) const;
 
