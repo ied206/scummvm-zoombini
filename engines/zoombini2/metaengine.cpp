@@ -45,6 +45,7 @@ void Zoombini2MetaEngine::registerDefaultSettings(const Common::String &target) 
 	ConfMan.registerDefault(kConfigUseFloatingPointPaths, false);
 	ConfMan.registerDefault(kConfigOriginalPRNG, true);
 	ConfMan.registerDefault(kConfigEnhancedKbdShortcuts, true);
+	ConfMan.registerDefault(kConfigSavefilesReadOnly, false);
 }
 
 GUI::OptionsContainerWidget *Zoombini2MetaEngine::buildEngineOptionsWidget(GUI::GuiObject *boss, const Common::String &name,

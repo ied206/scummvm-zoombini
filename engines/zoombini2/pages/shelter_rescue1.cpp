@@ -119,7 +119,7 @@ void ShelterRescueSite1::init() {
 	_arrowRightOn->loadFromBB(Common::Path(kArrowRightOnPath));
 
 	loadScrollButtons(kScrollLeftPath, kScrollRightPath);
-	startMusic(kMusicPath);
+	startPageMusic(Common::Path(kMusicPath));
 	resetRescueState();
 	initRescueRoster();
 
@@ -141,7 +141,7 @@ void ShelterRescueSite1::init() {
 }
 
 void ShelterRescueSite1::initRescueRoster() {
-	GameState *state = _vm->getGameState();
+	GameState *state = _vm->_state;
 	BoardRecord **board = state->_rescue1Board;
 	prepareWaitingBoard(board);
 	_scrollRow = GameState::findBoardScrollRow(board);
@@ -149,7 +149,7 @@ void ShelterRescueSite1::initRescueRoster() {
 	if (_vm->_isSavedGame) {
 		state->_hasReachedRescue1 = 1;
 		const int oldArrivalCount = state->_rescue1ArrivalCount;
-		state->_rescue1ArrivalCount += _vm->_globalZoombinis.size();
+		state->_rescue1ArrivalCount += _vm->_state->_activeZoombinis.size();
 		const int arrivalCount = state->_rescue1ArrivalCount;
 		const bool hadVisit = state->hasPageVisit(kPageRescue1, 1);
 		state->registerPageVisit(kPageRescue1);
@@ -162,7 +162,7 @@ void ShelterRescueSite1::initRescueRoster() {
 			}
 		} else if (oldArrivalCount < 8) {
 			enqueueSpeech(kFirstDepartureSpeechPath);
-		} else if (countBoardMembers(board) + static_cast<int>(_vm->_globalZoombinis.size()) >= 8) {
+		} else if (8 <= countBoardMembers(board) + _vm->_state->_activeZoombinis.size()) {
 			enqueueSpeech(kReadyDepartureSpeechPath);
 		} else {
 			enqueueSpeech(kIncompleteDepartureSpeechPath);
@@ -172,9 +172,9 @@ void ShelterRescueSite1::initRescueRoster() {
 }
 
 void ShelterRescueSite1::refillBoardingRoster() {
-	GameState::refillFromBoard(getRescueBoard(), _vm->_globalZoombinis, 8);
-	for (uint i = 0; i < _vm->_globalZoombinis.size(); i++) {
-		ZoombiniRunner *zoombini = _vm->_globalZoombinis[i];
+	GameState::refillFromBoard(getRescueBoard(), _vm->_state->_activeZoombinis, 8);
+	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
+		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
 		zoombini->_puzzleStatus = 0;
 		zoombini->_inputEnabled = 1;
 		zoombini->_dragging = false;
@@ -244,9 +244,9 @@ bool ShelterRescueSite1::seatsFullyOccupied() const {
 }
 
 ZoombiniRunner *ShelterRescueSite1::getDraggedZoombini() const {
-	for (uint i = 0; i < _vm->_globalZoombinis.size(); i++) {
-		if (_vm->_globalZoombinis[i]->_dragging)
-			return _vm->_globalZoombinis[i];
+	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
+		if (_vm->_state->_activeZoombinis[i]->_dragging)
+			return _vm->_state->_activeZoombinis[i];
 	}
 	return nullptr;
 }
@@ -254,8 +254,8 @@ ZoombiniRunner *ShelterRescueSite1::getDraggedZoombini() const {
 bool ShelterRescueSite1::isDepartingMember(const ZoombiniRunner *zoombini) const {
 	for (int seat = 0; seat < kDepartureSeatCount; seat++) {
 		const ZoombiniDropTarget &target = _dropTargets[kSeatTargetBase + seat];
-		if (target.occupied && 0 <= target.zoombiniIndex && static_cast<uint>(target.zoombiniIndex) < _vm->_globalZoombinis.size() &&
-			_vm->_globalZoombinis[target.zoombiniIndex] == zoombini)
+		if (target.occupied && 0 <= target.zoombiniIndex && static_cast<uint>(target.zoombiniIndex) < _vm->_state->_activeZoombinis.size() &&
+			_vm->_state->_activeZoombinis[target.zoombiniIndex] == zoombini)
 			return true;
 	}
 	return false;
@@ -268,8 +268,8 @@ void ShelterRescueSite1::gridDropCallback(void *context, int targetIndex, int zo
 	ZoombiniDropTarget &target = page->_dropTargets[targetIndex];
 	if (!target.occupied)
 		return;
-	if (0 <= zoombiniIndex && static_cast<uint>(zoombiniIndex) < page->_vm->_globalZoombinis.size())
-		page->_vm->_globalZoombinis[zoombiniIndex]->setPosition(Common::Point32(target.rect.left - 8, target.rect.top - 15));
+	if (0 <= zoombiniIndex && static_cast<uint>(zoombiniIndex) < page->_vm->_state->_activeZoombinis.size())
+		page->_vm->_state->_activeZoombinis[zoombiniIndex]->setPosition(Common::Point32(target.rect.left - 8, target.rect.top - 15));
 	page->captureToBoard(targetIndex, zoombiniIndex);
 }
 
@@ -277,25 +277,25 @@ void ShelterRescueSite1::seatDropCallback(void *context, int targetIndex, int zo
 	ShelterRescueSite1 *page = static_cast<ShelterRescueSite1 *>(context);
 	if (!page || targetIndex < kSeatTargetBase || kDropTargetCount <= targetIndex)
 		return;
-	if (zoombiniIndex < 0 || page->_vm->_globalZoombinis.size() <= static_cast<uint>(zoombiniIndex))
+	if (zoombiniIndex < 0 || page->_vm->_state->_activeZoombinis.size() <= static_cast<uint>(zoombiniIndex))
 		return;
 	const ZoombiniDropTarget &target = page->_dropTargets[targetIndex];
-	page->_vm->_globalZoombinis[zoombiniIndex]->setPosition(Common::Point32(target.rect.left, target.rect.top - 36));
+	page->_vm->_state->_activeZoombinis[zoombiniIndex]->setPosition(Common::Point32(target.rect.left, target.rect.top - 36));
 }
 
 void ShelterRescueSite1::captureToBoard(int recordIndex, int zoombiniIndex) {
-	if (zoombiniIndex < 0 || _vm->_globalZoombinis.size() <= static_cast<uint>(zoombiniIndex))
+	if (zoombiniIndex < 0 || _vm->_state->_activeZoombinis.size() <= static_cast<uint>(zoombiniIndex))
 		return;
 	const int boardIndex = getGridRecordBoardIndex(recordIndex);
 	BoardRecord **board = getRescueBoard();
 	if (boardIndex < 0 || kBoardRows * kBoardCols <= boardIndex)
 		return;
-	ZoombiniRunner *zoombini = _vm->_globalZoombinis[zoombiniIndex];
+	ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[zoombiniIndex];
 	delete board[boardIndex];
 	board[boardIndex] = new BoardRecord();
 	board[boardIndex]->store(*zoombini);
 	delete zoombini;
-	_vm->_globalZoombinis.remove_at(zoombiniIndex);
+	_vm->_state->_activeZoombinis.remove_at(zoombiniIndex);
 	for (uint record = 0; record < _dropTargets.size(); record++) {
 		if (_dropTargets[record].zoombiniIndex > zoombiniIndex)
 			_dropTargets[record].zoombiniIndex -= 1;
@@ -332,7 +332,7 @@ bool ShelterRescueSite1::materializeFromBoard(int gridCol, int gridRow, const Co
 	zoombini->setPosition(Common::Point32(zoombini->_screenPos.x + zoombini->_dragOffset.x, zoombini->_screenPos.y + zoombini->_dragOffset.y));
 	zoombini->_dragging = true;
 	zoombini->startAnimation(_pickupZombAnimation, 33, tick);
-	_vm->_globalZoombinis.push_back(zoombini);
+	_vm->_state->_activeZoombinis.push_back(zoombini);
 	delete board[boardIndex];
 	getRescueBoard()[boardIndex] = nullptr;
 	refreshGridOccupancy();
@@ -396,6 +396,9 @@ void ShelterRescueSite1::onUpdate() {
 	pumpSpeechQueue();
 	updateHoverCursor();
 	refreshGridOccupancy();
+	const uint32 tick = _vm->getGameTickCount();
+	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++)
+		_vm->_state->_activeZoombinis[i]->updateAnimation(tick);
 	if (_scrollPhase != kScrollIdle)
 		stepScrollAnimation();
 	if (_departurePrompted) {
@@ -410,25 +413,20 @@ bool ShelterRescueSite1::canUseGoButton() const {
 }
 
 BoardRecord **ShelterRescueSite1::getRescueBoard() const {
-	return _vm->getGameState()->_rescue1Board;
+	return _vm->_state->_rescue1Board;
 }
 
 void ShelterRescueSite1::buildBoardingDrawOrder(Common::Array<uint> &order, ZoombiniRunner *&draggedZoombini) const {
 	order.clear();
 	draggedZoombini = nullptr;
-	for (uint i = 0; i < _vm->_globalZoombinis.size(); i++) {
-		if (_vm->_globalZoombinis[i]->_dragging) {
-			draggedZoombini = _vm->_globalZoombinis[i];
+	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
+		if (_vm->_state->_activeZoombinis[i]->_dragging) {
+			draggedZoombini = _vm->_state->_activeZoombinis[i];
 			continue;
 		}
 		order.push_back(i);
 	}
-	for (uint i = 0; i < order.size(); i++) {
-		for (uint j = i + 1; j < order.size(); j++) {
-			if (_vm->_globalZoombinis[order[j]]->_screenPos.y < _vm->_globalZoombinis[order[i]]->_screenPos.y)
-				SWAP(order[i], order[j]);
-		}
-	}
+	ZoombiniRunner::sortDrawOrderByY(_vm->_state->_activeZoombinis, order);
 }
 
 void ShelterRescueSite1::drawBoardingActives(ManagedSurface32 *screen) const {
@@ -436,7 +434,7 @@ void ShelterRescueSite1::drawBoardingActives(ManagedSurface32 *screen) const {
 	ZoombiniRunner *draggedZoombini = nullptr;
 	buildBoardingDrawOrder(order, draggedZoombini);
 	for (uint i = 0; i < order.size(); i++) {
-		ZoombiniRunner *zoombini = _vm->_globalZoombinis[order[i]];
+		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[order[i]];
 		if (zoombini->_hidden)
 			continue;
 		zoombini->tryStartIdleAnimation(_idleZombAnimation, *_vm->_rnd, _vm->getGameTickCount());
@@ -468,7 +466,7 @@ void ShelterRescueSite1::drawWaitingBoard(ManagedSurface32 *screen, int pixelShi
 			if (boardIndex < 0 || kBoardRows * kBoardCols <= boardIndex || !board[boardIndex])
 				continue;
 			_vm->_gfx->drawZoombini(screen, _littleZombAnimation, board[boardIndex]->getTraits(),
-								   Common::Point32(kRosterGridBasePos.x + col * 40 + 18 + pixelShiftX, kRosterGridBasePos.y + row * 57 + 30), 33, 0, &clip);
+									Common::Point32(kRosterGridBasePos.x + col * 40 + 18 + pixelShiftX, kRosterGridBasePos.y + row * 57 + 30), 33, 0, &clip);
 		}
 	}
 }
@@ -478,11 +476,10 @@ void ShelterRescueSite1::onRenderContent(ManagedSurface32 *screen) {
 	// Restore their underlying pixels before blending translucent edges or moving sprites.
 	_vm->_gfx->drawBackground(screen, Common::Point32(0, 0));
 	onRenderSite(screen);
+	drawRosterBackdrop(screen, _scrollBgX);
 
-	if (_scrollPhase != kScrollIdle && _vm->_gfx->hasBackground()) {
+	if (_scrollPhase != kScrollIdle) {
 		const int shift = (_scrollPhase == kScrollPhaseUp04 ? 1 : -1) * (kScrollPixelLength - _scrollPixelsLeft);
-		_vm->_gfx->fillRect(screen, Common::Rect32(kRosterGridBasePos.x, 0, kRosterGridBasePos.x + 223, 600), 0);
-		_vm->_gfx->drawBackgroundSubRect(screen, Common::Point32(kRosterGridBasePos.x, 0), Common::Rect(_scrollBgX, 0, _scrollBgX + 223, 600));
 		drawWaitingBoard(screen, shift);
 	} else {
 		drawWaitingBoard(screen, 0);
@@ -542,12 +539,8 @@ void ShelterRescueSite1::onRenderSite(ManagedSurface32 *screen) {
 	}
 }
 
-EventHandleResult ShelterRescueSite1::onLButtonDown(const Common::Point &pos) {
-	// The original picks members up on the pressed frame, so start the drag here.
-	// Releases only finish a drag already in progress through onLButtonUp.
-	const ZoombiniInputResult inputResult = ZoombiniRunner::handlePointerInput(_vm->_globalZoombinis, Common::Point32(pos.x, pos.y), true,
-																			   _pickupZombAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
-	return inputResult != ZoombiniInputResult::kIgnored00 ? EventHandleResult::kConsumed : EventHandleResult::kPassthrough;
+EventHandleResult ShelterRescueSite1::onLButtonDown(const Common::Point &) {
+	return EventHandleResult::kPassthrough;
 }
 
 EventHandleResult ShelterRescueSite1::onLButtonUp(const Common::Point &pos) {
@@ -555,7 +548,7 @@ EventHandleResult ShelterRescueSite1::onLButtonUp(const Common::Point &pos) {
 		return EventHandleResult::kConsumed;
 	refreshGridOccupancy();
 	const uint32 tick = _vm->getGameTickCount();
-	const ZoombiniInputResult inputResult = ZoombiniRunner::handlePointerInput(_vm->_globalZoombinis, Common::Point32(pos.x, pos.y), true,
+	const ZoombiniInputResult inputResult = ZoombiniRunner::handlePointerInput(_vm->_state->_activeZoombinis, Common::Point32(pos.x, pos.y), true,
 																			   _pickupZombAnimation, tick, &_dropTargets, getAreaMask());
 	if (inputResult != ZoombiniInputResult::kIgnored00)
 		return EventHandleResult::kConsumed;
@@ -607,7 +600,7 @@ EventHandleResult ShelterRescueSite1::onLButtonUp(const Common::Point &pos) {
 }
 
 EventHandleResult ShelterRescueSite1::onMouseMove(const Common::Point &pos) {
-	const ZoombiniInputResult result = ZoombiniRunner::handlePointerInput(_vm->_globalZoombinis, Common::Point32(pos.x, pos.y), false,
+	const ZoombiniInputResult result = ZoombiniRunner::handlePointerInput(_vm->_state->_activeZoombinis, Common::Point32(pos.x, pos.y), false,
 																		  _pickupZombAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
 	return result == ZoombiniInputResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }

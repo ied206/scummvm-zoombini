@@ -80,8 +80,6 @@ protected: /** Bind a concrete rescue site to @p vm. */
 	void loadPorteSelector(const char *path);
 	/** Load the two roster scroll animations. */
 	void loadScrollButtons(const char *buttonUpPath, const char *buttonDownPath);
-	/** Start the site-owned looping music. */
-	void startMusic(const char *path);
 	/** Reset common selection and departure state after presentation resources load. */
 	void resetRescueState();
 	/** Clear an unvisited waiting board and restore its saved scroll position. */
@@ -99,13 +97,15 @@ protected: /** Bind a concrete rescue site to @p vm. */
 	/** Stop arrival speech playback and discard the queue. */
 	void clearSpeechQueue();
 	/** Count the occupied cells of @p board. */
-	static int countBoardMembers(BoardRecord *const *board);
+	static uint countBoardMembers(BoardRecord *const *board);
 	/** Begin the delayed map transition used by Rescue Site I's branch controls. */
 	void beginDeparture();
 	/** Return whether the delayed departure phase is active. */
 	bool isDeparting() const { return _phase == 1; }
 	/** Return the borrowed door-selection overlay, or nullptr when it failed to load. */
 	RleBlock *getPorteSelector() const { return _porteSelect; }
+	/** Draw the wrapping waiting-roster backdrop beneath its Zoombinis. */
+	void drawRosterBackdrop(ManagedSurface32 *screen, int scrollX) const;
 
 	/** Return the concrete site's waiting board. */
 	virtual BoardRecord **getRescueBoard() const = 0;
@@ -157,8 +157,6 @@ private:
 	int _phase = 0;
 	/** Time at which the current phase began. */
 	uint32 _phaseTimer = 0;
-	/** Music handle used while the rescue site is active. */
-	int _musicId = -1;
 	/** Arrival speech currently playing, or -1 when the queue is idle. */
 	int _speechSoundId = -1;
 	/** Arrival speech paths awaiting sequential playback. */

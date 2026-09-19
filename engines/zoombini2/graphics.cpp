@@ -63,6 +63,35 @@ void ManagedSurface32::frameRect(const Common::Rect32 &rect, uint32 color) {
 	Graphics::ManagedSurface::frameRect(clip16, color);
 }
 
+void ManagedSurface32::copyRectToSurface(const Graphics::Surface &srcSurface, int destX, int destY, const Common::Rect32 &subRect) {
+	if (!subRect.isValidRect())
+		return;
+
+	const Common::Rect32 srcBounds(srcSurface.w, srcSurface.h);
+	const Common::Rect32 src = subRect.findIntersectingRect(srcBounds);
+	if (src.isEmpty())
+		return;
+
+	const int32 destLeft = destX + src.left - subRect.left;
+	const int32 destTop = destY + src.top - subRect.top;
+	const int32 destRight = destLeft + src.width();
+	const int32 destBottom = destTop + src.height();
+	if (destRight <= 0 || destBottom <= 0 || w <= destLeft || h <= destTop)
+		return;
+
+	const int32 clippedDestLeft = destLeft < 0 ? 0 : destLeft;
+	const int32 clippedDestTop = destTop < 0 ? 0 : destTop;
+	const int32 clippedDestRight = w < destRight ? w : destRight;
+	const int32 clippedDestBottom = h < destBottom ? h : destBottom;
+	const int32 clippedSrcLeft = src.left + clippedDestLeft - destLeft;
+	const int32 clippedSrcTop = src.top + clippedDestTop - destTop;
+	const int32 clippedSrcRight = clippedSrcLeft + clippedDestRight - clippedDestLeft;
+	const int32 clippedSrcBottom = clippedSrcTop + clippedDestBottom - clippedDestTop;
+
+	const Common::Rect clippedSrc(static_cast<int16>(clippedSrcLeft), static_cast<int16>(clippedSrcTop), static_cast<int16>(clippedSrcRight), static_cast<int16>(clippedSrcBottom));
+	Graphics::ManagedSurface::copyRectToSurface(srcSurface, static_cast<int>(clippedDestLeft), static_cast<int>(clippedDestTop), clippedSrc);
+}
+
 void ManagedSurface32::blitFrom(const ManagedSurface32 &src, const Common::Point32 &destPos) {
 	const int32 srcRight = destPos.x + src.w;
 	const int32 srcBottom = destPos.y + src.h;
@@ -243,19 +272,19 @@ bool BitBlock::load(const Common::Path &basePath) {
 	if (pathString.hasSuffixIgnoreCase(".bb"))
 		return loadFromBB(basePath);
 
-	Common::Path sourcePath(basePath);
+	Common::Path srcPath(basePath);
 	Common::Path cachePath(basePath);
 	if (pathString.hasSuffixIgnoreCase(".bmp") || pathString.hasSuffixIgnoreCase(".bmt")) {
 		cachePath.removeExtension();
 		cachePath = cachePath.append(".bb");
 	} else {
 		cachePath = cachePath.append(".bb");
-		sourcePath = sourcePath.append(".bmp");
+		srcPath = srcPath.append(".bmp");
 	}
 
 	if (loadFromBB(cachePath))
 		return true;
-	return loadFromColorBMP(sourcePath);
+	return loadFromColorBMP(srcPath);
 }
 
 void BitBlock::createEmpty(const Size32 &size, bool withAlpha) {
@@ -351,33 +380,30 @@ void BitBlock::drawOpaque(ManagedSurface32 *destSurface, const Common::Point32 &
 	if (!_pixels || srcRect.isEmpty())
 		return;
 
-	const Common::Rect32 source = srcRect.findIntersectingRect(Common::Rect32(_size.width, _size.height));
-	if (source.isEmpty())
+	const Common::Rect32 src = srcRect.findIntersectingRect(Common::Rect32(_size.width, _size.height));
+	if (src.isEmpty())
 		return;
 
-	// Widen before translating so off-screen 32-bit positions cannot overflow.
-	const int64 left = static_cast<int64>(pos.x) + source.left - srcRect.left;
-	const int64 top = static_cast<int64>(pos.y) + source.top - srcRect.top;
-	const int64 right = left + source.width();
-	const int64 bottom = top + source.height();
+	const int32 left = pos.x + src.left - srcRect.left;
+	const int32 top = pos.y + src.top - srcRect.top;
+	const int32 right = left + src.width();
+	const int32 bottom = top + src.height();
 	if (right <= 0 || bottom <= 0 || destSurface->w <= left || destSurface->h <= top)
 		return;
 
-	const Common::Rect destination(MAX<int64>(0, left), MAX<int64>(0, top),
-		MIN<int64>(destSurface->w, right), MIN<int64>(destSurface->h, bottom));
-	const int sourceX = source.left + static_cast<int>(destination.left - left);
-	const int sourceY = source.top + static_cast<int>(destination.top - top);
-	const uint sourcePitch = static_cast<uint>(_size.width) * 4;
-	const byte *sourcePixels = _pixels + static_cast<size_t>(sourceY) * sourcePitch + static_cast<size_t>(sourceX) * 4;
-	byte *destinationPixels = static_cast<byte *>(destSurface->getBasePtr(destination.left, destination.top));
+	const Common::Rect dest(MAX<int32>(0, left), MAX<int32>(0, top), MIN<int32>(destSurface->w, right), MIN<int32>(destSurface->h, bottom));
+	const int srcX = src.left + static_cast<int>(dest.left - left);
+	const int srcY = src.top + static_cast<int>(dest.top - top);
+	const uint srcPitch = static_cast<uint>(_size.width) * 4;
+	const byte *srcPixels = _pixels + static_cast<size_t>(srcY) * srcPitch + static_cast<size_t>(srcX) * 4;
+	byte *destPixels = static_cast<byte *>(destSurface->getBasePtr(dest.left, dest.top));
 	// Ignore the stored fourth byte, including zero-filled bitmaps, and produce opaque output.
 	static constexpr Graphics::PixelFormat kSourceFormat = Graphics::PixelFormat::createFormatRGBA32(false);
-	if (!Graphics::crossBlit(destinationPixels, sourcePixels, destSurface->pitch, sourcePitch,
-			destination.width(), destination.height(), destSurface->format, kSourceFormat)) {
+	if (!Graphics::crossBlit(destPixels, srcPixels, destSurface->pitch, srcPitch, dest.width(), dest.height(), destSurface->format, kSourceFormat)) {
 		warning("BitBlock: unsupported opaque pixel conversion");
 		return;
 	}
-	destSurface->addDirtyRect(destination);
+	destSurface->addDirtyRect(dest);
 }
 
 /**
@@ -719,8 +745,8 @@ void RleBlock::drawToScreenClipped(ManagedSurface32 *destSurface, const Common::
 	if (!_rleData || _dataSize < 2 || !clip.isValidRect())
 		return;
 
-	const Common::Rect32 destinationClip = clip.findIntersectingRect(Common::Rect32(destSurface->w, destSurface->h));
-	if (destinationClip.isEmpty())
+	const Common::Rect32 destClip = clip.findIntersectingRect(Common::Rect32(destSurface->w, destSurface->h));
+	if (destClip.isEmpty())
 		return;
 	assert(destSurface->format.bytesPerPixel == 4);
 
@@ -739,16 +765,15 @@ void RleBlock::drawToScreenClipped(ManagedSurface32 *destSurface, const Common::
 		if (pixelCount < 0 || 1 < mode || static_cast<uint32>(end - ptr) < static_cast<uint32>(pixelCount) * 4)
 			return;
 
-		// Widen before translating so off-screen 32-bit positions cannot overflow.
-		const int64 screenX = static_cast<int64>(pos.x) + xOff;
-		const int64 screenY = static_cast<int64>(pos.y) + yOff;
-		if (screenY < destinationClip.top || destinationClip.bottom <= screenY) {
+		const int32 screenX = pos.x + xOff;
+		const int32 screenY = pos.y + yOff;
+		if (screenY < destClip.top || destClip.bottom <= screenY) {
 			ptr += pixelCount * 4;
 			continue;
 		}
 
-		const int64 left = MAX<int64>(screenX, destinationClip.left);
-		const int64 right = MIN<int64>(screenX + pixelCount, destinationClip.right);
+		const int32 left = MAX<int32>(screenX, destClip.left);
+		const int32 right = MIN<int32>(screenX + pixelCount, destClip.right);
 		if (left < right) {
 			const int x = static_cast<int>(left);
 			const int y = static_cast<int>(screenY);
@@ -903,12 +928,12 @@ void Gfx::drawZoombini(ManagedSurface32 *screen, const ZoombiniAnimation *animat
 }
 
 void Gfx::drawZoombiniPreview(ManagedSurface32 *screen, const ZoombiniAnimation *animation,
-							const int (&selectedValues)[ZmbTrait::kTraitCount], const Common::Point32 &pos) const {
+							  const int (&selectedValues)[ZmbTrait::kTraitCount], const Common::Point32 &pos) const {
 	drawZoombiniPreview(screen, animation, selectedValues, pos, _vm->getAlphaLUT());
 }
 
 void Gfx::drawZoombiniPreview(ManagedSurface32 *screen, const ZoombiniAnimation *animation,
-							const int (&selectedValues)[ZmbTrait::kTraitCount], const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) {
+							  const int (&selectedValues)[ZmbTrait::kTraitCount], const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) {
 	if (!screen || !animation)
 		return;
 	static constexpr int kBaseCell = 990;
@@ -1061,7 +1086,7 @@ void Gfx::drawLine(ManagedSurface32 *destSurface, const Common::Point32 &start, 
 		destSurface->drawLine(start.x, start.y, end.x, end.y, color);
 }
 
-ManagedSurface32 *Gfx::createMapTransitionBackground(PageId sourcePage, int mapRegion, RouteBranch routeBranch) {
+ManagedSurface32 *Gfx::createMapTransitionBackground(PageId srcPage, int mapRegion, RouteBranch routeBranch) {
 	ManagedSurface32 *background = createSurface(ManagedSurface32::kScreenSize);
 
 	const Common::String backgroundPath = Common::String::format("#bmp/maptrans/bigmap_background_%d", mapRegion);
@@ -1073,7 +1098,7 @@ ManagedSurface32 *Gfx::createMapTransitionBackground(PageId sourcePage, int mapR
 		fillRect(background, Common::Rect32(0, 0, ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), 0);
 	}
 
-	drawMapOverlays(background, sourcePage, mapRegion, routeBranch);
+	drawMapOverlays(background, srcPage, mapRegion, routeBranch);
 	return background;
 }
 
@@ -1100,14 +1125,14 @@ void Gfx::drawOverlaySprite(ManagedSurface32 *dst, const Common::String &name, c
  * Route direction at the page-4 fork is tracked through @ref GameState::hasPageVisit.
  * Page 6 visit kind 1 selects the upper path and page 5 selects the lower path.
  */
-void Gfx::drawMapOverlays(ManagedSurface32 *dst, PageId sourcePage, int mapRegion, RouteBranch routeBranch) {
-	GameState *gs = _vm->getGameState();
+void Gfx::drawMapOverlays(ManagedSurface32 *dst, PageId srcPage, int mapRegion, RouteBranch routeBranch) {
+	GameState *gs = _vm->_state;
 
 	// Helper lambda: standard overlay visibility check.
 	// "Show this path piece if destSurface was previously visited,
 	// OR if we're currently transitioning and haven't arrived yet."
 	auto visible = [&](int srcPageId, int dstPageId) -> bool {
-		return gs->isPageVisited(dstPageId) || (sourcePage == srcPageId && gs->isPageVisited(srcPageId) && !gs->hasPageVisit(dstPageId, 1));
+		return gs->isPageVisited(dstPageId) || (srcPage == srcPageId && gs->isPageVisited(srcPageId) && !gs->hasPageVisit(dstPageId, 1));
 	};
 
 	switch (mapRegion) {
@@ -1155,13 +1180,13 @@ void Gfx::drawMapOverlays(ManagedSurface32 *dst, PageId sourcePage, int mapRegio
 			drawOverlaySprite(dst, "bigmap_segment_05a", Common::Point32(201, 260));
 
 		// Magic Wall to Chez Norf segment.
-		const bool czNorfSeg = gs->isPageVisited(8) || (sourcePage == 6 && gs->isPageVisited(6) && !gs->hasPageVisit(8, 1));
+		const bool czNorfSeg = gs->isPageVisited(8) || (srcPage == 6 && gs->isPageVisited(6) && !gs->hasPageVisit(8, 1));
 		if (czNorfSeg)
 			drawOverlaySprite(dst, "bigmap_segment_06a", Common::Point32(310, 230));
 
 		// Chez Norf to Rescue Site II segment.
 		if (gs->hasPageVisit(8, 1)) {
-			if (gs->isPageVisited(9) || (sourcePage == 8 && gs->isPageVisited(8) && !gs->hasPageVisit(9, 1)))
+			if (gs->isPageVisited(9) || (srcPage == 8 && gs->isPageVisited(8) && !gs->hasPageVisit(9, 1)))
 				drawOverlaySprite(dst, "bigmap_segment_07a", Common::Point32(480, 233));
 		}
 
@@ -1170,13 +1195,13 @@ void Gfx::drawMapOverlays(ManagedSurface32 *dst, PageId sourcePage, int mapRegio
 			drawOverlaySprite(dst, "bigmap_segment_05b", Common::Point32(164, 376));
 
 		// Mystic Marsh to Wall of Fleens segment.
-		const bool wofSeg = gs->isPageVisited(7) || (sourcePage == 5 && gs->isPageVisited(5) && !gs->hasPageVisit(7, 1));
+		const bool wofSeg = gs->isPageVisited(7) || (srcPage == 5 && gs->isPageVisited(5) && !gs->hasPageVisit(7, 1));
 		if (wofSeg)
 			drawOverlaySprite(dst, "bigmap_segment_06b", Common::Point32(339, 476));
 
 		// Wall of Fleens to Rescue Site II segment.
 		if (gs->hasPageVisit(7, 1)) {
-			if (gs->isPageVisited(9) || (sourcePage == 7 && gs->isPageVisited(7) && !gs->hasPageVisit(9, 1)))
+			if (gs->isPageVisited(9) || (srcPage == 7 && gs->isPageVisited(7) && !gs->hasPageVisit(9, 1)))
 				drawOverlaySprite(dst, "bigmap_segment_07b", Common::Point32(512, 360));
 		}
 
@@ -1192,8 +1217,8 @@ void Gfx::drawMapOverlays(ManagedSurface32 *dst, PageId sourcePage, int mapRegio
 
 		// Rescue2 icon (reachable from either path)
 		if (gs->isPageVisited(9) ||
-			(sourcePage == 8 && gs->isPageVisited(8) && !gs->hasPageVisit(9, 1)) ||
-			(sourcePage == 7 && gs->isPageVisited(7) && !gs->hasPageVisit(9, 1)))
+			(srcPage == 8 && gs->isPageVisited(8) && !gs->hasPageVisit(9, 1)) ||
+			(srcPage == 7 && gs->isPageVisited(7) && !gs->hasPageVisit(9, 1)))
 			drawOverlaySprite(dst, "bigmap_icon_08", Common::Point32(476, 271));
 
 		// Bottom route icons
@@ -1380,8 +1405,8 @@ bool AreaMask::loadOneBitBitmap(Common::SeekableReadStream &stream, const Common
 	Common::Array<byte> pixels;
 	pixels.resize(static_cast<uint32>(pixelCount));
 	for (int32 row = 0; row < height; row++) {
-		const int32 sourceRow = bottomUp ? height - 1 - row : row;
-		stream.seek(static_cast<int64>(pixelOffset) + static_cast<int64>(sourceRow) * stride);
+		const int32 srcRow = bottomUp ? height - 1 - row : row;
+		stream.seek(static_cast<int64>(pixelOffset) + static_cast<int64>(srcRow) * stride);
 		byte packed = 0;
 		for (int32 col = 0; col < width; col++) {
 			if (col % 8 == 0)

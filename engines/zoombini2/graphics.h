@@ -262,6 +262,7 @@ public:
 		: Graphics::ManagedSurface(size.width, size.height, pixelFormat) {}
 
 	using Graphics::ManagedSurface::blitFrom;
+	using Graphics::ManagedSurface::copyRectToSurface;
 	using Graphics::ManagedSurface::fillRect;
 	using Graphics::ManagedSurface::frameRect;
 
@@ -269,6 +270,8 @@ public:
 	void fillRect(const Common::Rect32 &rect, uint32 color);
 	/** Draw a 32-bit rectangular outline after clipping it to this surface. */
 	void frameRect(const Common::Rect32 &rect, uint32 color);
+	/** Copy a source surface rectangle using 32-bit coordinates after clipping. */
+	void copyRectToSurface(const Graphics::Surface &srcSurface, int destX, int destY, const Common::Rect32 &subRect);
 	/** Copy a managed surface at a 32-bit destSurface pos after clipping. */
 	void blitFrom(const ManagedSurface32 &srcSurface, const Common::Point32 &destPos);
 };

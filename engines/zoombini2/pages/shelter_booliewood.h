@@ -282,8 +282,6 @@ private:
 	/** Shared waiting animation used by the 17 decorative actors. */
 	Animation *_waitingAnimation = nullptr;
 
-	/** Looping Booliewood music identifier. */
-	int _musicId = -1;
 	/** First-visit narration identifier. */
 	int _introSpeechId = -1;
 	/** Random crowd speech identifiers. */

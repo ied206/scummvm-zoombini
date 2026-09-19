@@ -26,6 +26,7 @@
 #include "common/rect.h"
 
 #include "zoombini2/pages/puzzle_base.h"
+#include "zoombini2/scripts.h"
 
 namespace Zoombini2 {
 
@@ -35,7 +36,7 @@ class RleBlock;
 /**
  * Bubble Bumpers (Route3-1)
  *
- * Choose each Zoombini's entrance and launch order to cross the marsh.
+ * Place Zoombinis in bubble craters to cross the marsh.
  */
 class PuzzleMysticMarsh : public PuzzleBase {
 public:
@@ -48,12 +49,18 @@ public:
 	void init() override;
 	/** Advance the active Zoombini through the grid. */
 	void onUpdate() override;
-	/** Draw the grid, launch slots, and Zoombinis. */
+	/** Draw the marsh background before grid and Zoombini passes. */
 	void onRenderBackground(ManagedSurface32 *screen) override;
 	/** Draw the grid behind active actors. */
 	void onRenderContent(ManagedSurface32 *screen) override;
-	/** Launch the next Zoombini from the selected entrance. */
+	/** Leave pointer presses to the common release-driven Zoombini input. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	/** Pick up or place a Zoombini through the common input lifecycle. */
+	EventHandleResult onLButtonUp(const Common::Point &pos) override;
+	/** Update a Zoombini currently following the pointer. */
+	EventHandleResult onMouseMove(const Common::Point &pos) override;
+	/** Apply scheduled Zoombini animation frames after drawing the roster. */
+	void onActorsRendered() override;
 
 	/** Number of grid columns. */
 	static constexpr int kGridCols = 16;
@@ -61,7 +68,7 @@ public:
 	static constexpr int kGridRows = 12;
 	/** Total cell capacity of the grid. */
 	static constexpr int kMaxCells = kGridCols * kGridRows;
-	/** Maximum number of bubble-crater launch slots. */
+	/** Maximum number of bubble-crater placement slots. */
 	static constexpr int kMaxSlots = 10;
 	/** Number of symbol visuals available to grid cells. */
 	static constexpr int kNumSymbols = 60;
@@ -78,6 +85,11 @@ private:
 	static constexpr const char *kTraitFormat = "bmp/mystic_marsh/traits/%d-%d";
 	static constexpr const char *kSymbolFormat = "bmp/mystic_marsh/symbols/%s";
 	static constexpr const char *kBubbleFormat = "bmp/mystic_marsh/bubble%d";
+	static constexpr const char *kPickupZombAnimationPath = "bmp/zombis/pris/pris.anm";
+	static constexpr const char *kAreaMaskFormat = "bmp/mystic_marsh/area%d.bmt";
+	static constexpr const char *kPlacementSoundPath = "sounds/fx/04-BS03.wav";
+	/** Starting positions selected by the six background variants. */
+	static const Common::Point32 kStartingPositions[6][8];
 	/** Resource names for the symbol slots. */
 	static constexpr const char *kSymbolNames[kNumSymbols] = {
 		"S_DIV1",
@@ -153,7 +165,7 @@ private:
 		Common::Point32 pos = Common::Point32();
 	};
 
-	/** One bubble-crater launch position. */
+	/** One bubble-crater placement position. */
 	struct Slot {
 		/** Grid column. */
 		int cellCol = 0;
@@ -161,22 +173,18 @@ private:
 		int cellRow = 0;
 		/** Screen position. */
 		Common::Point32 pos = Common::Point32();
-		/** Clickable launch area. */
+		/** Zoombini drop area. */
 		Common::Rect32 hitbox = Common::Rect32();
-		/** Assigned puzzle-roster index, or `-1` when empty. */
-		int zoombiniIdx = -1;
-		/** Whether a Zoombini currently occupies this slot. */
-		bool occupied = false;
 	};
 
 	/** Runtime phase of the Bubble Bumpers interaction. */
 	enum State {
 		/** Complete initial grid setup. */
 		kStateInit,
-		/** Wait for an entrance selection. */
+		/** Wait for a Zoombini to be placed in a crater. */
 		kStateIdle,
-		/** Move the active Zoombini through the grid. */
-		kStateLaunching,
+		/** Move the most recently placed Zoombini through the grid. */
+		kStateMoving,
 		/** Release a Zoombini that reached the correct exit. */
 		kStateFreeing,
 		/** Play collision feedback for an incorrect route. */
@@ -193,7 +201,7 @@ private:
 		int cellCol = 0;
 		/** Current grid row. */
 		int cellRow = 0;
-		/** Interpolated screen position. */
+		/** Current screen position. */
 		Common::Point32 targetPos = Common::Point32();
 		/** Time at which the current cell movement began. */
 		uint32 moveStartTime = 0;
@@ -210,13 +218,15 @@ private:
 
 	/** Populate the routing grid for the selected background. */
 	void setupGrid();
-	/** Build launch slots from crater cells. */
+	/** Build placement targets from crater cells. */
 	void buildSlots();
-	/** Generate the correct entrance sequence. */
+	/** Populate the current routing symbols and crater cells. */
 	void generateRules();
 
-	/** Launch the next Zoombini from entrance @p entranceIdx. */
-	void launchZoombini(int entranceIdx);
+	/** Apply the marsh-specific grid placement after a common target release. */
+	void placeZoombiniAtSlot(int slotIdx, int zoombiniIdx);
+	/** Adapt the common target callback to this page. */
+	static void slotDropCallback(void *context, int slotIdx, int zoombiniIdx);
 	/** Advance the active Zoombini by one routing step. */
 	void moveZoombini();
 	/** Release puzzle-roster entry @p zoombiniIdx. */
@@ -233,24 +243,23 @@ private:
 	State _state = kStateInit;
 	/** Number of Zoombinis already released. */
 	int _freedCount = 0;
-	/** Selected puzzle-roster index, or `-1` when none is selected. */
-	int _selectedZoombini = -1;
 	/** Level in the range one through four. */
 	int _level = 1;
 	/** Selected background variant. */
 	int _bgIndex = 1;
-	/** Number of launch slots populated in @ref PuzzleMysticMarsh::_slots. */
+	/** Number of crater slots populated in @ref PuzzleMysticMarsh::_slots. */
 	int _numSlots = 0;
 	/** Bubble-crater launch slots. */
 	Slot _slots[kMaxSlots] = {};
-
-	/** Index of the next Zoombini in the generated launch sequence. */
-	int _currentSequenceIdx = 0;
-	/** Correct entrance index for each Zoombini in sequence. */
-	Common::Array<int> _targetSequence;
+	/** Shared Zoombini input targets linked to the crater slots. */
+	Common::Array<ZoombiniDropTarget> _dropTargets;
+	/** Deadline after which all crater targets accept another placement. */
+	uint32 _slotUnlockTime = 0;
 
 	/** Runtime state of the currently moving Zoombini. */
 	ActiveZoombini _activeZ;
+	/** Crater slot playing the current placement animation. */
+	int _activeSlotIdx = -1;
 	/** Whether @ref PuzzleMysticMarsh::_activeZ is currently valid. */
 	bool _hasActiveZ = false;
 
@@ -269,9 +278,11 @@ private:
 	Animation *_bubbleCraterAnim = nullptr;
 	/** Whirlpool animation. */
 	Animation *_tourbiAnim = nullptr;
+	/** Borrowed pickup animation for the common Zoombini input. */
+	const ZoombiniAnimation *_pickupZombAnimation = nullptr;
 
-	/** Music handle used while Bubble Bumpers is active. */
-	int _musicId = -1;
+	/** Crater placement sound handle. */
+	int _placementSoundId = -1;
 };
 
 } // End of namespace Zoombini2

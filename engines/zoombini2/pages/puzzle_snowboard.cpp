@@ -54,11 +54,6 @@ PuzzleSnowboard::PuzzleSnowboard(Zoombini2Engine *vm)
 }
 
 PuzzleSnowboard::~PuzzleSnowboard() {
-	if (_musicId >= 0) {
-		SoundManager *snd = _vm->getSoundManager();
-		snd->stop(_musicId);
-		snd->unload(_musicId);
-	}
 	for (int f = 0; f < ZmbTrait::kTraitCount; f++) {
 		for (int v = 0; v < ZmbTrait::kTraitValueCount; v++) {
 			delete _traitIcons[f][v];
@@ -70,6 +65,7 @@ PuzzleSnowboard::~PuzzleSnowboard() {
 	for (int i = 0; i < 5; i++) {
 		delete _decorAnims[i];
 	}
+	finishPuzzleRoster(_vm->_state->_rescue2Board);
 }
 
 void PuzzleSnowboard::init() {
@@ -77,15 +73,9 @@ void PuzzleSnowboard::init() {
 	PuzzleBase::init();
 
 	// Start the Snowboard Gulch music.
-	if (SoundManager *snd = _vm->getSoundManager()) {
-		_musicId = snd->load(true, Common::Path(kMusicPath), true);
-		if (_musicId >= 0) {
-			snd->playLoop(_musicId);
-			snd->setVolume(_musicId, snd->_volumeMusic);
-		}
-	}
+	startPageMusic(Common::Path(kMusicPath));
 
-	int level = CLIP(_vm->getGameState()->_level, 1, 3);
+	int level = CLIP(_vm->_state->_level, 1, 3);
 	debug(1, "PuzzleSnowboard::init - level %d", level);
 	_numLanes = kLanesByLevel[level];
 	_treeDepth = _numLanes - 1; // Binary tree: depth = numLeaves - 1
@@ -198,7 +188,7 @@ int PuzzleSnowboard::classifyZoombini(const ZoombiniRunner *z) const {
 		return 0;
 
 	int v = 0;
-	int level = _vm->getGameState()->_level;
+	int level = _vm->_state->_level;
 
 	while (v < _treeDepth) {
 		const TreeNode &node = _tree[v];
@@ -249,7 +239,7 @@ void PuzzleSnowboard::onUpdate() {
 			_currentZoombini += 1;
 			_stateTimer = now;
 
-			if (static_cast<int>(_puzzleZoombinis.size()) <= _currentZoombini) {
+			if (_puzzleZoombinis.size() <= _currentZoombini) {
 				_state = kStateDone;
 				debug(1, "PuzzleSnowboard: All zoombinis assigned");
 			}
@@ -342,7 +332,7 @@ void PuzzleSnowboard::onRenderActors(ManagedSurface32 *screen) {
 
 		// Count zoombinis in this lane
 		int count = 0;
-		for (uint i = 0; i < _laneAssignments.size() && static_cast<int>(i) <= _currentZoombini; i++) {
+		for (uint i = 0; i < _laneAssignments.size() && i <= _currentZoombini; i++) {
 			if (_laneAssignments[i] == lane)
 				count += 1;
 		}
@@ -353,7 +343,7 @@ void PuzzleSnowboard::onRenderActors(ManagedSurface32 *screen) {
 				// Find the z-th zoombini assigned to this lane
 				int zoombiniIdx = -1;
 				int c = 0;
-				for (uint i = 0; i < _laneAssignments.size() && static_cast<int>(i) <= _currentZoombini; i++) {
+				for (uint i = 0; i < _laneAssignments.size() && i <= _currentZoombini; i++) {
 					if (_laneAssignments[i] == lane) {
 						if (c == z) {
 							zoombiniIdx = i;
@@ -374,7 +364,7 @@ void PuzzleSnowboard::onRenderActors(ManagedSurface32 *screen) {
 	}
 
 	// Draw current zoombini being processed
-	if (_state == kStateSliding && _currentZoombini < static_cast<int>(_puzzleZoombinis.size())) {
+	if (_state == kStateSliding && _currentZoombini < _puzzleZoombinis.size()) {
 		const ZoombiniRunner *z = _puzzleZoombinis[_currentZoombini];
 		static constexpr Common::Point32 kCurrentZoombiniPos = Common::Point32(400, 200);
 
@@ -390,7 +380,7 @@ EventHandleResult PuzzleSnowboard::onLButtonDown(const Common::Point &pos) {
 		_currentZoombini += 1;
 		_stateTimer = _vm->getGameTickCount();
 
-		if (static_cast<int>(_puzzleZoombinis.size()) <= _currentZoombini) {
+		if (_puzzleZoombinis.size() <= _currentZoombini) {
 			_state = kStateDone;
 		}
 		return EventHandleResult::kConsumed;

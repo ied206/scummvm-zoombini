@@ -179,7 +179,7 @@ private:
 		/** Clickable tablet area. */
 		Common::Rect rect;
 		/** Slot from which the tablet moves a beetle. */
-		int sourceSlot;
+		int srcSlot;
 		/** Slot to which the tablet moves a beetle. */
 		int destSlot;
 		/** Path followed during the transfer. */
@@ -222,7 +222,7 @@ private:
 	/** Synchronize door lights with the current color arrangement. */
 	void updateLights();
 	/** Return the number of slots that reached their destinations. */
-	int countCaptured() const;
+	uint countCaptured() const;
 
 	/** Draw maze layer @p level. */
 	void drawMazeLevel(ManagedSurface32 *screen, int level);
@@ -293,8 +293,6 @@ private:
 	/** Internal movement paths connecting maze slots. */
 	PathObject *_bougePaths[4] = {};
 
-	/** Music handle used while Beetle Bug Alley is active. */
-	int _musicId = -1;
 	/** Approval sounds cycled after successful moves. */
 	int _sndApproval[4] = {-1, -1, -1, -1};
 	/** Error sounds selected after invalid moves. */
