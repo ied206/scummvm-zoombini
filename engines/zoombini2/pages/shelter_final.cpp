@@ -384,7 +384,7 @@ void ShelterFinal::drawAnimation(const Animation *animation, int frameIndex,
 }
 
 void ShelterFinal::drawZoombini(const ZoombiniRunner &zoombini, ManagedSurface32 *screen) const {
-	zoombini.draw(screen, _vm->getAlphaLUT());
+	_vm->_gfx->drawZoombiniRunner(screen, &zoombini);
 }
 
 } // End of namespace Zoombini2

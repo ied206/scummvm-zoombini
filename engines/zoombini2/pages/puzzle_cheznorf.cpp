@@ -43,7 +43,6 @@ constexpr const char *PuzzleChezNorf::kFoodStemFormat;
 constexpr const char *PuzzleChezNorf::kNorfDefaultPath;
 constexpr const char *PuzzleChezNorf::kHighlightPath;
 constexpr const char *PuzzleChezNorf::kMusicPath;
-constexpr const char *PuzzleChezNorf::kDebugFontPath;
 
 // ============================================================================
 // PuzzleChezNorf - restaurant food-matching puzzle.
@@ -114,7 +113,6 @@ PuzzleChezNorf::~PuzzleChezNorf() {
 
 	delete _norfDefault;
 	delete _highlightImage;
-	delete _debugFont;
 }
 
 // ============================================================================
@@ -727,27 +725,21 @@ const char *PuzzleChezNorf::getDebugFoodName(int foodId) {
 }
 
 void PuzzleChezNorf::drawDebugOverlay(ManagedSurface32 *screen) {
-	if (!_debugFont) {
-		_debugFont = new BitmapFont(_vm);
-		if (!_debugFont->load(Common::Path(kDebugFontPath), 0, 255, 0)) {
-			delete _debugFont;
-			_debugFont = nullptr;
-			return;
-		}
-	}
+	if (!_vm->_gfx->hasTextFont(Gfx::TextColor::kGreen02) && !_vm->_gfx->loadTextFont(Gfx::TextColor::kGreen02))
+		return;
 
 	const Common::String header = Common::String::format("%d - %d %d %d - %d %d %d - %d %d %d", _templateId, _foodVals[0], _foodVals[1],
 														 _foodVals[2], _foodVals[3], _foodVals[4], _foodVals[5], _foodVals[6], _foodVals[7], _foodVals[8]);
-	_vm->_gfx->drawString(screen, _debugFont, Common::Point32(100, 0), header);
+	_vm->_gfx->drawText(screen, Gfx::TextColor::kGreen02, Common::Point32(100, 0), header);
 
 	for (int tableIndex = 0; tableIndex < _numTables; tableIndex++) {
 		const FoodAnswer &answer = _answers[tableIndex];
 		const int x = 205 + tableIndex * kTableSpacing;
-		_vm->_gfx->drawString(screen, _debugFont, Common::Point32(x, 50), getDebugFoodName(answer.slurp));
-		_vm->_gfx->drawString(screen, _debugFont, Common::Point32(x, 80), getDebugFoodName(answer.miam));
-		_vm->_gfx->drawString(screen, _debugFont, Common::Point32(x, 110), getDebugFoodName(answer.glouglou));
+		_vm->_gfx->drawText(screen, Gfx::TextColor::kGreen02, Common::Point32(x, 50), getDebugFoodName(answer.slurp));
+		_vm->_gfx->drawText(screen, Gfx::TextColor::kGreen02, Common::Point32(x, 80), getDebugFoodName(answer.miam));
+		_vm->_gfx->drawText(screen, Gfx::TextColor::kGreen02, Common::Point32(x, 110), getDebugFoodName(answer.glouglou));
 		const int assignmentCount = static_cast<int>(answer.slurp != 9) + static_cast<int>(answer.miam != 9) + static_cast<int>(answer.glouglou != 9);
-		_vm->_gfx->drawString(screen, _debugFont, Common::Point32(x, 140), Common::String::format("%d", assignmentCount));
+		_vm->_gfx->drawText(screen, Gfx::TextColor::kGreen02, Common::Point32(x, 140), Common::String::format("%d", assignmentCount));
 	}
 }
 

@@ -108,8 +108,11 @@ public:
 	bool activateRunnersAt(const Common::Point32 &point);
 	/** Draw an 800x600 subregion of the layer background. */
 	void drawBackgroundRegion(ManagedSurface32 *screen, int sourceX, int sourceY) const;
-	/** Draw the layer background and update every enabled animation runner. */
-	void drawAndUpdate(ManagedSurface32 *screen);
+	/**
+	 * Draw the layer background and update every enabled animation runner.
+	 * @param forceBackgroundRedraw Restore even a cached fixed background before runners when recomposing a complete frame.
+	 */
+	void drawAndUpdate(ManagedSurface32 *screen, bool forceBackgroundRedraw = false);
 
 private:
 	friend class PageLayerStack;
@@ -172,8 +175,11 @@ public:
 	/** Set the absolute horizontal scroll position on every layer. */
 	void setScrollX(int16 scrollX);
 
-	/** Draw and update the first layer, if present. */
-	void drawFirstLayer(ManagedSurface32 *screen);
+	/**
+	 * Draw and update the first layer, if present.
+	 * @param forceBackgroundRedraw Forward the complete-frame restoration policy to @ref PageLayer::drawAndUpdate.
+	 */
+	void drawFirstLayer(ManagedSurface32 *screen, bool forceBackgroundRedraw = false);
 
 private:
 	/** Copy the first layer dimensions into every backgroundless follower. */
