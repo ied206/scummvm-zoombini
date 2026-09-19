@@ -532,6 +532,11 @@ uint32 Zoombini2Engine::getGameTickCount() const {
 	return _useCachedFrameTime ? _cachedGameTickCount : calculateGameTickCount();
 }
 
+void Zoombini2Engine::restartGoBlink() {
+	if (_sidebar)
+		_sidebar->restartGoBlink();
+}
+
 void Zoombini2Engine::reseedRandomForV10() {
 	if ((_gameDescription->features & GF_Z2_V10) != 0)
 		_rnd->setSeed(getGameTickCount());

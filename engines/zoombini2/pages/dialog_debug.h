@@ -31,7 +31,6 @@ namespace Zoombini2 {
 
 class Zoombini2Engine;
 class Animation;
-class BitmapFont;
 class ManagedSurface32;
 class RleBlock;
 
@@ -81,7 +80,7 @@ class DialogDebug : public DialogBase {
 public:
 	/** Bind the reusable debug overlay to @p vm. */
 	explicit DialogDebug(Zoombini2Engine *vm);
-	/** Release the saved screen, title font, and loaded view resources. */
+	/** Release the saved screen and loaded view resources. */
 	~DialogDebug() override;
 
 	/** Set up @p cmd and open the modal. */
@@ -103,9 +102,6 @@ public:
 	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
 
 private:
-	/** Title font resource path. */
-	static constexpr const char *kTitleFontPath = "bmp/typo";
-
 	/** Release the loaded animation or sprite, if any. */
 	void freeAnimation();
 	/** Return the number of frames in the loaded animation view. */
@@ -121,8 +117,6 @@ private:
 	DialogDebugCommand::Type _viewType = DialogDebugCommand::Type::kNone;
 	/** Masked screen snapshot shown by the area-mask view. */
 	ManagedSurface32 *_savedScreen = nullptr;
-	/** Title font drawn over the active view. */
-	BitmapFont *_titleFont = nullptr;
 	/** Title line describing the active view. */
 	Common::String _titleText;
 	/** Loaded animation for the animation view, or nullptr. */

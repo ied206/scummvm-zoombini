@@ -130,7 +130,7 @@ bool PuzzleBase::loadPrimaryLayerBackground(const Common::Path &path) {
 }
 
 void PuzzleBase::drawPrimaryPageLayer(ManagedSurface32 *screen) {
-	_vm->_gfx->getPageLayerStack()->drawFirstLayer(screen);
+	_vm->_gfx->getPageLayerStack()->drawFirstLayer(screen, true);
 }
 
 void PuzzleBase::renderZoombinis(ManagedSurface32 *screen) const {

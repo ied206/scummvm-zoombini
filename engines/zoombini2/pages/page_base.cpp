@@ -206,13 +206,13 @@ void PageLayer::drawBackgroundRegion(ManagedSurface32 *screen, int sourceX, int 
 	_vm->_gfx->drawBitBlockSubRect(screen, _background, Common::Point32(0, 0), sourceRect);
 }
 
-void PageLayer::drawAndUpdate(ManagedSurface32 *screen) {
+void PageLayer::drawAndUpdate(ManagedSurface32 *screen, bool forceBackgroundRedraw) {
 	if (!screen)
 		return;
 
 	if (_background) {
 		if (_backgroundSize.width <= ManagedSurface32::kScreenSize.width) {
-			if (!_backgroundDrawn) {
+			if (forceBackgroundRedraw || !_backgroundDrawn) {
 				drawBackgroundRegion(screen, 0, 0);
 				_backgroundDrawn = true;
 			}
@@ -335,10 +335,10 @@ void PageLayerStack::setScrollX(int16 scrollX) {
 		_layers[index]->setScrollX(scrollX);
 }
 
-void PageLayerStack::drawFirstLayer(ManagedSurface32 *screen) {
+void PageLayerStack::drawFirstLayer(ManagedSurface32 *screen, bool forceBackgroundRedraw) {
 	PageLayer *layer = getLayer(0);
 	if (layer)
-		layer->drawAndUpdate(screen);
+		layer->drawAndUpdate(screen, forceBackgroundRedraw);
 }
 
 void PageLayerStack::propagateFirstLayerDimensions() {

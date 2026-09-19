@@ -133,8 +133,6 @@ private:
 	static constexpr int kScrollPixelLength = 40;
 	/** Scroll animation step in pixels per frame. */
 	static constexpr int kScrollPixelStep = 4;
-	/** Pressed-button flash length in milliseconds. */
-	static constexpr uint32 kScrollFlashMilliseconds = 150;
 
 	/** Origin of the Rescue Site I waiting-roster grid. */
 	static constexpr Common::Point32 kRosterGridBasePos = Common::Point32(68, 95);
@@ -231,10 +229,6 @@ private:
 	int _scrollBgX = 0;
 	/** Remaining scroll animation pixels. */
 	int _scrollPixelsLeft = 0;
-	/** Game tick until which the upward scroll button shows its pressed frame. */
-	uint32 _scrollUpFlashUntil = 0;
-	/** Game tick until which the downward scroll button shows its pressed frame. */
-	uint32 _scrollDownFlashUntil = 0;
 	/** Whether eight members have arrived in total, showing the portal ship. */
 	bool _shipVisible = false;
 	/** Whether a branch click prompted departure on the next update. */

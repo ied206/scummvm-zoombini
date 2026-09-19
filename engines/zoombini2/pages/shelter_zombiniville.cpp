@@ -41,7 +41,6 @@ constexpr const char *ShelterZombiniville::kBigZombAnimationPath;
 constexpr const char *ShelterZombiniville::kLittleZombAnimationPath;
 constexpr const char *ShelterZombiniville::kPickupZombAnimationPath;
 constexpr const char *ShelterZombiniville::kIdleZombAnimationPath;
-constexpr const char *ShelterZombiniville::kNameFontPath;
 constexpr const char *ShelterZombiniville::kMusicPath;
 constexpr const char *ShelterZombiniville::kFeatureSelectSoundPath;
 constexpr const char *ShelterZombiniville::kQuickFillSoundPath;
@@ -63,7 +62,6 @@ ShelterZombiniville::~ShelterZombiniville() {
 	delete _quickFillButton;
 	delete _batchFillButton;
 	delete _createButton;
-	delete _nameFont;
 	for (int feature = 0; feature < ZmbTrait::kTraitCount; feature++) {
 		for (int value = 0; value < ZmbTrait::kTraitValueCount; value++) {
 			delete _featureButtonRunners[feature][value];
@@ -245,10 +243,9 @@ void ShelterZombiniville::init() {
 	if (!_idleZombAnimation)
 		warning("ShelterZombiniville: Failed to load attenteZomb2.anm");
 	for (uint i = 0; i < _boardingZoombinis.size(); i++)
-		_boardingZoombinis[i]->setDefaultAnimation(_littleZombAnimation, 66);
+		_boardingZoombinis[i]->setDefaultAnimation(_littleZombAnimation, 33);
 
-	_nameFont = new BitmapFont(_vm);
-	if (!_nameFont->load(Common::Path(kNameFontPath), 16, 16, 16))
+	if (!_vm->_gfx->loadTextFont(Gfx::TextColor::kDark00))
 		warning("ShelterZombiniville: Failed to load name font");
 
 	setupFeatureRects();
@@ -352,7 +349,7 @@ bool ShelterZombiniville::passesPackTraitLimits(const ZmbTrait &traits) const {
 }
 
 Common::String ShelterZombiniville::generateName() {
-	static constexpr char *const kVowelPairs[30] = {
+	static constexpr const char *kVowelPairs[30] = {
 		"a ",
 		"a ",
 		"a ",
@@ -386,7 +383,7 @@ Common::String ShelterZombiniville::generateName() {
 	};
 	static constexpr char kSingleConsonants[] = "bbccdddfghjkkllmmnnprrssssttvwx";
 	static constexpr char kEndings[] = "aeiou";
-	static constexpr char *const kConsonantPairs[39] = {
+	static constexpr const char *kConsonantPairs[39] = {
 		"bl",
 		"br",
 		"ch",
@@ -500,7 +497,7 @@ bool ShelterZombiniville::createZoombini(bool allowConcurrentEntrances) {
 	_currentName = generateName();
 	Common::strlcpy(zoombini->_name, _currentName.c_str(), sizeof(zoombini->_name));
 	zoombini->setPosition(dest);
-	zoombini->setDefaultAnimation(_littleZombAnimation, 66);
+	zoombini->setDefaultAnimation(_littleZombAnimation, 33);
 	zoombini->_inputEnabled = false;
 	zoombini->_placementIndex = _boardingZoombinis.size();
 	zoombini->_tracksMovementDirection = true;
@@ -558,9 +555,9 @@ void ShelterZombiniville::drawBoardingZoombinis(ManagedSurface32 *screen) const 
 	ZoombiniRunner *draggedZoombini = nullptr;
 	buildBoardingZoombiniDrawOrder(order, draggedZoombini);
 	for (uint i = 0; i < order.size(); i++)
-		_boardingZoombinis[order[i]]->draw(screen, _vm->getAlphaLUT());
+		_vm->_gfx->drawZoombiniRunner(screen, _boardingZoombinis[order[i]]);
 	if (draggedZoombini)
-		draggedZoombini->draw(screen, _vm->getAlphaLUT());
+		_vm->_gfx->drawZoombiniRunner(screen, draggedZoombini);
 }
 
 ZoombiniRunner *ShelterZombiniville::getDraggedZoombini() const {
@@ -575,9 +572,9 @@ void ShelterZombiniville::onRenderContent(ManagedSurface32 *screen) {
 	_vm->_gfx->drawBackground(screen, Common::Point32(0, 0));
 	drawHoverRunners(screen);
 
-	if (hasActiveEntrance() && _nameFont && _nameFont->isLoaded()) {
-		const int width = _nameFont->getStringWidth(_currentName);
-		_nameFont->drawString(screen, Common::Point32(367 - width / 2, 280), _currentName, _vm->getAlphaLUT());
+	if (hasActiveEntrance() && _vm->_gfx->hasTextFont(Gfx::TextColor::kDark00)) {
+		const int width = _vm->_gfx->getTextWidth(_currentName, Gfx::TextColor::kDark00);
+		_vm->_gfx->drawText(screen, Gfx::TextColor::kDark00, Common::Point32(367 - width / 2, 280), _currentName);
 	}
 }
 
@@ -602,24 +599,10 @@ void ShelterZombiniville::onActorsRendered() {
 }
 
 void ShelterZombiniville::onRenderForeground(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &alphaLUT = _vm->getAlphaLUT();
-	if (_bigZombAnimation) {
-		static constexpr int kBaseCell = 990;
-		static constexpr int kFeatureCellBases[ZmbTrait::kTraitCount] = {996, 1002, 1008, 1014};
-		static constexpr int kFeatureDrawOrder[ZmbTrait::kTraitCount] = {0, 2, 3, 1};
-		const RleBlock *frame = _bigZombAnimation->getFrame(kBaseCell, 0);
-		if (frame)
-			frame->drawToScreen(screen, Common::Point32(300, 110), alphaLUT);
-		for (int i = 0; i < ZmbTrait::kTraitCount; i++) {
-			const int feature = kFeatureDrawOrder[i];
-			const int value = _stations[feature].selectedValue;
-			if (1 <= value && value <= ZmbTrait::kTraitValueCount) {
-				frame = _bigZombAnimation->getFrame(kFeatureCellBases[feature] + value, 0);
-				if (frame)
-					frame->drawToScreen(screen, Common::Point32(300, 110), alphaLUT);
-			}
-		}
-	}
+	int selectedValues[ZmbTrait::kTraitCount];
+	for (int feature = 0; feature < ZmbTrait::kTraitCount; feature++)
+		selectedValues[feature] = _stations[feature].selectedValue;
+	_vm->_gfx->drawZoombiniPreview(screen, _bigZombAnimation, selectedValues, Common::Point32(300, 110));
 }
 
 void ShelterZombiniville::drawHoverRunners(ManagedSurface32 *screen) {

@@ -34,7 +34,6 @@ class AlphaBlendLUT;
 class BitBlock;
 enum class DialogMsgBoxButton;
 class RleBlock;
-class BitmapFont;
 class VolumePanel;
 struct ZmbTrait;
 
@@ -82,8 +81,6 @@ private:
 	static constexpr const char *kPracticeStatsPath = "bmp/map/stats_scr3";
 	/** Resource path. */
 	static constexpr const char *kSavedGameStatsPath = "bmp/map/stats_scr1";
-	/** Resource path. */
-	static constexpr const char *kWhiteFontPath = "bmp/typo";
 	/** Resource path. */
 	static constexpr const char *kBlipSoundPath = "sounds/blip.wav";
 	/** Resource path format. */
@@ -242,8 +239,6 @@ private:
 	RleBlock *_statsSavedGame = nullptr;
 	/** Legend graphics indexed by inactive or active level. */
 	BitBlock *_legends[kNumLegends] = {};
-	/** White font used for saved-game statistics. */
-	BitmapFont *_whiteFont = nullptr;
 
 	/** Whether each icon accepts clicks in the current mode and progress state. */
 	bool _iconClickable[kNumIcons] = {};

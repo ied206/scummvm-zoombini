@@ -577,7 +577,7 @@ public:
 												  int scrollX = 0, int backgroundWidth = AnimationRunner::kDefaultBackgroundWidth);
 	/** Return the current drawing anchor after applying page scrolling or the active grab offset. */
 	Common::Point32 getDrawPosition(int scrollX = 0, int backgroundWidth = AnimationRunner::kDefaultBackgroundWidth) const;
-	/** Draw the active body and trait layers unless this Zoombini is hidden. */
+	/** Forward legacy drawing calls to @ref Gfx::drawZoombiniRunner without advancing animation. */
 	void draw(ManagedSurface32 *screen, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip = nullptr,
 			  int scrollX = 0, int backgroundWidth = AnimationRunner::kDefaultBackgroundWidth, const RleBlock *dropTargetIndicator = nullptr) const;
 	/** Return the sprite rectangle derived from the selected grid's base layer. */

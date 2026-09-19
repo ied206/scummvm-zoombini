@@ -29,14 +29,11 @@
 
 namespace Zoombini2 {
 
-constexpr const char *DialogDebug::kTitleFontPath;
-
 DialogDebug::DialogDebug(Zoombini2Engine *vm)
 	: DialogBase(vm) {
 	_savedScreen = _vm->_gfx->createSurface(ManagedSurface32::kScreenSize);
 
-	_titleFont = new BitmapFont(_vm);
-	if (!_titleFont->load(Common::Path(kTitleFontPath), 255, 255, 255))
+	if (!_vm->_gfx->loadTextFont(Gfx::TextColor::kWhite03))
 		warning("DialogDebug: Failed to load title font");
 }
 
@@ -44,7 +41,6 @@ DialogDebug::~DialogDebug() {
 	close();
 
 	delete _savedScreen;
-	delete _titleFont;
 }
 
 bool DialogDebug::open(const DialogDebugCommand &cmd) {
@@ -158,10 +154,10 @@ void DialogDebug::onRenderContent(ManagedSurface32 *screen) {
 		screen->copyFrom(*_savedScreen);
 	}
 
-	if (_titleFont && _titleFont->isLoaded() && !_titleText.empty()) {
+	if (_vm->_gfx->hasTextFont(Gfx::TextColor::kWhite03) && !_titleText.empty()) {
 		static constexpr int kTitleHeight = 22;
 		_vm->_gfx->fillRect(screen, Common::Rect32(0, 0, ManagedSurface32::kScreenSize.width, kTitleHeight), 0);
-		_titleFont->drawString(screen, Common::Point32(8, 3), _titleText, _vm->getAlphaLUT());
+		_vm->_gfx->drawText(screen, Gfx::TextColor::kWhite03, Common::Point32(8, 3), _titleText);
 	}
 }
 
