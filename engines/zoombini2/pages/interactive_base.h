@@ -66,6 +66,8 @@ public:
 	bool hasActiveDialog() const;
 	/** Return the help overlay managed by the sidebar. */
 	DialogHelp *getHelpScreen() { return _helpScreen; }
+	/** Restart the Go-button attention blink with the original toggle count and deadline. */
+	void restartGoBlink();
 
 private:
 	/** Resource path. */
@@ -113,6 +115,8 @@ private:
 	bool isInteractionBlocked() const;
 	/** Update hover state from the final frame mouse position. */
 	void updateHoverState(const Common::Point &pos, bool inputAllowed);
+	/** Paint the Help, Map, and Go controls over @p screen. */
+	void drawControls(ManagedSurface32 *screen);
 	/** Consume the release published by the input dispatcher. */
 	void consumePendingRelease();
 

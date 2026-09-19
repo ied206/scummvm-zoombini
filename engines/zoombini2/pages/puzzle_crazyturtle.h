@@ -45,12 +45,18 @@ public:
 
 	/** Load the dock and generate the level-selected ordering rules. */
 	void init() override;
-	/** Advance the common puzzle and active turtle animations. */
+	/** Advance the fall sequence, turtle spins, and departure start. */
 	void onUpdate() override;
-	/** Place the next Zoombini on the selected turtle. */
+	/** Keep the press state unchanged; releases place the Zoombini. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
-	/** Report that this puzzle does not use the common Go button. */
-	bool canUseGoButton() const override { return false; }
+	/** Release a held Zoombini onto the dock. */
+	EventHandleResult onLButtonUp(const Common::Point &pos) override;
+	/** Keep a held Zoombini following the pointer. */
+	EventHandleResult onMouseMove(const Common::Point &pos) override;
+	/** Report whether the shared Go button currently accepts input. */
+	bool canUseGoButton() const override;
+	/** Advance the roster sprite animations after the actor pass. */
+	void onActorsRendered() override;
 
 private:
 	/** Resource paths and formats used by the turtle scene. */
@@ -67,6 +73,17 @@ private:
 	static constexpr const char *kCollapsedBridgePath = "Bmp/crazy_turtle/pontKC.rb";
 	static constexpr const char *kBeamPath = "Bmp/crazy_turtle/poutrelle.rb";
 	static constexpr const char *kTraitFormat = "Bmp/mystic_marsh/TRAITS/%d-%d.RB";
+	static constexpr const char *kAreaMaskPath = "bmp/crazy_turtle/area.bmt";
+	static constexpr const char *kIdleZombAnimationPath = "bmp/zombis/attente/attenteZomb.anm";
+	static constexpr const char *kPickupZombAnimationPath = "bmp/zombis/pris/pris.anm";
+	static constexpr const char *kTombeAnimationPath = "bmp/zombis/tombe/tombe.anm";
+	static constexpr const char *kTurtleIdleSoundPath = "sounds/fx/08-BS02.wav";
+	static constexpr const char *kSmokeSoundPath = "sounds/fx/08-BS03.wav";
+	static constexpr const char *kTurtleSpinSoundPath = "sounds/fx/08-BS04.wav";
+	static constexpr const char *kTransitionSoundPath = "sounds/fx/08-BS05.wav";
+	static constexpr const char *kMismatchSoundPath = "sounds/fx/08-BS06.wav";
+	static constexpr const char *kFallSoundPath = "sounds/fx/08-BS07.wav";
+	static constexpr const char *kCollapseSoundPath = "sounds/fx/PierCollapse.wav";
 
 	/** Restore the dock background. */
 	void onRenderBackground(ManagedSurface32 *screen) override;
@@ -149,6 +166,37 @@ private:
 		Common::Point32(450, 60),
 		Common::Point32(477, 67),
 	};
+	/** Fall-back landing positions indexed by turtle. */
+	static constexpr Common::Point32 kLandingPos[kTurtleCount] = {
+		Common::Point32(26, 327),
+		Common::Point32(36, 392),
+		Common::Point32(56, 451),
+		Common::Point32(125, 498),
+		Common::Point32(199, 475),
+		Common::Point32(288, 453),
+		Common::Point32(263, 392),
+		Common::Point32(260, 317),
+		Common::Point32(268, 254),
+		Common::Point32(346, 209),
+		Common::Point32(435, 181),
+		Common::Point32(510, 182),
+		Common::Point32(603, 179),
+		Common::Point32(573, 251),
+		Common::Point32(484, 306),
+		Common::Point32(558, 352),
+	};
+	/** Delay before a mismatched placement reacts. */
+	static constexpr uint32 kFallReactionDelayMs = 1200;
+	/** Frames in one turtle spin cycle. */
+	static constexpr int kTurtleSpinFrameCount = 11;
+	/** Per-frame turtle spin duration in milliseconds. */
+	static constexpr uint32 kTurtleSpinFrameDelayMs = 120;
+	/** Frames in one dock-damage smoke cycle. */
+	static constexpr int kSmokeFrameCount = 6;
+	/** Per-frame smoke duration in milliseconds. */
+	static constexpr uint32 kSmokeFrameDelayMs = 130;
+	/** Draw position of the dock-damage smoke effect. */
+	static constexpr Common::Point32 kSmokePos = Common::Point32(30, 235);
 
 	/** Load an animation from @p path and report whether it succeeded. */
 	bool loadAnimationResource(Animation *&resource, const Common::Path &path);
@@ -157,6 +205,10 @@ private:
 
 	/** Load all turtle, dock, mother, and trait resources. */
 	void loadResources();
+	/** Load the Zoombini interaction grids, area mask, sounds, and runners. */
+	void loadInteractionResources();
+	/** Register one drop target per turtle. */
+	void buildDropTargets();
 	/** Select active features and generate their ordering rules. */
 	void generateRules();
 	/** Generate the value order for rule @p group. */
@@ -165,11 +217,43 @@ private:
 	void activateRandomRuleSlots(bool *slots, int count);
 	/** Position the puzzle roster before interaction begins. */
 	void placeZoombinis();
-	/** Draw the intact or damaged dock for the remaining mistake count. */
-	void drawBridgeState(ManagedSurface32 *screen) const;
+	/** Assign each turtle the party Zoombini the rule ordering requires. */
+	void buildTurtleAssignments();
+	/** Return whether @p zoombini satisfies @p turtleIndex's requirement. */
+	bool evaluateTurtleMatch(const ZoombiniRunner *zoombini, int turtleIndex) const;
+	/** Handle a Zoombini released over @p turtleIndex. */
+	void handleTurtleClick(int turtleIndex, int zoombiniIndex);
+	/** Start the departure sequence: sound and the idle walking phase. */
+	void startTransitionSequence();
+	/** Play one-shot sound @p soundId at the current SFX volume. */
+	void playSound(int soundId) const;
+	/** Count the party entries not yet placed on a turtle. */
+	int countFreeZoombinis() const;
+	/** Advance the mismatch fall state machine. */
+	void updateFallSequence(uint32 tick);
+	/** Start a random idle turtle spin when the page is otherwise quiet. */
+	void updateIdleTurtleSpin(uint32 tick);
+	/** Schedule roster sprite frame advances for @p tick. */
+	void updateZoombiniAnimations(uint32 tick);
+	/** Return whether @p turtleIndex currently has an active spin runner. */
+	bool hasActiveTurtleRunner(int turtleIndex) const;
+	/** Draw the active turtle and smoke animation runners. */
+	void drawTurtleRunners(ManagedSurface32 *screen) const;
+	/** Drop-target callback forwarding to @ref handleTurtleClick. */
+	static void onTurtleDrop(void *context, int targetIndex, int zoombiniIndex);
+	/** Matched-placement completion: settle and check the full board. */
+	static void onWalkComplete(void *context, ZoombiniRunner *zoombini);
+	/** Fall-animation completion: replay or finish the fall sequence. */
+	static void onTurtleFallComplete(void *context, ZoombiniRunner *zoombini);
+	/** Idle turtle spin completion: clear the active spin index. */
+	static void onTurtleIdleSpinComplete(void *context, AnimationRunner *runner);
+	/** Reaction turtle spin completion: mirror the original ready flag. */
+	static void onTurtleSpinComplete(void *context, AnimationRunner *runner);
+	/** Draw the intact or damaged dock for the mirrored mistake count. */
+	void drawBridgeState(ManagedSurface32 *screen);
 	/** Draw the active feature-order hints. */
 	void drawRuleHints(ManagedSurface32 *screen) const;
-	/** Draw each turtle in its current animation state. */
+	/** Draw each fixed turtle visual, skipping any active spin runner. */
 	void drawTurtles(ManagedSurface32 *screen) const;
 	/** Draw the mother turtle and feedback effects. */
 	void drawMother(ManagedSurface32 *screen) const;
@@ -218,6 +302,65 @@ private:
 
 	/** Music handle used while Turtle Hurdle is active. */
 	int _musicId = -1;
+
+	/** Zoombini grid for walking in place on a settled turtle. */
+	const ZoombiniAnimation *_idleZombAnimation = nullptr;
+	/** Zoombini grid used while a Zoombini is held. */
+	const ZoombiniAnimation *_pickupZombAnimation = nullptr;
+	/** Zoombini grid used while a Zoombini falls back to the dock. */
+	const ZoombiniAnimation *_tombeAnimation = nullptr;
+	/** One drop target per turtle. */
+	Common::Array<ZoombiniDropTarget> _turtleDropTargets;
+	/** Party index assigned to each turtle by the rule ordering. */
+	int _turtleAssignments[kTurtleCount] = {};
+	/** Input locked while a placement or fall sequence runs. */
+	bool _inputLocked = false;
+	/** Departure sequence start pending. */
+	bool _transitionRequested = false;
+	/** Placed Zoombinis walk in place once the departure starts. */
+	bool _idlePhaseEnabled = false;
+	/** Turtle playing the idle spin. -1 means none. */
+	int _idleTurtleIndex = -1;
+	/** Set when the active turtle animation completes. */
+	bool _turtleReady = false;
+	/** Fallback turtle for the Zoombini currently falling. */
+	int _fallbackTurtleIndex = -1;
+	/** Party index of the Zoombini in the fall sequence. */
+	int _fallZoombiniIndex = -1;
+	/** Fall sequence phase: 0 waiting, 1 rising, 2 descending. */
+	int _fallPhase = 0;
+	/** Tick at which the mismatch reaction starts. */
+	uint32 _fallTimerTick = 0;
+	/** Turtle clicked on the latest mismatch. */
+	int _activeTurtleIndex = -1;
+	/** Self-rescheduling count for the fall animation. */
+	int _fallCounter = 0;
+	/** Party index of the last Zoombini that fell. */
+	int _lastFallZoombiniIndex = -1;
+	/** Mistake count used for the dock redraw, refreshed after each fall. */
+	int _mistakesMirror = 0;
+	/** Dock-damage smoke pending after the latest fall completes. */
+	bool _smokePending = false;
+	/** Idle-spin turtle runners indexed by turtle type. */
+	AnimationRunner *_turtleIdleRunners[kFeatureCount] = {};
+	/** Reaction-spin turtle runners indexed by turtle type. */
+	AnimationRunner *_turtleSpinRunners[kFeatureCount] = {};
+	/** Dock-damage smoke runner. */
+	AnimationRunner *_smokeRunner = nullptr;
+	/** One-shot sound: idle turtle spin start. */
+	int _sndTurtleIdle = -1;
+	/** One-shot sound: dock-damage smoke. */
+	int _sndSmoke = -1;
+	/** One-shot sound: mismatch reaction spin start. */
+	int _sndTurtleSpin = -1;
+	/** One-shot sound: departure sequence start. */
+	int _sndTransition = -1;
+	/** One-shot sound: mismatched placement. */
+	int _sndMismatch = -1;
+	/** One-shot sound: fall animation start. */
+	int _sndFall = -1;
+	/** One-shot sound: dock collapse. */
+	int _sndCollapse = -1;
 };
 
 } // End of namespace Zoombini2

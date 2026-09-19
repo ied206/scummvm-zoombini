@@ -81,7 +81,11 @@ private:
 protected:
 	/** Replace the first page layer's background and refresh the borrowed compatibility pointer. */
 	bool loadPrimaryLayerBackground(const Common::Path &path);
-	/** Draw the first page layer and advance its general-object animation runners. */
+	/**
+	 * Restore the primary background on every call, then draw and advance its general-object animation runners.
+	 * Call once at the start of complete puzzle composition, before other lower content and actors.
+	 * Page-local overlays and subsequent layers must be recomposed afterward.
+	 */
 	void drawPrimaryPageLayer(ManagedSurface32 *screen);
 	/** Render active roster entries in stable ascending logical-Y order, with the held entry last. */
 	void renderZoombinis(ManagedSurface32 *screen) const;
