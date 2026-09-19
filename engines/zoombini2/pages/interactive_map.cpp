@@ -163,10 +163,10 @@ InteractiveMap::~InteractiveMap() {
 void InteractiveMap::init() {
 	debug(1, "MapScreenPage::init (mode=%d)", _mode);
 	SoundManager *sm = _vm->getSoundManager();
-	GameState *gs = _vm->getGameState();
+	GameState *gs = _vm->_state;
 	if (!isPracticeMode() && _vm->_isSavedGame)
 		_vm->writeGameSave(gs->_playerName);
-	_vm->clearGlobalZoombinis();
+	_vm->_state->clearActiveZoombinis();
 	_vm->_isSavedGame = !isPracticeMode();
 
 	// The saved-game map always exposes the starting hub.
@@ -220,7 +220,7 @@ void InteractiveMap::init() {
 	// --- Audio ---
 	_blipSoundId = sm->load(false, Common::Path(kBlipSoundPath), false);
 
-	_mapMusicId = _vm->ensureMapMusic();
+	startMapMusic();
 
 	// --- Compute stats ---
 	computeStats();
@@ -234,7 +234,7 @@ void InteractiveMap::init() {
 // ============================================================================
 
 void InteractiveMap::setupIcons() {
-	GameState *gs = _vm->getGameState();
+	GameState *gs = _vm->_state;
 
 	if (isPracticeMode()) {
 		// Practice mode:
@@ -312,8 +312,8 @@ bool InteractiveMap::practiceCandidateFitsPack(const ZmbTrait &traits) const {
 
 	const uint16 candidateHash = traits.calculateHash();
 	int matchingCombinations = 0;
-	for (uint i = 0; i < _vm->_globalZoombinis.size(); i++) {
-		const ZoombiniRunner *zoombini = _vm->_globalZoombinis[i];
+	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
+		const ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
 		for (int traitOrdinal = 0; traitOrdinal < ZmbTrait::kTraitCount; traitOrdinal++) {
 			const ZmbTrait::TraitIndex traitIndex = static_cast<ZmbTrait::TraitIndex>(traitOrdinal);
 			const byte value = zoombini->_traits.getValue(traitIndex);
@@ -453,12 +453,12 @@ Common::String InteractiveMap::generatePracticeZoombiniName() const {
 }
 
 void InteractiveMap::createPracticeParty(int pageId) {
-	const int partySize = getPracticePartySize(pageId);
-	_vm->clearGlobalZoombinis();
+	const uint partySize = getPracticePartySize(pageId);
+	_vm->_state->clearActiveZoombinis();
 	if (partySize == 0)
 		return;
 
-	while (static_cast<int>(_vm->_globalZoombinis.size()) < partySize) {
+	while (_vm->_state->_activeZoombinis.size() < partySize) {
 		const byte hair = static_cast<byte>(_vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
 		const byte eyes = static_cast<byte>(_vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
 		const byte nose = static_cast<byte>(_vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
@@ -472,12 +472,12 @@ void InteractiveMap::createPracticeParty(int pageId) {
 		zoombini->_inputEnabled = 1;
 		zoombini->_puzzleStatus = 0;
 		zoombini->_animationCell = 33;
-		_vm->_globalZoombinis.push_back(zoombini);
+		_vm->_state->_activeZoombinis.push_back(zoombini);
 	}
 
-	for (uint i = 0; i < _vm->_globalZoombinis.size(); i++) {
+	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
 		const Common::String name = generatePracticeZoombiniName();
-		Common::strlcpy(_vm->_globalZoombinis[i]->_name, name.c_str(), sizeof(_vm->_globalZoombinis[i]->_name));
+		Common::strlcpy(_vm->_state->_activeZoombinis[i]->_name, name.c_str(), sizeof(_vm->_state->_activeZoombinis[i]->_name));
 	}
 }
 
@@ -536,7 +536,7 @@ void InteractiveMap::loadButtons() {
 		 kQuitHighlightPath, nullptr},
 	};
 
-	GameState *gs = _vm->getGameState();
+	GameState *gs = _vm->_state;
 
 	for (int i = 0; i < kNumButtons; i++) {
 		const ButtonSetup &s = setup[i];
@@ -585,7 +585,7 @@ void InteractiveMap::loadButtons() {
 // ============================================================================
 
 void InteractiveMap::computeStats() {
-	GameState *gs = _vm->getGameState();
+	GameState *gs = _vm->_state;
 
 	// The four rows are remaining, board A, board B, and completed counts.
 	int boardA = 0;
@@ -642,7 +642,7 @@ void InteractiveMap::onUpdate() {
 
 void InteractiveMap::onRenderContent(ManagedSurface32 *screen) {
 	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
-	GameState *gs = _vm->getGameState();
+	GameState *gs = _vm->_state;
 
 	// 1. Background
 	_vm->_gfx->drawBackground(screen, Common::Point32(0, 0));
@@ -774,7 +774,7 @@ void InteractiveMap::drawSavedGameSegments(ManagedSurface32 *screen, const Alpha
 	// Draw specific slots using each page's stored level.
 	// Draw order: 10, 1, 2, 3, 5, 4, 7, 6, 9, 8, 0, 11, 13
 	// (Skips slot 12, draws slot 13 instead at same position.)
-	GameState *gs = _vm->getGameState();
+	GameState *gs = _vm->_state;
 
 	static constexpr int drawOrder[] = {10, 1, 2, 3, 5, 4, 7, 6, 9, 8, 0, 11, 13};
 	for (int idx = 0; idx < 13; idx++) {
@@ -893,7 +893,7 @@ EventHandleResult InteractiveMap::onLButtonDown(const Common::Point &pos) {
 		}
 
 		// Saved-game navigation uses the selected page's stored level.
-		GameState *gs = _vm->getGameState();
+		GameState *gs = _vm->_state;
 		if (!isPracticeMode()) {
 			_currentLevel = gs->_pageLevel[clicked];
 		}
@@ -1030,7 +1030,7 @@ void InteractiveMap::handleQuitConfirmation(DialogMsgBoxButton button) {
 		_vm->requestPageChange(kPageCredits);
 }
 
-int InteractiveMap::getPracticePartySize(int pageId) {
+uint InteractiveMap::getPracticePartySize(int pageId) {
 	switch (pageId) {
 	case kPageCrazyTurtle:
 	case kPageWaterslide:

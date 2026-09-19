@@ -21,10 +21,12 @@
 
 #include <string.h>
 
+#include "common/config-manager.h"
 #include "common/debug.h"
 #include "common/memstream.h"
 #include "common/savefile.h"
 
+#include "zoombini2/metaengine.h"
 #include "zoombini2/scripts.h"
 #include "zoombini2/state.h"
 
@@ -184,6 +186,18 @@ bool GameState::recordCompletedZoombini(const ZoombiniRunner &zoombini) {
 	return false;
 }
 
+void GameState::recordBooliesCompletion() {
+	if (_activeZoombinis.empty() || !_activeZoombinis[0])
+		return;
+
+	const int rescuedBooliesPerZoombini = _activeZoombinis[0]->_rescuedBooliesPerZoombini;
+	_rescuedBoolieCount += static_cast<int32>(_activeZoombinis.size()) * rescuedBooliesPerZoombini;
+	for (uint i = 0; i < _activeZoombinis.size(); i++) {
+		if (_activeZoombinis[i])
+			recordCompletedZoombini(*_activeZoombinis[i]);
+	}
+}
+
 GameState::GameState() {
 	init();
 }
@@ -192,7 +206,14 @@ GameState::~GameState() {
 	clearOwnedData();
 }
 
+void GameState::clearActiveZoombinis() {
+	for (uint i = 0; i < _activeZoombinis.size(); i++)
+		delete _activeZoombinis[i];
+	_activeZoombinis.clear();
+}
+
 void GameState::clearOwnedData() {
+	clearActiveZoombinis();
 	for (int i = 0; i < kBoardSize; i++) {
 		delete _rescue1Board[i];
 		delete _rescue2Board[i];
@@ -259,6 +280,7 @@ void GameState::swapState(GameState &other) {
 	swapArray(_traitRegistrations._combinationUseCounts, other._traitRegistrations._combinationUseCounts);
 	swapArray(_traitRegistrations._unusedTail, other._traitRegistrations._unusedTail);
 	_savedRoster.swap(other._savedRoster);
+	_activeZoombinis.swap(other._activeZoombinis);
 }
 
 bool GameState::canRead(Common::SeekableReadStream *stream, uint64 bytes) {
@@ -277,15 +299,67 @@ bool GameState::load(Common::SeekableReadStream *stream) {
 	return true;
 }
 
-void GameState::transferSavedRoster(Common::Array<ZoombiniRunner *> &src, Common::Array<ZoombiniRunner *> &dest) {
+void GameState::restoreSavedZoombinis() {
+	transferRoster(_savedRoster, _activeZoombinis);
+}
+
+void GameState::stashActiveZoombinis() {
+	transferRoster(_activeZoombinis, _savedRoster);
+}
+
+void GameState::finishPuzzleRoster(int pageId, BoardRecord **board, bool advancing, bool savedGame) {
+	if (!savedGame) {
+		clearActiveZoombinis();
+		return;
+	}
+
+	const uint expectedPartySize = board ? 8 : 16;
+	if (0 <= pageId && pageId < 100 && _activeZoombinis.size() == expectedPartySize) {
+		bool allSucceeded = true;
+		for (uint i = 0; i < _activeZoombinis.size(); i++) {
+			if (!_activeZoombinis[i] || _activeZoombinis[i]->_puzzleStatus == 0) {
+				allSucceeded = false;
+				break;
+			}
+		}
+		if (allSucceeded) {
+			_legacyData[pageId] += 1;
+			if (_legacyData[pageId] == 3) {
+				_legacyData[pageId] = 0;
+				if (_pageLevel[pageId] < 3)
+					_pageLevel[pageId] += 1;
+			}
+		}
+	}
+
+	for (uint i = 0; i < _activeZoombinis.size();) {
+		ZoombiniRunner *zoombini = _activeZoombinis[i];
+		if (!advancing || zoombini->_puzzleStatus == 0) {
+			if (board)
+				storeInBoard(board, *zoombini);
+			else
+				_savedRoster.push_back(cloneRosterMember(*zoombini));
+			delete zoombini;
+			_activeZoombinis.remove_at(i);
+		} else {
+			i += 1;
+		}
+	}
+}
+
+ZoombiniRunner *GameState::cloneRosterMember(const ZoombiniRunner &src) {
+	ZoombiniRunner *copy = new ZoombiniRunner();
+	copy->_traits = src._traits;
+	copy->_traitHash = copy->_traits.calculateHash();
+	memcpy(copy->_name, src._name, sizeof(copy->_name));
+	return copy;
+}
+
+void GameState::transferRoster(Common::Array<ZoombiniRunner *> &src, Common::Array<ZoombiniRunner *> &dest) {
 	assert(&src != &dest);
 	for (uint i = 0; i < src.size(); i++) {
 		const ZoombiniRunner *previous = src[i];
-		ZoombiniRunner *restored = new ZoombiniRunner();
-		restored->_traits = previous->_traits;
-		restored->_traitHash = restored->_traits.calculateHash();
-		memcpy(restored->_name, previous->_name, sizeof(restored->_name));
-		dest.push_back(restored);
+		dest.push_back(cloneRosterMember(*previous));
 		delete previous;
 	}
 	src.clear();
@@ -428,11 +502,11 @@ Zoombini2PopulationSummary GameState::getPopulationSummary() const {
 	return summary;
 }
 
-bool GameState::save(Common::WriteStream *stream, const Common::Array<ZoombiniRunner *> *globalRoster) const {
+bool GameState::save(Common::WriteStream *stream) const {
 	if (!stream || stream->err())
 		return false;
-	const uint32 globalCount = globalRoster && 0 <= _currentGameplayPageId && _currentGameplayPageId <= 3 ? globalRoster->size() : 0;
-	const uint64 count = static_cast<uint64>(_savedRoster.size()) + globalCount;
+	const uint32 activeCount = 0 <= _currentGameplayPageId && _currentGameplayPageId <= 3 ? _activeZoombinis.size() : 0;
+	const uint64 count = static_cast<uint64>(_savedRoster.size()) + activeCount;
 	if (static_cast<uint64>(INT32_MAX) < count || static_cast<uint32>(INT32_MAX) <= _playerName.size())
 		return false;
 	const uint32 nameLength = _playerName.size() + 1;
@@ -466,7 +540,7 @@ bool GameState::save(Common::WriteStream *stream, const Common::Array<ZoombiniRu
 	const int rescue2BoardCount = writeBoard(stream, _rescue2Board);
 	stream->writeUint32LE(static_cast<uint32>(count));
 	for (uint64 i = 0; i < count; i++) {
-		const ZoombiniRunner *zoombini = i < _savedRoster.size() ? _savedRoster[i] : (*globalRoster)[i - _savedRoster.size()];
+		const ZoombiniRunner *zoombini = i < _savedRoster.size() ? _savedRoster[i] : _activeZoombinis[i - _savedRoster.size()];
 		if (!zoombini)
 			return false;
 		const ZmbTrait &traits = zoombini->_traits;
@@ -477,7 +551,7 @@ bool GameState::save(Common::WriteStream *stream, const Common::Array<ZoombiniRu
 		stream->writeByte(traits._eyes);
 	}
 	for (uint64 i = 0; i < count; i++) {
-		const ZoombiniRunner *zoombini = i < _savedRoster.size() ? _savedRoster[i] : (*globalRoster)[i - _savedRoster.size()];
+		const ZoombiniRunner *zoombini = i < _savedRoster.size() ? _savedRoster[i] : _activeZoombinis[i - _savedRoster.size()];
 		stream->write(zoombini->_name, sizeof(zoombini->_name));
 	}
 	const int64 expectedSize = 2822 + static_cast<int64>(nameLength) + (rescue1BoardCount + rescue2BoardCount) * 28 + count * 20;
@@ -582,13 +656,12 @@ bool Zoombini2SavegameManager::verifySaveData(const Common::String &saveFileName
 	return matches;
 }
 
-bool Zoombini2SavegameManager::saveProfile(const Common::String &profileName, const GameState &state,
-										   const Common::Array<ZoombiniRunner *> *globalRoster) const {
+bool Zoombini2SavegameManager::saveProfile(const Common::String &profileName, const GameState &state) const {
 	if (!_saveFileManager || !isValidProfileName(profileName))
 		return false;
 
 	Common::MemoryWriteStreamDynamic data(DisposeAfterUse::YES);
-	if (!state.save(&data, globalRoster))
+	if (!state.save(&data))
 		return false;
 
 	const Common::String saveFileName = makeSaveFileName(profileName);
@@ -633,7 +706,8 @@ bool Zoombini2SavegameManager::loadProfile(const Common::String &profileName, Ga
 }
 
 bool Zoombini2SavegameManager::importProfile(const Common::String &profileName, Common::SeekableReadStream *src, bool overwrite) const {
-	if (!_saveFileManager || !src || !isValidProfileName(profileName) || (!overwrite && profileExists(profileName)))
+	if (ConfMan.getBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, _target) || !_saveFileManager || !src || !isValidProfileName(profileName) ||
+		(!overwrite && profileExists(profileName)))
 		return false;
 
 	GameState importedState;
@@ -680,7 +754,8 @@ bool Zoombini2SavegameManager::deleteProfile(const Common::String &profileName) 
 }
 
 bool Zoombini2SavegameManager::renameProfile(const Common::String &oldProfileName, const Common::String &newProfileName) const {
-	if (!_saveFileManager || !isValidProfileName(oldProfileName) || !isValidProfileName(newProfileName))
+	if (ConfMan.getBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, _target) || !_saveFileManager || !isValidProfileName(oldProfileName) ||
+		!isValidProfileName(newProfileName))
 		return false;
 	if (oldProfileName == newProfileName)
 		return true;
@@ -698,6 +773,19 @@ bool Zoombini2SavegameManager::renameProfile(const Common::String &oldProfileNam
 
 	deleteProfile(newProfileName);
 	return false;
+}
+
+bool Zoombini2SavegameManager::duplicateProfile(const Common::String &srcProfileName, const Common::String &newProfileName) const {
+	if (ConfMan.getBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, _target) || !_saveFileManager || !isValidProfileName(srcProfileName) ||
+		!isValidProfileName(newProfileName) || srcProfileName.equalsIgnoreCase(newProfileName) || profileExists(newProfileName))
+		return false;
+
+	GameState duplicatedState;
+	if (!loadProfile(srcProfileName, duplicatedState))
+		return false;
+
+	duplicatedState._playerName = newProfileName;
+	return saveProfile(newProfileName, duplicatedState);
 }
 
 bool Zoombini2SavegameManager::profileExists(const Common::String &profileName) const {

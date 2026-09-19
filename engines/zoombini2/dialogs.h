@@ -59,11 +59,11 @@ private:
 	Zoombini2Engine *_vm;
 };
 
-/** Modal dialog for renaming a Zoombini2 profile. */
+/** Modal dialog for entering a Zoombini2 profile name. */
 class Zoombini2ProfileNameDialog : public GUI::Dialog {
 public:
-	/** Construct the editor with @p initialName. */
-	explicit Zoombini2ProfileNameDialog(const Common::U32String &initialName);
+	/** Construct the editor titled @p title with @p initialName. */
+	Zoombini2ProfileNameDialog(const Common::U32String &title, const Common::U32String &initialName);
 
 	/** Return the entered profile name. */
 	Common::U32String getProfileName() const;
@@ -118,6 +118,8 @@ private:
 
 	/** Command used to rename the selected profile. */
 	static constexpr uint32 kEditProfileCommand = 'z2ed';
+	/** Command used to clone the selected profile. */
+	static constexpr uint32 kDuplicateProfileCommand = 'z2cp';
 	/** Command used to delete the selected profile. */
 	static constexpr uint32 kDeleteProfileCommand = 'z2dl';
 	/** Command used to import one independent Z2 save file. */
@@ -135,6 +137,8 @@ private:
 	void updateButtons();
 	/** Prompt for and commit a new name for the selected profile. */
 	void renameSelectedProfile();
+	/** Prompt for and create a distinct copy of the selected profile. */
+	void duplicateSelectedProfile();
 	/** Choose, validate, and import one external Z2 .mk file. */
 	void importProfile();
 	/** Copy the selected profile to an external Z2 .mk file. */
@@ -162,6 +166,8 @@ private:
 	int _profileRowCount = 0;
 	/** Rename button managed by this dialog. */
 	GUI::ButtonWidget *_editButton = nullptr;
+	/** Clone button managed by this dialog. */
+	GUI::ButtonWidget *_duplicateButton = nullptr;
 	/** Import button managed by this dialog. */
 	GUI::ButtonWidget *_importButton = nullptr;
 	/** Export button managed by this dialog. */
@@ -218,6 +224,8 @@ private:
 	GUI::CheckboxWidget *_floatingPointPathsCheckbox = nullptr;
 	/** Toggle enabling the enhanced keyboard shortcut set. */
 	GUI::CheckboxWidget *_enhancedKbdShortcutsCheckbox = nullptr;
+	/** Keep saved game files unchanged during repeatable tests. */
+	GUI::CheckboxWidget *_savefilesReadOnlyCheckbox = nullptr;
 
 	/** Define this widget's overlay-compatible GUI layout. */
 	void defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const override;

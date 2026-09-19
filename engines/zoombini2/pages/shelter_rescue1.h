@@ -45,7 +45,7 @@ public:
 	void onUpdate() override;
 	/** Draw the site, scroll controls, waiting board, and boarding actives. */
 	void onRenderContent(ManagedSurface32 *screen) override;
-	/** Ignore button presses; the original acts on release clicks. */
+	/** Leave button presses pending until the release event. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 	/** Route common pickup and drop first, then branch, scroll, and boarding clicks. */
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;

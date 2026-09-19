@@ -59,18 +59,80 @@ constexpr const char *PuzzleMysticMarsh::kTourbiPath;
 constexpr const char *PuzzleMysticMarsh::kTraitFormat;
 constexpr const char *PuzzleMysticMarsh::kSymbolFormat;
 constexpr const char *PuzzleMysticMarsh::kBubbleFormat;
+constexpr const char *PuzzleMysticMarsh::kPickupZombAnimationPath;
+constexpr const char *PuzzleMysticMarsh::kAreaMaskFormat;
+constexpr const char *PuzzleMysticMarsh::kPlacementSoundPath;
 constexpr const char *PuzzleMysticMarsh::kSymbolNames[kNumSymbols];
+
+const Common::Point32 PuzzleMysticMarsh::kStartingPositions[6][8] = {
+	{
+		Common::Point32(127, 397),
+		Common::Point32(176, 411),
+		Common::Point32(232, 411),
+		Common::Point32(99, 437),
+		Common::Point32(151, 449),
+		Common::Point32(210, 447),
+		Common::Point32(117, 484),
+		Common::Point32(186, 490),
+	},
+	{
+		Common::Point32(127, 397),
+		Common::Point32(176, 411),
+		Common::Point32(232, 411),
+		Common::Point32(99, 437),
+		Common::Point32(151, 449),
+		Common::Point32(210, 447),
+		Common::Point32(117, 484),
+		Common::Point32(186, 490),
+	},
+	{
+		Common::Point32(127, 397),
+		Common::Point32(176, 411),
+		Common::Point32(232, 411),
+		Common::Point32(99, 437),
+		Common::Point32(151, 449),
+		Common::Point32(210, 447),
+		Common::Point32(117, 484),
+		Common::Point32(186, 490),
+	},
+	{
+		Common::Point32(52, 458),
+		Common::Point32(103, 463),
+		Common::Point32(148, 463),
+		Common::Point32(200, 475),
+		Common::Point32(53, 514),
+		Common::Point32(90, 514),
+		Common::Point32(132, 520),
+		Common::Point32(175, 513),
+	},
+	{
+		Common::Point32(106, 452),
+		Common::Point32(155, 465),
+		Common::Point32(211, 465),
+		Common::Point32(78, 491),
+		Common::Point32(131, 503),
+		Common::Point32(189, 501),
+		Common::Point32(95, 538),
+		Common::Point32(164, 543),
+	},
+	{
+		Common::Point32(127, 397),
+		Common::Point32(176, 411),
+		Common::Point32(232, 411),
+		Common::Point32(99, 437),
+		Common::Point32(151, 449),
+		Common::Point32(210, 447),
+		Common::Point32(117, 484),
+		Common::Point32(186, 490),
+	}};
 
 PuzzleMysticMarsh::PuzzleMysticMarsh(Zoombini2Engine *vm)
 	: PuzzleBase(vm, kPageMysticMarsh) {
 }
 
 PuzzleMysticMarsh::~PuzzleMysticMarsh() {
-	if (_musicId >= 0) {
-		SoundManager *snd = _vm->getSoundManager();
-		snd->stop(_musicId);
-		snd->unload(_musicId);
-	}
+	if (0 <= _placementSoundId)
+		_vm->getSoundManager()->unload(_placementSoundId);
 	for (int i = 0; i < kNumSymbols; i++)
 		delete _symbolImage[i];
 
@@ -84,6 +146,7 @@ PuzzleMysticMarsh::~PuzzleMysticMarsh() {
 	delete _craterImage;
 	delete _bubbleCraterAnim;
 	delete _tourbiAnim;
+	finishPuzzleRoster(_vm->_state->_rescue1Board);
 }
 
 void PuzzleMysticMarsh::init() {
@@ -91,15 +154,11 @@ void PuzzleMysticMarsh::init() {
 	PuzzleBase::init();
 
 	// Start the Bubble Bumpers music.
-	if (SoundManager *snd = _vm->getSoundManager()) {
-		_musicId = snd->load(true, Common::Path(kMusicPath), true);
-		if (_musicId >= 0) {
-			snd->playLoop(_musicId);
-			snd->setVolume(_musicId, snd->_volumeMusic);
-		}
-	}
+	startPageMusic(Common::Path(kMusicPath));
+	if (SoundManager *snd = _vm->getSoundManager())
+		_placementSoundId = snd->load(false, Common::Path(kPlacementSoundPath), false);
 
-	int gameMode = CLIP(_vm->getGameState()->_level, 1, 3);
+	int gameMode = CLIP(_vm->_state->_level, 1, 3);
 
 	// Map game mode to level (1-4)
 	switch (gameMode) {
@@ -144,25 +203,32 @@ void PuzzleMysticMarsh::init() {
 
 	// Load puzzle resources
 	loadResources();
+	_pickupZombAnimation = _vm->loadZoombiniAnimation(Common::Path(kPickupZombAnimationPath), 100);
+	loadAreaMask(Common::Path(Common::String::format(kAreaMaskFormat, _bgIndex)));
+	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
+		ZoombiniRunner *zoombini = _puzzleZoombinis[i];
+		if (!zoombini)
+			continue;
+		if (i < 8)
+			zoombini->setPosition(kStartingPositions[_bgIndex - 1][i]);
+		zoombini->setDefaultAnimation(_zoombiniAnimation);
+		zoombini->_inputEnabled = true;
+		zoombini->_puzzleStatus = 0;
+		zoombini->_hidden = false;
+		zoombini->_dragging = false;
+		zoombini->clearMovement();
+	}
 
 	// Setup grid
 	setupGrid();
 	buildSlots();
 
 	_freedCount = 0;
-	_selectedZoombini = -1;
-	_currentSequenceIdx = 0;
 	_hasActiveZ = false;
+	_activeSlotIdx = -1;
+	_slotUnlockTime = 0;
 	_state = kStateIdle;
 	_stateTimer = _vm->getGameTickCount();
-
-	// Generate a target launch sequence for this puzzle
-	if (_level == 3)
-		_vm->reseedRandomForV10();
-	_targetSequence.clear();
-	for (int i = 0; i < (int)_puzzleZoombinis.size(); i++) {
-		_targetSequence.push_back(_vm->_rnd->getRandomNumber(4)); // 4 possible entrances
-	}
 }
 
 void PuzzleMysticMarsh::loadResources() {
@@ -265,7 +331,7 @@ void PuzzleMysticMarsh::generateRules() {
 	// Craters are where zoombinis are placed. We place enough for
 	// the puzzle pack size.
 
-	int numZoombinis = MIN((int)_puzzleZoombinis.size(), 8);
+	const int numZoombinis = MIN<int>(_puzzleZoombinis.size(), 8);
 	int numCraters = MAX(numZoombinis, 4);
 
 	// Place craters in a staggered pattern across the grid
@@ -318,6 +384,7 @@ void PuzzleMysticMarsh::generateRules() {
 void PuzzleMysticMarsh::buildSlots() {
 	// Build the fixed-capacity slot array from crater cells.
 	_numSlots = 0;
+	_dropTargets.clear();
 
 	for (int col = 0; col < kGridCols && _numSlots < kMaxSlots; col++) {
 		for (int row = 0; row < kGridRows && _numSlots < kMaxSlots; row++) {
@@ -335,36 +402,60 @@ void PuzzleMysticMarsh::buildSlots() {
 
 			slot.hitbox = Common::Rect32(cellPos.x - 8, cellPos.y + 52, cellPos.x - 8 + kSlotHitSize.width, cellPos.y + 52 + kSlotHitSize.height);
 
-			slot.zoombiniIdx = -1;
-			slot.occupied = false;
+			ZoombiniDropTarget target;
+			target.rect = slot.hitbox;
+			target.callback = &slotDropCallback;
+			target.callbackContext = this;
+			_dropTargets.push_back(target);
 
-			_numSlots++;
+			_numSlots += 1;
 		}
 	}
 
 	debug(2, "PuzzleMysticMarsh: Built %d slots", _numSlots);
 }
 
-void PuzzleMysticMarsh::launchZoombini(int entranceIdx) {
-	if (_hasActiveZ)
+void PuzzleMysticMarsh::slotDropCallback(void *context, int slotIdx, int zoombiniIdx) {
+	PuzzleMysticMarsh *page = static_cast<PuzzleMysticMarsh *>(context);
+	if (page && 0 <= slotIdx && slotIdx < page->_numSlots && page->_dropTargets[slotIdx].occupied)
+		page->placeZoombiniAtSlot(slotIdx, zoombiniIdx);
+}
+
+void PuzzleMysticMarsh::placeZoombiniAtSlot(int slotIdx, int zoombiniIdx) {
+	if (_hasActiveZ || slotIdx < 0 || _numSlots <= slotIdx)
 		return;
-	if (_currentSequenceIdx >= (int)_puzzleZoombinis.size())
+	if (zoombiniIdx < 0 || _puzzleZoombinis.size() <= static_cast<uint>(zoombiniIdx))
 		return;
 
+	const Slot &slot = _slots[slotIdx];
+	const int cellIdx = slot.cellCol * kGridRows + slot.cellRow;
+	if (_grid[cellIdx].type != 60 && _grid[cellIdx].type != 61)
+		return;
+	const uint32 now = _vm->getGameTickCount();
+	for (uint i = 0; i < _dropTargets.size(); i++) {
+		_dropTargets[i].occupied = true;
+		_dropTargets[i].zoombiniIndex = -1;
+	}
+	_slotUnlockTime = now + 4000;
+	if (0 <= _placementSoundId) {
+		SoundManager *soundManager = _vm->getSoundManager();
+		soundManager->playWithVolume(_placementSoundId, soundManager->_volumeSFX);
+	}
 	_hasActiveZ = true;
-	_activeZ.zoombiniIdx = _currentSequenceIdx;
+	_activeSlotIdx = slotIdx;
+	_activeZ.zoombiniIdx = zoombiniIdx;
+	_activeZ.cellCol = slot.cellCol;
+	_activeZ.cellRow = slot.cellRow;
+	_activeZ.targetPos = Common::Point32(slot.pos.x + 10, slot.pos.y + 30);
+	_activeZ.moveStartTime = now;
+	ZoombiniRunner *zoombini = _puzzleZoombinis[zoombiniIdx];
+	zoombini->_inputEnabled = false;
+	zoombini->setPosition(_activeZ.targetPos);
 
-	// Entrance positions (simplified: 4 entrances across the bottom)
-	_activeZ.cellCol = 2 + entranceIdx * 3;
-	_activeZ.cellRow = 11;
-	_activeZ.targetPos = _grid[_activeZ.cellCol * kGridRows + _activeZ.cellRow].pos;
-	_activeZ.moveStartTime = _vm->getGameTickCount();
+	_state = kStateMoving;
+	_stateTimer = now;
 
-	_state = kStateLaunching;
-	_stateTimer = _vm->getGameTickCount();
-
-	debug(2, "PuzzleMysticMarsh: Launching zoombini %d from entrance %d",
-		  _activeZ.zoombiniIdx, entranceIdx);
+	debug(2, "PuzzleMysticMarsh: Placed zoombini %d at crater %d", zoombiniIdx, slotIdx);
 }
 
 void PuzzleMysticMarsh::moveZoombini() {
@@ -378,7 +469,7 @@ void PuzzleMysticMarsh::moveZoombini() {
 	if (elapsed > 500) {
 		// Simple movement: move upwards (towards exit)
 		// In a full implementation, this would check _grid[idx].type for arrows/diverters
-		_activeZ.cellRow--;
+		_activeZ.cellRow -= 1;
 
 		if (_activeZ.cellRow < 0) {
 			// Reached the exit!
@@ -388,14 +479,15 @@ void PuzzleMysticMarsh::moveZoombini() {
 		}
 
 		_activeZ.targetPos = _grid[_activeZ.cellCol * kGridRows + _activeZ.cellRow].pos;
+		_puzzleZoombinis[_activeZ.zoombiniIdx]->setPosition(_activeZ.targetPos);
 		_activeZ.moveStartTime = now;
 	}
 }
 
 void PuzzleMysticMarsh::freeZoombini(int zoombiniIdx) {
-	_puzzleZoombinis[zoombiniIdx]->_puzzleStatus = 0;
-	_freedCount++;
-	_currentSequenceIdx++;
+	_puzzleZoombinis[zoombiniIdx]->_puzzleStatus = 1;
+	_puzzleZoombinis[zoombiniIdx]->_hidden = true;
+	_freedCount += 1;
 	_hasActiveZ = false;
 	debug(1, "PuzzleMysticMarsh: Freed zoombini %d (total: %d)", zoombiniIdx, _freedCount);
 }
@@ -403,38 +495,42 @@ void PuzzleMysticMarsh::freeZoombini(int zoombiniIdx) {
 int PuzzleMysticMarsh::countFreeZoombinis() const {
 	int count = 0;
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
-		if (_puzzleZoombinis[i]->_puzzleStatus == 0)
-			count++;
+		if (_puzzleZoombinis[i]->_puzzleStatus == 1)
+			count += 1;
 	}
 	return count;
 }
 
 EventHandleResult PuzzleMysticMarsh::onLButtonDown(const Common::Point &pos) {
-	if (_state != kStateIdle)
-		return EventHandleResult::kPassthrough;
-
-	// Check for clicks on the 4 launch entrances at the bottom
-	for (int i = 0; i < 4; i++) {
-		int ex = 2 + i * 3;
-		int ey = 11;
-		const Common::Point32 screenPos = _grid[ex * kGridRows + ey].pos;
-
-		Common::Rect entranceHitbox(
-			static_cast<int16>(screenPos.x - 20),
-			static_cast<int16>(screenPos.y),
-			static_cast<int16>(screenPos.x + 20),
-			static_cast<int16>(screenPos.y + 50));
-		if (entranceHitbox.contains(pos)) {
-			launchZoombini(i);
-			return EventHandleResult::kConsumed;
-		}
-	}
+	(void)pos;
 	return EventHandleResult::kPassthrough;
+}
+
+EventHandleResult PuzzleMysticMarsh::onLButtonUp(const Common::Point &pos) {
+	const bool clickReleased = _state == kStateIdle;
+	const ZoombiniInputResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), clickReleased,
+																		  _pickupZombAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
+	return result == ZoombiniInputResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+}
+
+EventHandleResult PuzzleMysticMarsh::onMouseMove(const Common::Point &pos) {
+	const ZoombiniInputResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), false,
+																		  _pickupZombAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
+	return result == ZoombiniInputResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 
 void PuzzleMysticMarsh::onUpdate() {
 	uint32 now = _vm->getGameTickCount();
 	uint32 elapsed = now - _stateTimer;
+	if (_slotUnlockTime != 0 && _slotUnlockTime < now) {
+		for (uint i = 0; i < _dropTargets.size(); i++)
+			_dropTargets[i].occupied = false;
+		_slotUnlockTime = 0;
+	}
+	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
+		if (_puzzleZoombinis[i])
+			_puzzleZoombinis[i]->updateAnimation(now);
+	}
 
 	switch (_state) {
 	case kStateInit:
@@ -443,8 +539,9 @@ void PuzzleMysticMarsh::onUpdate() {
 	case kStateIdle:
 		break;
 
-	case kStateLaunching:
-		moveZoombini();
+	case kStateMoving:
+		if (kPlaceDelay < elapsed)
+			moveZoombini();
 		if (_state == kStateFreeing) {
 			_stateTimer = now;
 		}
@@ -488,6 +585,13 @@ void PuzzleMysticMarsh::onRenderBackground(ManagedSurface32 *screen) {
 void PuzzleMysticMarsh::onRenderContent(ManagedSurface32 *screen) {
 	// Draw grid elements
 	drawGrid(screen);
+	if (_state == kStateMoving && 0 <= _activeSlotIdx && _activeSlotIdx < _numSlots && _bubbleCraterAnim && 0 < _bubbleCraterAnim->getFrameCount()) {
+		const uint32 elapsed = _vm->getGameTickCount() - _stateTimer;
+		if (elapsed < kPlaceDelay) {
+			const int frame = MIN<int>(static_cast<int>(elapsed / 100), _bubbleCraterAnim->getFrameCount() - 1);
+			_vm->_gfx->drawAnimationFrame(screen, _bubbleCraterAnim, frame, _slots[_activeSlotIdx].pos);
+		}
+	}
 }
 
 void PuzzleMysticMarsh::drawGrid(ManagedSurface32 *screen) {
@@ -525,16 +629,13 @@ void PuzzleMysticMarsh::drawGrid(ManagedSurface32 *screen) {
 }
 
 void PuzzleMysticMarsh::onRenderActors(ManagedSurface32 *screen) {
-	if (!_zoombiniAnimation || !_hasActiveZ)
-		return;
+	renderZoombinis(screen);
+}
 
-	// Draw the currently active zoombini at its interpolated position
-	int zIdx = _activeZ.zoombiniIdx;
-	if (0 <= zIdx && zIdx < static_cast<int>(_puzzleZoombinis.size())) {
-		const ZoombiniRunner *z = _puzzleZoombinis[zIdx];
-		const Common::Point32 pos = _activeZ.targetPos;
-
-		_vm->_gfx->drawZoombini(screen, _zoombiniAnimation, z->_traits, pos, 0, 0);
+void PuzzleMysticMarsh::onActorsRendered() {
+	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
+		if (_puzzleZoombinis[i])
+			_puzzleZoombinis[i]->advanceAnimationAfterDraw();
 	}
 }
 

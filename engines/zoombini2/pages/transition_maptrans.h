@@ -61,6 +61,38 @@ private:
 	static constexpr const char *kRouteFormat = "bmp/maptrans/%s";
 	static constexpr const char *kZoombiniAnimationPath = "bmp/transition1/PitiZomb3.anm";
 	static constexpr const char *kMusicPath = "#sounds/music/ZMR-Transition.wav";
+	
+	static constexpr const char *kSpeechTur11 = "tur11";
+	static constexpr const char *kSpeechZbv31_2 = "zbv31.2";
+	static constexpr const char *kSpeechZbv31_3 = "zbv31.3";
+	static constexpr const char *kSpeechTur21Format = "tur21.%d";
+	static constexpr const char *kSpeechWsl11 = "wsl11";
+	static constexpr const char *kSpeechWsl21Format = "wsl21.%d";
+	static constexpr const char *kSpeechAqu11_1_1 = "aqu11.1.1";
+	static constexpr const char *kSpeechAqu11_1_2 = "aqu11.1.2";
+	static constexpr const char *kSpeechAqu11_1_3 = "aqu11.1.3";
+	static constexpr const char *kSpeechAqu21Format = "aqu21.%d";
+	static constexpr const char *kSpeechAqu31 = "aqu31";
+	static constexpr const char *kSpeechMgw11 = "mgw11";
+	static constexpr const char *kSpeechMgw21Format = "mgw21.%d";
+	static constexpr const char *kSpeechMym11 = "mym11";
+	static constexpr const char *kSpeechMym21Format = "mym21.%d";
+	static constexpr const char *kSpeechWlf11 = "wlf11";
+	static constexpr const char *kSpeechWlf21Format = "wlf21.%d";
+	static constexpr const char *kSpeechCzn11_1 = "czn11.1";
+	static constexpr const char *kSpeechCzn11_2 = "czn11.2";
+	static constexpr const char *kSpeechCzn21Format = "czn21.%d";
+	static constexpr const char *kSpeechBc211 = "bc211";
+	static constexpr const char *kSpeechBc212 = "bc212";
+	static constexpr const char *kSpeechSwb11 = "swb11";
+	static constexpr const char *kSpeechSwb11B = "swb11B";
+	static constexpr const char *kSpeechSwb21Format = "swb21.%d";
+	static constexpr const char *kSpeechBlp11 = "blp11";
+	static constexpr const char *kSpeechBlp11B = "blp11B";
+	static constexpr const char *kSpeechBlp21Format = "blp21.%d";
+	static constexpr const char *kSpeechBlw11_1 = "blw11.1";
+	static constexpr const char *kSpeechBlw11_3 = "blw11.3";
+	static constexpr const char *kSpeechBlw12Format = "blw12.%d";
 
 	/** Start any due walkers and update all active party paths. */
 	void walkZoombinis();
@@ -69,7 +101,7 @@ private:
 	/** Load and append one logical speech clip name. */
 	void queueSpeech(const Common::String &name);
 	/** Reproduce the source-world first-visit or revisit speech selection. */
-	void queueTravelSpeech(PageId sourcePage);
+	void queueTravelSpeech(PageId srcPage);
 	/** Finish a completed clip and start the next queued speech clip. */
 	void updateSpeechQueue();
 	/** Return whether queued travel speech is playing or waiting to start. */
@@ -90,18 +122,16 @@ private:
 	Common::Path _patPath;
 
 	/** Index of the next party member waiting to start. */
-	int _nextWalkIndex = 0;
+	uint _nextWalkIndex = 0;
 	/** Time at which the next walker may start. */
 	uint32 _nextWalkTime = 0;
 	/** Number of walkers that have reached the route endpoint. */
-	int _completedCount = 0;
+	uint _completedCount = 0;
 
 	/** Page whose entry follows this route. */
 	PageId _targetPageId = kPageNone;
 	/** Whether the destination page has already been requested. */
 	bool _transitionFinished = false;
-	/** Music handle used during the map transition. */
-	int _musicId = -1;
 	/** Serial destination-speech handles in original enqueue order. */
 	Common::Array<int> _speechIds;
 	/** Index of the next queued speech handle to start. */

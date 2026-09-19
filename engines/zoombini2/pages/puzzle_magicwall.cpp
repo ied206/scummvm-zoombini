@@ -96,26 +96,20 @@ PuzzleMagicWall::PuzzleMagicWall(Zoombini2Engine *vm)
 PuzzleMagicWall::~PuzzleMagicWall() {
 	SoundManager *snd = _vm->getSoundManager();
 
-	// Unload music
-	if (_musicId >= 0) {
-		snd->stop(_musicId);
-		snd->unload(_musicId);
-	}
-
 	// Unload sound effects
 	for (int i = 0; i < 4; i++) {
-		if (_sndApproval[i] >= 0)
+		if (0 <= _sndApproval[i])
 			snd->unload(_sndApproval[i]);
-		if (_sndHint[i] >= 0)
+		if (0 <= _sndHint[i])
 			snd->unload(_sndHint[i]);
 	}
 	for (int i = 0; i < 2; i++) {
-		if (_sndError[i] >= 0)
+		if (0 <= _sndError[i])
 			snd->unload(_sndError[i]);
 	}
-	if (_sndGateOpen >= 0)
+	if (0 <= _sndGateOpen)
 		snd->unload(_sndGateOpen);
-	if (_sndZoombiniMove >= 0)
+	if (0 <= _sndZoombiniMove)
 		snd->unload(_sndZoombiniMove);
 
 	for (int i = 0; i < kColorCount; i++) {
@@ -135,6 +129,7 @@ PuzzleMagicWall::~PuzzleMagicWall() {
 	for (int i = 0; i < 5; i++) {
 		delete _crystalAnims[i];
 	}
+	finishPuzzleRoster(_vm->_state->_rescue1Board);
 }
 
 void PuzzleMagicWall::init() {
@@ -142,13 +137,8 @@ void PuzzleMagicWall::init() {
 	PuzzleBase::init();
 
 	// Start the Beetle Bug Alley music.
+	startPageMusic(Common::Path(kMusicPath));
 	if (SoundManager *snd = _vm->getSoundManager()) {
-		_musicId = snd->load(true, Common::Path(kMusicPath), true);
-		if (_musicId >= 0) {
-			snd->playLoop(_musicId);
-			snd->setVolume(_musicId, snd->_volumeMusic);
-		}
-
 		// Load sound effects
 		// Approval sounds (success): 6-A1.wav through 6-A4.wav
 		for (int i = 0; i < 4; i++) {
@@ -173,7 +163,7 @@ void PuzzleMagicWall::init() {
 		_sndZoombiniMove = snd->load(false, Common::Path(kZoombiniMovePath), false);
 	}
 
-	int level = CLIP(_vm->getGameState()->_level, 1, 3);
+	int level = CLIP(_vm->_state->_level, 1, 3);
 
 	debug(1, "PuzzleMagicWall::init - level %d", level);
 
@@ -364,14 +354,14 @@ void PuzzleMagicWall::placeColorBugs() {
 		_colorBugs.push_back(bug);
 	}
 
-	debug(2, "PuzzleMagicWall: Placed %d color bugs", (int)_colorBugs.size());
+	debug(2, "PuzzleMagicWall: Placed %u color bugs", _colorBugs.size());
 }
 
 void PuzzleMagicWall::assignZoombiniSlots() {
 	// Assign beetles (zoombinis) to the 4 internal slots
-	int zoomIdx = 0;
+	uint zoomIdx = 0;
 	for (int slot = 0; slot < 4; slot++) {
-		if (zoomIdx < (int)_puzzleZoombinis.size()) {
+		if (zoomIdx < _puzzleZoombinis.size()) {
 			_slots[slot].zoombiniIdx = zoomIdx;
 			_slots[slot].pathProgress = 100;
 			_slots[slot].pos = _colorDots[slot].pos;
@@ -380,7 +370,7 @@ void PuzzleMagicWall::assignZoombiniSlots() {
 			// Assign a color to this zoombini
 			_zoombiniColors[zoomIdx] = (zoomIdx % kColorCount);
 
-			debug(2, "PuzzleMagicWall: Slot %d -> Beetle (Zoombini %d, Color %d)", slot, zoomIdx, _zoombiniColors[zoomIdx]);
+			debug(2, "PuzzleMagicWall: Slot %d -> Beetle (Zoombini %u, Color %d)", slot, zoomIdx, _zoombiniColors[zoomIdx]);
 			zoomIdx++;
 		}
 	}
@@ -405,7 +395,7 @@ void PuzzleMagicWall::setupTablets() {
 	for (const auto &d : defs) {
 		Tablet t;
 		t.rect = d.rect;
-		t.sourceSlot = d.src;
+		t.srcSlot = d.src;
 		t.destSlot = d.dst;
 		t.path = _bougePaths[d.pathIdx];
 		_tablets.push_back(t);
@@ -414,12 +404,12 @@ void PuzzleMagicWall::setupTablets() {
 	// Wall lever to exit the puzzle
 	_wallLever = Common::Rect(550, 200, 600, 300);
 
-	debug(2, "PuzzleMagicWall: Setup %d tablets", (int)_tablets.size());
+	debug(2, "PuzzleMagicWall: Setup %u tablets", _tablets.size());
 }
 
 void PuzzleMagicWall::startZoombiniPath(int slotIdx) {
 	// This function is now used to move beetles between slots or to exit
-	if (slotIdx < 0 || slotIdx >= 8)
+	if (slotIdx < 0 || 8 <= slotIdx)
 		return;
 
 	ZoombiniSlot &slot = _slots[slotIdx];
@@ -443,7 +433,7 @@ void PuzzleMagicWall::startZoombiniPath(int slotIdx) {
 void PuzzleMagicWall::advanceZoombiniPath(int slotIdx) {
 	// Advance the selected Zoombini along its active path.
 
-	if (slotIdx < 0 || slotIdx >= 8)
+	if (slotIdx < 0 || 8 <= slotIdx)
 		return;
 
 	ZoombiniSlot &slot = _slots[slotIdx];
@@ -470,7 +460,7 @@ void PuzzleMagicWall::advanceZoombiniPath(int slotIdx) {
 		uint32 elapsed = now - _stateTimer;
 		float progress = (float)elapsed / kPathAnimDuration;
 
-		if (progress >= 1.0f) {
+		if (1.0f <= progress) {
 			slot.pathProgress = 100;
 		} else {
 			slot.pathProgress = (int)(progress * 100);
@@ -486,31 +476,31 @@ void PuzzleMagicWall::advanceZoombiniPath(int slotIdx) {
 }
 
 bool PuzzleMagicWall::checkSlotComplete(int slotIdx) {
-	if (slotIdx < 0 || slotIdx >= 8)
+	if (slotIdx < 0 || 8 <= slotIdx)
 		return false;
 
-	return _slots[slotIdx].pathProgress >= 100;
+	return 100 <= _slots[slotIdx].pathProgress;
 }
 
 void PuzzleMagicWall::completeSlot(int slotIdx) {
 	// Finish path animation for beetle in slotIdx
-	if (slotIdx < 0 || slotIdx >= 8)
+	if (slotIdx < 0 || 8 <= slotIdx)
 		return;
 
 	ZoombiniSlot &slot = _slots[slotIdx];
 	int zoomIdx = slot.zoombiniIdx;
 
-	if (slotIdx >= 4) {
+	if (4 <= slotIdx) {
 		// Reached exit
 		slot.captured = true; // We should probably use a different flag now
-		if (zoomIdx >= 0 && zoomIdx < (int)_puzzleZoombinis.size()) {
+		if (0 <= zoomIdx && zoomIdx < (int)_puzzleZoombinis.size()) {
 			_puzzleZoombinis[zoomIdx]->_puzzleStatus = 1;
 		}
 		_capturedCount++;
 		debug(1, "PuzzleMagicWall: Beetle %d exited", zoomIdx);
 	} else {
 		// Moved to another slot
-		if (_destSlot >= 0 && _destSlot < 8) {
+		if (0 <= _destSlot && _destSlot < 8) {
 			_slots[_destSlot].zoombiniIdx = zoomIdx;
 			_slots[_destSlot].pathProgress = 100;
 			if (_slots[_destSlot].path) {
@@ -530,7 +520,7 @@ void PuzzleMagicWall::completeSlot(int slotIdx) {
 
 	// Play approval sound
 	if (SoundManager *snd = _vm->getSoundManager()) {
-		if (_sndApproval[_nextApprovalIdx] >= 0) {
+		if (0 <= _sndApproval[_nextApprovalIdx]) {
 			snd->play(_sndApproval[_nextApprovalIdx]);
 		}
 		_nextApprovalIdx = (_nextApprovalIdx + 1) % 4;
@@ -540,7 +530,7 @@ void PuzzleMagicWall::completeSlot(int slotIdx) {
 void PuzzleMagicWall::updateLights() {
 	for (uint i = 0; i < _colorDots.size(); i++) {
 		int zoomIdx = _slots[i].zoombiniIdx;
-		if (zoomIdx >= 0 && zoomIdx < 16) {
+		if (0 <= zoomIdx && zoomIdx < 16) {
 			if (_zoombiniColors[zoomIdx] == _colorDots[i].colorIdx) {
 				_colorDots[i].lightOn = true;
 			} else {
@@ -552,11 +542,11 @@ void PuzzleMagicWall::updateLights() {
 	}
 }
 
-int PuzzleMagicWall::countCaptured() const {
-	int count = 0;
+uint PuzzleMagicWall::countCaptured() const {
+	uint count = 0;
 	for (int i = 0; i < 4; i++) {
 		if (_slots[i].captured)
-			count++;
+			count += 1;
 	}
 	return count;
 }
@@ -576,14 +566,15 @@ void PuzzleMagicWall::onUpdate() {
 
 	case kStateZoombiniMoving:
 		// Animate zoombini movement along path
-		if (_activeSlot >= 0) {
+		if (0 <= _activeSlot) {
 			advanceZoombiniPath(_activeSlot);
 
 			if (checkSlotComplete(_activeSlot)) {
 				completeSlot(_activeSlot);
 
 				// Check if all captured
-				if (countCaptured() >= 4 || countCaptured() >= (int)_puzzleZoombinis.size()) {
+				const uint capturedCount = countCaptured();
+				if (4 <= capturedCount || _puzzleZoombinis.size() <= capturedCount) {
 					_state = kStateComplete;
 					_stateTimer = now;
 				} else {
@@ -598,20 +589,20 @@ void PuzzleMagicWall::onUpdate() {
 
 	case kStateGateOpening:
 		// Gate animation
-		if (elapsed > kGateAnimDuration) {
+		if (kGateAnimDuration < elapsed) {
 			_state = kStateIdle;
 		}
 		break;
 
 	case kStateComplete:
-		debug(1, "PuzzleMagicWall: All zoombinis captured (%d)", countCaptured());
+		debug(1, "PuzzleMagicWall: All zoombinis captured (%u)", countCaptured());
 		_state = kStateDone;
 		_stateTimer = now;
 		break;
 
 	case kStateDone:
 		// Wait before transitioning out
-		if (elapsed > 2000) {
+		if (2000 < elapsed) {
 			debug(1, "PuzzleMagicWall: Complete, returning to map");
 			_vm->_returningFromPuzzle = true;
 			_vm->_mapTransitionSourcePageId = kPageMagicWall;
@@ -785,12 +776,12 @@ EventHandleResult PuzzleMagicWall::onLButtonDown(const Common::Point &pos) {
 		const Tablet &t = _tablets[i];
 		if (t.rect.contains(pos)) {
 			// Check if there is a beetle in the source slot
-			if (_slots[t.sourceSlot].zoombiniIdx >= 0) {
-				debug(2, "PuzzleMagicWall: Tablet %d clicked, moving beetle from %d to %d", i, t.sourceSlot, t.destSlot);
+			if (0 <= _slots[t.srcSlot].zoombiniIdx) {
+				debug(2, "PuzzleMagicWall: Tablet %d clicked, moving beetle from %d to %d", i, t.srcSlot, t.destSlot);
 
 				_destSlot = t.destSlot;
-				_slots[t.sourceSlot].path = t.path;
-				startZoombiniPath(t.sourceSlot);
+				_slots[t.srcSlot].path = t.path;
+				startZoombiniPath(t.srcSlot);
 				return EventHandleResult::kConsumed;
 			}
 		}
@@ -811,7 +802,7 @@ EventHandleResult PuzzleMagicWall::onLButtonDown(const Common::Point &pos) {
 			debug(2, "PuzzleMagicWall: Wall lever pressed, all lights on! Opening doors.");
 			// Start exit sequence for all beetles
 			for (int i = 0; i < 4; i++) {
-				if (_slots[i].zoombiniIdx >= 0) {
+				if (0 <= _slots[i].zoombiniIdx) {
 					_destSlot = i + 4;
 					_slots[i].path = _exitPaths[i];
 					startZoombiniPath(i);
