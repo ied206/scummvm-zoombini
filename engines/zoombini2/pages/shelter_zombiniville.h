@@ -153,8 +153,6 @@ private:
 	/** Zoombini states assigned to departure slots. */
 	Common::Array<ZoombiniRunner *> _boardingZoombinis;
 
-	/** Shelter music handle. */
-	int _musicId = -1;
 	/** Sound played when a feature value is selected. */
 	int _sndFeatureSelect = -1;
 	/** Sound played by Quick Fill. */

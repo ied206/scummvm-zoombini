@@ -58,8 +58,6 @@ private:
 	bool _clicked = false;
 	/** Gameplay deadline for automatic dismissal. */
 	uint32 _deadline = 0;
-	/** Title music sound identifier. */
-	int _musicId = -1;
 };
 
 } // End of namespace Zoombini2

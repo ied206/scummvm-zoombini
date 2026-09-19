@@ -83,7 +83,8 @@ PuzzleBase::PuzzleBase(Zoombini2Engine *vm, int puzzleId)
 	_pageId = puzzleId;
 }
 
-PuzzleBase::~PuzzleBase() {
+void PuzzleBase::finishPuzzleRoster(BoardRecord **board) {
+	_vm->_state->finishPuzzleRoster(_puzzleId, board, _vm->isStartingMapTransition(), _vm->_isSavedGame);
 }
 
 void PuzzleBase::init() {
@@ -113,10 +114,10 @@ void PuzzleBase::init() {
 	if (!_zoombiniAnimation)
 		debug(1, "Puzzle: Failed to load zoombini graphics");
 
-	// Transfer zoombinis from global to puzzle
+	// Mirror the active party for puzzle rendering.
 	_puzzleZoombinis.clear();
-	for (uint i = 0; i < _vm->_globalZoombinis.size(); i++) {
-		_puzzleZoombinis.push_back(_vm->_globalZoombinis[i]);
+	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
+		_puzzleZoombinis.push_back(_vm->_state->_activeZoombinis[i]);
 	}
 
 	_stateTimer = _vm->getGameTickCount();
@@ -144,14 +145,9 @@ void PuzzleBase::renderZoombinis(ManagedSurface32 *screen) const {
 			draggedZoombini = zoombini;
 			continue;
 		}
-		uint insertion = order.size();
 		order.push_back(index);
-		while (0 < insertion && zoombini->_screenPos.y < _puzzleZoombinis[order[insertion - 1]]->_screenPos.y) {
-			order[insertion] = order[insertion - 1];
-			insertion -= 1;
-		}
-		order[insertion] = index;
 	}
+	ZoombiniRunner::sortDrawOrderByY(_puzzleZoombinis, order);
 	for (uint index : order)
 		_vm->_gfx->drawZoombiniRunner(screen, _puzzleZoombinis[index]);
 	if (draggedZoombini)

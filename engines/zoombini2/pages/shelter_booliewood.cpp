@@ -56,10 +56,6 @@ ShelterBooliewood::ShelterBooliewood(Zoombini2Engine *vm)
 ShelterBooliewood::~ShelterBooliewood() {
 	SoundManager *sound = _vm->getSoundManager();
 	if (sound) {
-		if (0 <= _musicId) {
-			sound->stop(_musicId);
-			sound->unload(_musicId);
-		}
 		if (0 <= _introSpeechId)
 			sound->unload(_introSpeechId);
 		for (int i = 0; i < kAmbientSpeechCount; i++) {
@@ -77,12 +73,12 @@ ShelterBooliewood::~ShelterBooliewood() {
 	delete _pascontentMarker;
 	delete _walkingAnimation;
 	delete _waitingAnimation;
-	_vm->clearGlobalZoombinis();
+	_vm->_state->clearActiveZoombinis();
 }
 
 void ShelterBooliewood::init() {
 	debug(1, "BooliewoodPage::init");
-	GameState *state = _vm->getGameState();
+	GameState *state = _vm->_state;
 	const bool firstVisit = !state->hasPageVisit(kPageBooliewood, 1);
 	state->_hasReachedBooliewood = 1;
 	state->registerPageVisit(kPageBooliewood, 1);
@@ -129,13 +125,9 @@ void ShelterBooliewood::init() {
 	loadAttractions(now);
 	loadCrowdActors(now);
 
+	startPageMusic(Common::Path(kMusicPath));
 	SoundManager *sound = _vm->getSoundManager();
 	if (sound) {
-		_musicId = sound->load(true, Common::Path(kMusicPath), true);
-		if (0 <= _musicId) {
-			sound->playLoop(_musicId);
-			sound->setVolume(_musicId, sound->_volumeMusic);
-		}
 		if (firstVisit) {
 			_introSpeechId = sound->load(false, Common::Path(kIntroSpeechPath), false);
 			if (0 <= _introSpeechId) {
@@ -179,11 +171,10 @@ void ShelterBooliewood::onRenderActors(ManagedSurface32 *screen) {
 }
 
 void ShelterBooliewood::onActorsRendered() {
-	int count = static_cast<int>(_vm->_globalZoombinis.size());
-	if (kMaximumVisibleZoombinis < count)
-		count = kMaximumVisibleZoombinis;
-	for (int i = 0; i < count; i++)
-		_vm->_globalZoombinis[i]->advanceAnimationAfterDraw();
+	const uint maxVisibleCount = kMaximumVisibleZoombinis;
+	const uint count = MIN<uint>(_vm->_state->_activeZoombinis.size(), maxVisibleCount);
+	for (uint i = 0; i < count; i++)
+		_vm->_state->_activeZoombinis[i]->advanceAnimationAfterDraw();
 }
 
 void ShelterBooliewood::onRenderForeground(ManagedSurface32 *screen) {
@@ -233,10 +224,10 @@ bool ShelterBooliewood::assignSeat(Common::Point32 &pos) {
 }
 
 void ShelterBooliewood::buildSeatedCommunity(uint32 now) {
-	GameState *state = _vm->getGameState();
-	const int incomingCount = static_cast<int>(_vm->_globalZoombinis.size());
+	GameState *state = _vm->_state;
+	const int incomingCount = static_cast<int>(_vm->_state->_activeZoombinis.size());
 	for (int i = 0; i < incomingCount; i++) {
-		ZoombiniRunner *zoombini = _vm->_globalZoombinis[i];
+		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
 		Common::Point32 pos;
 		if (assignSeat(pos))
 			zoombini->setPosition(pos);
@@ -250,7 +241,8 @@ void ShelterBooliewood::buildSeatedCommunity(uint32 now) {
 	if (180 < historicalCount)
 		historicalCount = 180;
 	int walkingQuota = historicalCount / 5;
-	for (int i = 0; i < historicalCount && static_cast<int>(_vm->_globalZoombinis.size()) < kMaximumVisibleZoombinis; i++) {
+	const uint maxVisibleCount = kMaximumVisibleZoombinis;
+	for (int i = 0; i < historicalCount && _vm->_state->_activeZoombinis.size() < maxVisibleCount; i++) {
 		Common::Point32 pos;
 		if (!assignSeat(pos))
 			break;
@@ -258,7 +250,7 @@ void ShelterBooliewood::buildSeatedCommunity(uint32 now) {
 		zoombini->setPosition(pos);
 		zoombini->setDefaultAnimation(_zoombiniAnimation, kSeatedZoombiniCell);
 		zoombini->_inputEnabled = false;
-		_vm->_globalZoombinis.push_back(zoombini);
+		_vm->_state->_activeZoombinis.push_back(zoombini);
 		if (walkingQuota != 0 && _vm->_rnd->getRandomNumber(1) != 0) {
 			zoombini->startAnimation(_walkingZoombiniAnimation, kSeatedZoombiniCell, now);
 			walkingQuota -= 1;
@@ -267,11 +259,10 @@ void ShelterBooliewood::buildSeatedCommunity(uint32 now) {
 }
 
 void ShelterBooliewood::updateSeatedAnimations(uint32 now) {
-	int count = static_cast<int>(_vm->_globalZoombinis.size());
-	if (kMaximumVisibleZoombinis < count)
-		count = kMaximumVisibleZoombinis;
-	for (int i = 0; i < count; i++)
-		_vm->_globalZoombinis[i]->updateAnimation(now);
+	const uint maxVisibleCount = kMaximumVisibleZoombinis;
+	const uint count = MIN<uint>(_vm->_state->_activeZoombinis.size(), maxVisibleCount);
+	for (uint i = 0; i < count; i++)
+		_vm->_state->_activeZoombinis[i]->updateAnimation(now);
 }
 
 ZoombiniRunner *ShelterBooliewood::createHistoricalZoombini(int32 traitHash) {
@@ -493,7 +484,7 @@ void ShelterBooliewood::drawAttractions(ManagedSurface32 *screen) const {
 }
 
 void ShelterBooliewood::drawRescuedCrowd(ManagedSurface32 *screen) const {
-	const int rescuedTotal = _vm->getGameState()->_rescuedBoolieCount;
+	const int rescuedTotal = _vm->_state->_rescuedBoolieCount;
 	int drawn = 0;
 	for (int row = 26; 0 <= row && drawn < rescuedTotal; row--) {
 		const int y = 474 - (26 - row) * 16;
@@ -511,23 +502,15 @@ void ShelterBooliewood::drawRescuedCrowd(ManagedSurface32 *screen) const {
 void ShelterBooliewood::drawSeatedCommunity(ManagedSurface32 *screen) const {
 	if (!_zoombiniAnimation)
 		return;
-	int count = static_cast<int>(_vm->_globalZoombinis.size());
-	if (kMaximumVisibleZoombinis < count)
-		count = kMaximumVisibleZoombinis;
-	int order[kMaximumVisibleZoombinis];
-	for (int i = 0; i < count; i++) {
-		order[i] = i;
-		int insert = i;
-		while (0 < insert && _vm->_globalZoombinis[order[insert]]->_screenPos.y < _vm->_globalZoombinis[order[insert - 1]]->_screenPos.y) {
-			const int temporary = order[insert];
-			order[insert] = order[insert - 1];
-			order[insert - 1] = temporary;
-			insert -= 1;
-		}
-	}
-	for (int i = 0; i < count; i++) {
-		const int visibleIndex = order[i];
-		const ZoombiniRunner &zoombini = *_vm->_globalZoombinis[visibleIndex];
+	const uint maxVisibleCount = kMaximumVisibleZoombinis;
+	const uint count = MIN<uint>(_vm->_state->_activeZoombinis.size(), maxVisibleCount);
+	Common::Array<uint> order;
+	for (uint i = 0; i < count; i++)
+		order.push_back(i);
+	ZoombiniRunner::sortDrawOrderByY(_vm->_state->_activeZoombinis, order);
+	for (uint i = 0; i < order.size(); i++) {
+		const uint visibleIndex = order[i];
+		const ZoombiniRunner &zoombini = *_vm->_state->_activeZoombinis[visibleIndex];
 		const int animationFrame = zoombini._animationActive ? zoombini._animationFrame : 0;
 		drawZoombiniInPanorama(zoombini, zoombini._activeAnimation, zoombini._animationCell, animationFrame, zoombini._screenPos, screen);
 	}

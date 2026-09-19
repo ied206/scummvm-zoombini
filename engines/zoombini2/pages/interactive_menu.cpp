@@ -91,8 +91,7 @@ InteractiveMenu::~InteractiveMenu() {
 }
 
 void InteractiveMenu::init() {
-	_vm->getGameState()->init();
-	_vm->clearGlobalZoombinis();
+	_vm->_state->init();
 	loadResources();
 	loadButtons();
 
@@ -101,7 +100,7 @@ void InteractiveMenu::init() {
 		warning("MenuScreenPage: Failed to load save-list fonts");
 	scanSaveFiles();
 
-	_mapMusicId = _vm->ensureMapMusic();
+	startMapMusic();
 	_state = MenuScreenState::kMain00;
 }
 
@@ -359,12 +358,12 @@ void InteractiveMenu::startSelectedSave() {
 	if (saveName.empty())
 		return;
 
-	GameState *gameState = _vm->getGameState();
+	GameState *gameState = _vm->_state;
 	bool success = false;
 	if (_fileList->isEditing()) {
 		gameState->init();
 		gameState->_playerName = saveName;
-		success = _vm->writeGameSave(saveName);
+		success = _vm->createGameSave(saveName);
 	} else {
 		success = _vm->readGameSave(saveName);
 		if (!success)

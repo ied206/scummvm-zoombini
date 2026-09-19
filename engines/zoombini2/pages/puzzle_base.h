@@ -30,6 +30,7 @@
 namespace Zoombini2 {
 
 class BitBlock;
+struct BoardRecord;
 class ZoombiniRunner;
 class ZoombiniAnimation;
 
@@ -42,8 +43,8 @@ class PuzzleBase : public InteractiveBase {
 public:
 	/** Bind shared puzzle state to @p vm and @p puzzleId. */
 	PuzzleBase(Zoombini2Engine *vm, int puzzleId);
-	/** Release shared puzzle resources and roster entries. */
-	~PuzzleBase() override;
+	/** Release shared puzzle resources. */
+	~PuzzleBase() override = default;
 	/** Return whether the shared sidebar is visible. */
 	bool hasSidebar() const override { return true; }
 
@@ -79,6 +80,8 @@ private:
 	static constexpr const char *kBooliesBackgroundPath = "Boolies/background";
 
 protected:
+	/** Finish this puzzle's roster using the board selected by the concrete puzzle. */
+	void finishPuzzleRoster(BoardRecord **board);
 	/** Replace the first page layer's background and refresh the borrowed compatibility pointer. */
 	bool loadPrimaryLayerBackground(const Common::Path &path);
 	/**

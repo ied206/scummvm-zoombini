@@ -71,8 +71,6 @@ private:
 	/** Horizontal-scrolled credits bitmap. */
 	BitBlock *_background = nullptr;
 
-	/** Credits music sound identifier. */
-	int _musicId = -1;
 	/** Whether the credits have requested engine exit. */
 	bool _finished = false;
 };

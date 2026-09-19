@@ -39,8 +39,6 @@ ShelterRescueSiteBase::ShelterRescueSiteBase(Zoombini2Engine *vm)
 }
 
 ShelterRescueSiteBase::~ShelterRescueSiteBase() {
-	if (0 <= _musicId)
-		_vm->getSoundManager()->stop(_musicId);
 	clearSpeechQueue();
 
 	delete _selector;
@@ -62,6 +60,16 @@ void ShelterRescueSiteBase::loadSelector(const char *path) {
 	_selector->loadFromFile(Common::Path(path));
 }
 
+void ShelterRescueSiteBase::drawRosterBackdrop(ManagedSurface32 *screen, int scrollX) const {
+	if (!_selector || !_selector->isValid())
+		return;
+
+	const Common::Rect32 wrapClip(0, 0, _gridBasePos.x + 223, screen->h);
+	const Common::Rect32 rosterClip(_gridBasePos.x, 0, screen->w, screen->h);
+	_selector->drawToScreenClipped(screen, Common::Point32(_gridBasePos.x + 223 - scrollX, _gridBasePos.y), wrapClip, _vm->getAlphaLUT());
+	_selector->drawToScreenClipped(screen, Common::Point32(_gridBasePos.x - scrollX, _gridBasePos.y), rosterClip, _vm->getAlphaLUT());
+}
+
 void ShelterRescueSiteBase::loadPorteSelector(const char *path) {
 	_porteSelect = new RleBlock(_vm);
 	_porteSelect->loadFromFile(Common::Path(path));
@@ -73,12 +81,6 @@ void ShelterRescueSiteBase::loadScrollButtons(const char *buttonUpPath, const ch
 
 	_buttonDown = new Animation(_vm);
 	_buttonDown->loadFromFile(Common::Path(buttonDownPath));
-}
-
-void ShelterRescueSiteBase::startMusic(const char *path) {
-	_musicId = _vm->getSoundManager()->load(true, Common::Path(path), true);
-	if (0 <= _musicId)
-		_vm->getSoundManager()->play(_musicId);
 }
 
 void ShelterRescueSiteBase::resetRescueState() {
@@ -98,17 +100,17 @@ void ShelterRescueSiteBase::resetRescueState() {
 }
 
 void ShelterRescueSiteBase::prepareWaitingBoard(BoardRecord **board) {
-	GameState *state = _vm->getGameState();
+	GameState *state = _vm->_state;
 	if (!state->hasPageVisit(_pageId, 1))
 		GameState::clearBoard(board);
 	_scrollOffset = GameState::findBoardScrollRow(board);
 }
 
 void ShelterRescueSiteBase::refillDepartureRoster(BoardRecord **board) {
-	GameState::refillFromBoard(board, _vm->_globalZoombinis, 8);
+	GameState::refillFromBoard(board, _vm->_state->_activeZoombinis, 8);
 	_departureRoster.clear();
-	for (uint i = 0; i < _vm->_globalZoombinis.size(); i++) {
-		ZoombiniRunner *zoombini = _vm->_globalZoombinis[i];
+	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
+		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
 		zoombini->_puzzleStatus = 0;
 		zoombini->_inputEnabled = 1;
 		if (i < 8)
@@ -118,8 +120,8 @@ void ShelterRescueSiteBase::refillDepartureRoster(BoardRecord **board) {
 }
 
 void ShelterRescueSiteBase::saveRescueRoster(BoardRecord **board) {
-	GameState *state = _vm->getGameState();
-	Common::Array<ZoombiniRunner *> &roster = _vm->_globalZoombinis;
+	GameState *state = _vm->_state;
+	Common::Array<ZoombiniRunner *> &roster = _vm->_state->_activeZoombinis;
 	for (uint i = 0; i < roster.size();) {
 		ZoombiniRunner *zoombini = roster[i];
 		bool departing = false;
@@ -180,8 +182,8 @@ void ShelterRescueSiteBase::clearSpeechQueue() {
 	_speechQueue.clear();
 }
 
-int ShelterRescueSiteBase::countBoardMembers(BoardRecord *const *board) {
-	int count = 0;
+uint ShelterRescueSiteBase::countBoardMembers(BoardRecord *const *board) {
+	uint count = 0;
 	for (int i = 0; i < kBoardRows * kBoardCols; i++) {
 		if (board[i])
 			count += 1;

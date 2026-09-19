@@ -23,8 +23,8 @@
 #include "common/str.h"
 
 #include "zoombini2/graphics.h"
-#include "zoombini2/scripts.h"
 #include "zoombini2/pages/shelter_final.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
@@ -57,14 +57,10 @@ ShelterFinal::ShelterFinal(Zoombini2Engine *vm)
 }
 
 ShelterFinal::~ShelterFinal() {
-	_vm->clearGlobalZoombinis();
+	_vm->_state->clearActiveZoombinis();
 
 	SoundManager *sound = _vm->getSoundManager();
 	if (sound) {
-		if (0 <= _musicId) {
-			sound->stop(_musicId);
-			sound->unload(_musicId);
-		}
 		if (0 <= _openingSpeechId)
 			sound->unload(_openingSpeechId);
 		if (0 <= _closingSpeechId)
@@ -85,14 +81,14 @@ ShelterFinal::~ShelterFinal() {
 	for (int i = 0; i < kFireworkCount; i++)
 		delete _fireworks[i].animation;
 
-	GameState *state = _vm->getGameState();
+	GameState *state = _vm->_state;
 	if (state)
 		_vm->writeGameSave(state->_playerName);
 }
 
 void ShelterFinal::init() {
 	debug(1, "BooliewoodFinalPage::init");
-	_vm->clearGlobalZoombinis();
+	_vm->_state->clearActiveZoombinis();
 
 	_background = new BitBlock(_vm);
 	if (!_background->load(Common::Path(kBackgroundPath))) {
@@ -162,13 +158,9 @@ void ShelterFinal::init() {
 	_revealRow = 0;
 	_revealColumn = 0;
 
+	startPageMusic(Common::Path(kMusicPath));
 	SoundManager *sound = _vm->getSoundManager();
 	if (sound) {
-		_musicId = sound->load(true, Common::Path(kMusicPath), true);
-		if (0 <= _musicId) {
-			sound->playLoop(_musicId);
-			sound->setVolume(_musicId, sound->_volumeMusic);
-		}
 		_openingSpeechId = sound->load(false, Common::Path(kOpeningSpeechPath), false);
 		if (0 <= _openingSpeechId)
 			sound->playWithVolume(_openingSpeechId, sound->_volumeSpeech);
@@ -226,13 +218,17 @@ void ShelterFinal::onRenderContent(ManagedSurface32 *screen) {
 }
 
 void ShelterFinal::onRenderActors(ManagedSurface32 *screen) {
-	for (int i = 0; i < kDecorativeZoombiniCount && i < static_cast<int>(_vm->_globalZoombinis.size()); i++)
-		drawZoombini(*_vm->_globalZoombinis[i], screen);
+	Common::Array<uint> order;
+	for (uint i = 0; i < kDecorativeZoombiniCount && i < _vm->_state->_activeZoombinis.size(); i++)
+		order.push_back(i);
+	ZoombiniRunner::sortDrawOrderByY(_vm->_state->_activeZoombinis, order);
+	for (uint i = 0; i < order.size(); i++)
+		drawZoombini(*_vm->_state->_activeZoombinis[order[i]], screen);
 }
 
 void ShelterFinal::onActorsRendered() {
-	for (int i = 0; i < kDecorativeZoombiniCount && i < static_cast<int>(_vm->_globalZoombinis.size()); i++)
-		_vm->_globalZoombinis[i]->advanceAnimationAfterDraw();
+	for (uint i = 0; i < kDecorativeZoombiniCount && i < _vm->_state->_activeZoombinis.size(); i++)
+		_vm->_state->_activeZoombinis[i]->advanceAnimationAfterDraw();
 	updateDecorativeZoombiniRunnersAfterDraw(_vm->getGameTickCount());
 }
 
@@ -243,7 +239,7 @@ EventHandleResult ShelterFinal::onLButtonDown(const Common::Point &pos) {
 }
 
 void ShelterFinal::createDecorativeZoombinis() {
-	for (int i = 0; i < kDecorativeZoombiniCount; i++) {
+	for (uint i = 0; i < kDecorativeZoombiniCount; i++) {
 		ZoombiniRunner *zoombini = new ZoombiniRunner();
 		const byte nose = static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1);
 		const byte eyes = static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1);
@@ -253,18 +249,18 @@ void ShelterFinal::createDecorativeZoombinis() {
 		zoombini->setPosition(kDecorativeZoombiniPos[i]);
 		zoombini->setDefaultAnimation(_zoombiniAnimation, kDecorativeZoombiniCells[i]);
 		zoombini->_inputEnabled = false;
-		_vm->_globalZoombinis.push_back(zoombini);
+		_vm->_state->_activeZoombinis.push_back(zoombini);
 	}
 }
 
 void ShelterFinal::updateDecorativeZoombinis(uint32 now) {
-	for (int i = 0; i < kDecorativeZoombiniCount && i < static_cast<int>(_vm->_globalZoombinis.size()); i++)
-		_vm->_globalZoombinis[i]->updateAnimation(now);
+	for (uint i = 0; i < kDecorativeZoombiniCount && i < _vm->_state->_activeZoombinis.size(); i++)
+		_vm->_state->_activeZoombinis[i]->updateAnimation(now);
 }
 
 void ShelterFinal::updateDecorativeZoombiniRunnersAfterDraw(uint32 now) {
-	for (int i = 0; i < kDecorativeZoombiniCount && i < static_cast<int>(_vm->_globalZoombinis.size()); i++) {
-		ZoombiniRunner *zoombini = _vm->_globalZoombinis[i];
+	for (uint i = 0; i < kDecorativeZoombiniCount && i < _vm->_state->_activeZoombinis.size(); i++) {
+		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
 		if (!zoombini->_animationActive && _vm->_rnd->getRandomNumber(99) == 10)
 			zoombini->startAnimation(_walkingZoombiniAnimation, 33, now);
 		if (zoombini->_animationActive && _vm->_rnd->getRandomNumber(49) == 10) {
@@ -374,8 +370,7 @@ void ShelterFinal::playRandomAmbient() {
 		sound->playWithVolume(_ambientSoundIds[index], sound->_volumeSpeech);
 }
 
-void ShelterFinal::drawAnimation(const Animation *animation, int frameIndex,
-										const Common::Point32 &pos, ManagedSurface32 *screen) const {
+void ShelterFinal::drawAnimation(const Animation *animation, int frameIndex, const Common::Point32 &pos, ManagedSurface32 *screen) const {
 	if (!animation || animation->getFrameCount() <= 0)
 		return;
 	const RleBlock *frame = animation->getFrame(frameIndex % animation->getFrameCount());

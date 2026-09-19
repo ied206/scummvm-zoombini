@@ -176,14 +176,13 @@ Zoombini2Engine::Zoombini2Engine(OSystem *syst, const Zoombini2GameDescription *
 Zoombini2Engine::~Zoombini2Engine() {
 	_nextPageId = kPageNone;
 	destroyCurrentPage();
-	if (_gameState)
-		writeGameSave(_gameState->_playerName);
-	clearGlobalZoombinis();
+	if (_state)
+		writeGameSave(_state->_playerName);
+	delete _state;
 	clearZoombiniAnimationCache();
 
 	delete _cursorSprite;
 	delete _interactiveCursorSprite;
-	delete _gameState;
 	delete _sidebar;
 	delete _msgBoxDialog;
 	delete _debugDialog;
@@ -192,24 +191,6 @@ Zoombini2Engine::~Zoombini2Engine() {
 	delete _screen;
 	delete _rnd;
 	delete _resourceFileResolver;
-}
-
-void Zoombini2Engine::clearGlobalZoombinis() {
-	for (uint i = 0; i < _globalZoombinis.size(); i++)
-		delete _globalZoombinis[i];
-	_globalZoombinis.clear();
-}
-
-void Zoombini2Engine::recordBooliesCompletion() {
-	if (!_gameState || _globalZoombinis.empty() || !_globalZoombinis[0])
-		return;
-
-	const int rescuedBooliesPerZoombini = _globalZoombinis[0]->_rescuedBooliesPerZoombini;
-	_gameState->_rescuedBoolieCount += static_cast<int32>(_globalZoombinis.size()) * rescuedBooliesPerZoombini;
-	for (uint i = 0; i < _globalZoombinis.size(); i++) {
-		if (_globalZoombinis[i])
-			_gameState->recordCompletedZoombini(*_globalZoombinis[i]);
-	}
 }
 
 const ZoombiniAnimation *Zoombini2Engine::loadZoombiniAnimation(const Common::Path &path, uint32 frameDelay) {
@@ -236,17 +217,30 @@ void Zoombini2Engine::clearZoombiniAnimationCache() {
 }
 
 bool Zoombini2Engine::writeGameSave(const Common::String &name) {
-	if (!_gameState)
+	if (ConfMan.getBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, ConfMan.getActiveDomainName()))
+		return false;
+	return saveGameProfile(name);
+}
+
+bool Zoombini2Engine::createGameSave(const Common::String &name) {
+	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName());
+	if (savegameManager.profileExists(name))
+		return false;
+	return saveGameProfile(name);
+}
+
+bool Zoombini2Engine::saveGameProfile(const Common::String &name) {
+	if (!_state)
 		return false;
 	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName());
-	return savegameManager.saveProfile(name, *_gameState, &_globalZoombinis);
+	return savegameManager.saveProfile(name, *_state);
 }
 
 bool Zoombini2Engine::readGameSave(const Common::String &name) {
-	if (!_gameState)
+	if (!_state)
 		return false;
 	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName());
-	return savegameManager.loadProfile(name, *_gameState);
+	return savegameManager.loadProfile(name, *_state);
 }
 
 bool Zoombini2Engine::deleteGameSave(const Common::String &name) {
@@ -257,20 +251,6 @@ bool Zoombini2Engine::deleteGameSave(const Common::String &name) {
 Common::StringArray Zoombini2Engine::listGameSaves() const {
 	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName());
 	return savegameManager.listProfiles();
-}
-
-int Zoombini2Engine::ensureMapMusic() {
-	if (!_soundManager)
-		return -1;
-
-	if (_mapMusicId < 0)
-		_mapMusicId = _soundManager->load(true, Common::Path("#sounds/music/ZMR-MapScreen.wav"), true);
-	if (0 <= _mapMusicId) {
-		if (!_soundManager->isPlaying(_mapMusicId))
-			_soundManager->playLoop(_mapMusicId);
-		_soundManager->setVolume(_mapMusicId, _soundManager->_volumeMusic);
-	}
-	return _mapMusicId;
 }
 
 int Zoombini2Engine::getMusicVolume() const {
@@ -299,14 +279,6 @@ void Zoombini2Engine::saveSoundVolumes(int music, int sfx, int speech) {
 	ConfMan.setInt("sfx_volume", percentToMixerVolume(sfx));
 	ConfMan.setInt("speech_volume", percentToMixerVolume(speech));
 	ConfMan.flushToDisk();
-}
-
-void Zoombini2Engine::stopMapMusic() {
-	if (!_soundManager || _mapMusicId < 0)
-		return;
-	_soundManager->stop(_mapMusicId);
-	_soundManager->unload(_mapMusicId);
-	_mapMusicId = -1;
 }
 
 /**
@@ -378,7 +350,7 @@ Common::Error Zoombini2Engine::run() {
 	syncSoundSettings();
 
 	// Initialize game state
-	_gameState = new GameState();
+	_state = new GameState();
 
 	// Initialize the shared Help, Map, and Go controls.
 	_sidebar = new Sidebar(this);
@@ -574,7 +546,7 @@ void Zoombini2Engine::refreshEngineSettings() {
 }
 
 void Zoombini2Engine::exportZoombiniSet() const {
-	if (_globalZoombinis.empty())
+	if (_state->_activeZoombinis.empty())
 		return;
 
 	Common::FSNode outputNode(Common::Path("zoombini.set"));
@@ -582,9 +554,9 @@ void Zoombini2Engine::exportZoombiniSet() const {
 	if (!output)
 		return;
 
-	output->writeString(Common::String::format("%u\n", _globalZoombinis.size()));
-	for (uint i = 0; i < _globalZoombinis.size(); i++) {
-		const ZoombiniRunner *zoombini = _globalZoombinis[i];
+	output->writeString(Common::String::format("%u\n", _state->_activeZoombinis.size()));
+	for (uint i = 0; i < _state->_activeZoombinis.size(); i++) {
+		const ZoombiniRunner *zoombini = _state->_activeZoombinis[i];
 		if (!zoombini)
 			continue;
 		output->writeString(Common::String::format("%u %u %u %u\n", zoombini->_traits._feet, zoombini->_traits._nose, zoombini->_traits._hair,
@@ -601,7 +573,7 @@ void Zoombini2Engine::importZoombiniSet() {
 		return;
 
 	const uint fileCount = static_cast<uint>(input->readLine().asUint64());
-	const uint importCount = MIN<uint>(fileCount, _globalZoombinis.size());
+	const uint importCount = MIN<uint>(fileCount, _state->_activeZoombinis.size());
 	for (uint i = 0; i < importCount && !input->eos(); i++) {
 		Common::StringTokenizer tokens(input->readLine());
 		byte values[ZmbTrait::kTraitCount];
@@ -615,8 +587,8 @@ void Zoombini2Engine::importZoombiniSet() {
 		}
 		if (!completeTuple)
 			break;
-		if (_globalZoombinis[i])
-			_globalZoombinis[i]->setTraits(ZmbTrait(values[0], values[1], values[2], values[3]));
+		if (_state->_activeZoombinis[i])
+			_state->_activeZoombinis[i]->setTraits(ZmbTrait(values[0], values[1], values[2], values[3]));
 	}
 	delete input;
 }
@@ -628,9 +600,9 @@ void Zoombini2Engine::applyDebugPuzzleCompletion() {
 		_currentPageId == kPageFinal)
 		return;
 
-	for (uint i = 0; i < _globalZoombinis.size(); i++) {
-		if (_globalZoombinis[i])
-			_globalZoombinis[i]->_puzzleStatus = 1;
+	for (uint i = 0; i < _state->_activeZoombinis.size(); i++) {
+		if (_state->_activeZoombinis[i])
+			_state->_activeZoombinis[i]->_puzzleStatus = 1;
 	}
 	_zoombiniWalkingFlag = true;
 	if (_currentPage)
@@ -700,7 +672,6 @@ void Zoombini2Engine::applyPendingPageChange() {
 		return;
 
 	const int requestedPage = _nextPageId;
-	_nextPageId = kPageNone;
 	switchPage(requestedPage);
 
 	// Input collected for the previous page must not reach the replacement page.
@@ -784,8 +755,8 @@ void Zoombini2Engine::drawFrame() {
 }
 
 const ZoombiniRunner *Zoombini2Engine::getDraggedGlobalZoombini() const {
-	for (uint i = 0; i < _globalZoombinis.size(); i++) {
-		const ZoombiniRunner *zoombini = _globalZoombinis[i];
+	for (uint i = 0; i < _state->_activeZoombinis.size(); i++) {
+		const ZoombiniRunner *zoombini = _state->_activeZoombinis[i];
 		if (zoombini && zoombini->_dragging)
 			return zoombini;
 	}
@@ -866,14 +837,9 @@ void Zoombini2Engine::destroyCurrentPage() {
 void Zoombini2Engine::switchPage(int pageId) {
 	debug(1, "Zoombini2: Switching from page %d to page %d", _currentPageId, pageId);
 	if (_currentPageId == kPageBoolies && pageId == kPageMapTrans)
-		recordBooliesCompletion();
-	const bool usesMapMusic = pageId == kPageMenuLoad || pageId == kPageMenuPractice ||
-							  pageId == kPageMenuOptions || pageId == kPageMapScreen ||
-							  pageId == kPageMenuAlt;
-	if (!usesMapMusic)
-		stopMapMusic();
-
+		_state->recordBooliesCompletion();
 	destroyCurrentPage();
+	_nextPageId = kPageNone;
 	_currentPageId = pageId;
 
 	switch (pageId) {
@@ -888,13 +854,13 @@ void Zoombini2Engine::switchPage(int pageId) {
 		_currentPage = new TransitionVideo(this, kPageCutsceneFirst);
 		break;
 	case kPageCutsceneSecond:
-		if (_gameState)
-			_gameState->markRescue1MoviePlayed();
+		if (_state)
+			_state->markRescue1MoviePlayed();
 		_currentPage = new TransitionVideo(this, kPageCutsceneSecond);
 		break;
 	case kPageCutsceneThird:
-		if (_gameState)
-			_gameState->markRescue2MoviePlayed();
+		if (_state)
+			_state->markRescue2MoviePlayed();
 		_currentPage = new TransitionVideo(this, kPageCutsceneThird);
 		break;
 	case kPageTitleScreen:
@@ -972,8 +938,8 @@ void Zoombini2Engine::switchPage(int pageId) {
 
 	if (_currentPage) {
 		_currentPage->init();
-		if (_gameState && kPageZombiniville <= pageId && pageId <= kPageBooliewood)
-			_gameState->_currentGameplayPageId = pageId;
+		if (_state && kPageZombiniville <= pageId && pageId <= kPageBooliewood)
+			_state->_currentGameplayPageId = pageId;
 	}
 }
 

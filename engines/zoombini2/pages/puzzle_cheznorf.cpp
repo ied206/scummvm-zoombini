@@ -93,11 +93,6 @@ PuzzleChezNorf::PuzzleChezNorf(Zoombini2Engine *vm)
 }
 
 PuzzleChezNorf::~PuzzleChezNorf() {
-	if (_musicId >= 0) {
-		SoundManager *snd = _vm->getSoundManager();
-		snd->stop(_musicId);
-		snd->unload(_musicId);
-	}
 	delete _symbOK;
 	delete _symbNO;
 	delete _symbMaybe;
@@ -113,6 +108,7 @@ PuzzleChezNorf::~PuzzleChezNorf() {
 
 	delete _norfDefault;
 	delete _highlightImage;
+	finishPuzzleRoster(_vm->_state->_rescue1Board);
 }
 
 // ============================================================================
@@ -183,15 +179,9 @@ void PuzzleChezNorf::init() {
 	PuzzleBase::init();
 
 	// Start the restaurant music.
-	if (SoundManager *snd = _vm->getSoundManager()) {
-		_musicId = snd->load(true, Common::Path(kMusicPath), true);
-		if (_musicId >= 0) {
-			snd->playLoop(_musicId);
-			snd->setVolume(_musicId, snd->_volumeMusic);
-		}
-	}
+	startPageMusic(Common::Path(kMusicPath));
 
-	_level = _vm->getGameState()->_level;
+	_level = _vm->_state->_level;
 	if (_level < 1)
 		_level = 1;
 	if (_level > 3)
@@ -227,7 +217,9 @@ void PuzzleChezNorf::init() {
 	}
 
 	// Assign zoombinis to tables (one per table, skip first zoombini which is "Norf")
-	for (int i = 0; i < _numTables && i + 1 < (int)_puzzleZoombinis.size(); i++) {
+	const uint tableCount = _numTables;
+	const uint zoombiniCount = _puzzleZoombinis.size();
+	for (uint i = 0; i < tableCount && i + 1 < zoombiniCount; i++) {
 		_tables[i].zoombiniIdx = i + 1;
 	}
 

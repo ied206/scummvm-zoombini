@@ -44,7 +44,7 @@ public:
 	void onUpdate() override;
 	/** Draw the scroll controls, waiting board, and boarding actives. */
 	void onRenderContent(ManagedSurface32 *screen) override;
-	/** Ignore button presses; the original acts on release clicks. */
+	/** Leave button presses pending until the release event. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 	/** Route common pickup and drop first, then scroll and boarding clicks. */
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
@@ -71,7 +71,7 @@ private:
 	static constexpr const char *kPickupZombAnimationPath = "bmp/zombis/pris/pris.anm";
 	static constexpr const char *kIdleZombAnimationPath = "bmp/zombis/attente2/attenteZomb2.anm";
 	static constexpr const char *kAreaMaskPath = "bmp/rescue2/area.bmt";
-	static constexpr const char *kMissingArrivalsSpeechFormat = "sounds/BC222.%d.wav";
+	static constexpr const char *kMissingArrivalsSpeechFormat = "sounds/BC222.%u.wav";
 	static constexpr const char *kReadyDepartureSpeechPath = "sounds/BC213.11.wav";
 
 	/** Number of waiting-grid drop records mirroring the visible board cells. */
