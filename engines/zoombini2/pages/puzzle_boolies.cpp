@@ -97,11 +97,6 @@ PuzzleBoolies::PuzzleBoolies(Zoombini2Engine *vm)
 }
 
 PuzzleBoolies::~PuzzleBoolies() {
-	if (_musicId >= 0) {
-		SoundManager *snd = _vm->getSoundManager();
-		snd->stop(_musicId);
-		snd->unload(_musicId);
-	}
 	delete _ballPosImage;
 	delete _ballNegImage;
 	delete _pinImage;
@@ -120,6 +115,7 @@ PuzzleBoolies::~PuzzleBoolies() {
 	for (int i = 0; i < 5; i++) {
 		delete _spotImage[i];
 	}
+	finishPuzzleRoster(_vm->_state->_rescue2Board);
 }
 
 void PuzzleBoolies::init() {
@@ -127,15 +123,9 @@ void PuzzleBoolies::init() {
 	PuzzleBase::init();
 
 	// Start the Boolie Boggle music.
-	if (SoundManager *snd = _vm->getSoundManager()) {
-		_musicId = snd->load(true, Common::Path(kMusicPath), true);
-		if (_musicId >= 0) {
-			snd->playLoop(_musicId);
-			snd->setVolume(_musicId, snd->_volumeMusic);
-		}
-	}
+	startPageMusic(Common::Path(kMusicPath));
 
-	const int level = _vm->getGameState()->getLevel();
+	const int level = _vm->_state->getLevel();
 	const int rescuedBooliesPerZoombini = getRescuedBooliesPerZoombini(level);
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
 		if (_puzzleZoombinis[i])
@@ -322,12 +312,12 @@ void PuzzleBoolies::setupPins() {
 		}
 	}
 
-	debug(2, "PuzzleBoolies: Setup %d pins", (int)_pins.size());
+	debug(2, "PuzzleBoolies: Setup %u pins", _pins.size());
 }
 
 void PuzzleBoolies::assignZoombinis() {
 	// Ball selection consumes the base-page roster in its existing order.
-	debug(2, "PuzzleBoolies: Retained %d Zoombinis in roster order", static_cast<int>(_puzzleZoombinis.size()));
+	debug(2, "PuzzleBoolies: Retained %u Zoombinis in roster order", _puzzleZoombinis.size());
 }
 
 void PuzzleBoolies::launchBall(int spotIdx) {
@@ -560,10 +550,7 @@ void PuzzleBoolies::drawSpots(ManagedSurface32 *screen) {
 			_vm->_gfx->drawRleBlock(screen, image, Common::Point32(_spots[i].pos.x - 25, _spots[i].pos.y - 25));
 		} else {
 			// Fallback: draw circle
-			_vm->_gfx->fillRect(screen, Common::Rect32(
-						 _spots[i].pos.x - 20, _spots[i].pos.y - 20,
-						 _spots[i].pos.x + 20, _spots[i].pos.y + 20),
-							 0x00FFFF);
+			_vm->_gfx->fillRect(screen, Common::Rect32(_spots[i].pos.x - 20, _spots[i].pos.y - 20, _spots[i].pos.x + 20, _spots[i].pos.y + 20), 0x00FFFF);
 		}
 	}
 }
@@ -598,10 +585,7 @@ void PuzzleBoolies::drawBall(ManagedSurface32 *screen) {
 	} else {
 		// Fallback: draw circle
 		uint32 color = (_activeBall.type == kBallPositive) ? 0x00FF00 : 0xFF0000;
-		_vm->_gfx->fillRect(screen, Common::Rect32(
-						 _activeBall.pos.x - 15, _activeBall.pos.y - 15,
-						 _activeBall.pos.x + 15, _activeBall.pos.y + 15),
-						 color);
+		_vm->_gfx->fillRect(screen, Common::Rect32(_activeBall.pos.x - 15, _activeBall.pos.y - 15, _activeBall.pos.x + 15, _activeBall.pos.y + 15), color);
 	}
 }
 
@@ -613,14 +597,8 @@ void PuzzleBoolies::drawBoat(ManagedSurface32 *screen) {
 		_vm->_gfx->drawRleBlock(screen, _boatImage, _boatPos);
 	} else {
 		// Fallback: draw simple boat shape
-		_vm->_gfx->fillRect(screen, Common::Rect32(
-						 _boatPos.x, _boatPos.y + 20,
-						 _boatPos.x + 80, _boatPos.y + 40),
-						 0x8B4513);
-		_vm->_gfx->fillRect(screen, Common::Rect32(
-						 _boatPos.x + 30, _boatPos.y,
-						 _boatPos.x + 50, _boatPos.y + 30),
-						 0xFFFFFF);
+		_vm->_gfx->fillRect(screen, Common::Rect32(_boatPos.x, _boatPos.y + 20, _boatPos.x + 80, _boatPos.y + 40), 0x8B4513);
+		_vm->_gfx->fillRect(screen, Common::Rect32(_boatPos.x + 30, _boatPos.y, _boatPos.x + 50, _boatPos.y + 30), 0xFFFFFF);
 	}
 }
 

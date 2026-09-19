@@ -36,13 +36,19 @@ class InteractiveBase : public PageBase {
 public:
 	/** Bind an interactive page to @p vm. */
 	explicit InteractiveBase(Zoombini2Engine *vm) : PageBase(vm, PageCategory::kInteractive) {}
+
+protected:
+	/** Resource path. */
+	static constexpr const char *kMapMusicPath = "#sounds/music/ZMR-MapScreen.wav";
+	/** Start this page's map soundtrack. */
+	void startMapMusic() { startPageMusic(Common::Path(kMapMusicPath)); }
 };
 
 /**
  * Manages shared Help, Map, and Go controls shown beside gameplay pages.
  *
- * The group polls the final frame mouse state to draw, hit-test, and consume
- * one pending mouse release for its three controls.
+ * The group uses the current pointer position for normal hover and the
+ * position paired with a pending release for that frame's hit test.
  * It also retains the help overlay, per-frame hover results, and saved screen
  * region needed to draw those controls. Map-return confirmation uses the
  * shared engine confirmation dialog.
@@ -113,7 +119,7 @@ private:
 	bool isInButtonRegion(const Common::Point &pos) const;
 	/** Return whether a drag or page-local state must receive pointer events before the sidebar. */
 	bool isInteractionBlocked() const;
-	/** Update hover state from the final frame mouse position. */
+	/** Update hover state from the pointer position used for this frame's controls. */
 	void updateHoverState(const Common::Point &pos, bool inputAllowed);
 	/** Paint the Help, Map, and Go controls over @p screen. */
 	void drawControls(ManagedSurface32 *screen);
@@ -161,6 +167,8 @@ private:
 	bool _primaryButtonArmed = false;
 	/** Whether a primary-button release awaits this frame's sidebar hit test. */
 	bool _pendingMouseRelease = false;
+	/** Pointer position paired with the pending primary-button release. */
+	Common::Point _pendingMouseReleasePos;
 	/** Go-enabled value observed during the previous draw. */
 	bool _goWasEnabled = false;
 	/** Whether the attention blink currently uses the highlighted sprite. */

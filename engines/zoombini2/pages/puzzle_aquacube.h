@@ -175,7 +175,7 @@ private:
 	/** Planned sequence of direction indices. */
 	Common::Array<int> _warpQueue;
 	/** Index of the warp movement currently being executed. */
-	int _warpQueueIdx = 0;
+	uint _warpQueueIdx = 0;
 
 	/** Direction cursor light. */
 	RleBlock *_lightImage = nullptr;
@@ -271,8 +271,6 @@ private:
 	/** Load all graphics and animations retained until the puzzle is released. */
 	void loadResources();
 
-	/** Music handle used while Aqua Cube is active. */
-	int _musicId = -1;
 };
 
 } // End of namespace Zoombini2

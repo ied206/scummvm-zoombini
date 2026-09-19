@@ -113,7 +113,7 @@ private:
 	Animation *_decorAnims[5] = {};
 
 	/** Puzzle-roster index currently sliding. */
-	int _currentZoombini = 0;
+	uint _currentZoombini = 0;
 	/** Current frame of the active board animation. */
 	int _animFrame = 0;
 	/** Time at which the animation last advanced. */
@@ -131,8 +131,6 @@ private:
 	/** Current automatic sequence phase. */
 	State _state = kStateInit;
 
-	/** Music handle used while Snowboard Gulch is active. */
-	int _musicId = -1;
 };
 
 } // End of namespace Zoombini2

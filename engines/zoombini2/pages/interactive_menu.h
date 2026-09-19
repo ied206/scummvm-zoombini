@@ -295,8 +295,6 @@ private:
 	int _typeSoundId = -1;
 	/** Profile deletion sound. */
 	int _deleteSoundId = -1;
-	/** Shared map music handle requested by this page. */
-	int _mapMusicId = -1;
 
 	/** Volume panel managed by this page while options are open. */
 	VolumePanel *_volumePanel = nullptr;

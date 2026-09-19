@@ -158,11 +158,6 @@ PuzzleAquacube::PuzzleAquacube(Zoombini2Engine *vm)
 }
 
 PuzzleAquacube::~PuzzleAquacube() {
-	if (_musicId >= 0) {
-		SoundManager *snd = _vm->getSoundManager();
-		snd->stop(_musicId);
-		snd->unload(_musicId);
-	}
 	delete _lightImage;
 	for (int i = 0; i < 3; i++)
 		delete _cubeImage[i];
@@ -184,6 +179,7 @@ PuzzleAquacube::~PuzzleAquacube() {
 		delete _fleenImage[i];
 	for (int i = 0; i < 2; i++)
 		delete _flareAnims[i];
+	finishPuzzleRoster(nullptr);
 }
 
 // ============================================================================
@@ -194,15 +190,9 @@ void PuzzleAquacube::init() {
 	PuzzleBase::init();
 
 	// Start the Aqua Cube music.
-	if (SoundManager *snd = _vm->getSoundManager()) {
-		_musicId = snd->load(true, Common::Path(kMusicPath), true);
-		if (_musicId >= 0) {
-			snd->playLoop(_musicId);
-			snd->setVolume(_musicId, snd->_volumeMusic);
-		}
-	}
+	startPageMusic(Common::Path(kMusicPath));
 
-	_level = CLIP(_vm->getGameState()->_level, 1, 4);
+	_level = CLIP(_vm->_state->_level, 1, 4);
 	debug(1, "PuzzleAquacube::init - level %d", _level);
 
 	// Apply the selected level's actor and movement limits.
@@ -285,7 +275,7 @@ void PuzzleAquacube::placeZoombinis() {
 	// Random binary direction choice for each Zoombini.
 	int dirChoices[4];
 
-	int numZoombinis = MIN(_numZoombinisToPlace, (int)_puzzleZoombinis.size());
+	const int numZoombinis = MIN<int>(_numZoombinisToPlace, _puzzleZoombinis.size());
 
 	for (int z = 0; z < numZoombinis; z++) {
 		// Pick a random unused node
@@ -650,7 +640,7 @@ void PuzzleAquacube::finishBallMove() {
 	// If we are executing a warp queue, advance to the next planned move
 	if (_gameState == kStateWarpExecuting) {
 		_warpQueueIdx += 1;
-		if (_warpQueueIdx < static_cast<int>(_warpQueue.size())) {
+		if (_warpQueueIdx < _warpQueue.size()) {
 			int nextDir = _warpQueue[_warpQueueIdx];
 			int adjNode = _nodes[_ballNode].adj[nextDir];
 			if (adjNode >= 0) {
@@ -945,7 +935,7 @@ EventHandleResult PuzzleAquacube::onLButtonDown(const Common::Point &pos) {
 				_warpQueueIdx = 0;
 				_gameState = kStateWarpExecuting;
 				_stateTimer = _vm->getGameTickCount();
-				debug(2, "PuzzleAquacube: Executing warp queue of %d moves", static_cast<int>(_warpQueue.size()));
+				debug(2, "PuzzleAquacube: Executing warp queue of %u moves", _warpQueue.size());
 
 				// Start first move in queue
 				int firstDir = _warpQueue[0];

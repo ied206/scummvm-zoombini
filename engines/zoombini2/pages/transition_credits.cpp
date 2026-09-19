@@ -38,11 +38,6 @@ TransitionCredits::TransitionCredits(Zoombini2Engine *vm)
 }
 
 TransitionCredits::~TransitionCredits() {
-	if (_musicId >= 0) {
-		SoundManager *sm = _vm->getSoundManager();
-		sm->stop(_musicId);
-		sm->unload(_musicId);
-	}
 	delete _background;
 }
 
@@ -68,12 +63,7 @@ void TransitionCredits::init() {
 	_endTime = _vm->getGameTickCount() + kInitialHoldMilliseconds;
 	_lastUpdateTime = _vm->getGameTickCount();
 
-	SoundManager *sm = _vm->getSoundManager();
-	_musicId = sm->load(true, Common::Path(kMusicPath), true);
-	if (_musicId >= 0) {
-		sm->playLoop(_musicId);
-		sm->setVolume(_musicId, sm->_volumeMusic);
-	}
+	startPageMusic(Common::Path(kMusicPath));
 
 	_finished = false;
 }

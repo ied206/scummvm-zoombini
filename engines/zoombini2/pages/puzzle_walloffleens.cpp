@@ -102,11 +102,6 @@ PuzzleWallOfFleens::PuzzleWallOfFleens(Zoombini2Engine *vm)
 }
 
 PuzzleWallOfFleens::~PuzzleWallOfFleens() {
-	if (_musicId >= 0) {
-		SoundManager *snd = _vm->getSoundManager();
-		snd->stop(_musicId);
-		snd->unload(_musicId);
-	}
 	for (int i = 0; i < kNumCannonAngles; i++)
 		delete _cannonImage[i];
 	delete _cannonCache;
@@ -121,6 +116,7 @@ PuzzleWallOfFleens::~PuzzleWallOfFleens() {
 	delete _highlightImage;
 	delete _lavaBubbleAnim;
 	delete _mirrorExplodeAnim;
+	finishPuzzleRoster(_vm->_state->_rescue1Board);
 }
 
 // ============================================================================
@@ -194,24 +190,18 @@ void PuzzleWallOfFleens::init() {
 	debug(1, "PuzzleWallOfFleens::init");
 
 	// Start the Magic Mirrors music.
-	if (SoundManager *snd = _vm->getSoundManager()) {
-		_musicId = snd->load(true, Common::Path(kMusicPath), true);
-		if (_musicId >= 0) {
-			snd->playLoop(_musicId);
-			snd->setVolume(_musicId, snd->_volumeMusic);
-		}
-	}
+	startPageMusic(Common::Path(kMusicPath));
 
 	loadResources();
 
 	// Determine level from the game state (1-based).
-	_level = _vm->getGameState()->_level;
+	_level = _vm->_state->_level;
 	if (_level < 1)
 		_level = 1;
 	if (_level > 4)
 		_level = 4;
 
-	_initialZoombiniCount = (int)_puzzleZoombinis.size();
+	_initialZoombiniCount = _puzzleZoombinis.size();
 	_freedCount = 0;
 	_currentZoombini = 0;
 	_selectedFleen = -1;
@@ -427,7 +417,7 @@ int PuzzleWallOfFleens::countMatchingTraits(int fleenIdx) const {
 	// Count matching visible traits between the selected Fleen and current Zoombini.
 	if (fleenIdx < 0 || fleenIdx >= _numFleens)
 		return 0;
-	if (_currentZoombini < 0 || _currentZoombini >= (int)_puzzleZoombinis.size())
+	if (_puzzleZoombinis.size() <= _currentZoombini)
 		return 0;
 
 	const FleenCell &cell = _fleens[fleenIdx];
@@ -492,7 +482,7 @@ void PuzzleWallOfFleens::missFleen() {
 }
 
 void PuzzleWallOfFleens::advanceToNextZoombini() {
-	_currentZoombini++;
+	_currentZoombini += 1;
 	_selectedFleen = -1;
 	_cannonballProgress = 0;
 
@@ -525,7 +515,7 @@ void PuzzleWallOfFleens::checkCompletion() {
 	}
 
 	// No more zoombinis to try
-	if (_currentZoombini >= (int)_puzzleZoombinis.size()) {
+	if (_currentZoombini >= _puzzleZoombinis.size()) {
 		debug(1, "WallOfFleens: No more zoombinis, transitioning out");
 		_gameState = kStateDone06;
 		_actionTimer = _vm->getGameTickCount();
@@ -548,7 +538,7 @@ EventHandleResult PuzzleWallOfFleens::onLButtonDown(const Common::Point &pos) {
 	if (_gameState != kStateIdle00)
 		return EventHandleResult::kPassthrough;
 
-	if (_currentZoombini >= (int)_puzzleZoombinis.size())
+	if (_puzzleZoombinis.size() <= _currentZoombini)
 		return EventHandleResult::kPassthrough;
 
 	// Check if player clicked on an uncaught fleen cell
@@ -705,7 +695,7 @@ void PuzzleWallOfFleens::onRenderActors(ManagedSurface32 *screen) {
 		return;
 
 	// Draw the current Zoombini beside the cannon.
-	if (_currentZoombini < static_cast<int>(_puzzleZoombinis.size())) {
+	if (_currentZoombini < _puzzleZoombinis.size()) {
 		const ZoombiniRunner *z = _puzzleZoombinis[_currentZoombini];
 		Common::Point32 zoombiniPos(kCannonDrawPos.x - 60, kCannonDrawPos.y + 10);
 		_vm->_gfx->drawZoombini(screen, _zoombiniAnimation, z->_traits, zoombiniPos, 0, 0);
@@ -714,10 +704,11 @@ void PuzzleWallOfFleens::onRenderActors(ManagedSurface32 *screen) {
 	// Draw remaining zoombinis in a queue line
 	const Common::Point32 queueStartPos(50, 550);
 	int spacing = 35;
-	int count = MIN(static_cast<int>(_puzzleZoombinis.size()), 16);
-	for (int i = _currentZoombini + 1; i < count; i++) {
+	const uint count = MIN<uint>(_puzzleZoombinis.size(), 16);
+	for (uint i = _currentZoombini + 1; i < count; i++) {
 		const ZoombiniRunner *z = _puzzleZoombinis[i];
-		Common::Point32 zoombiniPos(queueStartPos.x + (i - _currentZoombini - 1) * spacing, queueStartPos.y);
+		const int queueOffset = static_cast<int>(i - _currentZoombini - 1) * spacing;
+		Common::Point32 zoombiniPos(queueStartPos.x + queueOffset, queueStartPos.y);
 		_vm->_gfx->drawZoombini(screen, _zoombiniAnimation, z->_traits, zoombiniPos, 0, 0);
 	}
 }

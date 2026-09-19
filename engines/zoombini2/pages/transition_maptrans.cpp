@@ -50,11 +50,6 @@ TransitionMapTrans::TransitionMapTrans(Zoombini2Engine *vm)
 
 TransitionMapTrans::~TransitionMapTrans() {
 	cleanupSpeech();
-	if (_musicId >= 0) {
-		SoundManager *snd = _vm->getSoundManager();
-		snd->stop(_musicId);
-		snd->unload(_musicId);
-	}
 	cleanupPaths();
 	delete _compositedBg;
 }
@@ -67,80 +62,80 @@ void TransitionMapTrans::queueSpeech(const Common::String &name) {
 	_speechIds.push_back(sound->load(true, path, false));
 }
 
-void TransitionMapTrans::queueTravelSpeech(PageId sourcePage) {
-	GameState *state = _vm->getGameState();
+void TransitionMapTrans::queueTravelSpeech(PageId srcPage) {
+	GameState *state = _vm->_state;
 	if (!state)
 		return;
 
-	switch (sourcePage) {
+	switch (srcPage) {
 	case kPageZombiniville:
 		if (!state->hasPageVisit(kPageCrazyTurtle, 1)) {
-			queueSpeech("tur11");
+			queueSpeech(kSpeechTur11);
 		} else {
-			queueSpeech(state->hasPageVisit(kPageBooliewood, 1) ? "zbv31.3" : "zbv31.2");
-			queueSpeech(Common::String::format("tur21.%d", getRandomBinarySpeechVariant()));
+			queueSpeech(state->hasPageVisit(kPageBooliewood, 1) ? kSpeechZbv31_3 : kSpeechZbv31_2);
+			queueSpeech(Common::String::format(kSpeechTur21Format, getRandomBinarySpeechVariant()));
 		}
 		break;
 	case kPageCrazyTurtle:
-		queueSpeech(state->hasPageVisit(kPageWaterslide, 1) ? Common::String::format("wsl21.%d", getRandomBinarySpeechVariant()) : "wsl11");
+		queueSpeech(state->hasPageVisit(kPageWaterslide, 1) ? Common::String::format(kSpeechWsl21Format, getRandomBinarySpeechVariant()) : kSpeechWsl11);
 		break;
 	case kPageWaterslide:
 		if (!state->hasPageVisit(kPageAquacube, 1)) {
-			queueSpeech("aqu11.1.1");
-			queueSpeech("aqu11.1.2");
-			queueSpeech("aqu11.1.3");
+			queueSpeech(kSpeechAqu11_1_1);
+			queueSpeech(kSpeechAqu11_1_2);
+			queueSpeech(kSpeechAqu11_1_3);
 		} else {
-			queueSpeech(Common::String::format("aqu21.%d", getRandomBinarySpeechVariant()));
+			queueSpeech(Common::String::format(kSpeechAqu21Format, getRandomBinarySpeechVariant()));
 		}
 		break;
 	case kPageAquacube:
-		queueSpeech("aqu31");
+		queueSpeech(kSpeechAqu31);
 		break;
 	case kPageRescue1:
 		if (_vm->_routeDirection == RouteBranch::kLeft01)
-			queueSpeech(state->hasPageVisit(kPageMagicWall, 1) ? Common::String::format("mgw21.%d", getRandomBinarySpeechVariant()) : "mgw11");
+			queueSpeech(state->hasPageVisit(kPageMagicWall, 1) ? Common::String::format(kSpeechMgw21Format, getRandomBinarySpeechVariant()) : kSpeechMgw11);
 		else
-			queueSpeech(state->hasPageVisit(kPageMysticMarsh, 1) ? Common::String::format("mym21.%d", getRandomBinarySpeechVariant()) : "mym11");
+			queueSpeech(state->hasPageVisit(kPageMysticMarsh, 1) ? Common::String::format(kSpeechMym21Format, getRandomBinarySpeechVariant()) : kSpeechMym11);
 		break;
 	case kPageMysticMarsh:
-		queueSpeech(state->hasPageVisit(kPageWallOfFleens, 1) ? Common::String::format("wlf21.%d", getRandomBinarySpeechVariant()) : "wlf11");
+		queueSpeech(state->hasPageVisit(kPageWallOfFleens, 1) ? Common::String::format(kSpeechWlf21Format, getRandomBinarySpeechVariant()) : kSpeechWlf11);
 		break;
 	case kPageMagicWall:
 		if (!state->hasPageVisit(kPageChezNorf, 1)) {
-			queueSpeech("czn11.1");
-			queueSpeech("czn11.2");
+			queueSpeech(kSpeechCzn11_1);
+			queueSpeech(kSpeechCzn11_2);
 		} else {
-			queueSpeech(Common::String::format("czn21.%d", getRandomBinarySpeechVariant()));
+			queueSpeech(Common::String::format(kSpeechCzn21Format, getRandomBinarySpeechVariant()));
 		}
 		break;
 	case kPageWallOfFleens:
-		queueSpeech("bc211");
+		queueSpeech(kSpeechBc211);
 		break;
 	case kPageChezNorf:
-		queueSpeech("bc212");
+		queueSpeech(kSpeechBc212);
 		break;
 	case kPageRescue2:
 		if (!state->hasPageVisit(kPageSnowboard, 1)) {
-			queueSpeech("swb11");
-			queueSpeech("swb11B");
+			queueSpeech(kSpeechSwb11);
+			queueSpeech(kSpeechSwb11B);
 		} else {
-			queueSpeech(Common::String::format("swb21.%d", getRandomBinarySpeechVariant()));
+			queueSpeech(Common::String::format(kSpeechSwb21Format, getRandomBinarySpeechVariant()));
 		}
 		break;
 	case kPageSnowboard:
 		if (!state->hasPageVisit(kPageBoolies, 1)) {
-			queueSpeech("blp11");
-			queueSpeech("blp11B");
+			queueSpeech(kSpeechBlp11);
+			queueSpeech(kSpeechBlp11B);
 		} else {
-			queueSpeech(Common::String::format("blp21.%d", getRandomBinarySpeechVariant()));
+			queueSpeech(Common::String::format(kSpeechBlp21Format, getRandomBinarySpeechVariant()));
 		}
 		break;
 	case kPageBoolies:
 		if (!state->hasPageVisit(kPageBooliewood, 1)) {
-			queueSpeech("blw11.1");
-			queueSpeech("blw11.3");
+			queueSpeech(kSpeechBlw11_1);
+			queueSpeech(kSpeechBlw11_3);
 		} else {
-			queueSpeech(Common::String::format("blw12.%d", _vm->_rnd->getRandomNumber(2) + 1));
+			queueSpeech(Common::String::format(kSpeechBlw12Format, _vm->_rnd->getRandomNumber(2) + 1));
 		}
 		break;
 	default:
@@ -199,8 +194,8 @@ void TransitionMapTrans::cleanupSpeech() {
 }
 
 void TransitionMapTrans::cleanupPaths() {
-	for (uint i = 0; i < _vm->_globalZoombinis.size(); i++) {
-		ZoombiniRunner *zoombini = _vm->_globalZoombinis[i];
+	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
+		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
 		if (!zoombini)
 			continue;
 		zoombini->clearMovement();
@@ -276,7 +271,7 @@ void TransitionMapTrans::init() {
 	}
 	_patPath = Common::Path(Common::String::format(kRouteFormat, patName.c_str()));
 
-	_targetPageId = getDestPage(src, routeBranch, _vm->getGameState()->_rescuedBoolieCount);
+	_targetPageId = getDestPage(src, routeBranch, _vm->_state->_rescuedBoolieCount);
 	if (_targetPageId == kPageNone) {
 		warning("MapTransition: refusing invalid source/branch combination (%d, %d)",
 				static_cast<int>(src), static_cast<int>(routeBranch));
@@ -294,9 +289,9 @@ void TransitionMapTrans::init() {
 
 	// Preserve the previous page grid for cleanup, then install the map-only grid.
 	const uint32 now = _vm->getGameTickCount();
-	int numZoombinis = static_cast<int>(_vm->_globalZoombinis.size());
-	for (int i = 0; i < numZoombinis; i++) {
-		ZoombiniRunner *zoombini = _vm->_globalZoombinis[i];
+	const uint numZoombinis = _vm->_state->_activeZoombinis.size();
+	for (uint i = 0; i < numZoombinis; i++) {
+		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
 		zoombini->clearMovement();
 		zoombini->_hidden = true;
 		zoombini->_inputEnabled = false;
@@ -307,22 +302,19 @@ void TransitionMapTrans::init() {
 	_nextWalkTime = 0;
 	_completedCount = 0;
 
-	debug(1, "MapTransition: source=%d -> target=%d (region %d, path=%s, zoombinis=%d)",
+	debug(1, "MapTransition: source=%d -> target=%d (region %d, path=%s, zoombinis=%u)",
 		  src, _targetPageId, mapRegion, _patPath.toString().c_str(), numZoombinis);
 	queueTravelSpeech(src);
 
 	// Play transition music
-	_musicId = _vm->getSoundManager()->load(true,
-											Common::Path(kMusicPath), true);
-	if (_musicId >= 0)
-		_vm->getSoundManager()->play(_musicId);
+	startPageMusic(Common::Path(kMusicPath));
 	updateSpeechQueue();
 }
 
 /** Start and advance one independent path per Zoombini with an 800-millisecond stagger. */
 void TransitionMapTrans::walkZoombinis() {
 	uint32 now = _vm->getGameTickCount();
-	int numZoombinis = static_cast<int>(_vm->_globalZoombinis.size());
+	const uint numZoombinis = _vm->_state->_activeZoombinis.size();
 
 	// Start the next Zoombini walking if its strict 800-millisecond gate has passed.
 	if (_nextWalkIndex < numZoombinis && now > _nextWalkTime) {
@@ -330,20 +322,20 @@ void TransitionMapTrans::walkZoombinis() {
 
 		PathObject *path = PathObject::loadFromPAT(_vm, _patPath);
 		if (path) {
-			ZoombiniRunner *zoombini = _vm->_globalZoombinis[_nextWalkIndex];
+			ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[_nextWalkIndex];
 			zoombini->_hidden = false;
 			path->setStepValueForAllSegments(2);
 			zoombini->startMovement(path, now);
 		} else {
-			warning("MapTransition: cannot start walker %d without path '%s'", _nextWalkIndex, _patPath.toString().c_str());
+			warning("MapTransition: cannot start walker %u without path '%s'", _nextWalkIndex, _patPath.toString().c_str());
 			_completedCount += 1;
 		}
 		_nextWalkIndex += 1;
 	}
 
 	// Update all walking zoombinis
-	for (int i = 0; i < numZoombinis; i++) {
-		ZoombiniRunner *zoombini = _vm->_globalZoombinis[i];
+	for (uint i = 0; i < numZoombinis; i++) {
+		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
 		if (!zoombini->_movementPath)
 			continue;
 		if (zoombini->_movementPath->finished) {
@@ -366,13 +358,13 @@ void TransitionMapTrans::onUpdate() {
 }
 
 PageId TransitionMapTrans::getPostTransitionPage() const {
-	GameState *gameState = _vm->getGameState();
+	GameState *gameState = _vm->_state;
 	if (!gameState)
 		return _targetPageId;
 
 	const PageId src = _vm->_mapTransitionSourcePageId;
 	if (src == kPageAquacube && !gameState->hasPlayedRescue1Movie()) {
-		const int zoombiniCount = static_cast<int>(_vm->_globalZoombinis.size()) + gameState->_rescue1ArrivalCount;
+		const int zoombiniCount = static_cast<int>(_vm->_state->_activeZoombinis.size()) + gameState->_rescue1ArrivalCount;
 		if (kRescue1MovieMinimumZoombinis <= zoombiniCount)
 			return kPageCutsceneSecond;
 	}
@@ -402,32 +394,22 @@ void TransitionMapTrans::onRenderContent(ManagedSurface32 *screen) {
 
 void TransitionMapTrans::onRenderActors(ManagedSurface32 *screen) {
 	// Sort walkers by vertical position so lower sprites overlap higher ones.
-	int numZoombinis = static_cast<int>(_vm->_globalZoombinis.size());
-
-	// Build sort order by Y
-	Common::Array<int> drawOrder;
-	for (int i = 0; i < numZoombinis; i++) {
-		const ZoombiniRunner *zoombini = _vm->_globalZoombinis[i];
+	Common::Array<uint> drawOrder;
+	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
+		const ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
 		if (zoombini->_movementPath && !zoombini->_hidden)
 			drawOrder.push_back(i);
 	}
-
-	// The party is small enough for a direct pairwise sort.
-	for (uint i = 0; i < drawOrder.size(); i++) {
-		for (uint j = i + 1; j < drawOrder.size(); j++) {
-			if (_vm->_globalZoombinis[drawOrder[j]]->_screenPos.y < _vm->_globalZoombinis[drawOrder[i]]->_screenPos.y)
-				SWAP(drawOrder[i], drawOrder[j]);
-		}
-	}
+	ZoombiniRunner::sortDrawOrderByY(_vm->_state->_activeZoombinis, drawOrder);
 
 	// Draw each zoombini in Y-sorted order
 	for (uint i = 0; i < drawOrder.size(); i++)
-		_vm->_gfx->drawZoombiniRunner(screen, _vm->_globalZoombinis[drawOrder[i]]);
+		_vm->_gfx->drawZoombiniRunner(screen, _vm->_state->_activeZoombinis[drawOrder[i]]);
 }
 
 void TransitionMapTrans::onActorsRendered() {
-	for (uint i = 0; i < _vm->_globalZoombinis.size(); i++) {
-		ZoombiniRunner *zoombini = _vm->_globalZoombinis[i];
+	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
+		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
 		if (zoombini->_movementPath && !zoombini->_hidden)
 			zoombini->advanceAnimationAfterDraw();
 	}
