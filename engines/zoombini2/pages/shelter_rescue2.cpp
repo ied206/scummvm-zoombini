@@ -117,7 +117,8 @@ void ShelterRescueSite2::refillBoardingRoster() {
 		zoombini->_hidden = false;
 		zoombini->setDefaultAnimation(_littleZombAnimation, 33);
 		if (i < kDepartureSeatCount) {
-			zoombini->setPosition(kSeatPositions[i]);
+			// Seated members stand 36 pixels above the seat-rect origin, matching the seat drop snap.
+			zoombini->setPosition(Common::Point32(kSeatPositions[i].x, kSeatPositions[i].y - 36));
 			_dropTargets[kSeatTargetBase + i].occupied = true;
 			_dropTargets[kSeatTargetBase + i].zoombiniIndex = static_cast<int>(i);
 		} else if (i - kDepartureSeatCount < kDepartureSeatCount) {
@@ -126,6 +127,9 @@ void ShelterRescueSite2::refillBoardingRoster() {
 			zoombini->setPosition(kFloorPositions[kDepartureSeatCount - 1]);
 		}
 	}
+	// A restored roster of at least eight starts the Go blink like the original.
+	if (8 <= _vm->_globalZoombinis.size())
+		_vm->restartGoBlink();
 	refreshGridOccupancy();
 }
 
@@ -134,7 +138,7 @@ void ShelterRescueSite2::buildDropTargets() {
 	for (int col = 0; col < 4; col++) {
 		for (int row = 0; row < 5; row++) {
 			ZoombiniDropTarget target;
-			target.rect = Common::Rect32(kRosterGridBasePos.x + col * 40 + 18, kRosterGridBasePos.y + row * 57 + 30,
+			target.rect = Common::Rect32(kRosterGridBasePos.x + col * 40, kRosterGridBasePos.y + row * 57 + 30,
 										 kRosterGridBasePos.x + col * 40 + 58, kRosterGridBasePos.y + row * 57 + 87);
 			target.occupied = false;
 			target.callback = gridDropCallback;
@@ -211,10 +215,13 @@ void ShelterRescueSite2::seatDropCallback(void *context, int targetIndex, int zo
 	ShelterRescueSite2 *page = static_cast<ShelterRescueSite2 *>(context);
 	if (!page || targetIndex < kSeatTargetBase || kDropTargetCount <= targetIndex)
 		return;
-	if (zoombiniIndex < 0 || static_cast<uint>(zoombiniIndex) < page->_vm->_globalZoombinis.size())
+	if (zoombiniIndex < 0 || page->_vm->_globalZoombinis.size() <= static_cast<uint>(zoombiniIndex))
 		return;
 	const ZoombiniDropTarget &target = page->_dropTargets[targetIndex];
 	page->_vm->_globalZoombinis[zoombiniIndex]->setPosition(Common::Point32(target.rect.left, target.rect.top - 36));
+	// Completing all eight seats starts the Go blink like the original seat drop.
+	if (page->seatsFullyOccupied())
+		page->_vm->restartGoBlink();
 }
 
 void ShelterRescueSite2::captureToBoard(int recordIndex, int zoombiniIndex) {
@@ -234,6 +241,9 @@ void ShelterRescueSite2::captureToBoard(int recordIndex, int zoombiniIndex) {
 	}
 	_pendingReleaseIndex = zoombiniIndex;
 	refreshGridOccupancy();
+	// A full seat row after capture starts the Go blink like the original.
+	if (seatsFullyOccupied())
+		_vm->restartGoBlink();
 }
 
 void ShelterRescueSite2::releasePendingZoombini() {
@@ -241,7 +251,7 @@ void ShelterRescueSite2::releasePendingZoombini() {
 		return;
 	const int releaseIndex = _pendingReleaseIndex;
 	_pendingReleaseIndex = kNoPendingRelease;
-	if (releaseIndex < 0 || static_cast<uint>(releaseIndex) < _vm->_globalZoombinis.size())
+	if (releaseIndex < 0 || _vm->_globalZoombinis.size() <= static_cast<uint>(releaseIndex))
 		return;
 	delete _vm->_globalZoombinis[releaseIndex];
 	_vm->_globalZoombinis.remove_at(releaseIndex);
@@ -284,7 +294,6 @@ bool ShelterRescueSite2::materializeFromBoard(int gridCol, int gridRow, const Co
 }
 
 void ShelterRescueSite2::triggerScrollLeft() {
-	_scrollLeftFlashUntil = _vm->getGameTickCount() + kScrollFlashMilliseconds;
 	if (0 < _scrollRow && hasBoardCellsInRows(0, _scrollRow)) {
 		_scrollPhase = kScrollPhaseLeft04;
 		_scrollPixelsLeft = kScrollPixelLength;
@@ -292,7 +301,6 @@ void ShelterRescueSite2::triggerScrollLeft() {
 }
 
 void ShelterRescueSite2::triggerScrollRight() {
-	_scrollRightFlashUntil = _vm->getGameTickCount() + kScrollFlashMilliseconds;
 	if (_scrollRow + 4 < kBoardRows && hasBoardCellsInRows(_scrollRow + 3, kBoardRows - 1)) {
 		_scrollPhase = kScrollPhaseRight06;
 		_scrollPixelsLeft = kScrollPixelLength;
@@ -382,11 +390,11 @@ void ShelterRescueSite2::drawBoardingActives(ManagedSurface32 *screen) const {
 		if (zoombini->_hidden)
 			continue;
 		zoombini->tryStartIdleAnimation(_idleZombAnimation, *_vm->_rnd, _vm->getGameTickCount());
-		zoombini->draw(screen, _vm->getAlphaLUT());
+		_vm->_gfx->drawZoombiniRunner(screen, zoombini);
 		zoombini->advanceAnimationAfterDraw();
 	}
 	if (draggedZoombini && !draggedZoombini->_hidden) {
-		draggedZoombini->draw(screen, _vm->getAlphaLUT());
+		_vm->_gfx->drawZoombiniRunner(screen, draggedZoombini);
 		draggedZoombini->advanceAnimationAfterDraw();
 	}
 }
@@ -394,7 +402,6 @@ void ShelterRescueSite2::drawBoardingActives(ManagedSurface32 *screen) const {
 void ShelterRescueSite2::drawWaitingBoard(ManagedSurface32 *screen, int pixelShiftX) const {
 	if (!_littleZombAnimation)
 		return;
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	BoardRecord *const *board = getRescueBoard();
 	int startCol = -2;
 	if (_scrollRow == 1)
@@ -412,28 +419,17 @@ void ShelterRescueSite2::drawWaitingBoard(ManagedSurface32 *screen, int pixelShi
 			const int boardIndex = (_scrollRow + col) * kBoardCols + row;
 			if (boardIndex < 0 || kBoardRows * kBoardCols <= boardIndex || !board[boardIndex])
 				continue;
-			_littleZombAnimation->drawZoombini(screen, board[boardIndex]->getTraits(),
-											   Common::Point32(kRosterGridBasePos.x + col * 40 + 18 + pixelShiftX, kRosterGridBasePos.y + row * 57 + 30),
-											   33, 0, lut, &clip);
+			_vm->_gfx->drawZoombini(screen, _littleZombAnimation, board[boardIndex]->getTraits(),
+								   Common::Point32(kRosterGridBasePos.x + col * 40 + 18 + pixelShiftX, kRosterGridBasePos.y + row * 57 + 30),
+								   33, 0, &clip);
 		}
 	}
 }
 
 void ShelterRescueSite2::onRenderContent(ManagedSurface32 *screen) {
-	const uint32 tick = _vm->getGameTickCount();
-	if (_buttonUp && 0 < _buttonUp->getFrameCount()) {
-		const int frame = (tick < _scrollLeftFlashUntil && 1 < _buttonUp->getFrameCount()) ? 1 : 0;
-		const RleBlock *frameBlock = _buttonUp->getFrame(frame);
-		if (frameBlock)
-			frameBlock->drawToScreen(screen, _buttonUpPos, _vm->getAlphaLUT());
-	}
-
-	if (_buttonDown && 0 < _buttonDown->getFrameCount()) {
-		const int frame = (tick < _scrollRightFlashUntil && 1 < _buttonDown->getFrameCount()) ? 1 : 0;
-		const RleBlock *frameBlock = _buttonDown->getFrame(frame);
-		if (frameBlock)
-			frameBlock->drawToScreen(screen, _buttonDownPos, _vm->getAlphaLUT());
-	}
+	// Recompose translucent sprites over a clean background instead of the previous frame.
+	_vm->_gfx->fillRect(screen, Common::Rect32(screen->w, screen->h), 0);
+	_vm->_gfx->drawBackground(screen, Common::Point32(0, 0));
 
 	if (_scrollPhase != kScrollIdle && _vm->_gfx->hasBackground()) {
 		const int shift = (_scrollPhase == kScrollPhaseLeft04 ? 1 : -1) * (kScrollPixelLength - _scrollPixelsLeft);
@@ -443,12 +439,35 @@ void ShelterRescueSite2::onRenderContent(ManagedSurface32 *screen) {
 	} else {
 		drawWaitingBoard(screen, 0);
 	}
+	// The original draws the door-selection overlay over the waiting grid on every grid update, beneath the scroll controls.
+	if (RleBlock *porteSelect = getPorteSelector())
+		porteSelect->drawToScreen(screen, kRosterGridBasePos, _vm->getAlphaLUT());
+
+	// The original shows frame 1 on an idle button and frame 0 only while that
+	// button's own scroll animation is running.
+	if (_buttonUp && 0 < _buttonUp->getFrameCount()) {
+		const int frame = (1 < _buttonUp->getFrameCount()) ? ((_scrollPhase == kScrollPhaseLeft04) ? 0 : 1) : 0;
+		const RleBlock *frameBlock = _buttonUp->getFrame(frame);
+		if (frameBlock)
+			frameBlock->drawToScreen(screen, _buttonUpPos, _vm->getAlphaLUT());
+	}
+
+	if (_buttonDown && 0 < _buttonDown->getFrameCount()) {
+		const int frame = (1 < _buttonDown->getFrameCount()) ? ((_scrollPhase == kScrollPhaseRight06) ? 0 : 1) : 0;
+		const RleBlock *frameBlock = _buttonDown->getFrame(frame);
+		if (frameBlock)
+			frameBlock->drawToScreen(screen, _buttonDownPos, _vm->getAlphaLUT());
+	}
+
 	drawBoardingActives(screen);
 }
 
 EventHandleResult ShelterRescueSite2::onLButtonDown(const Common::Point &pos) {
-	(void)pos;
-	return EventHandleResult::kPassthrough;
+	// The original picks members up on the pressed frame, so start the drag here.
+	// Releases only finish a drag already in progress through onLButtonUp.
+	const ZoombiniInputResult inputResult = ZoombiniRunner::handlePointerInput(_vm->_globalZoombinis, Common::Point32(pos.x, pos.y), true,
+																			   _pickupZombAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
+	return inputResult != ZoombiniInputResult::kIgnored00 ? EventHandleResult::kConsumed : EventHandleResult::kPassthrough;
 }
 
 EventHandleResult ShelterRescueSite2::onLButtonUp(const Common::Point &pos) {

@@ -110,6 +110,7 @@ constexpr Size32(const Size16 &size) : SizeBase(static_cast<int32>(size.width), 
 END_SIZE_TYPE(int32, Size32)
 
 class Zoombini2Engine;
+class AlphaBlendLUT;
 class SoundManager;
 class Animation;
 class AnimationRunner;
@@ -132,73 +133,109 @@ public:
 
 	/** Create a managed surface in the current game screen format. */
 	ManagedSurface32 *createSurface(const Size32 &size) const;
-	/** Copy the current game screen into @p destination. */
-	void captureScreen(ManagedSurface32 *destination) const;
+	/** Copy the current game screen into @p destSurface. */
+	void captureScreen(ManagedSurface32 *destSurface) const;
 	/** Copy @p source onto the current game screen. */
-	void copyToScreen(const ManagedSurface32 &source) const;
-	/** Capture a rectangle from the current game screen at the destination origin. */
-	void captureScreenRegion(ManagedSurface32 *destination, const Common::Rect &sourceRect) const;
-	/** Restore @p source onto the current game screen at @p destination. */
-	void copyRegionToScreen(const ManagedSurface32 &source, const Common::Point &destination) const;
+	void copyToScreen(const ManagedSurface32 &srcSurface) const;
+	/** Capture a rectangle from the current game screen at the destSurface origin. */
+	void captureScreenRegion(ManagedSurface32 *destSurface, const Common::Rect &srcRect) const;
+	/** Restore @p source onto the current game screen at @p destSurface. */
+	void copyRegionToScreen(const ManagedSurface32 &srcSurface, const Common::Point &destSurface) const;
 
 	/** Draw an uncompressed bitmap through the shared Z2 rendering boundary. */
-	void drawBitBlock(ManagedSurface32 *destination, const BitBlock *bitmap, const Common::Point32 &position) const;
+	void drawBitBlock(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos) const;
 	/** Draw one bitmap sub-rectangle through the shared Z2 rendering boundary. */
-	void drawBitBlockSubRect(ManagedSurface32 *destination, const BitBlock *bitmap, const Common::Point32 &position, const Common::Rect &sourceRect) const;
+	void drawBitBlockSubRect(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos, const Common::Rect &srcRect) const;
 	/** Load the active page background, replacing any previous one. */
 	bool loadBackground(const Common::Path &path);
 	/** Release the active page background. */
 	void clearBackground();
 	/** Return whether a page background is loaded. */
 	bool hasBackground() const { return _background != nullptr; }
-	/** Draw the loaded page background at @p position. */
-	void drawBackground(ManagedSurface32 *destination, const Common::Point32 &position) const;
-	/** Draw a sub-rectangle of the loaded page background at @p position. */
-	void drawBackgroundSubRect(ManagedSurface32 *destination, const Common::Point32 &position, const Common::Rect &sourceRect) const;
+	/** Draw the loaded page background at @p pos. */
+	void drawBackground(ManagedSurface32 *destSurface, const Common::Point32 &pos) const;
+	/** Draw a sub-rectangle of the loaded page background at @p pos. */
+	void drawBackgroundSubRect(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect &srcRect) const;
 	/** Return the page layer collection released with the graphics interface. */
 	PageLayerStack *getPageLayerStack() const { return _pageLayerStack; }
 	/** Remove every page layer and reset transient stack state. */
 	void clearPageLayers();
 	/** Draw an RLE sprite through the shared Z2 rendering boundary. */
-	void drawRleBlock(ManagedSurface32 *destination, const RleBlock *sprite, const Common::Point32 &position) const;
+	void drawRleBlock(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos) const;
 	/** Draw one frame from an animation through the shared Z2 rendering boundary. */
-	void drawAnimationFrame(ManagedSurface32 *destination, const Animation *animation, int frameIndex, const Common::Point32 &position) const;
+	void drawAnimationFrame(ManagedSurface32 *destSurface, const Animation *animation, int frameIndex, const Common::Point32 &pos) const;
 	/** Draw and advance one general-object animation runner. */
-	void drawAndUpdateAnimationRunner(ManagedSurface32 *destination, AnimationRunner *runner, uint32 tickCount, int scrollX, int backgroundWidth) const;
-	/** Draw a Zoombini body and trait stack through the shared Z2 rendering boundary. */
-	void drawZoombini(ManagedSurface32 *destination, const ZoombiniAnimation *animation, const ZmbTrait &traits, const Common::Point32 &position, int cell, int frame, const Common::Rect32 *clip = nullptr) const;
-	/** Draw one active Zoombini runner through the shared Z2 rendering boundary. */
-	void drawZoombiniRunner(ManagedSurface32 *destination, const ZoombiniRunner *runner) const;
-	/** Draw bitmap-font text and return its horizontal pixel advance. */
-	int drawString(ManagedSurface32 *destination, const BitmapFont *font, const Common::Point32 &position, const Common::String &text) const;
-	/** Draw the held Zoombini name plate centered at the bottom of @p destination. */
-	void drawDragNameTooltip(ManagedSurface32 *destination, const Common::String &name);
-	/** Black out @p destination where @p areaMask rejects drops, or everywhere when @p areaMask is nullptr. */
-	void maskRejectedArea(ManagedSurface32 *destination, const AreaMask *areaMask);
+	void drawAndUpdateAnimationRunner(ManagedSurface32 *destSurface, AnimationRunner *runner, uint32 tickCount, int scrollX, int bgWidth) const;
+	/** Compose body, Feet, Nose, Hair and Eyes, retaining frame zero for single-frame entries. */
+	void drawZoombini(ManagedSurface32 *destSurface, const ZoombiniAnimation *animation, const ZmbTrait &traits,
+					  const Common::Point32 &pos, int cell, int frame, const Common::Rect32 *clip = nullptr) const;
+	/** Compose the same layers with an explicit blend table for compatibility callers. */
+	static void drawZoombini(ManagedSurface32 *destSurface, const ZoombiniAnimation *animation, const ZmbTrait &traits,
+							 const Common::Point32 &pos, int cell, int frame, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip = nullptr);
+	/**
+	 * Compose the large picker preview as body, Feet, Hair, Eyes and Nose at frame zero.
+	 * Unlike @ref Gfx::drawZoombini, only selected values 1 through 5 add feature layers.
+	 */
+	void drawZoombiniPreview(ManagedSurface32 *destSurface, const ZoombiniAnimation *animation,
+							 const int (&selectedValues)[ZmbTrait::kTraitCount], const Common::Point32 &pos) const;
+	/** Compose the same picker preview with an explicit blend table. */
+	static void drawZoombiniPreview(ManagedSurface32 *destSurface, const ZoombiniAnimation *animation,
+									const int (&selectedValues)[ZmbTrait::kTraitCount], const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT);
+	/** Draw one visible runner at its scrolled or dragged anchor without advancing animation. */
+	void drawZoombiniRunner(ManagedSurface32 *destSurface, const ZoombiniRunner *runner, const Common::Rect32 *clip = nullptr,
+							int scrollX = 0, int backgroundWidth = 800, const RleBlock *dropTargetIndicator = nullptr) const;
+	/** Apply runner visibility, bounds and frame selection with an explicit blend table. */
+	static void drawZoombiniRunner(ManagedSurface32 *destSurface, const ZoombiniRunner *runner, const AlphaBlendLUT &alphaLUT,
+								 const Common::Rect32 *clip = nullptr, int scrollX = 0, int backgroundWidth = 800,
+								 const RleBlock *dropTargetIndicator = nullptr);
+	/** Color variants of the shared bitmap text strip. */
+	enum class TextColor {
+		kDark00 = 0,
+		kBlue01 = 1,
+		kGreen02 = 2,
+		kWhite03 = 3
+	};
+
+	/** Load the shared text strip on demand; failed loads can be retried by the caller. */
+	bool loadTextFont(TextColor color);
+	/** Return whether the shared text strip is ready. */
+	bool hasTextFont(TextColor color) const;
+	/** Draw bitmap text tinted with @p color and return its horizontal advance. */
+	int drawText(ManagedSurface32 *destSurface, TextColor color, const Common::Point32 &pos, const Common::String &text) const;
+	/** Measure text with the same glyph advances used by @ref Gfx::drawText. */
+	int getTextWidth(const Common::String &text, TextColor color) const;
+	/** Draw the held Zoombini name plate centered at the bottom of @p destSurface. */
+	void drawDragNameTooltip(ManagedSurface32 *destSurface, const Common::String &name);
+	/** Black out @p destSurface where @p areaMask rejects drops, or everywhere when @p areaMask is nullptr. */
+	void maskRejectedArea(ManagedSurface32 *destSurface, const AreaMask *areaMask);
 	/** Fill a clipped rectangle through the shared Z2 rendering boundary. */
-	void fillRect(ManagedSurface32 *destination, const Common::Rect32 &rect, uint32 color) const;
+	void fillRect(ManagedSurface32 *destSurface, const Common::Rect32 &rect, uint32 color) const;
 	/** Fill a 16-bit API-boundary rectangle through the shared Z2 rendering boundary. */
-	void fillRect(ManagedSurface32 *destination, const Common::Rect &rect, uint32 color) const;
+	void fillRect(ManagedSurface32 *destSurface, const Common::Rect &rect, uint32 color) const;
 	/** Draw a clipped rectangular outline through the shared Z2 rendering boundary. */
-	void frameRect(ManagedSurface32 *destination, const Common::Rect32 &rect, uint32 color) const;
+	void frameRect(ManagedSurface32 *destSurface, const Common::Rect32 &rect, uint32 color) const;
 	/** Draw a 16-bit API-boundary rectangular outline through the shared Z2 rendering boundary. */
-	void frameRect(ManagedSurface32 *destination, const Common::Rect &rect, uint32 color) const;
+	void frameRect(ManagedSurface32 *destSurface, const Common::Rect &rect, uint32 color) const;
 	/** Draw a line through the shared Z2 rendering boundary. */
-	void drawLine(ManagedSurface32 *destination, const Common::Point32 &start, const Common::Point32 &end, uint32 color) const;
+	void drawLine(ManagedSurface32 *destSurface, const Common::Point32 &start, const Common::Point32 &end, uint32 color) const;
 
 	/** Create the route-map background with all state-dependent overlays applied. */
-	ManagedSurface32 *createMapTransitionBackground(PageId sourcePage, int mapRegion, RouteBranch routeBranch);
+	ManagedSurface32 *createMapTransitionBackground(PageId srcPageId, int mapRegion, RouteBranch routeBranch);
 
 private:
-	/** Load, draw, and release one cached map-overlay RLE sprite. */
-	void drawOverlaySprite(ManagedSurface32 *dst, const Common::String &name, const Common::Point32 &pos);
-	/** Compose the route-map overlays appropriate to the current progress. */
-	void drawMapOverlays(ManagedSurface32 *dst, PageId sourcePage, int mapRegion, RouteBranch routeBranch);
+	/** Bitmap strip shared by all UI text colors. */
+	static constexpr const char *kTextFontPath = "bmp/typo";
+	/** Single coverage-mask glyph set tinted per draw, retained until graphics shutdown. */
+	BitmapFont *_textFont = nullptr;
 
+	/** Load, draw, and release one cached map-overlay RLE sprite. */
+	void drawOverlaySprite(ManagedSurface32 *destSurface, const Common::String &name, const Common::Point32 &pos);
+	/** Compose the route-map overlays appropriate to the current progress. */
+	void drawMapOverlays(ManagedSurface32 *destSurface, PageId srcPageId, int mapRegion, RouteBranch routeBranch);
+	/** Return the tint channels for one text color. */
+	static void textColorRGB(TextColor color, byte &red, byte &green, byte &blue);
 	/** Name-plate sprite drawn under the held Zoombini name. */
 	RleBlock *_nameBoxSprite = nullptr;
-	/** Shared tooltip font drawn over the name plate. */
-	BitmapFont *_tooltipFont = nullptr;
 	/** Active page background released with the graphics interface. */
 	BitBlock *_background = nullptr;
 	/** Page layer collection released with the graphics interface. */
@@ -232,8 +269,8 @@ public:
 	void fillRect(const Common::Rect32 &rect, uint32 color);
 	/** Draw a 32-bit rectangular outline after clipping it to this surface. */
 	void frameRect(const Common::Rect32 &rect, uint32 color);
-	/** Copy a managed surface at a 32-bit destination pos after clipping. */
-	void blitFrom(const ManagedSurface32 &src, const Common::Point32 &destPos);
+	/** Copy a managed surface at a 32-bit destSurface pos after clipping. */
+	void blitFrom(const ManagedSurface32 &srcSurface, const Common::Point32 &destPos);
 };
 
 /**
@@ -249,15 +286,15 @@ public:
  *
  * `factor` is the coefficient applied to one channel. It is an opacity mask
  * when producing a premultiplied source contribution, or an inverse-alpha
- * value when retaining the destination contribution. `value` is one 8-bit
+ * value when retaining the destSurface contribution. `value` is one 8-bit
  * color channel.
  *
  * A mode-1 RLE pixel stores premultiplied BGR in its first three bytes and
  * inverse alpha in its fourth byte. RLE drawing therefore computes
- * `source + scale(inverseAlpha, destination)` for each channel. The
+ * `source + scale(inverseAlpha, destSurface)` for each channel. The
  * @ref BitBlock::drawRleMaskBlend method has an uncompressed bitmap and a
  * separate mask, so it computes
- * `scale(mask, source) + scale(255 - mask, destination)` instead.
+ * `scale(mask, source) + scale(255 - mask, destSurface)` instead.
  *
  * The table is populated once because these products are needed for every
  * blended color channel. A lookup avoids repeating multiplication and
@@ -277,7 +314,7 @@ public:
 	 * Return `floor(factor * value / 256)` for two byte-sized values.
 	 *
 	 * @param factor Opacity or inverse-alpha coefficient.
-	 * @param value Source or destination color-channel value.
+	 * @param value Source or destSurface color-channel value.
 	 */
 	byte scale(byte factor, byte value) const { return _values[factor][value]; }
 
@@ -290,8 +327,8 @@ private:
  * Uncompressed RGBA bitmap with an optional alpha mask.
  *
  * A BitBlock may be loaded from a color BMP, a color-and-alpha BMP pair, or
- * the game's cached BB format. Drawing clips source pixels to the destination
- * surface and preserves the destination outside the covered region.
+ * the game's cached BB format. Drawing clips source pixels to the destSurface
+ * surface and preserves the destSurface outside the covered region.
  */
 class BitBlock {
 public:
@@ -319,24 +356,24 @@ public:
 	void createEmpty(const Size32 &size, bool withAlpha);
 
 	/** Draw the full bitmap without alpha blending at @p pos. */
-	void drawToSurface(ManagedSurface32 *dst, const Common::Point32 &pos) const;
+	void drawToSurface(ManagedSurface32 *destSurface, const Common::Point32 &pos) const;
 	/** Draw @p srcRect from this bitmap without alpha blending at @p pos. */
-	void drawSubRect(ManagedSurface32 *dst, const Common::Point32 &pos, const Common::Rect &srcRect) const;
+	void drawSubRect(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect &srcRect) const;
 	/**
 	 * Draw the full bitmap with the separate-mask `/255` blend rule at @p pos.
 	 *
-	 * The source channel is added as supplied, while the destination channel is
+	 * The source channel is added as supplied, while the destSurface channel is
 	 * scaled by `(255 - mask) / 255`; this path intentionally does not use the
 	 * RLE `/256` lookup table.
 	 */
-	void drawAlphaBlend(ManagedSurface32 *dst, const Common::Point32 &pos) const;
+	void drawAlphaBlend(ManagedSurface32 *destSurface, const Common::Point32 &pos) const;
 	/**
 	 * Draw a bitmap-mask pair at @p pos using the RLE premultiplied blend rule.
 	 *
-	 * @p alphaLUT scales the raw source channel by the mask and the destination
+	 * @p alphaLUT scales the raw source channel by the mask and the destSurface
 	 * channel by the mask's inverse, using the renderer's `/256` rule.
 	 */
-	void drawRleMaskBlend(ManagedSurface32 *dst, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const;
+	void drawRleMaskBlend(ManagedSurface32 *destSurface, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const;
 
 	/** Return the bitmap dimensions in pixels. */
 	const Size32 &getSize() const { return _size; }
@@ -361,6 +398,8 @@ private:
 	/** Optional one-byte-per-pixel alpha storage held by this bitmap, or nullptr. */
 	byte *_alphaMap = nullptr;
 
+	/** Clip a bitmap region in 32-bit coordinates and convert its opaque pixels through the shared blitter. */
+	void drawOpaque(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &srcRect) const;
 	/** Decode a 24-bit BMP from @p stream through the shared image decoder. */
 	bool loadColorBMP(Common::SeekableReadStream *stream);
 	/** Decode an indexed alpha-mask BMP from @p stream through the shared image decoder. */
@@ -368,12 +407,12 @@ private:
 	/** Exchange bitmap buffer state with @p other. */
 	void swapData(BitBlock &other);
 	/**
-	 * Blend one bitmap channel with the destination through a separate mask.
+	 * Blend one bitmap channel with the destSurface through a separate mask.
 	 *
-	 * The source channel is added as supplied, and only the destination is
+	 * The source channel is added as supplied, and only the destSurface is
 	 * scaled by the mask's inverse using integer `/255` division.
 	 */
-	static byte blendChannel(byte src, byte dest, byte mask);
+	static byte blendChannel(byte srcSurface, byte dest, byte mask);
 };
 
 /**
@@ -384,7 +423,7 @@ private:
  * and expanded four-byte pixel records. Mode-1 records store premultiplied BGR
  * plus inverse alpha, which is composited through an @ref AlphaBlendLUT.
  * Drawing clips malformed or off-screen spans instead of writing outside the
- * destination surface.
+ * destSurface surface.
  */
 class RleBlock {
 public:
@@ -400,7 +439,7 @@ public:
 	/** Resolve @p basePath to an RB cache path and load it. */
 	bool load(const Common::Path &basePath);
 	/** Load the recoverable prefix of an ANM frame with a trusted size boundary. */
-	bool loadAnmFrame(Common::SeekableReadStream *stream, uint32 outerSize);
+	bool loadAnimationFrame(Common::SeekableReadStream *stream, uint32 outerSize);
 
 	/**
 	 * Draw this frame at @p pos using opaque copies or lookup-table blending.
@@ -408,14 +447,14 @@ public:
 	 * Mode-1 spans use their premultiplied BGR channels and inverse-alpha byte
 	 * with @p alphaLUT.
 	 */
-	void drawToScreen(ManagedSurface32 *dst, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const;
+	void drawToScreen(ManagedSurface32 *destSurface, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const;
 	/**
 	 * Draw this frame inside @p clip using opaque copies or lookup-table blending.
 	 *
 	 * Mode-1 spans use their premultiplied BGR channels and inverse-alpha byte
 	 * with @p alphaLUT.
 	 */
-	void drawToScreenClipped(ManagedSurface32 *dst, const Common::Point32 &pos, const Common::Rect32 &clip, const AlphaBlendLUT &alphaLUT) const;
+	void drawToScreenClipped(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &clip, const AlphaBlendLUT &alphaLUT) const;
 
 	/** Return the frame dimensions in pixels. */
 	const Size32 &getSize() const { return _size; }
@@ -441,13 +480,13 @@ private:
 	/** Expand complete encoded spans and report whether a malformed tail was discarded. */
 	static bool expand3to4bpp(const byte *srcData, uint32 srcSize, byte *&expandedData, uint32 &expandedSize, bool &salvaged);
 	/**
-	 * Add one premultiplied source channel to the destination scaled by @p inverseAlpha.
+	 * Add one premultiplied source channel to the destSurface scaled by @p inverseAlpha.
 	 *
 	 * Mode-1 RLE pixels store the premultiplied source channel directly, so only
-	 * the destination term needs an @p alphaLUT lookup.
+	 * the destSurface term needs an @p alphaLUT lookup.
 	 * The sum is saturated at 255.
 	 */
-	static byte blendChannel(byte src, byte dest, byte inverseAlpha, const AlphaBlendLUT &alphaLUT);
+	static byte blendChannel(byte srcSurface, byte dest, byte inverseAlpha, const AlphaBlendLUT &alphaLUT);
 	/** Exchange frame buffer state with @p other. */
 	void swapData(RleBlock &other);
 };
@@ -539,7 +578,7 @@ public:
 	int getFrameCount(int cellIndex) const;
 	/** Return the base layer's dimensions for one Zoombini cell and frame. */
 	Size32 getSpriteSize(int cell, int frame) const;
-	/** Draw body and trait layers, retaining frame zero for single-frame entries and honoring an optional clip rectangle. */
+	/** Forward legacy drawing calls to @ref Gfx::drawZoombini with the supplied blend table and clip. */
 	void drawZoombini(ManagedSurface32 *screen, const ZmbTrait &traits, const Common::Point32 &pos,
 					  int cell, int frame, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip = nullptr) const;
 
@@ -589,7 +628,7 @@ public:
 							const Common::Path &hoverPath = Common::Path(), const Common::Path &hoverMask = Common::Path(),
 							const Common::Path &disabledPath = Common::Path(), const Common::Path &disabledMask = Common::Path());
 
-	/** Set the button rectangle from a screen position and size. */
+	/** Set the button rectangle from a screen pos and size. */
 	void setRect(const Common::Point32 &pos, const Size32 &size);
 	/** Replace the button rectangle with @p rect. */
 	void setRect(const Common::Rect &rect);
@@ -608,7 +647,7 @@ public:
 	 * @return Zero when not hovered, two when newly hovered, or one when the
 	 * pointer remains over the button from the preceding draw.
 	 */
-	int drawAndHitTest(ManagedSurface32 *dst, const Common::Point32 &mousePos, const AlphaBlendLUT &alphaLUT);
+	int drawAndHitTest(ManagedSurface32 *destSurface, const Common::Point32 &mousePos, const AlphaBlendLUT &alphaLUT);
 
 	/** Return whether @p pos is inside the button rectangle. */
 	bool containsPoint(const Common::Point32 &pos) const;
@@ -683,6 +722,10 @@ enum MenuButtonId {
  * The supported glyph sequence contains uppercase letters, lowercase letters,
  * digits, and eighteen punctuation characters. Spaces and unsupported bytes
  * advance by @ref BitmapFont::kSpaceWidth without drawing.
+ *
+ * The strip is loaded once and only its per-pixel coverage masks are retained.
+ * The glyph color is a uniform tint applied at draw time, so this single glyph
+ * set serves every text color.
  */
 class BitmapFont {
 public:
@@ -693,14 +736,11 @@ public:
 
 	/** Construct an unloaded font bound to @p vm. */
 	explicit BitmapFont(Zoombini2Engine *vm);
-	/** Release every extracted glyph bitmap. */
-	~BitmapFont();
 
-	/** Load a BMT color-and-alpha pair and color its extracted glyphs. */
-	bool load(const Common::Path &basePath, byte red, byte green, byte blue);
-	/** Draw @p text at @p pos and return its horizontal pixel advance. */
-	int drawString(ManagedSurface32 *dst, const Common::Point32 &pos, const Common::String &text,
-				   const AlphaBlendLUT &alphaLUT) const;
+	/** Load the BMT color-and-alpha pair and extract the coverage masks. */
+	bool load(const Common::Path &basePath);
+	/** Draw @p text tinted with @p color at @p pos and return its horizontal pixel advance. */
+	int drawString(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::String &text, byte red, byte green, byte blue, const AlphaBlendLUT &alphaLUT) const;
 	/** Return the horizontal pixel advance for @p text without drawing it. */
 	int getStringWidth(const Common::String &text) const;
 	/** Return the glyph index for @p character, or -1 when it is unsupported. */
@@ -713,8 +753,28 @@ private:
 	Zoombini2Engine *_vm;
 	/** Whether the font strip has been processed. */
 	bool _loaded = false;
-	/** Glyph bitmaps held by this font in character-mapping order. */
-	BitBlock *_glyphs[kNumGlyphs] = {};
+	/** One extracted glyph: its coverage mask and dimensions. */
+	struct Glyph {
+		/** Per-pixel coverage, 0 (transparent) through 255 (opaque). */
+		byte *mask = nullptr;
+		/** Glyph width in pixels. */
+		int width = 0;
+		/** Glyph height in pixels. */
+		int height = 0;
+		/** Release the coverage mask. */
+		~Glyph() { delete[] mask; }
+	};
+	/** Glyph coverage masks held by this font in character-mapping order. */
+	Glyph _glyphs[kNumGlyphs];
+
+	/**
+	 * Draw one glyph's coverage mask tinted with @p color at @p pos.
+	 *
+	 * Full-coverage pixels copy the tint; partial-coverage pixels add the
+	 * tint scaled by the coverage and the destination scaled by its inverse,
+	 * matching the RLE premultiplied blend rule.
+	 */
+	void drawGlyph(ManagedSurface32 *destSurface, const Glyph &glyph, const Common::Point32 &pos, byte red, byte green, byte blue, const AlphaBlendLUT &alphaLUT) const;
 };
 
 /** Result of one @ref VolumePanel input-and-draw pass. */
@@ -772,20 +832,20 @@ public:
 	/** Play the category-specific sample for the most recently released slider. */
 	void playPreviewSound();
 	/** Paint the panel without applying input or changing audio. */
-	void draw(ManagedSurface32 *dst, const Common::Point32 &mousePos, const AlphaBlendLUT &alphaLUT);
+	void draw(ManagedSurface32 *destSurface, const Common::Point32 &mousePos, const AlphaBlendLUT &alphaLUT);
 
 	/** Return the current music volume percentage. */
-	int getMusicVolume() const { return _musicVolume; }
+	int getMusicVolume() const { return _settings._music; }
 	/** Return the current sound-effect volume percentage. */
-	int getSfxVolume() const { return _sfxVolume; }
+	int getSfxVolume() const { return _settings._sfx; }
 	/** Return the current speech volume percentage. */
-	int getSpeechVolume() const { return _speechVolume; }
+	int getSpeechVolume() const { return _settings._speech; }
 	/** Return the initial music volume percentage. */
-	int getInitialMusicVolume() const { return _initialMusicVolume; }
+	int getInitialMusicVolume() const { return _settings._initialMusic; }
 	/** Return the initial sound-effect volume percentage. */
-	int getInitialSfxVolume() const { return _initialSfxVolume; }
+	int getInitialSfxVolume() const { return _settings._initialSfx; }
 	/** Return the initial speech volume percentage. */
-	int getInitialSpeechVolume() const { return _initialSpeechVolume; }
+	int getInitialSpeechVolume() const { return _settings._initialSpeech; }
 
 	/** Clamp and assign the current music volume. */
 	void setMusicVolume(int volume);
@@ -804,18 +864,8 @@ public:
 private:
 	/** Borrowed vm used by the panel's gauge and button resources. */
 	Zoombini2Engine *_vm;
-	/** Current music volume percentage. */
-	int _musicVolume = 100;
-	/** Current sound-effect volume percentage. */
-	int _sfxVolume = 100;
-	/** Current speech volume percentage. */
-	int _speechVolume = 100;
-	/** Music volume restored when the caller cancels. */
-	int _initialMusicVolume = 100;
-	/** Sound-effect volume restored when the caller cancels. */
-	int _initialSfxVolume = 100;
-	/** Speech volume restored when the caller cancels. */
-	int _initialSpeechVolume = 100;
+	/** Current and cancellation-baseline audio levels edited by this session. */
+	VolumeSettings _settings;
 
 	/** Current music gauge endpoint. */
 	int _musicSliderX = kSliderMaxX;
@@ -825,7 +875,7 @@ private:
 	int _speechSliderX = kSliderMaxX;
 	/** Dragged slider index, or -1 when no slider is captured. */
 	int _activeSlider = -1;
-	/** Most recent mouse position observed while the primary button was held. */
+	/** Most recent mouse pos observed while the primary button was held. */
 	Common::Point32 _heldMousePos = Common::Point32();
 	/** Whether held-mouse coordinates are available for the next release. */
 	bool _hasHeldMouse = false;

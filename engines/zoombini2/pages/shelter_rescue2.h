@@ -89,25 +89,25 @@ private:
 	static constexpr int kDropTargetCount = 28;
 	/** Departure-seat screen positions from the original seat table. */
 	static constexpr Common::Point32 kSeatPositions[kDepartureSeatCount] = {
-		Common::Point32(527, 466),
-		Common::Point32(590, 467),
-		Common::Point32(656, 456),
-		Common::Point32(720, 438),
-		Common::Point32(482, 527),
-		Common::Point32(539, 527),
-		Common::Point32(601, 527),
-		Common::Point32(665, 518)
-	};
-	/** Waiting-floor screen positions from the original floor table. */
-	static constexpr Common::Point32 kFloorPositions[kDepartureSeatCount] = {
-		Common::Point32(305, 514),
-		Common::Point32(305, 543),
 		Common::Point32(527, 502),
 		Common::Point32(590, 503),
 		Common::Point32(656, 492),
 		Common::Point32(720, 474),
 		Common::Point32(482, 563),
-		Common::Point32(539, 563)
+		Common::Point32(539, 563),
+		Common::Point32(601, 563),
+		Common::Point32(665, 554),
+	};
+	/** Waiting-floor screen positions from the original floor table. */
+	static constexpr Common::Point32 kFloorPositions[kDepartureSeatCount] = {
+		Common::Point32(170, 540),
+		Common::Point32(150, 540),
+		Common::Point32(130, 540),
+		Common::Point32(110, 540),
+		Common::Point32(90, 540),
+		Common::Point32(70, 540),
+		Common::Point32(50, 540),
+		Common::Point32(30, 540),
 	};
 	/** No pending roster release. */
 	static constexpr int kNoPendingRelease = -1;
@@ -121,8 +121,6 @@ private:
 	static constexpr int kScrollPixelLength = 40;
 	/** Scroll animation step in pixels per frame. */
 	static constexpr int kScrollPixelStep = 4;
-	/** Pressed-button flash length in milliseconds. */
-	static constexpr uint32 kScrollFlashMilliseconds = 150;
 
 	/** Origin of the Rescue Site II waiting-roster grid. */
 	static constexpr Common::Point32 kRosterGridBasePos = Common::Point32(75, 193);
@@ -202,10 +200,6 @@ private:
 	int _scrollPixelsLeft = 0;
 	/** Roster index with a deferred removal pending, or -1 for none. */
 	int _pendingReleaseIndex = kNoPendingRelease;
-	/** Game tick until which the leftward scroll button shows its pressed frame. */
-	uint32 _scrollLeftFlashUntil = 0;
-	/** Game tick until which the rightward scroll button shows its pressed frame. */
-	uint32 _scrollRightFlashUntil = 0;
 };
 
 } // End of namespace Zoombini2

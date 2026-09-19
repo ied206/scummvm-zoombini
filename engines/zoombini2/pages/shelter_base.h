@@ -104,6 +104,8 @@ protected: /** Bind a concrete rescue site to @p vm. */
 	void beginDeparture();
 	/** Return whether the delayed departure phase is active. */
 	bool isDeparting() const { return _phase == 1; }
+	/** Return the borrowed door-selection overlay, or nullptr when it failed to load. */
+	RleBlock *getPorteSelector() const { return _porteSelect; }
 
 	/** Return the concrete site's waiting board. */
 	virtual BoardRecord **getRescueBoard() const = 0;

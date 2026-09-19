@@ -211,6 +211,8 @@ public:
 
 	/** Request that the main loop replace the active page with @p pageId. */
 	void requestPageChange(int pageId) { _nextPageId = pageId; }
+	/** Restart the sidebar Go-button attention blink with original timing. */
+	void restartGoBlink();
 	/** Return whether the pending transition leads back to a map or sign-in flow. */
 	bool isReturningToMap() const { return _nextPageId == kPageMenuLoad || _nextPageId == kPageMenuPractice || _nextPageId == kPageMapScreen; }
 	/** Return whether the pending page uses the route-map travel transition. */

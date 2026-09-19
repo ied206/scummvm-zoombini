@@ -27,6 +27,7 @@
 #include "common/str-array.h"
 #include "common/str.h"
 #include "common/stream.h"
+#include "common/util.h"
 
 namespace Common {
 class SaveFileManager;
@@ -153,6 +154,41 @@ struct Zoombini2ProfileSummary {
 	bool _stateValid = false;
 	/** Counts parsed from the independent .mk stream when @ref Zoombini2ProfileSummary::_stateValid is true. */
 	Zoombini2PopulationSummary _population;
+};
+
+/** Editing-session audio levels held by the volume panel's sliders. */
+struct VolumeSettings {
+	/** Largest accepted volume percentage. */
+	static constexpr int kMaxVolumePercent = 100;
+
+	/** Clamp and assign the current music level. */
+	void setMusic(int value) { _music = CLIP(value, 0, kMaxVolumePercent); }
+	/** Clamp and assign the current sound-effect level. */
+	void setSfx(int value) { _sfx = CLIP(value, 0, kMaxVolumePercent); }
+	/** Clamp and assign the current speech level. */
+	void setSpeech(int value) { _speech = CLIP(value, 0, kMaxVolumePercent); }
+	/** Clamp and assign the current levels, then capture them as the cancellation baseline. */
+	void setInitialVolumes(int music, int sfx, int speech) {
+		setMusic(music);
+		setSfx(sfx);
+		setSpeech(speech);
+		_initialMusic = _music;
+		_initialSfx = _sfx;
+		_initialSpeech = _speech;
+	}
+
+	/** Current music level percentage. */
+	int _music = kMaxVolumePercent;
+	/** Current sound-effect level percentage. */
+	int _sfx = kMaxVolumePercent;
+	/** Current speech level percentage. */
+	int _speech = kMaxVolumePercent;
+	/** Music level restored when the editing session is cancelled. */
+	int _initialMusic = kMaxVolumePercent;
+	/** Sound-effect level restored when the editing session is cancelled. */
+	int _initialSfx = kMaxVolumePercent;
+	/** Speech level restored when the editing session is cancelled. */
+	int _initialSpeech = kMaxVolumePercent;
 };
 
 /** Twenty-byte representation of one Zoombini stored in a sparse board cell. */
