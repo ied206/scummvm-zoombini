@@ -42,6 +42,7 @@
 namespace Zoombini2 {
 
 constexpr uint32 Zoombini2SaveManagementDialog::kEditProfileCommand;
+constexpr uint32 Zoombini2SaveManagementDialog::kDuplicateProfileCommand;
 constexpr uint32 Zoombini2SaveManagementDialog::kDeleteProfileCommand;
 constexpr uint32 Zoombini2SaveManagementDialog::kImportProfileCommand;
 constexpr uint32 Zoombini2SaveManagementDialog::kExportProfileCommand;
@@ -76,9 +77,9 @@ void Zoombini2MenuDialog::handleCommand(GUI::CommandSender *sender, uint32 cmd, 
 	MainMenuDialog::handleCommand(sender, cmd, data);
 }
 
-Zoombini2ProfileNameDialog::Zoombini2ProfileNameDialog(const Common::U32String &initialName)
+Zoombini2ProfileNameDialog::Zoombini2ProfileNameDialog(const Common::U32String &title, const Common::U32String &initialName)
 	: GUI::Dialog(0, 0, 360, 144) {
-	new GUI::StaticTextWidget(this, 12, 10, 336, 24, Common::U32String("Rename saved game"), Graphics::kTextAlignStart);
+	new GUI::StaticTextWidget(this, 12, 10, 336, 24, title, Graphics::kTextAlignStart);
 	new GUI::StaticTextWidget(this, 12, 38, 336, 20, false, Common::U32String("Use 1 to 16 letters, digits, or spaces"), Graphics::kTextAlignStart,
 							  Common::U32String(), GUI::ThemeEngine::kFontStyleNormal, Common::UNK_LANG, false);
 	_edit = new GUI::EditTextWidget(this, 12, 62, 336, 28, false, initialName);
@@ -115,10 +116,14 @@ Zoombini2SaveManagementDialog::Zoombini2SaveManagementDialog(const Common::Strin
 	new GUI::StaticTextWidget(this, kDialogMargin, 8, kTableWidth, 24, true, Common::U32String("Manage saved games"), Graphics::kTextAlignStart);
 
 	static constexpr int kActionButtonGap = 6;
-	static constexpr int kActionButtonWidth = (kTableWidth - 3 * kActionButtonGap) / 4;
+	static constexpr int kActionButtonCount = 5;
+	static constexpr int kActionButtonWidth = (kTableWidth - (kActionButtonCount - 1) * kActionButtonGap) / kActionButtonCount;
 	int actionX = kDialogMargin;
 	_editButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kActionButtonWidth, kButtonHeight, true, Common::U32String("Rename"),
 										Common::U32String(), kEditProfileCommand);
+	actionX += kActionButtonWidth + kActionButtonGap;
+	_duplicateButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kActionButtonWidth, kButtonHeight, true, Common::U32String("Clone"),
+											 Common::U32String(), kDuplicateProfileCommand);
 	actionX += kActionButtonWidth + kActionButtonGap;
 	_importButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kActionButtonWidth, kButtonHeight, true, Common::U32String("Import"),
 										  Common::U32String(), kImportProfileCommand);
@@ -262,6 +267,7 @@ void Zoombini2SaveManagementDialog::updateButtons() {
 	const bool hasSelection = 0 <= _selectedProfileIndex && _selectedProfileIndex < _profileRowCount;
 	const bool stateValid = hasSelection && _profileStateValid[_selectedProfileIndex];
 	_editButton->setEnabled(stateValid);
+	_duplicateButton->setEnabled(stateValid && _profileRowCount < kMaximumProfileRows);
 	_importButton->setEnabled(true);
 	_exportButton->setEnabled(stateValid);
 	_deleteButton->setEnabled(hasSelection);
@@ -272,7 +278,7 @@ void Zoombini2SaveManagementDialog::renameSelectedProfile() {
 		return;
 
 	const Common::String oldProfileName = _profileNames[_selectedProfileIndex];
-	Zoombini2ProfileNameDialog nameDialog(Common::U32String(oldProfileName.c_str()));
+	Zoombini2ProfileNameDialog nameDialog(Common::U32String("Rename saved game"), Common::U32String(oldProfileName.c_str()));
 	if (nameDialog.runModal() != GUI::kOKCmd)
 		return;
 
@@ -280,6 +286,28 @@ void Zoombini2SaveManagementDialog::renameSelectedProfile() {
 	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain);
 	if (!savegameManager.renameProfile(oldProfileName, newProfileName)) {
 		GUI::MessageDialog errorDialog(Common::U32String("Invalid file name for saving"));
+		errorDialog.runModal();
+		return;
+	}
+	refreshProfiles(newProfileName);
+	_profileList->reflowLayout();
+	g_gui.scheduleTopDialogRedraw();
+}
+
+void Zoombini2SaveManagementDialog::duplicateSelectedProfile() {
+	if (_selectedProfileIndex < 0 || static_cast<int>(_profileNames.size()) <= _selectedProfileIndex || !_profileStateValid[_selectedProfileIndex] ||
+		kMaximumProfileRows <= _profileRowCount)
+		return;
+
+	const Common::String srcProfileName = _profileNames[_selectedProfileIndex];
+	Zoombini2ProfileNameDialog nameDialog(Common::U32String("Clone saved game"), Common::U32String());
+	if (nameDialog.runModal() != GUI::kOKCmd)
+		return;
+
+	const Common::String newProfileName = nameDialog.getProfileName().encode();
+	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain);
+	if (!savegameManager.duplicateProfile(srcProfileName, newProfileName)) {
+		GUI::MessageDialog errorDialog(Common::U32String("Enter a unique name containing 1 to 16 letters, digits, or spaces"));
 		errorDialog.runModal();
 		return;
 	}
@@ -428,6 +456,9 @@ void Zoombini2SaveManagementDialog::handleCommand(GUI::CommandSender *sender, ui
 	case kEditProfileCommand:
 		renameSelectedProfile();
 		break;
+	case kDuplicateProfileCommand:
+		duplicateSelectedProfile();
+		break;
 	case kImportProfileCommand:
 		importProfile();
 		break;
@@ -458,6 +489,9 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	_originalPrngCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.OriginalPRNG",
 													Common::U32String("Use original random number generator (requires restart)"),
 													Common::U32String("Uses the original Windows engine's Visual C++ 6.0 CRT generator instead of ScummVM's default."));
+	_savefilesReadOnlyCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.SavefilesReadOnly",
+														 Common::U32String("Lock automatic savefile writes"),
+														 Common::U32String("Prevents automatic progress saves during tests. New profiles and deletion remain available; import and rename are blocked."));
 
 	new SeparatorWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayImprovementsSeparator");
 	GUI::StaticTextWidget *gameplayImprovementsHeader = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayImprovements",
@@ -485,6 +519,7 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 		.addWidget("GreedyWaterslide", "Checkbox")
 		.addWidget("CachedFrameTime", "Checkbox")
 		.addWidget("OriginalPRNG", "Checkbox")
+		.addWidget("SavefilesReadOnly", "Checkbox")
 		.addWidget("ManageProfiles", "Button")
 		.addSpace(10)
 		.addWidget("GameplayImprovementsSeparator", "", -1, 2)
@@ -501,6 +536,7 @@ void Zoombini2OptionsWidget::load() {
 	_greedyWaterslideCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _domain));
 	_cachedFrameTimeCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigCachedFrameTime, _domain));
 	_originalPrngCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _domain));
+	_savefilesReadOnlyCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, _domain));
 	_floatingPointPathsCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths, _domain));
 	_enhancedKbdShortcutsCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _domain));
 }
@@ -513,6 +549,7 @@ bool Zoombini2OptionsWidget::save() {
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _greedyWaterslideCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigCachedFrameTime, _cachedFrameTimeCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _originalPrngCheckbox->getState(), _domain);
+	ConfMan.setBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, _savefilesReadOnlyCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths, _floatingPointPathsCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _enhancedKbdShortcutsCheckbox->getState(), _domain);
 	if (originalPrngChanged && g_engine) {

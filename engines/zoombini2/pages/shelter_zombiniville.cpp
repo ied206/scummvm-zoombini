@@ -55,7 +55,7 @@ ShelterZombiniville::ShelterZombiniville(Zoombini2Engine *vm)
 
 ShelterZombiniville::~ShelterZombiniville() {
 	if (_vm->isReturningToMap())
-		GameState::transferSavedRoster(_vm->_globalZoombinis, _vm->getGameState()->_savedRoster);
+		_vm->_state->stashActiveZoombinis();
 	delete _quickFillButtonRunner;
 	delete _batchFillButtonRunner;
 	delete _createButtonRunner;
@@ -71,7 +71,7 @@ ShelterZombiniville::~ShelterZombiniville() {
 
 	SoundManager *sound = _vm->getSoundManager();
 	if (sound) {
-		const int sounds[] = {_musicId, _sndFeatureSelect, _sndQuickFill, _sndBatchFill, _sndValidZoombini, _sndWrongZoombini};
+		const int sounds[] = {_sndFeatureSelect, _sndQuickFill, _sndBatchFill, _sndValidZoombini, _sndWrongZoombini};
 		for (uint i = 0; i < ARRAYSIZE(sounds); i++) {
 			if (0 <= sounds[i])
 				sound->unload(sounds[i]);
@@ -189,18 +189,18 @@ Common::Point32 ShelterZombiniville::getSlotPosition(uint index) {
 		Common::Point32(209, 488),
 		Common::Point32(177, 465),
 	};
-	return index < static_cast<uint>(kMaxPackSize) ? kSlotPos[index] : kSlotPos[kMaxPackSize - 1];
+	return index < kMaxPackSize ? kSlotPos[index] : kSlotPos[kMaxPackSize - 1];
 }
 
 void ShelterZombiniville::init() {
 	debug(1, "ShelterZombiniville::init");
-	_vm->clearGlobalZoombinis();
+	_vm->_state->clearActiveZoombinis();
 	_boardingZoombinis.clear();
-	GameState *gameState = _vm->getGameState();
+	GameState *gameState = _vm->_state;
 	if (_vm->_isSavedGame)
-		GameState::transferSavedRoster(gameState->_savedRoster, _vm->_globalZoombinis);
-	for (uint i = 0; i < _vm->_globalZoombinis.size(); i++) {
-		ZoombiniRunner *zoombini = _vm->_globalZoombinis[i];
+		gameState->restoreSavedZoombinis();
+	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
+		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
 		const Common::Point32 slotPos = getSlotPosition(i);
 		zoombini->setPosition(slotPos);
 		zoombini->_inputEnabled = true;
@@ -254,10 +254,8 @@ void ShelterZombiniville::init() {
 	resetSelectedFeatures();
 	_currentName.clear();
 
+	startPageMusic(Common::Path(kMusicPath));
 	SoundManager *sound = _vm->getSoundManager();
-	_musicId = sound->load(true, Common::Path(kMusicPath), true);
-	if (0 <= _musicId)
-		sound->playLoop(_musicId);
 	_sndFeatureSelect = sound->load(false, Common::Path(kFeatureSelectSoundPath), false);
 	_sndQuickFill = sound->load(false, Common::Path(kQuickFillSoundPath), false);
 	_sndBatchFill = sound->load(false, Common::Path(kBatchFillSoundPath), false);
@@ -302,11 +300,11 @@ bool ShelterZombiniville::hasActiveEntrance() const {
 }
 
 bool ShelterZombiniville::canUseGoButton() const {
-	return static_cast<int>(_boardingZoombinis.size()) == kMaxPackSize;
+	return _boardingZoombinis.size() == kMaxPackSize;
 }
 
 bool ShelterZombiniville::canCreateSelectedZoombini() const {
-	if (kMaxPackSize <= static_cast<int>(_boardingZoombinis.size()) || hasActiveEntrance())
+	if (kMaxPackSize <= _boardingZoombinis.size() || hasActiveEntrance())
 		return false;
 	for (int feature = 0; feature < ZmbTrait::kTraitCount; feature++) {
 		if (_stations[feature].selectedValue == 0)
@@ -473,7 +471,7 @@ PathObject *ShelterZombiniville::createEntrancePath(const Common::Point32 &dest)
 }
 
 bool ShelterZombiniville::createZoombini(bool allowConcurrentEntrances) {
-	if ((!allowConcurrentEntrances && hasActiveEntrance()) || kMaxPackSize <= static_cast<int>(_boardingZoombinis.size()))
+	if ((!allowConcurrentEntrances && hasActiveEntrance()) || kMaxPackSize <= _boardingZoombinis.size())
 		return false;
 
 	for (int traitIndex = 0; traitIndex < ZmbTrait::kTraitCount; traitIndex++) {
@@ -483,7 +481,7 @@ bool ShelterZombiniville::createZoombini(bool allowConcurrentEntrances) {
 	const ZmbTrait traits(static_cast<byte>(_stations[0].selectedValue), static_cast<byte>(_stations[1].selectedValue),
 						  static_cast<byte>(_stations[2].selectedValue), static_cast<byte>(_stations[3].selectedValue));
 
-	GameState *gameState = _vm->getGameState();
+	GameState *gameState = _vm->_state;
 	if (gameState->hasReachedZoombiniRegistrationLimit() || !gameState->canRegisterTraits(traits))
 		return false;
 	if (!gameState->hasRelaxedPackTraitLimits() && !passesPackTraitLimits(traits))
@@ -504,7 +502,7 @@ bool ShelterZombiniville::createZoombini(bool allowConcurrentEntrances) {
 	const uint32 tick = _vm->getGameTickCount();
 	zoombini->startAnimation(nullptr, 66, tick);
 	zoombini->startMovement(createEntrancePath(dest), tick);
-	_vm->_globalZoombinis.push_back(zoombini);
+	_vm->_state->_activeZoombinis.push_back(zoombini);
 	_boardingZoombinis.push_back(zoombini);
 	for (int traitOrdinal = 0; traitOrdinal < ZmbTrait::kTraitCount; traitOrdinal++) {
 		const ZmbTrait::TraitIndex traitIndex = static_cast<ZmbTrait::TraitIndex>(traitOrdinal);
@@ -542,12 +540,7 @@ void ShelterZombiniville::buildBoardingZoombiniDrawOrder(Common::Array<uint> &or
 		}
 		order.push_back(i);
 	}
-	for (uint i = 0; i < order.size(); i++) {
-		for (uint j = i + 1; j < order.size(); j++) {
-			if (_boardingZoombinis[order[j]]->_screenPos.y < _boardingZoombinis[order[i]]->_screenPos.y)
-				SWAP(order[i], order[j]);
-		}
-	}
+	ZoombiniRunner::sortDrawOrderByY(_boardingZoombinis, order);
 }
 
 void ShelterZombiniville::drawBoardingZoombinis(ManagedSurface32 *screen) const {
@@ -681,10 +674,10 @@ EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
 
 	if (_quickFillButtonRunner->containsHitPoint(Common::Point32(pos))) {
 		_quickFillButtonRunner->start(_vm->getGameTickCount());
-		if (static_cast<int>(_boardingZoombinis.size()) < kMaxPackSize && !hasActiveEntrance()) {
+		if (_boardingZoombinis.size() < kMaxPackSize && !hasActiveEntrance()) {
 			if (0 <= _sndQuickFill)
 				_vm->getSoundManager()->playWithVolume(_sndQuickFill, _vm->getSoundManager()->_volumeSFX);
-			if (_vm->getGameState()->hasReachedZoombiniRegistrationLimit()) {
+			if (_vm->_state->hasReachedZoombiniRegistrationLimit()) {
 				return EventHandleResult::kConsumed;
 			}
 			do {
@@ -696,12 +689,12 @@ EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
 
 	if (_batchFillButtonRunner->containsHitPoint(Common::Point32(pos))) {
 		_batchFillButtonRunner->start(_vm->getGameTickCount());
-		if (static_cast<int>(_boardingZoombinis.size()) < kMaxPackSize && !hasActiveEntrance()) {
+		if (_boardingZoombinis.size() < kMaxPackSize && !hasActiveEntrance()) {
 			if (0 <= _sndBatchFill)
 				_vm->getSoundManager()->playWithVolume(_sndBatchFill, _vm->getSoundManager()->_volumeSFX);
 			randomizeSelectedFeatures();
-			while (static_cast<int>(_boardingZoombinis.size()) < kMaxPackSize) {
-				if (_vm->getGameState()->hasReachedZoombiniRegistrationLimit())
+			while (_boardingZoombinis.size() < kMaxPackSize) {
+				if (_vm->_state->hasReachedZoombiniRegistrationLimit())
 					break;
 				do {
 					randomizeSelectedFeatures();

@@ -57,6 +57,8 @@ public:
 	static constexpr const char *kConfigOriginalPRNG = "original_prng";
 	/** Target configuration key enabling the enhanced keyboard shortcut set. */
 	static constexpr const char *kConfigEnhancedKbdShortcuts = "enhanced_kbd_shortcuts";
+	/** Target configuration key that blocks automatic progress writes during tests. */
+	static constexpr const char *kConfigSavefilesReadOnly = "savefiles_read_only";
 
 	const char *getName() const override {
 		return "zoombini2";

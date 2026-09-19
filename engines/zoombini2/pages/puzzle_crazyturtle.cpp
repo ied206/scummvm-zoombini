@@ -57,11 +57,6 @@ PuzzleCrazyTurtle::PuzzleCrazyTurtle(Zoombini2Engine *vm)
 }
 
 PuzzleCrazyTurtle::~PuzzleCrazyTurtle() {
-	if (0 <= _musicId) {
-		SoundManager *soundManager = _vm->getSoundManager();
-		soundManager->stop(_musicId);
-		soundManager->unload(_musicId);
-	}
 	for (int type = 0; type < kFeatureCount; type++) {
 		delete _turtleIdleAnimations[type];
 		delete _turtleSpinAnimations[type];
@@ -82,6 +77,7 @@ PuzzleCrazyTurtle::~PuzzleCrazyTurtle() {
 		delete _turtleSpinRunners[type];
 	}
 	delete _smokeRunner;
+	finishPuzzleRoster(nullptr);
 }
 
 bool PuzzleCrazyTurtle::loadAnimationResource(Animation *&resource, const Common::Path &path) {
@@ -107,7 +103,7 @@ bool PuzzleCrazyTurtle::loadRleResource(RleBlock *&resource, const Common::Path 
 void PuzzleCrazyTurtle::init() {
 	PuzzleBase::init();
 
-	GameState *gameState = _vm->getGameState();
+	GameState *gameState = _vm->_state;
 	_level = CLIP(gameState ? gameState->_level : 1, 1, 4);
 	generateRules();
 	loadResources();
@@ -117,13 +113,7 @@ void PuzzleCrazyTurtle::init() {
 	buildTurtleAssignments();
 	_mistakesMirror = _remainingMistakes;
 
-	if (SoundManager *soundManager = _vm->getSoundManager()) {
-		_musicId = soundManager->load(true, Common::Path(kMusicPath), true);
-		if (0 <= _musicId) {
-			soundManager->playLoop(_musicId);
-			soundManager->setVolume(_musicId, soundManager->_volumeMusic);
-		}
-	}
+	startPageMusic(Common::Path(kMusicPath));
 
 	if (gameState && _vm->_isSavedGame)
 		gameState->registerPageVisit(kPageCrazyTurtle, 1);
@@ -216,7 +206,7 @@ void PuzzleCrazyTurtle::buildDropTargets() {
 }
 
 void PuzzleCrazyTurtle::buildTurtleAssignments() {
-	const int partySize = (int)MIN((int)kZoombiniCount, (int)_puzzleZoombinis.size());
+	const int partySize = MIN<int>(kZoombiniCount, _puzzleZoombinis.size());
 	bool used[kZoombiniCount] = {};
 	int assignedCount = 0;
 	for (int slot = 0; slot < kRuleSlotCount && assignedCount < kTurtleCount; slot++) {
@@ -300,7 +290,7 @@ void PuzzleCrazyTurtle::activateRandomRuleSlots(bool *slots, int count) {
 }
 
 void PuzzleCrazyTurtle::placeZoombinis() {
-	const uint count = MIN(static_cast<uint>(kZoombiniCount), _puzzleZoombinis.size());
+	const uint count = MIN<uint>(kZoombiniCount, _puzzleZoombinis.size());
 	for (uint index = 0; index < count; index++) {
 		ZoombiniRunner *zoombini = _puzzleZoombinis[index];
 		zoombini->setPosition(kZoombiniPos[index]);
@@ -483,12 +473,9 @@ bool PuzzleCrazyTurtle::evaluateTurtleMatch(const ZoombiniRunner *zoombini, int 
 	const ZoombiniRunner *required = _puzzleZoombinis[assigned];
 	if (!required)
 		return false;
-	if (zoombini->_traits.getValue(static_cast<ZmbTrait::TraitIndex>(_primaryFeature))
-		!= required->_traits.getValue(static_cast<ZmbTrait::TraitIndex>(_primaryFeature)))
+	if (zoombini->_traits.getValue(static_cast<ZmbTrait::TraitIndex>(_primaryFeature)) != required->_traits.getValue(static_cast<ZmbTrait::TraitIndex>(_primaryFeature)))
 		return false;
-	if (3 <= _level
-		&& zoombini->_traits.getValue(static_cast<ZmbTrait::TraitIndex>(_secondaryFeature))
-			   != required->_traits.getValue(static_cast<ZmbTrait::TraitIndex>(_secondaryFeature)))
+	if (3 <= _level && zoombini->_traits.getValue(static_cast<ZmbTrait::TraitIndex>(_secondaryFeature)) != required->_traits.getValue(static_cast<ZmbTrait::TraitIndex>(_secondaryFeature)))
 		return false;
 	return true;
 }
@@ -496,8 +483,7 @@ bool PuzzleCrazyTurtle::evaluateTurtleMatch(const ZoombiniRunner *zoombini, int 
 void PuzzleCrazyTurtle::handleTurtleClick(int turtleIndex, int zoombiniIndex) {
 	const uint32 tick = _vm->getGameTickCount();
 	_inputLocked = true;
-	if (turtleIndex < 0 || kTurtleCount <= turtleIndex || zoombiniIndex < 0 || (uint)zoombiniIndex >= _puzzleZoombinis.size()
-		|| _mistakesMirror <= 0)
+	if (turtleIndex < 0 || kTurtleCount <= turtleIndex || zoombiniIndex < 0 || (uint)zoombiniIndex >= _puzzleZoombinis.size() || _mistakesMirror <= 0)
 		return;
 
 	ZoombiniRunner *zoombini = _puzzleZoombinis[zoombiniIndex];

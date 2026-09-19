@@ -167,7 +167,7 @@ private:
 	};
 
 	/** Maximum number of entries addressable by the original byte-sized count. */
-	static constexpr int kMaxTimedFrameCount = 255;
+	static constexpr uint kMaxTimedFrameCount = 255;
 
 	Zoombini2Engine *_vm;
 	const Animation *_animation = nullptr;
@@ -190,7 +190,7 @@ private:
 	void *_completionCallbackContext = nullptr;
 	Size32 _backBufferSize = Size32();
 	ManagedSurface32 *_backBuffer = nullptr;
-	Common::Rect _backBufferScreenRect;
+	Common::Rect32 _backBufferScreenRect;
 	Common::Point32 _backBufferDrawPosition;
 	bool _backBufferValid = false;
 
@@ -575,6 +575,8 @@ public:
 												  bool clickReleased, const ZoombiniAnimation *pickupAnimation, uint32 tickCount,
 												  Common::Array<ZoombiniDropTarget> *dropTargets = nullptr, const AreaMask *areaMask = nullptr,
 												  int scrollX = 0, int backgroundWidth = AnimationRunner::kDefaultBackgroundWidth);
+	/** Stably sort selected roster indices by their logical screen Y position. */
+	static void sortDrawOrderByY(const Common::Array<ZoombiniRunner *> &zoombinis, Common::Array<uint> &order);
 	/** Return the current drawing anchor after applying page scrolling or the active grab offset. */
 	Common::Point32 getDrawPosition(int scrollX = 0, int backgroundWidth = AnimationRunner::kDefaultBackgroundWidth) const;
 	/** Forward legacy drawing calls to @ref Gfx::drawZoombiniRunner without advancing animation. */

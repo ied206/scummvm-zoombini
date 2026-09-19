@@ -71,7 +71,7 @@ public:
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
 	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
 	/** Return the required practice-party size for @p pageId, or zero for a shelter or unsupported page. */
-	static int getPracticePartySize(int pageId);
+	static uint getPracticePartySize(int pageId);
 	bool hasActiveDialog() const override { return _volumePanel != nullptr; }
 
 private:
@@ -252,8 +252,6 @@ private:
 
 	/** Menu selection sound. */
 	int _blipSoundId = -1;
-	/** Handle for the map-music stream shared across this game instance. */
-	int _mapMusicId = -1;
 
 	/** Volume panel managed by this page while options are open. */
 	VolumePanel *_volumePanel = nullptr;

@@ -96,10 +96,10 @@ enum class RouteBranch : int {
 };
 
 /** Maximum number of Zoombinis in the starting party. */
-const int kMaxPackSize = 16;
+const uint kMaxPackSize = 16;
 
 /** Maximum party size after a rescue-site transition. */
-const int kPostRescuePackSize = 8;
+const uint kPostRescuePackSize = 8;
 
 /** Number of distinct four-feature combinations. */
 const int kMaxCombinations = 625;
@@ -154,14 +154,10 @@ public:
 	const AlphaBlendLUT &getAlphaLUT() const { return _alphaBlendLUT; }
 	/** Return the sound manager for this game instance. */
 	SoundManager *getSoundManager() { return _soundManager; }
-	/** Return the active profile state for this game instance. */
-	GameState *getGameState() { return _gameState; }
 	/** Return the engine-owned shared message-box dialog. */
 	DialogMsgBox *getMsgBoxDialog() { return _msgBoxDialog; }
 	/** Return the engine-owned debug area-mask dialog. */
 	DialogDebug *getDebugDialog() { return _debugDialog; }
-	/** Start or retain the shared map-music stream and return its sound identifier. */
-	int ensureMapMusic();
 	/** Return the game-facing music volume percentage. */
 	int getMusicVolume() const;
 	/** Return the game-facing sound-effect volume percentage. */
@@ -195,19 +191,18 @@ public:
 	/** Add @p ms to the time excluded from gameplay tick calculations. */
 	void addPauseTime(uint32 ms) { _pauseTimeAccum += ms; }
 
-	/** Write the current profile under @p name. */
+	/** Write the current profile under @p name unless automatic saves are locked. */
 	bool writeGameSave(const Common::String &name);
+	/** Create a new player-selected profile without overwriting another one. */
+	bool createGameSave(const Common::String &name);
 	/** Replace the current profile with the profile stored under @p name. */
 	bool readGameSave(const Common::String &name);
 	/** Delete the active target's profile named @p name. */
 	bool deleteGameSave(const Common::String &name);
 	/** Return the active target's valid profile names in display order. */
 	Common::StringArray listGameSaves() const;
-	/** Delete and clear every entry in @ref Zoombini2Engine::_globalZoombinis. */
-	void clearGlobalZoombinis();
-
-	/** Party entries retained for active gameplay outside @ref GameState. */
-	Common::Array<ZoombiniRunner *> _globalZoombinis;
+	/** Current profile state, including its active party and rescue storage. */
+	GameState *_state = nullptr;
 
 	/** Request that the main loop replace the active page with @p pageId. */
 	void requestPageChange(int pageId) { _nextPageId = pageId; }
@@ -264,6 +259,9 @@ public:
 private:
 	class ResourceFileResolver;
 
+	/** Serialize the current profile after the caller applies its save policy. */
+	bool saveGameProfile(const Common::String &name);
+
 	typedef Common::HashMap<Common::Path, ZoombiniAnimation *, Common::Path::IgnoreCase_Hash, Common::Path::IgnoreCase_EqualTo> ZoombiniAnimationCache;
 
 	/** Maximum presentation-loop rate used to prevent the ScummVM backend from busy-spinning. */
@@ -294,11 +292,7 @@ private:
 
 	/** Sound manager for this game instance. */
 	SoundManager *_soundManager = nullptr;
-	/** Shared map-music sound identifier, or -1 when stopped. */
-	int _mapMusicId = -1;
 
-	/** Active profile state for this game instance. */
-	GameState *_gameState = nullptr;
 	/** Shared Help, Map, and Go controls for this game instance. */
 	Sidebar *_sidebar = nullptr;
 	/** Shared two-button message-box dialog for pages and controls. */
@@ -356,10 +350,6 @@ private:
 	void importZoombiniSet();
 	/** Apply the held global puzzle-completion shortcut to the active roster and page. */
 	void applyDebugPuzzleCompletion();
-	/** Stop the shared map-music stream and clear its identifier. */
-	void stopMapMusic();
-	/** Credit the party that completed Boolie Boggle to the active profile. */
-	void recordBooliesCompletion();
 	/** Release every Zoombini sprite grid cached by this game instance. */
 	void clearZoombiniAnimationCache();
 	/** Load and register the game cursor. */

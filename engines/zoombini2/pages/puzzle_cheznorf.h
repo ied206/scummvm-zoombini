@@ -271,8 +271,6 @@ private:
 	/** Selection highlight visual. */
 	RleBlock *_highlightImage = nullptr;
 
-	/** Music handle used while Chez Norf is active. */
-	int _musicId = -1;
 };
 
 } // End of namespace Zoombini2

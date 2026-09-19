@@ -245,8 +245,6 @@ private:
 	/** Second cascade animation. */
 	Animation *_cascade2Anim = nullptr;
 
-	/** Music handle used while Pipes of Paloo is active. */
-	int _musicId = -1;
 };
 
 } // End of namespace Zoombini2

@@ -37,12 +37,6 @@ TransitionTitle::TransitionTitle(Zoombini2Engine *vm)
 }
 
 TransitionTitle::~TransitionTitle() {
-	// Unload music
-	SoundManager *sound = _vm->getSoundManager();
-	if (sound && _musicId >= 0) {
-		sound->unload(_musicId);
-	}
-
 	delete _background;
 }
 
@@ -57,14 +51,7 @@ void TransitionTitle::init() {
 	}
 
 	// Play the title music until the page is dismissed.
-	SoundManager *sound = _vm->getSoundManager();
-	if (sound) {
-		_musicId = sound->load(true, Common::Path(kMusicPath), true);
-		if (_musicId >= 0) {
-			sound->playLoop(_musicId);
-			sound->setVolume(_musicId, sound->_volumeMusic);
-		}
-	}
+	startPageMusic(Common::Path(kMusicPath));
 }
 
 void TransitionTitle::onUpdate() {

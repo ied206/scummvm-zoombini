@@ -29,9 +29,13 @@
 #include "zoombini2/zoombini2.h"
 
 #include "common/callback.h"
+#include "common/config-manager.h"
 #include "common/keyboard.h"
+#include "zoombini2/metaengine.h"
 
 namespace Zoombini2 {
+
+constexpr const char *InteractiveBase::kMapMusicPath;
 
 constexpr const char *Sidebar::kHelpNormalPath;
 constexpr const char *Sidebar::kHelpHighlightPath;
@@ -134,8 +138,8 @@ bool Sidebar::isInButtonRegion(const Common::Point &pos) const {
 }
 
 bool Sidebar::isInteractionBlocked() const {
-	for (uint i = 0; i < _vm->_globalZoombinis.size(); i++) {
-		const ZoombiniRunner *zoombini = _vm->_globalZoombinis[i];
+	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
+		const ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
 		if (zoombini && zoombini->_dragging)
 			return true;
 	}
@@ -185,6 +189,7 @@ EventHandleResult Sidebar::onLButtonUp(const Common::Point &pos) {
 	}
 	if (_primaryButtonArmed) {
 		_primaryButtonArmed = false;
+		_pendingMouseReleasePos = pos;
 		_pendingMouseRelease = true;
 	}
 	if (shouldShow() && isInButtonRegion(pos))
@@ -225,7 +230,9 @@ void Sidebar::drawAndHandleInput(ManagedSurface32 *screen, bool inputAllowed) {
 
 	const bool pointerInputAllowed = inputAllowed && !isInteractionBlocked();
 	const Common::Point32 mousePos = _vm->getMousePos();
-	updateHoverState(Common::Point(mousePos.x, mousePos.y), pointerInputAllowed);
+	// Later mouse motion in the input batch must not move a pending release to another control.
+	const Common::Point hitPos = _pendingMouseRelease ? _pendingMouseReleasePos : Common::Point(mousePos.x, mousePos.y);
+	updateHoverState(hitPos, pointerInputAllowed);
 
 	_savedBackground->copyRectToSurface(*screen,
 										0, 0,
@@ -309,7 +316,7 @@ void Sidebar::onHelpClick() {
 	_vm->getSoundManager()->play(_helpClickSoundId);
 
 	PageId currentPage = static_cast<PageId>(_vm->getCurrentPageId());
-	int level = _vm->getGameState()->getLevel();
+	int level = _vm->_state->getLevel();
 
 	_helpScreen->open(static_cast<int>(currentPage), level);
 }
@@ -320,12 +327,13 @@ void Sidebar::onMapClick() {
 		returnToMap();
 		return;
 	}
-	if (!_vm->writeGameSave(_vm->getGameState()->_playerName))
+	if (!ConfMan.getBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, ConfMan.getActiveDomainName()) &&
+		!_vm->writeGameSave(_vm->_state->_playerName))
 		return;
 	const PageBase *page = _vm->getCurrentPage();
 	bool hasActive = false;
-	for (uint i = 0; i < _vm->_globalZoombinis.size(); i++) {
-		const ZoombiniRunner *zoombini = _vm->_globalZoombinis[i];
+	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
+		const ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
 		hasActive = hasActive || zoombini->_puzzleStatus == 1 || zoombini->_inputEnabled == 1;
 	}
 	if ((page && page->isShelter()) ||

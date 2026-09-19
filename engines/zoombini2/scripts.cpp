@@ -23,6 +23,7 @@
 
 #include "common/ptr.h"
 #include "common/textconsole.h"
+#include "common/util.h"
 
 #include "zoombini2/graphics.h"
 #include "zoombini2/random.h"
@@ -51,8 +52,8 @@ AnimationRunner::~AnimationRunner() {
 }
 
 bool AnimationRunner::addTimedFrame(int frameIndex, uint32 durationMs) {
-	if (kMaxTimedFrameCount <= static_cast<int>(_timedFrames.size())) {
-		warning("AnimationRunner: cannot append more than %d timed frames", kMaxTimedFrameCount);
+	if (kMaxTimedFrameCount <= _timedFrames.size()) {
+		warning("AnimationRunner: cannot append more than %u timed frames", kMaxTimedFrameCount);
 		return false;
 	}
 	if (frameIndex < -1 || 32767 < frameIndex) {
@@ -196,10 +197,10 @@ void AnimationRunner::advanceAfterDraw(uint32 tickCount) {
 void AnimationRunner::restoreBackgroundIfInactive(ManagedSurface32 *screen) const {
 	if (!screen || isActive() || !_backBuffer || !_backBufferValid)
 		return;
-	const int sourceX = _backBufferScreenRect.left - _backBufferDrawPosition.x;
-	const int sourceY = _backBufferScreenRect.top - _backBufferDrawPosition.y;
-	const Common::Rect sourceRect(sourceX, sourceY, sourceX + _backBufferScreenRect.width(), sourceY + _backBufferScreenRect.height());
-	screen->copyRectToSurface(*_backBuffer, _backBufferScreenRect.left, _backBufferScreenRect.top, sourceRect);
+	const int srcX = _backBufferScreenRect.left - _backBufferDrawPosition.x;
+	const int srcY = _backBufferScreenRect.top - _backBufferDrawPosition.y;
+	const Common::Rect srcRect(srcX, srcY, srcX + _backBufferScreenRect.width(), srcY + _backBufferScreenRect.height());
+	screen->copyRectToSurface(*_backBuffer, _backBufferScreenRect.left, _backBufferScreenRect.top, srcRect);
 }
 
 void AnimationRunner::captureBackground(ManagedSurface32 *screen, int scrollX, int backgroundWidth) {
@@ -248,14 +249,13 @@ void AnimationRunner::saveBackground(ManagedSurface32 *screen, const Common::Poi
 		_backBuffer = _vm->_gfx->createSurface(_backBufferSize);
 
 	_backBufferDrawPosition = drawPosition;
-	_backBufferScreenRect = Common::Rect(drawPosition.x, drawPosition.y, drawPosition.x + _backBufferSize.width,
-									 drawPosition.y + _backBufferSize.height);
+	_backBufferScreenRect = Common::Rect32(drawPosition.x, drawPosition.y, drawPosition.x + _backBufferSize.width, drawPosition.y + _backBufferSize.height);
 	_backBufferScreenRect.clip(screen->w, screen->h);
 	if (_backBufferScreenRect.isEmpty())
 		return;
-	const int destinationX = _backBufferScreenRect.left - drawPosition.x;
-	const int destinationY = _backBufferScreenRect.top - drawPosition.y;
-	_backBuffer->copyRectToSurface(*screen, destinationX, destinationY, _backBufferScreenRect);
+	const int destX = _backBufferScreenRect.left - drawPosition.x;
+	const int destY = _backBufferScreenRect.top - drawPosition.y;
+	_backBuffer->copyRectToSurface(*screen, destX, destY, _backBufferScreenRect);
 	_backBufferValid = true;
 }
 
@@ -1177,6 +1177,19 @@ ZoombiniInputResult ZoombiniRunner::handlePointerInput(const Common::Array<Zoomb
 		return ZoombiniInputResult::kPickedUp01;
 	}
 	return ZoombiniInputResult::kIgnored00;
+}
+
+void ZoombiniRunner::sortDrawOrderByY(const Common::Array<ZoombiniRunner *> &zoombinis, Common::Array<uint> &order) {
+	bool swapped;
+	do {
+		swapped = false;
+		for (uint i = 1; i < order.size(); i++) {
+			if (zoombinis[order[i]]->_screenPos.y < zoombinis[order[i - 1]]->_screenPos.y) {
+				SWAP(order[i - 1], order[i]);
+				swapped = true;
+			}
+		}
+	} while (swapped);
 }
 
 Common::Point32 ZoombiniRunner::getDrawPosition(int scrollX, int backgroundWidth) const {

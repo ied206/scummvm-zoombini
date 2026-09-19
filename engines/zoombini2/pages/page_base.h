@@ -107,7 +107,7 @@ public:
 	/** Run callbacks and start every inactive runner whose rectangle contains @p point. */
 	bool activateRunnersAt(const Common::Point32 &point);
 	/** Draw an 800x600 subregion of the layer background. */
-	void drawBackgroundRegion(ManagedSurface32 *screen, int sourceX, int sourceY) const;
+	void drawBackgroundRegion(ManagedSurface32 *screen, int srcX, int srcY) const;
 	/**
 	 * Draw the layer background and update every enabled animation runner.
 	 * @param forceBackgroundRedraw Restore even a cached fixed background before runners when recomposing a complete frame.
@@ -300,6 +300,8 @@ public:
 	const AreaMask *getAreaMask() const { return _areaMask; }
 
 protected:
+	/** Start or replace this page's looping music. */
+	void startPageMusic(const Common::Path &path);
 	/** Advance this page's simulation before rendering. */
 	virtual void onUpdate() {}
 	/** Restore or draw this page's background pixels. */
@@ -325,8 +327,12 @@ protected:
 	AreaMask *_areaMask = nullptr;
 
 private:
+	/** Stop and unload music started by this page. */
+	void releasePageMusic();
 	/** Run visual hooks and, when requested, the two completion boundaries. */
 	void renderFrame(ManagedSurface32 *screen, bool advanceState);
+	/** Music buffer released when this page is destroyed. */
+	int _pageMusicId = -1;
 };
 
 } // End of namespace Zoombini2

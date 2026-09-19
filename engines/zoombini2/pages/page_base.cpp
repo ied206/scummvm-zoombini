@@ -21,6 +21,7 @@
 
 #include "zoombini2/pages/page_base.h"
 #include "zoombini2/graphics.h"
+#include "zoombini2/sound.h"
 #include "zoombini2/zoombini2.h"
 
 #include "common/debug.h"
@@ -199,11 +200,11 @@ bool PageLayer::activateRunnersAt(const Common::Point32 &point) {
 	return hit;
 }
 
-void PageLayer::drawBackgroundRegion(ManagedSurface32 *screen, int sourceX, int sourceY) const {
+void PageLayer::drawBackgroundRegion(ManagedSurface32 *screen, int srcX, int srcY) const {
 	if (!_background || !screen)
 		return;
-	const Common::Rect sourceRect(sourceX, sourceY, sourceX + ManagedSurface32::kScreenSize.width, sourceY + ManagedSurface32::kScreenSize.height);
-	_vm->_gfx->drawBitBlockSubRect(screen, _background, Common::Point32(0, 0), sourceRect);
+	const Common::Rect srcRect(srcX, srcY, srcX + ManagedSurface32::kScreenSize.width, srcY + ManagedSurface32::kScreenSize.height);
+	_vm->_gfx->drawBitBlockSubRect(screen, _background, Common::Point32(0, 0), srcRect);
 }
 
 void PageLayer::drawAndUpdate(ManagedSurface32 *screen, bool forceBackgroundRedraw) {
@@ -354,7 +355,29 @@ PageBase::PageBase(Zoombini2Engine *vm, PageCategory pageCategory)
 }
 
 PageBase::~PageBase() {
+	releasePageMusic();
 	clearAreaMask();
+}
+
+void PageBase::startPageMusic(const Common::Path &path) {
+	releasePageMusic();
+	SoundManager *sound = _vm->getSoundManager();
+	if (!sound)
+		return;
+	_pageMusicId = sound->load(true, path, true);
+	if (0 <= _pageMusicId) {
+		sound->playLoop(_pageMusicId);
+		sound->setVolume(_pageMusicId, sound->_volumeMusic);
+	}
+}
+
+void PageBase::releasePageMusic() {
+	if (_pageMusicId < 0)
+		return;
+	SoundManager *sound = _vm->getSoundManager();
+	if (sound)
+		sound->unload(_pageMusicId);
+	_pageMusicId = -1;
 }
 
 bool PageBase::loadAreaMask(const Common::Path &path) {
