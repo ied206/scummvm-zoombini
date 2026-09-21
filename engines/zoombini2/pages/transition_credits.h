@@ -26,8 +26,6 @@
 
 namespace Zoombini2 {
 
-class BitBlock;
-
 /**
  * End credits presentation with an initial pause, vertical scroll, and end hold.
  * Dismissing it or reaching the end exits the game.
@@ -37,8 +35,6 @@ class TransitionCredits : public TransitionBase {
 public:
 	/** Bind the credits presentation to @p vm. */
 	TransitionCredits(Zoombini2Engine *vm);
-	/** Release the credits bitmap and music. */
-	~TransitionCredits() override;
 
 	/** Load resources and start the initial hold period. */
 	void init() override;
@@ -68,8 +64,6 @@ private:
 	uint32 _lastUpdateTime = 0;
 	/** Whether the presentation remains in its initial hold. */
 	bool _initialWait = false;
-	/** Horizontal-scrolled credits bitmap. */
-	BitBlock *_background = nullptr;
 
 	/** Whether the credits have requested engine exit. */
 	bool _finished = false;

@@ -29,7 +29,6 @@
 namespace Zoombini2 {
 
 class Animation;
-class BitBlock;
 class PathObject;
 class RleBlock;
 class ZoombiniAnimation;
@@ -243,6 +242,8 @@ private:
 	void drawAnimationInPanorama(const Animation *animation, int frameIndex, const Common::Point32 &pos, ManagedSurface32 *screen) const;
 	/** Draw one RLE marker at a cyclic scene-space position. */
 	void drawRleInPanorama(const RleBlock *frame, const Common::Point32 &pos, ManagedSurface32 *screen) const;
+	/** Draw one page-cached RLE marker at a cyclic scene-space position. */
+	void drawPageRleInPanorama(const Common::String &path, const Common::Point32 &pos, ManagedSurface32 *screen) const;
 	/** Draw the stage-gated attractions. */
 	void drawAttractions(ManagedSurface32 *screen) const;
 	/** Draw the rescued-total marker crowd. */
@@ -267,16 +268,10 @@ private:
 	/** Decorative walking actor state. */
 	CrowdActorState _crowdActors[kCrowdActorCount] = {};
 
-	/** Panorama background managed by this page. */
-	BitBlock *_background = nullptr;
 	/** Borrowed immutable seated sprite grid owned by the engine cache. */
 	const ZoombiniAnimation *_zoombiniAnimation = nullptr;
 	/** Borrowed immutable walking sprite grid owned by the engine cache. */
 	const ZoombiniAnimation *_walkingZoombiniAnimation = nullptr;
-	/** Marker managed by this page for an ordinary rescued crowd cell. */
-	RleBlock *_contentMarker = nullptr;
-	/** Marker managed by this page for a special rescued crowd cell. */
-	RleBlock *_pascontentMarker = nullptr;
 	/** Shared walking animation used by the 17 decorative actors. */
 	Animation *_walkingAnimation = nullptr;
 	/** Shared waiting animation used by the 17 decorative actors. */
@@ -285,7 +280,14 @@ private:
 	/** First-visit narration identifier. */
 	int _introSpeechId = -1;
 	/** Random crowd speech identifiers. */
-	int _ambientSpeechIds[kAmbientSpeechCount] = {-1, -1, -1, -1, -1, -1};
+	int _ambientSpeechIds[kAmbientSpeechCount] = {
+		-1,
+		-1,
+		-1,
+		-1,
+		-1,
+		-1,
+	};
 	/** Deadline for the next random crowd speech. */
 	uint32 _nextAmbientSpeechTime = 0;
 	/** Whether progress enables the random crowd speech loop. */

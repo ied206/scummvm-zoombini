@@ -22,245 +22,1066 @@
 #ifndef ZOOMBINI2_PAGES_PUZZLE_WALLOFFLEENS_H
 #define ZOOMBINI2_PAGES_PUZZLE_WALLOFFLEENS_H
 
-#include "common/array.h"
-#include "common/rect.h"
-
-#include "zoombini2/graphics.h"
 #include "zoombini2/pages/puzzle_base.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/state.h"
 
 namespace Zoombini2 {
 
-class Animation;
-class RleBlock;
-
-/**
- * Magic Mirrors (Route3-2)
- *
- * Find the real Fleens behind the strange mirrors.
- */
+/** Find hidden Fleens by comparing the four traits reported by each mirror. */
 class PuzzleWallOfFleens : public PuzzleBase {
 public:
-	/** Construct Magic Mirrors for @p vm. */
 	PuzzleWallOfFleens(Zoombini2Engine *vm);
-	/** Release grid, cannon, mirror, and animation resources. */
 	~PuzzleWallOfFleens() override;
-
-	/** Build the level-selected grid and initialize its mirror allowance. */
 	void init() override;
-	/** Advance aiming, projectile, feedback, and completion phases. */
 	void onUpdate() override;
-	/** Draw the grid, cannon, projectile, mirrors, and active Zoombini. */
+	void onRenderBackground(ManagedSurface32 *screen) override;
 	void onRenderContent(ManagedSurface32 *screen) override;
-	/** Draw the level indicator above the actors. */
+	void onRenderActors(ManagedSurface32 *screen) override;
 	void onRenderForeground(ManagedSurface32 *screen) override;
-	/** Aim the cannon at the selected uncaught Fleen. */
-	EventHandleResult onLButtonDown(const Common::Point &pos) override;
-	/** Mark the terminal board successful for the global debug-completion hotkey. */
+	void onActorsRendered() override;
+	EventHandleResult onLButtonUp(const Common::Point &pos) override;
 	void applyDebugPuzzleCompletion() override;
-
-	/** Maximum number of grid columns. */
-	static constexpr int kMaxGridCols = 12;
-	/** Maximum number of grid rows. */
-	static constexpr int kMaxGridRows = 6;
-	/** Maximum Fleen capacity of the grid. */
-	static constexpr int kMaxFleens = 72;
-	/** Number of cannon-angle visuals. */
-	static constexpr int kNumCannonAngles = 9;
-	/** Number of mirror damage visuals. */
-	static constexpr int kNumMirrorStates = 6;
-	/** Minimum number of released Zoombinis required for completion. */
-	static constexpr int kMinFreed = 4;
-	/** Spacing between grid cells. */
-	static constexpr Size32 kCellSize = Size32(52, 68);
-	/** Maximum value of a visible trait. */
-	static constexpr int kMaxTraitValue = 5;
-	/** Number of level-progress indicator visuals. */
-	static constexpr int kNumLevelIndicators = 5;
-	/** Number of grid panels cycled by level one. */
-	static constexpr int kNumLevel1Panels = 6;
-
-	/** Runtime phase of the Magic Mirrors interaction. */
-	enum GameState {
-		/** Wait for a grid-cell click. */
-		kStateIdle00 = 0,
-		/** Rotate the cannon toward the selected cell. */
-		kStateAiming01 = 1,
-		/** Move the cannonball toward the selected cell. */
-		kStateFiring02 = 2,
-		/** Show successful capture feedback. */
-		kStateHit03 = 3,
-		/** Show miss feedback and consume a mirror. */
-		kStateMiss04 = 4,
-		/** Prepare the next Zoombini at the cannon. */
-		kStateNextZoombini05 = 5,
-		/** Stop accepting input while leaving the page. */
-		kStateDone06 = 6
-	};
-
-	/** Visual damage state of one remaining-chance mirror. */
-	enum MirrorState {
-		/** Intact mirror. */
-		kMirrorNormal00 = 0,
-		/** Gray mirror damage state. */
-		kMirrorGris01 = 1,
-		/** Dark mirror damage state. */
-		kMirrorNoir02 = 2,
-		/** Cracked mirror damage state. */
-		kMirrorFelure03 = 3,
-		/** Exploding mirror state. */
-		kMirrorExplode04 = 4,
-		/** Empty mirror slot. */
-		kMirrorEmpty05 = 5
-	};
-
-	/** One Fleen's traits, grid position, and capture state. */
-	struct FleenCell {
-		/** Visible traits compared with a Zoombini. */
-		ZmbTrait traits;
-		/** Whether this Fleen has already been captured. */
-		bool caught = false;
-		/** Grid column. */
-		int gridCol = 0;
-		/** Grid row. */
-		int gridRow = 0;
-		/** Clickable grid-cell area. */
-		Common::Rect hitbox = Common::Rect();
-
-		/** Initialize an uncaught Fleen with empty traits at grid origin. */
-		FleenCell() = default;
-	};
+	bool onGoButtonPressed() override;
+	Common::String debugGetAnswer() const override;
+	PuzzleChanceInfo debugGetChances() const override { return PuzzleChanceInfo(PuzzleChanceInfo::Type::kAmorphous); }
+	Common::String debugGetChanceDetails() const override;
 
 private:
-	/** Resource paths and formats used by the mirror scene. */
-	static constexpr const char *kCannonFormat = "bmp/wall_of_fleens/canon0%d";
-	static constexpr const char *kCannonCachePath = "bmp/wall_of_fleens/canon_cache";
-	static constexpr const char *kMirrorNormalPath = "bmp/wall_of_fleens/mirror_nomal";
-	static constexpr const char *kMirrorGrisPath = "bmp/wall_of_fleens/mirror_GRIS";
-	static constexpr const char *kMirrorNoirPath = "bmp/wall_of_fleens/mirror_NOIR";
-	static constexpr const char *kMirrorFelurePath = "bmp/wall_of_fleens/mirror_felure";
-	static constexpr const char *kMirrorEmptyPath = "bmp/wall_of_fleens/mirror_empty_tunnel";
-	static constexpr const char *kTuyerePath = "bmp/wall_of_fleens/tuyere";
-	static constexpr const char *kLevelIndicatorFormat = "bmp/wall_of_fleens/LevelRED%d";
-	static constexpr const char *kLavaBubblePath = "bmp/wall_of_fleens/lava_bubble";
-	static constexpr const char *kMirrorExplodePath = "bmp/wall_of_fleens/mirror_explode";
+	/** Loading and projectile movement run independently of mirror reactions. */
+	enum class ShotPhase {
+		kLoading00 = 0,
+		kReady01 = 1,
+		kAiming02 = 2,
+		kOutbound03 = 3,
+		kRebound04 = 4,
+		kStopped05 = 5
+	};
+	enum class MirrorPhase {
+		kNone00 = 0,
+		kRotating01 = 1,
+		kExploding02 = 2,
+		kShouting03 = 3,
+		kLeaving04 = 4
+	};
+	struct Cell {
+		ZmbTrait traits;
+		Common::Point32 pos;
+		int score = -1;
+		bool tried = false;
+		bool revealed = false;
+		bool empty = false;
+		byte scoreMask = 1;
+	};
 	static constexpr const char *kMusicPath = "#sounds/music/05-BB01.wav";
+	static constexpr const char *kCannonFormat = "bmp/wall_of_fleens/canon0%d";
+	static constexpr const char *kMirrorPaths[5] = {
+		"bmp/wall_of_fleens/mirror_GRIS",
+		"bmp/wall_of_fleens/mirror_nomal",
+		"bmp/wall_of_fleens/mirror_NOIR",
+		"bmp/wall_of_fleens/mirror_felure",
+		"bmp/wall_of_fleens/mirror_empty_tunnel",
+	};
+	static constexpr const char *kBallPaths[6] = {
+		"bmp/wall_of_fleens/boulet/boulet",
+		"bmp/wall_of_fleens/boulet/boulet4",
+		"bmp/wall_of_fleens/boulet/boulet6",
+		"bmp/wall_of_fleens/boulet/boulet7",
+		"bmp/wall_of_fleens/boulet/boulet8",
+		"bmp/wall_of_fleens/boulet/boulet9",
+	};
+	static constexpr const char *kOverlayPaths[2] = {
+		"bmp/wall_of_fleens/tuyere",
+		"bmp/wall_of_fleens/canon_cache",
+	};
+	static constexpr const char *kScoreFormat = "bmp/wall_of_fleens/LevelRED%d";
+	static constexpr const char *kRotatePath = "bmp/wall_of_fleens/mirror_rotate";
+	static constexpr const char *kExplodePath = "bmp/wall_of_fleens/mirror_explode";
+	static constexpr const char *kBallLoadPath = "bmp/wall_of_fleens/bullet_on_cannon.pat";
+	static constexpr const char *kJumpPath = "bmp/wall_of_fleens/jump_in_cannon.pat";
+	static constexpr const char *kFleenPath = "bmp/fleens/fleens.anm";
+	static constexpr const char *kVocif1Path = "bmp/fleens/vocif/vocif1.anm";
+	static constexpr const char *kVocif2Path = "bmp/fleens/vocif/vocif2.anm";
+	static constexpr const char *kCannonZombPath = "bmp/wall_of_fleens/cannon_zomb/cannon_zomb.anm";
+	static constexpr const char *kJumpAnimationPath = "bmp/zombis/saut/saut.anm";
+	static constexpr const char *kCelebratePath = "bmp/zombis/attente/attenteZomb.anm";
+	static constexpr const char *kSoundPaths[8] = {
+		"sounds/fx/05-BB03.wav",
+		"sounds/fx/05-BB04.wav",
+		"sounds/fx/05-BS01.wav",
+		"sounds/fx/05-BS02.wav",
+		"sounds/fx/05-BS03.wav",
+		"sounds/fx/05-BS04.wav",
+		"sounds/fx/05-BS05.wav",
+		"sounds/fx/FleenLeavesWall.wav",
+	};
+	static constexpr const char *kSuccessSpeechPath = "sounds/8-E1.wav";
+	static constexpr const char *kLossSpeechPath = "sounds/8-E2.wav";
+	static constexpr const char *kRetreatSpeechPaths[2] = {
+		"sounds/wlf15.1.wav",
+		"sounds/wlf15.3.wav",
+	};
+	static constexpr const char *kAmbientFormat = "sounds/wlf12.%d.wav";
+	static constexpr const char *kPerfectGoFormat = "sounds/wld11.%d.wav";
+	static constexpr Common::Point32 kPanelOrigins[6] = {
+		{182, 88},
+		{344, 88},
+		{506, 87},
+		{183, 230},
+		{345, 229},
+		{508, 230},
+	};
+	static constexpr Common::Point32 kGridOrigins[5] = {
+		{0, 0},
+		{380, 200},
+		{200, 7},
+		{100, 7},
+		{95, 7},
+	};
+	static constexpr Common::Point32 kMuzzles[9] = {
+		{500, 432},
+		{500, 432},
+		{480, 421},
+		{460, 418},
+		{441, 404},
+		{415, 425},
+		{385, 428},
+		{379, 459},
+		{379, 459},
+	};
+	static constexpr byte kEasyPatterns[123][5][4] = {
+		{
+			{0, 1, 1, 1},
+			{0, 0, 0, 1},
+			{0, 0, 1, 0},
+			{0, 1, 0, 0},
+			{1, 0, 0, 0},
+		},
+		{
+			{0, 0, 0, 1},
+			{0, 1, 1, 1},
+			{1, 0, 1, 1},
+			{1, 1, 0, 1},
+			{1, 1, 1, 0},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 2, 2, 2},
+			{1, 0, 1, 1},
+			{1, 1, 0, 1},
+			{1, 1, 1, 0},
+		},
+		{
+			{0, 1, 0, 0},
+			{0, 1, 1, 1},
+			{0, 1, 2, 2},
+			{1, 0, 1, 1},
+			{1, 0, 2, 2},
+		},
+		{
+			{0, 1, 0, 0},
+			{0, 1, 1, 2},
+			{0, 1, 2, 1},
+			{1, 0, 1, 2},
+			{1, 0, 2, 1},
+		},
+		{
+			{1, 1, 1, 1},
+			{0, 0, 0, 1},
+			{0, 0, 1, 0},
+			{0, 1, 0, 0},
+			{1, 0, 0, 0},
+		},
+		{
+			{0, 0, 2, 2},
+			{0, 1, 0, 0},
+			{1, 0, 0, 0},
+			{1, 1, 0, 1},
+			{1, 1, 1, 0},
+		},
+		{
+			{1, 1, 2, 2},
+			{0, 1, 0, 0},
+			{1, 0, 0, 0},
+			{1, 1, 0, 1},
+			{1, 1, 1, 0},
+		},
+		{
+			{0, 0, 1, 2},
+			{0, 1, 0, 0},
+			{1, 0, 0, 0},
+			{1, 1, 0, 1},
+			{1, 1, 2, 0},
+		},
+		{
+			{1, 1, 1, 2},
+			{0, 1, 0, 0},
+			{1, 0, 0, 0},
+			{1, 1, 0, 1},
+			{1, 1, 2, 0},
+		},
+		{
+			{0, 0, 1, 1},
+			{0, 1, 0, 0},
+			{1, 0, 0, 0},
+			{1, 1, 0, 2},
+			{1, 1, 2, 0},
+		},
+		{
+			{1, 1, 1, 1},
+			{0, 1, 0, 0},
+			{1, 0, 0, 0},
+			{1, 1, 0, 2},
+			{1, 1, 2, 0},
+		},
+		{
+			{0, 0, 2, 1},
+			{0, 1, 0, 0},
+			{1, 0, 0, 0},
+			{1, 1, 0, 2},
+			{1, 1, 1, 0},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 0, 1, 1},
+			{0, 0, 2, 1},
+			{0, 1, 0, 2},
+			{0, 2, 0, 2},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 0, 1, 2},
+			{0, 1, 0, 1},
+			{1, 1, 2, 2},
+			{1, 2, 1, 1},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 0, 1, 2},
+			{0, 1, 2, 0},
+			{0, 2, 0, 1},
+			{1, 1, 1, 1},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 0, 2, 1},
+			{0, 1, 0, 2},
+			{0, 2, 1, 0},
+			{1, 1, 1, 1},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 0, 1, 1},
+			{0, 1, 0, 2},
+			{1, 1, 2, 1},
+			{1, 2, 1, 2},
+		},
+		{
+			{0, 1, 0, 0},
+			{1, 1, 0, 1},
+			{1, 1, 0, 2},
+			{1, 1, 1, 0},
+			{1, 1, 2, 0},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 1, 1, 1},
+			{0, 2, 1, 1},
+			{1, 0, 1, 1},
+			{1, 0, 2, 2},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 0, 1, 2},
+			{0, 0, 2, 2},
+			{0, 1, 0, 1},
+			{0, 2, 0, 1},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 1, 1, 1},
+			{0, 1, 2, 2},
+			{0, 2, 1, 2},
+			{0, 2, 2, 1},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 1, 1, 2},
+			{0, 1, 2, 1},
+			{0, 2, 1, 1},
+			{0, 2, 2, 2},
+		},
+		{
+			{1, 1, 2, 1},
+			{0, 1, 0, 0},
+			{1, 0, 0, 0},
+			{1, 1, 0, 2},
+			{1, 1, 1, 0},
+		},
+		{
+			{1, 0, 1, 1},
+			{0, 0, 1, 1},
+			{0, 1, 2, 0},
+			{0, 2, 0, 2},
+			{1, 1, 1, 2},
+		},
+		{
+			{1, 0, 1, 2},
+			{0, 0, 1, 2},
+			{0, 1, 2, 0},
+			{0, 2, 0, 1},
+			{1, 1, 1, 1},
+		},
+		{
+			{1, 0, 1, 1},
+			{0, 0, 1, 1},
+			{0, 1, 0, 2},
+			{1, 1, 2, 1},
+			{1, 2, 1, 2},
+		},
+		{
+			{1, 1, 1, 1},
+			{0, 0, 2, 1},
+			{0, 2, 1, 0},
+			{1, 0, 0, 2},
+			{2, 1, 0, 0},
+		},
+		{
+			{1, 2, 0, 2},
+			{0, 0, 2, 1},
+			{0, 1, 1, 0},
+			{1, 1, 2, 2},
+			{1, 2, 1, 1},
+		},
+		{
+			{1, 1, 0, 1},
+			{0, 0, 1, 2},
+			{0, 2, 2, 0},
+			{1, 1, 2, 2},
+			{1, 2, 1, 1},
+		},
+		{
+			{0, 0, 1, 1},
+			{0, 2, 1, 1},
+			{1, 1, 0, 2},
+			{1, 1, 2, 0},
+			{2, 0, 1, 1},
+		},
+		{
+			{1, 1, 1, 1},
+			{0, 0, 1, 2},
+			{0, 1, 2, 0},
+			{1, 2, 0, 0},
+			{2, 0, 0, 1},
+		},
+		{
+			{1, 2, 1, 0},
+			{0, 0, 2, 2},
+			{0, 1, 0, 1},
+			{1, 1, 1, 2},
+			{1, 2, 2, 1},
+		},
+		{
+			{1, 0, 1, 2},
+			{0, 1, 0, 1},
+			{0, 2, 2, 0},
+			{1, 1, 2, 2},
+			{1, 2, 1, 1},
+		},
+		{
+			{1, 1, 0, 2},
+			{0, 0, 1, 1},
+			{0, 2, 2, 0},
+			{1, 1, 2, 1},
+			{1, 2, 1, 2},
+		},
+		{
+			{1, 0, 2, 2},
+			{0, 1, 1, 0},
+			{0, 2, 0, 1},
+			{1, 1, 2, 1},
+			{1, 2, 1, 2},
+		},
+		{
+			{1, 0, 2, 1},
+			{0, 1, 1, 0},
+			{0, 2, 0, 2},
+			{1, 1, 2, 2},
+			{1, 2, 1, 1},
+		},
+		{
+			{1, 0, 1, 1},
+			{0, 1, 0, 2},
+			{0, 2, 2, 0},
+			{1, 1, 2, 1},
+			{1, 2, 1, 2},
+		},
+		{
+			{2, 2, 0, 0},
+			{0, 1, 1, 1},
+			{0, 1, 2, 2},
+			{1, 0, 1, 1},
+			{1, 0, 2, 2},
+		},
+		{
+			{1, 0, 2, 2},
+			{0, 1, 0, 1},
+			{0, 2, 1, 0},
+			{1, 1, 1, 2},
+			{1, 2, 2, 1},
+		},
+		{
+			{0, 0, 1, 1},
+			{1, 1, 1, 2},
+			{1, 2, 2, 1},
+			{2, 1, 2, 1},
+			{2, 2, 1, 2},
+		},
+		{
+			{2, 2, 0, 0},
+			{0, 1, 1, 2},
+			{0, 1, 2, 1},
+			{1, 0, 1, 2},
+			{1, 0, 2, 1},
+		},
+		{
+			{1, 1, 0, 1},
+			{0, 0, 2, 2},
+			{0, 2, 1, 0},
+			{1, 1, 1, 2},
+			{1, 2, 2, 1},
+		},
+		{
+			{1, 2, 0, 2},
+			{0, 0, 1, 1},
+			{0, 1, 2, 0},
+			{1, 1, 1, 2},
+			{1, 2, 2, 1},
+		},
+		{
+			{1, 1, 0, 2},
+			{0, 0, 2, 1},
+			{0, 2, 1, 0},
+			{1, 1, 1, 1},
+			{1, 2, 2, 2},
+		},
+		{
+			{1, 2, 0, 1},
+			{0, 0, 1, 2},
+			{0, 1, 2, 0},
+			{1, 1, 1, 1},
+			{1, 2, 2, 2},
+		},
+		{
+			{1, 2, 1, 0},
+			{0, 0, 2, 1},
+			{0, 1, 0, 2},
+			{1, 1, 1, 1},
+			{1, 2, 2, 2},
+		},
+		{
+			{1, 0, 1, 2},
+			{0, 1, 2, 0},
+			{0, 2, 0, 1},
+			{1, 1, 1, 1},
+			{1, 2, 2, 2},
+		},
+		{
+			{1, 1, 1, 0},
+			{0, 0, 2, 2},
+			{0, 2, 0, 1},
+			{1, 1, 2, 1},
+			{1, 2, 1, 2},
+		},
+		{
+			{1, 0, 2, 1},
+			{0, 1, 0, 2},
+			{0, 2, 1, 0},
+			{1, 1, 1, 1},
+			{1, 2, 2, 2},
+		},
+		{
+			{1, 0, 1, 1},
+			{0, 1, 2, 0},
+			{0, 2, 0, 2},
+			{1, 1, 1, 2},
+			{1, 2, 2, 1},
+		},
+		{
+			{1, 2, 0, 1},
+			{0, 0, 2, 2},
+			{0, 1, 1, 0},
+			{1, 1, 2, 1},
+			{1, 2, 1, 2},
+		},
+		{
+			{1, 1, 1, 0},
+			{0, 0, 2, 1},
+			{0, 2, 0, 2},
+			{1, 1, 2, 2},
+			{1, 2, 1, 1},
+		},
+		{
+			{1, 2, 2, 0},
+			{0, 0, 1, 2},
+			{0, 1, 0, 1},
+			{1, 1, 2, 2},
+			{1, 2, 1, 1},
+		},
+		{
+			{0, 0, 1, 1},
+			{1, 1, 2, 1},
+			{1, 2, 1, 2},
+			{2, 1, 1, 2},
+			{2, 2, 2, 1},
+		},
+		{
+			{1, 1, 2, 0},
+			{0, 0, 1, 2},
+			{0, 2, 0, 1},
+			{1, 1, 1, 1},
+			{1, 2, 2, 2},
+		},
+		{
+			{1, 2, 2, 0},
+			{0, 0, 1, 1},
+			{0, 1, 0, 2},
+			{1, 1, 2, 1},
+			{1, 2, 1, 2},
+		},
+		{
+			{1, 1, 2, 0},
+			{0, 0, 1, 1},
+			{0, 2, 0, 2},
+			{1, 1, 1, 2},
+			{1, 2, 2, 1},
+		},
+		{
+			{1, 1, 1, 1},
+			{0, 1, 1, 2},
+			{0, 1, 2, 1},
+			{1, 0, 1, 2},
+			{1, 0, 2, 1},
+		},
+		{
+			{1, 1, 1, 1},
+			{0, 2, 1, 1},
+			{1, 1, 0, 2},
+			{1, 1, 2, 0},
+			{2, 0, 1, 1},
+		},
+		{
+			{1, 1, 1, 1},
+			{0, 1, 2, 1},
+			{1, 0, 1, 2},
+			{1, 2, 1, 0},
+			{2, 1, 0, 1},
+		},
+		{
+			{1, 1, 1, 1},
+			{0, 1, 1, 2},
+			{1, 0, 2, 1},
+			{1, 2, 0, 1},
+			{2, 1, 1, 0},
+		},
+		{
+			{0, 1, 1, 1},
+			{0, 0, 0, 1},
+			{0, 0, 1, 0},
+			{0, 1, 0, 0},
+			{1, 1, 1, 1},
+		},
+		{
+			{0, 1, 1, 1},
+			{0, 0, 1, 0},
+			{0, 1, 0, 0},
+			{1, 0, 0, 0},
+			{1, 1, 1, 2},
+		},
+		{
+			{0, 1, 1, 2},
+			{0, 0, 1, 0},
+			{0, 1, 0, 0},
+			{1, 0, 0, 0},
+			{1, 1, 1, 1},
+		},
+		{
+			{1, 1, 1, 2},
+			{0, 0, 1, 0},
+			{0, 1, 0, 0},
+			{0, 1, 1, 1},
+			{1, 1, 1, 0},
+		},
+		{
+			{1, 1, 1, 2},
+			{0, 0, 1, 0},
+			{0, 1, 0, 0},
+			{0, 1, 1, 1},
+			{1, 0, 1, 1},
+		},
+		{
+			{1, 1, 1, 1},
+			{0, 0, 1, 0},
+			{0, 1, 0, 0},
+			{0, 1, 1, 2},
+			{1, 1, 1, 0},
+		},
+		{
+			{0, 0, 1, 1},
+			{0, 2, 1, 1},
+			{1, 0, 0, 0},
+			{1, 1, 0, 2},
+			{1, 1, 2, 0},
+		},
+		{
+			{0, 1, 0, 1},
+			{0, 1, 2, 1},
+			{1, 0, 0, 0},
+			{1, 0, 1, 2},
+			{1, 2, 1, 0},
+		},
+		{
+			{0, 1, 0, 0},
+			{0, 1, 1, 1},
+			{0, 1, 2, 2},
+			{1, 0, 1, 1},
+			{1, 1, 1, 2},
+		},
+		{
+			{0, 1, 0, 0},
+			{0, 1, 1, 2},
+			{0, 1, 2, 1},
+			{1, 0, 1, 2},
+			{1, 1, 1, 1},
+		},
+		{
+			{0, 0, 1, 0},
+			{0, 1, 1, 1},
+			{1, 0, 1, 1},
+			{1, 1, 1, 0},
+			{1, 1, 1, 2},
+		},
+		{
+			{0, 0, 1, 0},
+			{0, 1, 1, 1},
+			{1, 0, 1, 1},
+			{1, 1, 0, 1},
+			{1, 1, 1, 2},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 1, 1, 2},
+			{1, 0, 2, 1},
+			{1, 1, 1, 1},
+			{1, 2, 0, 1},
+		},
+		{
+			{0, 1, 1, 0},
+			{0, 1, 1, 2},
+			{1, 0, 0, 0},
+			{1, 0, 2, 1},
+			{1, 2, 0, 1},
+		},
+		{
+			{1, 1, 1, 2},
+			{0, 1, 1, 1},
+			{1, 0, 1, 1},
+			{1, 1, 0, 1},
+			{1, 1, 1, 0},
+		},
+		{
+			{0, 1, 1, 1},
+			{0, 0, 0, 1},
+			{0, 0, 1, 0},
+			{1, 0, 0, 0},
+			{1, 1, 1, 1},
+		},
+		{
+			{1, 0, 1, 1},
+			{0, 0, 0, 1},
+			{0, 0, 1, 0},
+			{0, 1, 0, 0},
+			{1, 1, 1, 1},
+		},
+		{
+			{1, 1, 1, 1},
+			{0, 0, 0, 1},
+			{0, 0, 1, 0},
+			{0, 1, 1, 1},
+			{1, 0, 1, 1},
+		},
+		{
+			{1, 1, 1, 2},
+			{0, 0, 1, 0},
+			{0, 1, 1, 1},
+			{1, 0, 0, 0},
+			{1, 1, 1, 0},
+		},
+		{
+			{1, 1, 1, 1},
+			{0, 0, 1, 0},
+			{0, 1, 0, 0},
+			{1, 0, 1, 2},
+			{1, 1, 1, 0},
+		},
+		{
+			{1, 1, 0, 2},
+			{0, 0, 1, 1},
+			{0, 0, 2, 1},
+			{0, 1, 0, 0},
+			{1, 0, 0, 0},
+		},
+		{
+			{0, 0, 1, 1},
+			{0, 1, 0, 0},
+			{1, 0, 0, 0},
+			{1, 1, 0, 2},
+			{1, 1, 2, 1},
+		},
+		{
+			{0, 0, 2, 1},
+			{0, 1, 0, 0},
+			{1, 0, 0, 0},
+			{1, 1, 0, 2},
+			{1, 1, 1, 1},
+		},
+		{
+			{1, 1, 1, 1},
+			{0, 0, 1, 0},
+			{0, 1, 1, 2},
+			{1, 0, 0, 0},
+			{1, 1, 1, 0},
+		},
+		{
+			{0, 0, 1, 1},
+			{0, 1, 0, 0},
+			{0, 1, 1, 1},
+			{1, 0, 0, 0},
+			{1, 0, 1, 1},
+		},
+		{
+			{1, 1, 1, 2},
+			{0, 1, 0, 0},
+			{0, 1, 1, 1},
+			{1, 0, 0, 0},
+			{1, 0, 1, 1},
+		},
+		{
+			{1, 1, 1, 1},
+			{0, 1, 0, 0},
+			{0, 1, 1, 2},
+			{0, 1, 2, 1},
+			{1, 0, 0, 0},
+		},
+		{
+			{1, 1, 1, 1},
+			{0, 1, 0, 0},
+			{0, 1, 1, 2},
+			{1, 0, 0, 0},
+			{1, 0, 2, 1},
+		},
+		{
+			{1, 1, 1, 2},
+			{0, 0, 1, 0},
+			{0, 1, 0, 0},
+			{1, 0, 1, 1},
+			{1, 1, 1, 0},
+		},
+		{
+			{1, 1, 1, 1},
+			{0, 1, 0, 0},
+			{0, 1, 2, 1},
+			{1, 0, 0, 0},
+			{1, 0, 1, 2},
+		},
+		{
+			{1, 1, 1, 2},
+			{0, 0, 1, 0},
+			{0, 1, 0, 0},
+			{1, 0, 1, 1},
+			{1, 1, 0, 1},
+		},
+		{
+			{1, 1, 1, 2},
+			{0, 0, 1, 0},
+			{0, 1, 1, 1},
+			{1, 0, 0, 0},
+			{1, 1, 0, 1},
+		},
+		{
+			{0, 1, 0, 0},
+			{0, 0, 1, 1},
+			{0, 1, 1, 1},
+			{1, 0, 0, 2},
+			{1, 1, 2, 1},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 0, 1, 2},
+			{0, 0, 2, 2},
+			{0, 1, 0, 1},
+			{1, 1, 0, 1},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 0, 1, 2},
+			{0, 1, 0, 1},
+			{1, 1, 0, 1},
+			{1, 1, 2, 2},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 0, 1, 1},
+			{0, 1, 0, 2},
+			{0, 2, 2, 0},
+			{1, 0, 1, 1},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 0, 2, 2},
+			{0, 1, 0, 1},
+			{1, 1, 0, 1},
+			{1, 1, 1, 2},
+		},
+		{
+			{0, 0, 1, 1},
+			{1, 0, 0, 0},
+			{1, 0, 1, 1},
+			{1, 1, 1, 2},
+			{1, 2, 2, 1},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 0, 1, 1},
+			{0, 1, 2, 0},
+			{0, 2, 0, 2},
+			{1, 0, 1, 1},
+		},
+		{
+			{0, 1, 0, 0},
+			{0, 0, 1, 1},
+			{0, 0, 2, 1},
+			{1, 0, 0, 2},
+			{1, 1, 0, 2},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 0, 1, 1},
+			{0, 0, 2, 1},
+			{0, 1, 0, 2},
+			{1, 1, 0, 2},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 0, 1, 1},
+			{0, 1, 0, 2},
+			{1, 1, 0, 2},
+			{1, 1, 2, 1},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 0, 1, 2},
+			{0, 2, 0, 1},
+			{1, 1, 1, 1},
+			{1, 1, 2, 0},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 0, 2, 1},
+			{0, 1, 0, 2},
+			{1, 1, 1, 1},
+			{1, 2, 1, 0},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 0, 2, 1},
+			{0, 2, 1, 0},
+			{1, 1, 0, 2},
+			{1, 1, 1, 1},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 1, 0, 2},
+			{0, 2, 1, 0},
+			{1, 0, 2, 1},
+			{1, 1, 1, 1},
+		},
+		{
+			{0, 1, 0, 0},
+			{0, 0, 2, 2},
+			{1, 0, 0, 1},
+			{1, 1, 0, 1},
+			{1, 1, 1, 2},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 0, 2, 1},
+			{0, 1, 0, 2},
+			{1, 1, 0, 2},
+			{1, 1, 1, 1},
+		},
+		{
+			{0, 1, 0, 0},
+			{0, 0, 1, 2},
+			{0, 0, 2, 2},
+			{1, 0, 0, 1},
+			{1, 1, 0, 1},
+		},
+		{
+			{0, 1, 0, 0},
+			{0, 0, 1, 2},
+			{1, 0, 0, 1},
+			{1, 1, 0, 1},
+			{1, 1, 2, 2},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 1, 2, 0},
+			{0, 2, 0, 1},
+			{1, 0, 1, 2},
+			{1, 1, 1, 1},
+		},
+		{
+			{0, 1, 0, 0},
+			{0, 0, 2, 1},
+			{1, 0, 0, 2},
+			{1, 1, 0, 2},
+			{1, 1, 1, 1},
+		},
+		{
+			{1, 0, 0, 0},
+			{0, 0, 1, 2},
+			{0, 1, 2, 0},
+			{1, 1, 1, 1},
+			{1, 2, 0, 1},
+		},
+		{
+			{0, 1, 0, 0},
+			{0, 0, 1, 1},
+			{1, 0, 0, 2},
+			{1, 1, 0, 2},
+			{1, 1, 2, 1},
+		},
+		{
+			{1, 1, 0, 1},
+			{0, 0, 2, 2},
+			{0, 2, 1, 0},
+			{1, 0, 0, 1},
+			{1, 1, 1, 2},
+		},
+		{
+			{1, 1, 0, 2},
+			{0, 0, 2, 1},
+			{0, 2, 1, 0},
+			{1, 0, 0, 2},
+			{1, 1, 1, 1},
+		},
+		{
+			{1, 0, 1, 1},
+			{0, 1, 2, 0},
+			{0, 2, 0, 2},
+			{1, 0, 0, 1},
+			{1, 1, 1, 2},
+		},
+		{
+			{1, 0, 1, 2},
+			{0, 1, 2, 0},
+			{0, 2, 0, 1},
+			{1, 0, 0, 2},
+			{1, 1, 1, 1},
+		},
+		{
+			{0, 1, 1, 1},
+			{0, 0, 1, 0},
+			{0, 1, 0, 0},
+			{1, 0, 0, 2},
+			{1, 1, 1, 1},
+		},
+		{
+			{0, 0, 1, 1},
+			{0, 1, 0, 0},
+			{0, 1, 1, 1},
+			{1, 0, 0, 0},
+			{1, 1, 1, 2},
+		},
+		{
+			{0, 1, 0, 1},
+			{0, 0, 1, 0},
+			{0, 1, 1, 1},
+			{1, 0, 0, 0},
+			{1, 1, 1, 2},
+		},
+	};
 
-	/** Load cannon, grid, mirror, animation, and audio resources. */
 	void loadResources();
-
-	/** Configure cell geometry for the selected level. */
 	void buildGrid();
-	/** Generate visible traits for each active Fleen. */
-	void generateFleenTraits();
+	void generateEasyPanel();
+	void permute(int *values, int count);
+	int compareTraits(int first, int second) const;
+	void loadNextProjectile();
+	void startFlight(const Common::Point32 &start, const Common::Point32 &end, int step);
+	void finishShot();
+	void finishCatch();
+	void startRetreat();
+	void playEffect(int index);
+	void queueSpeech(const Common::String &path);
+	void updateSpeech();
+	void drawCell(ManagedSurface32 *screen, const Cell &cell, bool active) const;
+	static int direction(const Common::Point32 &start, const Common::Point32 &end, int sectors);
+	static void onFleenAnimationDone(void *context, ZoombiniRunner *runner);
+	PathObject *makeLine(const Common::Point32 &start, const Common::Point32 &end, int step);
 
-	/** Convert target position into the nearest cannon angle. */
-	int computeCannonAngle(const Common::Point32 &targetPos) const;
-	/** Count traits shared by the current Zoombini and Fleen @p fleenIdx. */
-	int countMatchingTraits(int fleenIdx) const;
-	/** Start the projectile phase after the cannon finishes aiming. */
-	void fireCannon();
-	/** Capture Fleen @p fleenIdx and release the current Zoombini. */
-	void catchFleen(int fleenIdx);
-	/** Apply miss feedback and consume one mirror. */
-	void missFleen();
-	/** Move the next puzzle-roster entry to the cannon. */
-	void advanceToNextZoombini();
-	/** Finish the round when its success or failure condition is met. */
-	void checkCompletion();
-	/** Convert grid coordinates to a Fleen index, or return `-1`. */
-	int fleenIndexAt(int col, int row) const;
-
-	/** Draw every active Fleen grid cell. */
-	void drawGrid(ManagedSurface32 *screen);
-	/** Draw the cannon at its current angle. */
-	void drawCannon(ManagedSurface32 *screen);
-	/** Draw the projectile while it is in flight. */
-	void drawCannonball(ManagedSurface32 *screen);
-	/** Draw remaining and consumed chance mirrors. */
-	void drawMirrors(ManagedSurface32 *screen);
-	/** Draw the current and already released Zoombinis. */
-	void onRenderActors(ManagedSurface32 *screen) override;
-
-	/** Level in the range one through four. */
+	Cell _cells[72];
+	Cell _easyHistory[36];
 	int _level = 1;
-	/** Number of columns in the active grid. */
-	int _gridCols = 3;
-	/** Number of rows in the active grid. */
-	int _gridRows = 2;
-	/** Number of active Fleens. */
-	int _numFleens = 6;
-	/** Puzzle-roster size before any Zoombinis are released. */
-	uint _initialZoombiniCount = 0;
-	/** Number of Zoombinis already released. */
-	int _freedCount = 0;
-	/** Puzzle-roster index currently at the cannon. */
-	uint _currentZoombini = 0;
-	/** Selected Fleen index, or `-1` when none is selected. */
-	int _selectedFleen = -1;
-	/** Current interaction phase. */
-	GameState _gameState = kStateIdle00;
-	/** Time at which the current phase began. */
-	uint32 _actionTimer = 0;
-
-	/** Current grid panel cycled by level one. */
-	int _gridPage = 0;
-
-	/** Fleen grid storage sized for the largest level. */
-	FleenCell _fleens[kMaxFleens] = {};
-
-	/** Screen origin of the active grid. */
-	Common::Point32 _gridOrigin = Common::Point32(380, 200);
-
-	/** Current cannon angle index. */
-	int _cannonAngle = 4;
-	/** Target cannon angle index. */
+	int _columns = 3;
+	int _cellCount = 6;
+	int _panel = 0;
+	int _target = 0;
+	int _alternateTarget = 0;
+	int _clickCount = 0;
+	int _selected = -1;
+	int _ballsLeft = 0;
+	int _initialPartyCount = 0;
+	int _loadedRunner = -1;
+	int _angle = 4;
 	int _targetAngle = 4;
-	/** Selected Fleen grid column. */
-	int _targetCol = 0;
-	/** Selected Fleen grid row. */
-	int _targetRow = 0;
-
-	/** Current projectile position. */
-	Common::Point32 _cannonballPos = Common::Point32();
-	/** Projectile position at the muzzle. */
-	Common::Point32 _cannonballStartPos = Common::Point32();
-	/** Projectile target at the selected Fleen. */
-	Common::Point32 _cannonballEndPos = Common::Point32();
-	/** Fixed-point projectile progress from zero through one thousand. */
-	int _cannonballProgress = 0;
-
-	/** Number of chance mirrors still available. */
-	int _mirrorsLeft = 12;
-	/** Initial mirror allowance for the selected level. */
-	int _mirrorsTotal = 12;
-
-	/** Cannon visuals indexed by angle. */
-	RleBlock *_cannonImage[kNumCannonAngles] = {};
-	/** Background restored around the rotating cannon. */
-	RleBlock *_cannonCache = nullptr;
-	/** Active grid-cell background. */
-	RleBlock *_slotActiveImage = nullptr;
-	/** Empty grid-cell background. */
-	RleBlock *_slotEmptyImage = nullptr;
-	/** Selected-cell cursor overlay. */
-	RleBlock *_slotCursorImage = nullptr;
-	/** Mirror visuals indexed by @ref PuzzleWallOfFleens::MirrorState. */
-	RleBlock *_mirrorImage[kNumMirrorStates] = {};
-	/** Cannon nozzle visual. */
-	RleBlock *_tuyereImage = nullptr;
-	/** Progress indicators for released Zoombinis. */
-	RleBlock *_levelRedImage[kNumLevelIndicators] = {};
-	/** Successful-capture highlight. */
-	RleBlock *_highlightImage = nullptr;
-
-	/** Background lava-bubble animation. */
-	Animation *_lavaBubbleAnim = nullptr;
-	/** Mirror-breaking animation. */
-	Animation *_mirrorExplodeAnim = nullptr;
-
+	int _projectileCell = 4;
+	int _projectileImage = 1;
+	int _caughtTargets = 0;
+	int _shoutCount = 0;
+	bool _resetting = false;
+	bool _finished = false;
+	bool _retreating = false;
+	bool _shotConsumed = true;
+	bool _foundPrimary = false;
+	bool _foundSecondary = false;
+	bool _goTransitionPending = false;
+	ShotPhase _shotPhase = ShotPhase::kStopped05;
+	MirrorPhase _mirrorPhase = MirrorPhase::kNone00;
+	uint32 _aimTick = 0;
+	uint32 _mirrorTick = 0;
+	uint32 _nextAmbientTick = 0;
+	PathObject *_projectilePath = nullptr;
+	PathObject *_railPaths[12] = {};
+	Common::Point32 _railPositions[12];
+	Common::Point32 _projectilePos;
+	ZoombiniRunner _fleensRunner;
+	ZoombiniRunner _projectileRunner;
+	const ZoombiniAnimation *_fleensAnimation = nullptr;
+	const ZoombiniAnimation *_vocif1 = nullptr;
+	const ZoombiniAnimation *_vocif2 = nullptr;
+	const ZoombiniAnimation *_cannonAnimation = nullptr;
+	const ZoombiniAnimation *_jumpAnimation = nullptr;
+	const ZoombiniAnimation *_celebrationAnimation = nullptr;
+	Animation *_rotate = nullptr;
+	Animation *_explode = nullptr;
+	int _sounds[8];
+	int _ambientSounds[3];
+	int _speechSound = -1;
+	Common::Array<Common::String> _speechQueue;
 };
 
-} // End of namespace Zoombini2
+} // namespace Zoombini2
 
-#endif // ZOOMBINI2_PAGES_PUZZLE_WALLOFFLEENS_H
+#endif

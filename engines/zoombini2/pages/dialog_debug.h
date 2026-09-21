@@ -32,7 +32,6 @@ namespace Zoombini2 {
 class Zoombini2Engine;
 class Animation;
 class ManagedSurface32;
-class RleBlock;
 
 /**
  * One debug view request for @ref DialogDebug.
@@ -106,8 +105,6 @@ private:
 	void freeAnimation();
 	/** Return the number of frames in the loaded animation view. */
 	int getFrameCount() const;
-	/** Return the frame shown at the current index, or nullptr. */
-	const RleBlock *getCurrentFrame() const;
 	/** Refresh the animation title from the current frame index. */
 	void updateAnimationTitle();
 
@@ -121,14 +118,13 @@ private:
 	Common::String _titleText;
 	/** Loaded animation for the animation view, or nullptr. */
 	Animation *_animation = nullptr;
-	/** Loaded sprite for the single-frame animation view, or nullptr. */
-	RleBlock *_sprite = nullptr;
+	/** Whether the active animation view uses one page-cached RLE sprite. */
+	bool _singleFrameSprite = false;
 	/** Resource path of the loaded animation or sprite. */
 	Common::Path _animPath;
 	/** Zero-based index of the displayed animation frame. */
 	int _frameIndex = 0;
 	/** System tick captured when the overlay paused gameplay. */
-	uint32 _pauseStartTime = 0;
 };
 
 } // End of namespace Zoombini2

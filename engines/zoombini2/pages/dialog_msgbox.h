@@ -30,9 +30,6 @@
 
 namespace Zoombini2 {
 
-class BitBlock;
-class RleBlock;
-
 /** Numeric result supplied to a shared confirmation callback. */
 enum class DialogMsgBoxButton {
 	kNone00 = 0,
@@ -51,8 +48,9 @@ enum class DialogMsgBoxState {
  * Reusable two-button confirmation dialog shared by pages and controls.
  *
  * A request supplies only its text resource, position, text offset, and
- * completion callback. The dialog owns the panel resources, saved screen
- * rectangle, pause lifecycle, hover state, and exclusive input routing.
+ * completion callback. The dialog borrows its panel resources from the graphics
+ * page cache and retains the saved screen rectangle, pause lifecycle, hover
+ * state, and exclusive input routing.
  */
 class DialogMsgBox : public DialogBase {
 public:
@@ -98,7 +96,7 @@ private:
 
 	/** Load request-specific resources and retain the covered screen rectangle. */
 	bool openDialog();
-	/** Release all resources loaded for the current request. */
+	/** Release the saved screen pixels for the current request. */
 	void releaseResources();
 	/** Return the dialog button under @p pos. */
 	DialogMsgBoxButton hitTest(const Common::Point &pos) const;
@@ -112,21 +110,16 @@ private:
 	/** Text bitmap offset relative to @ref DialogMsgBox::_position. */
 	Common::Point32 _textOffset = Common::Point32(17, 17);
 	/** Request-specific text bitmap path. */
-	Common::Path _textPath;
+	Common::String _textPath;
 	/** Callback owned for the lifetime of the request. */
 	Common::BaseCallback<DialogMsgBoxButton> *_callback = nullptr;
 	/** Button currently under the pointer. */
 	DialogMsgBoxButton _hoveredButton = DialogMsgBoxButton::kNone00;
 	/** Whether the retained panel rectangle must be recomposed. */
 	bool _redrawNeeded = false;
-	/** Neutral, OK-highlighted, and Cancel-highlighted panel sprites. */
-	RleBlock *_panels[3] = {};
-	/** Request-specific text bitmap. */
-	BitBlock *_textImage = nullptr;
 	/** Saved pixels covered by the panel. */
 	ManagedSurface32 *_savedBackground = nullptr;
 	/** System tick captured when the open dialog paused gameplay. */
-	uint32 _pauseStartTime = 0;
 };
 
 } // End of namespace Zoombini2

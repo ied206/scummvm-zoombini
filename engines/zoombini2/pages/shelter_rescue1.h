@@ -27,8 +27,6 @@
 
 namespace Zoombini2 {
 
-class BitBlock;
-class RleBlock;
 class ZoombiniAnimation;
 
 /** Rescue Site I waiting shelter and Route2/Route3 branch selector. */
@@ -36,7 +34,7 @@ class ShelterRescueSite1 : public ShelterRescueSiteBase {
 public:
 	/** Create Rescue Site I with page identifier four. */
 	explicit ShelterRescueSite1(Zoombini2Engine *vm);
-	/** Persist the Rescue Site I roster and release its route-selection resources. */
+	/** Persist the Rescue Site I roster and reset its hover state. */
 	~ShelterRescueSite1() override;
 
 	/** Load Rescue Site I resources and restore its waiting roster. */
@@ -189,20 +187,6 @@ private:
 	/** Snap a dropped Zoombini into a departure seat. */
 	static void seatDropCallback(void *context, int targetIndex, int zoombiniIndex);
 
-	/** Portal body, drawn only once eight members have arrived in total. */
-	RleBlock *_portal = nullptr;
-	/** Portal foreground. */
-	RleBlock *_portalTop = nullptr;
-	/** Foreground overlay. */
-	RleBlock *_cramure = nullptr;
-	/** Inactive left route arrow. */
-	BitBlock *_arrowLeftOff = nullptr;
-	/** Highlighted left route arrow. */
-	BitBlock *_arrowLeftOn = nullptr;
-	/** Inactive right route arrow. */
-	BitBlock *_arrowRightOff = nullptr;
-	/** Highlighted right route arrow. */
-	BitBlock *_arrowRightOn = nullptr;
 	/** Left route-arrow draw position. */
 	Common::Point32 _arrowLeftPos = Common::Point32();
 	/** Right route-arrow draw position. */
@@ -211,8 +195,6 @@ private:
 	Common::Point32 _portalPos = Common::Point32();
 	/** Portal-foreground draw position. */
 	Common::Point32 _portalTopPos = Common::Point32();
-	/** Foreground-overlay draw position. */
-	Common::Point32 _cramurePos = Common::Point32();
 	/** Shared little-Zoombini grid borrowed for boarding actives. */
 	const ZoombiniAnimation *_littleZombAnimation = nullptr;
 	/** Shared pickup grid borrowed for boarding actives. */

@@ -69,19 +69,12 @@ ShelterRescueSite1::~ShelterRescueSite1() {
 	saveRescueRoster(getRescueBoard());
 
 	_vm->setHoverCursorActive(false);
-	delete _portal;
-	delete _portalTop;
-	delete _cramure;
-	delete _arrowLeftOff;
-	delete _arrowLeftOn;
-	delete _arrowRightOff;
-	delete _arrowRightOn;
 }
 
 void ShelterRescueSite1::init() {
 	debug(1, "ShelterRescueSite1::init");
 
-	if (!_vm->_gfx->loadBackground(Common::Path(kBackgroundPath)))
+	if (!_vm->_gfx->loadBackground(kBackgroundPath))
 		warning("ShelterRescueSite1: Failed to load background");
 	_vm->getScreen()->fillRect(Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), 0);
 	_vm->_gfx->drawBackground(_vm->getScreen(), Common::Point32(0, 0));
@@ -91,32 +84,19 @@ void ShelterRescueSite1::init() {
 	_arrowRightPos = Common::Point32(641, 253);
 	_portalPos = Common::Point32(520, 84);
 	_portalTopPos = Common::Point32(518, 99);
-	_cramurePos = Common::Point32(311, 99);
 
 	loadSelector(kSelectorPath);
 
-	_portal = new RleBlock(_vm);
-	_portal->loadFromFile(Common::Path(kPortalPath));
+	_vm->_gfx->loadPageRleBlock(kPortalPath);
+	_vm->_gfx->loadPageRleBlock(kPortalTopPath);
 
-	_portalTop = new RleBlock(_vm);
-	_portalTop->loadFromFile(Common::Path(kPortalTopPath));
+	_vm->_gfx->loadPageRleBlock(kPorteSelectorPath);
 
-	loadPorteSelector(kPorteSelectorPath);
-
-	_cramure = new RleBlock(_vm);
-	_cramure->loadFromFile(Common::Path(kCramurePath));
-
-	_arrowLeftOff = new BitBlock(_vm);
-	_arrowLeftOff->loadFromBB(Common::Path(kArrowLeftOffPath));
-
-	_arrowLeftOn = new BitBlock(_vm);
-	_arrowLeftOn->loadFromBB(Common::Path(kArrowLeftOnPath));
-
-	_arrowRightOff = new BitBlock(_vm);
-	_arrowRightOff->loadFromBB(Common::Path(kArrowRightOffPath));
-
-	_arrowRightOn = new BitBlock(_vm);
-	_arrowRightOn->loadFromBB(Common::Path(kArrowRightOnPath));
+	_vm->_gfx->loadPageRleBlock(kCramurePath);
+	_vm->_gfx->loadPageBitBlock(kArrowLeftOffPath);
+	_vm->_gfx->loadPageBitBlock(kArrowLeftOnPath);
+	_vm->_gfx->loadPageBitBlock(kArrowRightOffPath);
+	_vm->_gfx->loadPageBitBlock(kArrowRightOnPath);
 
 	loadScrollButtons(kScrollLeftPath, kScrollRightPath);
 	startPageMusic(Common::Path(kMusicPath));
@@ -485,57 +465,46 @@ void ShelterRescueSite1::onRenderContent(ManagedSurface32 *screen) {
 		drawWaitingBoard(screen, 0);
 	}
 	// The original draws the door-selection overlay over the waiting grid on every grid update, beneath the scroll controls.
-	if (RleBlock *porteSelect = getPorteSelector())
-		porteSelect->drawToScreen(screen, kRosterGridBasePos, _vm->getAlphaLUT());
+	_vm->_gfx->drawPageRleBlock(screen, kPorteSelectorPath, kRosterGridBasePos);
 
 	// The original shows frame 1 on an idle button and frame 0 only while that
 	// button's own scroll animation is running.
 	if (_buttonUp && 0 < _buttonUp->getFrameCount()) {
-		const int frame = (1 < _buttonUp->getFrameCount()) ? ((_scrollPhase == kScrollPhaseUp04) ? 0 : 1) : 0;
-		const RleBlock *frameBlock = _buttonUp->getFrame(frame);
-		if (frameBlock)
-			frameBlock->drawToScreen(screen, _buttonUpPos, _vm->getAlphaLUT());
+		int frame = 0;
+		if (1 < _buttonUp->getFrameCount() && _scrollPhase != kScrollPhaseUp04)
+			frame = 1;
+		_vm->_gfx->drawAnimationFrame(screen, _buttonUp, frame, _buttonUpPos);
 	}
 
 	if (_buttonDown && 0 < _buttonDown->getFrameCount()) {
-		const int frame = (1 < _buttonDown->getFrameCount()) ? ((_scrollPhase == kScrollPhaseDown06) ? 0 : 1) : 0;
-		const RleBlock *frameBlock = _buttonDown->getFrame(frame);
-		if (frameBlock)
-			frameBlock->drawToScreen(screen, _buttonDownPos, _vm->getAlphaLUT());
+		int frame = 0;
+		if (1 < _buttonDown->getFrameCount() && _scrollPhase != kScrollPhaseDown06)
+			frame = 1;
+		_vm->_gfx->drawAnimationFrame(screen, _buttonDown, frame, _buttonDownPos);
 	}
 
 	drawBoardingActives(screen);
 }
 
 void ShelterRescueSite1::onRenderSite(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	// The original draws the closed stone door at the portal position, and slides it up off-screen once the ship arrives.
-	if (_portal && _portal->isValid()) {
-		if (_shipVisible)
-			_portal->drawToScreenClipped(screen, Common::Point32(_portalPos.x, -130), Common::Rect32(0, 100, 800, 600), lut);
-		else
-			_portal->drawToScreen(screen, _portalPos, lut);
-	}
+	if (_shipVisible)
+		_vm->_gfx->drawPageRleBlockClipped(screen, kPortalPath, Common::Point32(_portalPos.x, -130), Common::Rect32(0, 100, 800, 600));
+	else
+		_vm->_gfx->drawPageRleBlock(screen, kPortalPath, _portalPos);
 
-	if (_portalTop && _portalTop->isValid())
-		_portalTop->drawToScreen(screen, _portalTopPos, lut);
-	// The original never draws the cramure sprite; it only sizes a background snapshot. Drawing it here would smear smoke streaks over the machine.
+	_vm->_gfx->drawPageRleBlock(screen, kPortalTopPath, _portalTopPos);
+	// The cramure sprite is cached for site setup but is not composited over the machine.
 
 	if (_vm->_routeDirection == RouteBranch::kLeft01) {
-		if (_arrowLeftOn)
-			_arrowLeftOn->drawToSurface(screen, _arrowLeftPos);
-		if (_arrowRightOff)
-			_arrowRightOff->drawToSurface(screen, _arrowRightPos);
+		_vm->_gfx->drawPageBitBlock(screen, kArrowLeftOnPath, _arrowLeftPos);
+		_vm->_gfx->drawPageBitBlock(screen, kArrowRightOffPath, _arrowRightPos);
 	} else if (_vm->_routeDirection == RouteBranch::kRight02) {
-		if (_arrowLeftOff)
-			_arrowLeftOff->drawToSurface(screen, _arrowLeftPos);
-		if (_arrowRightOn)
-			_arrowRightOn->drawToSurface(screen, _arrowRightPos);
+		_vm->_gfx->drawPageBitBlock(screen, kArrowLeftOffPath, _arrowLeftPos);
+		_vm->_gfx->drawPageBitBlock(screen, kArrowRightOnPath, _arrowRightPos);
 	} else {
-		if (_arrowLeftOff)
-			_arrowLeftOff->drawToSurface(screen, _arrowLeftPos);
-		if (_arrowRightOff)
-			_arrowRightOff->drawToSurface(screen, _arrowRightPos);
+		_vm->_gfx->drawPageBitBlock(screen, kArrowLeftOffPath, _arrowLeftPos);
+		_vm->_gfx->drawPageBitBlock(screen, kArrowRightOffPath, _arrowRightPos);
 	}
 }
 
