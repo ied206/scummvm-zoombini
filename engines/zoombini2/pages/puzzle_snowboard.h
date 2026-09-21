@@ -62,13 +62,19 @@ public:
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
 	/** Queue the original Go speech before leaving a saved game. */
 	bool onGoButtonPressed() override;
+	/** Return whether the ride sequence has completed enough successful exits to leave. */
+	bool canUseGoButton() const override;
+	/** Describe the generated decision tree and classified rider routes for the console. */
 	Common::String debugGetAnswer() const override;
+	/** Report remaining collision tolerance as the puzzle's chance count. */
 	PuzzleChanceInfo debugGetChances() const override;
+	/** Return whether the console can alter collision tolerance between rides. */
 	bool debugCanSetChances() const override;
+	/** Set collision tolerance and synchronize the completed/Go state for the console. */
 	bool debugSetChances(int remaining) override;
 
 private:
-	/** Music and resource paths used by the snowboard scene. */
+	/** Music, trait icons, PAT ride paths, board art, scenery, and obstacle art. */
 	static constexpr const char *kMusicPath = "#sounds/music/01-BS06.wav";
 	static constexpr const char *kTraitFormat = "bmp/snowboard/traits/%d-%d";
 	static constexpr const char *kPatFormat = "bmp/snowboard/pat/easy/%d.pat";
@@ -88,6 +94,7 @@ private:
 		41,
 		44,
 	};
+	/** Area mask, board and obstacle effects, collision/completion speech, and celebration animation. */
 	static constexpr const char *kAreaMaskPath = "bmp/snowboard/AREA.BMT";
 	static constexpr const char *kBoardReadySoundPath = "sounds/fx/01-BB02.wav";
 	static constexpr const char *kRideSoundPath = "sounds/fx/01-BS01.wav";
@@ -102,6 +109,7 @@ private:
 	static constexpr const char *kPerfectGoSpeechFormat = "sounds/WLD11.%d.wav";
 	static constexpr const char *kCaveGoSpeechPath = "sounds/DW-Cave.wav";
 	static constexpr const char *kCelebrationAnimationPath = "bmp/zombis/attente/attenteZomb.anm";
+	/** Counts for physical lanes, decision tests, exit slots, and animation-bank frame roles. */
 	static constexpr int kLaneCount = 4;
 	static constexpr int kRuleCount = 3;
 	static constexpr int kEndpointCount = 33;
@@ -133,6 +141,7 @@ private:
 
 	/** One page-local speech request and whether it gates another collision. */
 	struct SpeechEntry {
+		/** Resource path and collision gate associated with one queued speech item. */
 		Common::String path;
 		bool collision;
 	};
@@ -242,7 +251,7 @@ private:
 	/** Generated root and child trait tests for the current party. */
 	TreeNode _tree[kRuleCount] = {};
 	/** Board drop region used when a dragged rider is released. */
-	Common::Array<ZoombiniDropTarget> _dropTargets;
+	Common::Array<ZmbDropTarget> _dropTargets;
 	/** Shared celebration grid for successful riders after completion. */
 	const ZoombiniAnimation *_celebrationAnimation = nullptr;
 	/** One-shot board cover after the final rider is captured. */

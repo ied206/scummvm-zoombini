@@ -37,7 +37,7 @@ public:
 	explicit InteractiveBase(Zoombini2Engine *vm) : PageBase(vm, PageCategory::kInteractive) {}
 
 protected:
-	/** Resource path. */
+	/** Shared map soundtrack used by interactive pages that present the route map. */
 	static constexpr const char *kMapMusicPath = "#sounds/music/ZMR-MapScreen.wav";
 	/** Start this page's map soundtrack. */
 	void startMapMusic() { startPageMusic(Common::Path(kMapMusicPath)); }
@@ -60,10 +60,15 @@ public:
 	~Sidebar();
 	/** Poll input, consume one release, and paint visible controls or their active dialog. */
 	void drawAndHandleInput(ManagedSurface32 *screen, bool inputAllowed);
+	/** Arm a sidebar control release or route a press to the active Help overlay. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	/** Queue a sidebar control release or route it to the active Help overlay. */
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
+	/** Preserve normal event routing while the per-frame draw pass updates sidebar hover state. */
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
+	/** Route key presses to the active Help overlay. */
 	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
+	/** Route key releases to the active Help overlay when one is present. */
 	EventHandleResult onKeyUp(const Common::KeyState &key) override;
 	/** Return whether the active page exposes the sidebar. */
 	bool shouldShow() const;
@@ -75,25 +80,25 @@ public:
 	void restartGoBlink();
 
 private:
-	/** Resource path. */
+	/** Normal Help control sprite. */
 	static constexpr const char *kHelpNormalPath = "Bmp/BARRE/QUOI.RB";
-	/** Resource path. */
+	/** Highlighted Help control sprite. */
 	static constexpr const char *kHelpHighlightPath = "Bmp/BARRE/QUOIROLL.RB";
-	/** Resource path. */
+	/** Normal Map control sprite. */
 	static constexpr const char *kMapNormalPath = "Bmp/BARRE/PATH.RB";
-	/** Resource path. */
+	/** Highlighted Map control sprite. */
 	static constexpr const char *kMapHighlightPath = "Bmp/BARRE/PATHROLL.RB";
-	/** Resource path. */
+	/** Normal enabled Go control sprite. */
 	static constexpr const char *kGoNormalPath = "Bmp/BARRE/Next.rb";
-	/** Resource path. */
+	/** Highlighted Go control sprite. */
 	static constexpr const char *kGoHighlightPath = "Bmp/BARRE/NextRoll.rb";
-	/** Resource path. */
+	/** Disabled Go control sprite. */
 	static constexpr const char *kGoDisabledPath = "Bmp/BARRE/NextInvisible.rb";
-	/** Resource path. */
+	/** Sound played when the Help control opens its overlay. */
 	static constexpr const char *kHelpClickSoundPath = "sounds/fx/I-BS2.wav";
-	/** Resource path. */
+	/** Sound played when the Map control begins map-return handling. */
 	static constexpr const char *kMapClickSoundPath = "sounds/fx/I-BS1.wav";
-	/** Resource path. */
+	/** Confirmation panel shown before abandoning active gameplay for the map. */
 	static constexpr const char *kAbandonConfirmationPath = "bmp/menu/Quit_panel_text_abandon";
 
 	/** Return the active modal overlay, or nullptr. */
@@ -110,8 +115,8 @@ private:
 	void handleAbandonConfirmation(DialogMsgBoxButton button);
 	/** Save when required and return to the correct map mode. */
 	void returnToMap();
-	/** Start or advance the Go-button attention blink for @p pageId. */
-	void updateGoBlink(bool goEnabled, int pageId);
+	/** Advance or clear the explicitly requested Go-button attention blink for @p pageId. */
+	void updateGoBlink(bool goEnabled, PageId pageId);
 	/** Return whether @p pos is strictly inside @p rect. */
 	static bool isPointStrictlyInside(const Common::Rect &rect, const Common::Point &pos);
 	/** Return whether @p pos is in a fixed sidebar control region. */
@@ -154,14 +159,12 @@ private:
 	bool _pendingMouseRelease = false;
 	/** Pointer position paired with the pending primary-button release. */
 	Common::Point _pendingMouseReleasePos;
-	/** Go-enabled value observed during the previous draw. */
-	bool _goWasEnabled = false;
 	/** Whether the attention blink currently uses the highlighted sprite. */
 	bool _goBlinkHighlighted = false;
 	/** Number of attention-blink transitions still pending. */
 	int _goBlinkTogglesRemaining = 0;
 	/** Page identifier associated with the current Go-button blink state. */
-	int _goPageId = -1;
+	PageId _goPageId = kPageNone;
 	/** Gameplay tick at which the next attention-blink transition occurs. */
 	uint32 _goBlinkDeadline = 0;
 

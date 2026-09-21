@@ -44,9 +44,13 @@ public:
 
 	/** Load the dock and generate the level-selected ordering rules. */
 	void init() override;
+	/** Format active feature ordering and turtle assignments for the puzzle console. */
 	Common::String debugGetAnswer() const override;
+	/** Report remaining incorrect placements as the puzzle's chance count. */
 	PuzzleChanceInfo debugGetChances() const override;
+	/** Return whether the console may alter mistakes while no placement is resolving. */
 	bool debugCanSetChances() const override;
+	/** Set remaining mistakes and update the dock state for the puzzle console. */
 	bool debugSetChances(int remaining) override;
 	/** Advance the fall sequence, turtle spins, and departure start. */
 	void onUpdate() override;
@@ -64,11 +68,13 @@ public:
 	void onActorsRendered() override;
 
 private:
+	/** Perfect and retreat Go speech selected after the player leaves Turtle Hurdle. */
 	static constexpr const char *kGoSpeechFormat = "sounds/wld11.%d.wav";
 	static constexpr const char *kRetreatSpeech = "sounds/DW-Zville.wav";
+	/** Deferred Go transition flag and its currently playing speech handle. */
 	bool _goPending = false;
 	int _goSpeech = -1;
-	/** Resource paths and formats used by the turtle scene. */
+	/** Music, turtle/mother/dock art, trait icons, area mask, and Zoombini animations. */
 	static constexpr const char *kMusicPath = "#sounds/music/08-BS01.wav";
 	static constexpr const char *kTurtleIdleFormat = "Bmp/crazy_turtle/TORTUES/ATTENTE/%d/%d.AN";
 	static constexpr const char *kTurtleSpinFormat = "Bmp/crazy_turtle/TORTUES/tourbillonne/%d/%d.AN";
@@ -86,6 +92,7 @@ private:
 	static constexpr const char *kIdleZombAnimationPath = "bmp/zombis/attente/attenteZomb.anm";
 	static constexpr const char *kPickupZombAnimationPath = "bmp/zombis/pris/pris.anm";
 	static constexpr const char *kTombeAnimationPath = "bmp/zombis/tombe/tombe.anm";
+	/** Turtle, dock, placement, completion, and partial-completion audio resources. */
 	static constexpr const char *kTurtleIdleSoundPath = "sounds/fx/08-BS02.wav";
 	static constexpr const char *kSmokeSoundPath = "sounds/fx/08-BS03.wav";
 	static constexpr const char *kTurtleSpinSoundPath = "sounds/fx/08-BS04.wav";
@@ -258,7 +265,7 @@ private:
 	bool hasActiveTurtleRunner(int turtleIndex) const;
 	/** Draw the active turtle and smoke animation runners. */
 	void drawTurtleRunners(ManagedSurface32 *screen) const;
-	/** Drop-target callback forwarding to @ref handleTurtleClick. */
+	/** Drop-target callback forwarding to @ref PuzzleCrazyTurtle::handleTurtleClick. */
 	static void onTurtleDrop(void *context, int targetIndex, int zoombiniIndex);
 	/** Matched-placement completion: settle and check the full board. */
 	static void onWalkComplete(void *context, ZoombiniRunner *zoombini);
@@ -320,7 +327,7 @@ private:
 	/** Zoombini grid used while a Zoombini falls back to the dock. */
 	const ZoombiniAnimation *_tombeAnimation = nullptr;
 	/** One drop target per turtle. */
-	Common::Array<ZoombiniDropTarget> _turtleDropTargets;
+	Common::Array<ZmbDropTarget> _turtleDropTargets;
 	/** Party index assigned to each turtle by the rule ordering. */
 	int _turtleAssignments[kTurtleCount] = {};
 	/** Input locked while a placement or fall sequence runs. */

@@ -21,9 +21,11 @@
 
 #include "zoombini2/pages/dialog_help.h"
 #include "zoombini2/graphics.h"
+#include "zoombini2/metaengine.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/zoombini2.h"
 
+#include "common/config-manager.h"
 #include "common/file.h"
 #include "common/system.h"
 
@@ -78,37 +80,38 @@ const char *DialogHelp::getLevelString(int level) {
 	}
 }
 
-bool DialogHelp::isPageValid(int puzzleId, int level, int page) {
+bool DialogHelp::isPageValid(PageId pageId, int level, int sheet) {
 	// Construct help page path
-	Common::String path = Common::String::format(kHelpPageFormat, puzzleId, getLevelString(level), page);
+	Common::String path = Common::String::format(kHelpPageFormat, static_cast<int>(pageId), getLevelString(level), sheet);
 
 	// Check if file exists in archive
 	return _vm->hasResource(path);
 }
 
-bool DialogHelp::open(int puzzleId, int level) {
+bool DialogHelp::open(PageId pageId, int level) {
 	if (_isActive) {
 		return false; // Already open
 	}
 
-	// Check if page 1 exists
-	if (!isPageValid(puzzleId, level, 1)) {
-		debug("No help available for puzzle %d, level %d", puzzleId, level);
+	// Check if sheet 1 exists
+	if (!isPageValid(pageId, level, 1)) {
+		debug("No help available for page %d, level %d", static_cast<int>(pageId), level);
 		return false;
 	}
 
 	_isActive = true;
-	_currentPuzzleId = puzzleId;
+	_currentPageId = pageId;
 	_currentLevel = level;
-	_currentPage = 1;
+	_currentSheet = 1;
+	_transparentHelpPages = (_vm->getFeatures() & GF_Z2_SOLID_HELP_PAGES) != 0 && ConfMan.getBool(::Zoombini2MetaEngine::kConfigTransparentHelpPages);
 
 	_vm->setDialogPaused(true);
 
 	// Save current screen
 	_vm->_gfx->captureScreen(_savedScreen);
 
-	// Load first help page
-	if (!loadPage(puzzleId, level, 1)) {
+	// Load first help sheet
+	if (!loadPage(pageId, level, 1)) {
 		// Failed to load - close and return
 		close();
 		return false;
@@ -132,17 +135,18 @@ void DialogHelp::close() {
 
 	_vm->setDialogPaused(false);
 
-	_currentPuzzleId = -1;
+	_currentPageId = kPageNone;
 	_currentLevel = -1;
-	_currentPage = 1;
+	_currentSheet = 1;
+	_transparentHelpPages = false;
 }
 
-bool DialogHelp::loadPage(int puzzleId, int level, int page) {
-	// Free existing page
+bool DialogHelp::loadPage(PageId pageId, int level, int sheet) {
+	// Free existing sheet
 	freePage();
 
-	// Construct help page path
-	Common::String path = Common::String::format(kHelpPageFormat, puzzleId, getLevelString(level), page);
+	// Construct help sheet path
+	Common::String path = Common::String::format(kHelpPageFormat, static_cast<int>(pageId), getLevelString(level), sheet);
 
 	// Load help page
 	if (!_vm->_gfx->loadPageBitBlock(path))
@@ -162,12 +166,21 @@ void DialogHelp::onRenderContent(ManagedSurface32 *screen) {
 
 	screen->copyFrom(*_savedScreen);
 
-	// Draw help frame overlay (darkened background)
-	_vm->_gfx->drawSharedRleBlock(screen, kHelpFramePath, Common::Point32(0, 0));
+	// Draw the help frame without allowing the v1.0NL gray canvas to cover the saved screen.
+	if ((_vm->getFeatures() & GF_Z2_SOLID_HELP_FRAME) != 0) {
+		/** RGB component value of the v1.0NL frame's solid gray canvas. */
+		static constexpr byte nlBgKey = 128;
+		_vm->_gfx->drawSharedRleBlockColorKey(screen, kHelpFramePath, Common::Point32(0, 0), nlBgKey, nlBgKey, nlBgKey);
+	} else {
+		_vm->_gfx->drawSharedRleBlock(screen, kHelpFramePath, Common::Point32(0, 0));
+	}
 
 	// Draw the sheet inside the help frame.
 	if (!_helpPagePath.empty()) {
-		_vm->_gfx->drawPageBitBlock(screen, _helpPagePath, Common::Point32(135, 191));
+		if (_transparentHelpPages)
+			_vm->_gfx->drawPageBitBlockColorKey(screen, _helpPagePath, Common::Point32(135, 191));
+		else
+			_vm->_gfx->drawPageBitBlock(screen, _helpPagePath, Common::Point32(135, 191));
 	} else {
 		// Show placeholder if no help page loaded
 		_vm->_gfx->drawSharedRleBlock(screen, kPlaceholderPath, Common::Point32(0, 0));
@@ -180,14 +193,14 @@ void DialogHelp::onRenderContent(ManagedSurface32 *screen) {
 	_vm->_gfx->drawSharedBitBlock(screen, okPath, Common::Point32(_okButtonRect.left, _okButtonRect.top));
 
 	// Draw left arrow
-	bool leftEnabled = isPageValid(_currentPuzzleId, _currentLevel, _currentPage - 1);
+	bool leftEnabled = isPageValid(_currentPageId, _currentLevel, _currentSheet - 1);
 	const char *leftPath = kLeftArrowEmptyPath;
 	if (leftEnabled && _vm->_gfx->loadSharedBitBlock(kLeftArrowNormalPath))
 		leftPath = kLeftArrowNormalPath;
 	_vm->_gfx->drawSharedBitBlock(screen, leftPath, Common::Point32(_leftArrowRect.left, _leftArrowRect.top));
 
 	// Draw right arrow
-	bool rightEnabled = isPageValid(_currentPuzzleId, _currentLevel, _currentPage + 1);
+	bool rightEnabled = isPageValid(_currentPageId, _currentLevel, _currentSheet + 1);
 	const char *rightPath = kRightArrowEmptyPath;
 	if (rightEnabled && _vm->_gfx->loadSharedBitBlock(kRightArrowNormalPath))
 		rightPath = kRightArrowNormalPath;
@@ -216,21 +229,21 @@ EventHandleResult DialogHelp::onLButtonDown(const Common::Point &pos) {
 		return EventHandleResult::kConsumed;
 	}
 
-	// Left arrow - previous page
+	// Left arrow - previous sheet
 	if (_leftArrowRect.contains(pos)) {
-		if (isPageValid(_currentPuzzleId, _currentLevel, _currentPage - 1)) {
-			if (loadPage(_currentPuzzleId, _currentLevel, _currentPage - 1)) {
-				_currentPage -= 1;
+		if (isPageValid(_currentPageId, _currentLevel, _currentSheet - 1)) {
+			if (loadPage(_currentPageId, _currentLevel, _currentSheet - 1)) {
+				_currentSheet -= 1;
 			}
 		}
 		return EventHandleResult::kConsumed;
 	}
 
-	// Right arrow - next page
+	// Right arrow - next sheet
 	if (_rightArrowRect.contains(pos)) {
-		if (isPageValid(_currentPuzzleId, _currentLevel, _currentPage + 1)) {
-			if (loadPage(_currentPuzzleId, _currentLevel, _currentPage + 1)) {
-				_currentPage += 1;
+		if (isPageValid(_currentPageId, _currentLevel, _currentSheet + 1)) {
+			if (loadPage(_currentPageId, _currentLevel, _currentSheet + 1)) {
+				_currentSheet += 1;
 			}
 		}
 		return EventHandleResult::kConsumed;
