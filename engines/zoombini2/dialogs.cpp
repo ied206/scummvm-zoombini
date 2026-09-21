@@ -21,6 +21,7 @@
 
 #include "common/config-manager.h"
 #include "common/fs.h"
+#include "common/gui_options.h"
 #include "common/language.h"
 #include "common/savefile.h"
 #include "common/system.h"
@@ -539,6 +540,11 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	_enhancedKbdShortcutsCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.EnhancedKbdShortcuts",
 															Common::U32String("Enable enhanced keyboard shortcuts"),
 															Common::U32String("Enables some ScummVM-only keyboard shortcuts for quality of life improvements."));
+	if (Common::checkGameGUIOption(GAMEOPTION_HELP_PAGE_COLOR_KEYING, ConfMan.get("guioptions", domain))) {
+		_transparentHelpPagesCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.TransparentHelpPages",
+																Common::U32String("Remove solid color behind help text"),
+																Common::U32String("Uses the help sheet's corner color as a transparency key for affected releases."));
+	}
 
 	new SeparatorWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayAdjustmentSeparator");
 	header = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayAdjustment",
@@ -549,6 +555,9 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	_greedyWaterslideCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GreedyWaterslide",
 														Common::U32String("Use alternate Pipes of Paloo pairing"),
 														Common::U32String("Selects the alternate pairing branch for level one."));
+	_aquacubeSafeFirstMoveCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.AquacubeSafeFirstMove",
+															 Common::U32String("Protect Aqua Cube's first lever move"),
+															 Common::U32String("On level three, swaps the hidden axes of two levers if the first direct lever press would enter a Fleen cell."));
 	_originalPrngCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.OriginalPRNG",
 													Common::U32String("Use original random number generator (requires restart)"),
 													Common::U32String("Uses the original Windows engine's Visual C++ 6.0 CRT generator instead of ScummVM's default."));
@@ -581,11 +590,13 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 		.addWidget("StereoOutput", "Checkbox")
 		.addWidget("FloatingPointPaths", "Checkbox")
 		.addWidget("EnhancedKbdShortcuts", "Checkbox")
+		.addWidget("TransparentHelpPages", "Checkbox")
 		.addSpace(10)
 		.addWidget("GameplayAdjustmentSeparator", "", -1, 2)
 		.addWidget("GameplayAdjustment", "", -1, lineHeight)
 		.addWidget("DebugHotkeys", "Checkbox")
 		.addWidget("GreedyWaterslide", "Checkbox")
+		.addWidget("AquacubeSafeFirstMove", "Checkbox")
 		.addWidget("OriginalPRNG", "Checkbox")
 		.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
 		.addWidget("FrameRateLabel", "OptionsLabel")
@@ -601,8 +612,11 @@ void Zoombini2OptionsWidget::load() {
 	_stereoOutputCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigStereoOutput, _domain));
 	_floatingPointPathsCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths, _domain));
 	_enhancedKbdShortcutsCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _domain));
+	if (_transparentHelpPagesCheckbox)
+		_transparentHelpPagesCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigTransparentHelpPages, _domain));
 	_debugHotkeysCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigDebugHotkeys, _domain));
 	_greedyWaterslideCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _domain));
+	_aquacubeSafeFirstMoveCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove, _domain));
 	_originalPrngCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _domain));
 	const int frameRate = CLIP<int>(ConfMan.getInt(::Zoombini2MetaEngine::kConfigFrameRate, _domain),
 									::Zoombini2MetaEngine::kMinFrameRate, ::Zoombini2MetaEngine::kMaxFrameRate);
@@ -621,8 +635,11 @@ bool Zoombini2OptionsWidget::save() {
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigStereoOutput, _stereoOutputCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths, _floatingPointPathsCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _enhancedKbdShortcutsCheckbox->getState(), _domain);
+	if (_transparentHelpPagesCheckbox)
+		ConfMan.setBool(::Zoombini2MetaEngine::kConfigTransparentHelpPages, _transparentHelpPagesCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigDebugHotkeys, _debugHotkeysCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _greedyWaterslideCheckbox->getState(), _domain);
+	ConfMan.setBool(::Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove, _aquacubeSafeFirstMoveCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _originalPrngCheckbox->getState(), _domain);
 	ConfMan.setInt(::Zoombini2MetaEngine::kConfigFrameRate, frameRate, _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigUnlockFrameRate, _unlockFrameRateCheckbox->getState(), _domain);

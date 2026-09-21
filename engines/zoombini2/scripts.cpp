@@ -1105,8 +1105,7 @@ bool ZoombiniRunner::isStrictlyInside(const Common::Point32 &point, const Common
 	return rect.left < point.x && point.x < rect.right && rect.top < point.y && point.y < rect.bottom;
 }
 
-int ZoombiniRunner::findHoveredDropTarget(const ZoombiniRunner &zoombini, const Common::Point32 &pointerPos,
-										  const Common::Array<ZoombiniDropTarget> &targets) {
+int ZoombiniRunner::findHoveredDropTarget(const ZoombiniRunner &zoombini, const Common::Point32 &pointerPos, const Common::Array<ZmbDropTarget> &targets) {
 	const Common::Point32 footPoint(pointerPos.x - zoombini._dragOffset.x + 17, pointerPos.y - zoombini._dragOffset.y + 46);
 	int targetIndex = -1;
 	for (uint i = 0; i < targets.size(); i++) {
@@ -1116,8 +1115,7 @@ int ZoombiniRunner::findHoveredDropTarget(const ZoombiniRunner &zoombini, const 
 	return targetIndex;
 }
 
-int ZoombiniRunner::findReleaseDropTarget(const ZoombiniRunner &zoombini, const Common::Point32 &pointerPos,
-										  const Common::Array<ZoombiniDropTarget> &targets, int scrollX, int backgroundWidth) {
+int ZoombiniRunner::findReleaseDropTarget(const ZoombiniRunner &zoombini, const Common::Point32 &pointerPos, const Common::Array<ZmbDropTarget> &targets, int scrollX, int backgroundWidth) {
 	Common::Point32 footPoint(pointerPos.x - zoombini._dragOffset.x + 17, pointerPos.y - zoombini._dragOffset.y + 46);
 	if (backgroundWidth != AnimationRunner::kDefaultBackgroundWidth) {
 		footPoint.x += scrollX;
@@ -1132,10 +1130,10 @@ int ZoombiniRunner::findReleaseDropTarget(const ZoombiniRunner &zoombini, const 
 	return -1;
 }
 
-ZoombiniInputResult ZoombiniRunner::handlePointerInput(const Common::Array<ZoombiniRunner *> &zoombinis, const Common::Point32 &pointerPos,
-													   bool clickReleased, const ZoombiniAnimation *pickupAnimation, uint32 tickCount,
-													   Common::Array<ZoombiniDropTarget> *dropTargets, const AreaMask *areaMask,
-													   int scrollX, int backgroundWidth) {
+ZmbDropResult ZoombiniRunner::handlePointerInput(const Common::Array<ZoombiniRunner *> &zoombinis, const Common::Point32 &pointerPos,
+												 bool clickReleased, const ZoombiniAnimation *pickupAnimation, uint32 tickCount,
+												 Common::Array<ZmbDropTarget> *dropTargets, const AreaMask *areaMask,
+												 int scrollX, int backgroundWidth) {
 	ZoombiniRunner *dragged = nullptr;
 	int draggedIndex = -1;
 	for (uint i = 0; i < zoombinis.size(); i++) {
@@ -1160,35 +1158,35 @@ ZoombiniInputResult ZoombiniRunner::handlePointerInput(const Common::Array<Zoomb
 		}
 
 		if (!clickReleased)
-			return ZoombiniInputResult::kStillHeld04;
+			return ZmbDropResult::kStillHeld04;
 		int targetIndex = -1;
 		if (dropTargets)
 			targetIndex = findReleaseDropTarget(*dragged, pointerPos, *dropTargets, scrollX, backgroundWidth);
 		if (dropTargets && targetIndex != -1) {
-			ZoombiniDropTarget &target = (*dropTargets)[targetIndex];
+			ZmbDropTarget &target = (*dropTargets)[targetIndex];
 			dragged->endDrag(false);
 			target.occupied = true;
 			target.zoombiniIndex = draggedIndex;
 			if (target.callback)
 				target.callback(target.callbackContext, targetIndex, draggedIndex);
-			return ZoombiniInputResult::kDroppedOnTarget02;
+			return ZmbDropResult::kDroppedOnTarget02;
 		}
 		if (areaMask && areaMask->hasMarkedByteAt(Common::Point32(pointerPos.x, pointerPos.y))) {
 			dragged->endDrag(true);
-			return ZoombiniInputResult::kDroppedOnArea03;
+			return ZmbDropResult::kDroppedOnArea03;
 		}
-		return ZoombiniInputResult::kStillHeld04;
+		return ZmbDropResult::kStillHeld04;
 	}
 
 	if (!clickReleased)
-		return ZoombiniInputResult::kIgnored00;
+		return ZmbDropResult::kIgnored00;
 	for (uint i = 0; i < zoombinis.size(); i++) {
 		ZoombiniRunner *zoombini = zoombinis[i];
 		if (!zoombini || !zoombini->canBeginDrag(pointerPos))
 			continue;
 		if (dropTargets) {
 			for (uint targetIndex = 0; targetIndex < dropTargets->size(); targetIndex++) {
-				ZoombiniDropTarget &target = (*dropTargets)[targetIndex];
+				ZmbDropTarget &target = (*dropTargets)[targetIndex];
 				if (!target.occupied || target.zoombiniIndex != static_cast<int>(i))
 					continue;
 				target.occupied = false;
@@ -1197,9 +1195,9 @@ ZoombiniInputResult ZoombiniRunner::handlePointerInput(const Common::Array<Zoomb
 			}
 		}
 		zoombini->startDrag(pointerPos, pickupAnimation, tickCount);
-		return ZoombiniInputResult::kPickedUp01;
+		return ZmbDropResult::kPickedUp01;
 	}
-	return ZoombiniInputResult::kIgnored00;
+	return ZmbDropResult::kIgnored00;
 }
 
 void ZoombiniRunner::sortDrawOrderByY(const Common::Array<ZoombiniRunner *> &zoombinis, Common::Array<uint> &order) {

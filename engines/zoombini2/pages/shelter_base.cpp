@@ -195,7 +195,7 @@ void ShelterRescueSiteBase::onUpdate() {
 	} else if (_phase == 1) {
 		const uint32 elapsed = _vm->getGameTickCount() - _phaseTimer;
 		if (1500 < elapsed) {
-			_vm->_mapTransitionSourcePageId = static_cast<PageId>(_pageId);
+			_vm->_mapTransitionSourcePageId = _pageId;
 			_vm->requestPageChange(kPageMapTrans);
 		}
 	}

@@ -243,6 +243,12 @@ bool PuzzleChezNorf::mealComplete(const Meal &meal) const {
 	return 0 <= meal.food[0] && 0 <= meal.food[1] && (_level == 1 || 0 <= meal.food[2]);
 }
 
+bool PuzzleChezNorf::canSubmitTo(int table) const {
+	if (_phase != kReady00 || _departAfterSpeech || _releasePending || _dismissPending)
+		return false;
+	return 0 <= _selectedTray && 0 <= table && table < _tableCount && !speechPlaying() && !motionActive(false) && !_norfs[table].served;
+}
+
 bool PuzzleChezNorf::motionActive(bool includeIdle) const {
 	for (int motion = 0; motion < 7; motion++) {
 		if ((includeIdle || motion != kIdle04) && _bodyRunners[motion] && _bodyRunners[motion]->isActive())
@@ -326,6 +332,8 @@ EventHandleResult PuzzleChezNorf::onLButtonUp(const Common::Point &pos) {
 	if (_buttonArmed) {
 		_click = _pointer;
 		_clickPending = true;
+		if (canSubmitTo(norfAt(_pointer)))
+			_vm->setPageCursorSprite(nullptr);
 	}
 	_buttonArmed = false;
 	return EventHandleResult::kPassthrough;
@@ -337,7 +345,7 @@ void PuzzleChezNorf::handleClick(const Common::Point32 &pos) {
 	const int norf = norfAt(pos);
 	if (_phase == kReady00 && 0 <= norf) {
 		if (0 <= _selectedTray) {
-			if (!speechPlaying() && !motionActive(false) && !_norfs[norf].served)
+			if (canSubmitTo(norf))
 				submit(norf);
 			return;
 		}
@@ -416,7 +424,7 @@ void PuzzleChezNorf::startMotion(int table, Motion motion) {
 		_idleNorf = table;
 	else
 		_animatedNorf = table;
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getFrameTickCount();
 	_bodyRunners[motion]->startAt(tablePosition(table, 205), now);
 	_capRunners[table][motion]->startAt(tablePosition(table, 205), now);
 }
@@ -531,8 +539,10 @@ void PuzzleChezNorf::releaseCohort() {
 		_remaining -= 1;
 	}
 	_phase = kRelease05;
-	if (_remaining == 0)
+	if (_remaining == 0) {
+		_vm->restartGoBlink();
 		playSpeech(Common::Path(kCompleteSpeechPath));
+	}
 	debug(1, "ChezNorf: release ordinal=%d count=%d remaining=%d", _successCount, count, _remaining);
 }
 
@@ -594,8 +604,10 @@ void PuzzleChezNorf::onActorsRendered() {
 		if (!moving && _phase == kRelease05) {
 			_successCount += 1;
 			_canDepart = true;
-			_phase = _remaining == 0 || _submissions == 8 ? kFinished07 : kReady00;
-			_vm->restartGoBlink();
+			const bool terminal = _remaining == 0 || _submissions == 8;
+			_phase = terminal ? kFinished07 : kReady00;
+			if (terminal)
+				_vm->restartGoBlink();
 		}
 	} else {
 		if (_phase == kReady00 && !motionActive() && now % 20 == 0) {

@@ -27,9 +27,9 @@
 namespace Zoombini2 {
 
 /**
- * End credits presentation with an initial pause, vertical scroll, and end hold.
- * Dismissing it or reaching the end exits the game.
- * It owns the dispatched screen rather than a modal overlay on another page.
+ * End credits presentation with a pause, vertical scroll, and end hold in retail releases.
+ * The demo presents a static background until the player releases the mouse button.
+ * Dismissing the presentation or reaching the scroll endpoint exits the game.
  */
 class TransitionCredits : public TransitionBase {
 public:
@@ -42,13 +42,17 @@ public:
 	void onUpdate() override;
 	/** Redraw the credits only when their scroll position changes. */
 	void onRenderContent(ManagedSurface32 *screen) override;
-	/** Finish the credits when the player clicks. */
+	/** Finish retail credits when the player presses the mouse button. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	/** Finish demo credits when the player releases the mouse button. */
+	EventHandleResult onLButtonUp(const Common::Point &pos) override;
 
 private:
 	/** Resource paths used by the credits presentation. */
 	static constexpr const char *kBackgroundPath = "#bmp/credits/credits";
 	static constexpr const char *kMusicPath = "#sounds/music/ZMR-Transition.wav";
+	static constexpr const char *kDemoBackgroundPath = "bmp/credits/background";
+	static constexpr const char *kDemoMusicPath = "sounds/music/01niv12.wav";
 
 	/** Gameplay deadline for the active hold period. */
 	uint32 _endTime = 0;

@@ -92,7 +92,8 @@ int SoundManager::load(bool isStream, const Common::Path &filename, bool loop) {
 	if (!isStream) {
 		Common::SeekableReadStream *file = _vm->openResourceFile(buf->path.toString('/'));
 		if (!file) {
-			warning("SoundManager::load: Cannot retain sample '%s'", buf->path.toString().c_str());
+			if (!_vm->isDemo())
+				warning("SoundManager::load: Cannot retain sample '%s'", buf->path.toString().c_str());
 		} else {
 			const int64 fileSize = file->size();
 			if (0 < fileSize && fileSize <= UINT32_MAX) {

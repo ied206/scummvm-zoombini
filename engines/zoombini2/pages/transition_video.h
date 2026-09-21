@@ -40,7 +40,7 @@ namespace Zoombini2 {
 class TransitionVideo : public TransitionBase {
 public:
 	/** Configure the video and the page dispatched after playback for @p pageId. */
-	TransitionVideo(Zoombini2Engine *vm, int pageId);
+	TransitionVideo(Zoombini2Engine *vm, PageId pageId);
 	/** Stop and release the decoder and retained frame. */
 	~TransitionVideo() override;
 
@@ -75,7 +75,7 @@ private:
 	/** Original logical video resource name selected for the current page. */
 	Common::Path _videoPath = Common::Path();
 	/** Page requested when playback finishes or fails to start. */
-	int _nextPageId = -1;
+	PageId _nextPageId = kPageNone;
 	/** Bink Video decoder. */
 	Video::VideoDecoder *_decoder = nullptr;
 	/** Whether decoder playback started successfully. */

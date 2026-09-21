@@ -29,8 +29,127 @@
 #include "zoombini2/metaengine.h"
 #include "zoombini2/scripts.h"
 #include "zoombini2/state.h"
+#include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
+
+Common::String GameState::generateZoombiniName(Random &random) {
+	static constexpr const char *kVowelPairs[30] = {
+		"a ",
+		"a ",
+		"a ",
+		"e ",
+		"e ",
+		"e ",
+		"e ",
+		"i ",
+		"i ",
+		"i ",
+		"o ",
+		"o ",
+		"o ",
+		"u ",
+		"u ",
+		"y ",
+		"ee",
+		"oo",
+		"yo",
+		"ya",
+		"ye",
+		"ei",
+		"ie",
+		"ai",
+		"ia",
+		"au",
+		"ua",
+		"uo",
+		"ou",
+		"ae",
+	};
+	static constexpr char kSingleConsonants[] = "bbccdddfghjkkllmmnnprrssssttvwx";
+	static constexpr char kEndings[] = "aeiou";
+	static constexpr const char *kConsonantPairs[39] = {
+		"bl",
+		"br",
+		"ch",
+		"cl",
+		"cr",
+		"dr",
+		"dw",
+		"fl",
+		"fr",
+		"gh",
+		"gl",
+		"gr",
+		"kl",
+		"kn",
+		"kr",
+		"kw",
+		"ld",
+		"mp",
+		"nd",
+		"nh",
+		"nn",
+		"ph",
+		"pl",
+		"pr",
+		"qu",
+		"qu",
+		"rh",
+		"rn",
+		"sc",
+		"sl",
+		"sm",
+		"sn",
+		"sp",
+		"sr",
+		"st",
+		"sw",
+		"th",
+		"tr",
+		"tw",
+	};
+
+	char name[8] = {};
+	const int targetLength = random.getRandomNumber(1) + 4;
+	bool useVowelPair = random.getRandomNumber(98) + 1 < 40;
+	int length = 0;
+	while (length < targetLength) {
+		bool usedConsonantPair = false;
+		if (useVowelPair) {
+			useVowelPair = false;
+			const char *pair = kVowelPairs[random.getRandomNumber(29)];
+			if (pair[1] != ' ') {
+				name[length] = pair[0];
+				length += 1;
+				name[length] = pair[1];
+				length += 1;
+			} else {
+				name[length] = pair[0];
+				name[length] = pair[0];
+				length += 1;
+			}
+		} else {
+			useVowelPair = true;
+			if (1 < length || random.getRandomNumber(98) + 1 <= 33) {
+				const char *pair = kConsonantPairs[random.getRandomNumber(38)];
+				name[length] = pair[0];
+				length += 1;
+				name[length] = pair[1];
+				length += 1;
+				usedConsonantPair = true;
+			} else {
+				name[length] = kSingleConsonants[random.getRandomNumber(30)];
+				length += 1;
+			}
+		}
+		if (usedConsonantPair && targetLength <= length)
+			name[length - 1] = kEndings[random.getRandomNumber(4)];
+		if (length == 2 && name[0] == name[1])
+			length = 1;
+	}
+	return Common::String(name);
+}
 
 byte ZmbTrait::getValue(TraitIndex index) const {
 	switch (index) {
@@ -138,7 +257,7 @@ int GameState::findBoardScrollRow(BoardRecord *const *board) {
 	return 62;
 }
 
-int GameState::getTraitCombinationTableIndex(const ZmbTrait &traits) {
+int TraitComboTable::getComboIndex(const ZmbTrait &traits) {
 	if (!traits.hasValidValues())
 		return -1;
 	const int eyesAndHair = (traits._eyes - 1) + ZmbTrait::kTraitValueCount * (traits._hair - 1);
@@ -146,32 +265,55 @@ int GameState::getTraitCombinationTableIndex(const ZmbTrait &traits) {
 	return (traits._feet - 1) + ZmbTrait::kTraitValueCount * noseEyesAndHair;
 }
 
-byte GameState::getTraitCombinationRegistrationCount(const ZmbTrait &traits) const {
-	const int tableIndex = getTraitCombinationTableIndex(traits);
+byte TraitComboTable::getComboCount(const ZmbTrait &traits) const {
+	const int tableIndex = getComboIndex(traits);
 	if (tableIndex < 0)
 		return 0;
-	return _traitRegistrations._combinationUseCounts[tableIndex];
+	return _combinationUseCounts[tableIndex];
 }
 
-bool GameState::canRegisterTraits(const ZmbTrait &traits) const {
-	return traits.hasValidValues() && getTraitCombinationRegistrationCount(traits) < 2;
+bool TraitComboTable::canRegisterCombo(const ZmbTrait &traits) const {
+	return traits.hasValidValues() && getComboCount(traits) < 2;
 }
 
-bool GameState::registerTraits(const ZmbTrait &traits) {
-	const int tableIndex = getTraitCombinationTableIndex(traits);
+bool TraitComboTable::registerCombo(const ZmbTrait &traits) {
+	const int tableIndex = getComboIndex(traits);
 	if (tableIndex < 0)
 		return false;
 
-	const byte previousCount = _traitRegistrations._combinationUseCounts[tableIndex];
+	const byte previousCount = _combinationUseCounts[tableIndex];
 	if (2 <= previousCount)
 		return false;
 	if (previousCount == 0)
-		_traitRegistrations._uniqueCombinationCount += 1;
+		_uniqueCombinationCount += 1;
 	const byte count = previousCount + 1;
-	_traitRegistrations._combinationUseCounts[tableIndex] = count;
+	_combinationUseCounts[tableIndex] = count;
 	if (count == 2)
-		_traitRegistrations._twiceRegisteredCombinationCount += 1;
-	_traitRegistrations._totalCount += 1;
+		_twiceRegisteredCombinationCount += 1;
+	_totalCount += 1;
+	return true;
+}
+
+bool TraitComboTable::unregisterCombo(const ZmbTrait &traits) {
+	const int tableIndex = getComboIndex(traits);
+	if (tableIndex < 0)
+		return false;
+
+	const byte previousCount = _combinationUseCounts[tableIndex];
+	if (previousCount == 0 || _totalCount <= 0)
+		return false;
+	if (previousCount == 2) {
+		if (_twiceRegisteredCombinationCount <= 0)
+			return false;
+		_twiceRegisteredCombinationCount -= 1;
+	}
+	if (previousCount == 1) {
+		if (_uniqueCombinationCount <= 0)
+			return false;
+		_uniqueCombinationCount -= 1;
+	}
+	_combinationUseCounts[tableIndex] = previousCount - 1;
+	_totalCount -= 1;
 	return true;
 }
 
@@ -229,7 +371,7 @@ void GameState::init() {
 	clearOwnedData();
 	_playerName.clear();
 	_level = 0;
-	_currentGameplayPageId = 0;
+	_currentGameplayPageId = kPageZombiniville;
 	_legacyStateFlag = 0;
 	_hasReachedRescue1 = 0;
 	_hasReachedRescue2 = 0;
@@ -244,14 +386,14 @@ void GameState::init() {
 	memset(_completedTraitHashes, 0, sizeof(_completedTraitHashes));
 	_rescue1MoviePlayed = 0;
 	_rescue2MoviePlayed = 0;
-	_traitRegistrations._totalCount = 1;
-	_traitRegistrations._uniqueCombinationCount = 1;
-	_traitRegistrations._twiceRegisteredCombinationCount = 0;
-	memset(_traitRegistrations._combinationUseCounts, 0, sizeof(_traitRegistrations._combinationUseCounts));
-	memset(_traitRegistrations._unusedTail, 0, sizeof(_traitRegistrations._unusedTail));
+	_traitComboTable._totalCount = 1;
+	_traitComboTable._uniqueCombinationCount = 1;
+	_traitComboTable._twiceRegisteredCombinationCount = 0;
+	memset(_traitComboTable._combinationUseCounts, 0, sizeof(_traitComboTable._combinationUseCounts));
+	memset(_traitComboTable._unusedTail, 0, sizeof(_traitComboTable._unusedTail));
 	// Seed the counter for the initial Feet 1, Nose 4, Hair 5, Eyes 5 combination.
-	const int initialCombinationIndex = getTraitCombinationTableIndex(ZmbTrait(1, 4, 5, 5));
-	_traitRegistrations._combinationUseCounts[initialCombinationIndex] = 1;
+	const int initialCombinationIndex = TraitComboTable::getComboIndex(ZmbTrait(1, 4, 5, 5));
+	_traitComboTable._combinationUseCounts[initialCombinationIndex] = 1;
 }
 
 void GameState::swapState(GameState &other) {
@@ -274,11 +416,11 @@ void GameState::swapState(GameState &other) {
 	swapArray(_completedTraitHashes, other._completedTraitHashes);
 	SWAP(_rescue1MoviePlayed, other._rescue1MoviePlayed);
 	SWAP(_rescue2MoviePlayed, other._rescue2MoviePlayed);
-	SWAP(_traitRegistrations._totalCount, other._traitRegistrations._totalCount);
-	SWAP(_traitRegistrations._uniqueCombinationCount, other._traitRegistrations._uniqueCombinationCount);
-	SWAP(_traitRegistrations._twiceRegisteredCombinationCount, other._traitRegistrations._twiceRegisteredCombinationCount);
-	swapArray(_traitRegistrations._combinationUseCounts, other._traitRegistrations._combinationUseCounts);
-	swapArray(_traitRegistrations._unusedTail, other._traitRegistrations._unusedTail);
+	SWAP(_traitComboTable._totalCount, other._traitComboTable._totalCount);
+	SWAP(_traitComboTable._uniqueCombinationCount, other._traitComboTable._uniqueCombinationCount);
+	SWAP(_traitComboTable._twiceRegisteredCombinationCount, other._traitComboTable._twiceRegisteredCombinationCount);
+	swapArray(_traitComboTable._combinationUseCounts, other._traitComboTable._combinationUseCounts);
+	swapArray(_traitComboTable._unusedTail, other._traitComboTable._unusedTail);
 	_savedRoster.swap(other._savedRoster);
 	_activeZoombinis.swap(other._activeZoombinis);
 }
@@ -307,14 +449,15 @@ void GameState::stashActiveZoombinis() {
 	transferRoster(_activeZoombinis, _savedRoster);
 }
 
-void GameState::finishPuzzleRoster(int pageId, BoardRecord **board, bool advancing, bool savedGame) {
+void GameState::finishPuzzleRoster(PageId pageId, BoardRecord **board, bool advancing, bool savedGame) {
 	if (!savedGame) {
 		clearActiveZoombinis();
 		return;
 	}
 
 	const uint expectedPartySize = board ? 8 : 16;
-	if (0 <= pageId && pageId < 100 && _activeZoombinis.size() == expectedPartySize) {
+	const int pageIndex = static_cast<int>(pageId);
+	if (0 <= pageIndex && pageIndex < 100 && _activeZoombinis.size() == expectedPartySize) {
 		bool allSucceeded = true;
 		for (uint i = 0; i < _activeZoombinis.size(); i++) {
 			if (!_activeZoombinis[i] || _activeZoombinis[i]->_puzzleStatus == 0) {
@@ -323,11 +466,11 @@ void GameState::finishPuzzleRoster(int pageId, BoardRecord **board, bool advanci
 			}
 		}
 		if (allSucceeded) {
-			_legacyData[pageId] += 1;
-			if (_legacyData[pageId] == 3) {
-				_legacyData[pageId] = 0;
-				if (_pageLevel[pageId] < 3)
-					_pageLevel[pageId] += 1;
+			_legacyData[pageIndex] += 1;
+			if (_legacyData[pageIndex] == 3) {
+				_legacyData[pageIndex] = 0;
+				if (_pageLevel[pageIndex] < 3)
+					_pageLevel[pageIndex] += 1;
 			}
 		}
 	}
@@ -426,12 +569,12 @@ bool GameState::readState(Common::SeekableReadStream *stream) {
 		_completedTraitHashes[i] = stream->readSint32LE();
 	_rescue1MoviePlayed = stream->readByte();
 	_rescue2MoviePlayed = stream->readByte();
-	_traitRegistrations._totalCount = stream->readSint32LE();
-	_traitRegistrations._uniqueCombinationCount = stream->readSint32LE();
-	_traitRegistrations._twiceRegisteredCombinationCount = stream->readSint32LE();
-	if (stream->read(_traitRegistrations._combinationUseCounts, sizeof(_traitRegistrations._combinationUseCounts)) !=
-			sizeof(_traitRegistrations._combinationUseCounts) ||
-		stream->read(_traitRegistrations._unusedTail, sizeof(_traitRegistrations._unusedTail)) != sizeof(_traitRegistrations._unusedTail))
+	_traitComboTable._totalCount = stream->readSint32LE();
+	_traitComboTable._uniqueCombinationCount = stream->readSint32LE();
+	_traitComboTable._twiceRegisteredCombinationCount = stream->readSint32LE();
+	if (stream->read(_traitComboTable._combinationUseCounts, sizeof(_traitComboTable._combinationUseCounts)) !=
+			sizeof(_traitComboTable._combinationUseCounts) ||
+		stream->read(_traitComboTable._unusedTail, sizeof(_traitComboTable._unusedTail)) != sizeof(_traitComboTable._unusedTail))
 		return false;
 
 	if (!readBoard(stream, _rescue1Board) || !readBoard(stream, _rescue2Board) || !canRead(stream, 4))
@@ -505,7 +648,7 @@ Zoombini2PopulationSummary GameState::getPopulationSummary() const {
 bool GameState::save(Common::WriteStream *stream) const {
 	if (!stream || stream->err())
 		return false;
-	const uint32 activeCount = 0 <= _currentGameplayPageId && _currentGameplayPageId <= 3 ? _activeZoombinis.size() : 0;
+	const uint32 activeCount = kPageZombiniville <= _currentGameplayPageId && _currentGameplayPageId <= kPageAquacube ? _activeZoombinis.size() : 0;
 	const uint64 count = static_cast<uint64>(_savedRoster.size()) + activeCount;
 	if (static_cast<uint64>(INT32_MAX) < count || static_cast<uint32>(INT32_MAX) <= _playerName.size())
 		return false;
@@ -531,11 +674,11 @@ bool GameState::save(Common::WriteStream *stream) const {
 		stream->writeSint32LE(_completedTraitHashes[i]);
 	stream->writeByte(_rescue1MoviePlayed);
 	stream->writeByte(_rescue2MoviePlayed);
-	stream->writeSint32LE(_traitRegistrations._totalCount);
-	stream->writeSint32LE(_traitRegistrations._uniqueCombinationCount);
-	stream->writeSint32LE(_traitRegistrations._twiceRegisteredCombinationCount);
-	stream->write(_traitRegistrations._combinationUseCounts, sizeof(_traitRegistrations._combinationUseCounts));
-	stream->write(_traitRegistrations._unusedTail, sizeof(_traitRegistrations._unusedTail));
+	stream->writeSint32LE(_traitComboTable._totalCount);
+	stream->writeSint32LE(_traitComboTable._uniqueCombinationCount);
+	stream->writeSint32LE(_traitComboTable._twiceRegisteredCombinationCount);
+	stream->write(_traitComboTable._combinationUseCounts, sizeof(_traitComboTable._combinationUseCounts));
+	stream->write(_traitComboTable._unusedTail, sizeof(_traitComboTable._unusedTail));
 	const int rescue1BoardCount = writeBoard(stream, _rescue1Board);
 	const int rescue2BoardCount = writeBoard(stream, _rescue2Board);
 	stream->writeUint32LE(static_cast<uint32>(count));
@@ -566,10 +709,11 @@ bool GameState::save(Common::WriteStream *stream) const {
 	return !stream->err() && 0 <= startPosition && stream->pos() - startPosition == expectedSize;
 }
 
-void GameState::registerPageVisit(int pageId, int visitKind) {
-	if (pageId < 0 || 24 < pageId || visitKind < 1 || 3 < visitKind)
+void GameState::registerPageVisit(PageId pageId, int visitKind) {
+	const int pageIndex = static_cast<int>(pageId);
+	if (pageIndex < 0 || 24 < pageIndex || visitKind < 1 || 3 < visitKind)
 		return;
-	byte &visits = _pageVisitCounts[5 * pageId + visitKind];
+	byte &visits = _pageVisitCounts[5 * pageIndex + visitKind];
 	if (visits < 250)
 		visits += 1;
 }

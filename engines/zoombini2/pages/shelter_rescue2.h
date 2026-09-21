@@ -189,7 +189,7 @@ private:
 	/** Shared idle grid borrowed for boarding actives. */
 	const ZoombiniAnimation *_idleZombAnimation = nullptr;
 	/** Waiting-grid and departure-seat drop records. */
-	Common::Array<ZoombiniDropTarget> _dropTargets;
+	Common::Array<ZmbDropTarget> _dropTargets;
 	/** First board row shown in the visible roster grid. */
 	int _scrollRow = 0;
 	/** Roster scroll phase: idle, scrolling left, or scrolling right. */

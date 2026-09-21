@@ -40,12 +40,14 @@ public:
 	void onRenderContent(ManagedSurface32 *screen) override;
 	/** Mark the title screen as dismissed by the player. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	EventHandleResult onLButtonUp(const Common::Point &pos) override;
 	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
 
 private:
 	/** Resource paths used by the title screen. */
 	static constexpr const char *kBackgroundPath = "bmp/story_intro/title_screen";
 	static constexpr const char *kMusicPath = "#sounds/music/Booliewood_Level1.wav";
+	static constexpr const char *kDemoMusicPath = "sounds/music/I_BB1.wav";
 
 	EventHandleResult dismiss();
 	/** Whether the player clicked to dismiss the title screen. */

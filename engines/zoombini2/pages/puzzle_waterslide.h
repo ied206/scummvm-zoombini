@@ -30,29 +30,47 @@ namespace Zoombini2 {
 /** Arrange matching traits along the pipes, then release the connected party with the valve. */
 class PuzzleWaterslide : public PuzzleBase {
 public:
+	/** Construct the Water Slide pipe-matching puzzle for @p vm. */
 	PuzzleWaterslide(Zoombini2Engine *vm);
+	/** Release active decoration and valve animation runners. */
 	~PuzzleWaterslide() override;
+	/** Generate the difficulty board, load resources, and arrange the party. */
 	void init() override;
+	/** Advance the valve, cascade, and Zoombini discharge sequence. */
 	void onUpdate() override;
+	/** Restore the background before drawing pipes and puzzle decorations. */
 	void onRenderBackground(ManagedSurface32 *screen) override;
+	/** Draw pipe connections, labels, the valve, and the waterfall. */
 	void onRenderContent(ManagedSurface32 *screen) override;
+	/** Draw waiting, picked-up, and draining Zoombinis. */
 	void onRenderActors(ManagedSurface32 *screen) override;
+	/** Advance Zoombini animation frames after the actor pass. */
 	void onActorsRendered() override;
+	/** Start dragging a Zoombini or arm the valve at @p pos. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	/** Drop the held Zoombini into a compatible slot at @p pos. */
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
+	/** Update target hover feedback while a Zoombini is held. */
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
+	/** Return to the map immediately or after retreat speech. */
 	bool onGoButtonPressed() override;
+	/** Return whether every required connection has resolved. */
 	bool canUseGoButton() const override;
+	/** Format the generated placement solution for the puzzle console. */
 	Common::String debugGetAnswer() const override;
+	/** Report generated graph and current connections for the puzzle console. */
 	Common::String debugGetChanceDetails() const override;
 
 private:
+	/** Page music and traits shown beside connected pipe endpoints. */
 	static constexpr const char *kMusicPath = "#sounds/music/02-BS01.wav";
 	static constexpr const char *kTraitFormat = "bmp/waterslide/traits/%d";
+	/** Pipe art formats selected by difficulty, color, and graph edge type. */
 	static constexpr const char *kHorizontalFormat = "bmp/waterslide/pipes - %s/pipe - horizontal";
 	static constexpr const char *kLargePipeFormat = "bmp/waterslide/pipes - blue/pipe - lev%d_bigone";
 	static constexpr const char *kSelectorFormat = "bmp/waterslide/pipes - %s/pipe_bigone_selector_%02d";
 	static constexpr const char *kHardPipeFormat = "bmp/waterslide/pipes - %s/pipe - hard %02d";
+	/** Color suffixes for easy/medium and hard pipe art. */
 	static constexpr const char *kPipeColors[2] = {
 		"grey",
 		"blue",
@@ -61,6 +79,7 @@ private:
 		"grey",
 		"red",
 	};
+	/** Decorative pipe, outlet, landscape, valve, and cascade resources. */
 	static constexpr const char *kMiniDiagonalPath = "bmp/waterslide/pipes - blue/pipe - mini racord diagon";
 	static constexpr const char *kMiniHorizontalPath = "bmp/waterslide/pipes - blue/pipe - mini horizontal";
 	static constexpr const char *kOutletPath = "bmp/waterslide/pipes - red/truc_rouge";
@@ -70,10 +89,12 @@ private:
 	static constexpr const char *kTreePath = "bmp/waterslide/little tree";
 	static constexpr const char *kValvePath = "bmp/waterslide/mr valve master";
 	static constexpr const char *kCascadeFormat = "bmp/waterslide/pipe - cascade %d";
+	/** Hit-area mask and Zoombini pickup, idle, and drain animations. */
 	static constexpr const char *kAreaPath = "bmp/waterslide/area.bmt";
 	static constexpr const char *kPickupPath = "bmp/zombis/pris/pris.anm";
 	static constexpr const char *kIdlePath = "bmp/zombis/attente/attenteZomb.anm";
 	static constexpr const char *kAspirationPath = "bmp/zombis/aspiration/aspiration.anm";
+	/** Page effects plus success, partial-success, retreat, and Go speech. */
 	static constexpr const char *kSoundFormat = "sounds/fx/%s.wav";
 	static constexpr const char *kPraisePath = "sounds/wsl31.wav";
 	static constexpr const char *kPartialPraisePath = "sounds/wsl31alt.wav";
@@ -81,26 +102,36 @@ private:
 	static constexpr const char *kGoSpeechFormat = "sounds/wld11.%d.wav";
 
 	enum Phase {
+		/** Accept player placements and update graph connections. */
 		kInteractive00 = 0,
+		/** Animate the opened valve before water begins flowing. */
 		kValve01 = 1,
+		/** Send connected Zoombinis through the cascade one at a time. */
 		kDischarge02 = 2,
+		/** All discharge work is complete and Go may leave the puzzle. */
 		kFinished03 = 3,
 	};
 	/** Generated endpoints name board slots; a negative axis denotes an unlabeled connection. */
 	struct Edge {
+		/** Endpoint slots, trait axis, and currently satisfied connection flag. */
 		int a = -1;
 		int b = -1;
 		int axis = -1;
 		bool connected = false;
 	};
+	/** Candidate pair returned while generating one trait-labeled graph edge. */
 	struct Pair {
+		/** Endpoint slots and their shared trait axis. */
 		int a = -1;
 		int b = -1;
 		int axis = -1;
 	};
+	/** Screen placement and art type for one possible graph edge. */
 	struct GraphPlacement {
+		/** Endpoint slots, pipe type, and screen location for its trait label. */
 		int a, b, type, labelX, labelY;
 	};
+	/** Adjacency candidates used to construct a connected sixteen-slot graph. */
 	static constexpr int kNeighbors[16][5] = {
 		{1, 6, 8, 4, -1},
 		{0, 9, 2, -1, -1},
@@ -119,6 +150,7 @@ private:
 		{13, 10, 6, -1, -1},
 		{9, 7, 11, -1, -1},
 	};
+	/** Waiting positions for the party and visual placements for all drawable graph edges. */
 	static constexpr Common::Point32 kWaitingPositions[16] = {
 		{131, 312},
 		{158, 369},
@@ -166,48 +198,72 @@ private:
 		{2, 6, 3, 494, 303},
 	};
 
+	/** Load page art, sounds, interaction targets, and Zoombini animations. */
 	void loadResources();
+	/** Construct a deterministic party when the page runs without a saved roster. */
+	void createDemoParty();
+	/** Generate the three difficulty-specific graph and trait-placement variants. */
 	void generateEasy();
 	void generateMedium();
 	void generateHard();
+	/** Build a graph and return its root slot, optionally selecting it randomly. */
 	int generateGraph(bool randomRoot);
+	/** Return a usable common trait axis for two generated Zoombinis. */
 	int sharedAxis(int first, int second, bool rejectLast);
+	/** Find a still-available partner for @p source and record it in @p pair. */
 	bool findPair(int source, bool *available, Pair &pair);
+	/** Return generated Zoombini @p generatedIndex's value on trait @p axis. */
 	int trait(int generatedIndex, int axis) const;
+	/** Add one logical connection and its screen placement to the board graph. */
 	void addEdge(int a, int b, int axis);
+	/** Create droppable slot targets for the current graph. */
 	void setupTargets();
+	/** Convert a graph slot or logical edge to its page-space draw data. */
 	static Common::Point32 graphPosition(int slot);
 	static const GraphPlacement *graphPlacement(const Edge &edge);
+	/** Update each edge's satisfied flag after a slot assignment changes. */
 	void evaluateConnections();
+	/** Return whether both occupants of @p edge match its required trait axis. */
 	bool matches(const Edge &edge) const;
+	/** Test and search an assignment for console answer generation. */
 	bool debugPlacementMatches(int slot, int actor, const int *assignment) const;
 	bool debugFindPlacement(int *assignment, uint32 used, int &budget) const;
+	/** Start the valve animation and the following cascade sequence. */
 	void activateValve();
+	/** Start the next eligible Zoombini's drain animation. */
 	void dischargeNext();
+	/** Play indexed pipe or valve sound and count free visible Zoombinis. */
 	void playSound(int sound);
 	int countFreeZoombinis() const;
+	/** Draw the graph and its decorative animated scenery. */
 	void drawBoard(ManagedSurface32 *screen) const;
 	void drawDecorations(ManagedSurface32 *screen);
+	/** Receive slot reassignment and animation completion callbacks. */
 	static void onSlotChanged(void *context, int slot, int zoombini);
 	static void onAspirationComplete(void *context, ZoombiniRunner *zoombini);
 	static void onCascadeComplete(void *context, AnimationRunner *runner);
 
+	/** Difficulty, current transition phase, connection count, and held party member. */
 	int _level = 1;
 	Phase _phase = kInteractive00;
 	int _connectionCount = 0;
 	int _heldZoombini = -1;
+	/** Slot eligibility/activity, generated solution, and generation order. */
 	bool _eligible[16] = {};
 	bool _activeSlot[16] = {};
 	int _solution[16] = {};
 	Common::Array<int> _generationOrder;
+	/** Graph connections and drag/drop targets for the generated board. */
 	Common::Array<Edge> _edges;
-	Common::Array<ZoombiniDropTarget> _targets;
+	Common::Array<ZmbDropTarget> _targets;
+	/** Valve/cascade placement, discharge timing, and deferred Go/speech state. */
 	Common::Point32 _valvePos;
 	Common::Point32 _cascadePos;
 	uint32 _dischargeStart = 0;
 	bool _goPending = false;
 	int _goSpeech = -1;
 	int _praiseSpeech = -1;
+	/** Indexed pipe and valve effects. */
 	int _sounds[6] = {
 		-1,
 		-1,
@@ -217,6 +273,7 @@ private:
 		-1,
 	};
 
+	/** Decorative and valve animation resources plus their active runners. */
 	Animation *_tree = nullptr;
 	Animation *_fountain = nullptr;
 	Animation *_valve = nullptr;
@@ -225,6 +282,7 @@ private:
 	AnimationRunner *_cascadeRunner = nullptr;
 	AnimationRunner *_treeRunner = nullptr;
 	AnimationRunner *_fountainRunner = nullptr;
+	/** Zoombini animations for dragging, waiting, and cascade aspiration. */
 	const ZoombiniAnimation *_pickup = nullptr;
 	const ZoombiniAnimation *_idle = nullptr;
 	const ZoombiniAnimation *_aspiration = nullptr;

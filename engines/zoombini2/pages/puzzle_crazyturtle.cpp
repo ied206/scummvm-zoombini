@@ -201,7 +201,7 @@ void PuzzleCrazyTurtle::loadInteractionResources() {
 void PuzzleCrazyTurtle::buildDropTargets() {
 	for (int index = 0; index < kTurtleCount; index++) {
 		const TurtlePlacement &placement = kTurtlePlacements[index];
-		ZoombiniDropTarget target;
+		ZmbDropTarget target;
 		target.rect = Common::Rect32(placement.pos.x + 15, placement.pos.y + 25, placement.pos.x + 15 + 60, placement.pos.y + 25 + 62);
 		target.occupied = false;
 		target.callback = &onTurtleDrop;
@@ -551,6 +551,14 @@ void PuzzleCrazyTurtle::handleTurtleClick(int turtleIndex, int zoombiniIndex) {
 		zoombini->startAnimation(_idleZombAnimation, 33, tick);
 		zoombini->setAnimationCompleteCallback(&onWalkComplete, this);
 		zoombini->_puzzleStatus = 1;
+		_vm->_zoombiniWalkingFlag = true;
+		int placedCount = 0;
+		for (const ZoombiniRunner *actor : _puzzleZoombinis) {
+			if (actor->_puzzleStatus == 1)
+				placedCount += 1;
+		}
+		if (placedCount == static_cast<int>(_puzzleZoombinis.size()))
+			_vm->restartGoBlink();
 		return;
 	}
 
@@ -725,19 +733,19 @@ EventHandleResult PuzzleCrazyTurtle::onLButtonUp(const Common::Point &pos) {
 	// While a placement or fall sequence runs, the original blocks pickup and
 	// treats the release as movement-only input.
 	const bool clickReleased = !_inputLocked;
-	const ZoombiniInputResult inputResult =
+	const ZmbDropResult inputResult =
 		ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), clickReleased, _pickupZombAnimation,
 										   _vm->getGameTickCount(), &_turtleDropTargets, getAreaMask());
-	if (inputResult == ZoombiniInputResult::kIgnored00)
+	if (inputResult == ZmbDropResult::kIgnored00)
 		return EventHandleResult::kPassthrough;
 	return EventHandleResult::kConsumed;
 }
 
 EventHandleResult PuzzleCrazyTurtle::onMouseMove(const Common::Point &pos) {
-	const ZoombiniInputResult inputResult =
+	const ZmbDropResult inputResult =
 		ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), false, _pickupZombAnimation,
 										   _vm->getGameTickCount(), &_turtleDropTargets, getAreaMask());
-	if (inputResult == ZoombiniInputResult::kIgnored00)
+	if (inputResult == ZmbDropResult::kIgnored00)
 		return EventHandleResult::kPassthrough;
 	return EventHandleResult::kConsumed;
 }

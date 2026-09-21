@@ -462,7 +462,7 @@ private:
 };
 
 /** One page-managed target accepted by the common Zoombini input lifecycle. */
-struct ZoombiniDropTarget {
+struct ZmbDropTarget {
 	/** Callback invoked after the target releases or receives a Zoombini. */
 	typedef void (*Callback)(void *context, int targetIndex, int zoombiniIndex);
 
@@ -479,7 +479,7 @@ struct ZoombiniDropTarget {
 };
 
 /** Observable result of one common Zoombini pointer-input pass. */
-enum class ZoombiniInputResult {
+enum class ZmbDropResult {
 	/** No held or eligible Zoombini consumed the event. */
 	kIgnored00 = 0,
 	/** A Zoombini entered the click-to-carry state. */
@@ -571,9 +571,9 @@ public:
 	 * A release picks an eligible Zoombini up or attempts to drop the one already
 	 * held onto the first overlapping free release target, then onto the area mask.
 	 */
-	static ZoombiniInputResult handlePointerInput(const Common::Array<ZoombiniRunner *> &zoombinis, const Common::Point32 &pointerPos,
+	static ZmbDropResult handlePointerInput(const Common::Array<ZoombiniRunner *> &zoombinis, const Common::Point32 &pointerPos,
 												  bool clickReleased, const ZoombiniAnimation *pickupAnimation, uint32 tickCount,
-												  Common::Array<ZoombiniDropTarget> *dropTargets = nullptr, const AreaMask *areaMask = nullptr,
+												  Common::Array<ZmbDropTarget> *dropTargets = nullptr, const AreaMask *areaMask = nullptr,
 												  int scrollX = 0, int backgroundWidth = AnimationRunner::kDefaultBackgroundWidth);
 	/** Stably sort selected roster indices by their logical screen Y position. */
 	static void sortDrawOrderByY(const Common::Array<ZoombiniRunner *> &zoombinis, Common::Array<uint> &order);
@@ -661,10 +661,10 @@ private:
 	void startDrag(const Common::Point32 &pointerPos, const ZoombiniAnimation *pickupAnimation, uint32 tickCount);
 	/** Return the last free target containing the unscrolled held foot point, or -1. */
 	static int findHoveredDropTarget(const ZoombiniRunner &zoombini, const Common::Point32 &pointerPos,
-									 const Common::Array<ZoombiniDropTarget> &targets);
+									 const Common::Array<ZmbDropTarget> &targets);
 	/** Return the first free target containing the release foot point after page scrolling is applied. */
 	static int findReleaseDropTarget(const ZoombiniRunner &zoombini, const Common::Point32 &pointerPos,
-									 const Common::Array<ZoombiniDropTarget> &targets, int scrollX, int backgroundWidth);
+									 const Common::Array<ZmbDropTarget> &targets, int scrollX, int backgroundWidth);
 	/** Refresh @ref ZoombiniRunner::_spriteSize from the current grid and cell. */
 	void updateSpriteSize();
 	/** Apply one scheduled transition and the frame-11 grid-role branch. */
