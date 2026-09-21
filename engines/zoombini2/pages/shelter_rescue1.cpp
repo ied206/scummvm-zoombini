@@ -179,7 +179,7 @@ void ShelterRescueSite1::buildDropTargets() {
 	_dropTargets.clear();
 	for (int col = 0; col < 4; col++) {
 		for (int row = 0; row < 5; row++) {
-			ZoombiniDropTarget target;
+			ZmbDropTarget target;
 			target.rect = Common::Rect32(kRosterGridBasePos.x + col * 40 + 18, kRosterGridBasePos.y + row * 57 + 30,
 										 kRosterGridBasePos.x + col * 40 + 58, kRosterGridBasePos.y + row * 57 + 87);
 			target.occupied = false;
@@ -190,7 +190,7 @@ void ShelterRescueSite1::buildDropTargets() {
 		}
 	}
 	for (int seat = 0; seat < kDepartureSeatCount; seat++) {
-		ZoombiniDropTarget target;
+		ZmbDropTarget target;
 		target.rect = Common::Rect32(kSeatPositions[seat].x, kSeatPositions[seat].y,
 									 kSeatPositions[seat].x + 61, kSeatPositions[seat].y + 23);
 		target.occupied = false;
@@ -233,7 +233,7 @@ ZoombiniRunner *ShelterRescueSite1::getDraggedZoombini() const {
 
 bool ShelterRescueSite1::isDepartingMember(const ZoombiniRunner *zoombini) const {
 	for (int seat = 0; seat < kDepartureSeatCount; seat++) {
-		const ZoombiniDropTarget &target = _dropTargets[kSeatTargetBase + seat];
+		const ZmbDropTarget &target = _dropTargets[kSeatTargetBase + seat];
 		if (target.occupied && 0 <= target.zoombiniIndex && static_cast<uint>(target.zoombiniIndex) < _vm->_state->_activeZoombinis.size() &&
 			_vm->_state->_activeZoombinis[target.zoombiniIndex] == zoombini)
 			return true;
@@ -245,7 +245,7 @@ void ShelterRescueSite1::gridDropCallback(void *context, int targetIndex, int zo
 	ShelterRescueSite1 *page = static_cast<ShelterRescueSite1 *>(context);
 	if (!page || targetIndex < 0 || kGridTargetCount <= targetIndex)
 		return;
-	ZoombiniDropTarget &target = page->_dropTargets[targetIndex];
+	ZmbDropTarget &target = page->_dropTargets[targetIndex];
 	if (!target.occupied)
 		return;
 	if (0 <= zoombiniIndex && static_cast<uint>(zoombiniIndex) < page->_vm->_state->_activeZoombinis.size())
@@ -259,7 +259,7 @@ void ShelterRescueSite1::seatDropCallback(void *context, int targetIndex, int zo
 		return;
 	if (zoombiniIndex < 0 || page->_vm->_state->_activeZoombinis.size() <= static_cast<uint>(zoombiniIndex))
 		return;
-	const ZoombiniDropTarget &target = page->_dropTargets[targetIndex];
+	const ZmbDropTarget &target = page->_dropTargets[targetIndex];
 	page->_vm->_state->_activeZoombinis[zoombiniIndex]->setPosition(Common::Point32(target.rect.left, target.rect.top - 36));
 }
 
@@ -383,7 +383,7 @@ void ShelterRescueSite1::onUpdate() {
 		stepScrollAnimation();
 	if (_departurePrompted) {
 		_departurePrompted = false;
-		_vm->_mapTransitionSourcePageId = static_cast<PageId>(_pageId);
+		_vm->_mapTransitionSourcePageId = _pageId;
 		_vm->requestPageChange(kPageMapTrans);
 	}
 }
@@ -517,9 +517,9 @@ EventHandleResult ShelterRescueSite1::onLButtonUp(const Common::Point &pos) {
 		return EventHandleResult::kConsumed;
 	refreshGridOccupancy();
 	const uint32 tick = _vm->getGameTickCount();
-	const ZoombiniInputResult inputResult = ZoombiniRunner::handlePointerInput(_vm->_state->_activeZoombinis, Common::Point32(pos.x, pos.y), true,
+	const ZmbDropResult inputResult = ZoombiniRunner::handlePointerInput(_vm->_state->_activeZoombinis, Common::Point32(pos.x, pos.y), true,
 																			   _pickupZombAnimation, tick, &_dropTargets, getAreaMask());
-	if (inputResult != ZoombiniInputResult::kIgnored00)
+	if (inputResult != ZmbDropResult::kIgnored00)
 		return EventHandleResult::kConsumed;
 	if (_scrollPhase != kScrollIdle || getDraggedZoombini())
 		return EventHandleResult::kPassthrough;
@@ -569,9 +569,9 @@ EventHandleResult ShelterRescueSite1::onLButtonUp(const Common::Point &pos) {
 }
 
 EventHandleResult ShelterRescueSite1::onMouseMove(const Common::Point &pos) {
-	const ZoombiniInputResult result = ZoombiniRunner::handlePointerInput(_vm->_state->_activeZoombinis, Common::Point32(pos.x, pos.y), false,
+	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_vm->_state->_activeZoombinis, Common::Point32(pos.x, pos.y), false,
 																		  _pickupZombAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
-	return result == ZoombiniInputResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 
 } // End of namespace Zoombini2

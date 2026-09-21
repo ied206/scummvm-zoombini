@@ -81,6 +81,8 @@ PuzzleWaterslide::~PuzzleWaterslide() {
 }
 
 void PuzzleWaterslide::init() {
+	if (_vm->isDemo())
+		createDemoParty();
 	PuzzleBase::init();
 	_level = CLIP(_puzzleLevel, 1, 4);
 	const int count = _puzzleZoombinis.size();
@@ -116,6 +118,28 @@ void PuzzleWaterslide::init() {
 	startPageMusic(Common::Path(kMusicPath));
 	if (_vm->_isSavedGame)
 		_vm->_state->registerPageVisit(kPageWaterslide, 2);
+}
+
+void PuzzleWaterslide::createDemoParty() {
+	_vm->_isSavedGame = false;
+	_vm->_state->_level = 1;
+	_puzzleLevel = 1;
+	_vm->_zoombiniWalkingFlag = false;
+	_vm->_state->clearActiveZoombinis();
+	for (int index = 0; index < 16; index++) {
+		const byte hair = static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1);
+		const byte eyes = static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1);
+		const byte nose = static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1);
+		const byte feet = static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1);
+		ZoombiniRunner *actor = new ZoombiniRunner();
+		actor->setTraits(ZmbTrait(feet, nose, hair, eyes));
+		actor->_animationCell = 33;
+		_vm->_state->_activeZoombinis.push_back(actor);
+	}
+	for (ZoombiniRunner *actor : _vm->_state->_activeZoombinis) {
+		const Common::String name = GameState::generateZoombiniName(*_vm->_rnd);
+		Common::strlcpy(actor->_name, name.c_str(), sizeof(actor->_name));
+	}
 }
 
 void PuzzleWaterslide::loadResources() {
@@ -256,7 +280,8 @@ void PuzzleWaterslide::generateEasy() {
 	}
 	Common::Array<Pair> pairs;
 	Common::Array<int> remaining, unmatched;
-	if (_vm->useGreedyWaterslidePairing()) {
+	const bool greedyPairing = _vm->isDemo() || _vm->useGreedyWaterslidePairing();
+	if (greedyPairing) {
 		for (int attempt = 0; attempt < 10; attempt++) {
 			pairs.clear();
 			bool available[16];
@@ -289,6 +314,11 @@ void PuzzleWaterslide::generateEasy() {
 					remaining.push_back(i);
 			if (left <= 1)
 				break;
+			if (_vm->isDemo() && attempt < 9 && !remaining.empty()) {
+				const int unmatchedActor = _generationOrder[remaining[0]];
+				_generationOrder.remove_at(remaining[0]);
+				_generationOrder.insert_at(0, unmatchedActor);
+			}
 		}
 	} else {
 		for (int attempt = 0; attempt < 9; attempt++) {
@@ -356,7 +386,7 @@ void PuzzleWaterslide::generateEasy() {
 		}
 		pairs.push_back(pair);
 	}
-	if (!_vm->useGreedyWaterslidePairing() && !pairs.empty()) {
+	if (!greedyPairing && !pairs.empty()) {
 		const int first = _vm->_rnd->getRandomNumber(pairs.size() - 1);
 		const int second = _vm->_rnd->getRandomNumber(pairs.size() - 1);
 		SWAP(pairs[first], pairs[second]);
@@ -592,7 +622,7 @@ void PuzzleWaterslide::setupTargets() {
 		}
 		if (!_activeSlot[slot])
 			pos = Common::Point32(1000, 1000);
-		ZoombiniDropTarget &target = _targets[slot];
+		ZmbDropTarget &target = _targets[slot];
 		target.rect = Common::Rect32(pos.x, pos.y, pos.x + 60, pos.y + 60);
 		target.callback = &onSlotChanged;
 		target.callbackContext = this;
@@ -600,8 +630,8 @@ void PuzzleWaterslide::setupTargets() {
 }
 
 bool PuzzleWaterslide::matches(const Edge &edge) const {
-	const ZoombiniDropTarget &a = _targets[edge.a];
-	const ZoombiniDropTarget &b = _targets[edge.b];
+	const ZmbDropTarget &a = _targets[edge.a];
+	const ZmbDropTarget &b = _targets[edge.b];
 	if (!a.occupied || !b.occupied)
 		return false;
 	if (edge.axis < 0)
@@ -708,7 +738,11 @@ void PuzzleWaterslide::activateValve() {
 void PuzzleWaterslide::dischargeNext() {
 	int order[16];
 	int size = 0;
-	if (_level == 1) {
+	if (_vm->isDemo()) {
+		for (int slot = 0; slot < 16; slot++)
+			order[slot] = slot;
+		size = 16;
+	} else if (_level == 1) {
 		const int rows = (_targets.size() + 1) / 2;
 		for (int row = 0; row < rows; row++) {
 			order[size] = row;
@@ -732,7 +766,7 @@ void PuzzleWaterslide::dischargeNext() {
 		size = 16;
 	}
 	for (int i = 0; i < size; i++) {
-		ZoombiniDropTarget &target = _targets[order[i]];
+		ZmbDropTarget &target = _targets[order[i]];
 		if (!target.occupied || !_eligible[target.zoombiniIndex])
 			continue;
 		target.occupied = false;
@@ -921,13 +955,14 @@ void PuzzleWaterslide::drawDecorations(ManagedSurface32 *screen) {
 	const uint32 tick = _vm->getGameTickCount();
 	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _treeRunner, tick, 0, ManagedSurface32::kScreenSize.width);
 	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _fountainRunner, tick, 0, ManagedSurface32::kScreenSize.width);
-	if (!_valveRunner->isActive() && _level != 4)
-		_vm->_gfx->drawAnimationFrame(screen, _valve, 0, _valvePos);
-	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _valveRunner, tick, 0, ManagedSurface32::kScreenSize.width);
 	if (_cascadeRunner->isActive())
 		_vm->_gfx->drawAndUpdateAnimationRunner(screen, _cascadeRunner, tick, 0, ManagedSurface32::kScreenSize.width);
 	else
 		_vm->_gfx->drawAnimationFrame(screen, _cascade, 0, _cascadePos);
+	// The valve overlaps the cascade's left edge and must remain in front of it.
+	if (!_valveRunner->isActive() && _level != 4)
+		_vm->_gfx->drawAnimationFrame(screen, _valve, 0, _valvePos);
+	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _valveRunner, tick, 0, ManagedSurface32::kScreenSize.width);
 }
 
 void PuzzleWaterslide::onRenderContent(ManagedSurface32 *screen) {
@@ -960,17 +995,17 @@ EventHandleResult PuzzleWaterslide::onLButtonUp(const Common::Point &pos) {
 	if (_valveRunner->containsHitPoint(Common::Point32(pos.x, pos.y))) {
 		return EventHandleResult::kConsumed;
 	}
-	const ZoombiniInputResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), true,
+	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), true,
 																		  _pickup, _vm->getGameTickCount(), &_targets, getAreaMask());
-	return result == ZoombiniInputResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 
 EventHandleResult PuzzleWaterslide::onMouseMove(const Common::Point &pos) {
 	if (_phase != kInteractive00)
 		return EventHandleResult::kPassthrough;
-	const ZoombiniInputResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), false,
+	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), false,
 																		  _pickup, _vm->getGameTickCount(), &_targets, getAreaMask());
-	return result == ZoombiniInputResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 
 int PuzzleWaterslide::countFreeZoombinis() const {
@@ -982,10 +1017,14 @@ int PuzzleWaterslide::countFreeZoombinis() const {
 }
 
 bool PuzzleWaterslide::canUseGoButton() const {
-	return !_goPending && _vm->_zoombiniWalkingFlag;
+	return _vm->isDemo() || (!_goPending && _vm->_zoombiniWalkingFlag);
 }
 
 bool PuzzleWaterslide::onGoButtonPressed() {
+	if (_vm->isDemo()) {
+		_vm->quitGame();
+		return false;
+	}
 	if (!_vm->_isSavedGame)
 		return true;
 	if (_goPending)

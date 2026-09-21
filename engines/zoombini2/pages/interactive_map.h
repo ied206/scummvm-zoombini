@@ -69,7 +69,7 @@ public:
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
 	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
 	/** Return the required practice-party size for @p pageId, or zero for a shelter or unsupported page. */
-	static uint getPracticePartySize(int pageId);
+	static uint getPracticePartySize(PageId pageId);
 	bool hasActiveDialog() const override { return _volumePanel != nullptr; }
 
 private:
@@ -176,21 +176,21 @@ private:
 	 * Index = segment slot, value = page ID whose level to use.
 	 * Slot 12 is unused in saved-game mode; slot 13 occupies its position.
 	 */
-	static constexpr int kSegmentPageIds[kNumSegments] = {
-		1,  //  0: CrazyTurtle
-		2,  //  1: Waterslide
-		3,  //  2: Aquacube
-		3,  //  3: Aquacube
-		5,  //  4: MysticMarsh
-		6,  //  5: MagicWall
-		7,  //  6: WallOfFleens
-		8,  //  7: ChezNorf
-		7,  //  8: WallOfFleens
-		8,  //  9: ChezNorf
-		10, // 10: Snowboard
-		11, // 11: Boolies
-		11, // 12: unused in saved-game mode
-		11  // 13: Boolies duplicate
+	static constexpr PageId kSegmentPageIds[kNumSegments] = {
+		kPageCrazyTurtle,  //  0: CrazyTurtle
+		kPageWaterslide,   //  1: Waterslide
+		kPageAquacube,     //  2: Aquacube
+		kPageAquacube,     //  3: Aquacube
+		kPageMysticMarsh,  //  4: MysticMarsh
+		kPageMagicWall,    //  5: MagicWall
+		kPageWallOfFleens, //  6: WallOfFleens
+		kPageChezNorf,     //  7: ChezNorf
+		kPageWallOfFleens, //  8: WallOfFleens
+		kPageChezNorf,     //  9: ChezNorf
+		kPageSnowboard,    // 10: Snowboard
+		kPageBoolies,      // 11: Boolies
+		kPageBoolies,      // 12: unused in saved-game mode
+		kPageBoolies       // 13: Boolies duplicate
 	};
 
 	/** One bottom-panel button with either RLE or bit-block visuals. */
@@ -273,11 +273,9 @@ private:
 	/** Return whether this page uses direct practice selection. */
 	bool isPracticeMode() const { return _mode == kMapScreenPractice; }
 	/** Replace the active roster with the route-sized practice party for @p pageId. */
-	void createPracticeParty(int pageId);
+	void createPracticeParty(PageId pageId);
 	/** Return whether @p traits satisfy the practice party's trait distribution limits. */
 	bool practiceCandidateFitsPack(const ZmbTrait &traits) const;
-	/** Generate one name for a practice Zoombini. */
-	Common::String generatePracticeZoombiniName() const;
 	/** Draw every route segment at the practice level. */
 	void drawPracticeSegments(ManagedSurface32 *screen);
 	/** Draw visited route segments at their stored page levels. */

@@ -60,9 +60,9 @@ bool DialogDebug::open(const DialogDebugCommand &cmd) {
 		_vm->_gfx->maskRejectedArea(_savedScreen, page->getAreaMask());
 
 		if (page->hasAreaMask())
-			_titleText = Common::String::format("[AreaMask] page(%d)", page->getPageId());
+			_titleText = Common::String::format("[AreaMask] page(%d)", static_cast<int>(page->getPageId()));
 		else
-			_titleText = Common::String::format("[AreaMask] page(%d) no area mask", page->getPageId());
+			_titleText = Common::String::format("[AreaMask] page(%d) no area mask", static_cast<int>(page->getPageId()));
 	} else if (cmd._type == DialogDebugCommand::Type::kDrawAnimation) {
 		if (cmd._animPath.toString().hasSuffixIgnoreCase(".rb")) {
 			if (!_vm->_gfx->loadPageRleBlock(cmd._animPath.toString('/'))) {

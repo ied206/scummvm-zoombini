@@ -155,7 +155,8 @@ BitBlock::~BitBlock() {
 bool BitBlock::loadFromColorAlphaBMP(const Common::Path &colorPath, const Common::Path &alphaPath) {
 	Common::ScopedPtr<Common::SeekableReadStream> colorStream(_vm->openResourceFile(colorPath.toString('/')));
 	if (!colorStream) {
-		warning("BitBlock: cannot open color BMP '%s'", colorPath.toString().c_str());
+		if (!_vm->isDemo())
+			warning("BitBlock: cannot open color BMP '%s'", colorPath.toString().c_str());
 		return false;
 	}
 	Common::SeekableReadStream &colorFile = *colorStream;
@@ -166,7 +167,8 @@ bool BitBlock::loadFromColorAlphaBMP(const Common::Path &colorPath, const Common
 
 	Common::ScopedPtr<Common::SeekableReadStream> alphaStream(_vm->openResourceFile(alphaPath.toString('/')));
 	if (!alphaStream) {
-		warning("BitBlock: cannot open alpha BMP '%s'", alphaPath.toString().c_str());
+		if (!_vm->isDemo())
+			warning("BitBlock: cannot open alpha BMP '%s'", alphaPath.toString().c_str());
 		return false;
 	}
 	Common::SeekableReadStream &alphaFile = *alphaStream;
@@ -195,14 +197,7 @@ bool BitBlock::loadFromColorBMP(const Common::Path &colorPath) {
 	return true;
 }
 
-/**
- * Load the cached `.bb` BitBlock format.
- *
- * Format:
- *   - 20-byte header: field0(4) + pPixels_placeholder(4) + bufSize(4) + width(4) + height(4)
- *   - 4-byte data size (= 3 * width * height)
- *   - Raw BGR pixel data (3 bytes per pixel, top-to-bottom)
- */
+/** Load one cached BB record described by @ref BitBlock. */
 bool BitBlock::loadFromBB(const Common::Path &bbPath) {
 	Common::ScopedPtr<Common::SeekableReadStream> stream(_vm->openResourceFile(bbPath.toString('/')));
 	if (!stream) {
@@ -389,14 +384,18 @@ byte BitBlock::blendChannel(byte src, byte dest, byte mask) {
 }
 
 void BitBlock::drawToSurface(ManagedSurface32 *destSurface, const Common::Point32 &pos) const {
-	drawOpaque(destSurface, pos, Common::Rect32(_size.width, _size.height));
+	drawToSurfaceInternal(destSurface, pos, Common::Rect32(_size.width, _size.height), false);
+}
+
+void BitBlock::drawToSurfaceColorKey(ManagedSurface32 *destSurface, const Common::Point32 &pos) const {
+	drawToSurfaceInternal(destSurface, pos, Common::Rect32(_size.width, _size.height), true);
 }
 
 void BitBlock::drawSubRect(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect &srcRect) const {
-	drawOpaque(destSurface, pos, Common::Rect32(srcRect.left, srcRect.top, srcRect.right, srcRect.bottom));
+	drawToSurfaceInternal(destSurface, pos, Common::Rect32(srcRect.left, srcRect.top, srcRect.right, srcRect.bottom), false);
 }
 
-void BitBlock::drawOpaque(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &srcRect) const {
+void BitBlock::drawToSurfaceInternal(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &srcRect, bool useColorKey) const {
 	if (!_pixels || srcRect.isEmpty())
 		return;
 
@@ -417,10 +416,20 @@ void BitBlock::drawOpaque(ManagedSurface32 *destSurface, const Common::Point32 &
 	const uint srcPitch = static_cast<uint>(_size.width) * 4;
 	const byte *srcPixels = _pixels + static_cast<size_t>(srcY) * srcPitch + static_cast<size_t>(srcX) * 4;
 	byte *destPixels = static_cast<byte *>(destSurface->getBasePtr(dest.left, dest.top));
-	// Ignore the stored fourth byte, including zero-filled bitmaps, and produce opaque output.
-	static constexpr Graphics::PixelFormat kSourceFormat = Graphics::PixelFormat::createFormatRGBA32(false);
-	if (!Graphics::crossBlit(destPixels, srcPixels, destSurface->pitch, srcPitch, dest.width(), dest.height(), destSurface->format, kSourceFormat)) {
-		warning("BitBlock: unsupported opaque pixel conversion");
+	bool converted = false;
+	if (useColorKey) {
+		static constexpr Graphics::PixelFormat kSourceFormat = Graphics::PixelFormat::createFormatRGBA32();
+		const uint32 colorKey = kSourceFormat.RGBToColor(_pixels[0], _pixels[1], _pixels[2]);
+		converted = Graphics::crossKeyBlit(destPixels, srcPixels, destSurface->pitch, srcPitch, dest.width(), dest.height(), destSurface->format,
+										   kSourceFormat, colorKey);
+	} else {
+		// Ignore the stored fourth byte, including zero-filled bitmaps, and produce opaque output.
+		static constexpr Graphics::PixelFormat kSourceFormat = Graphics::PixelFormat::createFormatRGBA32(false);
+		converted = Graphics::crossBlit(destPixels, srcPixels, destSurface->pitch, srcPitch, dest.width(), dest.height(), destSurface->format,
+										kSourceFormat);
+	}
+	if (!converted) {
+		warning("BitBlock: unsupported pixel conversion");
 		return;
 	}
 	destSurface->addDirtyRect(dest);
@@ -518,14 +527,15 @@ RleBlock::RleBlock(Zoombini2Engine *vm) : _vm(vm) {
 }
 
 RleBlock::~RleBlock() {
-	free(_rleData);
+	free(_pixels);
 }
 
 void RleBlock::swapData(RleBlock &other) {
 	SWAP(_size, other._size);
-	SWAP(_dataSize, other._dataSize);
-	SWAP(_rleData, other._rleData);
-	SWAP(_field20, other._field20);
+	_spans.swap(other._spans);
+	SWAP(_pixels, other._pixels);
+	SWAP(_pixelCount, other._pixelCount);
+	SWAP(_loaded, other._loaded);
 }
 
 /**
@@ -533,13 +543,13 @@ void RleBlock::swapData(RleBlock &other) {
  * File: [24-byte header] [4-byte dataSize] [dataSize bytes RLE data].
  */
 bool RleBlock::loadFromStream(Common::SeekableReadStream *stream) {
-	/* uint32 effectiveHeight = */ stream->readUint32LE();
-	/* uint32 dataPlaceholder = */ stream->readUint32LE();
+	/* uint32 cachedEffectiveHeight = */ stream->readUint32LE();
+	/* uint32 serializedDataPointer = */ stream->readUint32LE();
 	const uint32 headerSize = stream->readUint32LE();
 	const int32 width = stream->readSint32LE();
 	const int32 height = stream->readSint32LE();
 	const Size32 size(width, height);
-	const int32 field20 = stream->readSint32LE();
+	/* uint32 uninitializedSerializedField = */ stream->readUint32LE();
 	const uint32 externalSize = stream->readUint32LE();
 
 	if (stream->err() || headerSize != externalSize || size.width <= 0 || size.height <= 0 || headerSize < 2) {
@@ -566,10 +576,11 @@ bool RleBlock::loadFromStream(Common::SeekableReadStream *stream) {
 	if (readableSize != headerSize)
 		warning("RleBlock: salvaging %u of %u encoded bytes", readableSize, headerSize);
 
-	byte *expandedData = nullptr;
-	uint32 expandedSize = 0;
+	Common::Array<Span> spans;
+	uint32 *pixels = nullptr;
+	uint32 pixelCount = 0;
 	bool salvagedSpans = false;
-	if (!expand3to4bpp(encodedData, readableSize, expandedData, expandedSize, salvagedSpans)) {
+	if (!decodeSpans(encodedData, readableSize, spans, pixels, pixelCount, salvagedSpans)) {
 		warning("RleBlock: malformed RLE span data");
 		free(encodedData);
 		return false;
@@ -578,11 +589,12 @@ bool RleBlock::loadFromStream(Common::SeekableReadStream *stream) {
 	if (salvagedSpans)
 		warning("RleBlock: discarded a malformed RLE tail after complete spans");
 
-	free(_rleData);
+	free(_pixels);
 	_size = size;
-	_dataSize = expandedSize;
-	_rleData = expandedData;
-	_field20 = field20;
+	_spans.swap(spans);
+	_pixels = pixels;
+	_pixelCount = pixelCount;
+	_loaded = true;
 
 	return true;
 }
@@ -616,13 +628,13 @@ bool RleBlock::load(const Common::Path &basePath) {
 }
 
 bool RleBlock::loadAnimationFrame(Common::SeekableReadStream *stream, uint32 outerSize) {
-	/* uint32 effectiveHeight = */ stream->readUint32LE();
-	/* uint32 dataPlaceholder = */ stream->readUint32LE();
+	/* uint32 cachedEffectiveHeight = */ stream->readUint32LE();
+	/* uint32 serializedDataPointer = */ stream->readUint32LE();
 	const uint32 headerSize = stream->readUint32LE();
 	const int32 width = stream->readSint32LE();
 	const int32 height = stream->readSint32LE();
 	const Size32 size(width, height);
-	const int32 field20 = stream->readSint32LE();
+	/* uint32 uninitializedSerializedField = */ stream->readUint32LE();
 
 	if (stream->err() || headerSize != outerSize || size.width <= 0 || size.height <= 0 || headerSize < 2) {
 		warning("RleBlock: invalid ANM frame header");
@@ -645,10 +657,11 @@ bool RleBlock::loadAnimationFrame(Common::SeekableReadStream *stream, uint32 out
 	if (readableSize != headerSize)
 		warning("RleBlock: salvaging %u of %u ANM encoded bytes", readableSize, headerSize);
 
-	byte *expandedData = nullptr;
-	uint32 expandedSize = 0;
+	Common::Array<Span> spans;
+	uint32 *pixels = nullptr;
+	uint32 pixelCount = 0;
 	bool salvagedSpans = false;
-	if (!expand3to4bpp(encodedData, readableSize, expandedData, expandedSize, salvagedSpans)) {
+	if (!decodeSpans(encodedData, readableSize, spans, pixels, pixelCount, salvagedSpans)) {
 		free(encodedData);
 		return false;
 	}
@@ -656,79 +669,87 @@ bool RleBlock::loadAnimationFrame(Common::SeekableReadStream *stream, uint32 out
 	if (salvagedSpans)
 		warning("RleBlock: discarded a malformed ANM RLE tail after complete spans");
 
-	free(_rleData);
+	free(_pixels);
 	_size = size;
-	_dataSize = expandedSize;
-	_rleData = expandedData;
-	_field20 = field20;
+	_spans.swap(spans);
+	_pixels = pixels;
+	_pixelCount = pixelCount;
+	_loaded = true;
 	return true;
 }
 
-bool RleBlock::expand3to4bpp(const byte *srcData, uint32 srcSize, byte *&expandedData, uint32 &expandedSize, bool &salvaged) {
-	expandedData = nullptr;
-	expandedSize = 0;
+bool RleBlock::decodeSpans(const byte *srcData, uint32 srcSize, Common::Array<Span> &spans, uint32 *&pixels, uint32 &pixelCount, bool &salvaged) {
+	spans.clear();
+	pixels = nullptr;
+	pixelCount = 0;
 	salvaged = false;
 	if (!srcData || srcSize < 2)
 		return false;
 
 	const byte *src = srcData + 2;
 	const byte *srcEnd = srcData + srcSize;
-	uint64 requiredSize = 2;
+	uint32 spanCount = 0;
+	uint64 requiredPixelCount = 0;
 	while (src < srcEnd) {
 		if (static_cast<size_t>(srcEnd - src) < 7) {
 			salvaged = true;
 			break;
 		}
-		const int16 pixelCount = READ_LE_INT16(src + 4);
-		const byte mode = src[6];
-		if (pixelCount < 0 || 1 < mode) {
+		const int16 encodedPixelCount = READ_LE_INT16(src + 4);
+		const byte rawMode = src[6];
+		if (encodedPixelCount < 0 || static_cast<byte>(SpanMode::kInverseAlphaBgr01) < rawMode) {
 			salvaged = true;
 			break;
 		}
+		const SpanMode mode = static_cast<SpanMode>(rawMode);
 		src += 7;
-		const uint32 encodedPixelSize = mode == 1 ? 4 : 3;
-		const uint32 availablePixelCount = MIN<uint32>(pixelCount, static_cast<size_t>(srcEnd - src) / encodedPixelSize);
+		const uint32 encodedPixelSize = mode == SpanMode::kOpaqueBgr00 ? 3 : 4;
+		const uint32 availablePixelCount = MIN<uint32>(encodedPixelCount, static_cast<size_t>(srcEnd - src) / encodedPixelSize);
 		src += availablePixelCount * encodedPixelSize;
-		requiredSize += 7 + availablePixelCount * 4;
-		if (0xFFFFFFFFU < requiredSize)
+		requiredPixelCount += availablePixelCount;
+		if (0xFFFFFFFFU / sizeof(uint32) < requiredPixelCount || 0xFFFFFFFFU / sizeof(Span) <= spanCount)
 			return false;
-		if (availablePixelCount != static_cast<uint32>(pixelCount)) {
+		spanCount += 1;
+		if (availablePixelCount != static_cast<uint32>(encodedPixelCount)) {
 			salvaged = true;
 			break;
 		}
 	}
 
-	expandedSize = static_cast<uint32>(requiredSize);
-	expandedData = static_cast<byte *>(malloc(expandedSize));
-	if (!expandedData)
+	// The first serialized payload starts at offset 0x09 after the two-byte prefix and seven-byte span header.
+	// Later seven-byte headers likewise do not guarantee four-byte payload alignment.
+	// Keep headers separate and place every decoded pixel in one uint32-aligned allocation for the shared 32-bit blitters.
+	uint32 *decodedPixels = nullptr;
+	if (requiredPixelCount != 0)
+		decodedPixels = static_cast<uint32 *>(malloc(static_cast<size_t>(requiredPixelCount) * sizeof(uint32)));
+	if (requiredPixelCount != 0 && !decodedPixels)
 		return false;
 
-	src = srcData;
-	byte *dst = expandedData;
-	memcpy(dst, src, 2);
-	src += 2;
-	dst += 2;
-	while (src < srcEnd) {
-		if (static_cast<uint32>(srcEnd - src) < 7)
-			break;
-		const int16 pixelCount = READ_LE_INT16(src + 4);
-		const byte mode = src[6];
-		if (pixelCount < 0 || 1 < mode)
-			break;
-		const uint32 encodedPixelSize = mode == 1 ? 4 : 3;
-		const uint32 availablePixelCount = MIN<uint32>(pixelCount, static_cast<size_t>(srcEnd - src - 7) / encodedPixelSize);
-		memcpy(dst, src, 7);
-		WRITE_LE_UINT16(dst + 4, availablePixelCount);
+	Common::Array<Span> decodedSpans;
+	decodedSpans.reserve(spanCount);
+	src = srcData + 2;
+	uint32 decodedPixelCount = 0;
+	for (uint32 spanIndex = 0; spanIndex < spanCount; spanIndex++) {
+		Span span;
+		span.xOffset = READ_LE_INT16(src);
+		span.yOffset = READ_LE_INT16(src + 2);
+		const int16 encodedPixelCount = READ_LE_INT16(src + 4);
+		span.mode = static_cast<SpanMode>(src[6]);
+		span.pixelOffset = decodedPixelCount;
+		const uint32 encodedPixelSize = span.mode == SpanMode::kOpaqueBgr00 ? 3 : 4;
+		span.pixelCount = MIN<uint32>(encodedPixelCount, static_cast<size_t>(srcEnd - src - 7) / encodedPixelSize);
 		src += 7;
-		dst += 7;
+		byte *dst = nullptr;
+		if (span.pixelCount != 0)
+			dst = reinterpret_cast<byte *>(decodedPixels + decodedPixelCount);
 
-		if (mode == 1) {
-			const uint32 copySize = availablePixelCount * 4;
-			memcpy(dst, src, copySize);
+		if (span.mode == SpanMode::kInverseAlphaBgr01) {
+			const uint32 copySize = span.pixelCount * 4;
+			if (copySize != 0)
+				memcpy(dst, src, copySize);
 			src += copySize;
-			dst += copySize;
 		} else {
-			for (uint32 i = 0; i < availablePixelCount; i++) {
+			for (uint32 i = 0; i < span.pixelCount; i++) {
 				dst[0] = src[0];
 				dst[1] = src[1];
 				dst[2] = src[2];
@@ -737,15 +758,19 @@ bool RleBlock::expand3to4bpp(const byte *srcData, uint32 srcSize, byte *&expande
 				dst += 4;
 			}
 		}
-		if (availablePixelCount != static_cast<uint32>(pixelCount))
-			break;
+		decodedPixelCount += span.pixelCount;
+		decodedSpans.push_back(span);
 	}
+
+	spans.swap(decodedSpans);
+	pixels = decodedPixels;
+	pixelCount = decodedPixelCount;
 	return true;
 }
 
 byte RleBlock::blendChannel(byte src, byte dest, byte invAlpha, const AlphaBlendLUT &alphaLUT) {
 	// @ref Graphics::alphaBlit normally handles per-pixel opacity, but expects straight RGB and forward alpha.
-	// Mode-1 RLE stores premultiplied BGR and inverse alpha, so that blitter would scale the source again.
+	// Mode 1 RLE stores premultiplied BGR and inverse alpha, so that blitter would scale the source again.
 	// Keep `min(255, source + floor(destination * inverseAlpha / 256))` via @ref AlphaBlendLUT.
 	// Unpremultiplying first would lose integer precision and would not preserve the saturated sum.
 	const int destPart = alphaLUT.scale(invAlpha, dest);
@@ -754,61 +779,65 @@ byte RleBlock::blendChannel(byte src, byte dest, byte invAlpha, const AlphaBlend
 
 /**
  * Draw the RLE spans with opaque copying or lookup-table alpha blending.
- *
- * Span data begins after the two-byte resource prefix.
  */
 void RleBlock::drawToScreen(ManagedSurface32 *destSurface, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const {
-	drawToScreenClipped(destSurface, pos, Common::Rect32(destSurface->w, destSurface->h), alphaLUT);
+	drawToScreenInternal(destSurface, pos, Common::Rect32(destSurface->w, destSurface->h), alphaLUT, false, 0, 0, 0);
+}
+
+void RleBlock::drawToScreenColorKey(ManagedSurface32 *destSurface, const Common::Point32 &pos, byte red, byte green, byte blue,
+									const AlphaBlendLUT &alphaLUT) const {
+	drawToScreenInternal(destSurface, pos, Common::Rect32(destSurface->w, destSurface->h), alphaLUT, true, red, green, blue);
 }
 
 void RleBlock::drawToScreenClipped(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &clip, const AlphaBlendLUT &alphaLUT) const {
-	if (!_rleData || _dataSize < 2 || !clip.isValidRect())
+	drawToScreenInternal(destSurface, pos, clip, alphaLUT, false, 0, 0, 0);
+}
+
+void RleBlock::drawToScreenInternal(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &clip,
+									const AlphaBlendLUT &alphaLUT, bool useColorKey, byte red, byte green, byte blue) const {
+	if (!_loaded || !clip.isValidRect())
 		return;
 
 	const Common::Rect32 destClip = clip.findIntersectingRect(Common::Rect32(destSurface->w, destSurface->h));
 	if (destClip.isEmpty())
 		return;
 	assert(destSurface->format.bytesPerPixel == 4);
+	static constexpr Graphics::PixelFormat kOpaqueRleFormat = Graphics::PixelFormat::createFormatBGRA32(false);
+	const uint32 colorKey = kOpaqueRleFormat.RGBToColor(red, green, blue);
 
-	const byte *ptr = _rleData + 2;
-	const byte *end = _rleData + _dataSize;
+	for (uint spanIndex = 0; spanIndex < _spans.size(); spanIndex++) {
+		const Span &span = _spans[spanIndex];
+		assert(span.pixelOffset <= _pixelCount);
+		assert(span.pixelCount <= _pixelCount - span.pixelOffset);
 
-	while (ptr < end) {
-		if (end - ptr < 7)
-			break;
-
-		const int16 xOff = READ_LE_INT16(ptr);
-		const int16 yOff = READ_LE_INT16(ptr + 2);
-		const int16 pixelCount = READ_LE_INT16(ptr + 4);
-		const byte mode = ptr[6];
-		ptr += 7;
-		if (pixelCount < 0 || 1 < mode || static_cast<uint32>(end - ptr) < static_cast<uint32>(pixelCount) * 4)
-			return;
-
-		const int32 screenX = pos.x + xOff;
-		const int32 screenY = pos.y + yOff;
-		if (screenY < destClip.top || destClip.bottom <= screenY) {
-			ptr += pixelCount * 4;
+		const int32 screenX = pos.x + span.xOffset;
+		const int32 screenY = pos.y + span.yOffset;
+		if (screenY < destClip.top || destClip.bottom <= screenY)
 			continue;
-		}
 
 		const int32 left = MAX<int32>(screenX, destClip.left);
-		const int32 right = MIN<int32>(screenX + pixelCount, destClip.right);
+		const int32 right = MIN<int32>(screenX + static_cast<int32>(span.pixelCount), destClip.right);
 		if (left < right) {
 			const int x = static_cast<int>(left);
 			const int y = static_cast<int>(screenY);
 			const int count = static_cast<int>(right - left);
 			const int startCol = static_cast<int>(left - screenX);
-			const byte *srcPixel = ptr + startCol * 4;
+			const byte *srcPixel = reinterpret_cast<const byte *>(_pixels + span.pixelOffset + startCol);
 			byte *dstPixel = static_cast<byte *>(destSurface->getBasePtr(x, y));
 
-			if (mode == 0) {
-				// Copy potentially unaligned payload bytes before applying typed alpha writes in place.
-				// Preserve raw BGRA byte order independently of the destination format.
-				static constexpr Graphics::PixelFormat kByteFormat = Graphics::PixelFormat::createFormatBGRA32();
-				destSurface->copyRectToSurface(srcPixel, count * 4, x, y, count, 1);
-				Graphics::setAlpha(dstPixel, dstPixel, destSurface->pitch, destSurface->pitch, count, 1, kByteFormat, false, 255);
+			if (span.mode == SpanMode::kOpaqueBgr00) {
+				bool converted = false;
+				if (useColorKey)
+					converted = Graphics::crossKeyBlit(dstPixel, srcPixel, destSurface->pitch, count * 4, count, 1, destSurface->format, kOpaqueRleFormat, colorKey);
+				else
+					converted = Graphics::crossBlit(dstPixel, srcPixel, destSurface->pitch, count * 4, count, 1, destSurface->format, kOpaqueRleFormat);
+				if (!converted) {
+					warning("RleBlock: unsupported opaque pixel conversion");
+					continue;
+				}
+				destSurface->addDirtyRect(Common::Rect(x, y, x + count, y + 1));
 			} else {
+				assert(span.mode == SpanMode::kInverseAlphaBgr01);
 				// Mode 1 stores premultiplied BGR followed by inverse alpha.
 				for (int i = 0; i < count; i++) {
 					const byte invAlpha = srcPixel[3];
@@ -822,7 +851,6 @@ void RleBlock::drawToScreenClipped(ManagedSurface32 *destSurface, const Common::
 				destSurface->addDirtyRect(Common::Rect(x, y, x + count, y + 1));
 			}
 		}
-		ptr += pixelCount * 4;
 	}
 }
 
@@ -944,6 +972,11 @@ void Gfx::drawBitBlock(ManagedSurface32 *destSurface, const BitBlock *bitmap, co
 		bitmap->drawToSurface(destSurface, pos);
 }
 
+void Gfx::drawBitBlockColorKey(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos) const {
+	if (destSurface && bitmap)
+		bitmap->drawToSurfaceColorKey(destSurface, pos);
+}
+
 Size32 Gfx::getPageBitBlockSize(const Common::String &key) {
 	BitBlock *bitmap = loadPageBitBlock(key);
 	return bitmap ? bitmap->getSize() : Size32();
@@ -980,6 +1013,11 @@ void Gfx::drawBackgroundSubRect(ManagedSurface32 *destSurface, const Common::Poi
 void Gfx::drawRleBlock(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos) const {
 	if (destSurface && sprite)
 		sprite->drawToScreen(destSurface, pos, _vm->getAlphaLUT());
+}
+
+void Gfx::drawRleBlockColorKey(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos, byte red, byte green, byte blue) const {
+	if (destSurface && sprite)
+		sprite->drawToScreenColorKey(destSurface, pos, red, green, blue, _vm->getAlphaLUT());
 }
 
 Size32 Gfx::getPageRleBlockSize(const Common::String &key) {
@@ -1201,7 +1239,7 @@ void Gfx::drawLine(ManagedSurface32 *destSurface, const Common::Point32 &start, 
 		destSurface->drawLine(start.x, start.y, end.x, end.y, color);
 }
 
-ManagedSurface32 *Gfx::createMapTransitionBackground(PageId srcPage, int mapRegion, RouteBranch routeBranch) {
+ManagedSurface32 *Gfx::createMapTransitionBackground(PageId srcPageId, int mapRegion, RouteBranch routeBranch) {
 	ManagedSurface32 *background = createSurface(ManagedSurface32::kScreenSize);
 
 	const Common::String backgroundPath = Common::String::format(kMapTransitionBackgroundPathFormat, mapRegion);
@@ -1213,7 +1251,7 @@ ManagedSurface32 *Gfx::createMapTransitionBackground(PageId srcPage, int mapRegi
 		fillRect(background, Common::Rect32(0, 0, ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), 0);
 	}
 
-	drawMapOverlays(background, srcPage, mapRegion, routeBranch);
+	drawMapOverlays(background, srcPageId, mapRegion, routeBranch);
 	return background;
 }
 
@@ -1237,26 +1275,26 @@ void Gfx::drawOverlaySprite(ManagedSurface32 *dst, const Common::String &name, c
  *   or if the current transition starts at srcPageId and that page is visited
  *   but dstPageId has not been reached at this level yet.
  *
- * Route direction at the page-4 fork is tracked through @ref GameState::hasPageVisit.
- * Page 6 visit kind 1 selects the upper path and page 5 selects the lower path.
+ * Route direction at the Rescue Site I fork is tracked through @ref GameState::hasPageVisit.
+ * Magic Wall visit kind 1 selects the upper path and Mystic Marsh selects the lower path.
  */
-void Gfx::drawMapOverlays(ManagedSurface32 *dst, PageId srcPage, int mapRegion, RouteBranch routeBranch) {
+void Gfx::drawMapOverlays(ManagedSurface32 *dst, PageId srcPageId, int mapRegion, RouteBranch routeBranch) {
 	GameState *gs = _vm->_state;
 
 	// Helper lambda: standard overlay visibility check.
 	// "Show this path piece if destSurface was previously visited,
 	// OR if we're currently transitioning and haven't arrived yet."
-	auto visible = [&](int srcPageId, int dstPageId) -> bool {
-		return gs->isPageVisited(dstPageId) || (srcPage == srcPageId && gs->isPageVisited(srcPageId) && !gs->hasPageVisit(dstPageId, 1));
+	auto visible = [&](PageId segmentSrcPageId, PageId dstPageId) -> bool {
+		return gs->isPageVisited(dstPageId) || (srcPageId == segmentSrcPageId && gs->isPageVisited(segmentSrcPageId) && !gs->hasPageVisit(dstPageId, 1));
 	};
 
 	switch (mapRegion) {
 	case 1: {
 		// Map region one covers ShelterZombiniville through Rescue Site I.
-		const bool seg01vis = visible(0, 1);
-		const bool seg02vis = visible(1, 2);
-		const bool seg03vis = visible(2, 3);
-		const bool seg04vis = visible(3, 4);
+		const bool seg01vis = visible(kPageZombiniville, kPageCrazyTurtle);
+		const bool seg02vis = visible(kPageCrazyTurtle, kPageWaterslide);
+		const bool seg03vis = visible(kPageWaterslide, kPageAquacube);
+		const bool seg04vis = visible(kPageAquacube, kPageRescue1);
 
 		if (seg01vis)
 			drawOverlaySprite(dst, "bigmap_segment_01", Common::Point32(264, 206));
@@ -1283,40 +1321,42 @@ void Gfx::drawMapOverlays(ManagedSurface32 *dst, PageId srcPage, int mapRegion, 
 
 	case 2: {
 		// Map region two covers both routes between the rescue sites.
-		const bool northRoute = gs->hasPageVisit(6, 1) || routeBranch == RouteBranch::kLeft01;
-		const bool southRoute = gs->hasPageVisit(5, 1) || routeBranch == RouteBranch::kRight02;
+		const bool northRoute = gs->hasPageVisit(kPageMagicWall, 1) || routeBranch == RouteBranch::kLeft01;
+		const bool southRoute = gs->hasPageVisit(kPageMysticMarsh, 1) || routeBranch == RouteBranch::kRight02;
 
 		// Unconditional: start of route from Rescue1
 		drawOverlaySprite(dst, "bigmap_segment_03", Common::Point32(-18, 198));
 		drawOverlaySprite(dst, "bigmap_segment_04", Common::Point32(99, 280));
 
 		// Top path: fork, Magic Wall, Chez Norf, then Rescue Site II.
-		if (northRoute && visible(4, 6))
+		if (northRoute && visible(kPageRescue1, kPageMagicWall))
 			drawOverlaySprite(dst, "bigmap_segment_05a", Common::Point32(201, 260));
 
 		// Magic Wall to Chez Norf segment.
-		const bool czNorfSeg = gs->isPageVisited(8) || (srcPage == 6 && gs->isPageVisited(6) && !gs->hasPageVisit(8, 1));
+		const bool czNorfSeg = gs->isPageVisited(kPageChezNorf) ||
+							   (srcPageId == kPageMagicWall && gs->isPageVisited(kPageMagicWall) && !gs->hasPageVisit(kPageChezNorf, 1));
 		if (czNorfSeg)
 			drawOverlaySprite(dst, "bigmap_segment_06a", Common::Point32(310, 230));
 
 		// Chez Norf to Rescue Site II segment.
-		if (gs->hasPageVisit(8, 1)) {
-			if (gs->isPageVisited(9) || (srcPage == 8 && gs->isPageVisited(8) && !gs->hasPageVisit(9, 1)))
+		if (gs->hasPageVisit(kPageChezNorf, 1)) {
+			if (gs->isPageVisited(kPageRescue2) || (srcPageId == kPageChezNorf && gs->isPageVisited(kPageChezNorf) && !gs->hasPageVisit(kPageRescue2, 1)))
 				drawOverlaySprite(dst, "bigmap_segment_07a", Common::Point32(480, 233));
 		}
 
 		// Bottom path: fork, Mystic Marsh, Wall of Fleens, then Rescue Site II.
-		if (southRoute && visible(4, 5))
+		if (southRoute && visible(kPageRescue1, kPageMysticMarsh))
 			drawOverlaySprite(dst, "bigmap_segment_05b", Common::Point32(164, 376));
 
 		// Mystic Marsh to Wall of Fleens segment.
-		const bool wofSeg = gs->isPageVisited(7) || (srcPage == 5 && gs->isPageVisited(5) && !gs->hasPageVisit(7, 1));
+		const bool wofSeg = gs->isPageVisited(kPageWallOfFleens) ||
+							(srcPageId == kPageMysticMarsh && gs->isPageVisited(kPageMysticMarsh) && !gs->hasPageVisit(kPageWallOfFleens, 1));
 		if (wofSeg)
 			drawOverlaySprite(dst, "bigmap_segment_06b", Common::Point32(339, 476));
 
 		// Wall of Fleens to Rescue Site II segment.
-		if (gs->hasPageVisit(7, 1)) {
-			if (gs->isPageVisited(9) || (srcPage == 7 && gs->isPageVisited(7) && !gs->hasPageVisit(9, 1)))
+		if (gs->hasPageVisit(kPageWallOfFleens, 1)) {
+			if (gs->isPageVisited(kPageRescue2) || (srcPageId == kPageWallOfFleens && gs->isPageVisited(kPageWallOfFleens) && !gs->hasPageVisit(kPageRescue2, 1)))
 				drawOverlaySprite(dst, "bigmap_segment_07b", Common::Point32(512, 360));
 		}
 
@@ -1325,30 +1365,30 @@ void Gfx::drawMapOverlays(ManagedSurface32 *dst, PageId srcPage, int mapRegion, 
 		drawOverlaySprite(dst, "bigmap_icon_05", Common::Point32(116, 315));
 
 		// Top route icons
-		if (northRoute && visible(4, 6))
+		if (northRoute && visible(kPageRescue1, kPageMagicWall))
 			drawOverlaySprite(dst, "bigmap_icon_06a", Common::Point32(259, 210));
 		if (czNorfSeg)
 			drawOverlaySprite(dst, "bigmap_icon_07a", Common::Point32(440, 170));
 
 		// Rescue2 icon (reachable from either path)
-		if (gs->isPageVisited(9) ||
-			(srcPage == 8 && gs->isPageVisited(8) && !gs->hasPageVisit(9, 1)) ||
-			(srcPage == 7 && gs->isPageVisited(7) && !gs->hasPageVisit(9, 1)))
+		if (gs->isPageVisited(kPageRescue2) ||
+			(srcPageId == kPageChezNorf && gs->isPageVisited(kPageChezNorf) && !gs->hasPageVisit(kPageRescue2, 1)) ||
+			(srcPageId == kPageWallOfFleens && gs->isPageVisited(kPageWallOfFleens) && !gs->hasPageVisit(kPageRescue2, 1)))
 			drawOverlaySprite(dst, "bigmap_icon_08", Common::Point32(476, 271));
 
 		// Bottom route icons
-		if (southRoute && visible(4, 5))
+		if (southRoute && visible(kPageRescue1, kPageMysticMarsh))
 			drawOverlaySprite(dst, "bigmap_icon_06b", Common::Point32(290, 418));
-		if (visible(5, 7))
+		if (visible(kPageMysticMarsh, kPageWallOfFleens))
 			drawOverlaySprite(dst, "bigmap_icon_07b", Common::Point32(443, 430));
 		break;
 	}
 
 	case 3: {
 		// Map region three covers Rescue Site II through the finale.
-		const bool northRouteVisited = gs->hasPageVisit(6, 1);
-		const bool czNorfFlag = gs->hasPageVisit(8, 1);
-		const bool wofFlag = gs->hasPageVisit(7, 1);
+		const bool northRouteVisited = gs->hasPageVisit(kPageMagicWall, 1);
+		const bool czNorfFlag = gs->hasPageVisit(kPageChezNorf, 1);
+		const bool wofFlag = gs->hasPageVisit(kPageWallOfFleens, 1);
 
 		// Previous route segments (show which path was taken)
 		if (northRouteVisited) {
@@ -1364,10 +1404,10 @@ void Gfx::drawMapOverlays(ManagedSurface32 *dst, PageId srcPage, int mapRegion, 
 		drawOverlaySprite(dst, "bigmap_segment_08", Common::Point32(313, 407));
 
 		// Snowboard Gulch to Boolie Boggle.
-		if (visible(10, 11))
+		if (visible(kPageSnowboard, kPageBoolies))
 			drawOverlaySprite(dst, "bigmap_segment_09", Common::Point32(434, 328));
 		// Boolie Boggle to the finale.
-		if (visible(11, 12))
+		if (visible(kPageBoolies, kPageBooliewood))
 			drawOverlaySprite(dst, "bigmap_segment_10", Common::Point32(527, 111));
 
 		// Prior-route icons remain conditional on saved progress.
@@ -1382,9 +1422,9 @@ void Gfx::drawMapOverlays(ManagedSurface32 *dst, PageId srcPage, int mapRegion, 
 		drawOverlaySprite(dst, "bigmap_icon_09", Common::Point32(367, 367));
 
 		// Conditional icons
-		if (visible(10, 11))
+		if (visible(kPageSnowboard, kPageBoolies))
 			drawOverlaySprite(dst, "bigmap_icon_10", Common::Point32(469, 273));
-		if (visible(11, 12))
+		if (visible(kPageBoolies, kPageBooliewood))
 			drawOverlaySprite(dst, "bigmap_icon_11", Common::Point32(608, -12));
 		break;
 	}
@@ -1410,10 +1450,7 @@ Animation::~Animation() {
 		delete _frames[i];
 }
 
-/**
- * Load an animation from an `.an` cache file.
- * Format: DWORD frameCount, per frame: 24-byte header + 4-byte dataSize + data.
- */
+/** Load one AN frame sequence described by @ref Animation. */
 bool Animation::loadFromFile(const Common::Path &path) {
 	Common::Path resolvedPath(path);
 	const Common::String pathString = path.toString();
@@ -1544,7 +1581,8 @@ bool AreaMask::loadOneBitBitmap(Common::SeekableReadStream &stream, const Common
 bool AreaMask::loadFromFile(const Common::Path &path) {
 	Common::ScopedPtr<Common::SeekableReadStream> stream(_vm->openResourceFile(path.toString('/')));
 	if (!stream) {
-		warning("AreaMask: cannot open '%s'", path.toString().c_str());
+		if (!_vm->isDemo())
+			warning("AreaMask: cannot open '%s'", path.toString().c_str());
 		return false;
 	}
 
@@ -1619,7 +1657,8 @@ ZoombiniAnimation::~ZoombiniAnimation() {
 bool ZoombiniAnimation::loadFromFile(const Common::Path &path) {
 	Common::ScopedPtr<Common::SeekableReadStream> stream(_vm->openResourceFile(path.toString('/')));
 	if (!stream) {
-		warning("ZoombiniAnimation: cannot open '%s'", path.toString().c_str());
+		if (!_vm->isDemo())
+			warning("ZoombiniAnimation: cannot open '%s'", path.toString().c_str());
 		return false;
 	}
 	Common::SeekableReadStream &f = *stream;

@@ -221,10 +221,14 @@ private:
 	GUI::CheckboxWidget *_floatingPointPathsCheckbox = nullptr;
 	/** Toggle enabling the enhanced keyboard shortcut set. */
 	GUI::CheckboxWidget *_enhancedKbdShortcutsCheckbox = nullptr;
+	/** Toggle keying the solid color from affected help-sheet bitmaps. */
+	GUI::CheckboxWidget *_transparentHelpPagesCheckbox = nullptr;
 	/** Toggle for the F2, F3, P, and Chez Norf C developer keys. */
 	GUI::CheckboxWidget *_debugHotkeysCheckbox = nullptr;
 	/** Toggle selecting the alternate level-one Waterslide pairing. */
 	GUI::CheckboxWidget *_greedyWaterslideCheckbox = nullptr;
+	/** Toggle protecting Aqua Cube's first direct lever move from a Fleen. */
+	GUI::CheckboxWidget *_aquacubeSafeFirstMoveCheckbox = nullptr;
 	/** Toggle selecting the original Windows random-number generator. */
 	GUI::CheckboxWidget *_originalPrngCheckbox = nullptr;
 	/** Frame-rate limit in frames per second. */
