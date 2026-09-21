@@ -44,11 +44,11 @@ public:
 	/** Close the active help sheet and release the saved screen. */
 	~DialogHelp() override;
 
-	/** Return whether a help sheet exists for the supplied puzzle coordinates. */
-	bool isPageValid(int puzzleId, int level, int page);
+	/** Return whether a help sheet exists for the supplied page coordinates. */
+	bool isPageValid(PageId pageId, int level, int sheet);
 
 	/** Save the current screen and open the first help sheet. */
-	bool open(int puzzleId, int level);
+	bool open(PageId pageId, int level);
 
 	/** Close the overlay, restore the saved screen, and resume gameplay timing. */
 	void close() override;
@@ -78,7 +78,7 @@ private:
 	static constexpr const char *kHelpPageFormat = "Bmp/help/%02d_help_%s_%02d.bb";
 
 	/** Replace the active help-sheet path with the requested sheet. */
-	bool loadPage(int puzzleId, int level, int page);
+	bool loadPage(PageId pageId, int level, int sheet);
 	/** Forget the active help-sheet path. */
 	void freePage();
 	/** Return the resource-directory label for @p level. */
@@ -86,16 +86,18 @@ private:
 
 	/** Whether the help overlay is active. */
 	bool _isActive = false;
-	/** Puzzle identifier used to resolve the active help resource. */
-	int _currentPuzzleId = -1;
+	/** Page identifier used to resolve the active help resource. */
+	PageId _currentPageId = kPageNone;
 	/** Level used to resolve the active help resource. */
 	int _currentLevel = -1;
 	/** One-based help sheet currently displayed. */
-	int _currentPage = 1;
+	int _currentSheet = 1;
 	/** Screen snapshot restored when the overlay closes. */
 	ManagedSurface32 *_savedScreen = nullptr;
 	/** Path of the active help-sheet bitmap in the graphics page cache. */
 	Common::String _helpPagePath;
+	/** Whether the active release and target enable help-sheet color keying. */
+	bool _transparentHelpPages = false;
 	/** Close-button hit rectangle. */
 	Common::Rect _okButtonRect = Common::Rect(597, 400, 671, 444);
 	/** Previous-sheet button hit rectangle. */

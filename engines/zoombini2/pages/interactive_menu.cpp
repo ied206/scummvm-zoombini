@@ -373,7 +373,7 @@ void InteractiveMenu::startSelectedSave() {
 
 	if (!success)
 		return;
-	if (gameState->hasPageVisit(0, 1))
+	if (gameState->hasPageVisit(kPageZombiniville, 1))
 		_vm->requestPageChange(kPageMenuLoad);
 	else
 		_vm->requestPageChange(kPageCutsceneFirst);

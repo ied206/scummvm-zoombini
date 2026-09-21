@@ -43,7 +43,7 @@ constexpr const char *PuzzleBase::kBooliesBackgroundPath;
 
 // Public activity names paired with their internal resource directories.
 static constexpr struct {
-	int id;
+	PageId pageId;
 	const char *name;
 	const char *dir;
 	const char *bgName; // Background BMP name (without bmp/ prefix or .bmp extension)
@@ -57,44 +57,44 @@ static constexpr struct {
 	{kPageChezNorf, "Chez Norf", "chez_norf", "chez_norf/baquegund"},
 	{kPageSnowboard, "Snowboard Gulch", "snowboard", "snowboard/snowboard-EASY"},
 	{kPageBoolies, "Boolie Boggle", "boolies", "Boolies/background"},
-	{0, nullptr, nullptr, nullptr},
+	{kPageNone, nullptr, nullptr, nullptr},
 };
 
 /* static */
-const char *PuzzleBase::getPuzzleName(int puzzleId) {
+const char *PuzzleBase::getPuzzleName(PageId pageId) {
 	for (int i = 0; kPuzzleInfo[i].name; i++) {
-		if (kPuzzleInfo[i].id == puzzleId)
+		if (kPuzzleInfo[i].pageId == pageId)
 			return kPuzzleInfo[i].name;
 	}
 	return "Unknown";
 }
 
 /* static */
-const char *PuzzleBase::getPuzzleDir(int puzzleId) {
+const char *PuzzleBase::getPuzzleDir(PageId pageId) {
 	for (int i = 0; kPuzzleInfo[i].dir; i++) {
-		if (kPuzzleInfo[i].id == puzzleId)
+		if (kPuzzleInfo[i].pageId == pageId)
 			return kPuzzleInfo[i].dir;
 	}
 	return nullptr;
 }
 
-PuzzleBase::PuzzleBase(Zoombini2Engine *vm, int puzzleId)
-	: InteractiveBase(vm), _puzzleId(puzzleId), _puzzleLevel(vm->_state->_level) {
-	_pageId = puzzleId;
+PuzzleBase::PuzzleBase(Zoombini2Engine *vm, PageId pageId)
+	: InteractiveBase(vm), _puzzleLevel(vm->_state->_level) {
+	_pageId = pageId;
 }
 
 void PuzzleBase::finishPuzzleRoster(BoardRecord **board) {
-	_vm->_state->finishPuzzleRoster(_puzzleId, board, _vm->isStartingMapTransition(), _vm->_isSavedGame);
+	_vm->_state->finishPuzzleRoster(_pageId, board, _vm->isStartingMapTransition(), _vm->_isSavedGame);
 }
 
 void PuzzleBase::init() {
-	const char *name = getPuzzleName(_puzzleId);
-	debug(1, "Puzzle::init - %s (page %d)", name, _puzzleId);
+	const char *name = getPuzzleName(_pageId);
+	debug(1, "Puzzle::init - %s (page %d)", name, static_cast<int>(_pageId));
 
 	// Load the background from the activity resource table.
 	const char *bgName = nullptr;
 	for (int i = 0; kPuzzleInfo[i].name; i++) {
-		if (kPuzzleInfo[i].id == _puzzleId) {
+		if (kPuzzleInfo[i].pageId == _pageId) {
 			bgName = kPuzzleInfo[i].bgName;
 			break;
 		}
@@ -171,7 +171,7 @@ const char *PuzzleChanceInfo::typeName(Type type) {
 }
 
 Common::String PuzzleBase::debugAnswerHeader() const {
-	return Common::String::format("%s (level %d, party %u)\nIndices below are one-based.\n", getPuzzleName(_puzzleId), _puzzleLevel, _puzzleZoombinis.size());
+	return Common::String::format("%s (level %d, party %u)\nIndices below are one-based.\n", getPuzzleName(_pageId), _puzzleLevel, _puzzleZoombinis.size());
 }
 
 Common::String PuzzleBase::debugActorDescription(int index) const {
@@ -195,7 +195,7 @@ void PuzzleBase::debugForceFinish() {
 	applyDebugPuzzleCompletion();
 	_vm->_zoombiniWalkingFlag = true;
 	if (_vm->_isSavedGame) {
-		_vm->_mapTransitionSourcePageId = static_cast<PageId>(_puzzleId);
+		_vm->_mapTransitionSourcePageId = _pageId;
 		_vm->requestPageChange(kPageMapTrans);
 	} else {
 		_vm->requestPageChange(kPageMenuPractice);

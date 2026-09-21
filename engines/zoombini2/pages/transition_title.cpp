@@ -30,6 +30,7 @@ namespace Zoombini2 {
 
 constexpr const char *TransitionTitle::kBackgroundPath;
 constexpr const char *TransitionTitle::kMusicPath;
+constexpr const char *TransitionTitle::kDemoMusicPath;
 
 TransitionTitle::TransitionTitle(Zoombini2Engine *vm)
 	: TransitionBase(vm) {
@@ -46,7 +47,7 @@ void TransitionTitle::init() {
 	}
 
 	// Play the title music until the page is dismissed.
-	startPageMusic(Common::Path(kMusicPath));
+	startPageMusic(Common::Path(_vm->isDemo() ? kDemoMusicPath : kMusicPath));
 }
 
 void TransitionTitle::onUpdate() {
@@ -63,7 +64,16 @@ void TransitionTitle::onRenderContent(ManagedSurface32 *screen) {
 
 EventHandleResult TransitionTitle::onLButtonDown(const Common::Point &pos) {
 	(void)pos;
+	if (_vm->isDemo())
+		return EventHandleResult::kConsumed;
 	return dismiss();
+}
+
+EventHandleResult TransitionTitle::onLButtonUp(const Common::Point &pos) {
+	(void)pos;
+	if (_vm->isDemo())
+		return dismiss();
+	return EventHandleResult::kPassthrough;
 }
 
 EventHandleResult TransitionTitle::onKeyDown(const Common::KeyState &key, bool repeat) {
@@ -74,7 +84,7 @@ EventHandleResult TransitionTitle::onKeyDown(const Common::KeyState &key, bool r
 
 EventHandleResult TransitionTitle::dismiss() {
 	_clicked = true;
-	_vm->requestPageChange(kPageMenuOptions);
+	_vm->requestPageChange(_vm->isDemo() ? kPageWaterslide : kPageMenuOptions);
 	return EventHandleResult::kConsumed;
 }
 
