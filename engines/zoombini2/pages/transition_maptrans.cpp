@@ -72,12 +72,18 @@ void TransitionMapTrans::queueTravelSpeech(PageId srcPage) {
 		if (!state->hasPageVisit(kPageCrazyTurtle, 1)) {
 			queueSpeech(kSpeechTur11);
 		} else {
-			queueSpeech(state->hasPageVisit(kPageBooliewood, 1) ? kSpeechZbv31_3 : kSpeechZbv31_2);
+			if (state->hasPageVisit(kPageBooliewood, 1))
+				queueSpeech(kSpeechZbv31_3);
+			else
+				queueSpeech(kSpeechZbv31_2);
 			queueSpeech(Common::String::format(kSpeechTur21Format, getRandomBinarySpeechVariant()));
 		}
 		break;
 	case kPageCrazyTurtle:
-		queueSpeech(state->hasPageVisit(kPageWaterslide, 1) ? Common::String::format(kSpeechWsl21Format, getRandomBinarySpeechVariant()) : kSpeechWsl11);
+		if (state->hasPageVisit(kPageWaterslide, 1))
+			queueSpeech(Common::String::format(kSpeechWsl21Format, getRandomBinarySpeechVariant()));
+		else
+			queueSpeech(kSpeechWsl11);
 		break;
 	case kPageWaterslide:
 		if (!state->hasPageVisit(kPageAquacube, 1)) {
@@ -92,13 +98,23 @@ void TransitionMapTrans::queueTravelSpeech(PageId srcPage) {
 		queueSpeech(kSpeechAqu31);
 		break;
 	case kPageRescue1:
-		if (_vm->_routeDirection == RouteBranch::kLeft01)
-			queueSpeech(state->hasPageVisit(kPageMagicWall, 1) ? Common::String::format(kSpeechMgw21Format, getRandomBinarySpeechVariant()) : kSpeechMgw11);
-		else
-			queueSpeech(state->hasPageVisit(kPageMysticMarsh, 1) ? Common::String::format(kSpeechMym21Format, getRandomBinarySpeechVariant()) : kSpeechMym11);
+		if (_vm->_routeDirection == RouteBranch::kLeft01) {
+			if (state->hasPageVisit(kPageMagicWall, 1))
+				queueSpeech(Common::String::format(kSpeechMgw21Format, getRandomBinarySpeechVariant()));
+			else
+				queueSpeech(kSpeechMgw11);
+		} else {
+			if (state->hasPageVisit(kPageMysticMarsh, 1))
+				queueSpeech(Common::String::format(kSpeechMym21Format, getRandomBinarySpeechVariant()));
+			else
+				queueSpeech(kSpeechMym11);
+		}
 		break;
 	case kPageMysticMarsh:
-		queueSpeech(state->hasPageVisit(kPageWallOfFleens, 1) ? Common::String::format(kSpeechWlf21Format, getRandomBinarySpeechVariant()) : kSpeechWlf11);
+		if (state->hasPageVisit(kPageWallOfFleens, 1))
+			queueSpeech(Common::String::format(kSpeechWlf21Format, getRandomBinarySpeechVariant()));
+		else
+			queueSpeech(kSpeechWlf11);
 		break;
 	case kPageMagicWall:
 		if (!state->hasPageVisit(kPageChezNorf, 1)) {

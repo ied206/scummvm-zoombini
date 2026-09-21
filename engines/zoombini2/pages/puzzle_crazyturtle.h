@@ -29,7 +29,6 @@
 namespace Zoombini2 {
 
 class Animation;
-class RleBlock;
 
 /**
  * Turtle Hurdle (Route1-1)
@@ -45,6 +44,10 @@ public:
 
 	/** Load the dock and generate the level-selected ordering rules. */
 	void init() override;
+	Common::String debugGetAnswer() const override;
+	PuzzleChanceInfo debugGetChances() const override;
+	bool debugCanSetChances() const override;
+	bool debugSetChances(int remaining) override;
 	/** Advance the fall sequence, turtle spins, and departure start. */
 	void onUpdate() override;
 	/** Keep the press state unchanged; releases place the Zoombini. */
@@ -55,10 +58,16 @@ public:
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
 	/** Report whether the shared Go button currently accepts input. */
 	bool canUseGoButton() const override;
+	/** Wait for departure speech before continuing the saved-game route. */
+	bool onGoButtonPressed() override;
 	/** Advance the roster sprite animations after the actor pass. */
 	void onActorsRendered() override;
 
 private:
+	static constexpr const char *kGoSpeechFormat = "sounds/wld11.%d.wav";
+	static constexpr const char *kRetreatSpeech = "sounds/DW-Zville.wav";
+	bool _goPending = false;
+	int _goSpeech = -1;
 	/** Resource paths and formats used by the turtle scene. */
 	static constexpr const char *kMusicPath = "#sounds/music/08-BS01.wav";
 	static constexpr const char *kTurtleIdleFormat = "Bmp/crazy_turtle/TORTUES/ATTENTE/%d/%d.AN";
@@ -84,6 +93,8 @@ private:
 	static constexpr const char *kMismatchSoundPath = "sounds/fx/08-BS06.wav";
 	static constexpr const char *kFallSoundPath = "sounds/fx/08-BS07.wav";
 	static constexpr const char *kCollapseSoundPath = "sounds/fx/PierCollapse.wav";
+	static constexpr const char *kMotherSuccessSpeechPath = "sounds/8-E1.wav";
+	static constexpr const char *kMotherPartialSpeechPath = "sounds/8-E2.wav";
 
 	/** Restore the dock background. */
 	void onRenderBackground(ManagedSurface32 *screen) override;
@@ -195,13 +206,21 @@ private:
 	static constexpr int kSmokeFrameCount = 6;
 	/** Per-frame smoke duration in milliseconds. */
 	static constexpr uint32 kSmokeFrameDelayMs = 130;
+	/** Frames in the mother turtle's completion animation. */
+	static constexpr int kMotherFrameCount = 10;
+	/** Per-frame mother turtle duration in milliseconds. */
+	static constexpr uint32 kMotherFrameDelayMs = 110;
+	/** Duration of the final held mother turtle frame in milliseconds. */
+	static constexpr uint32 kMotherFinalHoldMs = 500;
+	/** Draw position of the mother turtle. */
+	static constexpr Common::Point32 kMotherPos = Common::Point32(488, 310);
 	/** Draw position of the dock-damage smoke effect. */
 	static constexpr Common::Point32 kSmokePos = Common::Point32(30, 235);
 
 	/** Load an animation from @p path and report whether it succeeded. */
 	bool loadAnimationResource(Animation *&resource, const Common::Path &path);
-	/** Load an RLE sprite from @p path and report whether it succeeded. */
-	bool loadRleResource(RleBlock *&resource, const Common::Path &path);
+	/** Preload an RLE sprite from @p path and report whether it succeeded. */
+	bool loadRleResource(const Common::String &path);
 
 	/** Load all turtle, dock, mother, and trait resources. */
 	void loadResources();
@@ -223,7 +242,7 @@ private:
 	bool evaluateTurtleMatch(const ZoombiniRunner *zoombini, int turtleIndex) const;
 	/** Handle a Zoombini released over @p turtleIndex. */
 	void handleTurtleClick(int turtleIndex, int zoombiniIndex);
-	/** Start the departure sequence: sound and the idle walking phase. */
+	/** Start the mother turtle, departure sound, and idle walking phase. */
 	void startTransitionSequence();
 	/** Play one-shot sound @p soundId at the current SFX volume. */
 	void playSound(int soundId) const;
@@ -249,6 +268,8 @@ private:
 	static void onTurtleIdleSpinComplete(void *context, AnimationRunner *runner);
 	/** Reaction turtle spin completion: mirror the original ready flag. */
 	static void onTurtleSpinComplete(void *context, AnimationRunner *runner);
+	/** Show the retracted mother turtle and play the completion speech. */
+	static void onMotherAnimationComplete(void *context, AnimationRunner *runner);
 	/** Draw the intact or damaged dock for the mirrored mistake count. */
 	void drawBridgeState(ManagedSurface32 *screen);
 	/** Draw the active feature-order hints. */
@@ -279,27 +300,18 @@ private:
 	Animation *_turtleIdleAnimations[kFeatureCount] = {};
 	/** Feedback turtle animations indexed by turtle type. */
 	Animation *_turtleSpinAnimations[kFeatureCount] = {};
-	/** Fixed turtle visuals indexed by turtle type. */
-	RleBlock *_turtleFixedImages[kFeatureCount] = {};
 	/** Mother turtle animation. */
 	Animation *_motherAnimation = nullptr;
+	/** Mother turtle completion runner. */
+	AnimationRunner *_motherRunner = nullptr;
 	/** Mother turtle speech animation. */
 	Animation *_motherSpeechAnimation = nullptr;
 	/** Dock-damage smoke animation. */
 	Animation *_smokeAnimation = nullptr;
-	/** Mother turtle's starting visual. */
-	RleBlock *_motherStartImage = nullptr;
-	/** Mother turtle's ending visual. */
-	RleBlock *_motherEndImage = nullptr;
-	/** Intact dock visual. */
-	RleBlock *_bridgeImage = nullptr;
-	/** Collapsed dock visual. */
-	RleBlock *_collapsedBridgeImage = nullptr;
-	/** Individual dock-beam visual. */
-	RleBlock *_beamImage = nullptr;
-	/** Feature-value hint visuals. */
-	RleBlock *_traitImages[kFeatureCount][kFeatureValueCount] = {};
-
+	/** Whether the mother turtle has completed its neck animation. */
+	bool _motherFinished = false;
+	/** Speech started when the mother turtle animation finishes. */
+	int _motherSpeechSound = -1;
 
 	/** Zoombini grid for walking in place on a settled turtle. */
 	const ZoombiniAnimation *_idleZombAnimation = nullptr;
@@ -325,10 +337,10 @@ private:
 	int _fallbackTurtleIndex = -1;
 	/** Party index of the Zoombini in the fall sequence. */
 	int _fallZoombiniIndex = -1;
-	/** Fall sequence phase: 0 waiting, 1 rising, 2 descending. */
-	int _fallPhase = 0;
+	/** Fall sequence phase: -1 inactive, 0 waiting, 1 rising, 2 descending. */
+	int _fallPhase = -1;
 	/** Tick at which the mismatch reaction starts. */
-	uint32 _fallTimerTick = 0;
+	uint32 _fallTimerTick = 0xFFFFFFFFU;
 	/** Turtle clicked on the latest mismatch. */
 	int _activeTurtleIndex = -1;
 	/** Self-rescheduling count for the fall animation. */

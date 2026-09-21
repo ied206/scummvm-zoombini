@@ -41,8 +41,6 @@ ShelterRescueSiteBase::ShelterRescueSiteBase(Zoombini2Engine *vm)
 ShelterRescueSiteBase::~ShelterRescueSiteBase() {
 	clearSpeechQueue();
 
-	delete _selector;
-	delete _porteSelect;
 	delete _buttonUp;
 	delete _buttonDown;
 }
@@ -56,23 +54,18 @@ void ShelterRescueSiteBase::configureRosterLayout(const Common::Point32 &gridBas
 }
 
 void ShelterRescueSiteBase::loadSelector(const char *path) {
-	_selector = new RleBlock(_vm);
-	_selector->loadFromFile(Common::Path(path));
+	_selectorPath = path;
+	_selectorReady = _vm->_gfx->loadPageRleBlock(_selectorPath) != nullptr;
 }
 
 void ShelterRescueSiteBase::drawRosterBackdrop(ManagedSurface32 *screen, int scrollX) const {
-	if (!_selector || !_selector->isValid())
+	if (!_selectorReady)
 		return;
 
 	const Common::Rect32 wrapClip(0, 0, _gridBasePos.x + 223, screen->h);
 	const Common::Rect32 rosterClip(_gridBasePos.x, 0, screen->w, screen->h);
-	_selector->drawToScreenClipped(screen, Common::Point32(_gridBasePos.x + 223 - scrollX, _gridBasePos.y), wrapClip, _vm->getAlphaLUT());
-	_selector->drawToScreenClipped(screen, Common::Point32(_gridBasePos.x - scrollX, _gridBasePos.y), rosterClip, _vm->getAlphaLUT());
-}
-
-void ShelterRescueSiteBase::loadPorteSelector(const char *path) {
-	_porteSelect = new RleBlock(_vm);
-	_porteSelect->loadFromFile(Common::Path(path));
+	_vm->_gfx->drawPageRleBlockClipped(screen, _selectorPath, Common::Point32(_gridBasePos.x + 223 - scrollX, _gridBasePos.y), wrapClip);
+	_vm->_gfx->drawPageRleBlockClipped(screen, _selectorPath, Common::Point32(_gridBasePos.x - scrollX, _gridBasePos.y), rosterClip);
 }
 
 void ShelterRescueSiteBase::loadScrollButtons(const char *buttonUpPath, const char *buttonDownPath) {
@@ -209,20 +202,13 @@ void ShelterRescueSiteBase::onUpdate() {
 }
 
 void ShelterRescueSiteBase::onRenderContent(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	onRenderSite(screen);
 
-	if (_buttonUp && 0 < _buttonUp->getFrameCount()) {
-		const RleBlock *frame = _buttonUp->getFrame(0);
-		if (frame)
-			frame->drawToScreen(screen, _buttonUpPos, lut);
-	}
+	if (_buttonUp && 0 < _buttonUp->getFrameCount())
+		_vm->_gfx->drawAnimationFrame(screen, _buttonUp, 0, _buttonUpPos);
 
-	if (_buttonDown && 0 < _buttonDown->getFrameCount()) {
-		const RleBlock *frame = _buttonDown->getFrame(0);
-		if (frame)
-			frame->drawToScreen(screen, _buttonDownPos, lut);
-	}
+	if (_buttonDown && 0 < _buttonDown->getFrameCount())
+		_vm->_gfx->drawAnimationFrame(screen, _buttonDown, 0, _buttonDownPos);
 
 	if (!_zoombiniAnimation)
 		return;
@@ -245,8 +231,8 @@ void ShelterRescueSiteBase::onRenderContent(ManagedSurface32 *screen) {
 			const int y = _gridBasePos.y + row * kSlotSize.height + 30;
 			const Common::Rect32 clip(_gridBasePos.x, 0, clipRight, ManagedSurface32::kScreenSize.height);
 			_vm->_gfx->drawZoombini(screen, _zoombiniAnimation, record->getTraits(), Common::Point32(x, y), kStandingCell, 0, &clip);
-			if (slotIdx == _selectedZoombini && _selector)
-				_selector->drawToScreen(screen, Common::Point32(x - 10, y - 10), lut);
+			if (slotIdx == _selectedZoombini && _selectorReady)
+				_vm->_gfx->drawPageRleBlock(screen, _selectorPath, Common::Point32(x - 10, y - 10));
 		}
 	}
 }

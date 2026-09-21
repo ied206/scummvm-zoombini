@@ -68,9 +68,6 @@ ShelterBooliewood::~ShelterBooliewood() {
 		delete _attractions[i].animation;
 	for (int i = 0; i < kCrowdActorCount; i++)
 		delete _crowdActors[i].path;
-	delete _background;
-	delete _contentMarker;
-	delete _pascontentMarker;
 	delete _walkingAnimation;
 	delete _waitingAnimation;
 	_vm->_state->clearActiveZoombinis();
@@ -94,11 +91,8 @@ void ShelterBooliewood::init() {
 	if (rescuedTotal < 50)
 		_developmentStage = 1;
 
-	_background = new BitBlock(_vm);
-	if (!_background->load(Common::Path(kBackgroundPath))) {
+	if (!_vm->_gfx->loadPageBitBlock(kBackgroundPath)) {
 		warning("BooliewoodPage: Failed to load background");
-		delete _background;
-		_background = nullptr;
 	}
 
 	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path(kSeatedAnimationPath), 50);
@@ -108,16 +102,8 @@ void ShelterBooliewood::init() {
 	if (!_walkingZoombiniAnimation)
 		warning("BooliewoodPage: Failed to load attenteZomb.anm");
 
-	_contentMarker = new RleBlock(_vm);
-	if (!_contentMarker->loadFromFile(Common::Path(kContentMarkerPath))) {
-		delete _contentMarker;
-		_contentMarker = nullptr;
-	}
-	_pascontentMarker = new RleBlock(_vm);
-	if (!_pascontentMarker->loadFromFile(Common::Path(kPascontentMarkerPath))) {
-		delete _pascontentMarker;
-		_pascontentMarker = nullptr;
-	}
+	_vm->_gfx->loadPageRleBlock(kContentMarkerPath);
+	_vm->_gfx->loadPageRleBlock(kPascontentMarkerPath);
 
 	const uint32 now = _vm->getGameTickCount();
 	resetSeats();
@@ -273,9 +259,23 @@ ZoombiniRunner *ShelterBooliewood::createHistoricalZoombini(int32 traitHash) {
 
 void ShelterBooliewood::loadAttractions(uint32 now) {
 	const Common::Point32 attractionPos[kAttractionCount] = {
-		Common::Point32(1734, 195), Common::Point32(1829, 79), Common::Point32(2197, 90), Common::Point32(670, 347),
-		Common::Point32(656, 231), Common::Point32(990, 271), Common::Point32(2639, 167)};
-	const int minimumStages[kAttractionCount] = {1, 1, 1, 4, 3, 2, 2};
+		Common::Point32(1734, 195),
+		Common::Point32(1829, 79),
+		Common::Point32(2197, 90),
+		Common::Point32(670, 347),
+		Common::Point32(656, 231),
+		Common::Point32(990, 271),
+		Common::Point32(2639, 167),
+	};
+	const int minimumStages[kAttractionCount] = {
+		1,
+		1,
+		1,
+		4,
+		3,
+		2,
+		2,
+	};
 	for (int i = 0; i < kAttractionCount; i++) {
 		AttractionState &attraction = _attractions[i];
 		attraction.pos = attractionPos[i];
@@ -441,20 +441,20 @@ void ShelterBooliewood::playAmbientSpeech() {
 }
 
 void ShelterBooliewood::drawBackground(ManagedSurface32 *screen) const {
-	if (!_background)
+	const int width = _vm->_gfx->getPageBitBlockSize(kBackgroundPath).width;
+	if (width == 0)
 		return;
-	const int width = _background->getWidth();
 	if (width <= ManagedSurface32::kScreenSize.width) {
-		_background->drawToSurface(screen, Common::Point32(0, 0));
+		_vm->_gfx->drawPageBitBlock(screen, kBackgroundPath, Common::Point32(0, 0));
 		return;
 	}
 	const int origin = _scrollX % width;
 	const int tailWidth = width - origin;
 	if (ManagedSurface32::kScreenSize.width <= tailWidth) {
-		_background->drawSubRect(screen, Common::Point32(0, 0), Common::Rect(origin, 0, origin + ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height));
+		_vm->_gfx->drawPageBitBlockSubRect(screen, kBackgroundPath, Common::Point32(0, 0), Common::Rect(origin, 0, origin + ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height));
 	} else {
-		_background->drawSubRect(screen, Common::Point32(0, 0), Common::Rect(origin, 0, width, ManagedSurface32::kScreenSize.height));
-		_background->drawSubRect(screen, Common::Point32(tailWidth, 0), Common::Rect(0, 0, ManagedSurface32::kScreenSize.width - tailWidth, ManagedSurface32::kScreenSize.height));
+		_vm->_gfx->drawPageBitBlockSubRect(screen, kBackgroundPath, Common::Point32(0, 0), Common::Rect(origin, 0, width, ManagedSurface32::kScreenSize.height));
+		_vm->_gfx->drawPageBitBlockSubRect(screen, kBackgroundPath, Common::Point32(tailWidth, 0), Common::Rect(0, 0, ManagedSurface32::kScreenSize.width - tailWidth, ManagedSurface32::kScreenSize.height));
 	}
 }
 
@@ -468,11 +468,17 @@ void ShelterBooliewood::drawAnimationInPanorama(const Animation *animation, int 
 void ShelterBooliewood::drawRleInPanorama(const RleBlock *frame, const Common::Point32 &pos, ManagedSurface32 *screen) const {
 	if (!frame)
 		return;
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	const int baseX = pos.x - _scrollX;
-	frame->drawToScreen(screen, Common::Point32(baseX - kPanoramaWidth, pos.y), lut);
-	frame->drawToScreen(screen, Common::Point32(baseX, pos.y), lut);
-	frame->drawToScreen(screen, Common::Point32(baseX + kPanoramaWidth, pos.y), lut);
+	_vm->_gfx->drawRleBlock(screen, frame, Common::Point32(baseX - kPanoramaWidth, pos.y));
+	_vm->_gfx->drawRleBlock(screen, frame, Common::Point32(baseX, pos.y));
+	_vm->_gfx->drawRleBlock(screen, frame, Common::Point32(baseX + kPanoramaWidth, pos.y));
+}
+
+void ShelterBooliewood::drawPageRleInPanorama(const Common::String &path, const Common::Point32 &pos, ManagedSurface32 *screen) const {
+	const int baseX = pos.x - _scrollX;
+	_vm->_gfx->drawPageRleBlock(screen, path, Common::Point32(baseX - kPanoramaWidth, pos.y));
+	_vm->_gfx->drawPageRleBlock(screen, path, Common::Point32(baseX, pos.y));
+	_vm->_gfx->drawPageRleBlock(screen, path, Common::Point32(baseX + kPanoramaWidth, pos.y));
 }
 
 void ShelterBooliewood::drawAttractions(ManagedSurface32 *screen) const {
@@ -492,8 +498,8 @@ void ShelterBooliewood::drawRescuedCrowd(ManagedSurface32 *screen) const {
 			const char marker = kCrowdPattern[row][column];
 			if (marker == '0')
 				continue;
-			const RleBlock *frame = marker == '1' ? _contentMarker : _pascontentMarker;
-			drawRleInPanorama(frame, Common::Point32(3450 + column * 16, y), screen);
+			const Common::String path(marker == '1' ? kContentMarkerPath : kPascontentMarkerPath);
+			drawPageRleInPanorama(path, Common::Point32(3450 + column * 16, y), screen);
 			drawn += 1;
 		}
 	}

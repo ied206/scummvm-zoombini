@@ -444,7 +444,7 @@ struct PathObject {
 
 	/** Parse and return a newly allocated path, or nullptr on failure. */
 	static PathObject *loadFromPAT(Zoombini2Engine *vm, const Common::Path &path);
-	/** Append one segment using the engine's currently selected numeric representation. */
+	/** Append one segment and retain its final endpoint using the selected numeric representation. */
 	void appendSegment(const Common::Point32 &start, const Common::Point32 &ctrl0, const Common::Point32 &ctrl1, const Common::Point32 &end,
 					   int stepValue, int waitInitial);
 	/** Reset segment state and begin evaluation at @p tickCount. */

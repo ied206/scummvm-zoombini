@@ -43,22 +43,27 @@ class OSystem;
 /** Meta-engine settings and factory for the Zoombini2 engine. */
 class Zoombini2MetaEngine : public AdvancedMetaEngine<Zoombini2::Zoombini2GameDescription> {
 public:
-	/** Target configuration key enabling the developer hotkeys. */
-	static constexpr const char *kConfigDebugHotkeys = "debug_hotkeys";
-	/** Target configuration key selecting stereo game-audio streams. */
-	static constexpr const char *kConfigStereoOutput = "stereo_output";
-	/** Target configuration key selecting the alternate level-one Waterslide pairing. */
-	static constexpr const char *kConfigGreedyWaterslidePairing = "greedy_waterslide_pairing";
-	/** Target configuration key selecting the once-per-frame gameplay clock snapshot. */
-	static constexpr const char *kConfigCachedFrameTime = "cached_frame_time";
-	/** Target configuration key selecting floating-point Bezier path calculations. */
-	static constexpr const char *kConfigUseFloatingPointPaths = "use_floating_point_paths";
-	/** Target configuration key selecting the original Windows random-number generator. */
-	static constexpr const char *kConfigOriginalPRNG = "original_prng";
-	/** Target configuration key enabling the enhanced keyboard shortcut set. */
-	static constexpr const char *kConfigEnhancedKbdShortcuts = "enhanced_kbd_shortcuts";
 	/** Target configuration key that blocks automatic progress writes during tests. */
 	static constexpr const char *kConfigSavefilesReadOnly = "savefiles_read_only";
+	/** Target configuration key selecting stereo game-audio streams. */
+	static constexpr const char *kConfigStereoOutput = "stereo_output";
+	/** Target configuration key selecting floating-point Bezier path calculations. */
+	static constexpr const char *kConfigUseFloatingPointPaths = "use_floating_point_paths";
+	/** Target configuration key enabling the enhanced keyboard shortcut set. */
+	static constexpr const char *kConfigEnhancedKbdShortcuts = "enhanced_kbd_shortcuts";
+	/** Target configuration key enabling the developer hotkeys. */
+	static constexpr const char *kConfigDebugHotkeys = "debug_hotkeys";
+	/** Target configuration key selecting the alternate level-one Waterslide pairing. */
+	static constexpr const char *kConfigGreedyWaterslidePairing = "greedy_waterslide_pairing";
+	/** Target configuration key selecting the original Windows random-number generator. */
+	static constexpr const char *kConfigOriginalPRNG = "original_prng";
+	/** Target frame rate for the engine's presentation loop. */
+	static constexpr const char *kConfigFrameRate = "frame_rate";
+	/** Disable the engine's frame-rate limiter. */
+	static constexpr const char *kConfigUnlockFrameRate = "unlock_frame_rate";
+	static constexpr int kMinFrameRate = 30;
+	static constexpr int kDefaultFrameRate = 60;
+	static constexpr int kMaxFrameRate = 240;
 
 	const char *getName() const override {
 		return "zoombini2";

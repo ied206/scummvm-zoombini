@@ -34,7 +34,6 @@
 namespace Zoombini2 {
 
 class AreaMask;
-class BitBlock;
 class Zoombini2Engine;
 class ManagedSurface32;
 
@@ -43,13 +42,11 @@ class PageLayer : public Common::NonCopyable {
 public:
 	/** Initialize a layer with its horizontal scroll direction and optional background. */
 	PageLayer(Zoombini2Engine *vm, byte scrollDirection, const Common::Path &backgroundPath = Common::Path());
-	/** Release the background and every animation runner registered with this layer. */
+	/** Release every animation runner registered with this layer. */
 	~PageLayer();
 
 	/** Replace the background and refresh its dimensions. */
 	bool loadBackground(const Common::Path &path);
-	/** Return the background retained by this layer, or nullptr for a backgroundless layer. */
-	BitBlock *getBackground() const { return _background; }
 	/** Return the background dimensions copied from the first layer when this layer has no bitmap. */
 	const Size32 &getBackgroundSize() const { return _backgroundSize; }
 	/** Return whether this layer was created without a background bitmap. */
@@ -138,8 +135,8 @@ private:
 	bool _backgroundless = true;
 	/** Whether a non-scrolling background has already been materialized. */
 	bool _backgroundDrawn = false;
-	/** Optional bitmap released with this layer. */
-	BitBlock *_background = nullptr;
+	/** Path of the current background in the graphics page cache. */
+	Common::String _backgroundPath;
 };
 
 /** Page-level collection that coordinates backgrounds, pointer input, scrolling, and animation runners. */
@@ -284,6 +281,8 @@ public:
 	virtual bool hasGoButton() const { return hasSidebar(); }
 	/** Return whether the visible Go button currently accepts input. */
 	virtual bool canUseGoButton() const { return hasGoButton(); }
+	/** Handle page-local Go speech; return true to continue the shared transition. */
+	virtual bool onGoButtonPressed() { return true; }
 	/** Return whether page-local state prevents the sidebar from accepting pointer input. */
 	virtual bool blocksSidebarInteraction() const { return hasActiveDialog(); }
 	/** Return whether this page implements a shelter flow. */

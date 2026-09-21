@@ -138,8 +138,8 @@ public:
 	Common::Point32 getMousePos() const { return _mousePos; }
 	/** Present the interactive hover cursor instead of the default cursor. */
 	void setHoverCursorActive(bool active);
-	/** Return whether the primary mouse button is currently held. */
-	bool isMouseDown() const { return _mouseDown; }
+	/** Select a page's carried-item cursor, or restore normal hover selection with nullptr. */
+	void setPageCursorSprite(const RleBlock *sprite);
 
 	/** Return the detected release language. */
 	Common::Language getLanguage() const { return _gameDescription->desc.language; }
@@ -177,19 +177,17 @@ public:
 	/** Return whether the Chez Norf diagnostic overlay key is currently held. */
 	bool showChezNorfDebugOverlay() const { return _debugHotkeysEnabled && _debugOverlayKeyDown; }
 
-	/** Load a BitBlock through the engine resource resolver. */
-	BitBlock *loadBitBlock(const Common::String &path);
-	/** Load an RLE block through the engine resource resolver. */
-	RleBlock *loadRleBlock(const Common::String &path);
 	/** Load or return a shared Zoombini sprite grid and select its page-configured frame delay. */
 	const ZoombiniAnimation *loadZoombiniAnimation(const Common::Path &path, uint32 frameDelay);
 	/** Open an original logical resource name through the engine's CD/installed-root resolver. */
 	Common::SeekableReadStream *openResourceFile(const Common::String &path) const;
 	/** Return whether @p path resolves through the engine's CD/installed-root resolver. */
 	bool hasResource(const Common::String &path) const;
+	/** Return and clear the validated direct-practice request, if the startup command supplied one. */
+	bool takePracticePuzzleLaunch(int &pageId, int &level);
 
-	/** Add @p ms to the time excluded from gameplay tick calculations. */
-	void addPauseTime(uint32 ms) { _pauseTimeAccum += ms; }
+	/** Pause or resume the gameplay clock for a game dialog. */
+	void setDialogPaused(bool paused);
 
 	/** Write the current profile under @p name unless automatic saves are locked. */
 	bool writeGameSave(const Common::String &name);
@@ -217,8 +215,10 @@ public:
 	/** Return the borrowed active page. */
 	PageBase *getCurrentPage() { return _currentPage; }
 
-	/** Return elapsed gameplay milliseconds with accumulated pause time removed. */
+	/** Return gameplay milliseconds from the current clock read. */
 	uint32 getGameTickCount() const;
+	/** Return the gameplay millisecond snapshot captured before the current page pass. */
+	uint32 getFrameTickCount() const { return _cachedGameTickCount; }
 
 	/** Gameplay random generator for this game instance. */
 	Random *_rnd;
@@ -235,12 +235,13 @@ public:
 	RouteBranch _routeDirection = RouteBranch::kNone00;
 	/** Gameplay page shown as the source of the next map transition. */
 	PageId _mapTransitionSourcePageId = kPageZombiniville;
-	/** Whether the engine's gameplay clock is currently paused. */
-	bool _isPaused = false;
 	/** Total paused time excluded from @ref Zoombini2Engine::getGameTickCount. */
 	uint32 _pauseTimeAccum = 0;
 	/** System tick captured when the current pause began. */
 	uint32 _pauseTimeStart = 0;
+	/** Independent dialog and ScummVM modal reasons for freezing gameplay time. */
+	bool _dialogPaused = false;
+	bool _backendPaused = false;
 	/** Whether at least one route-transition Zoombini is still walking. */
 	bool _zoombiniWalkingFlag = false;
 	/** Whether the current transition may skip its remaining presentation. */
@@ -249,7 +250,12 @@ public:
 	RouteBranch _lastRouteDirection = RouteBranch::kNone00;
 
 	/** Selected ShelterZombiniville feature values, or -1 for an unselected slot. */
-	int16 _selectedFeatures[ZmbTrait::kTraitCount] = {-1, -1, -1, -1};
+	int16 _selectedFeatures[ZmbTrait::kTraitCount] = {
+		-1,
+		-1,
+		-1,
+		-1,
+	};
 
 	/** Deadline or countdown used by the active page transition. */
 	int _pageTransitionTimer = 0;
@@ -258,19 +264,20 @@ public:
 
 private:
 	class ResourceFileResolver;
+	/** Decimal factor separating a direct-practice page ID from its difficulty. */
+	static constexpr int kPracticeBootParamPageFactor = 100;
+	static constexpr const char *kCursorSpritePath = "bmp/cursor/cursor01.rb";
+	static constexpr const char *kInteractiveCursorSpritePath = "bmp/cursor/cursor02.rb";
 
 	/** Serialize the current profile after the caller applies its save policy. */
 	bool saveGameProfile(const Common::String &name);
 
 	typedef Common::HashMap<Common::Path, ZoombiniAnimation *, Common::Path::IgnoreCase_Hash, Common::Path::IgnoreCase_EqualTo> ZoombiniAnimationCache;
 
-	/** Maximum presentation-loop rate used to prevent the ScummVM backend from busy-spinning. */
-	static constexpr uint32 kTargetFrameRate = 60;
-	/** Duration of one presentation-loop pass at @ref kTargetFrameRate. */
-	static constexpr double kTargetFrameTimeMs = 1000.0 / kTargetFrameRate;
-
 	/** Return the unique child directory whose name matches @p name without case. */
 	static Common::FSNode findChildDirectoryIgnoreCase(const Common::FSNode &directory, const char *name);
+	/** Decode and validate a direct-practice boot parameter before the initial page is selected. */
+	bool configurePracticeBootParamLaunch();
 
 	/** Original logical resource-name resolver for the CD and installed roots. */
 	ResourceFileResolver *_resourceFileResolver = nullptr;
@@ -279,12 +286,14 @@ private:
 	/** Immutable animation sets shared by page lifetimes. */
 	ZoombiniAnimationCache _zoombiniAnimationCache;
 
-	/** Cursor sprite registered for this game instance. */
+	/** Cursor sprite borrowed from the graphics shared cache. */
 	RleBlock *_cursorSprite = nullptr;
-	/** Interactive hover cursor sprite, loaded on first use. */
+	/** Interactive hover cursor sprite borrowed from the graphics shared cache. */
 	RleBlock *_interactiveCursorSprite = nullptr;
 	/** Whether the interactive hover cursor is currently presented. */
 	bool _hoverCursorActive = false;
+	/** Borrowed carried-item sprite, cleared by the page before its resources are released. */
+	const RleBlock *_pageCursorSprite = nullptr;
 	/** Signed 16-bit hotspot offset used by the active cursor image. */
 	Common::Point _cursorHotspot = Common::Point();
 	/** Whether CursorMan should present the game cursor. */
@@ -302,8 +311,6 @@ private:
 
 	/** Most recently processed game-space mouse position. */
 	Common::Point32 _mousePos = Common::Point32();
-	/** Whether the primary mouse button is currently held. */
-	bool _mouseDown = false;
 	/** Ordered input events awaiting the current page's dispatch boundary. */
 	Common::Array<Common::Event> _pendingPageEvents;
 
@@ -313,19 +320,32 @@ private:
 	int _nextPageId = kPageLogoTLC;
 	/** Active page, or nullptr between page lifetimes. */
 	PageBase *_currentPage = nullptr;
+	/** Validated direct-practice destination pending the practice-map setup. */
+	int _practicePuzzlePageId = kPageNone;
+	/** Validated direct-practice level pending the practice-map setup. */
+	int _practicePuzzleLevel = 0;
 
 	/** System tick used as the gameplay-clock origin. */
 	uint32 _startTime = 0;
 	/** Gameplay tick snapshot refreshed once per main-loop pass. */
 	uint32 _cachedGameTickCount = 0;
+	/** Last backend millisecond accepted for presentation. */
+	uint32 _lastPresentTimeMs = 0;
+	/** Host-time origin used to number frame slots at the selected rate. */
+	uint32 _frameTimeOriginMs = 0;
+	/** Last host-time offset observed by the frame scheduler. */
+	uint32 _lastFrameElapsedMs = 0;
+	/** Most recent frame slot processed by the engine. */
+	uint64 _lastFrameIndex = 0;
+	bool _hasFrameIndex = false;
+	int _frameRate = 60;
+	bool _unlockFrameRate = false;
 	/** Whether the developer hotkeys are active. */
 	bool _debugHotkeysEnabled = false;
 	/** Whether newly started stereo game-audio streams retain both channels. */
 	bool _stereoOutputEnabled = false;
 	/** Whether Waterslide level one uses the alternate greedy pairing. */
 	bool _useGreedyWaterslidePairing = false;
-	/** Whether gameplay time reads use the current frame snapshot. */
-	bool _useCachedFrameTime = false;
 	/** Whether Bezier paths use the optional floating-point evaluator. */
 	bool _useFloatingPointPaths = false;
 	/** Whether the enhanced keyboard shortcut set is enabled. */
@@ -342,6 +362,10 @@ private:
 	static int percentToMixerVolume(int volume);
 	/** Compute gameplay time directly from the backend clock. */
 	uint32 calculateGameTickCount() const;
+	/** Update one pause reason and account only the combined paused interval. */
+	void setPauseState(bool &reason, bool paused);
+	/** Track the ScummVM modal pause alongside game dialogs. */
+	void pauseEngineIntern(bool pause) override;
 	/** Load the target-scoped compatibility and gameplay-improvement switches from ScummVM configuration. */
 	void refreshEngineSettings();
 	/** Export the active party's trait tuples to working-directory zoombini.set. */
@@ -368,7 +392,7 @@ private:
 	void requestQuitConfirmation();
 	/** Apply the shared quit-confirmation result. */
 	void handleQuitConfirmation(DialogMsgBoxButton button);
-	/** Consume pending backend events and update frame-local input state. */
+	/** Drain backend events and update frame-local input state. */
 	void processEvents();
 	/** Apply a queued page replacement before the active frame is dispatched. */
 	void applyPendingPageChange();
@@ -381,6 +405,8 @@ private:
 	void drawFrame();
 	/** Copy the composed game surface to the backend and present it. */
 	void presentFrame();
+	/** Wait for the next frame slot without replaying any missed slots. */
+	void waitForFrameSlot();
 	/** Process and present one complete engine frame. */
 	void runFrame();
 	/** Select the startup page and run frames until the engine quits. */

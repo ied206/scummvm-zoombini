@@ -23,6 +23,7 @@
 #define ZOOMBINI2_GRAPHICS_H
 
 #include "common/array.h"
+#include "common/hash-str.h"
 #include "common/noncopyable.h"
 #include "common/path.h"
 #include "common/rect.h"
@@ -133,6 +134,20 @@ public:
 
 	/** Create a managed surface in the current game screen format. */
 	ManagedSurface32 *createSurface(const Size32 &size) const;
+	/** Load an RLE sprite once for the current page and return a borrowed pointer. */
+	RleBlock *loadPageRleBlock(const Common::String &key) { return loadRleBlock(_pageRleBlocks, key); }
+	/** Load an uncompressed bitmap once for the current page and return a borrowed pointer. */
+	BitBlock *loadPageBitBlock(const Common::String &key) { return loadBitBlock(_pageBitBlocks, key); }
+	/** Load a color and alpha BMP pair once for the current page. */
+	BitBlock *loadPageMaskedBitBlock(const Common::String &colorKey, const Common::String &alphaKey) {
+		return loadMaskedBitBlock(colorKey, alphaKey);
+	}
+	/** Load an RLE sprite retained for the lifetime of the graphics interface. */
+	RleBlock *loadSharedRleBlock(const Common::String &key) { return loadRleBlock(_sharedRleBlocks, key); }
+	/** Load a bitmap retained for the lifetime of the graphics interface. */
+	BitBlock *loadSharedBitBlock(const Common::String &key) { return loadBitBlock(_sharedBitBlocks, key); }
+	/** Release cached page bitmaps after all page and dialog users have closed. */
+	void clearPageBitmapCache();
 	/** Copy the current game screen into @p destSurface. */
 	void captureScreen(ManagedSurface32 *destSurface) const;
 	/** Copy @p source onto the current game screen. */
@@ -144,11 +159,28 @@ public:
 
 	/** Draw an uncompressed bitmap through the shared Z2 rendering boundary. */
 	void drawBitBlock(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos) const;
+	/** Load and draw a bitmap from the current page cache. */
+	void drawPageBitBlock(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos) {
+		if (destSurface)
+			drawBitBlock(destSurface, loadPageBitBlock(key), pos);
+	}
+	/** Load and draw a bitmap retained across page changes. */
+	void drawSharedBitBlock(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos) {
+		if (destSurface)
+			drawBitBlock(destSurface, loadSharedBitBlock(key), pos);
+	}
+	/** Return a page bitmap's dimensions, or an empty size when it cannot be loaded. */
+	Size32 getPageBitBlockSize(const Common::String &key);
 	/** Draw one bitmap sub-rectangle through the shared Z2 rendering boundary. */
 	void drawBitBlockSubRect(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos, const Common::Rect &srcRect) const;
+	/** Load and draw one sub-rectangle of a page bitmap. */
+	void drawPageBitBlockSubRect(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos, const Common::Rect &srcRect) {
+		if (destSurface)
+			drawBitBlockSubRect(destSurface, loadPageBitBlock(key), pos, srcRect);
+	}
 	/** Load the active page background, replacing any previous one. */
-	bool loadBackground(const Common::Path &path);
-	/** Release the active page background. */
+	bool loadBackground(const Common::String &key);
+	/** Forget the active page background; its bitmap remains in the page cache. */
 	void clearBackground();
 	/** Return whether a page background is loaded. */
 	bool hasBackground() const { return _background != nullptr; }
@@ -162,6 +194,25 @@ public:
 	void clearPageLayers();
 	/** Draw an RLE sprite through the shared Z2 rendering boundary. */
 	void drawRleBlock(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos) const;
+	/** Load and draw an RLE sprite from the current page cache. */
+	void drawPageRleBlock(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos) {
+		if (destSurface)
+			drawRleBlock(destSurface, loadPageRleBlock(key), pos);
+	}
+	/** Load and draw an RLE sprite retained across page changes. */
+	void drawSharedRleBlock(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos) {
+		if (destSurface)
+			drawRleBlock(destSurface, loadSharedRleBlock(key), pos);
+	}
+	/** Return a page RLE sprite's dimensions, or an empty size when it cannot be loaded. */
+	Size32 getPageRleBlockSize(const Common::String &key);
+	/** Draw an RLE sprite inside an absolute screen clip. */
+	void drawRleBlockClipped(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos, const Common::Rect32 &clip) const;
+	/** Load and draw a page RLE sprite inside an absolute screen clip. */
+	void drawPageRleBlockClipped(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos, const Common::Rect32 &clip) {
+		if (destSurface)
+			drawRleBlockClipped(destSurface, loadPageRleBlock(key), pos, clip);
+	}
 	/** Draw one frame from an animation through the shared Z2 rendering boundary. */
 	void drawAnimationFrame(ManagedSurface32 *destSurface, const Animation *animation, int frameIndex, const Common::Point32 &pos) const;
 	/** Draw and advance one general-object animation runner. */
@@ -186,8 +237,8 @@ public:
 							int scrollX = 0, int backgroundWidth = 800, const RleBlock *dropTargetIndicator = nullptr) const;
 	/** Apply runner visibility, bounds and frame selection with an explicit blend table. */
 	static void drawZoombiniRunner(ManagedSurface32 *destSurface, const ZoombiniRunner *runner, const AlphaBlendLUT &alphaLUT,
-								 const Common::Rect32 *clip = nullptr, int scrollX = 0, int backgroundWidth = 800,
-								 const RleBlock *dropTargetIndicator = nullptr);
+								   const Common::Rect32 *clip = nullptr, int scrollX = 0, int backgroundWidth = 800,
+								   const RleBlock *dropTargetIndicator = nullptr);
 	/** Color variants of the shared bitmap text strip. */
 	enum class TextColor {
 		kDark00 = 0,
@@ -223,12 +274,34 @@ public:
 	ManagedSurface32 *createMapTransitionBackground(PageId srcPageId, int mapRegion, RouteBranch routeBranch);
 
 private:
+	struct MaskedBitBlockEntry {
+		Common::String colorPath;
+		Common::String alphaPath;
+		BitBlock *bitmap;
+	};
+	typedef Common::HashMap<Common::String, RleBlock *, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> RleBlockCache;
+	typedef Common::HashMap<Common::String, BitBlock *, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> BitBlockCache;
+
+	/** Reuse a decoded resource or a cached failed load. */
+	RleBlock *loadRleBlock(RleBlockCache &cache, const Common::String &key);
+	BitBlock *loadBitBlock(BitBlockCache &cache, const Common::String &key);
+	BitBlock *loadMaskedBitBlock(const Common::String &colorKey, const Common::String &alphaKey);
+	/** Release every value in one path-indexed cache. */
+	static void clearRleBlockCache(RleBlockCache &cache);
+	static void clearBitBlockCache(BitBlockCache &cache);
+
 	/** Bitmap strip shared by all UI text colors. */
 	static constexpr const char *kTextFontPath = "bmp/typo";
+	/** Name plate sprite shown while dragging a Zoombini. */
+	static constexpr const char *kNameBoxSpritePath = "bmp/menu/name_box.rb";
+	/** Path format for one map transition overlay. */
+	static constexpr const char *kMapTransitionOverlayPathFormat = "bmp/maptrans/%s.bmp";
+	/** Path format for the map transition background. */
+	static constexpr const char *kMapTransitionBackgroundPathFormat = "#bmp/maptrans/bigmap_background_%d";
 	/** Single coverage-mask glyph set tinted per draw, retained until graphics shutdown. */
 	BitmapFont *_textFont = nullptr;
 
-	/** Load, draw, and release one cached map-overlay RLE sprite. */
+	/** Draw one map-overlay RLE sprite retained for the current page. */
 	void drawOverlaySprite(ManagedSurface32 *destSurface, const Common::String &name, const Common::Point32 &pos);
 	/** Compose the route-map overlays appropriate to the current progress. */
 	void drawMapOverlays(ManagedSurface32 *destSurface, PageId srcPageId, int mapRegion, RouteBranch routeBranch);
@@ -236,8 +309,15 @@ private:
 	static void textColorRGB(TextColor color, byte &red, byte &green, byte &blue);
 	/** Name-plate sprite drawn under the held Zoombini name. */
 	RleBlock *_nameBoxSprite = nullptr;
-	/** Active page background released with the graphics interface. */
+	/** Active page background borrowed from the page bitmap cache. */
 	BitBlock *_background = nullptr;
+	/** Decoded bitmaps borrowed by the current page and its transient controls. */
+	RleBlockCache _pageRleBlocks;
+	BitBlockCache _pageBitBlocks;
+	Common::Array<MaskedBitBlockEntry> _pageMaskedBitBlocks;
+	/** Decoded bitmaps borrowed by UI and cursors that survive page changes. */
+	RleBlockCache _sharedRleBlocks;
+	BitBlockCache _sharedBitBlocks;
 	/** Page layer collection released with the graphics interface. */
 	PageLayerStack *_pageLayerStack = nullptr;
 
@@ -680,17 +760,17 @@ private:
 	/** Hover state computed during the current draw. */
 	bool _isHovering = false;
 
-	/** Uncompressed normal-state image held by this button. */
+	/** Uncompressed normal-state image borrowed from the graphics page cache. */
 	BitBlock *_normalBB = nullptr;
-	/** Uncompressed highlighted-state image held by this button. */
+	/** Uncompressed highlighted-state image borrowed from the graphics page cache. */
 	BitBlock *_hoverBB = nullptr;
-	/** Uncompressed disabled-state image held by this button. */
+	/** Uncompressed disabled-state image borrowed from the graphics page cache. */
 	BitBlock *_disabledBB = nullptr;
-	/** RLE normal-state image held by this button. */
+	/** RLE normal-state image borrowed from the graphics page cache. */
 	RleBlock *_normalRle = nullptr;
-	/** RLE highlighted-state image held by this button. */
+	/** RLE highlighted-state image borrowed from the graphics page cache. */
 	RleBlock *_hoverRle = nullptr;
-	/** RLE disabled-state image held by this button. */
+	/** RLE disabled-state image borrowed from the graphics page cache. */
 	RleBlock *_disabledRle = nullptr;
 	/** Borrowed overlay drawn after the selected button state. */
 	const RleBlock *_overlay = nullptr;
@@ -865,6 +945,28 @@ public:
 	static int volumeToPixel(int volume);
 
 private:
+	/** Resource paths for panel artwork and audio previews. */
+	static constexpr const char *kGaugeImagePath = "bmp/menu/OPTION - Jauge.rb";
+	static constexpr const char *kOkNormalPath = "bmp/menu/MENU - Valid - OK";
+	static constexpr const char *kOkNormalMaskPath = "bmp/menu/MENUValidOK-a";
+	static constexpr const char *kOkHighlightPath = "bmp/menu/MENU - Valid - OK highlight";
+	static constexpr const char *kOkHighlightMaskPath = "bmp/menu/OKHighlight-a";
+	static constexpr const char *kNoNormalPath = "bmp/menu/MENU - Valid - NO";
+	static constexpr const char *kNoNormalMaskPath = "bmp/menu/MENUValidNO-a";
+	static constexpr const char *kNoHighlightPath = "bmp/menu/MENU - Valid - NO highlight";
+	static constexpr const char *kNoHighlightMaskPath = "bmp/menu/NOHighlight-a";
+	static constexpr const char *kMusicNormalPath = "bmp/menu/OPTION - Musique NORMAL";
+	static constexpr const char *kMusicHighlightPath = "bmp/menu/OPTION - Musique HIGHLIGHT";
+	static constexpr const char *kMusicMaskPath = "bmp/menu/OPTIONMusique-a";
+	static constexpr const char *kSfxNormalPath = "bmp/menu/OPTION - Bruitages NORMAL";
+	static constexpr const char *kSfxHighlightPath = "bmp/menu/OPTION - Bruitages HILITE";
+	static constexpr const char *kSfxMaskPath = "bmp/menu/OPTION_Bruitages-a";
+	static constexpr const char *kSpeechNormalPath = "bmp/menu/OPTION - Dialogues NORMAL";
+	static constexpr const char *kSpeechHighlightPath = "bmp/menu/OPTION - Dialogues HILITE";
+	static constexpr const char *kSpeechMaskPath = "bmp/menu/OPTIONDialogues-a";
+	static constexpr const char *kSpeechPreviewSoundPath = "sounds/voice.wav";
+	static constexpr const char *kSfxPreviewSoundPath = "sounds/fx/03-BS01.wav";
+
 	/** Borrowed vm used by the panel's gauge and button resources. */
 	Zoombini2Engine *_vm;
 	/** Current and cancellation-baseline audio levels edited by this session. */

@@ -31,9 +31,7 @@ class String;
 namespace Zoombini2 {
 
 class AlphaBlendLUT;
-class BitBlock;
 enum class DialogMsgBoxButton;
-class RleBlock;
 class VolumePanel;
 struct ZmbTrait;
 
@@ -55,7 +53,7 @@ class InteractiveMap : public InteractiveBase {
 public:
 	/** Construct a mountain map in @p mode for @p vm. */
 	InteractiveMap(Zoombini2Engine *vm, MapScreenMode mode);
-	/** Release map resources, controls, and its owned volume panel. */
+	/** Release map controls and the volume panel; bitmap resources remain in the graphics page cache. */
 	~InteractiveMap() override;
 
 	/** Load map resources and derive availability from the selected mode. */
@@ -166,7 +164,12 @@ private:
 	};
 
 	/** Vertical positions for the four saved-game statistics. */
-	static constexpr int kStatLabelY[4] = {15, 39, 63, 90};
+	static constexpr int kStatLabelY[4] = {
+		15,
+		39,
+		63,
+		90,
+	};
 
 	/**
 	 * Segment-to-page mapping for saved-game page-level drawing.
@@ -200,16 +203,12 @@ private:
 		bool hovered = false;
 		/** Whether this button uses RLE sprites instead of bit blocks. */
 		bool isRle = false;
-		/** Normal RLE visual when @ref MapButton::isRle is true. */
-		RleBlock *normalRle = nullptr;
-		/** Hovered RLE visual when @ref MapButton::isRle is true. */
-		RleBlock *hiliteRle = nullptr;
-		/** Optional disabled RLE visual. */
-		RleBlock *grayRle = nullptr;
-		/** Normal bit-block visual when @ref MapButton::isRle is false. */
-		BitBlock *normalBB = nullptr;
-		/** Hovered bit-block visual when @ref MapButton::isRle is false. */
-		BitBlock *hiliteBB = nullptr;
+		/** Normal visual path in the graphics page cache. */
+		Common::String normalPath;
+		/** Hovered visual path in the graphics page cache. */
+		Common::String hilitePath;
+		/** Optional disabled visual path in the graphics page cache. */
+		Common::String grayPath;
 
 		/** Initialize an enabled button with no loaded visuals. */
 		MapButton() = default;
@@ -227,18 +226,18 @@ private:
 	/** Hovered level legend, or zero when none is hovered. */
 	int _hoveredLegendTab = 0;
 
-	/** One colored or disabled icon for each map destination. */
-	RleBlock *_icons[kNumIcons] = {};
-	/** Title overlay corresponding to each map icon. */
-	RleBlock *_titles[kNumTitles] = {};
-	/** Path graphics indexed by level tier and segment slot. */
-	RleBlock *_segments[kNumLevelTiers][kNumSegments] = {};
-	/** Practice-mode instruction panel. */
-	RleBlock *_statsPractice = nullptr;
-	/** Saved-game progress panel. */
-	RleBlock *_statsSavedGame = nullptr;
-	/** Legend graphics indexed by inactive or active level. */
-	BitBlock *_legends[kNumLegends] = {};
+	/** One colored or disabled icon path for each map destination. */
+	Common::String _icons[kNumIcons];
+	/** Title overlay path corresponding to each map icon. */
+	Common::String _titles[kNumTitles];
+	/** Route graphic paths indexed by level tier and segment slot. */
+	Common::String _segments[kNumLevelTiers][kNumSegments];
+	/** Practice-mode instruction panel path. */
+	Common::String _statsPracticePath;
+	/** Saved-game progress panel path. */
+	Common::String _statsSavedGamePath;
+	/** Legend paths indexed by inactive or active level. */
+	Common::String _legends[kNumLegends];
 
 	/** Whether each icon accepts clicks in the current mode and progress state. */
 	bool _iconClickable[kNumIcons] = {};
@@ -280,9 +279,9 @@ private:
 	/** Generate one name for a practice Zoombini. */
 	Common::String generatePracticeZoombiniName() const;
 	/** Draw every route segment at the practice level. */
-	void drawPracticeSegments(ManagedSurface32 *screen, const AlphaBlendLUT &lut);
+	void drawPracticeSegments(ManagedSurface32 *screen);
 	/** Draw visited route segments at their stored page levels. */
-	void drawSavedGameSegments(ManagedSurface32 *screen, const AlphaBlendLUT &lut);
+	void drawSavedGameSegments(ManagedSurface32 *screen);
 
 	/** Open the volume panel. */
 	void openVolumePanel();

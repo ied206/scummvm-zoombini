@@ -43,17 +43,17 @@ DialogHelp::DialogHelp(Zoombini2Engine *vm)
 	: DialogBase(vm) {
 
 	// Load help screen UI elements
-	_helpFrame = _vm->loadRleBlock(kHelpFramePath);
-	_placeholder = _vm->loadRleBlock(kPlaceholderPath);
+	_vm->_gfx->loadSharedRleBlock(kHelpFramePath);
+	_vm->_gfx->loadSharedRleBlock(kPlaceholderPath);
 
-	_okButtonNormal = _vm->loadBitBlock(kOkButtonNormalPath);
-	_okButtonPushed = _vm->loadBitBlock(kOkButtonPushedPath);
+	_vm->_gfx->loadSharedBitBlock(kOkButtonNormalPath);
+	_vm->_gfx->loadSharedBitBlock(kOkButtonPushedPath);
 
-	_leftArrowNormal = _vm->loadBitBlock(kLeftArrowNormalPath);
-	_leftArrowEmpty = _vm->loadBitBlock(kLeftArrowEmptyPath);
+	_vm->_gfx->loadSharedBitBlock(kLeftArrowNormalPath);
+	_vm->_gfx->loadSharedBitBlock(kLeftArrowEmptyPath);
 
-	_rightArrowNormal = _vm->loadBitBlock(kRightArrowNormalPath);
-	_rightArrowEmpty = _vm->loadBitBlock(kRightArrowEmptyPath);
+	_vm->_gfx->loadSharedBitBlock(kRightArrowNormalPath);
+	_vm->_gfx->loadSharedBitBlock(kRightArrowEmptyPath);
 
 	// Create the saved screen buffer in the current game screen format.
 	_savedScreen = _vm->_gfx->createSurface(ManagedSurface32::kScreenSize);
@@ -62,14 +62,6 @@ DialogHelp::DialogHelp(Zoombini2Engine *vm)
 DialogHelp::~DialogHelp() {
 	close();
 
-	delete _helpFrame;
-	delete _placeholder;
-	delete _okButtonNormal;
-	delete _okButtonPushed;
-	delete _leftArrowNormal;
-	delete _leftArrowEmpty;
-	delete _rightArrowNormal;
-	delete _rightArrowEmpty;
 	delete _savedScreen;
 }
 
@@ -88,10 +80,7 @@ const char *DialogHelp::getLevelString(int level) {
 
 bool DialogHelp::isPageValid(int puzzleId, int level, int page) {
 	// Construct help page path
-	Common::String path = Common::String::format(kHelpPageFormat,
-												 puzzleId,
-												 getLevelString(level),
-												 page);
+	Common::String path = Common::String::format(kHelpPageFormat, puzzleId, getLevelString(level), page);
 
 	// Check if file exists in archive
 	return _vm->hasResource(path);
@@ -113,13 +102,7 @@ bool DialogHelp::open(int puzzleId, int level) {
 	_currentLevel = level;
 	_currentPage = 1;
 
-	// Record pause start time
-	_pauseStartTime = g_system->getMillis();
-	_vm->_isPaused = true;
-	_vm->_pauseTimeStart = _pauseStartTime;
-
-	// Pause audio
-	_vm->getSoundManager()->pauseAll();
+	_vm->setDialogPaused(true);
 
 	// Save current screen
 	_vm->_gfx->captureScreen(_savedScreen);
@@ -147,13 +130,7 @@ void DialogHelp::close() {
 	// Restore saved screen
 	_vm->_gfx->copyToScreen(*_savedScreen);
 
-	// Resume audio
-	_vm->getSoundManager()->resumeAll();
-
-	// Update pause accumulator (for accurate timing)
-	uint32 pauseDuration = g_system->getMillis() - _pauseStartTime;
-	_vm->addPauseTime(pauseDuration);
-	_vm->_isPaused = false;
+	_vm->setDialogPaused(false);
 
 	_currentPuzzleId = -1;
 	_currentLevel = -1;
@@ -165,20 +142,17 @@ bool DialogHelp::loadPage(int puzzleId, int level, int page) {
 	freePage();
 
 	// Construct help page path
-	Common::String path = Common::String::format(kHelpPageFormat,
-												 puzzleId,
-												 getLevelString(level),
-												 page);
+	Common::String path = Common::String::format(kHelpPageFormat, puzzleId, getLevelString(level), page);
 
 	// Load help page
-	_helpPage = _vm->loadBitBlock(path);
-
-	return (_helpPage != nullptr);
+	if (!_vm->_gfx->loadPageBitBlock(path))
+		return false;
+	_helpPagePath = path;
+	return true;
 }
 
 void DialogHelp::freePage() {
-	delete _helpPage;
-	_helpPage = nullptr;
+	_helpPagePath.clear();
 }
 
 void DialogHelp::onRenderContent(ManagedSurface32 *screen) {
@@ -186,45 +160,38 @@ void DialogHelp::onRenderContent(ManagedSurface32 *screen) {
 		return;
 	}
 
-	// Get alpha LUT for RleBlock rendering
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	screen->copyFrom(*_savedScreen);
 
 	// Draw help frame overlay (darkened background)
-	if (_helpFrame) {
-		_helpFrame->drawToScreen(screen, Common::Point32(0, 0), lut);
-	}
+	_vm->_gfx->drawSharedRleBlock(screen, kHelpFramePath, Common::Point32(0, 0));
 
 	// Draw the sheet inside the help frame.
-	if (_helpPage) {
-		_helpPage->drawToSurface(screen, Common::Point32(135, 191));
-	} else if (_placeholder) {
+	if (!_helpPagePath.empty()) {
+		_vm->_gfx->drawPageBitBlock(screen, _helpPagePath, Common::Point32(135, 191));
+	} else {
 		// Show placeholder if no help page loaded
-		_placeholder->drawToScreen(screen, Common::Point32(0, 0), lut);
+		_vm->_gfx->drawSharedRleBlock(screen, kPlaceholderPath, Common::Point32(0, 0));
 	}
 
 	// Draw OK button
-	if (_okButtonHovered && _okButtonPushed) {
-		_okButtonPushed->drawToSurface(screen, Common::Point32(_okButtonRect.left, _okButtonRect.top));
-	} else if (_okButtonNormal) {
-		_okButtonNormal->drawToSurface(screen, Common::Point32(_okButtonRect.left, _okButtonRect.top));
-	}
+	const char *okPath = kOkButtonNormalPath;
+	if (_okButtonHovered && _vm->_gfx->loadSharedBitBlock(kOkButtonPushedPath))
+		okPath = kOkButtonPushedPath;
+	_vm->_gfx->drawSharedBitBlock(screen, okPath, Common::Point32(_okButtonRect.left, _okButtonRect.top));
 
 	// Draw left arrow
 	bool leftEnabled = isPageValid(_currentPuzzleId, _currentLevel, _currentPage - 1);
-	if (leftEnabled && _leftArrowNormal) {
-		_leftArrowNormal->drawToSurface(screen, Common::Point32(_leftArrowRect.left, _leftArrowRect.top));
-	} else if (_leftArrowEmpty) {
-		_leftArrowEmpty->drawToSurface(screen, Common::Point32(_leftArrowRect.left, _leftArrowRect.top));
-	}
+	const char *leftPath = kLeftArrowEmptyPath;
+	if (leftEnabled && _vm->_gfx->loadSharedBitBlock(kLeftArrowNormalPath))
+		leftPath = kLeftArrowNormalPath;
+	_vm->_gfx->drawSharedBitBlock(screen, leftPath, Common::Point32(_leftArrowRect.left, _leftArrowRect.top));
 
 	// Draw right arrow
 	bool rightEnabled = isPageValid(_currentPuzzleId, _currentLevel, _currentPage + 1);
-	if (rightEnabled && _rightArrowNormal) {
-		_rightArrowNormal->drawToSurface(screen, Common::Point32(_rightArrowRect.left, _rightArrowRect.top));
-	} else if (_rightArrowEmpty) {
-		_rightArrowEmpty->drawToSurface(screen, Common::Point32(_rightArrowRect.left, _rightArrowRect.top));
-	}
+	const char *rightPath = kRightArrowEmptyPath;
+	if (rightEnabled && _vm->_gfx->loadSharedBitBlock(kRightArrowNormalPath))
+		rightPath = kRightArrowNormalPath;
+	_vm->_gfx->drawSharedBitBlock(screen, rightPath, Common::Point32(_rightArrowRect.left, _rightArrowRect.top));
 }
 
 EventHandleResult DialogHelp::onMouseMove(const Common::Point &pos) {

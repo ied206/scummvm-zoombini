@@ -71,7 +71,13 @@ ShelterZombiniville::~ShelterZombiniville() {
 
 	SoundManager *sound = _vm->getSoundManager();
 	if (sound) {
-		const int sounds[] = {_sndFeatureSelect, _sndQuickFill, _sndBatchFill, _sndValidZoombini, _sndWrongZoombini};
+		const int sounds[] = {
+			_sndFeatureSelect,
+			_sndQuickFill,
+			_sndBatchFill,
+			_sndValidZoombini,
+			_sndWrongZoombini,
+		};
 		for (uint i = 0; i < ARRAYSIZE(sounds); i++) {
 			if (0 <= sounds[i])
 				sound->unload(sounds[i]);
@@ -210,7 +216,7 @@ void ShelterZombiniville::init() {
 	refreshFeatureCounts();
 	gameState->registerPageVisit(kPageZombiniville);
 
-	if (!_vm->_gfx->loadBackground(Common::Path(kBackgroundPath)))
+	if (!_vm->_gfx->loadBackground(kBackgroundPath))
 		warning("ShelterZombiniville: Failed to load background");
 	loadAreaMask(Common::Path(kAreaMaskPath));
 
