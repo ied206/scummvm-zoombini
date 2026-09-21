@@ -45,7 +45,7 @@ bool DialogMsgBox::request(const Common::Path &textPath, Common::BaseCallback<Di
 		return false;
 	}
 
-	_textPath = textPath;
+	_textPath = textPath.toString('/');
 	_position = position;
 	_textOffset = textOffset;
 	_callback = callback;
@@ -59,17 +59,18 @@ bool DialogMsgBox::openDialog() {
 	if (_state != DialogMsgBoxState::kPendingOpen01)
 		return _state == DialogMsgBoxState::kOpen02;
 
+	bool loaded = true;
 	for (int i = 0; i < 3; i++)
-		_panels[i] = _vm->loadRleBlock(kPanelPaths[i]);
-	_textImage = _vm->loadBitBlock(_textPath.toString());
+		loaded = _vm->_gfx->loadPageRleBlock(kPanelPaths[i]) && loaded;
+	loaded = _vm->_gfx->loadPageBitBlock(_textPath) && loaded;
 
-	if (!_panels[0] || !_panels[1] || !_panels[2] || !_textImage) {
-		warning("DialogMsgBox: Failed to load confirmation resources for '%s'", _textPath.toString().c_str());
+	if (!loaded) {
+		warning("DialogMsgBox: Failed to load confirmation resources for '%s'", _textPath.c_str());
 		close();
 		return false;
 	}
 
-	const Size32 panelSize = _panels[1]->getSize();
+	const Size32 panelSize = _vm->_gfx->getPageRleBlockSize(kPanelPaths[1]);
 	if (_position.x == -1)
 		_position.x = ManagedSurface32::kScreenSize.width / 2 - panelSize.width / 2;
 	if (_position.y == -1)
@@ -79,11 +80,7 @@ bool DialogMsgBox::openDialog() {
 	_vm->_gfx->captureScreenRegion(_savedBackground,
 								   Common::Rect(_position.x, _position.y, _position.x + panelSize.width, _position.y + panelSize.height));
 
-	_pauseStartTime = g_system->getMillis();
-	_vm->_isPaused = true;
-	_vm->_pauseTimeStart = _pauseStartTime;
-	if (_vm->getSoundManager())
-		_vm->getSoundManager()->pauseAll();
+	_vm->setDialogPaused(true);
 	_state = DialogMsgBoxState::kOpen02;
 	return true;
 }
@@ -93,10 +90,7 @@ void DialogMsgBox::close() {
 		if (_savedBackground && _vm->getCurrentScreen()) {
 			_vm->_gfx->copyRegionToScreen(*_savedBackground, Common::Point(_position.x, _position.y));
 		}
-		_vm->addPauseTime(g_system->getMillis() - _pauseStartTime);
-		_vm->_isPaused = false;
-		if (_vm->getSoundManager())
-			_vm->getSoundManager()->resumeAll();
+		_vm->setDialogPaused(false);
 	}
 
 	_state = DialogMsgBoxState::kClosed00;
@@ -108,12 +102,6 @@ void DialogMsgBox::close() {
 }
 
 void DialogMsgBox::releaseResources() {
-	for (int i = 0; i < 3; i++) {
-		delete _panels[i];
-		_panels[i] = nullptr;
-	}
-	delete _textImage;
-	_textImage = nullptr;
 	delete _savedBackground;
 	_savedBackground = nullptr;
 }
@@ -152,8 +140,8 @@ void DialogMsgBox::onRenderContent(ManagedSurface32 *screen) {
 	if (!_redrawNeeded)
 		return;
 	screen->copyRectToSurface(*_savedBackground, _position.x, _position.y, Common::Rect(_savedBackground->w, _savedBackground->h));
-	_panels[static_cast<int>(_hoveredButton)]->drawToScreen(screen, _position, _vm->getAlphaLUT());
-	_textImage->drawToSurface(screen, _position + _textOffset);
+	_vm->_gfx->drawPageRleBlock(screen, kPanelPaths[static_cast<int>(_hoveredButton)], _position);
+	_vm->_gfx->drawPageBitBlock(screen, _textPath, _position + _textOffset);
 	_redrawNeeded = false;
 }
 

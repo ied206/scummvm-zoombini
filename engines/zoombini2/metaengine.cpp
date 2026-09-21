@@ -38,14 +38,15 @@ bool Zoombini2MetaEngine::hasFeature(MetaEngineFeature f) const {
 
 void Zoombini2MetaEngine::registerDefaultSettings(const Common::String &target) const {
 	(void)target;
-	ConfMan.registerDefault(kConfigDebugHotkeys, false);
-	ConfMan.registerDefault(kConfigStereoOutput, false);
-	ConfMan.registerDefault(kConfigGreedyWaterslidePairing, false);
-	ConfMan.registerDefault(kConfigCachedFrameTime, false);
-	ConfMan.registerDefault(kConfigUseFloatingPointPaths, false);
-	ConfMan.registerDefault(kConfigOriginalPRNG, true);
-	ConfMan.registerDefault(kConfigEnhancedKbdShortcuts, true);
 	ConfMan.registerDefault(kConfigSavefilesReadOnly, false);
+	ConfMan.registerDefault(kConfigStereoOutput, false);
+	ConfMan.registerDefault(kConfigUseFloatingPointPaths, false);
+	ConfMan.registerDefault(kConfigEnhancedKbdShortcuts, true);
+	ConfMan.registerDefault(kConfigDebugHotkeys, false);
+	ConfMan.registerDefault(kConfigGreedyWaterslidePairing, false);
+	ConfMan.registerDefault(kConfigOriginalPRNG, true);
+	ConfMan.registerDefault(kConfigFrameRate, kDefaultFrameRate);
+	ConfMan.registerDefault(kConfigUnlockFrameRate, false);
 }
 
 GUI::OptionsContainerWidget *Zoombini2MetaEngine::buildEngineOptionsWidget(GUI::GuiObject *boss, const Common::String &name,

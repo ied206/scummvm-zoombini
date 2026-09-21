@@ -208,27 +208,33 @@ public:
 private:
 	/** Thin themed separator used to divide option groups. */
 	class SeparatorWidget;
+	/** Numeric frame-rate entry. */
+	class FrameRateNumberBox;
 	/** Command used to open @ref Zoombini2SaveManagementDialog. */
 	static constexpr uint32 kManageProfilesCommand = 'z2mg';
-	/** Toggle for the F2, F3, P, and Chez Norf C developer keys. */
-	GUI::CheckboxWidget *_debugHotkeysCheckbox = nullptr;
+	static constexpr uint32 kUnlockFrameRateCommand = 'z2ul';
+	/** Keep saved game files unchanged during repeatable tests. */
+	GUI::CheckboxWidget *_savefilesReadOnlyCheckbox = nullptr;
 	/** Toggle selecting stereo rather than mono game-audio streams. */
 	GUI::CheckboxWidget *_stereoOutputCheckbox = nullptr;
-	/** Toggle selecting the alternate level-one Waterslide pairing. */
-	GUI::CheckboxWidget *_greedyWaterslideCheckbox = nullptr;
-	/** Toggle selecting one gameplay-clock snapshot per rendered frame. */
-	GUI::CheckboxWidget *_cachedFrameTimeCheckbox = nullptr;
-	/** Toggle selecting the original Windows random-number generator. */
-	GUI::CheckboxWidget *_originalPrngCheckbox = nullptr;
 	/** Toggle selecting floating-point rather than original Q10 Bezier calculations. */
 	GUI::CheckboxWidget *_floatingPointPathsCheckbox = nullptr;
 	/** Toggle enabling the enhanced keyboard shortcut set. */
 	GUI::CheckboxWidget *_enhancedKbdShortcutsCheckbox = nullptr;
-	/** Keep saved game files unchanged during repeatable tests. */
-	GUI::CheckboxWidget *_savefilesReadOnlyCheckbox = nullptr;
+	/** Toggle for the F2, F3, P, and Chez Norf C developer keys. */
+	GUI::CheckboxWidget *_debugHotkeysCheckbox = nullptr;
+	/** Toggle selecting the alternate level-one Waterslide pairing. */
+	GUI::CheckboxWidget *_greedyWaterslideCheckbox = nullptr;
+	/** Toggle selecting the original Windows random-number generator. */
+	GUI::CheckboxWidget *_originalPrngCheckbox = nullptr;
+	/** Frame-rate limit in frames per second. */
+	FrameRateNumberBox *_frameRateNumberBox = nullptr;
+	/** Disable the engine-side frame-rate limit. */
+	GUI::CheckboxWidget *_unlockFrameRateCheckbox = nullptr;
 
 	/** Define this widget's overlay-compatible GUI layout. */
 	void defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const override;
+	void updateFrameRateControls();
 };
 
 } // End of namespace Zoombini2

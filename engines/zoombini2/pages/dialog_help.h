@@ -29,8 +29,6 @@
 namespace Zoombini2 {
 
 class Zoombini2Engine;
-class BitBlock;
-class RleBlock;
 
 /**
  * Owns the context-sensitive help overlay for one puzzle and level.
@@ -43,7 +41,7 @@ class DialogHelp : public DialogBase {
 public:
 	/** Bind the reusable help overlay to @p vm. */
 	DialogHelp(Zoombini2Engine *vm);
-	/** Release the active page, controls, and saved screen. */
+	/** Close the active help sheet and release the saved screen. */
 	~DialogHelp() override;
 
 	/** Return whether a help sheet exists for the supplied puzzle coordinates. */
@@ -79,9 +77,9 @@ private:
 	static constexpr const char *kRightArrowEmptyPath = "Bmp/MENU/help_screen_rightarro_empty.bb";
 	static constexpr const char *kHelpPageFormat = "Bmp/help/%02d_help_%s_%02d.bb";
 
-	/** Replace the active help bitmap with the requested sheet. */
+	/** Replace the active help-sheet path with the requested sheet. */
 	bool loadPage(int puzzleId, int level, int page);
-	/** Release the active help-sheet bitmap. */
+	/** Forget the active help-sheet path. */
 	void freePage();
 	/** Return the resource-directory label for @p level. */
 	const char *getLevelString(int level);
@@ -96,24 +94,8 @@ private:
 	int _currentPage = 1;
 	/** Screen snapshot restored when the overlay closes. */
 	ManagedSurface32 *_savedScreen = nullptr;
-	/** Help-window frame sprite. */
-	RleBlock *_helpFrame = nullptr;
-	/** Fallback sprite shown when no help sheet is available. */
-	RleBlock *_placeholder = nullptr;
-	/** Normal close-button bitmap. */
-	BitBlock *_okButtonNormal = nullptr;
-	/** Pressed close-button bitmap. */
-	BitBlock *_okButtonPushed = nullptr;
-	/** Enabled previous-sheet button bitmap. */
-	BitBlock *_leftArrowNormal = nullptr;
-	/** Disabled previous-sheet button bitmap. */
-	BitBlock *_leftArrowEmpty = nullptr;
-	/** Enabled next-sheet button bitmap. */
-	BitBlock *_rightArrowNormal = nullptr;
-	/** Disabled next-sheet button bitmap. */
-	BitBlock *_rightArrowEmpty = nullptr;
-	/** Active help-sheet bitmap. */
-	BitBlock *_helpPage = nullptr;
+	/** Path of the active help-sheet bitmap in the graphics page cache. */
+	Common::String _helpPagePath;
 	/** Close-button hit rectangle. */
 	Common::Rect _okButtonRect = Common::Rect(597, 400, 671, 444);
 	/** Previous-sheet button hit rectangle. */
@@ -127,7 +109,6 @@ private:
 	/** Whether the pointer is over the next-sheet button. */
 	bool _rightArrowHovered = false;
 	/** System tick captured when the help overlay paused gameplay. */
-	uint32 _pauseStartTime = 0;
 };
 
 } // End of namespace Zoombini2

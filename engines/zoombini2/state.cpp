@@ -540,7 +540,11 @@ bool GameState::save(Common::WriteStream *stream) const {
 	const int rescue2BoardCount = writeBoard(stream, _rescue2Board);
 	stream->writeUint32LE(static_cast<uint32>(count));
 	for (uint64 i = 0; i < count; i++) {
-		const ZoombiniRunner *zoombini = i < _savedRoster.size() ? _savedRoster[i] : _activeZoombinis[i - _savedRoster.size()];
+		const ZoombiniRunner *zoombini;
+		if (i < _savedRoster.size())
+			zoombini = _savedRoster[i];
+		else
+			zoombini = _activeZoombinis[i - _savedRoster.size()];
 		if (!zoombini)
 			return false;
 		const ZmbTrait &traits = zoombini->_traits;
@@ -551,7 +555,11 @@ bool GameState::save(Common::WriteStream *stream) const {
 		stream->writeByte(traits._eyes);
 	}
 	for (uint64 i = 0; i < count; i++) {
-		const ZoombiniRunner *zoombini = i < _savedRoster.size() ? _savedRoster[i] : _activeZoombinis[i - _savedRoster.size()];
+		const ZoombiniRunner *zoombini;
+		if (i < _savedRoster.size())
+			zoombini = _savedRoster[i];
+		else
+			zoombini = _activeZoombinis[i - _savedRoster.size()];
 		stream->write(zoombini->_name, sizeof(zoombini->_name));
 	}
 	const int64 expectedSize = 2822 + static_cast<int64>(nameLength) + (rescue1BoardCount + rescue2BoardCount) * 28 + count * 20;

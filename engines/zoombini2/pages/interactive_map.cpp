@@ -124,31 +124,6 @@ InteractiveMap::InteractiveMap(Zoombini2Engine *vm, MapScreenMode mode)
 }
 
 InteractiveMap::~InteractiveMap() {
-	for (int i = 0; i < kNumIcons; i++) {
-		delete _icons[i];
-	}
-	for (int i = 0; i < kNumTitles; i++) {
-		delete _titles[i];
-	}
-	for (int tier = 0; tier < kNumLevelTiers; tier++) {
-		for (int slot = 0; slot < kNumSegments; slot++) {
-			delete _segments[tier][slot];
-		}
-	}
-	delete _statsPractice;
-	delete _statsSavedGame;
-	for (int i = 0; i < kNumLegends; i++) {
-		delete _legends[i];
-	}
-
-	for (int i = 0; i < kNumButtons; i++) {
-		delete _buttons[i].normalRle;
-		delete _buttons[i].hiliteRle;
-		delete _buttons[i].grayRle;
-		delete _buttons[i].normalBB;
-		delete _buttons[i].hiliteBB;
-	}
-
 	SoundManager *sm = _vm->getSoundManager();
 	if (sm && 0 <= _blipSoundId)
 		sm->unload(_blipSoundId);
@@ -168,6 +143,19 @@ void InteractiveMap::init() {
 		_vm->writeGameSave(gs->_playerName);
 	_vm->_state->clearActiveZoombinis();
 	_vm->_isSavedGame = !isPracticeMode();
+	if (isPracticeMode()) {
+		int practicePuzzlePageId = kPageNone;
+		int practiceLevel = 0;
+		if (_vm->takePracticePuzzleLaunch(practicePuzzlePageId, practiceLevel)) {
+			_currentLevel = practiceLevel;
+			gs->_level = _currentLevel;
+			_vm->_returningFromPuzzle = false;
+			createPracticeParty(practicePuzzlePageId);
+			_vm->_mapTransitionSourcePageId = static_cast<PageId>(practicePuzzlePageId);
+			_vm->requestPageChange(practicePuzzlePageId);
+			return;
+		}
+	}
 
 	// The saved-game map always exposes the starting hub.
 	if (!isPracticeMode()) {
@@ -175,7 +163,7 @@ void InteractiveMap::init() {
 	}
 
 	// --- Background ---
-	if (!_vm->_gfx->loadBackground(Common::Path(kBackgroundPath))) {
+	if (!_vm->_gfx->loadBackground(kBackgroundPath)) {
 		warning("MapScreenPage: Failed to load map background");
 	}
 
@@ -184,8 +172,11 @@ void InteractiveMap::init() {
 
 	// --- Title overlays ---
 	for (int i = 0; i < kNumTitles; i++) {
-		_titles[i] = new RleBlock(_vm);
-		if (!_titles[i]->load(Common::Path(kTitleFiles[i]))) {
+		const Common::String path(kTitleFiles[i]);
+		if (_vm->_gfx->loadPageRleBlock(path))
+			_titles[i] = path;
+		else {
+			_titles[i].clear();
 			warning("MapScreenPage: Failed to load title %d!", i);
 		}
 	}
@@ -195,15 +186,22 @@ void InteractiveMap::init() {
 
 	// --- Stats overlays (both always loaded) ---
 	// Practice and saved-game maps use different statistics panels.
-	_statsPractice = new RleBlock(_vm);
-	_statsPractice->load(Common::Path(kPracticeStatsPath));
-	_statsSavedGame = new RleBlock(_vm);
-	_statsSavedGame->load(Common::Path(kSavedGameStatsPath));
+	if (_vm->_gfx->loadPageRleBlock(kPracticeStatsPath))
+		_statsPracticePath = kPracticeStatsPath;
+	else
+		_statsPracticePath.clear();
+	if (_vm->_gfx->loadPageRleBlock(kSavedGameStatsPath))
+		_statsSavedGamePath = kSavedGameStatsPath;
+	else
+		_statsSavedGamePath.clear();
 
 	// --- Legend bitmaps (all 4: off, level1, level2, level3) ---
 	for (int i = 0; i < kNumLegends; i++) {
-		_legends[i] = new BitBlock(_vm);
-		_legends[i]->load(Common::Path(kLegendFiles[i]));
+		const Common::String path(kLegendFiles[i]);
+		if (_vm->_gfx->loadPageBitBlock(path))
+			_legends[i] = path;
+		else
+			_legends[i].clear();
 	}
 
 	// --- White bitmap font for stats ---
@@ -251,8 +249,8 @@ void InteractiveMap::setupIcons() {
 			} else {
 				path = Common::String::format(kIconFormat, i);
 			}
-			_icons[i] = new RleBlock(_vm);
-			if (!_icons[i]->load(Common::Path(path))) {
+			_icons[i] = _vm->_gfx->loadPageRleBlock(path) ? path : Common::String();
+			if (_icons[i].empty()) {
 				warning("MapScreenPage: Failed to load icon %d at %s!", i, path.c_str());
 			}
 		}
@@ -272,8 +270,7 @@ void InteractiveMap::setupIcons() {
 				} else {
 					path = Common::String::format(kDisabledIconFormat, i);
 				}
-				_icons[i] = new RleBlock(_vm);
-				_icons[i]->load(Common::Path(path));
+				_icons[i] = _vm->_gfx->loadPageRleBlock(path) ? path : Common::String();
 			}
 		} else {
 			// Normal progress uses each page's visited state.
@@ -292,8 +289,8 @@ void InteractiveMap::setupIcons() {
 				} else {
 					path = Common::String::format(kDisabledIconFormat, i);
 				}
-				_icons[i] = new RleBlock(_vm);
-				if (!_icons[i]->load(Common::Path(path))) {
+				_icons[i] = _vm->_gfx->loadPageRleBlock(path) ? path : Common::String();
+				if (_icons[i].empty()) {
 					warning("MapScreenPage: Failed to load icon %d at %s!", i, path.c_str());
 				}
 			}
@@ -490,8 +487,8 @@ void InteractiveMap::loadSegments() {
 		for (int slot = 0; slot < kNumSegments; slot++) {
 			Common::String path = Common::String::format(
 				kSegmentPathFormat, kSegmentDirs[tier], kSegmentFiles[slot]);
-			_segments[tier][slot] = new RleBlock(_vm);
-			if (!_segments[tier][slot]->load(Common::Path(path))) {
+			_segments[tier][slot] = _vm->_gfx->loadPageRleBlock(path) ? path : Common::String();
+			if (_segments[tier][slot].empty()) {
 				warning("MapScreenPage: Failed to load segment tier=%d slot=%d path=%s!",
 						tier, slot, path.c_str());
 			}
@@ -512,7 +509,7 @@ void InteractiveMap::loadButtons() {
 		const char *grayName;
 	};
 
-	const ButtonSetup setup[kNumButtons] = {
+	ButtonSetup setup[kNumButtons] = {
 		// Button 0: Files / Parties
 		{Common::Rect(27, 561, 172, 600), false,
 		 kFilesNormalPath,
@@ -521,20 +518,22 @@ void InteractiveMap::loadButtons() {
 		{Common::Rect(175, 561, 320, 600), false,
 		 kOptionsNormalPath,
 		 kOptionsHighlightPath, nullptr},
-		// Button 2: Game in practice mode or Entraine in saved-game mode
-		isPracticeMode()
-			? ButtonSetup{Common::Rect(468, 561, 613, 600), true,
-						  kGameNormalPath,
-						  kGameHighlightPath,
-						  kGameDisabledPath}
-			: ButtonSetup{Common::Rect(468, 561, 613, 600), false,
-						  kPracticeNormalPath,
-						  kPracticeHighlightPath, nullptr},
+		{},
 		// Button 3: Quitter
 		{Common::Rect(613, 561, 758, 600), true,
 		 kQuitNormalPath,
 		 kQuitHighlightPath, nullptr},
 	};
+	// Button 2: Game in practice mode or Entraine in saved-game mode
+	if (isPracticeMode())
+		setup[2] = ButtonSetup{Common::Rect(468, 561, 613, 600), true,
+							   kGameNormalPath,
+							   kGameHighlightPath,
+							   kGameDisabledPath};
+	else
+		setup[2] = ButtonSetup{Common::Rect(468, 561, 613, 600), false,
+							   kPracticeNormalPath,
+							   kPracticeHighlightPath, nullptr};
 
 	GameState *gs = _vm->_state;
 
@@ -555,26 +554,26 @@ void InteractiveMap::loadButtons() {
 		}
 
 		if (s.isRle) {
-			btn.normalRle = new RleBlock(_vm);
-			if (!btn.normalRle->load(Common::Path(s.normalName)))
+			btn.normalPath = _vm->_gfx->loadPageRleBlock(s.normalName) ? s.normalName : "";
+			if (btn.normalPath.empty())
 				debug(2, "MapScreenPage: button %d normal rle failed", i);
 
-			btn.hiliteRle = new RleBlock(_vm);
-			if (!btn.hiliteRle->load(Common::Path(s.hiliteName)))
+			btn.hilitePath = _vm->_gfx->loadPageRleBlock(s.hiliteName) ? s.hiliteName : "";
+			if (btn.hilitePath.empty())
 				debug(2, "MapScreenPage: button %d hilite rle failed", i);
 
 			if (s.grayName) {
-				btn.grayRle = new RleBlock(_vm);
-				if (!btn.grayRle->load(Common::Path(s.grayName)))
+				btn.grayPath = _vm->_gfx->loadPageRleBlock(s.grayName) ? s.grayName : "";
+				if (btn.grayPath.empty())
 					debug(2, "MapScreenPage: button %d gray rle failed", i);
 			}
 		} else {
-			btn.normalBB = new BitBlock(_vm);
-			if (!btn.normalBB->load(Common::Path(s.normalName)))
+			btn.normalPath = _vm->_gfx->loadPageBitBlock(s.normalName) ? s.normalName : "";
+			if (btn.normalPath.empty())
 				debug(2, "MapScreenPage: button %d normal bb failed", i);
 
-			btn.hiliteBB = new BitBlock(_vm);
-			if (!btn.hiliteBB->load(Common::Path(s.hiliteName)))
+			btn.hilitePath = _vm->_gfx->loadPageBitBlock(s.hiliteName) ? s.hiliteName : "";
+			if (btn.hilitePath.empty())
 				debug(2, "MapScreenPage: button %d hilite bb failed", i);
 		}
 	}
@@ -641,7 +640,6 @@ void InteractiveMap::onUpdate() {
 // ============================================================================
 
 void InteractiveMap::onRenderContent(ManagedSurface32 *screen) {
-	const AlphaBlendLUT &lut = _vm->getAlphaLUT();
 	GameState *gs = _vm->_state;
 
 	// 1. Background
@@ -649,24 +647,22 @@ void InteractiveMap::onRenderContent(ManagedSurface32 *screen) {
 
 	// 2. Path segments
 	if (isPracticeMode()) {
-		drawPracticeSegments(screen, lut);
+		drawPracticeSegments(screen);
 	} else {
-		drawSavedGameSegments(screen, lut);
+		drawSavedGameSegments(screen);
 	}
 
 	// 3. Stats panel and text
 	if (isPracticeMode()) {
 		// New-game mode: only draw stats_scr3 panel, no numbers or name.
 		// Practice mode shows instructions without player statistics.
-		if (_statsPractice && _statsPractice->isValid()) {
-			_statsPractice->drawToScreen(screen, Common::Point32(10, 10), lut);
-		}
+		if (!_statsPracticePath.empty())
+			_vm->_gfx->drawPageRleBlock(screen, _statsPracticePath, Common::Point32(10, 10));
 	} else {
 		// Load-game mode: draw stats_scr1 panel + player name + stat numbers.
 		// Saved-game mode shows the player name and four progress rows.
-		if (_statsSavedGame && _statsSavedGame->isValid()) {
-			_statsSavedGame->drawToScreen(screen, Common::Point32(10, 10), lut);
-		}
+		if (!_statsSavedGamePath.empty())
+			_vm->_gfx->drawPageRleBlock(screen, _statsSavedGamePath, Common::Point32(10, 10));
 
 		if (_vm->_gfx->hasTextFont(Gfx::TextColor::kWhite03)) {
 			// Player name centered at Y=10, min X=240
@@ -690,51 +686,43 @@ void InteractiveMap::onRenderContent(ManagedSurface32 *screen) {
 	// The legend highlights only the tab currently under the mouse.
 	if (isPracticeMode()) {
 		// Always draw legend_off base
-		if (_legends[0] && _legends[0]->getWidth() > 0) {
-			_legends[0]->drawToSurface(screen, Common::Point32(590, 427));
-		}
+		if (!_legends[0].empty())
+			_vm->_gfx->drawPageBitBlock(screen, _legends[0], Common::Point32(590, 427));
 		// The selected level affects the route. Only the hovered tab is overlaid.
 		int tabToShow = _hoveredLegendTab;
 		if (1 <= tabToShow && tabToShow <= 3) {
-			if (_legends[tabToShow] && _legends[tabToShow]->getWidth() > 0) {
-				_legends[tabToShow]->drawToSurface(screen, Common::Point32(590, 427));
-			}
+			if (!_legends[tabToShow].empty())
+				_vm->_gfx->drawPageBitBlock(screen, _legends[tabToShow], Common::Point32(590, 427));
 		}
 	}
 
 	// 5. Page icons
 	for (int i = 0; i < kNumIcons; i++) {
-		RleBlock *icon = _icons[i];
-		if (icon && icon->isValid()) {
-			icon->drawToScreen(screen, Common::Point32(kIconHitRects[i].left, kIconHitRects[i].top), lut);
-		}
+		if (!_icons[i].empty())
+			_vm->_gfx->drawPageRleBlock(screen, _icons[i], Common::Point32(kIconHitRects[i].left, kIconHitRects[i].top));
 	}
 
 	// 6. Title overlay for hovered icon
 	if (0 <= _hoveredIcon && _hoveredIcon < kNumTitles) {
-		RleBlock *title = _titles[_hoveredIcon];
-		if (title && title->isValid()) {
-			title->drawToScreen(screen, kTitlePos[_hoveredIcon], lut);
-		}
+		if (!_titles[_hoveredIcon].empty())
+			_vm->_gfx->drawPageRleBlock(screen, _titles[_hoveredIcon], kTitlePos[_hoveredIcon]);
 	}
 
 	// 7. Bottom panel buttons
 	for (int i = 0; i < kNumButtons; i++) {
 		const MapButton &btn = _buttons[i];
 		if (btn.isRle) {
-			RleBlock *img = nullptr;
-			if (!btn.enabled && btn.grayRle)
-				img = btn.grayRle;
-			else if (btn.hovered && btn.hiliteRle)
-				img = btn.hiliteRle;
-			else
-				img = btn.normalRle;
-			if (img && img->isValid())
-				img->drawToScreen(screen, Common::Point32(btn.rect.left, btn.rect.top), lut);
+			Common::String imagePath = btn.normalPath;
+			if (!btn.enabled && !btn.grayPath.empty())
+				imagePath = btn.grayPath;
+			else if (btn.hovered && !btn.hilitePath.empty())
+				imagePath = btn.hilitePath;
+			if (!imagePath.empty())
+				_vm->_gfx->drawPageRleBlock(screen, imagePath, Common::Point32(btn.rect.left, btn.rect.top));
 		} else {
-			BitBlock *img = (btn.hovered && btn.hiliteBB) ? btn.hiliteBB : btn.normalBB;
-			if (img && img->getWidth() > 0)
-				img->drawToSurface(screen, Common::Point32(btn.rect.left, btn.rect.top));
+			const Common::String &imagePath = btn.hovered && !btn.hilitePath.empty() ? btn.hilitePath : btn.normalPath;
+			if (!imagePath.empty())
+				_vm->_gfx->drawPageBitBlock(screen, imagePath, Common::Point32(btn.rect.left, btn.rect.top));
 		}
 	}
 }
@@ -750,7 +738,7 @@ void InteractiveMap::onRenderForeground(ManagedSurface32 *screen) {
 // Practice route drawing
 // ============================================================================
 
-void InteractiveMap::drawPracticeSegments(ManagedSurface32 *screen, const AlphaBlendLUT &lut) {
+void InteractiveMap::drawPracticeSegments(ManagedSurface32 *screen) {
 	// Practice uses one level for the full route and skips duplicate slot 13.
 	int tier = _currentLevel;
 	if (tier < 0 || kNumLevelTiers <= tier)
@@ -759,10 +747,8 @@ void InteractiveMap::drawPracticeSegments(ManagedSurface32 *screen, const AlphaB
 	for (int slot = 0; slot < kNumSegments; slot++) {
 		if (slot == 13)
 			continue;
-		RleBlock *seg = _segments[tier][slot];
-		if (seg && seg->isValid()) {
-			seg->drawToScreen(screen, kSegmentPos[slot], lut);
-		}
+		if (!_segments[tier][slot].empty())
+			_vm->_gfx->drawPageRleBlock(screen, _segments[tier][slot], kSegmentPos[slot]);
 	}
 }
 
@@ -770,13 +756,27 @@ void InteractiveMap::drawPracticeSegments(ManagedSurface32 *screen, const AlphaB
 // Saved-game route drawing
 // ============================================================================
 
-void InteractiveMap::drawSavedGameSegments(ManagedSurface32 *screen, const AlphaBlendLUT &lut) {
+void InteractiveMap::drawSavedGameSegments(ManagedSurface32 *screen) {
 	// Draw specific slots using each page's stored level.
 	// Draw order: 10, 1, 2, 3, 5, 4, 7, 6, 9, 8, 0, 11, 13
 	// (Skips slot 12, draws slot 13 instead at same position.)
 	GameState *gs = _vm->_state;
 
-	static constexpr int drawOrder[] = {10, 1, 2, 3, 5, 4, 7, 6, 9, 8, 0, 11, 13};
+	static constexpr int drawOrder[] = {
+		10,
+		1,
+		2,
+		3,
+		5,
+		4,
+		7,
+		6,
+		9,
+		8,
+		0,
+		11,
+		13,
+	};
 	for (int idx = 0; idx < 13; idx++) {
 		int slot = drawOrder[idx];
 		int pageId = kSegmentPageIds[slot];
@@ -784,10 +784,8 @@ void InteractiveMap::drawSavedGameSegments(ManagedSurface32 *screen, const Alpha
 		if (tier < 0 || kNumLevelTiers <= tier)
 			tier = 0;
 
-		RleBlock *seg = _segments[tier][slot];
-		if (seg && seg->isValid()) {
-			seg->drawToScreen(screen, kSegmentPos[slot], lut);
-		}
+		if (!_segments[tier][slot].empty())
+			_vm->_gfx->drawPageRleBlock(screen, _segments[tier][slot], kSegmentPos[slot]);
 	}
 }
 

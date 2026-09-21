@@ -29,8 +29,8 @@
 
 namespace Zoombini2 {
 
-class RleBlock;
 class Animation;
+class PathObject;
 
 /**
  * Boolie Boggle (Route4-2)
@@ -41,196 +41,351 @@ class PuzzleBoolies : public PuzzleBase {
 public:
 	/** Construct Boolie Boggle for @p vm. */
 	PuzzleBoolies(Zoombini2Engine *vm);
-	/** Release all bowling and boat resources. */
+	/** Release animations and active paths; sprites remain in the graphics page cache. */
 	~PuzzleBoolies() override;
 
-	/** Load the lane and assign the active Zoombinis. */
+	/** Load the three Boolie groups and place the active Zoombini in the boat. */
 	void init() override;
-	/** Advance the ball, pins, released Zoombini, and boat phases. */
+	/** Advance challenge balls, Boolie jumps, and boat travel. */
 	void onUpdate() override;
-	/** Draw the launch spots, obstacles, pins, actors, and boat. */
-	void onRenderContent(ManagedSurface32 *screen) override;
-	/** Restore the page background. */
+	/** Restore the primary page layer before drawing puzzle content. */
 	void onRenderBackground(ManagedSurface32 *screen) override;
-	/** Launch the current ball from the selected active spot. */
+	/** Draw the Boolie groups, balls, pin sections, lights, and boat. */
+	void onRenderContent(ManagedSurface32 *screen) override;
+	/** Draw the Zoombini riding in the boat. */
+	void onRenderActors(ManagedSurface32 *screen) override;
+	/** Advance Zoombini animation frames after they have been drawn. */
+	void onActorsRendered() override;
+	/** Select a Boolie row at @p pos while a challenge awaits input. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	/** Highlight the selectable Boolie row under @p pos. */
+	EventHandleResult onMouseMove(const Common::Point &pos) override;
+	Common::String debugGetAnswer() const override;
+	PuzzleChanceInfo debugGetChances() const override;
+	bool debugCanSetChances() const override;
+	bool debugSetChances(int remaining) override;
+
 	/** Return the rescued-Boolie credit assigned to each party member at @p level. */
 	static int getRescuedBooliesPerZoombini(int level);
 
 private:
-	/** Resource paths and formats used by the bowling scene. */
+	/** Number of Boolie ledges. */
+	static constexpr int kRowCount = 3;
+	/** Maximum number of Boolies on one ledge. */
+	static constexpr int kSlotCount = 4;
+	/** Maximum number of balls in one challenge. */
+	static constexpr int kMaxChallengeBalls = 6;
+	/** Music played while this page is active. */
 	static constexpr const char *kMusicPath = "#sounds/music/09-BB01.wav";
-	static constexpr const char *kBallPosPath = "bmp/boolies/ball_pos";
-	static constexpr const char *kBallNegPath = "bmp/boolies/ball_neg";
-	static constexpr const char *kPinPath = "bmp/boolies/pin";
+	/** Boolie and ball sprites in the release-matched resource tree. */
+	static constexpr const char *kFixePath = "bmp/boolies/FIXE";
+	static constexpr const char *kFixe2Path = "bmp/boolies/FIXE2";
+	static constexpr const char *kBallPosPath = "bmp/boolies/BALL_POS";
+	static constexpr const char *kBallNegPath = "bmp/boolies/BALL_NEG";
+	static constexpr const char *kPinPath = "bmp/boolies/PIN";
 	static constexpr const char *kPinLightedPath = "bmp/boolies/pin_lighted";
-	static constexpr const char *kBoatPath = "bmp/boolies/bateau";
-	static constexpr const char *kSpotFormat = "bmp/boolies/spot%02d";
-	static constexpr const char *kBlockerPath = "bmp/boolies/blocker";
-	static constexpr const char *kFixePath = "bmp/boolies/fixe";
-	static constexpr const char *kFixe2Path = "bmp/boolies/fixe2";
-	static constexpr const char *kMarchePath = "bmp/boolies/marche";
-	static constexpr const char *kMarche2Path = "bmp/boolies/marche2";
-	static constexpr const char *kAttendPath = "bmp/boolies/attend";
-	static constexpr const char *kAttend2Path = "bmp/boolies/attend2";
-	static constexpr const char *kRollPath = "bmp/boolies/roll";
-	static constexpr const char *kRoll2Path = "bmp/boolies/roll2";
-
-	/** Polarity assigned to a rolling Zoombini. */
-	enum BallType {
-		/** No ball is currently assigned. */
-		kBallNone = 0,
-		/** Use the positive ball path and visual. */
-		kBallPositive,
-		/** Use the negative ball path and visual. */
-		kBallNegative
+	static constexpr const char *kBoatPath = "bmp/boolies/BATEAU";
+	static constexpr const char *kSpotFormat = "bmp/boolies/SPOT%02d";
+	static constexpr const char *kBlockerPath = "bmp/boolies/BLOCKER";
+	static constexpr const char *kRollPath = "bmp/boolies/ROLL";
+	static constexpr const char *kRoll2Path = "bmp/boolies/ROLL2";
+	static constexpr const char *kBoolieWalkOnePath = "bmp/boolies/MARCHE";
+	static constexpr const char *kBoolieWalkTwoPath = "bmp/boolies/MARCHE2";
+	/** Paths used to feed, route, and board balls and Boolies. */
+	static constexpr const char *kPreviewEntryPath = "bmp/boolies/b_boolies1.pat";
+	static constexpr const char *kFeederPathFormat = "bmp/boolies/b_boolies1bis_%d.pat";
+	static constexpr const char *kLanePathFormat = "bmp/boolies/b_boolies%d.pat";
+	static constexpr const char *kJumpPathFormat = "bmp/boolies/Jump%d_%d.pat";
+	/** Row and polarity select effects 01 through 06; effect 07 accompanies a hit. */
+	static constexpr const char *kEffectPathFormat = "sounds/fx/09-BS%02d.wav";
+	/** Four Boolie voices used as members start boarding paths. */
+	static constexpr const char *kBoardVoicePathFormat = "sounds/blp15.%d.wav";
+	/** Duration of each frame in the original Boolie roll sequence. */
+	static constexpr uint32 kRollFrameTime = 30;
+	/** Duration of each frame in the opening blocker sequence. */
+	static constexpr uint32 kBlockerFrameTime = 70;
+	/** Number of frames played by the opening blocker sequence. */
+	static constexpr uint32 kBlockerFrameCount = 3;
+	static constexpr uint32 kBallLaunchInterval = 600;
+	static constexpr uint32 kFirstBallLaunchDelay = 30;
+	static constexpr uint32 kBoardingCheckDelay = 2000;
+	static constexpr uint32 kWalkFrameTime = 40;
+	static constexpr uint32 kWalkFrameCount = 11;
+	static constexpr int kWalkStepX = 30;
+	static constexpr int kRefillStartX[kSlotCount] = {
+		-20,
+		-22,
+		-24,
+		-26,
+	};
+	static constexpr int kRefillY[kRowCount] = {
+		107,
+		221,
+		322,
+	};
+	/** Original top-left holding positions for the preview and ready ball groups. */
+	static constexpr int kPreviewHoldX[kMaxChallengeBalls] = {
+		220,
+		187,
+		154,
+		121,
+		88,
+		55,
+	};
+	static constexpr int kPreviewHoldY[kMaxChallengeBalls] = {
+		25,
+		27,
+		28,
+		27,
+		23,
+		17,
+	};
+	static constexpr int kReadyHoldX[kMaxChallengeBalls] = {
+		601,
+		633,
+		663,
+		680,
+		674,
+		651,
+	};
+	static constexpr int kReadyHoldY[kMaxChallengeBalls] = {
+		56,
+		49,
+		39,
+		32,
+		15,
+		9,
 	};
 
-	/** Runtime phase of the Boolie Boggle interaction. */
-	enum State {
-		/** Complete initial placement before accepting input. */
-		kStateInit,
-		/** Wait for the player to select a launch spot. */
-		kStateIdle,
-		/** Move the current ball toward the pins. */
-		kStateBallRolling,
-		/** Hold while knocked pins settle. */
-		kStatePinsKnocked,
-		/** Move a successfully released Zoombini toward the boat. */
-		kStateZoombiniFreed,
-		/** Move the completed party away by boat. */
-		kStateBoatLeaving,
-		/** Stop accepting input after completion. */
-		kStateDone
+	/** Runtime phase of the Boolie challenge and boat transfer. */
+	enum class Phase {
+		/** Feed balls and accept one row selection. */
+		kFeeding00 = 0,
+		/** Move the selected challenge balls through the row. */
+		kRolling01 = 1,
+		/** Delay the next challenge after an uncleared row. */
+		kBetweenRounds02 = 2,
+		/** Carry the successful group away from the ledges. */
+		kBoatLeaving03 = 3,
+		/** Bring the boat back for the next Zoombini. */
+		kBoatReturning04 = 4,
+		/** Stop accepting row input and enable the Go control. */
+		kFinished05 = 5
 	};
 
-	/** One bowling pin's position and feedback state. */
-	struct Pin {
-		/** Screen position. */
-		Common::Point32 pos;
-		/** Whether the pin has been knocked down. */
-		bool knocked = false;
-		/** Whether the pin is shown as an active target. */
-		bool lighted = false;
+	/** Position of one challenge ball in its feeder and row paths. */
+	enum class BallStage {
+		/** Wait for the ball's scheduled feeder start. */
+		kWaiting00 = 0,
+		/** Follow the upper feeder path. */
+		kFeeder01 = 1,
+		/** Wait at the feeder endpoint for a row selection. */
+		kHeld02 = 2,
+		/** Follow the selected row path. */
+		kLane03 = 3,
+		/** Finish the row path and stop drawing the ball. */
+		kDone04 = 4,
+		/** Wait in the cave for this next-challenge preview ball's entry. */
+		kPreviewWaiting05 = 5,
+		/** Follow the cave-to-preview path. */
+		kPreviewEntry06 = 6,
+		/** Remain at the left preview position until the current turn ends. */
+		kPreviewHeld07 = 7
 	};
 
-	/** One selectable ball launch position. */
-	struct Spot {
-		/** Screen position. */
-		Common::Point32 pos;
-		/** Clickable area. */
-		Common::Rect hitbox;
-		/** Whether this spot can launch the current ball. */
-		bool active = false;
+	/** One Boolie's current value and ledge visibility. */
+	struct Boolie {
+		/** Value 1 or 2 in an active slot; zero in an unused slot. */
+		byte value = 0;
+		/** Value currently shown after queued rolling animations. */
+		byte visibleValue = 0;
+		/** Whether its jump path is currently running. */
+		bool jumping = false;
+		/** Whether the ledge slot is unused or has completed its jump. */
+		bool removed = false;
 	};
 
-	/** Position and timing for the currently rolling Zoombini. */
+	/** One queued visible transition after a ball changes a Boolie value. */
+	struct Flip {
+		int row = 0;
+		int slot = 0;
+		byte fromValue = 0;
+		byte toValue = 0;
+	};
+
+	/** One ball in the current signed challenge. */
 	struct Ball {
-		/** Positive or negative path selection. */
-		BallType type = kBallNone;
-		/** Puzzle-roster index represented by this ball. */
-		int zoombiniIdx = -1;
+		/** Current feeder or row path, released after the challenge. */
+		PathObject *path = nullptr;
+		/** Position in the indexed feeder and preview holding arrays. */
+		int index = 0;
 		/** Current screen position. */
 		Common::Point32 pos;
-		/** Screen position at the start of the roll. */
-		Common::Point32 startPos;
-		/** Target screen position. */
-		Common::Point32 endPos;
-		/** Time at which the roll began. */
-		uint32 rollStart = 0;
+		/** Earliest game tick at which the feeder path may start. */
+		uint32 startAt = 0;
+		/** Current path stage. */
+		BallStage stage = BallStage::kWaiting00;
 	};
 
-	/** Load all puzzle graphics and animations. */
+	/** A Boolie traveling from one ledge slot into the boat. */
+	struct Jump {
+		/** Row-specific path, released when the jump finishes. */
+		PathObject *path = nullptr;
+		/** Current screen position. */
+		Common::Point32 pos;
+		/** Source row. */
+		int row = 0;
+		/** Source slot on that row. */
+		int slot = 0;
+		/** Portrait selected by this Boolie's value. */
+		byte value = 1;
+		/** Whether this jump has started after earlier group members. */
+		bool started = false;
+	};
+
+	/** A Boolie retained at its landing position while the boat moves. */
+	struct Passenger {
+		/** Landing position in the boat's initial screen placement. */
+		Common::Point32 pos;
+		/** Portrait selected by this Boolie's value. */
+		byte value = 1;
+	};
+
+	/** Return the row hit by @p pos, or -1 outside the three row regions. */
+	static int getRowForPoint(const Common::Point &pos);
+	/** Return the screen position of @p slot on @p row. */
+	static Common::Point32 getBooliePosition(int row, int slot);
+	/** Return the center position of a ball held behind the left blocker. */
+	static Common::Point32 getPreviewHoldPosition(int index);
+	/** Return the center position of a ball waiting at the right feeder end. */
+	static Common::Point32 getReadyHoldPosition(int index);
+	/** Load the page's sprites, animations, and sound effects. */
 	void loadResources();
-	/** Initialize launch positions and their hit-test areas. */
-	void setupSpots();
-	/** Initialize the active pin layout. */
-	void setupPins();
-	/** Leave the puzzle roster in base-page order for sequential ball selection. */
-	void assignZoombinis();
+	/** Generate the active values on @p row for the selected difficulty. */
+	void generateRow(int row);
+	/** Draw the original difficulty-specific random values for one four-slot row. */
+	void sampleRowValues(byte (&values)[kSlotCount]);
+	/** Schedule a new signed ball challenge at game tick @p now. */
+	void beginRound(uint32 now);
+	/** Stage the following challenge at the left preview holding positions. */
+	void prepareNextChallenge(uint32 now);
+	/** Start the prepared preview cohort across the upper feeder. */
+	void startNextFeeder(uint32 now);
+	/** Replace the completed cohort with the already prepared one. */
+	void promoteNextChallenge(uint32 now);
+	/** Choose the signed challenge type for the selected difficulty. */
+	int pickChallengeType();
+	/** Release the previous challenge's ball paths. */
+	void clearBalls();
+	/** Release every path in @p balls and empty the array. */
+	static void clearBallArray(Common::Array<Ball> &balls);
+	/** Release any Boolie jump paths still in progress. */
+	void clearJumps();
+	/** Play a page effect through the configured effects volume. */
+	void playEffect(int soundId) const;
+	/** Play one randomly selected boarding voice through the original SFX volume. */
+	void playBoardVoice();
+	/** Move @p ball from its feeder endpoint onto the selected row at @p now. */
+	void startLaneBall(Ball &ball, uint32 now);
+	/** Advance @p ball through its feeder or row path at @p now. */
+	void advanceBall(Ball &ball, uint32 now);
+	/** Advance cave entry and feeder movement for the following challenge. */
+	void advanceNextBalls(uint32 now);
+	/** Return whether the upper gate must be lowered for scheduled feeder balls. */
+	bool isBlockerLowered() const;
+	/** Apply the completed @p ball to the selected Boolie row at @p now. */
+	void resolveBall(const Ball &ball, uint32 now);
+	/** Complete queued portrait rolls one at a time. */
+	void advanceFlips(uint32 now);
+	/** Start the selected row's jumps after every ball and portrait roll finishes. */
+	void startRowJumps(uint32 now);
+	/** Advance one Boolie jump and start the next at @p now. */
+	void advanceJumps(uint32 now);
+	/** Advance the selected row's replacement walkers one animation cycle. */
+	void advanceRefill(uint32 now);
+	/** End the selected challenge, starting the boat or the next round. */
+	void finishRound(uint32 now);
+	/** Mark the active Zoombini successful and start boat departure at @p now. */
+	void startBoat(uint32 now);
+	/** Move the boat and choose the next Zoombini at @p now. */
+	void advanceBoat(uint32 now);
+	/** Return whether @p row contains no Boolie with value 2. */
+	bool isRowEmpty(int row) const;
+	/** Draw the pin deflector sections and selected-row light. */
+	void drawPinSections(ManagedSurface32 *screen) const;
+	/** Draw lights for the row under the pointer. */
+	void drawSpotHighlights(ManagedSurface32 *screen) const;
 
-	/** Launch the current Zoombini from spot @p spotIdx. */
-	void launchBall(int spotIdx);
-	/** Advance the current roll and resolve its endpoint. */
-	void advanceBallRoll();
-	/** Return whether the current ball intersects an active pin. */
-	bool checkPinCollision();
-	/** Mark all pins reached by the current ball as knocked down. */
-	void knockDownPins();
-	/** Release puzzle-roster entry @p zoombiniIdx. */
-	void freeZoombini(int zoombiniIdx);
-	/** Return the number of puzzle-roster entries already released. */
-	int countFreeZoombinis() const;
-
-	/** Draw the five launch spots. */
-	void drawSpots(ManagedSurface32 *screen);
-	/** Draw standing and knocked pins. */
-	void drawPins(ManagedSurface32 *screen);
-	/** Draw the currently rolling ball. */
-	void drawBall(ManagedSurface32 *screen);
-	/** Draw the escape boat when visible. */
-	void drawBoat(ManagedSurface32 *screen);
-	/** Draw lane blockers. */
-	void drawBlockers(ManagedSurface32 *screen);
-	/** Draw waiting and released Zoombinis. */
-	void onRenderActors(ManagedSurface32 *screen) override;
-
-	/** Current interaction phase. */
-	State _state = kStateInit;
-	/** Selected launch spot, or `-1` when none is selected. */
-	int _currentSpot = -1;
-	/** Number of Zoombinis already released. */
-	int _freedCount = 0;
-	/** Total number of pins already knocked down. */
-	int _pinsKnocked = 0;
-	/** Launch positions. */
-	Spot _spots[5] = {};
-	/** Active bowling pin layout. */
-	Common::Array<Pin> _pins;
-	/** Currently rolling Zoombini state. */
-	Ball _activeBall;
-
-	/** Current escape-boat position. */
-	Common::Point32 _boatPos = Common::Point32(550, 100);
-	/** Whether the escape boat is currently drawn. */
-	bool _boatVisible = true;
-
-	/** Screen positions of lane blockers. */
-	Common::Array<Common::Point32> _blockers;
-
-	/** Positive ball visual. */
-	RleBlock *_ballPosImage = nullptr;
-	/** Negative ball visual. */
-	RleBlock *_ballNegImage = nullptr;
-	/** Normal pin visual. */
-	RleBlock *_pinImage = nullptr;
-	/** Highlighted active-pin visual. */
-	RleBlock *_pinLightedImage = nullptr;
-	/** Escape-boat visual. */
-	RleBlock *_boatImage = nullptr;
-	/** Launch-spot visuals. */
-	RleBlock *_spotImage[5] = {};
-	/** Static blocker visual. */
-	RleBlock *_blockerImage = nullptr;
-	/** First fixed lane overlay. */
-	RleBlock *_fixeImage = nullptr;
-	/** Second fixed lane overlay. */
-	RleBlock *_fixe2Image = nullptr;
-	/** First walking animation. */
-	Animation *_marcheAnim = nullptr;
-	/** Second walking animation. */
-	Animation *_marche2Anim = nullptr;
-	/** First waiting animation. */
-	Animation *_attendAnim = nullptr;
-	/** Second waiting animation. */
-	Animation *_attend2Anim = nullptr;
-	/** Positive rolling animation. */
-	Animation *_rollAnim = nullptr;
-	/** Negative rolling animation. */
-	Animation *_roll2Anim = nullptr;
-	/** Animated blocker effect. */
-	Animation *_blockerAnim = nullptr;
-
+	/** Current values and ledge state of the three Boolie groups. */
+	Boolie _boolies[kRowCount][kSlotCount] = {};
+	/** Balls in the current challenge and their active paths. */
+	Common::Array<Ball> _balls;
+	/** Following challenge, visible at the left while the current balls wait or roll. */
+	Common::Array<Ball> _nextBalls;
+	/** Pending visible transitions in impact order. */
+	Common::Array<Flip> _flips;
+	/** Group members waiting to jump or currently jumping. */
+	Common::Array<Jump> _jumps;
+	/** Completed jump landings retained for the current boat trip. */
+	Common::Array<Passenger> _passengers;
+	/** Opening blocker transition, played once. */
+	Animation *_blockerAnimation = nullptr;
+	/** Original rolling portraits for values 1 and 2. */
+	Animation *_rollAnimations[2] = {};
+	/** Eleven-frame walking animations for incoming value-1 and value-2 Boolies. */
+	Animation *_walkAnimations[2] = {};
+	/** Row and sign effects followed by the hit effect. */
+	int _effectIds[7] = {};
+	/** Four random boarding voices. */
+	int _boardVoiceIds[4] = {};
+	/** Replacement values generated when a row becomes ready to board. */
+	byte _replacementValues[kRowCount][kSlotCount] = {};
+	/** Start tick of the current visible roll. */
+	uint32 _flipStart = 0;
+	/** Start tick of the opening blocker transition. */
+	uint32 _blockerStart = 0;
+	/** Whether the selected row has started boarding. */
+	bool _rowJumpsStarted = false;
+	/** Whether the post-roll boarding check has been scheduled. */
+	bool _boardingCheckScheduled = false;
+	uint32 _boardingCheckAt = 0;
+	/** Whether one replacement Boolie is walking from the left edge. */
+	bool _refillActive = false;
+	int _refillRow = -1;
+	int _refillSlot = 0;
+	int _refillX = 0;
+	uint32 _refillCycleStart = 0;
+	/** Current challenge or boat-transfer phase. */
+	Phase _phase = Phase::kFeeding00;
+	/** Tick when the current timed phase began. */
+	uint32 _phaseTime = 0;
+	/** Puzzle-roster entry currently riding in the boat. */
+	int _activeRunnerIndex = 0;
+	/** Selected row, or -1 before the player has chosen one. */
+	int _selectedRow = -1;
+	/** Persistent clipped PIN route selected by the most recent lane click. */
+	int _pinRoute = 0;
+	/** Index and deadline of the next ball to launch into the selected lane. */
+	uint _nextLaneBallIndex = 0;
+	uint32 _nextLaneLaunchAt = 0;
+	/** Row currently highlighted by the pointer, or -1. */
+	int _hoverRow = -1;
+	/** Signed type and ball count of the current challenge. */
+	int _challengeType = 0;
+	/** Signed type selected for the following preview cohort. */
+	int _nextChallengeType = 0;
+	/** Whether the following challenge has been selected and staged. */
+	bool _nextPrepared = false;
+	/** Whether the following challenge should cross the upper feeder. */
+	bool _nextFeedingRequested = false;
+	/** Whether the following cohort has started its upper feeder paths. */
+	bool _nextFeeding = false;
+	/** Number of resolved challenges. */
+	int _completedTurns = 0;
+	/** Turn threshold checked after each completed challenge. */
+	int _requiredTurns = 0;
+	/** Current horizontal screen position of the boat sprite. */
+	int _boatX = 80;
 };
 
 } // End of namespace Zoombini2
