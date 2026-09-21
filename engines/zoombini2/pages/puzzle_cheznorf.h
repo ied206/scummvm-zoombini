@@ -22,255 +22,276 @@
 #ifndef ZOOMBINI2_PAGES_PUZZLE_CHEZNORF_H
 #define ZOOMBINI2_PAGES_PUZZLE_CHEZNORF_H
 
-#include "common/array.h"
-#include "common/rect.h"
-
 #include "zoombini2/pages/puzzle_base.h"
 
 namespace Zoombini2 {
 
 class Animation;
-class RleBlock;
+class AnimationRunner;
+struct PathObject;
 
-/**
- * Chez Norf (Route2-2)
- *
- * Use the Norfs' clues to prepare and serve each requested meal.
- */
+/** Prepare meals from the Norfs' spoken clues and release the waiting party. */
 class PuzzleChezNorf : public PuzzleBase {
 public:
-	/** Construct Chez Norf for @p vm. */
 	PuzzleChezNorf(Zoombini2Engine *vm);
-	/** Release food, table, and Norf resources. */
 	~PuzzleChezNorf() override;
-
-	/** Load the restaurant and generate the level-selected clue layout. */
 	void init() override;
-	/** Advance serving and answer-feedback phases. */
-	void onUpdate() override;
-	/** Draw the clue board, tables, meals, Norf, and seated Zoombinis. */
-	void onRenderContent(ManagedSurface32 *screen) override;
-	/** Draw feedback above table occupants. */
-	void onRenderForeground(ManagedSurface32 *screen) override;
-	/** Select food or serve the pending order to a table. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
-
-	/** Maximum table capacity used by the hardest layout. */
-	static constexpr int kMaxTables = 6;
-	/** Number of food categories. */
-	static constexpr int kNumFoodCategories = 3;
-	/** Number of choices within each food category. */
-	static constexpr int kFoodsPerCategory = 3;
-	/** Total number of selectable food items. */
-	static constexpr int kTotalFoods = 9;
-
-	/** Horizontal distance between adjacent tables. */
-	static constexpr int kTableSpacing = 85;
+	EventHandleResult onLButtonUp(const Common::Point &pos) override;
+	EventHandleResult onMouseMove(const Common::Point &pos) override;
+	bool canUseGoButton() const override;
+	bool onGoButtonPressed() override;
+	bool blocksSidebarInteraction() const override;
+	void applyDebugPuzzleCompletion() override;
+	Common::String debugGetAnswer() const override;
+	PuzzleChanceInfo debugGetChances() const override;
+	bool debugCanSetChances() const override;
+	bool debugSetChances(int remaining) override;
+	Common::String debugGetChanceDetails() const override;
 
 private:
-	/** Resource paths used by the Chez Norf restaurant. */
-	static constexpr const char *kSymbolOkPath = "bmp/chez_norf/symb_OK";
-	static constexpr const char *kSymbolNoPath = "bmp/chez_norf/symb_NO";
-	static constexpr const char *kSymbolMaybePath = "bmp/chez_norf/symb_MAYBE";
-	static constexpr const char *kPlatoLevel1Path = "bmp/chez_norf/plato2";
-	static constexpr const char *kPlatoPath = "bmp/chez_norf/plato";
-	static constexpr const char *kPlatoMiniPath = "bmp/chez_norf/plato_mini";
-	/** Dessert, main-dish, drink, and order-overlay name fragments. */
-	static constexpr const char *kSlurpNames[3] = {"slurp_glace", "slurp_pasteque", "slurp_tarte"};
-	static constexpr const char *kMiamNames[3] = {"miam_poisson", "miam_salade", "miam_sandwitch"};
-	static constexpr const char *kGlouglouNames[3] = {"glouglou_cafe", "glouglou_lait", "glouglou_orange"};
-	static constexpr const char *kComandeNames[3] = {"COMANDE1", "comande2", "comande3"};
-	static constexpr const char *kFoodStemFormat = "bmp/chez_norf/%s";
-	static constexpr const char *kNorfDefaultPath = "bmp/chez_norf/norf/norfDeBaz";
+	static constexpr const char *kFoodFormat = "bmp/chez_norf/%s";
+	static constexpr const char *kFoodNames[9] = {
+		"miam_sandwitch",
+		"miam_poisson",
+		"miam_salade",
+		"glouglou_cafe",
+		"glouglou_orange",
+		"glouglou_lait",
+		"slurp_tarte",
+		"slurp_pasteque",
+		"slurp_glace",
+	};
+	static constexpr const char *kSymbolNames[3] = {
+		"symb_NO",
+		"symb_OK",
+		"symb_MAYBE",
+	};
+	static constexpr const char *kPanelNames[3] = {
+		"comande3",
+		"COMANDE1",
+		"comande2",
+	};
+	static constexpr const char *kPlatePath = "bmp/chez_norf/plato";
+	static constexpr const char *kSmallPlatePath = "bmp/chez_norf/plato2";
+	static constexpr const char *kMiniPlatePath = "bmp/chez_norf/plato_mini";
 	static constexpr const char *kHighlightPath = "bmp/chez_norf/highlight";
+	static constexpr const char *kNorfPath = "bmp/chez_norf/norf/norfDeBaz";
+	static constexpr const char *kCapPath = "bmp/chez_norf/norf/cask/%d/cask2baz";
+	static constexpr const char *kNorfAnimationFormat = "bmp/chez_norf/norf/norf%d.an";
+	static constexpr const char *kCapAnimationFormat = "bmp/chez_norf/norf/cask/%d/cask%d.an";
+	static constexpr const char *kExitFormat = "bmp/chez_norf/out%d.pat";
+	static constexpr const char *kWaiterExitPath = "bmp/chez_norf/out_special.pat";
 	static constexpr const char *kMusicPath = "#sounds/music/07-BB02.wav";
+	static constexpr const char *kSoundFormat = "sounds/fx/07-BS%02d.wav";
+	static constexpr const char *kClueFormat = "sounds/7-N%d-%d";
+	static constexpr const char *kFeedbackFormat = "sounds/7-N%d-G%02d.wav";
+	static constexpr const char *kCompleteSpeechPath = "sounds/CZN31.wav";
+	static constexpr const char *kRetreatSpeechPath = "sounds/DW-Cave.wav";
 
-	/** Selectable food item IDs grouped by course. */
-	enum FoodItem {
-		/** No food item is selected. */
-		kFoodNone = -1,
-		/** Ice cream from the dessert category. */
-		kFoodGlace = 0,
-		/** Watermelon from the dessert category. */
-		kFoodPasteque = 1,
-		/** Pie from the dessert category. */
-		kFoodTarte = 2,
-		/** Fish from the main-dish category. */
-		kFoodPoisson = 3,
-		/** Salad from the main-dish category. */
-		kFoodSalade = 4,
-		/** Sandwich from the main-dish category. */
-		kFoodSandwitch = 5,
-		/** Coffee from the drink category. */
-		kFoodCafe = 6,
-		/** Milk from the drink category. */
-		kFoodLait = 7,
-		/** Orange drink from the drink category. */
-		kFoodOrange = 8
+	/** Indices in the paired body/cap animation bank. */
+	enum Motion {
+		kReject00 = 0,
+		kRejectReturn01 = 1,
+		kDismiss02 = 2,
+		kAccept03 = 3,
+		kIdle04 = 4,
+		kPointRight05 = 5,
+		kPointLeft06 = 6
 	};
-
-	/** Runtime phase of the Chez Norf interaction. */
-	enum State {
-		/** Complete generated table setup. */
-		kStateInit,
-		/** Wait for food and table selection. */
-		kStateIdle,
-		/** Play the serving animation. */
-		kStateServing,
-		/** Place the order at the selected table. */
-		kStateFoodServed,
-		/** Compare the served order with the table answer. */
-		kStateMatching,
-		/** Play correct-answer feedback and release the diner. */
-		kStateCorrect,
-		/** Play wrong-answer feedback. */
-		kStateWrong,
-		/** Stop accepting input after all diners are released. */
-		kStateDone
+	/** Success and rejection callbacks advance independently of the flying tray. */
+	enum Phase {
+		kReady00 = 0,
+		kThrow01 = 1,
+		kLand02 = 2,
+		kRejectFall03 = 3,
+		kFeedback04 = 4,
+		kRelease05 = 5,
+		kDismiss06 = 6,
+		kFinished07 = 7
 	};
-
-	/** One restaurant table and its current order. */
-	struct TableSlot {
-		/** Table position. */
-		Common::Point32 pos = Common::Point32();
-		/** Clickable table area. */
-		Common::Rect hitbox = Common::Rect();
-		/** Assigned puzzle-roster index, or `-1` when empty. */
-		int zoombiniIdx = -1;
-		/** Selected dessert choice, or `-1` when none is present. */
-		int foodSlurp = -1;
-		/** Selected main-dish choice, or `-1` when none is present. */
-		int foodMiam = -1;
-		/** Selected drink choice, or `-1` when none is present. */
-		int foodGlouglou = -1;
-		/** Whether the pending order has been served. */
+	struct Meal {
+		int food[3] = {
+			-1,
+			-1,
+			-1,
+		}; // Main dish, drink, dessert.
+	};
+	struct Norf {
+		Meal answer;
+		int clue[3] = {
+			9,
+			9,
+			9,
+		};
+		int gesture[2] = {};
 		bool served = false;
-		/** Whether the assigned Zoombini has been released. */
-		bool completed = false;
+		bool acceptedTray = false;
+		bool rejectedTray = false;
+		Meal accepted;
+		Meal rejected;
+	};
+	struct Layout {
+		byte answers[6][3];
+		byte clues[6][3];
+		byte gestures[6][2];
+	};
+	static constexpr Layout kLayouts[12] = {
+		{// Layout 11
+		 {{0, 3, 9}, {1, 3, 9}, {2, 5, 9}, {2, 3, 9}},
+		 {{0, 9, 9}, {2, 9, 9}, {3, 9, 9}, {4, 9, 9}},
+		 {{0, 0}, {1, 0}, {0, 0}, {0, 0}},},
+		{// Layout 12
+		 {{0, 5, 9}, {2, 3, 9}, {1, 5, 9}, {1, 4, 9}},
+		 {{0, 9, 9}, {5, 9, 9}, {2, 9, 9}, {4, 9, 9}},
+		 {{0, 0}, {0, 0}, {2, 0}, {0, 0}}},
+		{// Layout 13
+		 {{1, 5, 9}, {2, 5, 9}, {1, 5, 9}, {2, 4, 9}},
+		 {{3, 0, 9}, {1, 9, 9}, {9, 9, 9}, {5, 9, 9}},
+		 {{0, 0}, {0, 0}, {0, 0}, {0, 0}}},
+		{// Layout 14
+		 {{0, 5, 9}, {1, 5, 9}, {1, 5, 9}, {2, 5, 9}},
+		 {{2, 9, 9}, {2, 0, 9}, {1, 9, 9}, {3, 4, 9}},
+		 {{0, 0}, {0, 0}, {0, 0}, {0, 0}}},
+		{// Layout 21
+		 {{0, 4, 8}, {1, 4, 6}, {0, 5, 7}, {1, 3, 7}},
+		 {{0, 8, 9}, {7, 6, 9}, {5, 1, 9}, {3, 4, 9}},
+		 {{0, 0}, {1, 0}, {3, 0}, {0, 0}}},
+		{// Layout 22
+		 {{0, 5, 7}, {1, 5, 7}, {2, 3, 6}, {1, 5, 8}},
+		 {{2, 9, 9}, {1, 4, 9}, {5, 7, 9}, {1, 8, 9}},
+		 {{0, 0}, {0, 0}, {2, 0}, {0, 0}}},
+		{// Layout 23
+		 {{2, 3, 8}, {2, 5, 8}, {0, 5, 7}, {0, 4, 8}},
+		 {{0, 2, 9}, {7, 4, 9}, {6, 5, 9}, {0, 7, 9}},
+		 {{0, 0}, {1, 0}, {0, 0}, {0, 0}}},
+		{// Layout 24
+		 {{2, 5, 7}, {2, 3, 8}, {1, 5, 8}, {2, 3, 6}},
+		 {{4, 9, 9}, {2, 9, 9}, {1, 8, 9}, {0, 6, 5}},
+		 {{0, 0}, {0, 0}, {0, 0}, {0, 0}}},
+		{// Layout 31
+		 {{0, 3, 6}, {1, 5, 8}, {2, 3, 8}, {1, 4, 6}, {0, 5, 8}, {1, 5, 8}},
+		 {{8, 8, 4}, {1, 3, 9}, {7, 2, 9}, {4, 1, 9}, {1, 9, 9}, {5, 9, 9}},
+		 {{0, 0}, {3, 0}, {0, 0}, {0, 0}, {3, 0}, {3, 0}}},
+		{// Layout 32
+		 {{2, 4, 7}, {1, 3, 6}, {2, 5, 7}, {2, 4, 7}, {0, 3, 6}, {1, 4, 6}},
+		 {{2, 7, 8}, {6, 6, 9}, {4, 5, 9}, {0, 9, 9}, {2, 9, 9}, {3, 6, 9}},
+		 {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {2, 0}, {0, 0}}},
+		{// Layout 33
+		 {{0, 3, 8}, {0, 5, 6}, {2, 5, 7}, {2, 3, 6}, {2, 3, 6}, {0, 3, 6}},
+		 {{8, 5, 9}, {9, 9, 9}, {4, 9, 9}, {2, 1, 9}, {0, 9, 9}, {7, 9, 9}},
+		 {{0, 0}, {0, 0}, {1, 0}, {0, 0}, {0, 0}, {0, 0}}},
+		{// Layout 34
+		 {{1, 3, 8}, {2, 4, 8}, {2, 4, 7}, {1, 5, 6}, {1, 3, 6}, {1, 5, 6}},
+		 {{2, 9, 9}, {3, 1, 9}, {6, 8, 9}, {6, 1, 9}, {5, 9, 9}, {4, 9, 9}},
+		 {{0, 0}, {0, 0}, {1, 2}, {0, 0}, {0, 0}, {0, 0}}}};
+	static constexpr Common::Point32 kFoodPositions[9] = {
+		{121, 412},
+		{85, 415},
+		{51, 414},
+		{107, 462},
+		{81, 445},
+		{134, 457},
+		{122, 494},
+		{150, 494},
+		{91, 496},
+	};
+	static constexpr Common::Point32 kFoodOffsets[9] = {
+		{45, 34},
+		{43, 33},
+		{46, 32},
+		{15, 32},
+		{17, 18},
+		{18, 33},
+		{28, 51},
+		{25, 53},
+		{29, 40},
 	};
 
-	/** Required food-category values for one table. */
-	struct FoodAnswer {
-		/** Required dessert, or the wildcard value. */
-		int slurp = 0;
-		/** Required main dish, or the wildcard value. */
-		int miam = 0;
-		/** Required drink, or the wildcard value. */
-		int glouglou = 0;
-
-		FoodAnswer() = default;
-		FoodAnswer(int slurpValue, int miamValue, int glouglouValue)
-			: slurp(slurpValue), miam(miamValue), glouglou(glouglouValue) {}
-	};
-
-	/** Load all restaurant graphics. */
-	void loadResources();
-
-	/** Generate the food-value permutation used by the current puzzle. */
-	void generateFoodVals();
-	/** Assign each table answer from the chosen clue template. */
-	void setTableAnswersByTemplate();
-	/** Build the colored-dot clue grid from the generated answers. */
-	void generateFoodGrid();
-
-	/** Return the table at @p pos, or `-1` when none is hit. */
-	int findTableAtPos(const Common::Point &pos) const;
-	/** Return the food item at @p pos, or @ref PuzzleChezNorf::kFoodNone. */
-	int findFoodAtPos(const Common::Point &pos) const;
-	/** Serve the pending course selections to table @p tableIdx. */
-	void serveFoodToTable(int tableIdx);
-	/** Return whether table @p tableIdx matches its generated answer. */
-	bool checkFoodMatch(int tableIdx);
-	/** Release the Zoombini seated at table @p tableIdx. */
-	void freeZoombini(int tableIdx);
-	/** Return the number of table occupants already released. */
-	int countFreeZoombinis() const;
-
-	/** Draw the colored-dot clue board and food selectors. */
-	void drawFoodBoard(ManagedSurface32 *screen);
-	/** Draw the active table layout. */
-	void drawTables(ManagedSurface32 *screen);
-	/** Draw served orders at their tables. */
-	void drawPlates(ManagedSurface32 *screen);
-	/** Draw Norf and current answer feedback. */
-	void drawNorf(ManagedSurface32 *screen);
-	/** Draw the developer diagnostic overlay while C is held. */
-	void drawDebugOverlay(ManagedSurface32 *screen);
-	/** Return the abbreviated debug label for @p foodId. */
-	static const char *getDebugFoodName(int foodId);
-	/** Draw every seated Zoombini that has not been released. */
+	void onUpdate() override;
+	void onRenderContent(ManagedSurface32 *screen) override;
 	void onRenderActors(ManagedSurface32 *screen) override;
+	void onActorsRendered() override;
+	void onRenderForeground(ManagedSurface32 *screen) override;
+	void loadResources();
+	void generateRules();
+	void handleClick(const Common::Point32 &pos);
+	void updateCursor();
+	void clearSelection();
+	void sayClue(int index);
+	void playSpeech(const Common::Path &path);
+	void playSound(int index);
+	void startMotion(int table, Motion motion);
+	static void motionComplete(void *context, AnimationRunner *runner);
+	void finishMotion(Motion motion);
+	void submit(int table);
+	void checkMeal();
+	void releaseCohort();
+	void dismissWaiter();
+	void startTrayPath(const Common::Point32 &from, const Common::Point32 &to);
+	void drawTray(ManagedSurface32 *screen, const Common::Point32 &pos, const Meal &meal);
+	void drawDebugOverlay(ManagedSurface32 *screen);
+	bool mealComplete(const Meal &meal) const;
+	bool motionActive(bool includeIdle = true) const;
+	bool speechPlaying() const;
+	static bool inside(const Common::Point32 &pos, int x, int y, int width, int height);
+	int foodAt(const Common::Point32 &pos) const;
+	int trayAt(const Common::Point32 &pos) const;
+	int norfAt(const Common::Point32 &pos) const;
+	static Common::Point32 tablePosition(int index, int y);
 
-	/** Current interaction phase. */
-	State _state = kStateInit;
-	/** Number of tables enabled for the selected level. */
-	int _numTables = 4;
-	/** Level consumed by this page. */
 	int _level = 1;
-	/** Number of Zoombinis already released. */
-	int _freedCount = 0;
-	/** Currently active table, or `-1` when none is active. */
-	int _currentTable = -1;
-	/** Most recently selected food item. */
-	int _selectedFood = kFoodNone;
-	/** Number of incorrect orders submitted. */
-	int _wrongCount = 0;
-	/** Level-dependent incorrect-order allowance. */
-	int _maxAttempts = 0;
-	/** Number of feature attributes represented in the clue layout. */
-	int _clueAttrCount = 0;
-	/** Current Norf feedback visual state. */
-	int _norfState = 0;
-
-	/** Generated item order, grouped into dessert, main-dish, and drink ranges. */
-	int _foodVals[9] = {};
-	/** Identifier of the generated clue template. */
-	int _templateId = 11;
-
-	/** Pending dessert index within its category, or `-1`. */
-	int _pendingSlurp = -1;
-	/** Pending main-dish index within its category, or `-1`. */
-	int _pendingMiam = -1;
-	/** Pending drink index within its category, or `-1`. */
-	int _pendingGlouglou = -1;
-
-	/** Table runtime state. */
-	TableSlot _tables[kMaxTables] = {};
-	/** Correct answer corresponding to each table. */
-	FoodAnswer _answers[kMaxTables] = {};
-
-	/** Clue symbols indexed by category section, column, and row. */
-	int _foodGrid[3][6][4] = {};
-
-	/** Correct-answer feedback symbol. */
-	RleBlock *_symbOK = nullptr;
-	/** Incorrect-answer feedback symbol. */
-	RleBlock *_symbNO = nullptr;
-	/** Partial-match feedback symbol. */
-	RleBlock *_symbMaybe = nullptr;
-
-	/** Full-size served-order platter. */
-	RleBlock *_plato = nullptr;
-	/** Small served-order platter. */
-	RleBlock *_platoMini = nullptr;
-
-	/** Dessert item visuals. */
-	RleBlock *_slurpImage[3] = {};
-
-	/** Main-dish item visuals. */
-	RleBlock *_miamImage[3] = {};
-
-	/** Drink item visuals. */
-	RleBlock *_glouglouImage[3] = {};
-
-	/** Order-panel visuals. */
-	RleBlock *_comandeImage[3] = {};
-
-	/** Default Norf visual. */
-	RleBlock *_norfDefault = nullptr;
-	/** Selection highlight visual. */
-	RleBlock *_highlightImage = nullptr;
-
+	int _tableCount = 4;
+	int _layout = 11;
+	int _foodValues[10] = {};
+	Norf _norfs[6];
+	Meal _trays[6];
+	bool _trayAvailable[6] = {
+		true,
+		true,
+		true,
+		true,
+		true,
+		true,
+	};
+	byte _notes[3][3][6] = {};
+	int _traySupply = 5;
+	int _submissions = 0;
+	int _successCount = 0;
+	int _remaining = 0;
+	int _selectedFood = -1;
+	int _selectedTray = -1;
+	int _recipient = -1;
+	int _animatedNorf = -1;
+	int _idleNorf = -1;
+	int _nextGesture = 0;
+	Phase _phase = kReady00;
+	Meal _flyingMeal;
+	Common::Point32 _flyingPosition;
+	PathObject *_trayPath = nullptr;
+	Common::Point32 _pointer;
+	Common::Point32 _click;
+	bool _buttonArmed = false;
+	bool _clickPending = false;
+	bool _canDepart = false;
+	bool _departAfterSpeech = false;
+	bool _dismissPending = false;
+	bool _releasePending = false;
+	int _speechSound = -1;
+	int _sounds[8] = {
+		-1,
+		-1,
+		-1,
+		-1,
+		-1,
+		-1,
+		-1,
+		-1,
+	};
+	Animation *_bodyAnimations[7] = {};
+	Animation *_capAnimations[6][7] = {};
+	AnimationRunner *_bodyRunners[7] = {};
+	AnimationRunner *_capRunners[6][7] = {};
 };
 
 } // End of namespace Zoombini2

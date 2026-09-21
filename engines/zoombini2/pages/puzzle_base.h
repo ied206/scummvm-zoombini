@@ -29,10 +29,31 @@
 
 namespace Zoombini2 {
 
-class BitBlock;
 struct BoardRecord;
 class ZoombiniRunner;
 class ZoombiniAnimation;
+
+/** Snapshot of the active puzzle's attempt or resource budget. */
+struct PuzzleChanceInfo {
+	enum class Type {
+		kNone = 0,
+		kAmorphous = 1,
+		kInfinite = 2,
+		kSubmit = 3,
+		kMistake = 4,
+	};
+	Type type = Type::kNone;
+	int opportunities = -1;
+	int used = -1;
+	const char *unit = nullptr;
+
+	PuzzleChanceInfo() = default;
+	PuzzleChanceInfo(Type kind, int maximum = -1, int consumed = -1, const char *unitName = nullptr)
+		: type(kind), opportunities(maximum), used(consumed), unit(unitName) {}
+
+	int chancesLeft() const { return 0 <= opportunities && 0 <= used ? MAX(0, opportunities - used) : -1; }
+	static const char *typeName(Type type);
+};
 
 /**
  * Common page base for the nine rescue-mission puzzles.
@@ -41,7 +62,7 @@ class ZoombiniAnimation;
  */
 class PuzzleBase : public InteractiveBase {
 public:
-	/** Bind shared puzzle state to @p vm and @p puzzleId. */
+	/** Bind shared puzzle state to @p vm, capture its selected difficulty, and record @p puzzleId. */
 	PuzzleBase(Zoombini2Engine *vm, int puzzleId);
 	/** Release shared puzzle resources. */
 	~PuzzleBase() override = default;
@@ -50,6 +71,21 @@ public:
 
 	/** Initialize the shared puzzle background, sprite grid, and roster. */
 	void init() override;
+	/** Accept the whole current party and use the regular practice or adventure departure. */
+	void debugForceFinish();
+	/** Describe generated rules without changing the board or consuming random numbers. */
+	virtual Common::String debugGetAnswer() const = 0;
+	/** Describe the page's actual opportunity model. */
+	virtual PuzzleChanceInfo debugGetChances() const { return PuzzleChanceInfo(PuzzleChanceInfo::Type::kInfinite); }
+	/** Whether the current state permits editing a finite budget. */
+	virtual bool debugCanSetChances() const { return false; }
+	/** Set a validated remaining budget, including its visual and completion state. */
+	virtual bool debugSetChances(int remaining) {
+		(void)remaining;
+		return false;
+	}
+	/** Additional resources not represented by the primary chance count. */
+	virtual Common::String debugGetChanceDetails() const { return Common::String(); }
 	/** Return the display name belonging to @p puzzleId. */
 	static const char *getPuzzleName(int puzzleId);
 	/** Return the resource-directory name belonging to @p puzzleId. */
@@ -80,6 +116,12 @@ private:
 	static constexpr const char *kBooliesBackgroundPath = "Boolies/background";
 
 protected:
+	/** Banner shared by all puzzle answer reports. */
+	Common::String debugAnswerHeader() const;
+	/** Print a roster entry using stable one-based indices and named traits. */
+	Common::String debugActorDescription(int index) const;
+	/** Whether a forced departure has already been requested. */
+	bool _debugFinishPending = false;
 	/** Finish this puzzle's roster using the board selected by the concrete puzzle. */
 	void finishPuzzleRoster(BoardRecord **board);
 	/** Replace the first page layer's background and refresh the borrowed compatibility pointer. */
@@ -94,8 +136,10 @@ protected:
 	void renderZoombinis(ManagedSurface32 *screen) const;
 	/** Numeric dispatcher identifier for the concrete puzzle. */
 	int _puzzleId;
-	/** Borrowed first-layer background exposed while puzzle drawing is migrated to page layers. */
-	BitBlock *_background = nullptr;
+	/** Selected difficulty captured for this puzzle instance. */
+	int _puzzleLevel;
+	/** Path of the first-layer background used by puzzle-specific redraws. */
+	Common::String _backgroundPath;
 	/** Borrowed immutable sprite grid retained by the engine cache. */
 	const ZoombiniAnimation *_zoombiniAnimation = nullptr;
 	/** Active party entries mirrored from the engine's roster for this puzzle. */

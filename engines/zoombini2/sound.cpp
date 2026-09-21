@@ -175,7 +175,9 @@ void SoundManager::play(int id) {
 	if (!_stereoOutputEnabled && audioStream->isStereo())
 		audioStream = new MonoAudioStream(audioStream);
 
-	const byte volume = buf->usesCategoryVolume ? static_cast<byte>(Audio::Mixer::kMaxChannelVolume) : normalizeVolume(buf->volume);
+	byte volume = normalizeVolume(buf->volume);
+	if (buf->usesCategoryVolume)
+		volume = static_cast<byte>(Audio::Mixer::kMaxChannelVolume);
 	if (buf->isStream && _mixer->isSoundHandleActive(buf->streamHandle))
 		_mixer->stopHandle(buf->streamHandle);
 	_mixer->playStream(getMixerSoundType(buf->category), handle, audioStream, -1, volume);
@@ -284,7 +286,9 @@ void SoundManager::setVolume(int id, int volume) {
 
 	buf->volume = CLIP(volume, 0, kMaxVolumePercent);
 	buf->usesCategoryVolume = buf->volume == getCategoryVolume(buf->category);
-	const byte channelVolume = buf->usesCategoryVolume ? static_cast<byte>(Audio::Mixer::kMaxChannelVolume) : normalizeVolume(buf->volume);
+	byte channelVolume = normalizeVolume(buf->volume);
+	if (buf->usesCategoryVolume)
+		channelVolume = static_cast<byte>(Audio::Mixer::kMaxChannelVolume);
 
 	for (int i = 0; i < kMaxSampleSlots; i++) {
 		if (_mixer->isSoundHandleActive(buf->handles[i]))
@@ -370,7 +374,11 @@ Audio::RewindableAudioStream *SoundManager::makeAudioStream(Common::SeekableRead
 	}
 
 	const int channels = (flags & Audio::FLAG_STEREO) ? 2 : 1;
-	const int bytesPerSample = (flags & Audio::FLAG_24BITS) ? 3 : ((flags & Audio::FLAG_16BITS) ? 2 : 1);
+	int bytesPerSample = 1;
+	if (flags & Audio::FLAG_24BITS)
+		bytesPerSample = 3;
+	else if (flags & Audio::FLAG_16BITS)
+		bytesPerSample = 2;
 	const int sampleFrameSize = channels * bytesPerSample;
 	const int64 dataOffset = stream->pos();
 	if (dataSize < 0 || stream->size() < dataOffset) {

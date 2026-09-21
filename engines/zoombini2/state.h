@@ -95,7 +95,8 @@ struct ZmbTrait {
 			{"Sneakers", "RollerSkates", "Spring", "Wheels", "Propeller"},
 			{"Orange", "White", "Green", "Blue", "Pink"},
 			{"Braids", "LongHair", "BaseballCap", "Ponytail", "SpikyHair"},
-			{"NormalEyed", "OneEyed", "SleepyEyed", "Glasses", "Sunglasses"}};
+			{"NormalEyed", "OneEyed", "SleepyEyed", "Glasses", "Sunglasses"},
+		};
 		const int traitOrdinal = static_cast<int>(index);
 		if (0 <= traitOrdinal && traitOrdinal < kTraitCount && 1 <= value && value <= kTraitValueCount)
 			return kZoombiniTraitNames[traitOrdinal][value - 1];

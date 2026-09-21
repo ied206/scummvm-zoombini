@@ -42,7 +42,6 @@ public:
 };
 
 class Animation;
-class RleBlock;
 class ZoombiniAnimation;
 class ZoombiniRunner;
 struct BoardRecord;
@@ -76,8 +75,6 @@ protected: /** Bind a concrete rescue site to @p vm. */
 	void configureRosterLayout(const Common::Point32 &gridBasePos, const Common::Rect32 &scrollUpRect, const Common::Rect32 &scrollDownRect, const Common::Point32 &buttonUpPos, const Common::Point32 &buttonDownPos);
 	/** Load the selection marker used by the waiting roster. */
 	void loadSelector(const char *path);
-	/** Load the door-selection overlay retained by the site. */
-	void loadPorteSelector(const char *path);
 	/** Load the two roster scroll animations. */
 	void loadScrollButtons(const char *buttonUpPath, const char *buttonDownPath);
 	/** Reset common selection and departure state after presentation resources load. */
@@ -102,8 +99,6 @@ protected: /** Bind a concrete rescue site to @p vm. */
 	void beginDeparture();
 	/** Return whether the delayed departure phase is active. */
 	bool isDeparting() const { return _phase == 1; }
-	/** Return the borrowed door-selection overlay, or nullptr when it failed to load. */
-	RleBlock *getPorteSelector() const { return _porteSelect; }
 	/** Draw the wrapping waiting-roster backdrop beneath its Zoombinis. */
 	void drawRosterBackdrop(ManagedSurface32 *screen, int scrollX) const;
 
@@ -133,10 +128,10 @@ private:
 	/** Shared little-Zoombini animation loaded for the waiting roster. */
 	static constexpr const char *kRosterAnimationPath = "bmp/zombis/littleZomb.anm";
 
-	/** Selection marker for a visible Zoombini slot. */
-	RleBlock *_selector = nullptr;
-	/** Door-selection overlay retained by both rescue sites. */
-	RleBlock *_porteSelect = nullptr;
+	/** Selection marker path for the current rescue site. */
+	Common::String _selectorPath;
+	/** Whether the selection marker loaded successfully. */
+	bool _selectorReady = false;
 
 	/** Signed screen origin of the visible roster grid. */
 	Common::Point32 _gridBasePos = Common::Point32();

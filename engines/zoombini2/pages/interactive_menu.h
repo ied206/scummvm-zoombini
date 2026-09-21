@@ -31,8 +31,6 @@
 
 namespace Zoombini2 {
 
-class BitBlock;
-class RleBlock;
 enum class DialogMsgBoxButton;
 
 /** Internal state of the original sign-in page owner. */
@@ -104,7 +102,7 @@ private:
 		static constexpr int kVisibleRows = 4;
 
 		/** Construct a list for @p vm at @p pos using the borrowed @p selectionBar. */
-		SaveFileList(Zoombini2Engine *vm, const Common::Point32 &pos, RleBlock *selectionBar);
+		SaveFileList(Zoombini2Engine *vm, const Common::Point32 &pos);
 
 		/** Prepare the normal, prefix-match, and edit colors through @ref Gfx::loadTextFont. */
 		bool init();
@@ -114,7 +112,7 @@ private:
 		bool addItemSorted(const Common::String &name);
 
 		/** Draw the visible rows and the borrowed selection bar. */
-		void draw(ManagedSurface32 *screen, const AlphaBlendLUT &alphaLUT) const;
+		void draw(ManagedSurface32 *screen) const;
 		/** Select the row at @p pos and report whether the list consumed the click. */
 		bool handleClick(const Common::Point &pos);
 		/** Normalize and apply @p c to selection or the active edit buffer. */
@@ -180,8 +178,6 @@ private:
 		Zoombini2Engine *_vm;
 		/** Signed screen origin of the list. */
 		Common::Point32 _pos;
-		/** Borrowed selection-bar sprite retained by the menu screen. */
-		RleBlock *_selectionBar;
 
 		/** Profile names in case-insensitive display order. */
 		Common::Array<Common::String> _items;
@@ -244,6 +240,8 @@ private:
 	static constexpr const char *kStartHighlightPath = "bmp/menu/Start Highlight";
 	/** Resource path. */
 	static constexpr const char *kStartDisabledPath = "bmp/menu/Start Gray";
+	/** Shared transparency mask for the Start and New button images. */
+	static constexpr const char *kButtonMaskPath = "bmp/menu/button-a";
 	/** Resource path. */
 	static constexpr const char *kOptionsNormalPath = "bmp/menu/PANEL - Options  NORMAL";
 	/** Resource path. */
@@ -278,12 +276,6 @@ private:
 
 	/** Panel currently accepting input. */
 	MenuScreenState _state = MenuScreenState::kMain00;
-	/** Normal saved-game list frame. */
-	BitBlock *_selectorNormal = nullptr;
-	/** Highlighted saved-game list frame. */
-	BitBlock *_selectorHilite = nullptr;
-	/** Bar drawn behind the selected save row. */
-	RleBlock *_selectionBar = nullptr;
 	/** Profile list and editor state managed by this menu screen. */
 	SaveFileList *_fileList = nullptr;
 	/** Primary menu controls indexed by menu button ID. */

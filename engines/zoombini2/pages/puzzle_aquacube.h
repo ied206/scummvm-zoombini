@@ -22,257 +22,250 @@
 #ifndef ZOOMBINI2_PAGES_PUZZLE_AQUACUBE_H
 #define ZOOMBINI2_PAGES_PUZZLE_AQUACUBE_H
 
-#include "common/array.h"
-#include "common/rect.h"
-
 #include "zoombini2/pages/puzzle_base.h"
 
 namespace Zoombini2 {
 
-class RleBlock;
 class Animation;
+class AnimationRunner;
+struct PathObject;
 
-/**
- * Aqua Cube (Route1-3)
- *
- * Use the levers to move the magic ball through the cube and rescue Zoombinis.
- */
+/** Move through a randomized cube, rescuing its occupants before the movement allowance expires. */
 class PuzzleAquacube : public PuzzleBase {
 public:
-	/** Construct the Aqua Cube puzzle for @p vm. */
 	PuzzleAquacube(Zoombini2Engine *vm);
-	/** Release graph sprites and animations. */
 	~PuzzleAquacube() override;
-
-	/** Load the graph selected by level and place all puzzle actors. */
 	void init() override;
-	/** Advance ball, match, penalty, and warp phases. */
 	void onUpdate() override;
-	/** Draw the cube graph, actors, controls, and remaining-step display. */
 	void onRenderBackground(ManagedSurface32 *screen) override;
-	/** Draw the layered cube and node sprites. */
 	void onRenderContent(ManagedSurface32 *screen) override;
-	/** Draw the moving ball. */
 	void onRenderActors(ManagedSurface32 *screen) override;
-	/** Draw direction controls, indicators, and visual effects. */
+	void onActorsRendered() override;
 	void onRenderForeground(ManagedSurface32 *screen) override;
-	/** Start a direction move or toggle the warp control. */
-	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	EventHandleResult onLButtonUp(const Common::Point &pos) override;
+	bool canUseGoButton() const override;
+	bool onGoButtonPressed() override;
+	Common::String debugGetAnswer() const override;
+	PuzzleChanceInfo debugGetChances() const override;
+	bool debugCanSetChances() const override;
+	bool debugSetChances(int remaining) override;
+	Common::String debugGetChanceDetails() const override;
 
 private:
-	/** Resource paths used by the Aqua Cube scene. */
 	static constexpr const char *kMusicPath = "#sounds/music/03-BB01.wav";
-	static constexpr const char *kBallPath = "bmp/aquacube/ball";
-	static constexpr const char *kBallBigPath = "bmp/aquacube/ballBIG";
 	static constexpr const char *kLightPath = "bmp/aquacube/light";
-	static constexpr const char *kCubeEasyPaths[3] = {
-		"bmp/aquacube/kub_easy_01",
-		"bmp/aquacube/kub_easy_02",
-		"bmp/aquacube/kub_easy_03",
+	static constexpr const char *kBallPaths[2] = {
+		"bmp/aquacube/ballBIG",
+		"bmp/aquacube/ball",
 	};
-	static constexpr const char *kCubeHardPaths[3] = {
-		"bmp/aquacube/kub_hard_01",
-		"bmp/aquacube/kub_hard_02",
-		"bmp/aquacube/kub_hard_03",
+	static constexpr const char *kCubeFormat = "bmp/aquacube/kub_%s_%02d";
+	static constexpr const char *kLeverPaths[2] = {
+		"bmp/aquacube/control_manetteOFF",
+		"bmp/aquacube/control_manetteON",
 	};
-	static constexpr const char *kManetteOnPath = "bmp/aquacube/control_manetteON";
-	static constexpr const char *kManetteOffPath = "bmp/aquacube/control_manetteOFF";
-	static constexpr const char *kShotsOnPath = "bmp/aquacube/control_shotsON";
-	static constexpr const char *kShotsOffPath = "bmp/aquacube/control_shotsOFF";
-	static constexpr const char *kLightRedPath = "bmp/aquacube/control_manette_lightRED";
-	static constexpr const char *kLightGreyPath = "bmp/aquacube/control_manette_lightGREY";
-	static constexpr const char *kWarpOnPath = "bmp/aquacube/control_warpBUTTON_ON";
-	static constexpr const char *kWarpOffPath = "bmp/aquacube/control_warpBUTTON_OFF";
-	static constexpr const char *kWarpDisablePath = "bmp/aquacube/control_warpBUTTON_DISABLE";
-	static constexpr const char *kWarpTimerPath = "bmp/aquacube/control_warpTIMER";
-	static constexpr const char *kFlareFormat = "bmp/aquacube/FLARE%d";
+	static constexpr const char *kIndicatorPaths[2] = {
+		"bmp/aquacube/control_manette_lightGREY",
+		"bmp/aquacube/control_manette_lightRED",
+	};
+	static constexpr const char *kShotPaths[2] = {
+		"bmp/aquacube/control_shotsOFF",
+		"bmp/aquacube/control_shotsON",
+	};
+	static constexpr const char *kWarpPaths[3] = {
+		"bmp/aquacube/control_warpBUTTON_OFF",
+		"bmp/aquacube/control_warpBUTTON_ON",
+		"bmp/aquacube/control_warpBUTTON_DISABLE",
+	};
+	static constexpr const char *kTimerEmptyPath = "bmp/aquacube/control_warpTIMER_empty";
+	static constexpr const char *kTimerPath = "bmp/aquacube/control_warpTIMER";
+	static constexpr const char *kFlareFormat = "bmp/aquacube/flare%d";
 	static constexpr const char *kBubbleFormat = "bmp/aquacube/bubble%d";
 	static constexpr const char *kFleenFormat = "bmp/aquacube/fleen/fixe/f%dfixe";
+	static constexpr const char *kAngryFormat = "bmp/aquacube/fleen/vener/f%dma66";
+	static constexpr const char *kChaseFormat = "bmp/aquacube/fleen/marche/f%dco66";
+	static constexpr const char *kSmallestPath = "bmp/aquacube/smallest/smallest.anm";
+	static constexpr const char *kIdlePath = "bmp/aquacube/smallest/attente/attente.anm";
+	static constexpr const char *kSoundPaths[5] = {
+		"sounds/fx/03-BS01.wav",
+		"sounds/fx/03-BS03.wav",
+		"sounds/fx/03-BS05.wav",
+		"sounds/fx/03-BB02.wav",
+		"sounds/fx/FleenChasesZs.wav",
+	};
+	static constexpr const char *kPraisePaths[2] = {
+		"sounds/8-E2.wav",
+		"sounds/8-E1.wav",
+	};
+	static constexpr const char *kRetreatPath = "sounds/DW-Zville.wav";
 
-	/** One cube-graph vertex with adjacency, display, and occupant state. */
-	struct GraphNode {
-		/** Adjacent vertex indices, with `-1` marking a missing edge. */
-		int adj[4];
-		/** Signed 32-bit screen position of this vertex. */
+	enum NodeState {
+		kOccupied00 = 0,
+		kEmpty01 = 1,
+		kStart02 = 2,
+		kFleen03 = 3
+	};
+	enum WarpButtonState {
+		kWarpButtonOff00 = 0,
+		kWarpButtonOn01 = 1,
+		kWarpButtonDisabled02 = 2
+	};
+	struct Node {
+		int adj[4] = {};
 		Common::Point32 pos;
-		/** Vertex role identifying occupants, the ball start, or a Fleen. */
-		int state;
-		/** Number of Zoombinis assigned to this vertex. */
-		int occupantCount;
-		/** Puzzle-roster indices assigned to this vertex. */
-		int occupants[3];
-		/** Binary graph coordinates used to resolve directional movement. */
-		int dirValues[4];
-		/** Fleen visual variant, or zero when no Fleen occupies the vertex. */
-		int fleenType;
+		NodeState state = kEmpty01;
+		int occupantCount = 0;
+		int occupants[3] = {};
+		int coordinates = 0;
+		int fleenType = 0;
+	};
+	struct NodeLayout {
+		int adj[4];
+		int x, y;
+		const char *labels;
+	};
+	struct Bubble {
+		bool active = false;
+		int type = 0;
+		int originX = 100;
+		float x = 100;
+		float y = 640;
+		float phase = 0;
+	};
+	static constexpr NodeLayout kEasyNodes[8] = {
+		{{1, 3, 4, -1}, 162, 530, "DLF"},
+		{{0, 2, 5, -1}, 524, 530, "DRF"},
+		{{3, 1, 6, -1}, 591, 175, "URF"},
+		{{2, 0, 7, -1}, 92, 175, "ULF"},
+		{{5, 7, 0, -1}, 238, 350, "DLB"},
+		{{4, 6, 1, -1}, 441, 350, "DRB"},
+		{{7, 5, 2, -1}, 458, 136, "URB"},
+		{{6, 4, 3, -1}, 218, 136, "ULB"},
+	};
+	static constexpr NodeLayout kHardNodes[16] = {
+		{{1, 3, 12, 4}, 165, 533, "DLFX"},
+		{{0, 2, 13, 5}, 527, 533, "DRFX"},
+		{{3, 1, 14, 6}, 594, 178, "URFX"},
+		{{2, 0, 15, 7}, 95, 178, "ULFX"},
+		{{5, 7, 8, 0}, 275, 403, "DLFC"},
+		{{4, 6, 9, 1}, 406, 403, "DRFC"},
+		{{7, 5, 10, 2}, 419, 260, "URFC"},
+		{{6, 4, 11, 3}, 269, 260, "ULFC"},
+		{{9, 11, 4, 12}, 293, 335, "DLBC"},
+		{{8, 10, 5, 13}, 393, 335, "DRBC"},
+		{{11, 9, 6, 14}, 403, 223, "URBC"},
+		{{10, 8, 7, 15}, 283, 223, "ULBC"},
+		{{13, 15, 0, 8}, 241, 353, "DLBX"},
+		{{12, 14, 1, 9}, 444, 353, "DRBX"},
+		{{15, 13, 2, 10}, 461, 139, "URBX"},
+		{{14, 12, 3, 11}, 221, 139, "ULBX"},
+	};
+	static constexpr Common::Point32 kRescuePositions[16] = {
+		{775, 38},
+		{778, 62},
+		{760, 40},
+		{763, 59},
+		{750, 62},
+		{744, 41},
+		{734, 64},
+		{730, 46},
+		{722, 63},
+		{715, 49},
+		{707, 64},
+		{695, 53},
+		{692, 66},
+		{676, 59},
+		{674, 66},
+		{663, 62},
+	};
+	static constexpr Common::Point32 kLeverPositions[4] = {
+		{649, 483},
+		{674, 484},
+		{698, 483},
+		{725, 482},
+	};
+	static constexpr Common::Point32 kIndicatorPositions[4] = {
+		{648, 526},
+		{676, 527},
+		{701, 526},
+		{727, 525},
+	};
+	static constexpr int kShotX[11] = {
+		647,
+		658,
+		667,
+		676,
+		685,
+		695,
+		705,
+		713,
+		723,
+		730,
+		738,
 	};
 
-	/** Runtime phase of the Aqua Cube interaction. */
-	enum GameState {
-		/** Wait for directional input. */
-		kStateIdle,
-		/** Animate the ball along a graph edge. */
-		kStateBallMoving,
-		/** Resolve the destination vertex. */
-		kStateMatchCheck,
-		/** Hold briefly after releasing Zoombinis. */
-		kStateZoombiniFreed,
-		/** Apply the penalty for reaching a Fleen. */
-		kStateFleenHit,
-		/** Collect a sequence of warp directions. */
-		kStateWarpPlanning,
-		/** Execute the collected warp directions. */
-		kStateWarpExecuting,
-		/** Stop accepting input after success or failure. */
-		kStateDone
-	};
-
-	/** Level in the range one through four. */
-	int _level = 1;
-
-	/** Number of active vertices in @ref PuzzleAquacube::_nodes. */
-	int _numNodes = 8;
-	/** Graph storage sized for the largest level. */
-	GraphNode _nodes[16];
-	/** Vertex currently occupied by the ball. */
-	int _ballNode = 0;
-	/** Destination vertex while the ball is moving. */
-	int _targetNode = -1;
-
-	/** Current screen position of the moving ball. */
-	Common::Point32 _ballPos = Common::Point32();
-	/** Ball position at the start of the current move. */
-	Common::Point32 _ballStartPos = Common::Point32();
-	/** Ball position at the end of the current move. */
-	Common::Point32 _ballEndPos = Common::Point32();
-	/** Time at which the current ball movement began. */
-	uint32 _moveStartTime = 0;
-	/** Duration of one graph-edge movement in milliseconds. */
-	static constexpr uint32 kMoveAnimDuration = 680;
-
-	/** Number of Zoombinis placed on the graph for this level. */
-	int _numZoombinisToPlace = 3;
-	/** Initial movement allowance for this level. */
-	int _totalSteps = 6;
-	/** Number of Fleen obstacles placed on the graph. */
-	int _numFleens = 0;
-	/** Number of ball movements already consumed. */
-	int _stepsUsed = 0;
-	/** Maximum number of ball movements allowed. */
-	int _maxSteps = 6;
-
-	/** Offset applied when drawing Zoombinis at graph vertices. */
-	Common::Point32 _zoombiniOffset = Common::Point32(-2, 6);
-	/** Offset applied when drawing Fleens at graph vertices. */
-	Common::Point32 _fleenOffset = Common::Point32(10, 6);
-	/** Offset applied when drawing graph-vertex markers. */
-	Common::Point32 _nodeOffset = Common::Point32();
-
-	/** Whether the selected level exposes the warp control. */
-	bool _warpAvailable = false;
-	/** Whether direction clicks are currently building a warp sequence. */
-	bool _warpActive = false;
-	/** Planned sequence of direction indices. */
-	Common::Array<int> _warpQueue;
-	/** Index of the warp movement currently being executed. */
-	uint _warpQueueIdx = 0;
-
-	/** Direction cursor light. */
-	RleBlock *_lightImage = nullptr;
-	/** Three cube layers drawn behind and around the actors. */
-	RleBlock *_cubeImage[3] = {};
-	/** Enabled joystick visual. */
-	RleBlock *_manetteOnImage = nullptr;
-	/** Disabled joystick visual. */
-	RleBlock *_manetteOffImage = nullptr;
-	/** Normal ball visual. */
-	RleBlock *_ballImage = nullptr;
-	/** Enlarged ball visual used during movement effects. */
-	RleBlock *_ballBigImage = nullptr;
-	/** Active movement-counter mark. */
-	RleBlock *_shotsOnImage = nullptr;
-	/** Consumed movement-counter mark. */
-	RleBlock *_shotsOffImage = nullptr;
-	/** Red direction indicator. */
-	RleBlock *_lightRedImage = nullptr;
-	/** Inactive direction indicator. */
-	RleBlock *_lightGreyImage = nullptr;
-	/** Active warp-control visual. */
-	RleBlock *_warpOnImage = nullptr;
-	/** Available warp-control visual. */
-	RleBlock *_warpOffImage = nullptr;
-	/** Disabled warp-control visual. */
-	RleBlock *_warpDisableImage = nullptr;
-	/** Warp timing effect. */
-	Animation *_warpTimerAnim = nullptr;
-	/** Bubble effects used at occupied graph vertices. */
-	RleBlock *_bubbleImage[3] = {};
-	/** Fleen visuals indexed by obstacle variant. */
-	RleBlock *_fleenImage[4] = {};
-	/** Flare effects used while releasing occupants. */
-	Animation *_flareAnims[2] = {};
-
-	/** Current interaction phase. */
-	GameState _gameState = kStateIdle;
-	/** Number of Zoombinis successfully released. */
-	int _freedCount = 0;
-
-	/** Direction labels for the eight-node cube. */
-	static constexpr char kGraph1DirLabels[8][4] = {
-		{'D', 'L', 'F', 0}, // Node 0
-		{'D', 'R', 'F', 0}, // Node 1
-		{'U', 'R', 'F', 0}, // Node 2
-		{'U', 'L', 'F', 0}, // Node 3
-		{'D', 'L', 'B', 0}, // Node 4
-		{'D', 'R', 'B', 0}, // Node 5
-		{'U', 'R', 'B', 0}, // Node 6
-		{'U', 'L', 'B', 0}  // Node 7
-	};
-	/** Direction labels for the sixteen-node cube. */
-	static constexpr char kGraph2DirLabels[16][4] = {
-		{'D', 'L', 'F', 'X'}, // Node 0
-		{'D', 'R', 'F', 'X'}, // Node 1
-		{'U', 'R', 'F', 'X'}, // Node 2
-		{'U', 'L', 'F', 'X'}, // Node 3
-		{'D', 'L', 'F', 'C'}, // Node 4
-		{'D', 'R', 'F', 'C'}, // Node 5
-		{'U', 'R', 'F', 'C'}, // Node 6
-		{'U', 'L', 'F', 'C'}, // Node 7
-		{'D', 'L', 'B', 'C'}, // Node 8
-		{'D', 'R', 'B', 'C'}, // Node 9
-		{'U', 'R', 'B', 'C'}, // Node 10
-		{'U', 'L', 'B', 'C'}, // Node 11
-		{'D', 'L', 'B', 'X'}, // Node 12
-		{'D', 'R', 'B', 'X'}, // Node 13
-		{'U', 'R', 'B', 'X'}, // Node 14
-		{'U', 'L', 'B', 'X'}  // Node 15
-	};
-
-	/** Populate the graph topology selected by level. */
-	void loadGraph();
-	/** Assign puzzle-roster entries to graph vertices. */
-	void placeZoombinis();
-	/** Place the level-selected number of Fleen obstacles. */
-	void placeFleens();
-	/** Select the graph vertex at which the ball begins. */
-	void placeBallStart();
-	/** Begin moving the ball toward @p targetNode. */
-	void startBallMove(int targetNode);
-	/** Commit the current movement and begin destination resolution. */
-	void finishBallMove();
-	/** Find an eight-node graph vertex by its three binary coordinates. */
-	int findNodeByDirValues3(int a, int b, int c) const;
-	/** Find a sixteen-node graph vertex by its four binary coordinates. */
-	int findNodeByDirValues4(int a, int b, int c, int d) const;
-	/** Release every Zoombini assigned to vertex @p nodeIdx. */
-	void freeZoombini(int nodeIdx);
-	/** Return the number of puzzle-roster entries already released. */
-	int countFreeZoombinis() const;
-	/** Load all graphics and animations retained until the puzzle is released. */
+	void setupBoard();
 	void loadResources();
+	int findNode(int coordinates) const;
+	void putFleen(int coordinates, int type);
+	PathObject *makePath(const Common::Point32 &start, const Common::Point32 &end, int speed);
+	void moveBall(int axis);
+	void resolveArrival();
+	void finishPuzzle();
+	void beginChase();
+	void updateBubbles(uint32 elapsed);
+	void playSound(int index);
+	int countFreeZoombinis() const;
+	AnimationRunner *loadRunner(const Common::Path &path, int frames, int repeats, uint32 delay);
+	static void onFlareComplete(void *context, AnimationRunner *runner);
+	static void onAngryComplete(void *context, AnimationRunner *runner);
+	static void onTimerComplete(void *context, AnimationRunner *runner);
 
+	int _level = 1;
+	int _numNodes = 8;
+	int _dimensions = 3;
+	int _maxSteps = 6;
+	int _warpQuota = 0;
+	int _ballNode = 0;
+	int _stepsUsed = 0;
+	int _warpsUsed = 0;
+	int _freedCount = 0;
+	int _fleenIndex = -1;
+	int _axisMap[4] = {};
+	bool _leverOn[4] = {};
+	bool _warpPending[4] = {};
+	bool _warpPlanning = false;
+	bool _warpExecuting = false;
+	bool _finished = false;
+	bool _goPending = false;
+	bool _actorsEscaping = false;
+	bool _pendingInitialArrival = false;
+	Node _nodes[16];
+	Bubble _bubbles[12];
+	Common::Array<int> _rescued;
+	Common::Point32 _ballPos;
+	PathObject *_ballPath = nullptr;
+	PathObject *_chasePath = nullptr;
+	uint32 _lastTick = 0;
+	int _sounds[5] = {
+		-1,
+		-1,
+		-1,
+		-1,
+		-1,
+	};
+	int _praiseSpeech = -1;
+	int _goSpeech = -1;
+
+	AnimationRunner *_timer = nullptr;
+	AnimationRunner *_flare[2] = {};
+	AnimationRunner *_angry[4] = {};
+	AnimationRunner *_chase[4] = {};
+	/** Frame data retained until the associated page runners have been released. */
+	Common::Array<Animation *> _animations;
+	const ZoombiniAnimation *_smallest = nullptr;
+	const ZoombiniAnimation *_idle = nullptr;
 };
 
 } // End of namespace Zoombini2
 
-#endif // ZOOMBINI2_PAGES_PUZZLE_AQUACUBE_H
+#endif

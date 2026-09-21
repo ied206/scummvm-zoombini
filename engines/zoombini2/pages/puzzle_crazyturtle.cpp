@@ -32,6 +32,8 @@
 namespace Zoombini2 {
 
 constexpr const char *PuzzleCrazyTurtle::kMusicPath;
+constexpr const char *PuzzleCrazyTurtle::kGoSpeechFormat;
+constexpr const char *PuzzleCrazyTurtle::kRetreatSpeech;
 constexpr const char *PuzzleCrazyTurtle::kTurtleIdleFormat;
 constexpr const char *PuzzleCrazyTurtle::kTurtleSpinFormat;
 constexpr const char *PuzzleCrazyTurtle::kTurtleFixedFormat;
@@ -40,6 +42,8 @@ constexpr const char *PuzzleCrazyTurtle::kMotherSpeechPath;
 constexpr const char *PuzzleCrazyTurtle::kSmokePath;
 constexpr const char *PuzzleCrazyTurtle::kMotherStartPath;
 constexpr const char *PuzzleCrazyTurtle::kMotherEndPath;
+constexpr const char *PuzzleCrazyTurtle::kMotherSuccessSpeechPath;
+constexpr const char *PuzzleCrazyTurtle::kMotherPartialSpeechPath;
 constexpr const char *PuzzleCrazyTurtle::kBridgePath;
 constexpr const char *PuzzleCrazyTurtle::kCollapsedBridgePath;
 constexpr const char *PuzzleCrazyTurtle::kBeamPath;
@@ -51,32 +55,30 @@ constexpr Common::Point32 PuzzleCrazyTurtle::kPrimaryIconPos[kRuleSlotCount];
 constexpr Common::Point32 PuzzleCrazyTurtle::kSecondaryIconPos[kRuleSlotCount];
 constexpr Common::Point32 PuzzleCrazyTurtle::kLandingPos[kTurtleCount];
 constexpr Common::Point32 PuzzleCrazyTurtle::kSmokePos;
+constexpr Common::Point32 PuzzleCrazyTurtle::kMotherPos;
 
 PuzzleCrazyTurtle::PuzzleCrazyTurtle(Zoombini2Engine *vm)
 	: PuzzleBase(vm, kPageCrazyTurtle) {
 }
 
 PuzzleCrazyTurtle::~PuzzleCrazyTurtle() {
+	if (0 <= _goSpeech && _vm->getSoundManager())
+		_vm->getSoundManager()->unload(_goSpeech);
+	if (0 <= _motherSpeechSound && _vm->getSoundManager())
+		_vm->getSoundManager()->unload(_motherSpeechSound);
 	for (int type = 0; type < kFeatureCount; type++) {
 		delete _turtleIdleAnimations[type];
 		delete _turtleSpinAnimations[type];
-		delete _turtleFixedImages[type];
-		for (int value = 0; value < kFeatureValueCount; value++)
-			delete _traitImages[type][value];
 	}
 	delete _motherAnimation;
 	delete _motherSpeechAnimation;
 	delete _smokeAnimation;
-	delete _motherStartImage;
-	delete _motherEndImage;
-	delete _bridgeImage;
-	delete _collapsedBridgeImage;
-	delete _beamImage;
 	for (int type = 0; type < kFeatureCount; type++) {
 		delete _turtleIdleRunners[type];
 		delete _turtleSpinRunners[type];
 	}
 	delete _smokeRunner;
+	delete _motherRunner;
 	finishPuzzleRoster(nullptr);
 }
 
@@ -90,13 +92,10 @@ bool PuzzleCrazyTurtle::loadAnimationResource(Animation *&resource, const Common
 	return false;
 }
 
-bool PuzzleCrazyTurtle::loadRleResource(RleBlock *&resource, const Common::Path &path) {
-	resource = new RleBlock(_vm);
-	if (resource->loadFromFile(path))
+bool PuzzleCrazyTurtle::loadRleResource(const Common::String &path) {
+	if (_vm->_gfx->loadPageRleBlock(path))
 		return true;
-	warning("CrazyTurtlePuzzle: cannot load RLE graphic '%s'", path.toString().c_str());
-	delete resource;
-	resource = nullptr;
+	warning("CrazyTurtlePuzzle: cannot load RLE graphic '%s'", path.c_str());
 	return false;
 }
 
@@ -104,7 +103,7 @@ void PuzzleCrazyTurtle::init() {
 	PuzzleBase::init();
 
 	GameState *gameState = _vm->_state;
-	_level = CLIP(gameState ? gameState->_level : 1, 1, 4);
+	_level = CLIP(_puzzleLevel, 1, 4);
 	generateRules();
 	loadResources();
 	loadInteractionResources();
@@ -129,23 +128,21 @@ void PuzzleCrazyTurtle::loadResources() {
 							  Common::Path(Common::String::format(kTurtleIdleFormat, resourceNumber, resourceNumber)));
 		loadAnimationResource(_turtleSpinAnimations[type],
 							  Common::Path(Common::String::format(kTurtleSpinFormat, resourceNumber, resourceNumber)));
-		loadRleResource(_turtleFixedImages[type],
-						Common::Path(Common::String::format(kTurtleFixedFormat, resourceNumber, resourceNumber)));
+		loadRleResource(Common::String::format(kTurtleFixedFormat, resourceNumber, resourceNumber));
 	}
 
 	loadAnimationResource(_motherAnimation, Common::Path(kMotherPath));
 	loadAnimationResource(_motherSpeechAnimation, Common::Path(kMotherSpeechPath));
 	loadAnimationResource(_smokeAnimation, Common::Path(kSmokePath));
-	loadRleResource(_motherStartImage, Common::Path(kMotherStartPath));
-	loadRleResource(_motherEndImage, Common::Path(kMotherEndPath));
-	loadRleResource(_bridgeImage, Common::Path(kBridgePath));
-	loadRleResource(_collapsedBridgeImage, Common::Path(kCollapsedBridgePath));
-	loadRleResource(_beamImage, Common::Path(kBeamPath));
+	loadRleResource(kMotherStartPath);
+	loadRleResource(kMotherEndPath);
+	loadRleResource(kBridgePath);
+	loadRleResource(kCollapsedBridgePath);
+	loadRleResource(kBeamPath);
 
 	for (int feature = 0; feature < kFeatureCount; feature++) {
 		for (int value = 0; value < kFeatureValueCount; value++) {
-			loadRleResource(_traitImages[feature][value],
-							Common::Path(Common::String::format(kTraitFormat, feature + 1, value + 1)));
+			loadRleResource(Common::String::format(kTraitFormat, feature + 1, value + 1));
 		}
 	}
 }
@@ -190,6 +187,15 @@ void PuzzleCrazyTurtle::loadInteractionResources() {
 		for (int frame = 0; frame < kSmokeFrameCount; frame++)
 			_smokeRunner->addTimedFrame(frame, kSmokeFrameDelayMs);
 	}
+
+	_motherRunner = new AnimationRunner(_vm, kMotherPos, AnimationRunnerMode::kPlayOnce00);
+	if (_motherAnimation) {
+		_motherRunner->setAnimation(_motherAnimation);
+		for (int frame = 0; frame < kMotherFrameCount; frame++)
+			_motherRunner->addTimedFrame(frame, kMotherFrameDelayMs);
+		_motherRunner->addTimedFrame(kMotherFrameCount - 1, kMotherFinalHoldMs);
+		_motherRunner->setCompletionCallback(&onMotherAnimationComplete, this);
+	}
 }
 
 void PuzzleCrazyTurtle::buildDropTargets() {
@@ -210,12 +216,18 @@ void PuzzleCrazyTurtle::buildTurtleAssignments() {
 	bool used[kZoombiniCount] = {};
 	int assignedCount = 0;
 	for (int slot = 0; slot < kRuleSlotCount && assignedCount < kTurtleCount; slot++) {
-		for (int index = 0; index < partySize && assignedCount < kTurtleCount; index++) {
-			if (used[index] || _puzzleZoombinis[index]->_traits.getValue(static_cast<ZmbTrait::TraitIndex>(_primaryFeature)) != _ruleValues[0][slot])
-				continue;
-			used[index] = true;
-			_turtleAssignments[assignedCount] = index;
-			assignedCount += 1;
+		const int secondarySlots = 3 <= _level ? kRuleSlotCount : 1;
+		for (int secondarySlot = 0; secondarySlot < secondarySlots; secondarySlot++) {
+			for (int index = 0; index < partySize && assignedCount < kTurtleCount; index++) {
+				const ZmbTrait &traits = _puzzleZoombinis[index]->_traits;
+				if (used[index] || traits.getValue(static_cast<ZmbTrait::TraitIndex>(_primaryFeature)) != _ruleValues[0][slot])
+					continue;
+				if (3 <= _level && traits.getValue(static_cast<ZmbTrait::TraitIndex>(_secondaryFeature)) != _ruleValues[1][secondarySlot])
+					continue;
+				used[index] = true;
+				_turtleAssignments[assignedCount] = index;
+				assignedCount += 1;
+			}
 		}
 	}
 	for (int index = assignedCount; index < kTurtleCount; index++)
@@ -224,6 +236,7 @@ void PuzzleCrazyTurtle::buildTurtleAssignments() {
 
 void PuzzleCrazyTurtle::generateRules() {
 	_primaryFeature = _vm->_rnd->getRandomNumber(kFeatureCount - 1);
+	generateFeatureOrder(0);
 	int remainingFeatures[kFeatureCount - 1];
 	int remainingCount = 0;
 	for (int feature = 0; feature < kFeatureCount; feature++) {
@@ -233,9 +246,7 @@ void PuzzleCrazyTurtle::generateRules() {
 		}
 	}
 	_secondaryFeature = remainingFeatures[_vm->_rnd->getRandomNumber(remainingCount - 1)];
-
-	for (int group = 0; group < kRuleGroupCount; group++)
-		generateFeatureOrder(group);
+	generateFeatureOrder(1);
 	memset(_primaryRuleActive, 0, sizeof(_primaryRuleActive));
 	memset(_secondaryRuleActive, 0, sizeof(_secondaryRuleActive));
 
@@ -266,7 +277,13 @@ void PuzzleCrazyTurtle::generateRules() {
 }
 
 void PuzzleCrazyTurtle::generateFeatureOrder(int group) {
-	int values[kFeatureValueCount] = {1, 2, 3, 4, 5};
+	int values[kFeatureValueCount] = {
+		1,
+		2,
+		3,
+		4,
+		5,
+	};
 	int remainingCount = kFeatureValueCount;
 	for (int slot = 0; slot < kRuleSlotCount; slot++) {
 		const int selected = _vm->_rnd->getRandomNumber(remainingCount - 1);
@@ -278,7 +295,13 @@ void PuzzleCrazyTurtle::generateFeatureOrder(int group) {
 }
 
 void PuzzleCrazyTurtle::activateRandomRuleSlots(bool *slots, int count) {
-	int available[kRuleSlotCount] = {0, 1, 2, 3, 4};
+	int available[kRuleSlotCount] = {
+		0,
+		1,
+		2,
+		3,
+		4,
+	};
 	int availableCount = kRuleSlotCount;
 	for (int selectedCount = 0; selectedCount < count; selectedCount++) {
 		const int selected = _vm->_rnd->getRandomNumber(availableCount - 1);
@@ -302,6 +325,11 @@ void PuzzleCrazyTurtle::placeZoombinis() {
 
 void PuzzleCrazyTurtle::onUpdate() {
 	const uint32 tick = _vm->getGameTickCount();
+	if (_goPending && (_goSpeech < 0 || !_vm->getSoundManager()->isPlaying(_goSpeech))) {
+		_vm->_mapTransitionSourcePageId = kPageCrazyTurtle;
+		_vm->requestPageChange(kPageMapTrans);
+		return;
+	}
 
 	if (_smokePending) {
 		_smokePending = false;
@@ -357,6 +385,7 @@ void PuzzleCrazyTurtle::onActorsRendered() {
 void PuzzleCrazyTurtle::updateFallSequence(uint32 tick) {
 	if (_fallPhase == 0 && _fallTimerTick < tick) {
 		_fallPhase = 1;
+		_fallTimerTick = 0xFFFFFFFFU;
 		const TurtlePlacement &placement = kTurtlePlacements[_activeTurtleIndex];
 		if (_turtleSpinRunners[placement.type - 1])
 			_turtleSpinRunners[placement.type - 1]->startAt(placement.pos, tick);
@@ -390,7 +419,7 @@ void PuzzleCrazyTurtle::updateFallSequence(uint32 tick) {
 
 	if (_fallPhase == 2) {
 		int fallingIndex = -1;
-		for (int index = 0; index < (int)_puzzleZoombinis.size(); index++) {
+		for (int index = 0; index < static_cast<int>(_puzzleZoombinis.size()); index++) {
 			if (_puzzleZoombinis[index]->_movementPath) {
 				fallingIndex = index;
 				break;
@@ -411,6 +440,7 @@ void PuzzleCrazyTurtle::updateFallSequence(uint32 tick) {
 		_fallCounter = 0;
 		_fallPhase = 0;
 		playSound(_sndFall);
+		_vm->_zoombiniWalkingFlag = true;
 	}
 }
 
@@ -438,7 +468,10 @@ void PuzzleCrazyTurtle::updateZoombiniAnimations(uint32 tick) {
 }
 
 void PuzzleCrazyTurtle::startTransitionSequence() {
+	_vm->restartGoBlink();
 	playSound(_sndTransition);
+	if (_motherRunner && _motherAnimation)
+		_motherRunner->reset(_vm->getGameTickCount());
 	_idlePhaseEnabled = true;
 }
 
@@ -460,8 +493,30 @@ int PuzzleCrazyTurtle::countFreeZoombinis() const {
 }
 
 bool PuzzleCrazyTurtle::canUseGoButton() const {
-	const int freeZoombinis = countFreeZoombinis();
-	return freeZoombinis == 0 || 3 < freeZoombinis;
+	return !_goPending && _vm->_zoombiniWalkingFlag;
+}
+
+bool PuzzleCrazyTurtle::onGoButtonPressed() {
+	if (!_vm->_isSavedGame)
+		return true;
+	if (_goPending)
+		return false;
+	const int freeCount = countFreeZoombinis();
+	if (0 < freeCount && freeCount < 4)
+		return true;
+	Common::String speech = kRetreatSpeech;
+	if (freeCount == 0) {
+		const int variant = _vm->_rnd->getRandomNumber(4) + 1;
+		speech = Common::String::format(kGoSpeechFormat, variant);
+	}
+	SoundManager *sound = _vm->getSoundManager();
+	if (sound) {
+		_goSpeech = sound->load(true, Common::Path(speech), false);
+		if (0 <= _goSpeech)
+			sound->playWithVolume(_goSpeech, sound->_volumeSpeech);
+	}
+	_goPending = true;
+	return false;
 }
 
 bool PuzzleCrazyTurtle::evaluateTurtleMatch(const ZoombiniRunner *zoombini, int turtleIndex) const {
@@ -482,9 +537,9 @@ bool PuzzleCrazyTurtle::evaluateTurtleMatch(const ZoombiniRunner *zoombini, int 
 
 void PuzzleCrazyTurtle::handleTurtleClick(int turtleIndex, int zoombiniIndex) {
 	const uint32 tick = _vm->getGameTickCount();
-	_inputLocked = true;
-	if (turtleIndex < 0 || kTurtleCount <= turtleIndex || zoombiniIndex < 0 || (uint)zoombiniIndex >= _puzzleZoombinis.size() || _mistakesMirror <= 0)
+	if (turtleIndex < 0 || kTurtleCount <= turtleIndex || zoombiniIndex < 0 || _puzzleZoombinis.size() <= static_cast<uint>(zoombiniIndex) || _mistakesMirror <= 0)
 		return;
+	_inputLocked = true;
 
 	ZoombiniRunner *zoombini = _puzzleZoombinis[zoombiniIndex];
 	zoombini->_inputEnabled = false;
@@ -547,6 +602,7 @@ void PuzzleCrazyTurtle::onWalkComplete(void *context, ZoombiniRunner *zoombini) 
 			return;
 	}
 	page->_transitionRequested = true;
+	page->_vm->_zoombiniWalkingFlag = true;
 }
 
 void PuzzleCrazyTurtle::onTurtleFallComplete(void *context, ZoombiniRunner *zoombini) {
@@ -563,6 +619,9 @@ void PuzzleCrazyTurtle::onTurtleFallComplete(void *context, ZoombiniRunner *zoom
 		page->playSound(page->_sndCollapse);
 	if (page->_mistakesMirror <= 0)
 		page->_transitionRequested = true;
+	for (const ZoombiniRunner *actor : page->_puzzleZoombinis)
+		if (actor->_puzzleStatus == 1)
+			page->_vm->_zoombiniWalkingFlag = true;
 }
 
 void PuzzleCrazyTurtle::onTurtleIdleSpinComplete(void *context, AnimationRunner *runner) {
@@ -579,23 +638,34 @@ void PuzzleCrazyTurtle::onTurtleSpinComplete(void *context, AnimationRunner *run
 	page->_turtleReady = true;
 }
 
+void PuzzleCrazyTurtle::onMotherAnimationComplete(void *context, AnimationRunner *runner) {
+	(void)runner;
+	PuzzleCrazyTurtle *page = static_cast<PuzzleCrazyTurtle *>(context);
+	page->_motherFinished = true;
+	const char *speechPath = page->countFreeZoombinis() == 0 ? kMotherSuccessSpeechPath : kMotherPartialSpeechPath;
+	SoundManager *sound = page->_vm->getSoundManager();
+	if (sound) {
+		page->_motherSpeechSound = sound->load(true, Common::Path(speechPath), false);
+		if (0 <= page->_motherSpeechSound)
+			sound->playWithVolume(page->_motherSpeechSound, sound->_volumeSpeech);
+	}
+}
+
 void PuzzleCrazyTurtle::drawBridgeState(ManagedSurface32 *screen) {
 	// The dock redraw consumes the mirrored mistake count, which the frame
 	// handler refreshes only after a completed fall plays its smoke effect.
-	if (0 < _mistakesMirror) {
-		_vm->_gfx->drawRleBlock(screen, _bridgeImage, Common::Point32(10, 220));
-	} else {
-		_vm->_gfx->drawRleBlock(screen, _collapsedBridgeImage, Common::Point32(10, 220));
-		_transitionRequested = true;
-	}
-
-	if (!_beamImage || _mistakesMirror <= 0)
-		return;
 	Common::Point32 beamPos(11 * _mistakesMirror + 9, 310 - 12 * _mistakesMirror);
 	for (int beam = 0; beam < _mistakesMirror; beam++) {
-		_vm->_gfx->drawRleBlock(screen, _beamImage, beamPos);
+		_vm->_gfx->drawPageRleBlock(screen, kBeamPath, beamPos);
 		beamPos.x -= 11;
 		beamPos.y += 12;
+	}
+	if (0 < _mistakesMirror) {
+		_vm->_gfx->drawPageRleBlock(screen, kBridgePath, Common::Point32(10, 220));
+	} else {
+		_vm->_gfx->drawPageRleBlock(screen, kCollapsedBridgePath, Common::Point32(10, 220));
+		if (!_idlePhaseEnabled)
+			_transitionRequested = true;
 	}
 }
 
@@ -603,11 +673,11 @@ void PuzzleCrazyTurtle::drawRuleHints(ManagedSurface32 *screen) const {
 	for (int slot = 0; slot < kRuleSlotCount; slot++) {
 		if (!_primaryRuleActive[slot])
 			continue;
-		const RleBlock *primary = _traitImages[_primaryFeature][_ruleValues[0][slot] - 1];
-		_vm->_gfx->drawRleBlock(screen, primary, Common::Point32(kPrimaryIconPos[slot].x - 5, kPrimaryIconPos[slot].y));
+		const Common::String primaryPath = Common::String::format(kTraitFormat, _primaryFeature + 1, _ruleValues[0][slot]);
+		_vm->_gfx->drawPageRleBlock(screen, primaryPath, Common::Point32(kPrimaryIconPos[slot].x - 5, kPrimaryIconPos[slot].y));
 		if (3 <= _level) {
-			const RleBlock *secondary = _traitImages[_secondaryFeature][_ruleValues[1][slot] - 1];
-			_vm->_gfx->drawRleBlock(screen, secondary, Common::Point32(kSecondaryIconPos[slot].x - 5, kSecondaryIconPos[slot].y));
+			const Common::String secondaryPath = Common::String::format(kTraitFormat, _secondaryFeature + 1, _ruleValues[1][slot]);
+			_vm->_gfx->drawPageRleBlock(screen, secondaryPath, Common::Point32(kSecondaryIconPos[slot].x - 5, kSecondaryIconPos[slot].y));
 		}
 	}
 }
@@ -626,8 +696,8 @@ void PuzzleCrazyTurtle::drawTurtles(ManagedSurface32 *screen) const {
 		if (hasActiveTurtleRunner(index))
 			continue;
 		const TurtlePlacement &placement = kTurtlePlacements[index];
-		const RleBlock *image = _turtleFixedImages[placement.type - 1];
-		_vm->_gfx->drawRleBlock(screen, image, placement.pos);
+		const Common::String imagePath = Common::String::format(kTurtleFixedFormat, placement.type, placement.type);
+		_vm->_gfx->drawPageRleBlock(screen, imagePath, placement.pos);
 	}
 }
 
@@ -638,10 +708,11 @@ void PuzzleCrazyTurtle::drawTurtleRunners(ManagedSurface32 *screen) const {
 		_vm->_gfx->drawAndUpdateAnimationRunner(screen, _turtleSpinRunners[type], tick, 0, ManagedSurface32::kScreenSize.width);
 	}
 	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _smokeRunner, tick, 0, ManagedSurface32::kScreenSize.width);
+	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _motherRunner, tick, 0, ManagedSurface32::kScreenSize.width);
 }
 
 void PuzzleCrazyTurtle::drawMother(ManagedSurface32 *screen) const {
-	_vm->_gfx->drawRleBlock(screen, _motherStartImage, Common::Point32(488, 310));
+	_vm->_gfx->drawPageRleBlock(screen, _motherFinished ? kMotherEndPath : kMotherStartPath, kMotherPos);
 }
 
 EventHandleResult PuzzleCrazyTurtle::onLButtonDown(const Common::Point &pos) {
@@ -657,14 +728,54 @@ EventHandleResult PuzzleCrazyTurtle::onLButtonUp(const Common::Point &pos) {
 	const ZoombiniInputResult inputResult =
 		ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), clickReleased, _pickupZombAnimation,
 										   _vm->getGameTickCount(), &_turtleDropTargets, getAreaMask());
-	return inputResult == ZoombiniInputResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+	if (inputResult == ZoombiniInputResult::kIgnored00)
+		return EventHandleResult::kPassthrough;
+	return EventHandleResult::kConsumed;
 }
 
 EventHandleResult PuzzleCrazyTurtle::onMouseMove(const Common::Point &pos) {
 	const ZoombiniInputResult inputResult =
 		ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), false, _pickupZombAnimation,
 										   _vm->getGameTickCount(), &_turtleDropTargets, getAreaMask());
-	return inputResult == ZoombiniInputResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+	if (inputResult == ZoombiniInputResult::kIgnored00)
+		return EventHandleResult::kPassthrough;
+	return EventHandleResult::kConsumed;
+}
+
+Common::String PuzzleCrazyTurtle::debugGetAnswer() const {
+	Common::String answer = debugAnswerHeader();
+	static constexpr const char *traits[4] = {
+		"feet",
+		"nose",
+		"hair",
+		"eyes",
+	};
+	answer += Common::String::format("Primary rule: %s\n", traits[_primaryFeature]);
+	if (3 <= _level)
+		answer += Common::String::format("Secondary rule: %s\n", traits[_secondaryFeature]);
+	for (uint i = 0; i < _puzzleZoombinis.size(); i++)
+		answer += Common::String::format("Turtle %u: %s\n", i + 1, debugActorDescription(_turtleAssignments[i]).c_str());
+	answer += "Actors with the same required traits are interchangeable.\n";
+	return answer;
+}
+
+PuzzleChanceInfo PuzzleCrazyTurtle::debugGetChances() const {
+	return PuzzleChanceInfo(PuzzleChanceInfo::Type::kMistake, _initialMistakes, _initialMistakes - _remainingMistakes, "incorrect placement");
+}
+
+bool PuzzleCrazyTurtle::debugCanSetChances() const {
+	return !_debugFinishPending && !_inputLocked && !_idlePhaseEnabled && !_goPending;
+}
+
+bool PuzzleCrazyTurtle::debugSetChances(int remaining) {
+	if (!debugCanSetChances() || remaining < 0 || _initialMistakes < remaining)
+		return false;
+	_remainingMistakes = remaining;
+	_mistakesMirror = remaining;
+	_transitionRequested = remaining == 0;
+	if (!remaining)
+		playSound(_sndCollapse);
+	return true;
 }
 
 } // End of namespace Zoombini2
