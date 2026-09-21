@@ -51,10 +51,14 @@ public:
 	static constexpr const char *kConfigUseFloatingPointPaths = "use_floating_point_paths";
 	/** Target configuration key enabling the enhanced keyboard shortcut set. */
 	static constexpr const char *kConfigEnhancedKbdShortcuts = "enhanced_kbd_shortcuts";
+	/** Target configuration key making solid help-sheet backgrounds transparent. */
+	static constexpr const char *kConfigTransparentHelpPages = "transparent_help_pages";
 	/** Target configuration key enabling the developer hotkeys. */
 	static constexpr const char *kConfigDebugHotkeys = "debug_hotkeys";
 	/** Target configuration key selecting the alternate level-one Waterslide pairing. */
 	static constexpr const char *kConfigGreedyWaterslidePairing = "greedy_waterslide_pairing";
+	/** Target configuration key protecting Aqua Cube's first direct lever move from a Fleen. */
+	static constexpr const char *kConfigAquacubeSafeFirstMove = "aquacube_safe_first_move";
 	/** Target configuration key selecting the original Windows random-number generator. */
 	static constexpr const char *kConfigOriginalPRNG = "original_prng";
 	/** Target frame rate for the engine's presentation loop. */

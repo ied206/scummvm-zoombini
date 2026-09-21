@@ -637,6 +637,7 @@ void PuzzleBoolies::finishRound(uint32 now) {
 	}
 	if (_requiredTurns < _completedTurns) {
 		_phase = Phase::kFinished05;
+		_vm->_zoombiniWalkingFlag = true;
 		_vm->restartGoBlink();
 		return;
 	}
@@ -656,6 +657,7 @@ void PuzzleBoolies::advanceBoat(uint32 now) {
 			return;
 		if (lastRunner) {
 			_phase = Phase::kFinished05;
+			_vm->_zoombiniWalkingFlag = true;
 			_vm->restartGoBlink();
 			return;
 		}
@@ -674,6 +676,7 @@ void PuzzleBoolies::advanceBoat(uint32 now) {
 		return;
 	_boatX = 80;
 	_puzzleZoombinis[_activeRunnerIndex]->setPosition(Common::Point32(115, 495));
+	_vm->_zoombiniWalkingFlag = true;
 	if (_requiredTurns < _completedTurns) {
 		_phase = Phase::kFinished05;
 		_vm->restartGoBlink();
@@ -931,6 +934,10 @@ Common::String PuzzleBoolies::debugGetAnswer() const {
 	return answer;
 }
 
+bool PuzzleBoolies::canUseGoButton() const {
+	return _vm->_zoombiniWalkingFlag;
+}
+
 PuzzleChanceInfo PuzzleBoolies::debugGetChances() const {
 	return PuzzleChanceInfo(PuzzleChanceInfo::Type::kSubmit, _requiredTurns + 1, _completedTurns, "resolved challenge");
 }
@@ -945,6 +952,7 @@ bool PuzzleBoolies::debugSetChances(int remaining) {
 	_completedTurns = _requiredTurns + 1 - remaining;
 	if (!remaining) {
 		_phase = Phase::kFinished05;
+		_vm->_zoombiniWalkingFlag = true;
 		_vm->restartGoBlink();
 	}
 	return true;

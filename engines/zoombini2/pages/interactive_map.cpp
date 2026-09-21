@@ -102,10 +102,10 @@ constexpr Common::Point32 InteractiveMap::kSegmentPos[kNumSegments];
 /**
  * Segment-to-page mapping for saved-game page-level drawing.
  * The saved-game route uses each mapped page's stored level.
- * Index = segment slot, value = page ID (0-12).
+ * Index = segment slot, value = page ID.
  * Slot 12 is unused in saved-game mode.
  */
-constexpr int InteractiveMap::kSegmentPageIds[kNumSegments];
+constexpr PageId InteractiveMap::kSegmentPageIds[kNumSegments];
 
 constexpr const char *InteractiveMap::kSegmentDirs[];
 
@@ -144,22 +144,22 @@ void InteractiveMap::init() {
 	_vm->_state->clearActiveZoombinis();
 	_vm->_isSavedGame = !isPracticeMode();
 	if (isPracticeMode()) {
-		int practicePuzzlePageId = kPageNone;
+		PageId practicePageId = kPageNone;
 		int practiceLevel = 0;
-		if (_vm->takePracticePuzzleLaunch(practicePuzzlePageId, practiceLevel)) {
+		if (_vm->takePracticePuzzleLaunch(practicePageId, practiceLevel)) {
 			_currentLevel = practiceLevel;
 			gs->_level = _currentLevel;
 			_vm->_returningFromPuzzle = false;
-			createPracticeParty(practicePuzzlePageId);
-			_vm->_mapTransitionSourcePageId = static_cast<PageId>(practicePuzzlePageId);
-			_vm->requestPageChange(practicePuzzlePageId);
+			createPracticeParty(practicePageId);
+			_vm->_mapTransitionSourcePageId = practicePageId;
+			_vm->requestPageChange(practicePageId);
 			return;
 		}
 	}
 
 	// The saved-game map always exposes the starting hub.
 	if (!isPracticeMode()) {
-		gs->_pageLevel[0] = 1;
+		gs->_pageLevel[static_cast<int>(kPageZombiniville)] = 1;
 	}
 
 	// --- Background ---
@@ -209,7 +209,7 @@ void InteractiveMap::init() {
 
 	// --- Set initial level ---
 	if (isPracticeMode()) {
-		_currentLevel = 1;
+		_currentLevel = _vm->getPracticeLevel();
 	} else {
 		// Saved-game routes use per-page levels.
 		_currentLevel = gs->getLevel();
@@ -279,7 +279,7 @@ void InteractiveMap::setupIcons() {
 				_iconColored[i] = false;
 
 				Common::String path;
-				if (gs->hasPageVisit(i, 1)) {
+				if (gs->hasPageVisit(static_cast<PageId>(i), 1)) {
 					path = Common::String::format(kIconFormat, i);
 					_iconColored[i] = true;
 					// Only hub icons become clickable when visited.
@@ -331,125 +331,7 @@ bool InteractiveMap::practiceCandidateFitsPack(const ZmbTrait &traits) const {
 	return matchingCombinations < 2;
 }
 
-Common::String InteractiveMap::generatePracticeZoombiniName() const {
-	static constexpr const char *kVowelPairs[30] = {
-		"a ",
-		"a ",
-		"a ",
-		"e ",
-		"e ",
-		"e ",
-		"e ",
-		"i ",
-		"i ",
-		"i ",
-		"o ",
-		"o ",
-		"o ",
-		"u ",
-		"u ",
-		"y ",
-		"ee",
-		"oo",
-		"yo",
-		"ya",
-		"ye",
-		"ei",
-		"ie",
-		"ai",
-		"ia",
-		"au",
-		"ua",
-		"uo",
-		"ou",
-		"ae",
-	};
-	static constexpr char kSingleConsonants[] = "bbccdddfghjkkllmmnnprrssssttvwx";
-	static constexpr char kEndings[] = "aeiou";
-	static constexpr const char *kConsonantPairs[39] = {
-		"bl",
-		"br",
-		"ch",
-		"cl",
-		"cr",
-		"dr",
-		"dw",
-		"fl",
-		"fr",
-		"gh",
-		"gl",
-		"gr",
-		"kl",
-		"kn",
-		"kr",
-		"kw",
-		"ld",
-		"mp",
-		"nd",
-		"nh",
-		"nn",
-		"ph",
-		"pl",
-		"pr",
-		"qu",
-		"qu",
-		"rh",
-		"rn",
-		"sc",
-		"sl",
-		"sm",
-		"sn",
-		"sp",
-		"sr",
-		"st",
-		"sw",
-		"th",
-		"tr",
-		"tw",
-	};
-
-	char name[8] = {};
-	const int targetLength = _vm->_rnd->getRandomNumber(1) + 4;
-	bool useVowelPair = _vm->_rnd->getRandomNumber(98) + 1 < 40;
-	int length = 0;
-	while (length < targetLength) {
-		bool usedConsonantPair = false;
-		if (useVowelPair) {
-			useVowelPair = false;
-			const char *pair = kVowelPairs[_vm->_rnd->getRandomNumber(29)];
-			if (pair[1] != ' ') {
-				name[length] = pair[0];
-				length += 1;
-				name[length] = pair[1];
-				length += 1;
-			} else {
-				name[length] = pair[0];
-				name[length] = pair[0];
-				length += 1;
-			}
-		} else {
-			useVowelPair = true;
-			if (1 < length || _vm->_rnd->getRandomNumber(98) + 1 <= 33) {
-				const char *pair = kConsonantPairs[_vm->_rnd->getRandomNumber(38)];
-				name[length] = pair[0];
-				length += 1;
-				name[length] = pair[1];
-				length += 1;
-				usedConsonantPair = true;
-			} else {
-				name[length] = kSingleConsonants[_vm->_rnd->getRandomNumber(30)];
-				length += 1;
-			}
-		}
-		if (usedConsonantPair && targetLength <= length)
-			name[length - 1] = kEndings[_vm->_rnd->getRandomNumber(4)];
-		if (length == 2 && name[0] == name[1])
-			length = 1;
-	}
-	return Common::String(name);
-}
-
-void InteractiveMap::createPracticeParty(int pageId) {
+void InteractiveMap::createPracticeParty(PageId pageId) {
 	const uint partySize = getPracticePartySize(pageId);
 	_vm->_state->clearActiveZoombinis();
 	if (partySize == 0)
@@ -473,7 +355,7 @@ void InteractiveMap::createPracticeParty(int pageId) {
 	}
 
 	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
-		const Common::String name = generatePracticeZoombiniName();
+		const Common::String name = GameState::generateZoombiniName(*_vm->_rnd);
 		Common::strlcpy(_vm->_state->_activeZoombinis[i]->_name, name.c_str(), sizeof(_vm->_state->_activeZoombinis[i]->_name));
 	}
 }
@@ -779,8 +661,8 @@ void InteractiveMap::drawSavedGameSegments(ManagedSurface32 *screen) {
 	};
 	for (int idx = 0; idx < 13; idx++) {
 		int slot = drawOrder[idx];
-		int pageId = kSegmentPageIds[slot];
-		int tier = gs->_pageLevel[pageId];
+		PageId pageId = kSegmentPageIds[slot];
+		int tier = gs->_pageLevel[static_cast<int>(pageId)];
 		if (tier < 0 || kNumLevelTiers <= tier)
 			tier = 0;
 
@@ -841,6 +723,7 @@ EventHandleResult InteractiveMap::onLButtonDown(const Common::Point &pos) {
 		int tab = hitTestLegendTab(Common::Point32(pos));
 		if (1 <= tab && tab <= 3) {
 			_currentLevel = tab;
+			_vm->setPracticeLevel(_currentLevel);
 			if (0 <= _blipSoundId)
 				_vm->getSoundManager()->play(_blipSoundId);
 			return EventHandleResult::kConsumed;
@@ -915,9 +798,9 @@ EventHandleResult InteractiveMap::onLButtonDown(const Common::Point &pos) {
 		default:
 			_vm->_returningFromPuzzle = false;
 			if (isPracticeMode())
-				createPracticeParty(clicked);
+				createPracticeParty(static_cast<PageId>(clicked));
 			_vm->_mapTransitionSourcePageId = static_cast<PageId>(clicked);
-			_vm->requestPageChange(clicked);
+			_vm->requestPageChange(static_cast<PageId>(clicked));
 			break;
 		}
 		return EventHandleResult::kConsumed;
@@ -1028,7 +911,7 @@ void InteractiveMap::handleQuitConfirmation(DialogMsgBoxButton button) {
 		_vm->requestPageChange(kPageCredits);
 }
 
-uint InteractiveMap::getPracticePartySize(int pageId) {
+uint InteractiveMap::getPracticePartySize(PageId pageId) {
 	switch (pageId) {
 	case kPageCrazyTurtle:
 	case kPageWaterslide:

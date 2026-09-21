@@ -86,26 +86,20 @@ bool Sidebar::shouldShow() const {
 	return page && page->hasSidebar();
 }
 
-void Sidebar::updateGoBlink(bool goEnabled, int pageId) {
+void Sidebar::updateGoBlink(bool goEnabled, PageId pageId) {
 	if (_goPageId != pageId) {
 		_goPageId = pageId;
-		_goWasEnabled = goEnabled;
 		_goBlinkHighlighted = false;
 		_goBlinkTogglesRemaining = 0;
 		_goBlinkDeadline = 0;
 		return;
 	}
 
-	if (goEnabled && !_goWasEnabled) {
-		_goBlinkHighlighted = false;
-		_goBlinkTogglesRemaining = 30;
-		_goBlinkDeadline = _vm->getGameTickCount() + 150;
-	} else if (!goEnabled) {
+	if (!goEnabled) {
 		_goBlinkHighlighted = false;
 		_goBlinkTogglesRemaining = 0;
 		_goBlinkDeadline = 0;
 	}
-	_goWasEnabled = goEnabled;
 
 	const uint32 tick = _vm->getGameTickCount();
 	if (0 < _goBlinkTogglesRemaining && _goBlinkDeadline < tick) {
@@ -116,6 +110,7 @@ void Sidebar::updateGoBlink(bool goEnabled, int pageId) {
 }
 
 void Sidebar::restartGoBlink() {
+	_goPageId = _vm->getCurrentPageId();
 	_goBlinkHighlighted = false;
 	_goBlinkTogglesRemaining = 30;
 	_goBlinkDeadline = _vm->getGameTickCount() + 150;
@@ -305,14 +300,17 @@ void Sidebar::onHelpClick() {
 	}
 	_vm->getSoundManager()->play(_helpClickSoundId);
 
-	PageId currentPage = static_cast<PageId>(_vm->getCurrentPageId());
+	const PageId currentPage = _vm->getCurrentPageId();
 	int level = _vm->_state->getLevel();
 
-	_helpScreen->open(static_cast<int>(currentPage), level);
+	_helpScreen->open(currentPage, level);
 }
 
 void Sidebar::onMapClick() {
 	_vm->getSoundManager()->play(_mapClickSoundId);
+	PageBase *page = _vm->getCurrentPage();
+	if (page)
+		page->onMapButtonPressed();
 	if (!_vm->_isSavedGame) {
 		returnToMap();
 		return;
@@ -320,7 +318,6 @@ void Sidebar::onMapClick() {
 	if (!ConfMan.getBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, ConfMan.getActiveDomainName()) &&
 		!_vm->writeGameSave(_vm->_state->_playerName))
 		return;
-	const PageBase *page = _vm->getCurrentPage();
 	bool hasActive = false;
 	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
 		const ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
@@ -343,12 +340,16 @@ void Sidebar::onGoClick() {
 		returnToMap();
 		return;
 	}
-	const PageId pageId = static_cast<PageId>(_vm->getCurrentPageId());
+	const PageId pageId = _vm->getCurrentPageId();
 	_vm->_mapTransitionSourcePageId = pageId;
 	_vm->requestPageChange(kPageMapTrans);
 }
 
 void Sidebar::returnToMap() {
+	if (_vm->isDemo()) {
+		_vm->requestPageChange(kPageTitleScreen);
+		return;
+	}
 	_vm->requestPageChange(_vm->_isSavedGame ? kPageMenuLoad : kPageMenuPractice);
 }
 

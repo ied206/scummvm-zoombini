@@ -24,6 +24,9 @@
 
 #include "engines/advancedDetector.h"
 
+/** Detector GUI option for color-keying solid-color help-sheet bitmaps. */
+#define GAMEOPTION_HELP_PAGE_COLOR_KEYING GUIO_GAMEOPTIONS1
+
 namespace Zoombini2 {
 
 /** Release-family flags attached to one detected game description. */
@@ -47,6 +50,10 @@ enum GameFeatures {
 	 * No new puzzle rule or level change has been established.
 	 */
 	GF_Z2_V11 = (1 << 1),
+	/** Help-sheet bitmaps use a solid background color instead of the frame gradient. */
+	GF_Z2_SOLID_HELP_PAGES = (1 << 2),
+	/** The help frame resource stores a solid gray full-screen canvas. */
+	GF_Z2_SOLID_HELP_FRAME = (1 << 3),
 };
 
 /** Detection record combining ScummVM metadata with Z2 release-family flags. */

@@ -392,7 +392,7 @@ void PuzzleMagicWall::newPuzzle() {
 	}
 	_movingRule = -1;
 	_hoveredTablet = -1;
-	debug(1, "MagicWall: phase=%d difficulty=%d layout=%d points=%u tablets=%u", _phase, _puzzleLevel,
+	debug(1, "MagicWall: phase=%d difficulty=%d layout=%d points=%u tablets=%u", static_cast<int>(_phase), _puzzleLevel,
 		  _maze.layoutIndex(), _maze.positions().size(), _maze.rules().size());
 	for (uint i = 0; i < _maze.positions().size(); i++)
 		debug(2, "MagicWall: beetle %u at %d", i, _maze.positions()[i]);
@@ -443,7 +443,7 @@ int PuzzleMagicWall::directionIndex(const Common::Point32 &from, const Common::P
 }
 
 void PuzzleMagicWall::startRule(int index) {
-	if (!_ready || _phase == 2 || _nextPuzzlePending || gatesActive() || runnersMoving() || beetlesMoving())
+	if (!_ready || _phase == Phase::kFinished || _nextPuzzlePending || gatesActive() || runnersMoving() || beetlesMoving())
 		return;
 	const Common::Array<int> before = _maze.positions();
 	_maze.apply(index);
@@ -482,7 +482,7 @@ void PuzzleMagicWall::startRunnerPath(int index, int gate, bool exit) {
 }
 
 void PuzzleMagicWall::submit() {
-	if (!_ready || gatesActive() || runnersMoving() || beetlesMoving() || _phase == 2)
+	if (!_ready || gatesActive() || runnersMoving() || beetlesMoving() || _phase == Phase::kFinished)
 		return;
 	_leverRunner->start(_vm->getGameTickCount());
 	SoundManager *sound = _vm->getSoundManager();
@@ -504,19 +504,19 @@ void PuzzleMagicWall::submit() {
 		accepted = true;
 	}
 	if (accepted) {
-		_nextPuzzlePending = _phase == 0;
-		if (_phase == 1)
-			_phase = 2;
+		_nextPuzzlePending = _phase == Phase::kFirstBoard;
+		if (_phase == Phase::kSecondBoard)
+			_phase = Phase::kFinished;
 		_hoveredTablet = -1;
 	}
-	debug(1, "MagicWall: submit phase=%d accepted=%d", _phase, accepted);
+	debug(1, "MagicWall: submit phase=%d accepted=%d", static_cast<int>(_phase), accepted);
 }
 
 void PuzzleMagicWall::gateDone(void *context, AnimationRunner *runner) {
 	(void)runner;
 	PuzzleMagicWall *page = static_cast<PuzzleMagicWall *>(context);
 	page->_canDepart = true;
-	if (page->_phase == 2)
+	if (page->_phase == Phase::kFinished)
 		page->_vm->restartGoBlink();
 }
 
@@ -552,7 +552,7 @@ void PuzzleMagicWall::onUpdate() {
 		return;
 	}
 	if (_nextPuzzlePending) {
-		_phase += 1;
+		_phase = Phase::kSecondBoard;
 		_nextPuzzlePending = false;
 		newPuzzle();
 	}
@@ -569,7 +569,7 @@ void PuzzleMagicWall::onUpdate() {
 	if (wasMoving && !beetlesMoving())
 		_movingRule = -1;
 	_hoveredTablet = tabletAt(_pointer);
-	_vm->setHoverCursorActive(_phase != 2 && !_nextPuzzlePending && !beetlesMoving() && (0 <= _hoveredTablet || inside(_pointer, 279, 341, 40, 70)));
+	_vm->setHoverCursorActive(_phase != Phase::kFinished && !_nextPuzzlePending && !beetlesMoving() && (0 <= _hoveredTablet || inside(_pointer, 279, 341, 40, 70)));
 	if (0 <= _hoveredTablet || beetlesMoving()) {
 		_ripplePhase += 7;
 		if (255 < _ripplePhase)
@@ -624,7 +624,7 @@ void PuzzleMagicWall::drawRipple(ManagedSurface32 *screen, Common::Point32 from,
 void PuzzleMagicWall::drawTablets(ManagedSurface32 *screen) {
 	for (uint i = 0; i < _maze.rules().size(); i++) {
 		_vm->_gfx->drawPageRleBlock(screen, kTabletPath, kTabletPositions[i] - Common::Point32(5, 5));
-		if (_nextPuzzlePending || _phase == 2)
+		if (_nextPuzzlePending || _phase == Phase::kFinished)
 			continue;
 		for (const MagicWallMaze::Edge &edge : _maze.rules()[i])
 			drawRipple(screen, tabletPoint(i, edge.from, 12), tabletPoint(i, edge.to, 12), 255);
@@ -672,7 +672,7 @@ void PuzzleMagicWall::drawConnections(ManagedSurface32 *screen, int index) {
 }
 
 void PuzzleMagicWall::drawBeetles(ManagedSurface32 *screen) {
-	if (_phase == 2 || _nextPuzzlePending)
+	if (_phase == Phase::kFinished || _nextPuzzlePending)
 		return;
 	for (uint i = 0; i < _maze.positions().size(); i++) {
 		_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kBugFormat, kColors[i]), _beetles[i].position);
@@ -683,7 +683,7 @@ void PuzzleMagicWall::drawBeetles(ManagedSurface32 *screen) {
 void PuzzleMagicWall::onRenderContent(ManagedSurface32 *screen) {
 	if (!_ready)
 		return;
-	if (_phase != 2) {
+	if (_phase != Phase::kFinished) {
 		drawTablets(screen);
 		if (!_nextPuzzlePending)
 			drawConnections(screen, beetlesMoving() ? _movingRule : _hoveredTablet);
@@ -697,18 +697,14 @@ void PuzzleMagicWall::onRenderContent(ManagedSurface32 *screen) {
 	}
 	bool allMatched = true;
 	for (uint i = 0; i < _maze.positions().size(); i++) {
-		const bool lit = _phase != 2 && !beetlesMoving() && _maze.matched(i);
+		const bool lit = _phase != Phase::kFinished && _maze.matched(i);
 		_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kLightFormat, kColors[lit ? i : 10]),
 									kLightPositions[i] - Common::Point32(6, 5));
 		if (!_maze.matched(i))
 			allMatched = false;
 	}
-	if (allMatched && _phase != 2 && !beetlesMoving() && !_leverRunner->isActive())
+	if (allMatched && _phase != Phase::kFinished && !_leverRunner->isActive())
 		_vm->_gfx->drawPageBitBlock(screen, kLeverGlowPath, Common::Point32(279, 362));
-	for (int i = 0; i < 4; i++) {
-		if (_gateRunners[i]->isActive())
-			_vm->_gfx->drawPageBitBlock(screen, Common::String::format(kGateBackFormat, 'A' + i), kGatePositions[i]);
-	}
 }
 
 void PuzzleMagicWall::onRenderActors(ManagedSurface32 *screen) {
@@ -721,8 +717,12 @@ void PuzzleMagicWall::onActorsRendered() {
 }
 
 void PuzzleMagicWall::onRenderForeground(ManagedSurface32 *screen) {
+	for (int i = 0; i < 4; i++) {
+		if (_gateRunners[i]->isActive())
+			_vm->_gfx->drawPageBitBlock(screen, Common::String::format(kGateBackFormat, 'A' + i), kGatePositions[i]);
+	}
 	_vm->_gfx->getPageLayerStack()->getLayer(1)->drawAndUpdate(screen);
-	if (_ready && !_nextPuzzlePending && _phase != 2 && gatesActive())
+	if (_ready && !_nextPuzzlePending && _phase != Phase::kFinished && gatesActive())
 		drawBeetles(screen);
 }
 
@@ -731,7 +731,7 @@ bool PuzzleMagicWall::inside(const Common::Point &pos, int x, int y, int width, 
 }
 
 int PuzzleMagicWall::tabletAt(const Common::Point &pos) const {
-	if (!_ready || _phase == 2 || _nextPuzzlePending)
+	if (!_ready || _phase == Phase::kFinished || _nextPuzzlePending)
 		return -1;
 	for (uint i = 0; i < _maze.rules().size(); i++) {
 		if (inside(pos, kTabletPositions[i].x, kTabletPositions[i].y, 50, 50))
@@ -833,7 +833,7 @@ Common::String PuzzleMagicWall::debugGetAnswer() const {
 }
 
 Common::String PuzzleMagicWall::debugGetChanceDetails() const {
-	return Common::String::format("Tablet presses and rejected submissions are unlimited. Accepted rounds: %d/2.\n", _phase);
+	return Common::String::format("Tablet presses and rejected submissions are unlimited. Accepted rounds: %d/2.\n", static_cast<int>(_phase));
 }
 
 } // End of namespace Zoombini2

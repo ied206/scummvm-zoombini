@@ -51,13 +51,15 @@ public:
 
 	/** Load the shelter and initialize an empty boarding party. */
 	void init() override;
-	/** Advance feature controls and active entrance paths. */
+	/** Advance feature controls, entrance paths, and concurrent return paths. */
 	void onUpdate() override;
 	/** Draw the shelter, feature stations, and boarding party. */
 	void onRenderContent(ManagedSurface32 *screen) override;
 	void onRenderActors(ManagedSurface32 *screen) override;
 	void onActorsRendered() override;
 	void onRenderForeground(ManagedSurface32 *screen) override;
+	/** Draw and advance the held Zoombini above the shared sidebar. */
+	void renderDragOverlay(ManagedSurface32 *screen, bool advanceState) override;
 	/** Refresh button availability and restart the runner under the final frame pointer. */
 	void onPostRender() override;
 	/** Dispatch a click to a feature station or party action. */
@@ -66,10 +68,16 @@ public:
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
 	/** Move the held boarding Zoombini with the pointer. */
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
+	/** Return the held Zoombini, or the full party when enhanced Shift+Delete is pressed. */
+	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
 	/** Return whether a full party of 16 can leave the shelter. */
 	bool canUseGoButton() const override;
+	/** Complete all active returns before the Map control saves or leaves the page. */
+	void onMapButtonPressed() override;
 
 private:
+	/** Number of fixed slots in the Zombiniville boarding area. */
+	static constexpr int kBoardingSlotCount = 16;
 	/** Resource path. */
 	static constexpr const char *kBackgroundPath = "#bmp/zombiniville/zoombiniville";
 	/** Resource path. */
@@ -152,6 +160,14 @@ private:
 
 	/** Zoombini states assigned to departure slots. */
 	Common::Array<ZoombiniRunner *> _boardingZoombinis;
+	/** Independent occupancy retained for one original Zombiniville slot. */
+	struct BoardingSlotState {
+		bool occupied = false;
+	};
+	/** Sixteen fixed boarding slots whose occupancy is independent of roster order. */
+	BoardingSlotState _boardingSlots[kBoardingSlotCount] = {};
+	/** Zoombinis currently following their leftward return paths. */
+	Common::Array<ZoombiniRunner *> _departingZoombinis;
 
 	/** Sound played when a feature value is selected. */
 	int _sndFeatureSelect = -1;
@@ -173,6 +189,10 @@ private:
 	bool canCreateSelectedZoombini() const;
 	/** Return whether any boarding Zoombini is still entering. */
 	bool hasActiveEntrance() const;
+	/** Return whether any boarding Zoombini is returning to the entrance. */
+	bool hasActiveReturns() const;
+	/** Return whether @p zoombini is following a return path. */
+	bool isZoombiniReturning(const ZoombiniRunner *zoombini) const;
 	/** Return whether the supplied trait combination fits the current party. */
 	bool passesPackTraitLimits(const ZmbTrait &traits) const;
 	/** Select a random feature combination. */
@@ -185,6 +205,20 @@ private:
 	Common::String generateName();
 	/** Create an entrance path ending at @p dest. */
 	PathObject *createEntrancePath(const Common::Point32 &dest) const;
+	/** Create a return path from @p start to the left-side entrance. */
+	PathObject *createReturnPath(const Common::Point32 &start) const;
+	/** Return the first free fixed boarding slot, or -1 when all slots are occupied. */
+	int findFirstFreeSlot() const;
+	/** Restore the four feature stations from @p zoombini. */
+	void restoreSelectedFeatures(const ZoombiniRunner &zoombini);
+	/** Begin returning @p zoombini and optionally restore its traits to the picker. */
+	void sendZoombiniOff(ZoombiniRunner *zoombini, bool restoreFeatures);
+	/** Begin returning every boarding Zoombini without changing the picker traits. */
+	void sendAllZoombinisOff();
+	/** Remove and release @p zoombini after its return path has completed. */
+	void finishSendingZoombiniOff(ZoombiniRunner *zoombini);
+	/** Complete and release every Zoombini still following a return path. */
+	void finishAllZoombiniReturns();
 	/** Initialize station and action-control hit-test geometry. */
 	void setupFeatureRects();
 	/** Reconstruct the page-authored hover timing tables for all 23 controls. */
@@ -195,9 +229,9 @@ private:
 	void updateHoverRunners();
 	/** Return the boarding-area pos for @p index. */
 	static Common::Point32 getSlotPosition(uint index);
-	/** Build the stable-Y actor order and separate the dragged Zoombini drawn last. */
-	void buildBoardingZoombiniDrawOrder(Common::Array<uint> &order, ZoombiniRunner *&draggedZoombini) const;
-	/** Draw all Zoombinis currently in the boarding area. */
+	/** Build the stable-Y actor order without the held Zoombini. */
+	void buildBoardingZoombiniDrawOrder(Common::Array<uint> &order) const;
+	/** Draw non-held Zoombinis currently in the boarding area. */
 	void drawBoardingZoombinis(ManagedSurface32 *screen) const;
 	/** Return the currently dragged boarding Zoombini, or nullptr. */
 	ZoombiniRunner *getDraggedZoombini() const;
