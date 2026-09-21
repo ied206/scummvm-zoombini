@@ -71,9 +71,6 @@ ShelterFinal::~ShelterFinal() {
 		}
 	}
 
-	delete _background;
-	delete _fullBigBool;
-	delete _revealBigBool;
 	delete _dancingBoolie;
 	delete _boolDance;
 	delete _revealFlare1;
@@ -90,23 +87,13 @@ void ShelterFinal::init() {
 	debug(1, "BooliewoodFinalPage::init");
 	_vm->_state->clearActiveZoombinis();
 
-	_background = new BitBlock(_vm);
-	if (!_background->load(Common::Path(kBackgroundPath))) {
+	if (!_vm->_gfx->loadPageBitBlock(kBackgroundPath)) {
 		warning("BooliewoodFinalPage: Failed to load big BOOL background");
-		delete _background;
-		_background = nullptr;
 	}
-	_fullBigBool = new BitBlock(_vm);
-	if (!_fullBigBool->load(Common::Path(kFullBigBoolPath))) {
+	if (!_vm->_gfx->loadPageBitBlock(kFullBigBoolPath)) {
 		warning("BooliewoodFinalPage: Failed to load thefullbigbool overlay");
-		delete _fullBigBool;
-		_fullBigBool = nullptr;
 	}
-	_revealBigBool = new RleBlock(_vm);
-	if (!_revealBigBool->loadFromFile(Common::Path(kRevealBigBoolPath))) {
-		delete _revealBigBool;
-		_revealBigBool = nullptr;
-	}
+	_vm->_gfx->loadPageRleBlock(kRevealBigBoolPath);
 
 	_dancingBoolie = new Animation(_vm);
 	if (!_dancingBoolie->loadFromFile(Common::Path(kDancingBooliePath))) {
@@ -196,10 +183,8 @@ void ShelterFinal::onUpdate() {
 }
 
 void ShelterFinal::onRenderContent(ManagedSurface32 *screen) {
-	if (_background)
-		_background->drawToSurface(screen, Common::Point32(0, 0));
-	if (_fullBigBool)
-		_fullBigBool->drawToSurface(screen, Common::Point32(225, 34));
+	_vm->_gfx->drawPageBitBlock(screen, kBackgroundPath, Common::Point32(0, 0));
+	_vm->_gfx->drawPageBitBlock(screen, kFullBigBoolPath, Common::Point32(225, 34));
 
 	const uint32 elapsed = _vm->getGameTickCount() - _animationStartTime;
 	if (_boolDance && 0 < _boolDance->getFrameCount())
@@ -334,8 +319,12 @@ bool ShelterFinal::isFireworkPositionFree(const Common::Point32 &pos) const {
 		pos,
 		Common::Point32(pos.x + 60, pos.y),
 		Common::Point32(pos.x, pos.y + 59),
-		Common::Point32(pos.x + 60, pos.y + 59)};
-	Common::Rect fixedRects[2] = {Common::Rect(153, 3, 647, 416), Common::Rect(0, 387, 800, 600)};
+		Common::Point32(pos.x + 60, pos.y + 59),
+	};
+	Common::Rect fixedRects[2] = {
+		Common::Rect(153, 3, 647, 416),
+		Common::Rect(0, 387, 800, 600),
+	};
 	for (int i = 0; i < kFireworkCount; i++) {
 		const Common::Rect &rect = _fireworks[i].collisionRect;
 		for (int corner = 0; corner < 4; corner++) {
@@ -373,9 +362,7 @@ void ShelterFinal::playRandomAmbient() {
 void ShelterFinal::drawAnimation(const Animation *animation, int frameIndex, const Common::Point32 &pos, ManagedSurface32 *screen) const {
 	if (!animation || animation->getFrameCount() <= 0)
 		return;
-	const RleBlock *frame = animation->getFrame(frameIndex % animation->getFrameCount());
-	if (frame)
-		frame->drawToScreen(screen, pos, _vm->getAlphaLUT());
+	_vm->_gfx->drawAnimationFrame(screen, animation, frameIndex % animation->getFrameCount(), pos);
 }
 
 void ShelterFinal::drawZoombini(const ZoombiniRunner &zoombini, ManagedSurface32 *screen) const {

@@ -26,15 +26,11 @@
 
 namespace Zoombini2 {
 
-class BitBlock;
-
 /** Load the title background and wait for input or the timeout. */
 class TransitionTitle : public TransitionBase {
 public:
 	/** Bind the title screen to @p vm. */
 	TransitionTitle(Zoombini2Engine *vm);
-	/** Release the title background and music. */
-	~TransitionTitle() override;
 
 	/** Load the background, start music, and establish the timeout. */
 	void init() override;
@@ -52,8 +48,6 @@ private:
 	static constexpr const char *kMusicPath = "#sounds/music/Booliewood_Level1.wav";
 
 	EventHandleResult dismiss();
-	/** Title-screen background bitmap. */
-	BitBlock *_background = nullptr;
 	/** Whether the player clicked to dismiss the title screen. */
 	bool _clicked = false;
 	/** Gameplay deadline for automatic dismissal. */

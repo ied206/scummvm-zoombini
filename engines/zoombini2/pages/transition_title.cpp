@@ -36,17 +36,12 @@ TransitionTitle::TransitionTitle(Zoombini2Engine *vm)
 	_pageId = kPageTitleScreen;
 }
 
-TransitionTitle::~TransitionTitle() {
-	delete _background;
-}
-
 void TransitionTitle::init() {
 	debug(1, "TitleScreen::init");
 	_deadline = _vm->getGameTickCount() + 10000;
 
 	// Load the static title background.
-	_background = new BitBlock(_vm);
-	if (!_background->load(Common::Path(kBackgroundPath))) {
+	if (!_vm->_gfx->loadPageBitBlock(kBackgroundPath)) {
 		warning("TitleScreen: Failed to load title background");
 	}
 
@@ -63,9 +58,7 @@ void TransitionTitle::onUpdate() {
 }
 
 void TransitionTitle::onRenderContent(ManagedSurface32 *screen) {
-	if (_background) {
-		_background->drawToSurface(screen, Common::Point32(0, 0));
-	}
+	_vm->_gfx->drawPageBitBlock(screen, kBackgroundPath, Common::Point32(0, 0));
 }
 
 EventHandleResult TransitionTitle::onLButtonDown(const Common::Point &pos) {

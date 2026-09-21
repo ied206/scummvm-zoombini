@@ -28,7 +28,6 @@ namespace Zoombini2 {
 
 class DialogBase;
 class DialogHelp;
-class RleBlock;
 enum class DialogMsgBoxButton;
 
 /** Interactive screens, including menus, maps, shelters, and puzzles. */
@@ -57,7 +56,7 @@ class Sidebar : public PageEventHandler {
 public:
 	/** Bind sidebar policy and resources to @p vm. */
 	explicit Sidebar(Zoombini2Engine *vm);
-	/** Release button resources, help state, and the saved background. */
+	/** Release help state and the saved background; button sprites remain in the graphics shared cache. */
 	~Sidebar();
 	/** Poll input, consume one release, and paint visible controls or their active dialog. */
 	void drawAndHandleInput(ManagedSurface32 *screen, bool inputAllowed);
@@ -131,20 +130,6 @@ private:
 	/** Help overlay managed by the sidebar. */
 	DialogHelp *_helpScreen = nullptr;
 
-	/** Help button's normal sprite. */
-	RleBlock *_helpNormal = nullptr;
-	/** Help button's highlighted sprite. */
-	RleBlock *_helpHighlight = nullptr;
-	/** Map button's normal sprite. */
-	RleBlock *_mapNormal = nullptr;
-	/** Map button's highlighted sprite. */
-	RleBlock *_mapHighlight = nullptr;
-	/** Go button's normal sprite. */
-	RleBlock *_goNormal = nullptr;
-	/** Go button's highlighted sprite. */
-	RleBlock *_goHighlight = nullptr;
-	/** Go button's disabled sprite. */
-	RleBlock *_goDisabled = nullptr;
 	/** Shared Help click sound registered with the sound manager. */
 	int _helpClickSoundId = -1;
 	/** Shared Map click sound registered with the sound manager. */

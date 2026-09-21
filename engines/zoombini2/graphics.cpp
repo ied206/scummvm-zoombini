@@ -38,6 +38,26 @@ namespace Zoombini2 {
 
 constexpr Size32 ManagedSurface32::kScreenSize;
 constexpr Size32 VolumePanel::kLabelSize;
+constexpr const char *VolumePanel::kGaugeImagePath;
+constexpr const char *VolumePanel::kOkNormalPath;
+constexpr const char *VolumePanel::kOkNormalMaskPath;
+constexpr const char *VolumePanel::kOkHighlightPath;
+constexpr const char *VolumePanel::kOkHighlightMaskPath;
+constexpr const char *VolumePanel::kNoNormalPath;
+constexpr const char *VolumePanel::kNoNormalMaskPath;
+constexpr const char *VolumePanel::kNoHighlightPath;
+constexpr const char *VolumePanel::kNoHighlightMaskPath;
+constexpr const char *VolumePanel::kMusicNormalPath;
+constexpr const char *VolumePanel::kMusicHighlightPath;
+constexpr const char *VolumePanel::kMusicMaskPath;
+constexpr const char *VolumePanel::kSfxNormalPath;
+constexpr const char *VolumePanel::kSfxHighlightPath;
+constexpr const char *VolumePanel::kSfxMaskPath;
+constexpr const char *VolumePanel::kSpeechNormalPath;
+constexpr const char *VolumePanel::kSpeechHighlightPath;
+constexpr const char *VolumePanel::kSpeechMaskPath;
+constexpr const char *VolumePanel::kSpeechPreviewSoundPath;
+constexpr const char *VolumePanel::kSfxPreviewSoundPath;
 
 void ManagedSurface32::fillRect(const Common::Rect32 &rect, uint32 color) {
 	if (!rect.isValidRect())
@@ -807,20 +827,94 @@ void RleBlock::drawToScreenClipped(ManagedSurface32 *destSurface, const Common::
 }
 
 constexpr const char *Gfx::kTextFontPath;
+constexpr const char *Gfx::kNameBoxSpritePath;
+constexpr const char *Gfx::kMapTransitionOverlayPathFormat;
+constexpr const char *Gfx::kMapTransitionBackgroundPathFormat;
 
 Gfx::Gfx(Zoombini2Engine *vm) : _vm(vm), _pageLayerStack(new PageLayerStack(vm)) {
 }
 
 Gfx::~Gfx() {
-	delete _background;
 	delete _pageLayerStack;
-	delete _nameBoxSprite;
+	clearPageBitmapCache();
+	clearRleBlockCache(_sharedRleBlocks);
+	clearBitBlockCache(_sharedBitBlocks);
 	delete _textFont;
 }
 
 void Gfx::clearPageLayers() {
 	if (_pageLayerStack)
 		_pageLayerStack->clear();
+}
+
+RleBlock *Gfx::loadRleBlock(RleBlockCache &cache, const Common::String &key) {
+	RleBlockCache::const_iterator cached = cache.find(key);
+	if (cached != cache.end())
+		return cached->_value;
+
+	RleBlock *sprite = new RleBlock(_vm);
+	const bool loaded = sprite->loadFromFile(Common::Path(key));
+	if (!loaded) {
+		delete sprite;
+		sprite = nullptr;
+	}
+	cache[key] = sprite;
+	return sprite;
+}
+
+BitBlock *Gfx::loadBitBlock(BitBlockCache &cache, const Common::String &key) {
+	BitBlockCache::const_iterator cached = cache.find(key);
+	if (cached != cache.end())
+		return cached->_value;
+
+	BitBlock *bitmap = new BitBlock(_vm);
+	const bool loaded = bitmap->load(Common::Path(key));
+	if (!loaded) {
+		delete bitmap;
+		bitmap = nullptr;
+	}
+	cache[key] = bitmap;
+	return bitmap;
+}
+
+BitBlock *Gfx::loadMaskedBitBlock(const Common::String &colorKey, const Common::String &alphaKey) {
+	for (uint index = 0; index < _pageMaskedBitBlocks.size(); index++) {
+		const MaskedBitBlockEntry &entry = _pageMaskedBitBlocks[index];
+		if (entry.colorPath.equalsIgnoreCase(colorKey) && entry.alphaPath.equalsIgnoreCase(alphaKey))
+			return entry.bitmap;
+	}
+
+	const Common::Path colorFilePath(colorKey);
+	const Common::Path alphaFilePath(alphaKey);
+	BitBlock *bitmap = new BitBlock(_vm);
+	if (!bitmap->loadFromColorAlphaBMP(colorFilePath, alphaFilePath)) {
+		delete bitmap;
+		return nullptr;
+	}
+	const MaskedBitBlockEntry entry = {colorKey, alphaKey, bitmap};
+	_pageMaskedBitBlocks.push_back(entry);
+	return bitmap;
+}
+
+void Gfx::clearRleBlockCache(RleBlockCache &cache) {
+	for (RleBlockCache::iterator entry = cache.begin(); entry != cache.end(); entry++)
+		delete entry->_value;
+	cache.clear();
+}
+
+void Gfx::clearBitBlockCache(BitBlockCache &cache) {
+	for (BitBlockCache::iterator entry = cache.begin(); entry != cache.end(); entry++)
+		delete entry->_value;
+	cache.clear();
+}
+
+void Gfx::clearPageBitmapCache() {
+	_background = nullptr;
+	clearRleBlockCache(_pageRleBlocks);
+	clearBitBlockCache(_pageBitBlocks);
+	for (uint index = 0; index < _pageMaskedBitBlocks.size(); index++)
+		delete _pageMaskedBitBlocks[index].bitmap;
+	_pageMaskedBitBlocks.clear();
 }
 
 ManagedSurface32 *Gfx::createSurface(const Size32 &size) const {
@@ -850,25 +944,26 @@ void Gfx::drawBitBlock(ManagedSurface32 *destSurface, const BitBlock *bitmap, co
 		bitmap->drawToSurface(destSurface, pos);
 }
 
+Size32 Gfx::getPageBitBlockSize(const Common::String &key) {
+	BitBlock *bitmap = loadPageBitBlock(key);
+	return bitmap ? bitmap->getSize() : Size32();
+}
+
 void Gfx::drawBitBlockSubRect(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos, const Common::Rect &srcRect) const {
 	if (destSurface && bitmap)
 		bitmap->drawSubRect(destSurface, pos, srcRect);
 }
 
-bool Gfx::loadBackground(const Common::Path &path) {
-	BitBlock *background = new BitBlock(_vm);
-	if (!background->load(path)) {
-		delete background;
+bool Gfx::loadBackground(const Common::String &key) {
+	BitBlock *background = loadPageBitBlock(key);
+	if (!background)
 		return false;
-	}
 
-	delete _background;
 	_background = background;
 	return true;
 }
 
 void Gfx::clearBackground() {
-	delete _background;
 	_background = nullptr;
 }
 
@@ -885,6 +980,16 @@ void Gfx::drawBackgroundSubRect(ManagedSurface32 *destSurface, const Common::Poi
 void Gfx::drawRleBlock(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos) const {
 	if (destSurface && sprite)
 		sprite->drawToScreen(destSurface, pos, _vm->getAlphaLUT());
+}
+
+Size32 Gfx::getPageRleBlockSize(const Common::String &key) {
+	RleBlock *sprite = loadPageRleBlock(key);
+	return sprite ? sprite->getSize() : Size32();
+}
+
+void Gfx::drawRleBlockClipped(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos, const Common::Rect32 &clip) const {
+	if (destSurface && sprite)
+		sprite->drawToScreenClipped(destSurface, pos, clip, _vm->getAlphaLUT());
 }
 
 void Gfx::drawAnimationFrame(ManagedSurface32 *destSurface, const Animation *animation, int frameIndex, const Common::Point32 &pos) const {
@@ -937,8 +1042,18 @@ void Gfx::drawZoombiniPreview(ManagedSurface32 *screen, const ZoombiniAnimation 
 	if (!screen || !animation)
 		return;
 	static constexpr int kBaseCell = 990;
-	static constexpr int kFeatureCellBases[ZmbTrait::kTraitCount] = {996, 1002, 1008, 1014};
-	static constexpr int kFeatureDrawOrder[ZmbTrait::kTraitCount] = {0, 2, 3, 1};
+	static constexpr int kFeatureCellBases[ZmbTrait::kTraitCount] = {
+		996,
+		1002,
+		1008,
+		1014,
+	};
+	static constexpr int kFeatureDrawOrder[ZmbTrait::kTraitCount] = {
+		0,
+		2,
+		3,
+		1,
+	};
 	const RleBlock *frame = animation->getFrame(kBaseCell, 0);
 	if (frame)
 		frame->drawToScreen(screen, pos, alphaLUT);
@@ -1019,7 +1134,7 @@ void Gfx::drawDragNameTooltip(ManagedSurface32 *destSurface, const Common::Strin
 	if (!destSurface)
 		return;
 	if (!_nameBoxSprite) {
-		_nameBoxSprite = _vm->loadRleBlock("bmp/menu/name_box.rb");
+		_nameBoxSprite = loadSharedRleBlock(kNameBoxSpritePath);
 		if (!_nameBoxSprite)
 			return;
 	}
@@ -1089,10 +1204,10 @@ void Gfx::drawLine(ManagedSurface32 *destSurface, const Common::Point32 &start, 
 ManagedSurface32 *Gfx::createMapTransitionBackground(PageId srcPage, int mapRegion, RouteBranch routeBranch) {
 	ManagedSurface32 *background = createSurface(ManagedSurface32::kScreenSize);
 
-	const Common::String backgroundPath = Common::String::format("#bmp/maptrans/bigmap_background_%d", mapRegion);
-	BitBlock bitmap(_vm);
-	if (bitmap.load(Common::Path(backgroundPath))) {
-		drawBitBlock(background, &bitmap, Common::Point32(0, 0));
+	const Common::String backgroundPath = Common::String::format(kMapTransitionBackgroundPathFormat, mapRegion);
+	BitBlock *bitmap = loadPageBitBlock(backgroundPath);
+	if (bitmap) {
+		drawBitBlock(background, bitmap, Common::Point32(0, 0));
 	} else {
 		warning("MapTransition: Failed to load background %s", backgroundPath.c_str());
 		fillRect(background, Common::Rect32(0, 0, ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), 0);
@@ -1102,13 +1217,13 @@ ManagedSurface32 *Gfx::createMapTransitionBackground(PageId srcPage, int mapRegi
 	return background;
 }
 
-/** Load, draw, and release one cached map-overlay RLE sprite. */
+/** Draw one map-overlay RLE sprite retained for the current page. */
 void Gfx::drawOverlaySprite(ManagedSurface32 *dst, const Common::String &name, const Common::Point32 &pos) {
-	const Common::Path overlayPath(Common::String::format("bmp/maptrans/%s.bmp", name.c_str()));
+	const Common::String overlayPath = Common::String::format(kMapTransitionOverlayPathFormat, name.c_str());
 
-	RleBlock overlay(_vm);
-	if (overlay.load(overlayPath)) {
-		drawRleBlock(dst, &overlay, pos);
+	RleBlock *overlay = loadPageRleBlock(overlayPath);
+	if (overlay) {
+		drawRleBlock(dst, overlay, pos);
 	} else {
 		debug(2, "MapTransition: overlay '%s' not found", name.c_str());
 	}
@@ -1615,12 +1730,6 @@ UIButton::~UIButton() {
 }
 
 void UIButton::clearImages() {
-	delete _normalBB;
-	delete _hoverBB;
-	delete _disabledBB;
-	delete _normalRle;
-	delete _hoverRle;
-	delete _disabledRle;
 	_normalBB = nullptr;
 	_hoverBB = nullptr;
 	_disabledBB = nullptr;
@@ -1692,17 +1801,14 @@ bool UIButton::loadImage(const Common::Path &path, BitBlock *&bitmap, RleBlock *
 	if (path.empty())
 		return true;
 
-	bitmap = new BitBlock(_vm);
-	if (bitmap->load(path))
+	const Common::String key = path.toString('/');
+	bitmap = _vm->_gfx->loadPageBitBlock(key);
+	if (bitmap)
 		return true;
-	delete bitmap;
-	bitmap = nullptr;
 
-	rle = new RleBlock(_vm);
-	if (rle->load(path))
+	rle = _vm->_gfx->loadPageRleBlock(key);
+	if (rle)
 		return true;
-	delete rle;
-	rle = nullptr;
 	return false;
 }
 
@@ -1712,17 +1818,14 @@ bool UIButton::loadMaskedImage(const Common::Path &colorPath, const Common::Path
 	if (colorPath.empty() || maskPath.empty())
 		return false;
 
-	rle = new RleBlock(_vm);
-	if (rle->load(colorPath))
+	const Common::String colorKey = colorPath.toString('/');
+	rle = _vm->_gfx->loadPageRleBlock(colorKey);
+	if (rle)
 		return true;
-	delete rle;
-	rle = nullptr;
 
-	bitmap = new BitBlock(_vm);
-	if (bitmap->loadFromColorAlphaBMP(colorPath, maskPath))
+	bitmap = _vm->_gfx->loadPageMaskedBitBlock(colorKey, maskPath.toString('/'));
+	if (bitmap)
 		return true;
-	delete bitmap;
-	bitmap = nullptr;
 	return false;
 }
 
@@ -2066,39 +2169,38 @@ VolumePanel::~VolumePanel() {
 		if (0 <= _sfxPreviewSoundId)
 			_soundManager->unload(_sfxPreviewSoundId);
 	}
-	delete _gaugeImage;
 }
 
 bool VolumePanel::init(SoundManager *soundManager) {
 	_soundManager = soundManager;
-	delete _gaugeImage;
-	_gaugeImage = new RleBlock(_vm);
+	_gaugeImage = _vm->_gfx->loadPageRleBlock(kGaugeImagePath);
 	bool loaded = true;
-	if (!_gaugeImage->loadFromFile(Common::Path("bmp/menu/OPTION - Jauge.rb"))) {
+	if (!_gaugeImage) {
 		warning("VolumePanel: Failed to load gauge image");
-		delete _gaugeImage;
-		_gaugeImage = nullptr;
 		loaded = false;
 	}
 
 	_okButton.setRect(Common::Point32(294, 487), Size32(76, 74));
-	if (!_okButton.loadImages(Common::Path("bmp/menu/MENU - Valid - OK"), Common::Path("bmp/menu/MENU - Valid - OK highlight")))
+	if (!_okButton.loadImagesWithMask(Common::Path(kOkNormalPath), Common::Path(kOkNormalMaskPath), Common::Path(kOkHighlightPath), Common::Path(kOkHighlightMaskPath)))
 		loaded = false;
 
 	_noButton.setRect(Common::Point32(468, 487), Size32(76, 74));
-	if (!_noButton.loadImages(Common::Path("bmp/menu/MENU - Valid - NO"), Common::Path("bmp/menu/MENU - Valid - NO highlight")))
+	if (!_noButton.loadImagesWithMask(Common::Path(kNoNormalPath), Common::Path(kNoNormalMaskPath), Common::Path(kNoHighlightPath), Common::Path(kNoHighlightMaskPath)))
 		loaded = false;
 
 	_sliderLabels[0].setRect(Common::Point32(kLabelX, kMusicLabelY), kLabelSize);
-	if (!_sliderLabels[0].loadImages(Common::Path("bmp/menu/OPTION - Musique NORMAL"), Common::Path("bmp/menu/OPTION - Musique HIGHLIGHT")))
+	const Common::Path musicMask(kMusicMaskPath);
+	if (!_sliderLabels[0].loadImagesWithMask(Common::Path(kMusicNormalPath), musicMask, Common::Path(kMusicHighlightPath), musicMask))
 		loaded = false;
 
 	_sliderLabels[1].setRect(Common::Point32(kLabelX, kSfxLabelY), kLabelSize);
-	if (!_sliderLabels[1].loadImages(Common::Path("bmp/menu/OPTION - Bruitages NORMAL"), Common::Path("bmp/menu/OPTION - Bruitages HILITE")))
+	const Common::Path sfxMask(kSfxMaskPath);
+	if (!_sliderLabels[1].loadImagesWithMask(Common::Path(kSfxNormalPath), sfxMask, Common::Path(kSfxHighlightPath), sfxMask))
 		loaded = false;
 
 	_sliderLabels[2].setRect(Common::Point32(kLabelX, kSpeechLabelY), kLabelSize);
-	if (!_sliderLabels[2].loadImages(Common::Path("bmp/menu/OPTION - Dialogues NORMAL"), Common::Path("bmp/menu/OPTION - Dialogues HILITE")))
+	const Common::Path speechMask(kSpeechMaskPath);
+	if (!_sliderLabels[2].loadImagesWithMask(Common::Path(kSpeechNormalPath), speechMask, Common::Path(kSpeechHighlightPath), speechMask))
 		loaded = false;
 
 	_musicSliderX = volumeToPixel(_settings._music);
@@ -2108,8 +2210,8 @@ bool VolumePanel::init(SoundManager *soundManager) {
 	_sliderLabels[1].setOverlay(_gaugeImage, Common::Point32(kSliderMinX - kLabelX, kSfxGaugeY - kSfxLabelY), &_sfxSliderX);
 	_sliderLabels[2].setOverlay(_gaugeImage, Common::Point32(kSliderMinX - kLabelX, kSpeechGaugeY - kSpeechLabelY), &_speechSliderX);
 	if (_soundManager) {
-		_speechPreviewSoundId = _soundManager->load(false, Common::Path("sounds/voice.wav"), false);
-		_sfxPreviewSoundId = _soundManager->load(false, Common::Path("sounds/fx/03-BS01.wav"), false);
+		_speechPreviewSoundId = _soundManager->load(false, Common::Path(kSpeechPreviewSoundPath), false);
+		_sfxPreviewSoundId = _soundManager->load(false, Common::Path(kSfxPreviewSoundPath), false);
 	}
 
 	return loaded;
