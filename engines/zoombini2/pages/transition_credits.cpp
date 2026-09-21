@@ -37,20 +37,15 @@ TransitionCredits::TransitionCredits(Zoombini2Engine *vm)
 	_pageId = kPageCredits;
 }
 
-TransitionCredits::~TransitionCredits() {
-	delete _background;
-}
-
 void TransitionCredits::init() {
 	debug(1, "TransitionCredits::init");
 	static constexpr uint32 kInitialHoldMilliseconds = 4000;
 
-	_background = new BitBlock(_vm);
-	if (!_background->load(Common::Path(kBackgroundPath))) {
-		warning("TransitionCredits: Failed to load bmp/credits/credits");
+	const Size32 backgroundSize = _vm->_gfx->getPageBitBlockSize(kBackgroundPath);
+	if (backgroundSize.width == 0 || backgroundSize.height == 0) {
+		warning("TransitionCredits: Failed to load credits background");
 	}
 
-	const Size32 backgroundSize = _background->getSize();
 	_maxScrollY = 0;
 	if (ManagedSurface32::kScreenSize.height < backgroundSize.height)
 		_maxScrollY = backgroundSize.height - ManagedSurface32::kScreenSize.height;
@@ -104,16 +99,16 @@ void TransitionCredits::onRenderContent(ManagedSurface32 *screen) {
 		return;
 	_redrawNeeded = false;
 
-	if (!_background)
+	const Size32 backgroundSize = _vm->_gfx->getPageBitBlockSize(kBackgroundPath);
+	if (backgroundSize.width == 0 || backgroundSize.height == 0)
 		return;
 
 	const int y = static_cast<int>(_scrollY);
-	const Size32 backgroundSize = _background->getSize();
 	int srcBottom = y + ManagedSurface32::kScreenSize.height;
 	if (backgroundSize.height < srcBottom)
 		srcBottom = backgroundSize.height;
 
-	_background->drawSubRect(screen, Common::Point32(0, 0), Common::Rect(0, y, backgroundSize.width, srcBottom));
+	_vm->_gfx->drawPageBitBlockSubRect(screen, kBackgroundPath, Common::Point32(0, 0), Common::Rect(0, y, backgroundSize.width, srcBottom));
 }
 
 EventHandleResult TransitionCredits::onLButtonDown(const Common::Point &pos) {

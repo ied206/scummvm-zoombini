@@ -23,70 +23,112 @@
 #define ZOOMBINI2_PAGES_PUZZLE_MAGICWALL_H
 
 #include "common/array.h"
-#include "common/path.h"
 #include "common/rect.h"
-
-#include "zoombini2/graphics.h"
 #include "zoombini2/pages/puzzle_base.h"
+
+namespace Common {
+class SeekableReadStream;
+}
 
 namespace Zoombini2 {
 
-class RleBlock;
 class Animation;
-class PathObject;
+class AnimationRunner;
+struct PathObject;
 
-/**
- * Beetle Bug Alley (Route2-1)
- *
- * Use the stone tablets to move every beetle onto its matching color marker.
- */
-class PuzzleMagicWall : public PuzzleBase {
+class Random;
+
+/** Resource-defined beetle permutations and weighted puzzle generation. */
+class MagicWallMaze {
 public:
-	/** Construct Beetle Bug Alley for @p vm. */
-	PuzzleMagicWall(Zoombini2Engine *vm);
-	/** Release maze elements, paths, graphics, and sounds. */
-	~PuzzleMagicWall() override;
-
-	/** Load the selected maze and assign colors to the puzzle roster. */
-	void init() override;
-	/** Advance the active path, gates, and completion state. */
-	void onUpdate() override;
-	/** Draw the maze, controls, color guides, gates, and Zoombinis. */
-	void onRenderContent(ManagedSurface32 *screen) override;
-	/** Restore the page background. */
-	void onRenderBackground(ManagedSurface32 *screen) override;
-	/** Activate the tablet or lever at @p pos. */
-	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	struct Edge {
+		int from = 0;
+		int to = 0;
+		bool swap = false;
+	};
+	typedef Common::Array<Edge> Rule;
+	typedef Common::Array<Rule> Variant;
+	struct Layout {
+		int difficulty = 0;
+		int weight = 0;
+		Common::Array<Common::Point32> points;
+		Common::Array<Variant> groups[3];
+	};
+	/** Read bounded layout records, retaining complete records before damaged trailing data. */
+	bool load(Common::SeekableReadStream &stream);
+	bool generate(int difficulty, Random &random);
+	void apply(int ruleIndex);
+	bool matched(int color) const;
+	bool gateMatched(int gate) const;
+	int layoutIndex() const { return _layoutIndex; }
+	const Layout &layout() const { return _layouts[_layoutIndex]; }
+	const Common::Array<Layout> &layouts() const { return _layouts; }
+	const Variant &rules() const { return _rules; }
+	const Common::Array<int> &positions() const { return _positions; }
+	const Common::Array<int> &initialPositions() const { return _initialPositions; }
+	const Common::Array<int> &generationSequence() const { return _generationSequence; }
+	bool debugSolution(Common::Array<int> &sequence) const;
 
 private:
-	/** Color indices shared by doors, dots, bugs, and minimap lights. */
-	enum Color {
-		/** Blue resource set. */
-		kColorBlue = 0,
-		/** Green resource set. */
-		kColorGreen,
-		/** Navy resource set. */
-		kColorNavy,
-		/** Orange resource set. */
-		kColorOrange,
-		/** Purple resource set. */
-		kColorPurple,
-		/** Red resource set. */
-		kColorRed,
-		/** Rose resource set. */
-		kColorRose,
-		/** Turquoise resource set. */
-		kColorTurquoise,
-		/** Violet resource set. */
-		kColorViolet,
-		/** Yellow resource set. */
-		kColorYellow,
-		/** Number of color resource sets. */
-		kColorCount
-	};
+	static bool readCount(Common::SeekableReadStream &stream, int &count, int maximum);
+	static bool readLayout(Common::SeekableReadStream &stream, Layout &layout);
+	/** Apply a whole rule once per beetle, or sequentially when constructing a scramble. */
+	static void applyRule(const Rule &rule, Common::Array<int> &positions, bool simultaneous);
+	static bool isIdentity(const Common::Array<int> &positions);
+	int solve(const Common::Array<int> &positions, int depth) const;
+	bool debugSolve(const Common::Array<int> &positions, int depth, int &budget, Common::Array<int> &sequence) const;
+	void scramble(Random &random);
+	Common::Array<Layout> _layouts;
+	int _layoutIndex = -1;
+	Variant _rules;
+	Common::Array<int> _positions;
+	/** Sequential construction operations for the selected initial board, not a player solution. */
+	Common::Array<int> _generationSequence;
+	Common::Array<int> _initialPositions;
+};
 
-	/** Resource-name fragments indexed by @ref PuzzleMagicWall::Color. */
-	static constexpr const char *kColorNames[kColorCount] = {
+/** Beetle Bug Alley: stone tablets permute beetles to unlock four doors. */
+class PuzzleMagicWall : public PuzzleBase {
+public:
+	explicit PuzzleMagicWall(Zoombini2Engine *vm);
+	~PuzzleMagicWall() override;
+	void init() override;
+	void onUpdate() override;
+	void onRenderBackground(ManagedSurface32 *screen) override;
+	void onRenderContent(ManagedSurface32 *screen) override;
+	void onRenderActors(ManagedSurface32 *screen) override;
+	void onActorsRendered() override;
+	void onRenderForeground(ManagedSurface32 *screen) override;
+	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	EventHandleResult onLButtonUp(const Common::Point &pos) override;
+	EventHandleResult onMouseMove(const Common::Point &pos) override;
+	bool canUseGoButton() const override;
+	bool onGoButtonPressed() override;
+	bool blocksSidebarInteraction() const override;
+	Common::String debugGetAnswer() const override;
+	Common::String debugGetChanceDetails() const override;
+
+private:
+	static constexpr const char *kLayoutPath = "bmp/magic_wall/default.ztl";
+	static constexpr const char *kMusicPath = "#sounds/music/06-BB01.wav";
+	static constexpr const char *kDotFormat = "bmp/magic_wall/DOT-%s";
+	static constexpr const char *kBugFormat = "bmp/magic_wall/bug_c_%s";
+	static constexpr const char *kDirectionFormat = "bmp/magic_wall/bug_%d";
+	static constexpr const char *kLightFormat = "bmp/magic_wall/mini-light-%s";
+	static constexpr const char *kTabletPath = "bmp/magic_wall/mini-map";
+	static constexpr const char *kTabletDotPath = "bmp/magic_wall/mini-map-dot";
+	static constexpr const char *kLeverPath = "bmp/magic_wall/le_vier";
+	static constexpr const char *kLeverGlowPath = "bmp/magic_wall/le_vier_luisant";
+	static constexpr const char *kGateFormat = "bmp/magic_wall/porte-%c";
+	static constexpr const char *kGateBackFormat = "bmp/magic_wall/porte-%csingle";
+	static constexpr const char *kExitFormat = "bmp/magic_wall/PAT/EXIT%d.PAT";
+	static constexpr const char *kMoveFormat = "bmp/magic_wall/PAT/BOUGE%d.PAT";
+	static constexpr const char *kBugLoopPath = "sounds/fx/06-BB02.wav";
+	static constexpr const char *kGateSoundPath = "sounds/fx/06-BS03.wav";
+	static constexpr const char *kLeverSoundPath = "sounds/fx/06-BS05.wav";
+	static constexpr const char *kRetreatSpeechPath = "sounds/DW-Cave.wav";
+	static constexpr const char *kPerfectSpeechFormat = "sounds/wld11.%d.wav";
+	static constexpr const char *kColors[11] = {
 		"blue",
 		"green",
 		"navy",
@@ -97,216 +139,95 @@ private:
 		"turquoise",
 		"violet",
 		"yellow",
+		"pierre",
+	};
+	static constexpr Common::Point32 kTabletPositions[5] = {
+		{350, 400},
+		{415, 417},
+		{482, 425},
+		{553, 440},
+		{616, 455},
+	};
+	static constexpr Common::Point32 kGatePositions[4] = {
+		{76, 290},
+		{129, 288},
+		{180, 288},
+		{228, 285},
+	};
+	static constexpr Common::Point32 kRosterPositions[8] = {
+		{31, 442},
+		{77, 458},
+		{124, 465},
+		{171, 473},
+		{12, 478},
+		{60, 499},
+		{109, 515},
+		{158, 524},
+	};
+	static constexpr Common::Point32 kLightPositions[10] = {
+		{82, 346},
+		{130, 335},
+		{184, 336},
+		{243, 346},
+		{103, 347},
+		{151, 336},
+		{205, 336},
+		{265, 346},
+		{93, 326},
+		{142, 315},
 	};
 
-	/** Resource paths and formats used by the Beetle Bug Alley scene. */
-	static constexpr const char *kMusicPath = "#sounds/music/06-BB01.wav";
-	static constexpr const char *kApprovalFormat = "sounds/6-A%d.wav";
-	static constexpr const char *kErrorFormat = "sounds/6-E%d.wav";
-	static constexpr const char *kHintFormat = "sounds/6-H%d.wav";
-	static constexpr const char *kGateOpenPath = "sounds/fx/06-BS01.wav";
-	static constexpr const char *kZoombiniMovePath = "sounds/fx/06-BS02.wav";
-	static constexpr const char *kDotFormat = "bmp/magic_wall/DOT-%s";
-	static constexpr const char *kBugFormat = "bmp/magic_wall/bug_c_%s";
-	static constexpr const char *kMiniMapPath = "bmp/magic_wall/mini-map";
-	static constexpr const char *kMiniMapDotPath = "bmp/magic_wall/mini-map-dot";
-	static constexpr const char *kMiniLightFormat = "bmp/magic_wall/mini-light-%s";
-	static constexpr const char *kGlowwormPath = "bmp/magic_wall/le_vier_luisant";
-	static constexpr const char *kGlowwormAnimPath = "bmp/magic_wall/le_vier";
-	static constexpr const char *kGateFormat = "bmp/magic_wall/%s";
-	static constexpr const char *kCrystalFormat = "bmp/magic_wall/Crystal%d";
-	static constexpr const char *kExitPathFormat = "bmp/magic_wall/PAT/EXIT%d.PAT";
-	static constexpr const char *kBougePathFormat = "bmp/magic_wall/PAT/BOUGE%d.PAT";
-	/** Gate animation name fragments consumed by @ref kGateFormat. */
-	static constexpr const char *kGateNames[4] = {"porte-A", "porte-B", "porte-C", "porte-D"};
-
-	/** Runtime phase of the Beetle Bug Alley interaction. */
-	enum State {
-		/** Complete initial maze setup. */
-		kStateInit,
-		/** Wait for tablet or lever input. */
-		kStateIdle,
-		/** Move one Zoombini along its selected path. */
-		kStateZoombiniMoving,
-		/** Play the gate-opening animation. */
-		kStateGateOpening,
-		/** Hold after every assigned Zoombini reaches a destination. */
-		kStateComplete,
-		/** Stop accepting input while leaving the page. */
-		kStateDone
-	};
-
-	/** One occupied or destination slot in the maze. */
-	struct ZoombiniSlot {
-		/** Index into @ref Puzzle::_puzzleZoombinis, or `-1` when empty. */
-		int zoombiniIdx = -1;
-		/** Percentage progress along the active path. */
-		int pathProgress = 0;
-		/** Color required by this Zoombini's destination. */
-		int targetColor = -1;
-		/** Whether the Zoombini has reached its destination. */
-		bool captured = false;
-		/** Current screen position. */
-		Common::Point32 pos = Common::Point32();
-		/** Path currently being traversed. */
+	struct Beetle {
+		Common::Point32 position;
 		PathObject *path = nullptr;
-		/** Time at which path traversal began. */
-		uint32 pathStartTime = 0;
+		int direction = 0;
 	};
 
-	/** One colored destination marker in the maze. */
-	struct ColorDot {
-		/** Color index used by this marker. */
-		int colorIdx;
-		/** Screen position. */
-		Common::Point32 pos;
-		/** Whether the corresponding door light is enabled. */
-		bool lightOn = false;
-	};
-
-	/** One colored beetle guide in the maze. */
-	struct ColorBug {
-		/** Color index used by this beetle. */
-		int colorIdx;
-		/** Screen position. */
-		Common::Point32 pos;
-		/** Whether the beetle is currently guiding a path. */
-		bool active;
-	};
-
-	/** Clickable stone tablet that transfers a beetle between slots. */
-	struct Tablet {
-		/** Clickable tablet area. */
-		Common::Rect rect;
-		/** Slot from which the tablet moves a beetle. */
-		int srcSlot;
-		/** Slot to which the tablet moves a beetle. */
-		int destSlot;
-		/** Path followed during the transfer. */
-		PathObject *path = nullptr;
-	};
-
-	/** One destination gate and its animation state. */
-	struct Gate {
-		/** Gate index corresponding to gates A through D. */
-		int gateIdx;
-		/** Screen position. */
-		Common::Point32 pos;
-		/** Whether this gate is open. */
-		bool open = false;
-		/** Time at which the opening animation began. */
-		uint32 animStart = 0;
-	};
-
-	/** Load all maze graphics, animations, paths, and sounds. */
 	void loadResources();
-	/** Configure the maze variant selected by level. */
-	void setupMaze();
-	/** Place colored destination markers. */
-	void placeColorDots();
-	/** Place colored beetle guides. */
-	void placeColorBugs();
-	/** Configure tablet hit areas and transfer paths. */
-	void setupTablets();
-	/** Assign puzzle-roster entries to entrance slots. */
-	void assignZoombiniSlots();
-
-	/** Start path traversal for slot @p slotIdx. */
-	void startZoombiniPath(int slotIdx);
-	/** Advance the path traversal for slot @p slotIdx. */
-	void advanceZoombiniPath(int slotIdx);
-	/** Return whether slot @p slotIdx has reached the correct destination. */
-	bool checkSlotComplete(int slotIdx);
-	/** Mark slot @p slotIdx captured and update gate state. */
-	void completeSlot(int slotIdx);
-	/** Synchronize door lights with the current color arrangement. */
-	void updateLights();
-	/** Return the number of slots that reached their destinations. */
-	uint countCaptured() const;
-
-	/** Draw maze layer @p level. */
-	void drawMazeLevel(ManagedSurface32 *screen, int level);
-	/** Draw colored destination markers. */
-	void drawColorDots(ManagedSurface32 *screen);
-	/** Draw colored beetle guides. */
-	void drawColorBugs(ManagedSurface32 *screen);
-	/** Draw stone tablet controls. */
+	void newPuzzle();
+	void startRule(int index);
+	void submit();
+	void startRunnerPath(int index, int gate, bool exit);
+	bool gatesActive() const;
+	bool runnersMoving() const;
+	bool beetlesMoving() const;
+	int tabletAt(const Common::Point &pos) const;
+	Common::Point32 dotPosition(int index) const;
+	Common::Point32 tabletPoint(int tablet, int point, int inset) const;
 	void drawTablets(ManagedSurface32 *screen);
-	/** Draw the glowworm wall lever. */
-	void drawWallLever(ManagedSurface32 *screen);
-	/** Draw the minimap and its color lights. */
-	void drawMinimap(ManagedSurface32 *screen);
-	/** Draw all destination gates. */
-	void drawGates(ManagedSurface32 *screen);
-	/** Draw waiting and moving Zoombinis. */
-	void onRenderActors(ManagedSurface32 *screen) override;
+	void drawConnections(ManagedSurface32 *screen, int index);
+	void drawBeetles(ManagedSurface32 *screen);
+	void drawRipple(ManagedSurface32 *screen, Common::Point32 from, const Common::Point32 &to, int phase);
+	static int directionIndex(const Common::Point32 &from, const Common::Point32 &to);
+	static bool inside(const Common::Point &pos, int x, int y, int width, int height);
+	static void gateDone(void *context, AnimationRunner *runner);
 
-	/** Current interaction phase. */
-	State _state = kStateInit;
-	/** Level-selected maze variant. */
-	int _currentLevel = 0;
-	/** Currently moving slot, or `-1` when none is active. */
-	int _activeSlot = -1;
-	/** Destination slot for the current movement. */
-	int _destSlot = -1;
-	/** Number of Zoombinis already captured by their matching gates. */
-	int _capturedCount = 0;
+	MagicWallMaze _maze;
+	Beetle _beetles[10];
+	Animation *_gateAnimations[4] = {};
+	Animation *_leverAnimation = nullptr;
+	AnimationRunner *_gateRunners[4] = {};
+	AnimationRunner *_leverRunner = nullptr;
 
-	/** Four entrance slots followed by four destination slots. */
-	ZoombiniSlot _slots[8];
-
-	/** Destination color indexed by puzzle-roster entry. */
-	int _zoombiniColors[16];
-
-	/** Colored destination markers. */
-	Common::Array<ColorDot> _colorDots;
-	/** Colored beetle guides. */
-	Common::Array<ColorBug> _colorBugs;
-	/** Stone tablet controls. */
-	Common::Array<Tablet> _tablets;
-	/** Glowworm lever hit-test area. */
-	Common::Rect _wallLever = Common::Rect();
-	/** Four destination gates. */
-	Gate _gates[4];
-
-	/** Destination-dot visuals indexed by color. */
-	RleBlock *_dotImage[kColorCount] = {};
-	/** Beetle visuals indexed by color. */
-	RleBlock *_bugImage[kColorCount] = {};
-	/** Minimap background. */
-	RleBlock *_miniMapImage = nullptr;
-	/** Minimap position marker. */
-	RleBlock *_miniMapDotImage = nullptr;
-	/** Minimap lights indexed by color. */
-	RleBlock *_miniLightImage[kColorCount] = {};
-	/** Static glowworm lever visual. */
-	RleBlock *_glowwormImage = nullptr;
-	/** Animated glowworm lever visual. */
-	Animation *_glowwormAnim = nullptr;
-	/** Gate-opening animations. */
-	Animation *_gateAnims[4] = {};
-	/** Crystal feedback animations. */
-	Animation *_crystalAnims[5] = {};
-
-	/** Paths from matching gates to the maze exits. */
-	PathObject *_exitPaths[4] = {};
-	/** Internal movement paths connecting maze slots. */
-	PathObject *_bougePaths[4] = {};
-
-	/** Approval sounds cycled after successful moves. */
-	int _sndApproval[4] = {-1, -1, -1, -1};
-	/** Error sounds selected after invalid moves. */
-	int _sndError[2] = {-1, -1};
-	/** Hint sounds associated with the four gates. */
-	int _sndHint[4] = {-1, -1, -1, -1};
-	/** Gate-opening sound. */
-	int _sndGateOpen = -1;
-	/** Zoombini movement sound. */
-	int _sndZoombiniMove = -1;
-	/** Index of the next approval sound to play. */
-	int _nextApprovalIdx = 0;
+	// A runner is retired only after its exit path reaches the upper side of the gate.
+	bool _exited[8] = {};
+	bool _ready = false;
+	bool _nextPuzzlePending = false;
+	bool _canDepart = false;
+	bool _buttonArmed = false;
+	bool _speechPending = false;
+	// The first accepted submission starts a new board; the second finishes the puzzle.
+	int _phase = 0;
+	int _hoveredTablet = -1;
+	int _movingRule = -1;
+	int _ripplePhase = 0;
+	Common::Point _pointer;
+	int _bugSound = -1;
+	int _gateSound = -1;
+	int _leverSound = -1;
+	int _speechSound = -1;
 };
 
 } // End of namespace Zoombini2
 
-#endif // ZOOMBINI2_PAGES_PUZZLE_MAGICWALL_H
+#endif

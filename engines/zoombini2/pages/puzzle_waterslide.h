@@ -22,231 +22,214 @@
 #ifndef ZOOMBINI2_PAGES_PUZZLE_WATERSLIDE_H
 #define ZOOMBINI2_PAGES_PUZZLE_WATERSLIDE_H
 
-#include "common/array.h"
-#include "common/rect.h"
-
 #include "zoombini2/pages/puzzle_base.h"
-#include "zoombini2/state.h"
+#include "zoombini2/scripts.h"
 
 namespace Zoombini2 {
 
-class Animation;
-class RleBlock;
-
-/**
- * Pipes of Paloo (Route1-2)
- *
- * Match Zoombini pairs to the pipe labels and fill the water system.
- */
+/** Arrange matching traits along the pipes, then release the connected party with the valve. */
 class PuzzleWaterslide : public PuzzleBase {
 public:
-	/** Construct Pipes of Paloo for @p vm. */
 	PuzzleWaterslide(Zoombini2Engine *vm);
-	/** Release pipe, indicator, and decoration resources. */
 	~PuzzleWaterslide() override;
-
-	/** Load the pipe layout, build slots, and generate trait pairs. */
 	void init() override;
-	/** Advance movement, match feedback, sliding, and rejection phases. */
 	void onUpdate() override;
-	/** Draw pipes, slots, trait indicators, decorations, and Zoombinis. */
 	void onRenderBackground(ManagedSurface32 *screen) override;
-	/** Draw scene decorations and slot indicators. */
 	void onRenderContent(ManagedSurface32 *screen) override;
-	/** Move the selected Zoombini into the clicked slot. */
+	void onRenderActors(ManagedSurface32 *screen) override;
+	void onActorsRendered() override;
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	EventHandleResult onLButtonUp(const Common::Point &pos) override;
+	EventHandleResult onMouseMove(const Common::Point &pos) override;
+	bool onGoButtonPressed() override;
+	bool canUseGoButton() const override;
+	Common::String debugGetAnswer() const override;
+	Common::String debugGetChanceDetails() const override;
 
 private:
-	/** Resource paths and formats used by the waterslide scene. */
 	static constexpr const char *kMusicPath = "#sounds/music/02-BS01.wav";
 	static constexpr const char *kTraitFormat = "bmp/waterslide/traits/%d";
-	static constexpr const char *kPipeBlueHorizontalPath = "bmp/waterslide/pipes - blue/pipe - horizontal";
-	static constexpr const char *kPipeBlueBigPath = "bmp/waterslide/pipes - blue/pipe - lev1_bigone";
-	static constexpr const char *kPipeGreyHorizontalPath = "bmp/waterslide/pipes - grey/pipe - horizontal";
-	static constexpr const char *kPipeRedHorizontalPath = "bmp/waterslide/pipes - red/pipe - horizontal";
-	static constexpr const char *kPastilleBluePath = "bmp/waterslide/pastilles blue";
-	static constexpr const char *kPastilleGreyPath = "bmp/waterslide/pastilles grey";
+	static constexpr const char *kHorizontalFormat = "bmp/waterslide/pipes - %s/pipe - horizontal";
+	static constexpr const char *kLargePipeFormat = "bmp/waterslide/pipes - blue/pipe - lev%d_bigone";
+	static constexpr const char *kSelectorFormat = "bmp/waterslide/pipes - %s/pipe_bigone_selector_%02d";
+	static constexpr const char *kHardPipeFormat = "bmp/waterslide/pipes - %s/pipe - hard %02d";
+	static constexpr const char *kPipeColors[2] = {
+		"grey",
+		"blue",
+	};
+	static constexpr const char *kHardPipeColors[2] = {
+		"grey",
+		"red",
+	};
+	static constexpr const char *kMiniDiagonalPath = "bmp/waterslide/pipes - blue/pipe - mini racord diagon";
+	static constexpr const char *kMiniHorizontalPath = "bmp/waterslide/pipes - blue/pipe - mini horizontal";
+	static constexpr const char *kOutletPath = "bmp/waterslide/pipes - red/truc_rouge";
+	static constexpr const char *kPastillePath = "bmp/waterslide/pastilles grey";
 	static constexpr const char *kEdgePath = "bmp/waterslide/edge neutre";
-	static constexpr const char *kFountainPath = "bmp/waterslide/blue fountain";
+	static constexpr const char *kFountainPath = "bmp/waterslide/blue funtain";
 	static constexpr const char *kTreePath = "bmp/waterslide/little tree";
 	static constexpr const char *kValvePath = "bmp/waterslide/mr valve master";
-	static constexpr const char *kCascade1Path = "bmp/waterslide/pipe - cascade 1";
-	static constexpr const char *kCascade2Path = "bmp/waterslide/pipe - cascade 2";
+	static constexpr const char *kCascadeFormat = "bmp/waterslide/pipe - cascade %d";
+	static constexpr const char *kAreaPath = "bmp/waterslide/area.bmt";
+	static constexpr const char *kPickupPath = "bmp/zombis/pris/pris.anm";
+	static constexpr const char *kIdlePath = "bmp/zombis/attente/attenteZomb.anm";
+	static constexpr const char *kAspirationPath = "bmp/zombis/aspiration/aspiration.anm";
+	static constexpr const char *kSoundFormat = "sounds/fx/%s.wav";
+	static constexpr const char *kPraisePath = "sounds/wsl31.wav";
+	static constexpr const char *kPartialPraisePath = "sounds/wsl31alt.wav";
+	static constexpr const char *kRetreatSpeech = "sounds/DW-Zville.wav";
+	static constexpr const char *kGoSpeechFormat = "sounds/wld11.%d.wav";
 
-	/** Occupancy and feedback state of one pipe slot. */
-	enum SlotState {
-		/** No Zoombini occupies this slot. */
-		kSlotEmpty,
-		/** A Zoombini is waiting for a partner. */
-		kSlotOccupied,
-		/** The occupants formed a correct pair. */
-		kSlotMatched,
-		/** The occupants formed an incorrect pair. */
-		kSlotRejected
+	enum Phase {
+		kInteractive00 = 0,
+		kValve01 = 1,
+		kDischarge02 = 2,
+		kFinished03 = 3,
+	};
+	/** Generated endpoints name board slots; a negative axis denotes an unlabeled connection. */
+	struct Edge {
+		int a = -1;
+		int b = -1;
+		int axis = -1;
+		bool connected = false;
+	};
+	struct Pair {
+		int a = -1;
+		int b = -1;
+		int axis = -1;
+	};
+	struct GraphPlacement {
+		int a, b, type, labelX, labelY;
+	};
+	static constexpr int kNeighbors[16][5] = {
+		{1, 6, 8, 4, -1},
+		{0, 9, 2, -1, -1},
+		{1, 6, 10, 3, -1},
+		{2, 7, 11, -1, -1},
+		{0, 5, 12, -1, -1},
+		{4, 6, 13, -1, -1},
+		{5, 0, 2, 7, 14},
+		{6, 3, 15, -1, -1},
+		{0, 9, 12, -1, -1},
+		{8, 10, 15, 1, -1},
+		{9, 14, 11, 2, -1},
+		{10, 3, 15, -1, -1},
+		{8, 4, -1, -1, -1},
+		{5, 14, -1, -1, -1},
+		{13, 10, 6, -1, -1},
+		{9, 7, 11, -1, -1},
+	};
+	static constexpr Common::Point32 kWaitingPositions[16] = {
+		{131, 312},
+		{158, 369},
+		{180, 414},
+		{177, 469},
+		{162, 518},
+		{114, 355},
+		{122, 405},
+		{129, 457},
+		{112, 509},
+		{69, 339},
+		{70, 397},
+		{81, 463},
+		{61, 516},
+		{28, 475},
+		{37, 423},
+		{31, 367},
+	};
+	static constexpr GraphPlacement kGraphPlacements[26] = {
+		{0, 6, 1, 542, 380},
+		{9, 15, 1, 252, 272},
+		{0, 1, 0, 597, 383},
+		{1, 2, 0, 562, 322},
+		{2, 3, 0, 522, 242},
+		{4, 5, 0, 512, 455},
+		{5, 6, 0, 472, 374},
+		{6, 7, 0, 433, 291},
+		{8, 9, 0, 385, 381},
+		{9, 10, 0, 343, 299},
+		{10, 11, 0, 308, 226},
+		{13, 14, 0, 257, 362},
+		{4, 12, 2, 403, 481},
+		{0, 8, 2, 464, 433},
+		{5, 13, 2, 331, 403},
+		{1, 9, 2, 417, 353},
+		{6, 14, 2, 392, 314},
+		{7, 15, 2, 359, 239},
+		{2, 10, 2, 470, 270},
+		{3, 11, 2, 373, 190},
+		{0, 4, 3, 565, 465},
+		{8, 12, 3, 367, 455},
+		{10, 14, 3, 304, 288},
+		{11, 15, 3, 247, 214},
+		{3, 7, 3, 445, 225},
+		{2, 6, 3, 494, 303},
 	};
 
-	/** Runtime phase of the Pipes of Paloo interaction. */
-	enum PuzzleState {
-		/** Complete initial pair and slot setup. */
-		kStateInit,
-		/** Wait for a Zoombini or slot selection. */
-		kStateIdle,
-		/** Move a selected Zoombini into a slot. */
-		kStateZoombiniMoving,
-		/** Compare both occupants of a pair of slots. */
-		kStateCheckingMatch,
-		/** Move a correct pair down the waterslide. */
-		kStateSliding,
-		/** Return an incorrect pair from its slots. */
-		kStateRejecting,
-		/** Stop accepting input after completion. */
-		kStateDone
-	};
-
-	/** One clickable pipe slot and its current occupant. */
-	struct Slot {
-		/** Screen position. */
-		Common::Point32 pos;
-		/** Clickable area. */
-		Common::Rect hitbox;
-		/** Current occupancy or feedback state. */
-		SlotState state = kSlotEmpty;
-		/** Puzzle-roster index in this slot, or `-1` when empty. */
-		int zoombiniIdx = -1;
-		/** Partner slot index, or `-1` when unpaired. */
-		int pairSlot = -1;
-	};
-
-	/** Correct pairing and its shared trait value. */
-	struct TraitPair {
-		/** First puzzle-roster index. */
-		int zoombiniA = -1;
-		/** Second puzzle-roster index. */
-		int zoombiniB = -1;
-		/** Trait index shared by the pair. */
-		ZmbTrait::TraitIndex traitAxis;
-		/** Trait value shared by the pair. */
-		int sharedValue;
-		/** Whether this pair has been placed correctly. */
-		bool matched = false;
-	};
-
-	/** Load pipe, indicator, and decoration resources. */
 	void loadResources();
-	/** Return trait @p axis from @p zoombini. */
-	static byte getTrait(const ZoombiniRunner *zoombini, ZmbTrait::TraitIndex axis);
-	/** Initialize slot geometry and partner relationships. */
-	void setupSlots();
-	/** Select the level-specific pairing algorithm. */
-	void computePairs();
-	/** Generate the level-one pair layout. */
-	void computePairsLevel1();
-	/** Generate level-one pairs with the default linked-list-style matching branch. */
-	void computePairsLevel1Matching();
-	/** Generate level-one pairs with the alternate greedy scan/retry branch. */
-	void computePairsLevel1Greedy();
-	/** Generate the level-two pair layout. */
-	void computePairsLevel2();
-	/** Generate the upper-level pair layout. */
-	void computePairsLevel3();
-	/** Reset every generated pair slot. */
-	void clearPairs();
-	/** Append one generated pair sharing @p traitAxis and @p sharedValue. */
-	void addPair(int zoombiniA, int zoombiniB, ZmbTrait::TraitIndex traitAxis, int sharedValue);
-	/** Find a randomized shared trait for two roster entries. */
-	bool findSharedTrait(int zoombiniA, int zoombiniB, ZmbTrait::TraitIndex &traitAxis, int &sharedValue);
-
-	/** Dispatch a click on slot @p slotIdx. */
-	void clickSlot(int slotIdx);
-	/** Place puzzle-roster entry @p zoombiniIdx into slot @p slotIdx. */
-	void moveZoombiniToSlot(int zoombiniIdx, int slotIdx);
-	/** Return whether the occupants of @p slotA and @p slotB form a generated pair. */
-	bool checkPairMatch(int slotA, int slotB);
-	/** Release and animate the correct pair in @p slotA and @p slotB. */
-	void slideDownPair(int slotA, int slotB);
-	/** Reject the incorrect pair in @p slotA and @p slotB. */
-	void rejectPair(int slotA, int slotB);
-
-	/** Release puzzle-roster entry @p zoombiniIdx. */
-	void freeZoombini(int zoombiniIdx);
-	/** Return the number of puzzle-roster entries already released. */
+	void generateEasy();
+	void generateMedium();
+	void generateHard();
+	int generateGraph(bool randomRoot);
+	int sharedAxis(int first, int second, bool rejectLast);
+	bool findPair(int source, bool *available, Pair &pair);
+	int trait(int generatedIndex, int axis) const;
+	void addEdge(int a, int b, int axis);
+	void setupTargets();
+	static Common::Point32 graphPosition(int slot);
+	static const GraphPlacement *graphPlacement(const Edge &edge);
+	void evaluateConnections();
+	bool matches(const Edge &edge) const;
+	bool debugPlacementMatches(int slot, int actor, const int *assignment) const;
+	bool debugFindPlacement(int *assignment, uint32 used, int &budget) const;
+	void activateValve();
+	void dischargeNext();
+	void playSound(int sound);
 	int countFreeZoombinis() const;
-
-	/** Draw pipe segments using their current feedback colors. */
-	void drawPipes(ManagedSurface32 *screen);
-	/** Draw every active slot and occupant marker. */
-	void drawSlots(ManagedSurface32 *screen);
-	/** Draw the feature icons for generated pairs. */
-	void drawTraitIndicators(ManagedSurface32 *screen);
-	/** Draw the fountain, tree, valve, and cascades. */
+	void drawBoard(ManagedSurface32 *screen) const;
 	void drawDecorations(ManagedSurface32 *screen);
-	/** Draw waiting and placed Zoombinis. */
-	void onRenderActors(ManagedSurface32 *screen) override;
+	static void onSlotChanged(void *context, int slot, int zoombini);
+	static void onAspirationComplete(void *context, ZoombiniRunner *zoombini);
+	static void onCascadeComplete(void *context, AnimationRunner *runner);
 
-	/** Current interaction phase. */
-	PuzzleState _state = kStateInit;
-	/** Number of Zoombinis already released. */
-	int _freedCount = 0;
-	/** Selected puzzle-roster index, or `-1` when none is selected. */
-	int _selectedZoombini = -1;
-	/** Selected slot index, or `-1` when none is selected. */
-	int _selectedSlot = -1;
-	/** Time at which the current phase began. */
-	uint32 _stateTimer = 0;
+	int _level = 1;
+	Phase _phase = kInteractive00;
+	int _connectionCount = 0;
+	int _heldZoombini = -1;
+	bool _eligible[16] = {};
+	bool _activeSlot[16] = {};
+	int _solution[16] = {};
+	Common::Array<int> _generationOrder;
+	Common::Array<Edge> _edges;
+	Common::Array<ZoombiniDropTarget> _targets;
+	Common::Point32 _valvePos;
+	Common::Point32 _cascadePos;
+	uint32 _dischargeStart = 0;
+	bool _goPending = false;
+	int _goSpeech = -1;
+	int _praiseSpeech = -1;
+	int _sounds[6] = {
+		-1,
+		-1,
+		-1,
+		-1,
+		-1,
+		-1,
+	};
 
-	/** Maximum number of pipe slots. */
-	static constexpr int kMaxSlots = 16;
-	/** Maximum number of generated pairs. */
-	static constexpr int kMaxPairs = 8;
-	/** Pipe-slot runtime state. */
-	Slot _slots[kMaxSlots] = {};
-	/** Number of active entries in @ref WaterslidePuzzle::_slots. */
-	int _numSlots = 0;
-
-	/** Generated correct pair definitions. */
-	TraitPair _pairs[kMaxPairs] = {};
-	/** Number of active entries in @ref WaterslidePuzzle::_pairs. */
-	int _numPairs = 0;
-	/** Number of generated pairs already matched. */
-	int _matchedPairs = 0;
-
-	/** Trait indicators indexed by trait axis. */
-	RleBlock *_traitImage[4] = {};
-
-	/** Blue horizontal pipe segment. */
-	RleBlock *_pipeBlueHoriz = nullptr;
-	/** Gray horizontal pipe segment. */
-	RleBlock *_pipeGreyHoriz = nullptr;
-	/** Red horizontal pipe segment. */
-	RleBlock *_pipeRedHoriz = nullptr;
-	/** Blue large pipe segment. */
-	RleBlock *_pipeBlueBigone = nullptr;
-	/** Gray large pipe segment. */
-	RleBlock *_pipeGreyBigone = nullptr;
-	/** Red large pipe segment. */
-	RleBlock *_pipeRedBigone = nullptr;
-
-	/** Blue match indicator. */
-	RleBlock *_pastilleBlue = nullptr;
-	/** Gray inactive match indicator. */
-	RleBlock *_pastilleGrey = nullptr;
-
-	/** Neutral edge visual. */
-	RleBlock *_edgeNeutre = nullptr;
-
-	/** Fountain decoration animation. */
-	Animation *_blueFountainAnim = nullptr;
-	/** Tree decoration animation. */
-	Animation *_littleTreeAnim = nullptr;
-	/** Valve Master animation. */
-	Animation *_valveAnim = nullptr;
-	/** First cascade animation. */
-	Animation *_cascade1Anim = nullptr;
-	/** Second cascade animation. */
-	Animation *_cascade2Anim = nullptr;
-
+	Animation *_tree = nullptr;
+	Animation *_fountain = nullptr;
+	Animation *_valve = nullptr;
+	Animation *_cascade = nullptr;
+	AnimationRunner *_valveRunner = nullptr;
+	AnimationRunner *_cascadeRunner = nullptr;
+	AnimationRunner *_treeRunner = nullptr;
+	AnimationRunner *_fountainRunner = nullptr;
+	const ZoombiniAnimation *_pickup = nullptr;
+	const ZoombiniAnimation *_idle = nullptr;
+	const ZoombiniAnimation *_aspiration = nullptr;
 };
 
 } // End of namespace Zoombini2
 
-#endif // ZOOMBINI2_PAGES_PUZZLE_WATERSLIDE_H
+#endif

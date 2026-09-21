@@ -51,13 +51,13 @@ constexpr const char *Sidebar::kAbandonConfirmationPath;
 Sidebar::Sidebar(Zoombini2Engine *vm)
 	: _vm(vm) {
 
-	_helpNormal = _vm->loadRleBlock(kHelpNormalPath);
-	_helpHighlight = _vm->loadRleBlock(kHelpHighlightPath);
-	_mapNormal = _vm->loadRleBlock(kMapNormalPath);
-	_mapHighlight = _vm->loadRleBlock(kMapHighlightPath);
-	_goNormal = _vm->loadRleBlock(kGoNormalPath);
-	_goHighlight = _vm->loadRleBlock(kGoHighlightPath);
-	_goDisabled = _vm->loadRleBlock(kGoDisabledPath);
+	_vm->_gfx->loadSharedRleBlock(kHelpNormalPath);
+	_vm->_gfx->loadSharedRleBlock(kHelpHighlightPath);
+	_vm->_gfx->loadSharedRleBlock(kMapNormalPath);
+	_vm->_gfx->loadSharedRleBlock(kMapHighlightPath);
+	_vm->_gfx->loadSharedRleBlock(kGoNormalPath);
+	_vm->_gfx->loadSharedRleBlock(kGoHighlightPath);
+	_vm->_gfx->loadSharedRleBlock(kGoDisabledPath);
 	_helpClickSoundId = _vm->getSoundManager()->load(false, Common::Path(kHelpClickSoundPath), false);
 	_mapClickSoundId = _vm->getSoundManager()->load(false, Common::Path(kMapClickSoundPath), false);
 
@@ -70,13 +70,6 @@ Sidebar::Sidebar(Zoombini2Engine *vm)
 
 Sidebar::~Sidebar() {
 	delete _helpScreen;
-	delete _helpNormal;
-	delete _helpHighlight;
-	delete _mapNormal;
-	delete _mapHighlight;
-	delete _goNormal;
-	delete _goHighlight;
-	delete _goDisabled;
 	delete _savedBackground;
 }
 
@@ -258,28 +251,25 @@ void Sidebar::drawControls(ManagedSurface32 *screen) {
 		return;
 	updateGoBlink(page->hasGoButton() && page->canUseGoButton(), page->getPageId());
 
-	if (_helpHovered && _helpHighlight) {
-		_helpHighlight->drawToScreen(screen, Common::Point32(_helpButtonRect.left, _helpButtonRect.top), _vm->getAlphaLUT());
-	} else if (_helpNormal) {
-		_helpNormal->drawToScreen(screen, Common::Point32(_helpButtonRect.left, _helpButtonRect.top), _vm->getAlphaLUT());
-	}
+	const char *helpPath = kHelpNormalPath;
+	if (_helpHovered && _vm->_gfx->loadSharedRleBlock(kHelpHighlightPath))
+		helpPath = kHelpHighlightPath;
+	_vm->_gfx->drawSharedRleBlock(screen, helpPath, Common::Point32(_helpButtonRect.left, _helpButtonRect.top));
 
-	if (_mapHovered && _mapHighlight) {
-		_mapHighlight->drawToScreen(screen, Common::Point32(_mapButtonRect.left, _mapButtonRect.top), _vm->getAlphaLUT());
-	} else if (_mapNormal) {
-		_mapNormal->drawToScreen(screen, Common::Point32(_mapButtonRect.left, _mapButtonRect.top), _vm->getAlphaLUT());
-	}
+	const char *mapPath = kMapNormalPath;
+	if (_mapHovered && _vm->_gfx->loadSharedRleBlock(kMapHighlightPath))
+		mapPath = kMapHighlightPath;
+	_vm->_gfx->drawSharedRleBlock(screen, mapPath, Common::Point32(_mapButtonRect.left, _mapButtonRect.top));
 
 	if (!page->hasGoButton())
 		return;
 	const bool goEnabled = page->canUseGoButton();
-	if (!goEnabled && _goDisabled) {
-		_goDisabled->drawToScreen(screen, Common::Point32(_goButtonRect.left, _goButtonRect.top), _vm->getAlphaLUT());
-	} else if ((_goHovered || _goBlinkHighlighted) && _goHighlight) {
-		_goHighlight->drawToScreen(screen, Common::Point32(_goButtonRect.left, _goButtonRect.top), _vm->getAlphaLUT());
-	} else if (_goNormal) {
-		_goNormal->drawToScreen(screen, Common::Point32(_goButtonRect.left, _goButtonRect.top), _vm->getAlphaLUT());
-	}
+	const char *goPath = kGoNormalPath;
+	if (!goEnabled && _vm->_gfx->loadSharedRleBlock(kGoDisabledPath))
+		goPath = kGoDisabledPath;
+	else if ((_goHovered || _goBlinkHighlighted) && _vm->_gfx->loadSharedRleBlock(kGoHighlightPath))
+		goPath = kGoHighlightPath;
+	_vm->_gfx->drawSharedRleBlock(screen, goPath, Common::Point32(_goButtonRect.left, _goButtonRect.top));
 }
 
 EventHandleResult Sidebar::onMouseMove(const Common::Point &pos) {
@@ -344,8 +334,10 @@ void Sidebar::onMapClick() {
 }
 
 void Sidebar::onGoClick() {
-	const PageBase *page = _vm->getCurrentPage();
+	PageBase *page = _vm->getCurrentPage();
 	if (!page || !page->canUseGoButton())
+		return;
+	if (!page->onGoButtonPressed())
 		return;
 	if (!_vm->_isSavedGame) {
 		returnToMap();

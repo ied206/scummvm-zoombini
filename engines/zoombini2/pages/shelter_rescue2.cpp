@@ -62,13 +62,13 @@ ShelterRescueSite2::~ShelterRescueSite2() {
 void ShelterRescueSite2::init() {
 	debug(1, "ShelterRescueSite2::init");
 
-	if (!_vm->_gfx->loadBackground(Common::Path(kBackgroundPath)))
+	if (!_vm->_gfx->loadBackground(kBackgroundPath))
 		warning("ShelterRescueSite2: Failed to load background");
 	_vm->getScreen()->fillRect(Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), 0);
 	_vm->_gfx->drawBackground(_vm->getScreen(), Common::Point32(0, 0));
 	configureRosterLayout(kRosterGridBasePos, _rosterScrollUpRect, _rosterScrollDownRect, kRosterButtonUpPos, kRosterButtonDownPos);
 	loadSelector(kSelectorPath);
-	loadPorteSelector(kPorteSelectorPath);
+	_vm->_gfx->loadPageRleBlock(kPorteSelectorPath);
 	loadScrollButtons(kScrollLeftPath, kScrollRightPath);
 	startPageMusic(Common::Path(kMusicPath));
 	resetRescueState();
@@ -437,23 +437,22 @@ void ShelterRescueSite2::onRenderContent(ManagedSurface32 *screen) {
 		drawWaitingBoard(screen, 0);
 	}
 	// The original draws the door-selection overlay over the waiting grid on every grid update, beneath the scroll controls.
-	if (RleBlock *porteSelect = getPorteSelector())
-		porteSelect->drawToScreen(screen, kRosterGridBasePos, _vm->getAlphaLUT());
+	_vm->_gfx->drawPageRleBlock(screen, kPorteSelectorPath, kRosterGridBasePos);
 
 	// The original shows frame 1 on an idle button and frame 0 only while that
 	// button's own scroll animation is running.
 	if (_buttonUp && 0 < _buttonUp->getFrameCount()) {
-		const int frame = (1 < _buttonUp->getFrameCount()) ? ((_scrollPhase == kScrollPhaseLeft04) ? 0 : 1) : 0;
-		const RleBlock *frameBlock = _buttonUp->getFrame(frame);
-		if (frameBlock)
-			frameBlock->drawToScreen(screen, _buttonUpPos, _vm->getAlphaLUT());
+		int frame = 0;
+		if (1 < _buttonUp->getFrameCount() && _scrollPhase != kScrollPhaseLeft04)
+			frame = 1;
+		_vm->_gfx->drawAnimationFrame(screen, _buttonUp, frame, _buttonUpPos);
 	}
 
 	if (_buttonDown && 0 < _buttonDown->getFrameCount()) {
-		const int frame = (1 < _buttonDown->getFrameCount()) ? ((_scrollPhase == kScrollPhaseRight06) ? 0 : 1) : 0;
-		const RleBlock *frameBlock = _buttonDown->getFrame(frame);
-		if (frameBlock)
-			frameBlock->drawToScreen(screen, _buttonDownPos, _vm->getAlphaLUT());
+		int frame = 0;
+		if (1 < _buttonDown->getFrameCount() && _scrollPhase != kScrollPhaseRight06)
+			frame = 1;
+		_vm->_gfx->drawAnimationFrame(screen, _buttonDown, frame, _buttonDownPos);
 	}
 
 	drawBoardingActives(screen);

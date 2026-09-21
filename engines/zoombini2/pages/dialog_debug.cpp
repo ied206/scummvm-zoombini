@@ -65,11 +65,11 @@ bool DialogDebug::open(const DialogDebugCommand &cmd) {
 			_titleText = Common::String::format("[AreaMask] page(%d) no area mask", page->getPageId());
 	} else if (cmd._type == DialogDebugCommand::Type::kDrawAnimation) {
 		if (cmd._animPath.toString().hasSuffixIgnoreCase(".rb")) {
-			_sprite = new RleBlock(_vm);
-			if (!_sprite->loadFromFile(cmd._animPath)) {
+			if (!_vm->_gfx->loadPageRleBlock(cmd._animPath.toString('/'))) {
 				freeAnimation();
 				return false;
 			}
+			_singleFrameSprite = true;
 		} else {
 			_animation = new Animation(_vm);
 			if (!_animation->loadFromFile(cmd._animPath)) {
@@ -91,11 +91,7 @@ bool DialogDebug::open(const DialogDebugCommand &cmd) {
 
 	_viewType = cmd._type;
 
-	_pauseStartTime = g_system->getMillis();
-	_vm->_isPaused = true;
-	_vm->_pauseTimeStart = _pauseStartTime;
-	if (_vm->getSoundManager())
-		_vm->getSoundManager()->pauseAll();
+	_vm->setDialogPaused(true);
 
 	_isActive = true;
 	return true;
@@ -108,34 +104,22 @@ void DialogDebug::close() {
 	_isActive = false;
 	_viewType = DialogDebugCommand::Type::kNone;
 	freeAnimation();
-	_vm->addPauseTime(g_system->getMillis() - _pauseStartTime);
-	_vm->_isPaused = false;
-	if (_vm->getSoundManager())
-		_vm->getSoundManager()->resumeAll();
+	_vm->setDialogPaused(false);
 }
 
 void DialogDebug::freeAnimation() {
 	delete _animation;
 	_animation = nullptr;
-	delete _sprite;
-	_sprite = nullptr;
+	_singleFrameSprite = false;
 	_frameIndex = 0;
 }
 
 int DialogDebug::getFrameCount() const {
-	if (_sprite)
+	if (_singleFrameSprite)
 		return 1;
 	if (_animation)
 		return _animation->getFrameCount();
 	return 0;
-}
-
-const RleBlock *DialogDebug::getCurrentFrame() const {
-	if (_sprite)
-		return _sprite->isValid() ? _sprite : nullptr;
-	if (_animation && 0 <= _frameIndex && _frameIndex < _animation->getFrameCount())
-		return _animation->getFrame(_frameIndex);
-	return nullptr;
 }
 
 void DialogDebug::updateAnimationTitle() {
@@ -149,7 +133,10 @@ void DialogDebug::onRenderContent(ManagedSurface32 *screen) {
 	if (_viewType == DialogDebugCommand::Type::kDrawAnimation) {
 		const uint32 white = screen->format.ARGBToColor(255, 255, 255, 255);
 		_vm->_gfx->fillRect(screen, Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), white);
-		_vm->_gfx->drawRleBlock(screen, getCurrentFrame(), Common::Point32(0, 0));
+		if (_singleFrameSprite)
+			_vm->_gfx->drawPageRleBlock(screen, _animPath.toString('/'), Common::Point32(0, 0));
+		else if (_animation && 0 <= _frameIndex && _frameIndex < _animation->getFrameCount())
+			_vm->_gfx->drawRleBlock(screen, _animation->getFrame(_frameIndex), Common::Point32(0, 0));
 	} else {
 		screen->copyFrom(*_savedScreen);
 	}

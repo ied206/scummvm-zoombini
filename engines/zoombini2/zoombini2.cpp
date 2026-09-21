@@ -39,6 +39,7 @@
 #include "zoombini2/graphics.h"
 #include "zoombini2/metaengine.h"
 #include "zoombini2/pages/dialog_debug.h"
+#include "zoombini2/pages/dialog_help.h"
 #include "zoombini2/pages/dialog_msgbox.h"
 #include "zoombini2/pages/interactive_base.h"
 #include "zoombini2/pages/interactive_map.h"
@@ -69,6 +70,9 @@
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
+
+constexpr const char *Zoombini2Engine::kCursorSpritePath;
+constexpr const char *Zoombini2Engine::kInteractiveCursorSpritePath;
 
 /** Resolve original logical resource names against their distinct physical roots. */
 class Zoombini2Engine::ResourceFileResolver {
@@ -181,8 +185,6 @@ Zoombini2Engine::~Zoombini2Engine() {
 	delete _state;
 	clearZoombiniAnimationCache();
 
-	delete _cursorSprite;
-	delete _interactiveCursorSprite;
 	delete _sidebar;
 	delete _msgBoxDialog;
 	delete _debugDialog;
@@ -251,6 +253,17 @@ bool Zoombini2Engine::deleteGameSave(const Common::String &name) {
 Common::StringArray Zoombini2Engine::listGameSaves() const {
 	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName());
 	return savegameManager.listProfiles();
+}
+
+bool Zoombini2Engine::takePracticePuzzleLaunch(int &pageId, int &level) {
+	if (_practicePuzzlePageId == kPageNone || _practicePuzzleLevel == 0)
+		return false;
+
+	pageId = _practicePuzzlePageId;
+	level = _practicePuzzleLevel;
+	_practicePuzzlePageId = kPageNone;
+	_practicePuzzleLevel = 0;
+	return true;
 }
 
 int Zoombini2Engine::getMusicVolume() const {
@@ -362,6 +375,9 @@ Common::Error Zoombini2Engine::run() {
 
 	_startTime = g_system->getMillis();
 	_cachedGameTickCount = 0;
+	_frameTimeOriginMs = _startTime;
+	_lastFrameElapsedMs = 0;
+	_hasFrameIndex = false;
 
 	// Run the main game loop
 	mainGameLoop();
@@ -376,11 +392,9 @@ Common::Error Zoombini2Engine::run() {
  */
 void Zoombini2Engine::initCursor() {
 	// Load cursor sprite from cursor01.rb (default cursor)
-	_cursorSprite = new RleBlock(this);
-	if (!_cursorSprite->loadFromFile(Common::Path("bmp/cursor/cursor01.rb"))) {
+	_cursorSprite = _gfx->loadSharedRleBlock(kCursorSpritePath);
+	if (!_cursorSprite) {
 		warning("Zoombini2Engine: Failed to load cursor sprite");
-		delete _cursorSprite;
-		_cursorSprite = nullptr;
 		return;
 	}
 
@@ -404,18 +418,25 @@ void Zoombini2Engine::registerCursorWithCursorMan() {
 
 void Zoombini2Engine::setHoverCursorActive(bool active) {
 	if (active && !_interactiveCursorSprite) {
-		_interactiveCursorSprite = new RleBlock(this);
-		if (!_interactiveCursorSprite->loadFromFile(Common::Path("bmp/cursor/cursor02.rb"))) {
+		_interactiveCursorSprite = _gfx->loadSharedRleBlock(kInteractiveCursorSpritePath);
+		if (!_interactiveCursorSprite) {
 			warning("Zoombini2Engine: Failed to load interactive cursor sprite");
-			delete _interactiveCursorSprite;
-			_interactiveCursorSprite = nullptr;
 			return;
 		}
 	}
 	if (!_interactiveCursorSprite || active == _hoverCursorActive)
 		return;
 	_hoverCursorActive = active;
-	registerCursorSpriteWithCursorMan(active ? _interactiveCursorSprite : _cursorSprite);
+	if (!_pageCursorSprite)
+		registerCursorSpriteWithCursorMan(active ? _interactiveCursorSprite : _cursorSprite);
+}
+
+void Zoombini2Engine::setPageCursorSprite(const RleBlock *sprite) {
+	if (_pageCursorSprite == sprite)
+		return;
+	_pageCursorSprite = sprite;
+	const RleBlock *fallback = _hoverCursorActive ? _interactiveCursorSprite : _cursorSprite;
+	registerCursorSpriteWithCursorMan(sprite ? sprite : fallback);
 }
 
 void Zoombini2Engine::registerCursorSpriteWithCursorMan(const RleBlock *sprite) {
@@ -501,7 +522,35 @@ void Zoombini2Engine::registerCursorSpriteWithCursorMan(const RleBlock *sprite) 
 }
 
 uint32 Zoombini2Engine::getGameTickCount() const {
-	return _useCachedFrameTime ? _cachedGameTickCount : calculateGameTickCount();
+	return calculateGameTickCount();
+}
+
+void Zoombini2Engine::setPauseState(bool &reason, bool paused) {
+	if (reason == paused)
+		return;
+	const bool wasPaused = _dialogPaused || _backendPaused;
+	reason = paused;
+	const bool isPaused = _dialogPaused || _backendPaused;
+	const uint32 now = g_system->getMillis();
+	if (!wasPaused && isPaused) {
+		_pauseTimeStart = now;
+		if (_soundManager)
+			_soundManager->pauseAll();
+		_mixer->pauseAll(true);
+	} else if (wasPaused && !isPaused) {
+		_pauseTimeAccum += now - _pauseTimeStart;
+		if (_soundManager)
+			_soundManager->resumeAll();
+		_mixer->pauseAll(false);
+	}
+}
+
+void Zoombini2Engine::setDialogPaused(bool paused) {
+	setPauseState(_dialogPaused, paused);
+}
+
+void Zoombini2Engine::pauseEngineIntern(bool pause) {
+	setPauseState(_backendPaused, pause);
 }
 
 void Zoombini2Engine::restartGoBlink() {
@@ -517,7 +566,7 @@ void Zoombini2Engine::reseedRandomForV10() {
 uint32 Zoombini2Engine::calculateGameTickCount() const {
 	const uint32 now = g_system->getMillis();
 	uint32 elapsed = now - _startTime;
-	if (_isPaused)
+	if (_dialogPaused || _backendPaused)
 		elapsed -= _pauseTimeAccum + (now - _pauseTimeStart);
 	else
 		elapsed -= _pauseTimeAccum;
@@ -533,10 +582,19 @@ int Zoombini2Engine::percentToMixerVolume(int volume) {
 }
 
 void Zoombini2Engine::refreshEngineSettings() {
+	const int frameRate = CLIP<int>(ConfMan.getInt(::Zoombini2MetaEngine::kConfigFrameRate),
+									::Zoombini2MetaEngine::kMinFrameRate, ::Zoombini2MetaEngine::kMaxFrameRate);
+	const bool unlockFrameRate = ConfMan.getBool(::Zoombini2MetaEngine::kConfigUnlockFrameRate);
+	if (_frameRate != frameRate || _unlockFrameRate != unlockFrameRate) {
+		_frameRate = frameRate;
+		_unlockFrameRate = unlockFrameRate;
+		_frameTimeOriginMs = g_system->getMillis();
+		_lastFrameElapsedMs = 0;
+		_hasFrameIndex = false;
+	}
 	_debugHotkeysEnabled = ConfMan.getBool(::Zoombini2MetaEngine::kConfigDebugHotkeys);
 	_stereoOutputEnabled = ConfMan.getBool(::Zoombini2MetaEngine::kConfigStereoOutput);
 	_useGreedyWaterslidePairing = ConfMan.getBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing);
-	_useCachedFrameTime = ConfMan.getBool(::Zoombini2MetaEngine::kConfigCachedFrameTime);
 	_useFloatingPointPaths = ConfMan.getBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths);
 	_enhancedKbdShortcuts = ConfMan.getBool(::Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts);
 	if (!_debugHotkeysEnabled) {
@@ -612,7 +670,6 @@ void Zoombini2Engine::applyDebugPuzzleCompletion() {
 void Zoombini2Engine::processEvents() {
 	Common::Event event;
 	_pendingPageEvents.clear();
-
 	while (g_system->getEventManager()->pollEvent(event)) {
 		switch (event.type) {
 		case Common::EVENT_QUIT:
@@ -625,16 +682,17 @@ void Zoombini2Engine::processEvents() {
 			break;
 		case Common::EVENT_LBUTTONDOWN:
 			_pendingPageEvents.push_back(event);
-			_mouseDown = true;
 			_mousePos = event.mouse;
 			break;
 		case Common::EVENT_LBUTTONUP:
 			_pendingPageEvents.push_back(event);
-			_mouseDown = false;
 			_mousePos = event.mouse;
 			break;
 		case Common::EVENT_MOUSEMOVE:
-			_pendingPageEvents.push_back(event);
+			if (!_pendingPageEvents.empty() && _pendingPageEvents.back().type == Common::EVENT_MOUSEMOVE)
+				_pendingPageEvents.back() = event;
+			else
+				_pendingPageEvents.push_back(event);
 			_mousePos = event.mouse;
 			break;
 		case Common::EVENT_KEYDOWN:
@@ -685,9 +743,8 @@ bool Zoombini2Engine::dispatchPageEvents() {
 	const bool sharedDialogWasActive = msgBoxWasActive || debugDialogWasActive || sidebarDialogWasActive;
 	bool modalInputBlocked = sharedDialogWasActive;
 
-	// Event dispatch temporarily replays each event's mouse state. The sidebar then polls the final backend state for this frame.
+	// Event dispatch temporarily replays each event's mouse position. The sidebar then polls the final position for this frame.
 	const Common::Point32 polledMousePos = _mousePos;
-	const bool polledMouseDown = _mouseDown;
 	for (const Common::Event &event : _pendingPageEvents) {
 		if (_nextPageId != kPageNone)
 			break;
@@ -700,10 +757,6 @@ bool Zoombini2Engine::dispatchPageEvents() {
 
 		if (event.type == Common::EVENT_LBUTTONDOWN || event.type == Common::EVENT_LBUTTONUP || event.type == Common::EVENT_MOUSEMOVE)
 			_mousePos = event.mouse;
-		if (event.type == Common::EVENT_LBUTTONDOWN)
-			_mouseDown = true;
-		else if (event.type == Common::EVENT_LBUTTONUP)
-			_mouseDown = false;
 
 		EventHandleResult result = EventHandleResult::kPassthrough;
 		if (msgBoxEventWasActive)
@@ -724,7 +777,6 @@ bool Zoombini2Engine::dispatchPageEvents() {
 			break;
 	}
 	_mousePos = polledMousePos;
-	_mouseDown = polledMouseDown;
 
 	return sharedDialogWasActive;
 }
@@ -782,38 +834,86 @@ void Zoombini2Engine::updateDragOverlay() {
 }
 
 void Zoombini2Engine::presentFrame() {
+	const uint32 now = g_system->getMillis();
+	if (!_unlockFrameRate && now == _lastPresentTimeMs)
+		return;
+	_lastPresentTimeMs = now;
 	g_system->copyRectToScreen(_screen->getPixels(), _screen->pitch, 0, 0, ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height);
 	g_system->updateScreen();
 }
 
+void Zoombini2Engine::waitForFrameSlot() {
+	if (_unlockFrameRate)
+		return;
+
+	uint32 elapsed = g_system->getMillis() - _frameTimeOriginMs;
+	if (elapsed < _lastFrameElapsedMs) {
+		// Reset the frame number after the 32-bit millisecond clock completes a full cycle.
+		_frameTimeOriginMs = g_system->getMillis();
+		elapsed = 0;
+		_hasFrameIndex = false;
+	}
+
+	uint64 frameIndex = (static_cast<uint64>(elapsed) * static_cast<uint32>(_frameRate)) / 1000;
+	while (_hasFrameIndex && frameIndex <= _lastFrameIndex) {
+		const uint64 nextFrameTime = ((_lastFrameIndex + 1) * 1000 + static_cast<uint32>(_frameRate) - 1) / static_cast<uint32>(_frameRate);
+		const uint32 waitMs = elapsed < nextFrameTime ? static_cast<uint32>(nextFrameTime - elapsed) : 1;
+		g_system->delayMillis(waitMs);
+		elapsed = g_system->getMillis() - _frameTimeOriginMs;
+		frameIndex = (static_cast<uint64>(elapsed) * static_cast<uint32>(_frameRate)) / 1000;
+	}
+
+	_lastFrameElapsedMs = elapsed;
+	_lastFrameIndex = frameIndex;
+	_hasFrameIndex = true;
+}
+
 void Zoombini2Engine::runFrame() {
-	const uint32 frameStartTime = g_system->getMillis();
+	waitForFrameSlot();
 	processEvents();
 	if (shouldQuit())
 		return;
-
-	// Keep one gameplay-time snapshot for every active pass, as selected by the compatibility setting.
+	// Keep one gameplay-time snapshot for every active pass.
 	_cachedGameTickCount = calculateGameTickCount();
 	applyPendingPageChange();
 	drawFrame();
 	presentFrame();
-
-	// Z2's authored timing is millisecond based. This host-side cap only prevents a busy presentation loop.
-	const uint32 frameElapsed = g_system->getMillis() - frameStartTime;
-	if (frameElapsed < kTargetFrameTimeMs)
-		g_system->delayMillis(static_cast<uint32>(kTargetFrameTimeMs - frameElapsed));
 }
 
 void Zoombini2Engine::mainGameLoop() {
-	// The Korean release starts with the ArisuMedia logo before the TLC and Polygon logos.
-	// Other releases start with the TLC logo.
-	_nextPageId = getLanguage() == Common::KO_KOR ? kPageLogoArisuMedia : kPageLogoTLC;
+	if (configurePracticeBootParamLaunch()) {
+		_nextPageId = kPageMenuPractice;
+	} else {
+		// The Korean release starts with the ArisuMedia logo before the TLC and Polygon logos.
+		// Other releases start with the TLC logo.
+		_nextPageId = getLanguage() == Common::KO_KOR ? kPageLogoArisuMedia : kPageLogoTLC;
+	}
 
 	while (!shouldQuit())
 		runFrame();
 }
 
+bool Zoombini2Engine::configurePracticeBootParamLaunch() {
+	const int bootParam = ConfMan.getInt("boot_param");
+	if (bootParam == 0)
+		return false;
+
+	const int pageId = bootParam / kPracticeBootParamPageFactor;
+	const int level = bootParam % kPracticeBootParamPageFactor;
+	if (InteractiveMap::getPracticePartySize(pageId) == 0 || level < 1 || 3 < level) {
+		warning("Zoombini2: unsupported practice boot parameter %d", bootParam);
+		return false;
+	}
+
+	_practicePuzzlePageId = pageId;
+	_practicePuzzleLevel = level;
+	debug(1, "Zoombini2: practice boot parameter=%d page=%d level=%d", bootParam, pageId, level);
+	return true;
+}
+
 void Zoombini2Engine::destroyCurrentPage() {
+	if (_sidebar && _sidebar->getHelpScreen())
+		_sidebar->getHelpScreen()->close();
 	if (_msgBoxDialog)
 		_msgBoxDialog->close();
 	if (_debugDialog)
@@ -823,8 +923,10 @@ void Zoombini2Engine::destroyCurrentPage() {
 		_currentPage = nullptr;
 	}
 	// Reset the shared page-layer collection so the replacement page starts empty.
-	if (_gfx)
+	if (_gfx) {
 		_gfx->clearPageLayers();
+		_gfx->clearPageBitmapCache();
+	}
 	// Clear screen on page destroy to prevent stale content showing
 	// when transitioning to a new page that uses double buffering.
 	if (_screen)
@@ -941,24 +1043,6 @@ void Zoombini2Engine::switchPage(int pageId) {
 		if (_state && kPageZombiniville <= pageId && pageId <= kPageBooliewood)
 			_state->_currentGameplayPageId = pageId;
 	}
-}
-
-BitBlock *Zoombini2Engine::loadBitBlock(const Common::String &path) {
-	BitBlock *bb = new BitBlock(this);
-	if (bb->load(Common::Path(path))) {
-		return bb;
-	}
-	delete bb;
-	return nullptr;
-}
-
-RleBlock *Zoombini2Engine::loadRleBlock(const Common::String &path) {
-	RleBlock *rle = new RleBlock(this);
-	if (rle->loadFromFile(Common::Path(path))) {
-		return rle;
-	}
-	delete rle;
-	return nullptr;
 }
 
 Common::SeekableReadStream *Zoombini2Engine::openResourceFile(const Common::String &path) const {

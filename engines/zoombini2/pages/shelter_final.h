@@ -29,14 +29,12 @@
 namespace Zoombini2 {
 
 class Animation;
-class BitBlock;
-class RleBlock;
 class ZoombiniAnimation;
 class ZoombiniRunner;
 
-/** 
+/**
  * Booliewood - Celebration shown after 400 rescues.
- * 
+ *
  * @remark The save is considered complete after 400 Zoombinis arrive;
  * This page is only shown if the save is complete.
  */
@@ -118,7 +116,10 @@ private:
 		Common::Point32(200, 550),
 	};
 	/** Resting cells restored after the two decorative Zoombinis finish walking. */
-	static constexpr int kDecorativeZoombiniCells[kDecorativeZoombiniCount] = {77, 99};
+	static constexpr int kDecorativeZoombiniCells[kDecorativeZoombiniCount] = {
+		77,
+		99,
+	};
 
 	/** Allocate and initialize the two decorative Zoombinis. */
 	void createDecorativeZoombinis();
@@ -148,12 +149,6 @@ private:
 	/** Draw one Little-Zoombini state at a fixed position. */
 	void drawZoombini(const ZoombiniRunner &zoombini, ManagedSurface32 *screen) const;
 
-	/** Fixed celebration background managed by this page. */
-	BitBlock *_background = nullptr;
-	/** Persistent Grand Boolie foreground managed by this page. */
-	BitBlock *_fullBigBool = nullptr;
-	/** Dormant cell-reveal image managed by this page. */
-	RleBlock *_revealBigBool = nullptr;
 	/** Lower-edge dancing Boolie animation managed by this page. */
 	Animation *_dancingBoolie = nullptr;
 	/** Upper Boolie dance animation managed by this page. */
@@ -189,7 +184,15 @@ private:
 	/** Closing INT11.17 speech identifier. */
 	int _closingSpeechId = -1;
 	/** Celebration ambience identifiers. */
-	int _ambientSoundIds[kAmbientSoundCount] = {-1, -1, -1, -1, -1, -1, -1};
+	int _ambientSoundIds[kAmbientSoundCount] = {
+		-1,
+		-1,
+		-1,
+		-1,
+		-1,
+		-1,
+		-1,
+	};
 	/** Deadline for the next randomized ambience clip. */
 	uint32 _nextAmbientTime = 0;
 };

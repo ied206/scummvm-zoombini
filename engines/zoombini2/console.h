@@ -44,6 +44,10 @@ public:
 	~Zoombini2Console() override;
 
 private:
+	bool Cmd_Puzzle(int argc, const char **argv);
+	bool CmdSub_PuzzleFinish(int argc, const char **argv);
+	bool CmdSub_PuzzleAnswer(int argc, const char **argv);
+	bool CmdSub_PuzzleChance(int argc, const char **argv);
 	/** Top-level debugger command for drawing debug views. */
 	static constexpr const char *kCmdDraw = "draw";
 	/** Draw the active page through its drop-acceptance mask. */

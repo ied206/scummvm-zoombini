@@ -79,7 +79,7 @@ const char *PuzzleBase::getPuzzleDir(int puzzleId) {
 }
 
 PuzzleBase::PuzzleBase(Zoombini2Engine *vm, int puzzleId)
-	: InteractiveBase(vm), _puzzleId(puzzleId) {
+	: InteractiveBase(vm), _puzzleId(puzzleId), _puzzleLevel(vm->_state->_level) {
 	_pageId = puzzleId;
 }
 
@@ -101,6 +101,7 @@ void PuzzleBase::init() {
 	}
 
 	_vm->_gfx->getPageLayerStack()->clear();
+	_backgroundPath.clear();
 	_vm->_gfx->getPageLayerStack()->addLayer(1);
 	if (bgName) {
 		const Common::Path bgPath(Common::String::format(kPuzzleBackgroundFormat, bgName));
@@ -125,8 +126,7 @@ void PuzzleBase::init() {
 
 bool PuzzleBase::loadPrimaryLayerBackground(const Common::Path &path) {
 	const bool loaded = _vm->_gfx->getPageLayerStack()->loadLayerBackground(0, path);
-	PageLayer *primaryLayer = _vm->_gfx->getPageLayerStack()->getLayer(0);
-	_background = primaryLayer ? primaryLayer->getBackground() : nullptr;
+	_backgroundPath = loaded ? path.toString('/') : Common::String();
 	return loaded;
 }
 
@@ -152,6 +152,54 @@ void PuzzleBase::renderZoombinis(ManagedSurface32 *screen) const {
 		_vm->_gfx->drawZoombiniRunner(screen, _puzzleZoombinis[index]);
 	if (draggedZoombini)
 		_vm->_gfx->drawZoombiniRunner(screen, draggedZoombini);
+}
+
+const char *PuzzleChanceInfo::typeName(Type type) {
+	switch (type) {
+	case Type::kNone:
+		return "none";
+	case Type::kAmorphous:
+		return "amorphous";
+	case Type::kInfinite:
+		return "infinite";
+	case Type::kSubmit:
+		return "submit";
+	case Type::kMistake:
+		return "mistake";
+	}
+	return "?";
+}
+
+Common::String PuzzleBase::debugAnswerHeader() const {
+	return Common::String::format("%s (level %d, party %u)\nIndices below are one-based.\n", getPuzzleName(_puzzleId), _puzzleLevel, _puzzleZoombinis.size());
+}
+
+Common::String PuzzleBase::debugActorDescription(int index) const {
+	if (index < 0 || static_cast<int>(_puzzleZoombinis.size()) <= index)
+		return "(none)";
+	return Common::String::format("Zoombini %d [%s]", index + 1, _puzzleZoombinis[index]->_traits.toStr().c_str());
+}
+
+void PuzzleBase::debugForceFinish() {
+	if (_debugFinishPending)
+		return;
+	_debugFinishPending = true;
+	for (ZoombiniRunner *actor : _puzzleZoombinis) {
+		actor->clearMovement();
+		actor->setAnimationCompleteCallback(nullptr);
+		actor->_dragging = false;
+		actor->_inputEnabled = false;
+		actor->_puzzleStatus = 1;
+		actor->_exitComplete = true;
+	}
+	applyDebugPuzzleCompletion();
+	_vm->_zoombiniWalkingFlag = true;
+	if (_vm->_isSavedGame) {
+		_vm->_mapTransitionSourcePageId = static_cast<PageId>(_puzzleId);
+		_vm->requestPageChange(kPageMapTrans);
+	} else {
+		_vm->requestPageChange(kPageMenuPractice);
+	}
 }
 
 } // End of namespace Zoombini2

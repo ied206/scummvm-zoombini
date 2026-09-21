@@ -47,6 +47,7 @@ constexpr const char *InteractiveMenu::kArrowDownHighlightPath;
 constexpr const char *InteractiveMenu::kStartNormalPath;
 constexpr const char *InteractiveMenu::kStartHighlightPath;
 constexpr const char *InteractiveMenu::kStartDisabledPath;
+constexpr const char *InteractiveMenu::kButtonMaskPath;
 constexpr const char *InteractiveMenu::kOptionsNormalPath;
 constexpr const char *InteractiveMenu::kOptionsHighlightPath;
 constexpr const char *InteractiveMenu::kNewNormalPath;
@@ -71,9 +72,6 @@ InteractiveMenu::InteractiveMenu(Zoombini2Engine *vm)
 
 InteractiveMenu::~InteractiveMenu() {
 	delete _fileList;
-	delete _selectorNormal;
-	delete _selectorHilite;
-	delete _selectionBar;
 	for (int i = 0; i < kMenuButtonCount; ++i)
 		delete _buttons[i];
 
@@ -95,7 +93,7 @@ void InteractiveMenu::init() {
 	loadResources();
 	loadButtons();
 
-	_fileList = new SaveFileList(_vm, kFileListPos, _selectionBar);
+	_fileList = new SaveFileList(_vm, kFileListPos);
 	if (!_fileList->init())
 		warning("MenuScreenPage: Failed to load save-list fonts");
 	scanSaveFiles();
@@ -105,19 +103,16 @@ void InteractiveMenu::init() {
 }
 
 void InteractiveMenu::loadResources() {
-	if (!_vm->_gfx->loadBackground(Common::Path(kBackgroundPath)))
+	if (!_vm->_gfx->loadBackground(kBackgroundPath))
 		warning("MenuScreenPage: Failed to load menu background");
 
-	_selectorNormal = new BitBlock(_vm);
-	if (!_selectorNormal->load(Common::Path(kSelectorNormalPath)))
+	if (!_vm->_gfx->loadPageBitBlock(kSelectorNormalPath))
 		warning("MenuScreenPage: Failed to load normal selector");
 
-	_selectorHilite = new BitBlock(_vm);
-	if (!_selectorHilite->load(Common::Path(kSelectorHighlightPath)))
+	if (!_vm->_gfx->loadPageBitBlock(kSelectorHighlightPath))
 		warning("MenuScreenPage: Failed to load highlighted selector");
 
-	_selectionBar = new RleBlock(_vm);
-	if (!_selectionBar->loadFromFile(Common::Path(kSelectionBarPath)))
+	if (!_vm->_gfx->loadPageRleBlock(kSelectionBarPath))
 		warning("MenuScreenPage: Failed to load save selection bar");
 
 	SoundManager *sound = _vm->getSoundManager();
@@ -133,27 +128,34 @@ void InteractiveMenu::loadButtons() {
 		const char *normalPath;
 		const char *hoverPath;
 		const char *disabledPath;
+		const char *maskPath;
 		Common::Point32 pos;
 		Size32 size;
 	};
 
 	const ButtonDefinition definitions[kMenuButtonCount] = {
-		{kArrowUpNormalPath, kArrowUpHighlightPath, nullptr, Common::Point32(613, 350), Size32(46, 50)},
-		{kArrowDownNormalPath, kArrowDownHighlightPath, nullptr, Common::Point32(613, 416), Size32(46, 50)},
-		{kStartNormalPath, kStartHighlightPath, kStartDisabledPath, Common::Point32(27, 561), Size32(145, 39)},
-		{kOptionsNormalPath, kOptionsHighlightPath, nullptr, Common::Point32(175, 561), Size32(145, 39)},
-		{kNewNormalPath, kNewHighlightPath, kNewDisabledPath, Common::Point32(321, 561), Size32(145, 39)},
-		{kPracticeNormalPath, kPracticeHighlightPath, nullptr, Common::Point32(468, 561), Size32(145, 39)},
-		{kQuitNormalPath, kQuitHighlightPath, nullptr, Common::Point32(613, 561), Size32(145, 39)},
+		{kArrowUpNormalPath, kArrowUpHighlightPath, nullptr, nullptr, Common::Point32(613, 350), Size32(46, 50)},
+		{kArrowDownNormalPath, kArrowDownHighlightPath, nullptr, nullptr, Common::Point32(613, 416), Size32(46, 50)},
+		{kStartNormalPath, kStartHighlightPath, kStartDisabledPath, kButtonMaskPath, Common::Point32(27, 561), Size32(145, 39)},
+		{kOptionsNormalPath, kOptionsHighlightPath, nullptr, nullptr, Common::Point32(175, 561), Size32(145, 39)},
+		{kNewNormalPath, kNewHighlightPath, kNewDisabledPath, kButtonMaskPath, Common::Point32(321, 561), Size32(145, 39)},
+		{kPracticeNormalPath, kPracticeHighlightPath, nullptr, nullptr, Common::Point32(468, 561), Size32(145, 39)},
+		{kQuitNormalPath, kQuitHighlightPath, nullptr, nullptr, Common::Point32(613, 561), Size32(145, 39)},
 	};
 
 	for (int i = 0; i < kMenuButtonCount; ++i) {
 		const ButtonDefinition &definition = definitions[i];
 		_buttons[i] = new UIButton(_vm);
 		_buttons[i]->setRect(definition.pos, definition.size);
-		_buttons[i]->loadImages(Common::Path(definition.normalPath),
-								Common::Path(definition.hoverPath),
-								definition.disabledPath ? Common::Path(definition.disabledPath) : Common::Path());
+		const Common::Path normalPath(definition.normalPath);
+		const Common::Path hoverPath(definition.hoverPath);
+		const Common::Path disabledPath = definition.disabledPath ? Common::Path(definition.disabledPath) : Common::Path();
+		if (definition.maskPath) {
+			const Common::Path maskPath(definition.maskPath);
+			_buttons[i]->loadImagesWithMask(normalPath, maskPath, hoverPath, maskPath, disabledPath, maskPath);
+		} else {
+			_buttons[i]->loadImages(normalPath, hoverPath, disabledPath);
+		}
 	}
 }
 
@@ -226,11 +228,10 @@ void InteractiveMenu::drawMain(ManagedSurface32 *screen) {
 
 	const Common::Point32 mousePos = _vm->getMousePos();
 	const Common::Point mouseEventPos(mousePos.x, mousePos.y);
-	BitBlock *selector = isInSelectorArea(mouseEventPos) ? _selectorHilite : _selectorNormal;
-	if (selector)
-		selector->drawToSurface(screen, kFileListPos);
+	const char *selectorPath = isInSelectorArea(mouseEventPos) ? kSelectorHighlightPath : kSelectorNormalPath;
+	_vm->_gfx->drawPageBitBlock(screen, selectorPath, kFileListPos);
 	if (_fileList)
-		_fileList->draw(screen, _vm->getAlphaLUT());
+		_fileList->draw(screen);
 	drawButtonsAndUpdateHover(screen, mousePos);
 }
 
@@ -449,8 +450,8 @@ void InteractiveMenu::playSound(int soundId) {
 		sound->playWithVolume(soundId, sound->_volumeSFX);
 }
 
-InteractiveMenu::SaveFileList::SaveFileList(Zoombini2Engine *vm, const Common::Point32 &pos, RleBlock *selectionBar)
-	: _vm(vm), _pos(pos), _selectionBar(selectionBar) {
+InteractiveMenu::SaveFileList::SaveFileList(Zoombini2Engine *vm, const Common::Point32 &pos)
+	: _vm(vm), _pos(pos) {
 }
 
 bool InteractiveMenu::SaveFileList::init() {
@@ -480,16 +481,15 @@ bool InteractiveMenu::SaveFileList::addItemSorted(const Common::String &name) {
 	return true;
 }
 
-void InteractiveMenu::SaveFileList::draw(ManagedSurface32 *screen, const AlphaBlendLUT &alphaLUT) const {
+void InteractiveMenu::SaveFileList::draw(ManagedSurface32 *screen) const {
 	for (int row = 0; row < kVisibleRows; ++row) {
 		const int itemIndex = _scrollOffset + row;
 		if (static_cast<int>(_items.size()) <= itemIndex)
 			break;
 
 		const bool selected = itemIndex == _selectedIndex;
-		if (selected && _selectionBar && _selectionBar->isValid()) {
-			_selectionBar->drawToScreen(screen, Common::Point32(_pos.x + kSelectionOffsetX, _pos.y + kSelectionOffsetY + row * kRowStride), alphaLUT);
-		}
+		if (selected)
+			_vm->_gfx->drawPageRleBlock(screen, kSelectionBarPath, Common::Point32(_pos.x + kSelectionOffsetX, _pos.y + kSelectionOffsetY + row * kRowStride));
 
 		Gfx::TextColor color = Gfx::TextColor::kDark00;
 		if (selected && _editState == kEditPrefixMatch01)
@@ -503,12 +503,15 @@ void InteractiveMenu::SaveFileList::draw(ManagedSurface32 *screen, const AlphaBl
 }
 
 bool InteractiveMenu::SaveFileList::handleClick(const Common::Point &pos) {
-	if (kEditPrefixMatch01 < _editState || !_selectionBar || !_selectionBar->isValid())
+	if (kEditPrefixMatch01 < _editState)
 		return false;
 
 	const int left = _pos.x + kSelectionOffsetX;
 	const int top = _pos.y + kSelectionOffsetY;
-	const Size32 selectionSize(_selectionBar->getSize().width, _selectionBar->getSize().height * kVisibleRows);
+	const Size32 barSize = _vm->_gfx->getPageRleBlockSize(kSelectionBarPath);
+	if (barSize.width == 0 || barSize.height == 0)
+		return false;
+	const Size32 selectionSize(barSize.width, barSize.height * kVisibleRows);
 	if (pos.x < left || left + selectionSize.width <= pos.x || pos.y < top || top + selectionSize.height <= pos.y)
 		return false;
 
@@ -744,9 +747,10 @@ bool InteractiveMenu::SaveFileList::canAppendCharacter(char c) const {
 
 	Common::String prospective = _editBuffer;
 	prospective += normalizeCharacter(c);
-	if (!_vm->_gfx->hasTextFont(Gfx::TextColor::kDark00) || !_selectionBar || !_selectionBar->isValid())
+	const int barWidth = _vm->_gfx->getPageRleBlockSize(kSelectionBarPath).width;
+	if (!_vm->_gfx->hasTextFont(Gfx::TextColor::kDark00) || barWidth == 0)
 		return true;
-	return _vm->_gfx->getTextWidth(prospective, Gfx::TextColor::kDark00) <= _selectionBar->getWidth() - 5;
+	return _vm->_gfx->getTextWidth(prospective, Gfx::TextColor::kDark00) <= barWidth - 5;
 }
 
 char InteractiveMenu::SaveFileList::normalizeCharacter(char c) const {

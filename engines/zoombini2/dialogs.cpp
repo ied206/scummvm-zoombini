@@ -48,6 +48,7 @@ constexpr uint32 Zoombini2SaveManagementDialog::kImportProfileCommand;
 constexpr uint32 Zoombini2SaveManagementDialog::kExportProfileCommand;
 constexpr uint32 Zoombini2SaveManagementDialog::kProfileSelectionChangedCommand;
 constexpr uint32 Zoombini2OptionsWidget::kManageProfilesCommand;
+constexpr uint32 Zoombini2OptionsWidget::kUnlockFrameRateCommand;
 
 class Zoombini2OptionsWidget::SeparatorWidget : public GUI::Widget {
 public:
@@ -59,6 +60,43 @@ protected:
 	void drawWidget() override {
 		g_gui.theme()->drawLineSeparator(Common::Rect(_x, _y, _x + _w, _y + _h));
 	}
+};
+
+class Zoombini2OptionsWidget::FrameRateNumberBox : public GUI::EditTextWidget {
+public:
+	FrameRateNumberBox(GUI::GuiObject *boss, const Common::String &name, int value, const Common::U32String &tooltip)
+		: GUI::EditTextWidget(boss, name, Common::U32String::format("%d", value), tooltip), _value(value) {}
+
+	void setValue(int value) {
+		_value = value;
+		setEditString(Common::U32String::format("%d", value));
+	}
+
+	int getValue() const {
+		const Common::U32String &text = getEditString();
+		if (text.empty())
+			return _value;
+		int value = 0;
+		for (uint i = 0; i < text.size(); i++) {
+			if (text[i] < '0' || '9' < text[i])
+				return _value;
+			value = MIN<int>(::Zoombini2MetaEngine::kMaxFrameRate, value * 10 + static_cast<int>(text[i] - '0'));
+		}
+		return CLIP<int>(value, ::Zoombini2MetaEngine::kMinFrameRate, ::Zoombini2MetaEngine::kMaxFrameRate);
+	}
+
+protected:
+	bool isCharAllowed(Common::u32char_type_t character) const override {
+		return '0' <= character && character <= '9';
+	}
+
+	void lostFocusWidget() override {
+		setValue(getValue());
+		GUI::EditTextWidget::lostFocusWidget();
+	}
+
+private:
+	int _value;
 };
 
 Zoombini2MenuDialog::Zoombini2MenuDialog(Zoombini2Engine *vm) : MainMenuDialog(vm), _vm(vm) {
@@ -239,7 +277,9 @@ void Zoombini2SaveManagementDialog::refreshProfiles(const Common::String &select
 			_activePartyLabels[i]->setLabel(Common::U32String("?"));
 		}
 
-		const GUI::ThemeEngine::FontColor fontColor = summary._stateValid ? GUI::ThemeEngine::kFontColorNormal : GUI::ThemeEngine::kFontColorOverride;
+		GUI::ThemeEngine::FontColor fontColor = GUI::ThemeEngine::kFontColorOverride;
+		if (summary._stateValid)
+			fontColor = GUI::ThemeEngine::kFontColorNormal;
 		GUI::StaticTextWidget *rowLabels[] = {
 			_profileNameLabels[i],
 			_zombinivilleLabels[i],
@@ -476,28 +516,23 @@ void Zoombini2SaveManagementDialog::handleCommand(GUI::CommandSender *sender, ui
 
 Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Common::String &name, const Common::String &domain)
 	: GUI::OptionsContainerWidget(boss, name, "Zoombini2EngineOptionsDialog", domain) {
-	_debugHotkeysCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.DebugHotkeys", Common::U32String("Enable developer hotkeys"),
-													Common::U32String("Enables F2/F3 party exchange, P puzzle completion, and the Chez Norf C overlay."));
-	_stereoOutputCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.StereoOutput", Common::U32String("Enable stereo game audio"),
-													Common::U32String("Keeps both channels of stereo WAV resources instead of downmixing them to mono."));
-	_greedyWaterslideCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GreedyWaterslide",
-														Common::U32String("Use alternate Pipes of Paloo pairing"),
-														Common::U32String("Selects the alternate pairing branch for level one."));
-	_cachedFrameTimeCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.CachedFrameTime",
-													   Common::U32String("Use frame-cached game timing"),
-													   Common::U32String("Makes gameplay time reads share one clock snapshot per rendered frame."));
-	_originalPrngCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.OriginalPRNG",
-													Common::U32String("Use original random number generator (requires restart)"),
-													Common::U32String("Uses the original Windows engine's Visual C++ 6.0 CRT generator instead of ScummVM's default."));
+	new SeparatorWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.SaveFilesSeparator");
+	GUI::StaticTextWidget *header = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.SaveFilesHeader",
+															  Common::U32String("Save management"), Common::U32String(), GUI::ThemeEngine::kFontStyleBold);
+	header->setAlign(Graphics::TextAlign::kTextAlignStart);
+	GUI::ButtonWidget *manageProfilesButton = new GUI::ButtonWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ManageProfiles",
+																	Common::U32String("Saved games"), Common::U32String(), kManageProfilesCommand);
+	manageProfilesButton->setTarget(this);
 	_savefilesReadOnlyCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.SavefilesReadOnly",
 														 Common::U32String("Lock automatic savefile writes"),
 														 Common::U32String("Prevents automatic progress saves during tests. New profiles and deletion remain available; import and rename are blocked."));
 
-	new SeparatorWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayImprovementsSeparator");
-	GUI::StaticTextWidget *gameplayImprovementsHeader = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayImprovements",
-																				  Common::U32String("Gameplay improvements"), Common::U32String(),
-																				  GUI::ThemeEngine::kFontStyleBold);
-	gameplayImprovementsHeader->setAlign(Graphics::TextAlign::kTextAlignStart);
+	new SeparatorWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayEnhancementsSeparator");
+	header = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayEnhancements",
+									   Common::U32String("Gameplay Enhancements"), Common::U32String(), GUI::ThemeEngine::kFontStyleBold);
+	header->setAlign(Graphics::TextAlign::kTextAlignStart);
+	_stereoOutputCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.StereoOutput", Common::U32String("Enable stereo game audio"),
+													Common::U32String("Keeps both channels of stereo WAV resources instead of downmixing them to mono."));
 	_floatingPointPathsCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.FloatingPointPaths",
 														  Common::U32String("Use floating-point path calculations"),
 														  Common::U32String("Uses 32-bit floating point instead of the original signed Q10 fixed-point arithmetic for Bezier movement paths."));
@@ -505,53 +540,92 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 															Common::U32String("Enable enhanced keyboard shortcuts"),
 															Common::U32String("Enables some ScummVM-only keyboard shortcuts for quality of life improvements."));
 
-	GUI::ButtonWidget *manageProfilesButton = new GUI::ButtonWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ManageProfiles", Common::U32String("Saved games"),
-																	Common::U32String(), kManageProfilesCommand);
-	manageProfilesButton->setTarget(this);
+	new SeparatorWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayAdjustmentSeparator");
+	header = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayAdjustment",
+									   Common::U32String("Gameplay Adjustment"), Common::U32String(), GUI::ThemeEngine::kFontStyleBold);
+	header->setAlign(Graphics::TextAlign::kTextAlignStart);
+	_debugHotkeysCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.DebugHotkeys", Common::U32String("Enable developer hotkeys"),
+													Common::U32String("Enables F2/F3 party exchange, P puzzle completion, and the Chez Norf C overlay."));
+	_greedyWaterslideCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GreedyWaterslide",
+														Common::U32String("Use alternate Pipes of Paloo pairing"),
+														Common::U32String("Selects the alternate pairing branch for level one."));
+	_originalPrngCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.OriginalPRNG",
+													Common::U32String("Use original random number generator (requires restart)"),
+													Common::U32String("Uses the original Windows engine's Visual C++ 6.0 CRT generator instead of ScummVM's default."));
+	GUI::StaticTextWidget *frameRateLabel = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.FrameRateLabel",
+																	  Common::U32String("Frame rate (FPS):"));
+	frameRateLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
+	_frameRateNumberBox = new FrameRateNumberBox(widgetsBoss(), "Zoombini2EngineOptionsDialog.FrameRate",
+												 ::Zoombini2MetaEngine::kDefaultFrameRate,
+												 Common::U32String("Enter a whole number from 30 to 240 FPS."));
+	_unlockFrameRateCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.UnlockFrameRate",
+													   Common::U32String("Unlock frame rate"),
+													   Common::U32String("Removes the engine frame-rate limit. Display VSync may still limit presentation."),
+													   kUnlockFrameRateCommand);
+	_unlockFrameRateCheckbox->setTarget(this);
 }
 
 void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const {
+	const int lineHeight = layouts.getVar("Globals.Line.Height");
 	layouts.addDialog(layoutName, overlayedLayout)
 		.addLayout(GUI::ThemeLayout::kLayoutVertical)
 		.addPadding(0, 0, 0, 0)
-		.addWidget("DebugHotkeys", "Checkbox")
-		.addWidget("StereoOutput", "Checkbox")
-		.addWidget("GreedyWaterslide", "Checkbox")
-		.addWidget("CachedFrameTime", "Checkbox")
-		.addWidget("OriginalPRNG", "Checkbox")
-		.addWidget("SavefilesReadOnly", "Checkbox")
-		.addWidget("ManageProfiles", "Button")
 		.addSpace(10)
-		.addWidget("GameplayImprovementsSeparator", "", -1, 2)
-		.addWidget("GameplayImprovements", "OptionsLabel")
+		.addWidget("SaveFilesSeparator", "", -1, 2)
+		.addWidget("SaveFilesHeader", "", -1, lineHeight)
+		.addWidget("ManageProfiles", "Button")
+		.addWidget("SavefilesReadOnly", "Checkbox")
+		.addSpace(10)
+		.addWidget("GameplayEnhancementsSeparator", "", -1, 2)
+		.addWidget("GameplayEnhancements", "", -1, lineHeight)
+		.addWidget("StereoOutput", "Checkbox")
 		.addWidget("FloatingPointPaths", "Checkbox")
 		.addWidget("EnhancedKbdShortcuts", "Checkbox")
+		.addSpace(10)
+		.addWidget("GameplayAdjustmentSeparator", "", -1, 2)
+		.addWidget("GameplayAdjustment", "", -1, lineHeight)
+		.addWidget("DebugHotkeys", "Checkbox")
+		.addWidget("GreedyWaterslide", "Checkbox")
+		.addWidget("OriginalPRNG", "Checkbox")
+		.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
+		.addWidget("FrameRateLabel", "OptionsLabel")
+		.addWidget("FrameRate", "", 64, lineHeight)
+		.closeLayout()
+		.addWidget("UnlockFrameRate", "Checkbox")
 		.closeLayout()
 		.closeDialog();
 }
 
 void Zoombini2OptionsWidget::load() {
-	_debugHotkeysCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigDebugHotkeys, _domain));
-	_stereoOutputCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigStereoOutput, _domain));
-	_greedyWaterslideCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _domain));
-	_cachedFrameTimeCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigCachedFrameTime, _domain));
-	_originalPrngCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _domain));
 	_savefilesReadOnlyCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, _domain));
+	_stereoOutputCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigStereoOutput, _domain));
 	_floatingPointPathsCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths, _domain));
 	_enhancedKbdShortcutsCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _domain));
+	_debugHotkeysCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigDebugHotkeys, _domain));
+	_greedyWaterslideCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _domain));
+	_originalPrngCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _domain));
+	const int frameRate = CLIP<int>(ConfMan.getInt(::Zoombini2MetaEngine::kConfigFrameRate, _domain),
+									::Zoombini2MetaEngine::kMinFrameRate, ::Zoombini2MetaEngine::kMaxFrameRate);
+	_frameRateNumberBox->setValue(frameRate);
+	_unlockFrameRateCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigUnlockFrameRate, _domain));
+	updateFrameRateControls();
 }
 
 bool Zoombini2OptionsWidget::save() {
+	const int frameRate = _frameRateNumberBox->getValue();
+	_frameRateNumberBox->setValue(frameRate);
+
 	const bool originalPrngChanged = ConfMan.getBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _domain) != _originalPrngCheckbox->getState();
 
-	ConfMan.setBool(::Zoombini2MetaEngine::kConfigDebugHotkeys, _debugHotkeysCheckbox->getState(), _domain);
-	ConfMan.setBool(::Zoombini2MetaEngine::kConfigStereoOutput, _stereoOutputCheckbox->getState(), _domain);
-	ConfMan.setBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _greedyWaterslideCheckbox->getState(), _domain);
-	ConfMan.setBool(::Zoombini2MetaEngine::kConfigCachedFrameTime, _cachedFrameTimeCheckbox->getState(), _domain);
-	ConfMan.setBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _originalPrngCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, _savefilesReadOnlyCheckbox->getState(), _domain);
+	ConfMan.setBool(::Zoombini2MetaEngine::kConfigStereoOutput, _stereoOutputCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths, _floatingPointPathsCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _enhancedKbdShortcutsCheckbox->getState(), _domain);
+	ConfMan.setBool(::Zoombini2MetaEngine::kConfigDebugHotkeys, _debugHotkeysCheckbox->getState(), _domain);
+	ConfMan.setBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _greedyWaterslideCheckbox->getState(), _domain);
+	ConfMan.setBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _originalPrngCheckbox->getState(), _domain);
+	ConfMan.setInt(::Zoombini2MetaEngine::kConfigFrameRate, frameRate, _domain);
+	ConfMan.setBool(::Zoombini2MetaEngine::kConfigUnlockFrameRate, _unlockFrameRateCheckbox->getState(), _domain);
 	if (originalPrngChanged && g_engine) {
 		GUI::MessageDialog dialog(Common::U32String("The random number generator change will take effect after restarting the game."));
 		dialog.runModal();
@@ -560,12 +634,21 @@ bool Zoombini2OptionsWidget::save() {
 }
 
 void Zoombini2OptionsWidget::handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) {
+	if (cmd == kUnlockFrameRateCommand) {
+		updateFrameRateControls();
+		return;
+	}
 	if (cmd == kManageProfilesCommand) {
 		Zoombini2SaveManagementDialog dialog(_domain);
 		dialog.runModal();
 		return;
 	}
 	GUI::OptionsContainerWidget::handleCommand(sender, cmd, data);
+}
+
+void Zoombini2OptionsWidget::updateFrameRateControls() {
+	const bool unlocked = _unlockFrameRateCheckbox->getState();
+	_frameRateNumberBox->setEnabled(!unlocked);
 }
 
 } // End of namespace Zoombini2

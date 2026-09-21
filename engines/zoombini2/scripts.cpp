@@ -38,7 +38,7 @@ namespace Zoombini2 {
 
 AnimationRunner::AnimationRunner(Zoombini2Engine *vm, const Common::Point32 &position, AnimationRunnerMode mode)
 	: _vm(vm), _position(position), _mode(mode) {
-	const uint32 tickCount = _vm ? _vm->getGameTickCount() : 0;
+	const uint32 tickCount = _vm ? _vm->getFrameTickCount() : 0;
 	if (_mode == AnimationRunnerMode::kLoop01) {
 		_currentTimedEntryIndex = 0;
 		_cycleStartTime = tickCount;
@@ -702,6 +702,7 @@ void PathObject::appendSegment(const Common::Point32 &start, const Common::Point
 	CurveSegment *segment = new CurveSegment(_vm->useFloatingPointPaths());
 	segment->init(start, control0, control1, end, stepValue, waitInitial);
 	segments.push_back(segment);
+	endPos = end;
 }
 
 /**
@@ -896,7 +897,25 @@ void ZoombiniRunner::setPosition(const Common::Point32 &pos) {
 	int direction = static_cast<int>(acos(CLIP(static_cast<double>(deltaX) / distance, -1.0, 1.0)) * 180.0 / M_PI) / 22;
 	if (_previousScreenPos.y < pos.y)
 		direction = -direction;
-	static constexpr int kDirectionCells[17] = {44, 41, 11, 12, 22, 23, 33, 36, 66, 69, 99, 98, 88, 87, 77, 74, 44};
+	static constexpr int kDirectionCells[17] = {
+		44,
+		41,
+		11,
+		12,
+		22,
+		23,
+		33,
+		36,
+		66,
+		69,
+		99,
+		98,
+		88,
+		87,
+		77,
+		74,
+		44,
+	};
 	if (-8 <= direction && direction <= 8)
 		_animationCell = kDirectionCells[direction + 8];
 	updateSpriteSize();
@@ -913,9 +932,11 @@ bool ZoombiniRunner::advanceMovement(uint32 tickCount, const Common::Point32 &sp
 	if (!_movementPath)
 		return false;
 
-	Common::Point32 pathPos = _movementPath->currentSegment < static_cast<int>(_movementPath->segments.size())
-								  ? _movementPath->segments[_movementPath->currentSegment]->getPosition()
-								  : _movementPath->endPos;
+	Common::Point32 pathPos;
+	if (_movementPath->currentSegment < static_cast<int>(_movementPath->segments.size()))
+		pathPos = _movementPath->segments[_movementPath->currentSegment]->getPosition();
+	else
+		pathPos = _movementPath->endPos;
 	const bool active = _movementPath->advance(tickCount, pathPos);
 	setPosition(Common::Point32(pathPos.x - spriteOffset.x, pathPos.y - spriteOffset.y));
 	return active;
@@ -1140,7 +1161,9 @@ ZoombiniInputResult ZoombiniRunner::handlePointerInput(const Common::Array<Zoomb
 
 		if (!clickReleased)
 			return ZoombiniInputResult::kStillHeld04;
-		const int targetIndex = dropTargets ? findReleaseDropTarget(*dragged, pointerPos, *dropTargets, scrollX, backgroundWidth) : -1;
+		int targetIndex = -1;
+		if (dropTargets)
+			targetIndex = findReleaseDropTarget(*dragged, pointerPos, *dropTargets, scrollX, backgroundWidth);
 		if (dropTargets && targetIndex != -1) {
 			ZoombiniDropTarget &target = (*dropTargets)[targetIndex];
 			dragged->endDrag(false);
@@ -1215,7 +1238,13 @@ Common::Rect32 ZoombiniRunner::getSpriteRect(int scrollX, int backgroundWidth) c
 }
 
 void ZoombiniRunner::updateSpriteSize() {
-	const Size32 spriteSize = _activeAnimation ? _activeAnimation->getSpriteSize(_animationCell, _animationActive ? _animationFrame : 0) : Size32();
+	Size32 spriteSize;
+	if (_activeAnimation) {
+		int animationFrame = 0;
+		if (_animationActive)
+			animationFrame = _animationFrame;
+		spriteSize = _activeAnimation->getSpriteSize(_animationCell, animationFrame);
+	}
 	_spriteSize = Size16(static_cast<int16>(spriteSize.width), static_cast<int16>(spriteSize.height));
 }
 
