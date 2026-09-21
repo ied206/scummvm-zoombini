@@ -60,9 +60,15 @@ public:
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 	/** Highlight the selectable Boolie row under @p pos. */
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
+	/** Return whether at least one Boolie group has boarded and may depart. */
+	bool canUseGoButton() const override;
+	/** Describe active rows and the current/next ball cohorts for the puzzle console. */
 	Common::String debugGetAnswer() const override;
+	/** Report remaining challenges as the puzzle's chance count. */
 	PuzzleChanceInfo debugGetChances() const override;
+	/** Return whether the console may change challenge count while the board is idle. */
 	bool debugCanSetChances() const override;
+	/** Set remaining challenges and synchronize the generated turn threshold. */
 	bool debugSetChances(int remaining) override;
 
 	/** Return the rescued-Boolie credit assigned to each party member at @p level. */
@@ -106,6 +112,7 @@ private:
 	static constexpr uint32 kBlockerFrameTime = 70;
 	/** Number of frames played by the opening blocker sequence. */
 	static constexpr uint32 kBlockerFrameCount = 3;
+	/** Launch, boarding-check, replacement-walk timing, and replacement screen offsets. */
 	static constexpr uint32 kBallLaunchInterval = 600;
 	static constexpr uint32 kFirstBallLaunchDelay = 30;
 	static constexpr uint32 kBoardingCheckDelay = 2000;
@@ -207,6 +214,7 @@ private:
 
 	/** One queued visible transition after a ball changes a Boolie value. */
 	struct Flip {
+		/** Row/slot and source/destination portrait values for one queued visible roll. */
 		int row = 0;
 		int slot = 0;
 		byte fromValue = 0;
@@ -348,9 +356,11 @@ private:
 	bool _rowJumpsStarted = false;
 	/** Whether the post-roll boarding check has been scheduled. */
 	bool _boardingCheckScheduled = false;
+	/** Deadline for the scheduled post-roll boarding check. */
 	uint32 _boardingCheckAt = 0;
 	/** Whether one replacement Boolie is walking from the left edge. */
 	bool _refillActive = false;
+	/** Replacement walker source row/slot, screen X, and animation-cycle start tick. */
 	int _refillRow = -1;
 	int _refillSlot = 0;
 	int _refillX = 0;
@@ -367,6 +377,7 @@ private:
 	int _pinRoute = 0;
 	/** Index and deadline of the next ball to launch into the selected lane. */
 	uint _nextLaneBallIndex = 0;
+	/** Deadline for launching the next ball onto the selected lane. */
 	uint32 _nextLaneLaunchAt = 0;
 	/** Row currently highlighted by the pointer, or -1. */
 	int _hoverRow = -1;

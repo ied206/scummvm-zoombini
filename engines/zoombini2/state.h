@@ -36,6 +36,40 @@ class SaveFileManager;
 namespace Zoombini2 {
 
 class ZoombiniRunner;
+class Random;
+
+/** Numeric page identifiers accepted by the engine dispatcher. */
+enum PageId : int {
+	kPageMenuLoad = -4,         ///< Saved-adventure sign-in flow.
+	kPageMenuPractice = -3,     ///< Practice-map sign-in flow.
+	kPageMenuOptions = -2,      ///< Sign-in screen.
+	kPageNone = -1,             ///< No dispatched page.
+	kPageZombiniville = 0,      ///< Zoombiniville party-assembly shelter.
+	kPageCrazyTurtle = 1,       ///< Turtle Hurdle puzzle.
+	kPageWaterslide = 2,        ///< Pipes of Paloo puzzle.
+	kPageAquacube = 3,          ///< Aqua Cube puzzle.
+	kPageRescue1 = 4,           ///< First rescue-site shelter.
+	kPageMysticMarsh = 5,       ///< Bubble Bumpers puzzle.
+	kPageMagicWall = 6,         ///< Beetle Bug Alley puzzle.
+	kPageWallOfFleens = 7,      ///< Magic Mirrors puzzle.
+	kPageChezNorf = 8,          ///< Chez Norf puzzle.
+	kPageRescue2 = 9,           ///< Second rescue-site shelter.
+	kPageSnowboard = 10,        ///< Snowboard Gulch puzzle.
+	kPageBoolies = 11,          ///< Boolie Boggle puzzle.
+	kPageBooliewood = 12,       ///< Booliewood arrival shelter.
+	kPageCredits = 16,          ///< Credits transition.
+	kPageLogoTLC = 17,          ///< Splash video of The Learning Company
+	kPageCutsceneFirst = 18,    ///< First story video.
+	kPageCutsceneSecond = 20,   ///< Second story video.
+	kPageCutsceneThird = 21,    ///< Third story video.
+	kPageMapTrans = 22,         ///< Route-map travel transition
+	kPageFinal = 23,            ///< Booliewood final-celebration shelter
+	kPageTitleScreen = 24,      ///< Title screen
+	kPageLogoPolygon = 25,      ///< Splash video of Polygon Studio
+	kPageMapScreen = 30,        ///< ScummVM map-screen dispatcher alias
+	kPageMenuAlt = 40,          ///< Alternate sign-in route
+	kPageLogoArisuMedia = 1972, ///< (v1.1KR only) Splash video of ArisuMedia
+};
 
 /** Save-file version accepted by @ref GameState. */
 const int kSaveFileMagic = 262;
@@ -209,8 +243,8 @@ struct BoardRecord {
 	ZoombiniRunner *restore() const;
 };
 
-/** Aggregate counters and per-combination usage retained by the profile. */
-struct TraitRegistrationState {
+/** Per-combination use-count table retained by the profile. */
+struct TraitComboTable {
 	/** Total accepted registrations, including repeated combinations. */
 	int32 _totalCount;
 	/** Number of distinct trait combinations registered at least once. */
@@ -221,10 +255,21 @@ struct TraitRegistrationState {
 	byte _combinationUseCounts[kZoombiniCombinationCount];
 	/** Unused trailing bytes preserved by the original 640-byte save block. */
 	byte _unusedTail[3];
+
+	/** Return the table index for a validated trait combination, or -1. */
+	static int getComboIndex(const ZmbTrait &traits);
+	/** Return this table's count for @p traits, or zero for invalid values. */
+	byte getComboCount(const ZmbTrait &traits) const;
+	/** Return whether one more copy of @p traits may be registered in this table. */
+	bool canRegisterCombo(const ZmbTrait &traits) const;
+	/** Register one copy of @p traits in this table if its per-combination limit has not been reached. */
+	bool registerCombo(const ZmbTrait &traits);
+	/** Remove one prior registration of @p traits from this table. */
+	bool unregisterCombo(const ZmbTrait &traits);
 };
 
 /**
- * Owns one profile's progress, local roster, sparse boards, and trait-registration state.
+ * Owns one profile's progress, local roster, sparse boards, and trait-combo table.
  *
  * Loads are transactional: a complete temporary state is validated before it
  * replaces the active instance. The class also owns every pointer stored in
@@ -233,6 +278,8 @@ struct TraitRegistrationState {
  */
 class GameState {
 public:
+	/** Generate a short name for a newly created Zoombini. */
+	static Common::String generateZoombiniName(Random &random);
 	/** Construct a fresh profile state. */
 	GameState();
 	/** Release all board records and local-roster entries. */
@@ -252,7 +299,7 @@ public:
 	/** Retain the live party as saved roster entries on return to the map. */
 	void stashActiveZoombinis();
 	/** Retain puzzle leavers in the saved roster or @p board and keep successful route members active. */
-	void finishPuzzleRoster(int pageId, BoardRecord **board, bool advancing, bool savedGame);
+	void finishPuzzleRoster(PageId pageId, BoardRecord **board, bool advancing, bool savedGame);
 	/** Delete every record in @p board and clear its cells. */
 	static void clearBoard(BoardRecord **board);
 	/** Store @p zoombini in the first available cell of @p board. */
@@ -263,44 +310,41 @@ public:
 	static int findBoardScrollRow(BoardRecord *const *board);
 	/** Return the four shelter-stage counts and serialized active-party count. */
 	Zoombini2PopulationSummary getPopulationSummary() const;
-	/** Return the registration count for @p traits, or zero for invalid values. */
-	byte getTraitCombinationRegistrationCount(const ZmbTrait &traits) const;
-	/** Return whether one more copy of the supplied trait combination may be registered. */
-	bool canRegisterTraits(const ZmbTrait &traits) const;
-	/** Register one trait combination if its per-combination limit has not been reached. */
-	bool registerTraits(const ZmbTrait &traits);
 	/** Append one Booliewood completion snapshot while history capacity remains. */
 	bool recordCompletedZoombini(const ZoombiniRunner &zoombini);
 	/** Apply one completed Booliewood trip to this profile and its active party. */
 	void recordBooliesCompletion();
 	/** Return whether the profile has accepted its 625th Zoombini registration. */
-	bool hasReachedZoombiniRegistrationLimit() const { return _traitRegistrations._totalCount == kZoombiniCombinationCount; }
+	bool hasReachedZoombiniRegistrationLimit() const { return _traitComboTable._totalCount == kZoombiniCombinationCount; }
 	/** Return whether accumulated progress has unlocked relaxed party trait limits. */
-	bool hasRelaxedPackTraitLimits() const { return 600 <= _traitRegistrations._twiceRegisteredCombinationCount; }
+	bool hasRelaxedPackTraitLimits() const { return 600 <= _traitComboTable._twiceRegisteredCombinationCount; }
 
 	/** Return whether @p pageId has any recorded visit. */
-	bool isPageVisited(int pageId) const {
-		if (pageId < 0 || 100 <= pageId)
+	bool isPageVisited(PageId pageId) const {
+		const int pageIndex = static_cast<int>(pageId);
+		if (pageIndex < 0 || 100 <= pageIndex)
 			return false;
-		return _pageLevel[pageId] != 0;
+		return _pageLevel[pageIndex] != 0;
 	}
 
 	/** Return the recorded count for one page and visit kind, or zero for invalid input. */
-	byte getPageVisitCount(int pageId, int visitKind = 1) const {
-		if (visitKind < 1 || 3 < visitKind || pageId < 0 || 24 < pageId)
+	byte getPageVisitCount(PageId pageId, int visitKind = 1) const {
+		const int pageIndex = static_cast<int>(pageId);
+		if (visitKind < 1 || 3 < visitKind || pageIndex < 0 || 24 < pageIndex)
 			return 0;
-		return _pageVisitCounts[5 * pageId + visitKind];
+		return _pageVisitCounts[5 * pageIndex + visitKind];
 	}
 
 	/** Return whether @p pageId has a visit recorded for @p visitKind. */
-	bool hasPageVisit(int pageId, int visitKind = 1) const {
-		if (visitKind < 1 || 3 < visitKind || pageId < 0 || 24 < pageId)
+	bool hasPageVisit(PageId pageId, int visitKind = 1) const {
+		const int pageIndex = static_cast<int>(pageId);
+		if (visitKind < 1 || 3 < visitKind || pageIndex < 0 || 24 < pageIndex)
 			return false;
 		return getPageVisitCount(pageId, visitKind) != 0;
 	}
 
 	/** Increment a page's selected visit counter, saturating at 250. */
-	void registerPageVisit(int pageId, int visitKind = 1);
+	void registerPageVisit(PageId pageId, int visitKind = 1);
 
 	/** Return whether the first rescue movie has already played. */
 	bool hasPlayedRescue1Movie() const { return _rescue1MoviePlayed != 0; }
@@ -323,7 +367,7 @@ public:
 	/** Runtime level selected for the active gameplay page. */
 	int _level;
 	/** Most recently initialized gameplay page. */
-	int _currentGameplayPageId;
+	PageId _currentGameplayPageId = kPageZombiniville;
 	/** Serialized compatibility flag with no other known Z2-v1.1KR consumer. */
 	byte _legacyStateFlag;
 	/** Whether the saved party has reached Rescue Site I. */
@@ -356,8 +400,8 @@ public:
 	byte _rescue1MoviePlayed;
 	/** Second-rescue movie completion flag. */
 	byte _rescue2MoviePlayed;
-	/** Trait-combination usage and aggregate registration totals. */
-	TraitRegistrationState _traitRegistrations;
+	/** Trait-combination use-count table and aggregate totals. */
+	TraitComboTable _traitComboTable;
 	/** Zoombini roster stored in this profile. */
 	Common::Array<ZoombiniRunner *> _savedRoster;
 	/** Live party for the current page, separate from the serialized saved roster. */
@@ -387,8 +431,6 @@ private:
 	static int writeBoard(Common::WriteStream *stream, BoardRecord *const *board);
 	/** Count occupied cells in one sparse storage board, excluding its sentinel row. */
 	static int countBoardEntries(BoardRecord *const *board);
-	/** Return the counter-table index for a validated trait combination. */
-	static int getTraitCombinationTableIndex(const ZmbTrait &traits);
 	/** Exchange two fixed-size arrays element by element. */
 	template<typename T, uint N>
 	static void swapArray(T (&a)[N], T (&b)[N]) {

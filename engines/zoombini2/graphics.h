@@ -37,7 +37,6 @@
 
 namespace Zoombini2 {
 
-enum PageId : int;
 enum class RouteBranch : int;
 
 /** Signed width and height without positional semantics. */
@@ -159,10 +158,17 @@ public:
 
 	/** Draw an uncompressed bitmap through the shared Z2 rendering boundary. */
 	void drawBitBlock(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos) const;
+	/** Draw an uncompressed bitmap while treating its top-left pixel color as transparent. */
+	void drawBitBlockColorKey(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos) const;
 	/** Load and draw a bitmap from the current page cache. */
 	void drawPageBitBlock(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos) {
 		if (destSurface)
 			drawBitBlock(destSurface, loadPageBitBlock(key), pos);
+	}
+	/** Load and draw a page bitmap using its top-left pixel as a transparency key. */
+	void drawPageBitBlockColorKey(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos) {
+		if (destSurface)
+			drawBitBlockColorKey(destSurface, loadPageBitBlock(key), pos);
 	}
 	/** Load and draw a bitmap retained across page changes. */
 	void drawSharedBitBlock(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos) {
@@ -194,6 +200,8 @@ public:
 	void clearPageLayers();
 	/** Draw an RLE sprite through the shared Z2 rendering boundary. */
 	void drawRleBlock(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos) const;
+	/** Draw an RLE sprite while skipping opaque pixels matching @p red, @p green, and @p blue. */
+	void drawRleBlockColorKey(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos, byte red, byte green, byte blue) const;
 	/** Load and draw an RLE sprite from the current page cache. */
 	void drawPageRleBlock(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos) {
 		if (destSurface)
@@ -203,6 +211,12 @@ public:
 	void drawSharedRleBlock(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos) {
 		if (destSurface)
 			drawRleBlock(destSurface, loadSharedRleBlock(key), pos);
+	}
+	/** Load and draw a shared RLE sprite while skipping one opaque RGB color. */
+	void drawSharedRleBlockColorKey(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos, byte red, byte green,
+									byte blue) {
+		if (destSurface)
+			drawRleBlockColorKey(destSurface, loadSharedRleBlock(key), pos, red, green, blue);
 	}
 	/** Return a page RLE sprite's dimensions, or an empty size when it cannot be loaded. */
 	Size32 getPageRleBlockSize(const Common::String &key);
@@ -372,7 +386,7 @@ public:
  * value when retaining the destSurface contribution. `value` is one 8-bit
  * color channel.
  *
- * A mode-1 RLE pixel stores premultiplied BGR in its first three bytes and
+ * A mode 1 RLE pixel stores premultiplied BGR in its first three bytes and
  * inverse alpha in its fourth byte. RLE drawing therefore computes
  * `source + scale(inverseAlpha, destSurface)` for each channel. The
  * @ref BitBlock::drawRleMaskBlend method has an uncompressed bitmap and a
@@ -412,6 +426,28 @@ private:
  * A BitBlock may be loaded from a color BMP, a color-and-alpha BMP pair, or
  * the game's cached BB format. Drawing clips source pixels to the destSurface
  * surface and preserves the destSurface outside the covered region.
+ *
+ * Cached `.bb` files use the following little-endian layout:
+ * @code
+ * uint32 serializedAlphaMapPointer
+ * uint32 serializedPixelPointer
+ * uint32 bufferSize
+ * int32  width
+ * int32  height
+ * uint32 externalPixelSize
+ * byte   bgrPixels[bufferSize]
+ * @endcode
+ *
+ * The first two fields are serialized runtime pointer slots and are ignored.
+ * Both size fields normally equal `width * height * 3`.
+ * Pixels are stored as row-major BGR24 from the top row to the bottom row and
+ * are expanded to opaque RGBA32 when loaded.
+ * A truncated cache retains every complete BGR pixel and fills the unavailable
+ * tail with opaque black.
+ *
+ * Color `.bmp` and `.bmt` inputs are standard 24-bit BGR bitmaps.
+ * A separate alpha bitmap must decode to an indexed surface with matching
+ * dimensions, and each stored palette index is used directly as pixel coverage.
  */
 class BitBlock {
 public:
@@ -440,6 +476,8 @@ public:
 
 	/** Draw the full bitmap without alpha blending at @p pos. */
 	void drawToSurface(ManagedSurface32 *destSurface, const Common::Point32 &pos) const;
+	/** Draw the full bitmap while treating its top-left pixel color as transparent. */
+	void drawToSurfaceColorKey(ManagedSurface32 *destSurface, const Common::Point32 &pos) const;
 	/** Draw @p srcRect from this bitmap without alpha blending at @p pos. */
 	void drawSubRect(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect &srcRect) const;
 	/**
@@ -481,8 +519,8 @@ private:
 	/** Optional one-byte-per-pixel alpha storage held by this bitmap, or nullptr. */
 	byte *_alphaMap = nullptr;
 
-	/** Clip a bitmap region in 32-bit coordinates and convert its opaque pixels through the shared blitter. */
-	void drawOpaque(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &srcRect) const;
+	/** Clip and convert a bitmap region, optionally treating the full bitmap's top-left color as transparent. */
+	void drawToSurfaceInternal(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &srcRect, bool useColorKey) const;
 	/** Decode a 24-bit BMP from @p stream through the shared image decoder. */
 	bool loadColorBMP(Common::SeekableReadStream *stream);
 	/** Decode an indexed alpha-mask BMP from @p stream through the shared image decoder. */
@@ -501,10 +539,44 @@ private:
 /**
  * Represents one RLE-compressed sprite frame in the engine's drawing format.
  *
- * The frame header stores its dimensions and encoded byte count. Encoded spans
- * contain screen-relative coordinates, a pixel count, an opaque-or-alpha mode,
- * and expanded four-byte pixel records. Mode-1 records store premultiplied BGR
- * plus inverse alpha, which is composited through an @ref AlphaBlendLUT.
+ * Every frame begins with this little-endian 24-byte header:
+ * @code
+ * uint32 cachedEffectiveHeight
+ * uint32 serializedDataPointer
+ * uint32 payloadSize
+ * int32  width
+ * int32  height
+ * uint32 uninitializedSerializedField
+ * @endcode
+ *
+ * Only the payload size, width, and height are resource metadata.
+ * The other fields are consumed but ignored.
+ * A standalone `.rb` record stores a duplicate 32-bit payload size immediately
+ * after this header, while animation containers supply an outer size according
+ * to their own layout and then use the same header and RLE payload.
+ *
+ * The shared little-endian RLE payload has this structure:
+ * @code
+ * uint16 effectiveHeight
+ * repeat until the declared payload ends:
+ *     int16  xOffset
+ *     int16  yOffset
+ *     int16  pixelCount
+ *     uint8  mode
+ *     pixel[pixelCount]
+ * @endcode
+ *
+ * Mode 0 stores three bytes per pixel in BGR order. These pixels are completely
+ * opaque and replace the destination unless an explicit color key skips them.
+ * Mode 1 stores four bytes per pixel: premultiplied BGR followed by inverse
+ * alpha. Each destination channel is replaced with
+ * `min(255, source + floor(destination * inverseAlpha / 256))` through an
+ * @ref AlphaBlendLUT. Areas omitted by the span list leave the destination
+ * unchanged.
+ *
+ * Loading separates the serialized span metadata from aligned four-byte pixel
+ * storage. Mode 0 gains an unused fourth byte, while mode 1 retains its inverse
+ * alpha byte without conversion.
  * Drawing clips malformed or off-screen spans instead of writing outside the
  * destSurface surface.
  */
@@ -512,7 +584,7 @@ class RleBlock {
 public:
 	/** Construct an empty RLE frame bound to @p vm. */
 	explicit RleBlock(Zoombini2Engine *vm);
-	/** Release the member RLE data. */
+	/** Release the decoded pixel storage. */
 	~RleBlock();
 
 	/** Load the recoverable prefix of an RB or AN frame record from @p stream. */
@@ -527,14 +599,16 @@ public:
 	/**
 	 * Draw this frame at @p pos using opaque copies or lookup-table blending.
 	 *
-	 * Mode-1 spans use their premultiplied BGR channels and inverse-alpha byte
+	 * Mode 1 spans use their premultiplied BGR channels and inverse-alpha byte
 	 * with @p alphaLUT.
 	 */
 	void drawToScreen(ManagedSurface32 *destSurface, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const;
+	/** Draw this frame while skipping opaque pixels matching @p red, @p green, and @p blue. */
+	void drawToScreenColorKey(ManagedSurface32 *destSurface, const Common::Point32 &pos, byte red, byte green, byte blue, const AlphaBlendLUT &alphaLUT) const;
 	/**
 	 * Draw this frame inside @p clip using opaque copies or lookup-table blending.
 	 *
-	 * Mode-1 spans use their premultiplied BGR channels and inverse-alpha byte
+	 * Mode 1 spans use their premultiplied BGR channels and inverse-alpha byte
 	 * with @p alphaLUT.
 	 */
 	void drawToScreenClipped(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &clip, const AlphaBlendLUT &alphaLUT) const;
@@ -545,36 +619,79 @@ public:
 	int32 getWidth() const { return _size.width; }
 	/** Return the frame height in pixels. */
 	int32 getHeight() const { return _size.height; }
-	/** Return whether encoded frame data has been loaded. */
-	bool isValid() const { return _rleData != nullptr; }
+	/** Return whether frame data has been loaded. */
+	bool isValid() const { return _loaded; }
 
 private:
+	/** Serialized pixel layout and composition rule selected by one span's mode byte. */
+	enum class SpanMode : byte {
+		/** Mode 0: three-byte opaque BGR pixels which replace the destination. */
+		kOpaqueBgr00 = 0,
+		/** Mode 1: premultiplied BGR plus inverse alpha for the original composition rule. */
+		kInverseAlphaBgr01 = 1
+	};
+
+	/** One decoded span whose pixels occupy a contiguous range in @ref RleBlock::_pixels. */
+	struct Span {
+		/** Signed horizontal offset from the frame's draw position. */
+		int32 xOffset = 0;
+		/** Signed vertical offset from the frame's draw position. */
+		int32 yOffset = 0;
+		/** First four-byte pixel record in @ref RleBlock::_pixels. */
+		uint32 pixelOffset = 0;
+		/** Number of consecutive pixels in this span. */
+		uint32 pixelCount = 0;
+		/** Serialized pixel layout and composition rule for this span. */
+		SpanMode mode = SpanMode::kOpaqueBgr00;
+	};
+
 	/** Borrowed vm used to resolve RLE resources. */
 	Zoombini2Engine *_vm;
 	/** Frame dimensions in pixels. */
 	Size32 _size = Size32();
-	/** Number of bytes in @ref RleBlock::_rleData after load-time expansion. */
-	uint32 _dataSize = 0;
-	/** Expanded RLE span storage held by this frame, with four bytes per encoded pixel. */
-	byte *_rleData = nullptr;
-	/** Trailing header value retained with the decoded frame. */
-	int32 _field20 = 0;
+	/** Decoded span metadata held by this frame. */
+	Common::Array<Span> _spans;
+	/** Aligned decoded pixel storage held by this frame. */
+	uint32 *_pixels = nullptr;
+	/** Number of four-byte records in @ref RleBlock::_pixels. */
+	uint32 _pixelCount = 0;
+	/** Whether a structurally bounded frame prefix has been loaded. */
+	bool _loaded = false;
 
-	/** Expand complete encoded spans and report whether a malformed tail was discarded. */
-	static bool expand3to4bpp(const byte *srcData, uint32 srcSize, byte *&expandedData, uint32 &expandedSize, bool &salvaged);
+	/** Decode the structurally bounded span prefix into metadata and aligned pixels, reporting whether a malformed tail was discarded. */
+	static bool decodeSpans(const byte *srcData, uint32 srcSize, Common::Array<Span> &spans, uint32 *&pixels, uint32 &pixelCount, bool &salvaged);
 	/**
 	 * Add one premultiplied source channel to the destSurface scaled by @p inverseAlpha.
 	 *
-	 * Mode-1 RLE pixels store the premultiplied source channel directly, so only
+	 * Mode 1 RLE pixels store the premultiplied source channel directly, so only
 	 * the destSurface term needs an @p alphaLUT lookup.
 	 * The sum is saturated at 255.
 	 */
 	static byte blendChannel(byte srcSurface, byte dest, byte inverseAlpha, const AlphaBlendLUT &alphaLUT);
+	/** Draw this frame with clipping and an optional opaque-span color key. */
+	void drawToScreenInternal(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &clip, const AlphaBlendLUT &alphaLUT,
+							  bool useColorKey, byte red, byte green, byte blue) const;
 	/** Exchange frame buffer state with @p other. */
 	void swapData(RleBlock &other);
 };
 
-/** Represents the ordered RLE frames decoded from one AN animation file. */
+/**
+ * Represents the ordered RLE frames decoded from one AN animation file.
+ *
+ * An `.an` file is one little-endian frame sequence:
+ * @code
+ * uint32 frameCount
+ * repeat frameCount times:
+ *     byte   rleHeader[24]
+ *     uint32 externalDataSize
+ *     byte   rlePayload[externalDataSize]
+ * @endcode
+ *
+ * Each embedded frame has the same header, duplicate size, and span payload as
+ * a standalone @ref RleBlock `.rb` record.
+ * The file contains only frame order and image data; playback timing, events,
+ * sounds, and looping policy are supplied by the caller.
+ */
 class Animation {
 public:
 	/** Construct an animation without frames, bound to @p vm. */
@@ -599,6 +716,20 @@ private:
 
 /**
  * Decoded 1-bit page-area bitmap used by common Zoombini drop handling.
+ *
+ * The direct decoder accepts a standard uncompressed 1-bit BMP:
+ * @code
+ * 14-byte BITMAPFILEHEADER
+ * BITMAPINFOHEADER and two-color palette
+ * padding up to BITMAPFILEHEADER::bfOffBits
+ * repeat abs(height) rows:
+ *     byte packedPixels[((width + 31) / 32) * 4]
+ * @endcode
+ *
+ * Pixels are packed most-significant bit first, rows are padded to a four-byte
+ * boundary, and the sign of the BMP height selects bottom-up or top-down rows.
+ * Other indexed BMP variants use the shared bitmap decoder and retain their
+ * palette indices as one byte per pixel.
  *
  * The original tests the packed source byte containing a point rather than an
  * individual bit. The decoder keeps the pixel row and reproduces that byte-wide
@@ -632,6 +763,24 @@ private:
  * The first index selects one of 100 movement or animation cells. The second
  * selects the body or one of four feature layers, and the third selects the
  * base image or one of five feature values.
+ *
+ * An `.anm` file serializes every grid entry in that exact nested order:
+ * @code
+ * repeat 100 movementOrAnimation cells:
+ *     repeat 5 bodyOrFeature layers:
+ *         repeat 6 baseOrFeatureValue variants:
+ *             uint32 frameCount
+ *             repeat frameCount times:
+ *                 uint32 outerDataSize
+ *                 byte   rleHeader[24]
+ *                 byte   rlePayload[outerDataSize]
+ * @endcode
+ *
+ * The outer size precedes the embedded @ref RleBlock header and must match the
+ * payload size stored in that header.
+ * This differs from `.an`, where the duplicate size follows the RLE header.
+ * The file does not store playback timing; @ref setFrameDelay supplies one
+ * page-configured delay for the loaded grid.
  */
 class ZoombiniAnimation {
 public:
@@ -801,6 +950,17 @@ enum MenuButtonId {
 
 /**
  * Renders text with the 81 glyphs extracted from one bitmap-font strip.
+ *
+ * A font uses two files whose `.bmt` extension still contains standard BMP data:
+ * @code
+ * <base>.bmt    24-bit BGR color strip
+ * <base>-A.bmt  indexed coverage strip with matching dimensions
+ * @endcode
+ *
+ * Column zero is reserved and skipped.
+ * All-zero columns in the coverage strip separate glyphs, while each contiguous
+ * run of nonzero columns forms the next glyph in the fixed character sequence.
+ * The retained glyph width includes two trailing pixels beyond that nonzero run.
  *
  * The supported glyph sequence contains uppercase letters, lowercase letters,
  * digits, and eighteen punctuation characters. Spaces and unsupported bytes

@@ -173,13 +173,13 @@ void PuzzleAquacube::setupBoard() {
 	for (int i = 0; i < _numNodes; i++) {
 		Node &node = _nodes[i];
 		node = Node();
-		node.pos = Common::Point32(layout[i].x, layout[i].y);
+		node.pos = layout[i].pos;
 		for (int axis = 0; axis < 4; axis++)
 			node.adj[axis] = layout[i].adj[axis];
 		for (int axis = 0; axis < _dimensions; axis++) {
-			const char label = layout[i].labels[axis];
-			const bool first = label == 'U' || label == 'L' || label == 'F' || label == 'X';
-			node.coordinates = node.coordinates * 2 + (first ? flips[axis] : 1 - flips[axis]);
+			const NodeCoordinateLabel label = layout[i].labels[axis];
+			const bool usesSelectedFlip = label == kUp || label == kLeft || label == kFront || label == kOuter;
+			node.coordinates = node.coordinates * 2 + (usesSelectedFlip ? flips[axis] : 1 - flips[axis]);
 		}
 	}
 	int start = 0;
@@ -216,7 +216,7 @@ void PuzzleAquacube::setupBoard() {
 	_ballNode = findNode(start);
 	_nodes[_ballNode].state = kStart02;
 	_ballPos = _nodes[_ballNode].pos;
-	_pendingInitialArrival = _level == 4;
+	_pendingInitialArrival = true;
 	const Common::Point32 offset = _level < 3 ? Common::Point32(-2, 6) : Common::Point32(-5, 5);
 	int slot = 0;
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
@@ -259,6 +259,30 @@ void PuzzleAquacube::moveBall(int axis) {
 	_ballPath = makePath(_nodes[_ballNode].pos, _nodes[next].pos, 7);
 	_ballNode = next;
 	playSound(3);
+}
+
+void PuzzleAquacube::protectFirstDirectMoveFromFleen(int lever) {
+	if (_level != 3 || _stepsUsed != 0 || !_vm->useAquacubeSafeFirstMove())
+		return;
+
+	const int fleenAxis = _axisMap[lever];
+	const int fleenNode = _nodes[_ballNode].adj[fleenAxis];
+	if (_nodes[fleenNode].state != kFleen03)
+		return;
+
+	for (int safeLever = 0; safeLever < _dimensions; safeLever++) {
+		if (safeLever == lever)
+			continue;
+		const int safeAxis = _axisMap[safeLever];
+		const int safeNode = _nodes[_ballNode].adj[safeAxis];
+		if (_nodes[safeNode].state != kOccupied00)
+			continue;
+
+		_axisMap[lever] = safeAxis;
+		_axisMap[safeLever] = fleenAxis;
+		warning("AquaCube adjustment: first lever %d remapped from Fleen node %d to occupied node %d via lever %d", lever + 1, fleenNode, safeNode, safeLever + 1);
+		return;
+	}
 }
 
 void PuzzleAquacube::finishPuzzle() {
@@ -537,8 +561,10 @@ EventHandleResult PuzzleAquacube::onLButtonUp(const Common::Point &pos) {
 			_leverOn[i] = true;
 			if (_warpPlanning)
 				_warpPending[i] = true;
-			else
+			else {
+				protectFirstDirectMoveFromFleen(i);
 				moveBall(_axisMap[i]);
+			}
 			return EventHandleResult::kConsumed;
 		}
 	}
@@ -574,6 +600,8 @@ bool PuzzleAquacube::onGoButtonPressed() {
 Common::String PuzzleAquacube::debugGetAnswer() const {
 	Common::String answer = debugAnswerHeader();
 	answer += Common::String::format("Ball: node %d. Levers below are numbered left to right.\n", _ballNode + 1);
+	if (_level == 3 && _stepsUsed == 0 && _vm->useAquacubeSafeFirstMove())
+		answer += "Adjustment armed: a first direct lever leading to a Fleen will swap axes with the lowest-numbered safe lever.\n";
 	for (int i = 0; i < _numNodes; i++) {
 		const Node &node = _nodes[i];
 		answer += Common::String::format("Node %d (%d,%d): %s", i + 1, node.pos.x, node.pos.y,

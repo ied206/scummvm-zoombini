@@ -55,39 +55,6 @@ class Sidebar;
 class ZoombiniAnimation;
 class ZoombiniRunner;
 
-/** Numeric page identifiers accepted by the engine dispatcher. */
-enum PageId : int {
-	kPageMenuLoad = -4,         ///< Saved-adventure sign-in flow.
-	kPageMenuPractice = -3,     ///< Practice-map sign-in flow.
-	kPageMenuOptions = -2,      ///< Sign-in screen.
-	kPageNone = -1,             ///< No dispatched page.
-	kPageZombiniville = 0,      ///< Zoombiniville party-assembly shelter.
-	kPageCrazyTurtle = 1,       ///< Turtle Hurdle puzzle.
-	kPageWaterslide = 2,        ///< Pipes of Paloo puzzle.
-	kPageAquacube = 3,          ///< Aqua Cube puzzle.
-	kPageRescue1 = 4,           ///< First rescue-site shelter.
-	kPageMysticMarsh = 5,       ///< Bubble Bumpers puzzle.
-	kPageMagicWall = 6,         ///< Beetle Bug Alley puzzle.
-	kPageWallOfFleens = 7,      ///< Magic Mirrors puzzle.
-	kPageChezNorf = 8,          ///< Chez Norf puzzle.
-	kPageRescue2 = 9,           ///< Second rescue-site shelter.
-	kPageSnowboard = 10,        ///< Snowboard Gulch puzzle.
-	kPageBoolies = 11,          ///< Boolie Boggle puzzle.
-	kPageBooliewood = 12,       ///< Booliewood arrival shelter.
-	kPageCredits = 16,          ///< Credits transition.
-	kPageLogoTLC = 17,          ///< Splash video of The Learning Company
-	kPageCutsceneFirst = 18,    ///< First story video.
-	kPageCutsceneSecond = 20,   ///< Second story video.
-	kPageCutsceneThird = 21,    ///< Third story video.
-	kPageMapTrans = 22,         ///< Route-map travel transition
-	kPageFinal = 23,            ///< Booliewood final-celebration shelter
-	kPageTitleScreen = 24,      ///< Title screen
-	kPageLogoPolygon = 25,      ///< Splash video of Polygon Studio
-	kPageMapScreen = 30,        ///< ScummVM map-screen dispatcher alias
-	kPageMenuAlt = 40,          ///< Alternate sign-in route
-	kPageLogoArisuMedia = 1972, ///< (v1.1KR only) Splash video of ArisuMedia
-};
-
 /** Rescue Site I branch selected for the next map transition. */
 enum class RouteBranch : int {
 	kNone00 = 0, ///< No branch selected.
@@ -145,6 +112,8 @@ public:
 	Common::Language getLanguage() const { return _gameDescription->desc.language; }
 	/** Return the detected release feature flags. */
 	uint32 getFeatures() const { return _gameDescription->features; }
+	/** Return whether the detected release is the playable demo. */
+	bool isDemo() const { return (_gameDescription->desc.flags & ADGF_DEMO) != 0; }
 
 	/** Return the drawing surface for this game instance. */
 	ManagedSurface32 *getScreen() { return _screen; }
@@ -170,6 +139,8 @@ public:
 	void saveSoundVolumes(int music, int sfx, int speech);
 	/** Return whether the alternate level-one Waterslide pairing is enabled. */
 	bool useGreedyWaterslidePairing() const { return _useGreedyWaterslidePairing; }
+	/** Return whether Aqua Cube protects its first direct lever move from a Fleen. */
+	bool useAquacubeSafeFirstMove() const { return _useAquacubeSafeFirstMove; }
 	/** Return whether Bezier paths use floating-point rather than original Q10 calculations. */
 	bool useFloatingPointPaths() const { return _useFloatingPointPaths; }
 	/** Return whether the enhanced keyboard shortcut set is enabled. */
@@ -184,7 +155,11 @@ public:
 	/** Return whether @p path resolves through the engine's CD/installed-root resolver. */
 	bool hasResource(const Common::String &path) const;
 	/** Return and clear the validated direct-practice request, if the startup command supplied one. */
-	bool takePracticePuzzleLaunch(int &pageId, int &level);
+	bool takePracticePuzzleLaunch(PageId &pageId, int &level);
+	/** Return the practice-map level retained for this engine session. */
+	int getPracticeLevel() const { return _practiceLevel; }
+	/** Retain a validated practice-map level for later map visits. */
+	void setPracticeLevel(int level);
 
 	/** Pause or resume the gameplay clock for a game dialog. */
 	void setDialogPaused(bool paused);
@@ -203,7 +178,7 @@ public:
 	GameState *_state = nullptr;
 
 	/** Request that the main loop replace the active page with @p pageId. */
-	void requestPageChange(int pageId) { _nextPageId = pageId; }
+	void requestPageChange(PageId pageId) { _nextPageId = pageId; }
 	/** Restart the sidebar Go-button attention blink with original timing. */
 	void restartGoBlink();
 	/** Return whether the pending transition leads back to a map or sign-in flow. */
@@ -211,7 +186,7 @@ public:
 	/** Return whether the pending page uses the route-map travel transition. */
 	bool isStartingMapTransition() const { return _nextPageId == kPageMapTrans; }
 	/** Return the active page identifier. */
-	int getCurrentPageId() const { return _currentPageId; }
+	PageId getCurrentPageId() const { return _currentPageId; }
 	/** Return the borrowed active page. */
 	PageBase *getCurrentPage() { return _currentPage; }
 
@@ -268,6 +243,7 @@ private:
 	static constexpr int kPracticeBootParamPageFactor = 100;
 	static constexpr const char *kCursorSpritePath = "bmp/cursor/cursor01.rb";
 	static constexpr const char *kInteractiveCursorSpritePath = "bmp/cursor/cursor02.rb";
+	static constexpr const char *kQuitConfirmationPath = "bmp/menu/Quit_panel_text_quit";
 
 	/** Serialize the current profile after the caller applies its save policy. */
 	bool saveGameProfile(const Common::String &name);
@@ -315,15 +291,17 @@ private:
 	Common::Array<Common::Event> _pendingPageEvents;
 
 	/** Active page identifier. */
-	int _currentPageId = kPageNone;
+	PageId _currentPageId = kPageNone;
 	/** Requested replacement page identifier. */
-	int _nextPageId = kPageLogoTLC;
+	PageId _nextPageId = kPageLogoTLC;
 	/** Active page, or nullptr between page lifetimes. */
 	PageBase *_currentPage = nullptr;
 	/** Validated direct-practice destination pending the practice-map setup. */
-	int _practicePuzzlePageId = kPageNone;
+	PageId _practicePageId = kPageNone;
 	/** Validated direct-practice level pending the practice-map setup. */
 	int _practicePuzzleLevel = 0;
+	/** Practice-map level retained while puzzle pages replace the map. */
+	int _practiceLevel = 1;
 
 	/** System tick used as the gameplay-clock origin. */
 	uint32 _startTime = 0;
@@ -346,6 +324,8 @@ private:
 	bool _stereoOutputEnabled = false;
 	/** Whether Waterslide level one uses the alternate greedy pairing. */
 	bool _useGreedyWaterslidePairing = false;
+	/** Whether Aqua Cube level three protects its first direct lever move from a Fleen. */
+	bool _useAquacubeSafeFirstMove = false;
 	/** Whether Bezier paths use the optional floating-point evaluator. */
 	bool _useFloatingPointPaths = false;
 	/** Whether the enhanced keyboard shortcut set is enabled. */
@@ -384,8 +364,8 @@ private:
 	void registerCursorSpriteWithCursorMan(const RleBlock *sprite);
 	/** Return the first held global Zoombini, or nullptr when none is held. */
 	const ZoombiniRunner *getDraggedGlobalZoombini() const;
-	/** Hide the cursor while held and draw the held name plate. */
-	void updateDragOverlay();
+	/** Hide the cursor while held, then draw the page overlay and held name plate. */
+	void updateDragOverlay(bool advanceState);
 	/** Open the shared quit confirmation unless the original close gates suppress it. */
 	void handleQuitRequest();
 	/** Open the shared quit confirmation through the message-box dialog. */
@@ -412,7 +392,7 @@ private:
 	/** Select the startup page and run frames until the engine quits. */
 	void mainGameLoop();
 	/** Destroy the active page and construct @p pageId. */
-	void switchPage(int pageId);
+	void switchPage(PageId pageId);
 	/** Release the active page and clear its pointer. */
 	void destroyCurrentPage();
 };

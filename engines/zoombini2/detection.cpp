@@ -29,7 +29,7 @@ static constexpr PlainGameDescriptor zoombini2Games[] = {
 	{nullptr, nullptr},
 };
 
-static constexpr char *const directoryGlobs[] = {
+static constexpr const char *directoryGlobs[] = {
 	"Data",
 	"INSTALL",
 	"HD",
@@ -69,8 +69,14 @@ DetectedGame Zoombini2MetaEngineDetection::toDetectedGame(const ADDetectedGame &
 
 	if ((zoombini2Desc->features & (Zoombini2::GF_Z2_V10 | Zoombini2::GF_Z2_V11)) && zoombini2Desc->desc.extra && *zoombini2Desc->desc.extra) {
 		// Keep each release target stable when multiple versions share the same platform and language.
+		static const Common::String kDemoSuffix = " Demo";
+		const bool isDemo = (zoombini2Desc->desc.flags & ADGF_DEMO) != 0;
+		Common::String versionExtra = zoombini2Desc->desc.extra;
+		if (isDemo && versionExtra.hasSuffix(kDemoSuffix))
+			versionExtra.erase(versionExtra.size() - kDemoSuffix.size());
+
 		Common::String versionTag;
-		for (const char *character = zoombini2Desc->desc.extra; *character; character++) {
+		for (const char *character = versionExtra.c_str(); *character; character++) {
 			if (Common::isAlnum(*character))
 				versionTag += *character;
 			else if (*character == '_')

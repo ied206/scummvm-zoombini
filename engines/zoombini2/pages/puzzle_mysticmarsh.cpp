@@ -1200,7 +1200,7 @@ void PuzzleMysticMarsh::init() {
 		const Common::Point32 position = cellPosition(i);
 		slot.position = Common::Point32(position.x - 25, position.y - 10);
 		_slots.push_back(slot);
-		ZoombiniDropTarget target;
+		ZmbDropTarget target;
 		target.rect = Common::Rect32(position.x - 8, position.y + 52, position.x + 35, position.y + 102);
 		target.callback = slotDropCallback;
 		target.callbackContext = this;
@@ -1283,6 +1283,7 @@ void PuzzleMysticMarsh::freeZoombini(int index, uint32 now) {
 	ZoombiniRunner *zoombini = _puzzleZoombinis[index];
 	zoombini->_inputEnabled = false;
 	zoombini->_puzzleStatus = 1;
+	_vm->_zoombiniWalkingFlag = true;
 	zoombini->setActiveAnimation(_zoombiniAnimation);
 	zoombini->startMovement(createPath(zoombini->_screenPos, kExitPositions[_backgroundIndex - 1][_freed % 8], 7), now);
 	zoombini->startDirectionTrackedAnimation(now);
@@ -1472,15 +1473,15 @@ void PuzzleMysticMarsh::onRenderForeground(ManagedSurface32 *screen) {
 }
 
 EventHandleResult PuzzleMysticMarsh::onLButtonUp(const Common::Point &pos) {
-	const ZoombiniInputResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), true,
+	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), true,
 																		  _pickupAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
-	return result == ZoombiniInputResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 
 EventHandleResult PuzzleMysticMarsh::onMouseMove(const Common::Point &pos) {
-	const ZoombiniInputResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), false,
+	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), false,
 																		  _pickupAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
-	return result == ZoombiniInputResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 
 void PuzzleMysticMarsh::enqueueSpeech(const Common::String &name) {
@@ -1533,6 +1534,10 @@ bool PuzzleMysticMarsh::onGoButtonPressed() {
 	return false;
 }
 
+bool PuzzleMysticMarsh::canUseGoButton() const {
+	return _vm->_zoombiniWalkingFlag;
+}
+
 void PuzzleMysticMarsh::applyDebugPuzzleCompletion() {
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
 		ZoombiniRunner *zoombini = _puzzleZoombinis[i];
@@ -1549,6 +1554,7 @@ void PuzzleMysticMarsh::applyDebugPuzzleCompletion() {
 	_placingZoombini = -1;
 	_finished = true;
 	_freed = _puzzleZoombinis.size();
+	_vm->_zoombiniWalkingFlag = !_puzzleZoombinis.empty();
 }
 
 Common::String PuzzleMysticMarsh::debugGroup(const char *label, const Common::Array<int> &actors) const {

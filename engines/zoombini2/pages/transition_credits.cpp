@@ -31,6 +31,8 @@ namespace Zoombini2 {
 
 constexpr const char *TransitionCredits::kBackgroundPath;
 constexpr const char *TransitionCredits::kMusicPath;
+constexpr const char *TransitionCredits::kDemoBackgroundPath;
+constexpr const char *TransitionCredits::kDemoMusicPath;
 
 TransitionCredits::TransitionCredits(Zoombini2Engine *vm)
 	: TransitionBase(vm) {
@@ -41,8 +43,9 @@ void TransitionCredits::init() {
 	debug(1, "TransitionCredits::init");
 	static constexpr uint32 kInitialHoldMilliseconds = 4000;
 
-	const Size32 backgroundSize = _vm->_gfx->getPageBitBlockSize(kBackgroundPath);
-	if (backgroundSize.width == 0 || backgroundSize.height == 0) {
+	const char *backgroundPath = _vm->isDemo() ? kDemoBackgroundPath : kBackgroundPath;
+	const Size32 backgroundSize = _vm->_gfx->getPageBitBlockSize(backgroundPath);
+	if (!_vm->isDemo() && (backgroundSize.width == 0 || backgroundSize.height == 0)) {
 		warning("TransitionCredits: Failed to load credits background");
 	}
 
@@ -58,12 +61,14 @@ void TransitionCredits::init() {
 	_endTime = _vm->getGameTickCount() + kInitialHoldMilliseconds;
 	_lastUpdateTime = _vm->getGameTickCount();
 
-	startPageMusic(Common::Path(kMusicPath));
+	startPageMusic(Common::Path(_vm->isDemo() ? kDemoMusicPath : kMusicPath));
 
 	_finished = false;
 }
 
 void TransitionCredits::onUpdate() {
+	if (_vm->isDemo())
+		return;
 	static constexpr float kScrollPixelsPerMillisecond = 0.03f;
 	static constexpr uint32 kEndHoldMilliseconds = 10000;
 
@@ -99,7 +104,8 @@ void TransitionCredits::onRenderContent(ManagedSurface32 *screen) {
 		return;
 	_redrawNeeded = false;
 
-	const Size32 backgroundSize = _vm->_gfx->getPageBitBlockSize(kBackgroundPath);
+	const char *backgroundPath = _vm->isDemo() ? kDemoBackgroundPath : kBackgroundPath;
+	const Size32 backgroundSize = _vm->_gfx->getPageBitBlockSize(backgroundPath);
 	if (backgroundSize.width == 0 || backgroundSize.height == 0)
 		return;
 
@@ -108,17 +114,28 @@ void TransitionCredits::onRenderContent(ManagedSurface32 *screen) {
 	if (backgroundSize.height < srcBottom)
 		srcBottom = backgroundSize.height;
 
-	_vm->_gfx->drawPageBitBlockSubRect(screen, kBackgroundPath, Common::Point32(0, 0), Common::Rect(0, y, backgroundSize.width, srcBottom));
+	_vm->_gfx->drawPageBitBlockSubRect(screen, backgroundPath, Common::Point32(0, 0), Common::Rect(0, y, backgroundSize.width, srcBottom));
 }
 
 EventHandleResult TransitionCredits::onLButtonDown(const Common::Point &pos) {
 	(void)pos;
+	if (_vm->isDemo())
+		return EventHandleResult::kConsumed;
 	if (!_finished) {
 		_finished = true;
 		Engine::quitGame();
 		return EventHandleResult::kConsumed;
 	}
 	return EventHandleResult::kPassthrough;
+}
+
+EventHandleResult TransitionCredits::onLButtonUp(const Common::Point &pos) {
+	(void)pos;
+	if (!_vm->isDemo())
+		return EventHandleResult::kPassthrough;
+	_finished = true;
+	Engine::quitGame();
+	return EventHandleResult::kConsumed;
 }
 
 } // End of namespace Zoombini2

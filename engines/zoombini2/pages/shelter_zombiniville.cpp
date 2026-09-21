@@ -31,6 +31,7 @@
 
 namespace Zoombini2 {
 
+constexpr int ShelterZombiniville::kBoardingSlotCount;
 constexpr const char *ShelterZombiniville::kBackgroundPath;
 constexpr const char *ShelterZombiniville::kAreaMaskPath;
 constexpr const char *ShelterZombiniville::kFeatureAnimationFormat;
@@ -54,6 +55,7 @@ ShelterZombiniville::ShelterZombiniville(Zoombini2Engine *vm)
 }
 
 ShelterZombiniville::~ShelterZombiniville() {
+	finishAllZoombiniReturns();
 	if (_vm->isReturningToMap())
 		_vm->_state->stashActiveZoombinis();
 	delete _quickFillButtonRunner;
@@ -177,7 +179,7 @@ void ShelterZombiniville::setupHoverRunners() {
 }
 
 Common::Point32 ShelterZombiniville::getSlotPosition(uint index) {
-	static constexpr Common::Point32 kSlotPos[kMaxPackSize] = {
+	static constexpr Common::Point32 kSlotPos[kBoardingSlotCount] = {
 		Common::Point32(490, 524),
 		Common::Point32(500, 485),
 		Common::Point32(452, 526),
@@ -195,22 +197,39 @@ Common::Point32 ShelterZombiniville::getSlotPosition(uint index) {
 		Common::Point32(209, 488),
 		Common::Point32(177, 465),
 	};
-	return index < kMaxPackSize ? kSlotPos[index] : kSlotPos[kMaxPackSize - 1];
+	return index < kBoardingSlotCount ? kSlotPos[index] : kSlotPos[kBoardingSlotCount - 1];
+}
+
+int ShelterZombiniville::findFirstFreeSlot() const {
+	for (int slotIndex = 0; slotIndex < kBoardingSlotCount; slotIndex++) {
+		if (!_boardingSlots[slotIndex].occupied)
+			return slotIndex;
+	}
+	return -1;
 }
 
 void ShelterZombiniville::init() {
 	debug(1, "ShelterZombiniville::init");
 	_vm->_state->clearActiveZoombinis();
 	_boardingZoombinis.clear();
+	_departingZoombinis.clear();
+	for (int slotIndex = 0; slotIndex < kBoardingSlotCount; slotIndex++)
+		_boardingSlots[slotIndex].occupied = false;
 	GameState *gameState = _vm->_state;
 	if (_vm->_isSavedGame)
 		gameState->restoreSavedZoombinis();
 	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
 		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
-		const Common::Point32 slotPos = getSlotPosition(i);
+		const int slotIndex = findFirstFreeSlot();
+		if (slotIndex < 0) {
+			warning("ShelterZombiniville: No free boarding slot for restored Zoombini %u", i);
+			continue;
+		}
+		const Common::Point32 slotPos = getSlotPosition(slotIndex);
 		zoombini->setPosition(slotPos);
 		zoombini->_inputEnabled = true;
-		zoombini->_placementIndex = i;
+		zoombini->_placementIndex = slotIndex;
+		_boardingSlots[slotIndex].occupied = true;
 		_boardingZoombinis.push_back(zoombini);
 	}
 	refreshFeatureCounts();
@@ -299,18 +318,34 @@ void ShelterZombiniville::randomizeSelectedFeatures() {
 
 bool ShelterZombiniville::hasActiveEntrance() const {
 	for (uint i = 0; i < _boardingZoombinis.size(); i++) {
-		if (_boardingZoombinis[i]->_movementPath)
+		if (!isZoombiniReturning(_boardingZoombinis[i]) && _boardingZoombinis[i]->_movementPath)
+			return true;
+	}
+	return false;
+}
+
+bool ShelterZombiniville::hasActiveReturns() const {
+	return !_departingZoombinis.empty();
+}
+
+bool ShelterZombiniville::isZoombiniReturning(const ZoombiniRunner *zoombini) const {
+	for (uint i = 0; i < _departingZoombinis.size(); i++) {
+		if (_departingZoombinis[i] == zoombini)
 			return true;
 	}
 	return false;
 }
 
 bool ShelterZombiniville::canUseGoButton() const {
-	return _boardingZoombinis.size() == kMaxPackSize;
+	return !hasActiveReturns() && _boardingZoombinis.size() == kBoardingSlotCount;
+}
+
+void ShelterZombiniville::onMapButtonPressed() {
+	finishAllZoombiniReturns();
 }
 
 bool ShelterZombiniville::canCreateSelectedZoombini() const {
-	if (kMaxPackSize <= _boardingZoombinis.size() || hasActiveEntrance())
+	if (hasActiveReturns() || findFirstFreeSlot() < 0 || kBoardingSlotCount <= _boardingZoombinis.size() || hasActiveEntrance())
 		return false;
 	for (int feature = 0; feature < ZmbTrait::kTraitCount; feature++) {
 		if (_stations[feature].selectedValue == 0)
@@ -476,8 +511,94 @@ PathObject *ShelterZombiniville::createEntrancePath(const Common::Point32 &dest)
 	return path;
 }
 
+PathObject *ShelterZombiniville::createReturnPath(const Common::Point32 &start) const {
+	static constexpr int kReturnStepValue = 4;
+	const Common::Point32 dest(-70, 400);
+	PathObject *path = new PathObject(_vm);
+	path->appendSegment(start, Common::Point32(2 * (start.x / 3), 450), Common::Point32(start.x / 3, 420), dest, kReturnStepValue, 0);
+	path->endPos = dest;
+	return path;
+}
+
+void ShelterZombiniville::restoreSelectedFeatures(const ZoombiniRunner &zoombini) {
+	for (int feature = 0; feature < ZmbTrait::kTraitCount; feature++) {
+		const ZmbTrait::TraitIndex traitIndex = static_cast<ZmbTrait::TraitIndex>(feature);
+		const int value = zoombini._traits.getValue(traitIndex);
+		_stations[feature].selectedValue = value;
+		_vm->_selectedFeatures[feature] = value;
+	}
+}
+
+void ShelterZombiniville::sendZoombiniOff(ZoombiniRunner *zoombini, bool restoreFeatures) {
+	if (!zoombini || isZoombiniReturning(zoombini))
+		return;
+
+	const int slotIndex = zoombini->_placementIndex;
+	if (slotIndex < 0 || kBoardingSlotCount <= slotIndex || !_boardingSlots[slotIndex].occupied) {
+		warning("ShelterZombiniville: Cannot return Zoombini from invalid slot %d", slotIndex);
+		return;
+	}
+
+	if (restoreFeatures)
+		restoreSelectedFeatures(*zoombini);
+	zoombini->endDrag(true);
+	zoombini->_inputEnabled = false;
+	_boardingSlots[slotIndex].occupied = false;
+	_departingZoombinis.push_back(zoombini);
+	const uint32 tick = _vm->getGameTickCount();
+	zoombini->startDirectionTrackedAnimation(tick);
+	zoombini->startMovement(createReturnPath(zoombini->_screenPos), tick);
+	debug(2, "ShelterZombiniville: Returning '%s' from slot %d", zoombini->_name, slotIndex);
+}
+
+void ShelterZombiniville::sendAllZoombinisOff() {
+	const Common::Array<ZoombiniRunner *> zoombinis = _boardingZoombinis;
+	for (uint i = 0; i < zoombinis.size(); i++)
+		sendZoombiniOff(zoombinis[i], false);
+}
+
+void ShelterZombiniville::finishSendingZoombiniOff(ZoombiniRunner *zoombini) {
+	int departingIndex = -1;
+	for (uint i = 0; i < _departingZoombinis.size(); i++) {
+		if (_departingZoombinis[i] == zoombini) {
+			departingIndex = static_cast<int>(i);
+			break;
+		}
+	}
+	if (departingIndex < 0)
+		return;
+
+	_departingZoombinis.remove_at(departingIndex);
+	zoombini->clearMovement();
+	for (uint i = 0; i < _boardingZoombinis.size(); i++) {
+		if (_boardingZoombinis[i] == zoombini) {
+			_boardingZoombinis.remove_at(i);
+			break;
+		}
+	}
+	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
+		if (_vm->_state->_activeZoombinis[i] == zoombini) {
+			_vm->_state->_activeZoombinis.remove_at(i);
+			break;
+		}
+	}
+	if (!_vm->_state->_traitComboTable.unregisterCombo(zoombini->_traits))
+		warning("ShelterZombiniville: Failed to unregister returned Zoombini traits %s", zoombini->_traits.toStr().c_str());
+	debug(2, "ShelterZombiniville: Returned '%s'", zoombini->_name);
+	delete zoombini;
+	refreshFeatureCounts();
+}
+
+void ShelterZombiniville::finishAllZoombiniReturns() {
+	while (!_departingZoombinis.empty())
+		finishSendingZoombiniOff(_departingZoombinis.back());
+}
+
 bool ShelterZombiniville::createZoombini(bool allowConcurrentEntrances) {
-	if ((!allowConcurrentEntrances && hasActiveEntrance()) || kMaxPackSize <= _boardingZoombinis.size())
+	if (hasActiveReturns() || (!allowConcurrentEntrances && hasActiveEntrance()) || kBoardingSlotCount <= _boardingZoombinis.size())
+		return false;
+	const int slotIndex = findFirstFreeSlot();
+	if (slotIndex < 0)
 		return false;
 
 	for (int traitIndex = 0; traitIndex < ZmbTrait::kTraitCount; traitIndex++) {
@@ -488,14 +609,14 @@ bool ShelterZombiniville::createZoombini(bool allowConcurrentEntrances) {
 						  static_cast<byte>(_stations[2].selectedValue), static_cast<byte>(_stations[3].selectedValue));
 
 	GameState *gameState = _vm->_state;
-	if (gameState->hasReachedZoombiniRegistrationLimit() || !gameState->canRegisterTraits(traits))
+	if (gameState->hasReachedZoombiniRegistrationLimit() || !gameState->_traitComboTable.canRegisterCombo(traits))
 		return false;
 	if (!gameState->hasRelaxedPackTraitLimits() && !passesPackTraitLimits(traits))
 		return false;
-	if (!gameState->registerTraits(traits))
+	if (!gameState->_traitComboTable.registerCombo(traits))
 		return false;
 
-	const Common::Point32 dest = getSlotPosition(_boardingZoombinis.size());
+	const Common::Point32 dest = getSlotPosition(slotIndex);
 	ZoombiniRunner *zoombini = new ZoombiniRunner();
 	zoombini->setTraits(traits);
 	_currentName = generateName();
@@ -503,27 +624,37 @@ bool ShelterZombiniville::createZoombini(bool allowConcurrentEntrances) {
 	zoombini->setPosition(dest);
 	zoombini->setDefaultAnimation(_littleZombAnimation, 33);
 	zoombini->_inputEnabled = false;
-	zoombini->_placementIndex = _boardingZoombinis.size();
+	zoombini->_placementIndex = slotIndex;
 	zoombini->_tracksMovementDirection = true;
 	const uint32 tick = _vm->getGameTickCount();
 	zoombini->startAnimation(nullptr, 66, tick);
 	zoombini->startMovement(createEntrancePath(dest), tick);
 	_vm->_state->_activeZoombinis.push_back(zoombini);
 	_boardingZoombinis.push_back(zoombini);
+	_boardingSlots[slotIndex].occupied = true;
 	for (int traitOrdinal = 0; traitOrdinal < ZmbTrait::kTraitCount; traitOrdinal++) {
 		const ZmbTrait::TraitIndex traitIndex = static_cast<ZmbTrait::TraitIndex>(traitOrdinal);
 		_featureCounts[traitOrdinal][traits.getValue(traitIndex)] += 1;
 	}
 
-	debug(2, "ShelterZombiniville: Created '%s' with traits %s in slot %u", _currentName.c_str(), traits.toStr().c_str(), _boardingZoombinis.size() - 1);
+	debug(2, "ShelterZombiniville: Created '%s' with traits %s in slot %d", _currentName.c_str(), traits.toStr().c_str(), slotIndex);
 	return true;
 }
 
 void ShelterZombiniville::onUpdate() {
 	const uint32 tick = _vm->getGameTickCount();
+	for (int i = static_cast<int>(_departingZoombinis.size()) - 1; 0 <= i; i--) {
+		ZoombiniRunner *zoombini = _departingZoombinis[i];
+		zoombini->updateAnimation(tick);
+		if (!zoombini->advanceMovement(tick))
+			finishSendingZoombiniOff(zoombini);
+	}
+
 	bool completedEntrance = false;
 	for (uint i = 0; i < _boardingZoombinis.size(); i++) {
 		ZoombiniRunner *zoombini = _boardingZoombinis[i];
+		if (isZoombiniReturning(zoombini))
+			continue;
 		if (zoombini->_movementPath && !zoombini->advanceMovement(tick)) {
 			zoombini->clearMovement();
 			zoombini->_inputEnabled = true;
@@ -536,14 +667,11 @@ void ShelterZombiniville::onUpdate() {
 		resetSelectedFeatures();
 }
 
-void ShelterZombiniville::buildBoardingZoombiniDrawOrder(Common::Array<uint> &order, ZoombiniRunner *&draggedZoombini) const {
+void ShelterZombiniville::buildBoardingZoombiniDrawOrder(Common::Array<uint> &order) const {
 	order.clear();
-	draggedZoombini = nullptr;
 	for (uint i = 0; i < _boardingZoombinis.size(); i++) {
-		if (_boardingZoombinis[i]->_dragging) {
-			draggedZoombini = _boardingZoombinis[i];
+		if (_boardingZoombinis[i]->_dragging)
 			continue;
-		}
 		order.push_back(i);
 	}
 	ZoombiniRunner::sortDrawOrderByY(_boardingZoombinis, order);
@@ -551,12 +679,9 @@ void ShelterZombiniville::buildBoardingZoombiniDrawOrder(Common::Array<uint> &or
 
 void ShelterZombiniville::drawBoardingZoombinis(ManagedSurface32 *screen) const {
 	Common::Array<uint> order;
-	ZoombiniRunner *draggedZoombini = nullptr;
-	buildBoardingZoombiniDrawOrder(order, draggedZoombini);
+	buildBoardingZoombiniDrawOrder(order);
 	for (uint i = 0; i < order.size(); i++)
 		_vm->_gfx->drawZoombiniRunner(screen, _boardingZoombinis[order[i]]);
-	if (draggedZoombini)
-		_vm->_gfx->drawZoombiniRunner(screen, draggedZoombini);
 }
 
 ZoombiniRunner *ShelterZombiniville::getDraggedZoombini() const {
@@ -584,8 +709,7 @@ void ShelterZombiniville::onRenderActors(ManagedSurface32 *screen) {
 void ShelterZombiniville::onActorsRendered() {
 	const uint32 tick = _vm->getGameTickCount();
 	Common::Array<uint> order;
-	ZoombiniRunner *draggedZoombini = nullptr;
-	buildBoardingZoombiniDrawOrder(order, draggedZoombini);
+	buildBoardingZoombiniDrawOrder(order);
 	for (uint i = 0; i < order.size(); i++) {
 		ZoombiniRunner *zoombini = _boardingZoombinis[order[i]];
 		if (zoombini->_hidden)
@@ -593,8 +717,6 @@ void ShelterZombiniville::onActorsRendered() {
 		zoombini->tryStartIdleAnimation(_idleZombAnimation, *_vm->_rnd, tick);
 		zoombini->advanceAnimationAfterDraw();
 	}
-	if (draggedZoombini && !draggedZoombini->_hidden)
-		draggedZoombini->advanceAnimationAfterDraw();
 }
 
 void ShelterZombiniville::onRenderForeground(ManagedSurface32 *screen) {
@@ -602,6 +724,16 @@ void ShelterZombiniville::onRenderForeground(ManagedSurface32 *screen) {
 	for (int feature = 0; feature < ZmbTrait::kTraitCount; feature++)
 		selectedValues[feature] = _stations[feature].selectedValue;
 	_vm->_gfx->drawZoombiniPreview(screen, _bigZombAnimation, selectedValues, Common::Point32(300, 110));
+}
+
+void ShelterZombiniville::renderDragOverlay(ManagedSurface32 *screen, bool advanceState) {
+	ZoombiniRunner *draggedZoombini = getDraggedZoombini();
+	if (!draggedZoombini || draggedZoombini->_hidden)
+		return;
+
+	_vm->_gfx->drawZoombiniRunner(screen, draggedZoombini);
+	if (advanceState)
+		draggedZoombini->advanceAnimationAfterDraw();
 }
 
 void ShelterZombiniville::drawHoverRunners(ManagedSurface32 *screen) {
@@ -653,7 +785,7 @@ EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
 	for (int feature = 0; feature < ZmbTrait::kTraitCount; feature++) {
 		for (int value = 0; value < ZmbTrait::kTraitValueCount; value++) {
 			if (_featureButtonRunners[feature][value]->containsHitPoint(Common::Point32(pos))) {
-				if (hasActiveEntrance() || 5 <= _featureCounts[feature][value + 1])
+				if (hasActiveEntrance() || hasActiveReturns() || 5 <= _featureCounts[feature][value + 1])
 					return EventHandleResult::kConsumed;
 				_stations[feature].selectedValue = value + 1;
 				_vm->_selectedFeatures[feature] = value + 1;
@@ -675,31 +807,38 @@ EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
 		}
 		if (0 <= _sndValidZoombini)
 			_vm->getSoundManager()->playWithVolume(_sndValidZoombini, _vm->getSoundManager()->_volumeSFX);
+		if (_boardingZoombinis.size() == kBoardingSlotCount)
+			_vm->restartGoBlink();
+		if (_vm->_state->hasReachedZoombiniRegistrationLimit())
+			_vm->restartGoBlink();
 		return EventHandleResult::kConsumed;
 	}
 
 	if (_quickFillButtonRunner->containsHitPoint(Common::Point32(pos))) {
 		_quickFillButtonRunner->start(_vm->getGameTickCount());
-		if (_boardingZoombinis.size() < kMaxPackSize && !hasActiveEntrance()) {
+		if (_boardingZoombinis.size() < kBoardingSlotCount && !hasActiveEntrance() && !hasActiveReturns()) {
 			if (0 <= _sndQuickFill)
 				_vm->getSoundManager()->playWithVolume(_sndQuickFill, _vm->getSoundManager()->_volumeSFX);
 			if (_vm->_state->hasReachedZoombiniRegistrationLimit()) {
+				_vm->restartGoBlink();
 				return EventHandleResult::kConsumed;
 			}
 			do {
 				randomizeSelectedFeatures();
 			} while (!createZoombini(false));
+			if (_boardingZoombinis.size() == kBoardingSlotCount)
+				_vm->restartGoBlink();
 		}
 		return EventHandleResult::kConsumed;
 	}
 
 	if (_batchFillButtonRunner->containsHitPoint(Common::Point32(pos))) {
 		_batchFillButtonRunner->start(_vm->getGameTickCount());
-		if (_boardingZoombinis.size() < kMaxPackSize && !hasActiveEntrance()) {
+		if (_boardingZoombinis.size() < kBoardingSlotCount && !hasActiveEntrance() && !hasActiveReturns()) {
 			if (0 <= _sndBatchFill)
 				_vm->getSoundManager()->playWithVolume(_sndBatchFill, _vm->getSoundManager()->_volumeSFX);
 			randomizeSelectedFeatures();
-			while (_boardingZoombinis.size() < kMaxPackSize) {
+			while (_boardingZoombinis.size() < kBoardingSlotCount) {
 				if (_vm->_state->hasReachedZoombiniRegistrationLimit())
 					break;
 				do {
@@ -715,6 +854,7 @@ EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
 					_vm->_selectedFeatures[feature] = value;
 				}
 			}
+			_vm->restartGoBlink();
 		}
 		return EventHandleResult::kConsumed;
 	}
@@ -722,15 +862,28 @@ EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
 }
 
 EventHandleResult ShelterZombiniville::onLButtonUp(const Common::Point &pos) {
-	const ZoombiniInputResult result = ZoombiniRunner::handlePointerInput(_boardingZoombinis, Common::Point32(pos.x, pos.y), true,
-																		  _pickupZombAnimation, _vm->getGameTickCount(), nullptr, getAreaMask());
-	return result == ZoombiniInputResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_boardingZoombinis, Common::Point32(pos.x, pos.y), true,
+																	_pickupZombAnimation, _vm->getGameTickCount(), nullptr, getAreaMask());
+	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 
 EventHandleResult ShelterZombiniville::onMouseMove(const Common::Point &pos) {
-	const ZoombiniInputResult result = ZoombiniRunner::handlePointerInput(_boardingZoombinis, Common::Point32(pos.x, pos.y), false,
-																		  _pickupZombAnimation, _vm->getGameTickCount(), nullptr, getAreaMask());
-	return result == ZoombiniInputResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_boardingZoombinis, Common::Point32(pos.x, pos.y), false,
+																	_pickupZombAnimation, _vm->getGameTickCount(), nullptr, getAreaMask());
+	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+}
+
+EventHandleResult ShelterZombiniville::onKeyDown(const Common::KeyState &key, bool repeat) {
+	if (!_vm->useEnhancedKbdShortcuts() || key.keycode != Common::KEYCODE_DELETE)
+		return EventHandleResult::kPassthrough;
+
+	if (!repeat) {
+		if (key.hasFlags(Common::KBD_SHIFT))
+			sendAllZoombinisOff();
+		else
+			sendZoombiniOff(getDraggedZoombini(), true);
+	}
+	return EventHandleResult::kConsumed;
 }
 
 } // End of namespace Zoombini2

@@ -226,7 +226,7 @@ void PuzzleSnowboard::init() {
 		zoombini->_puzzleStatus = 0;
 	}
 	generateTree();
-	ZoombiniDropTarget boardTarget;
+	ZmbDropTarget boardTarget;
 	boardTarget.rect = Common::Rect32(290, 5, 670, 85);
 	boardTarget.callback = &PuzzleSnowboard::onBoardDrop;
 	boardTarget.callbackContext = this;
@@ -429,6 +429,7 @@ void PuzzleSnowboard::startExitPath(ZoombiniRunner *zoombini) {
 void PuzzleSnowboard::finishRide(ZoombiniRunner *zoombini) {
 	zoombini->clearMovement();
 	zoombini->resetAnimation();
+	_vm->_zoombiniWalkingFlag = true;
 	zoombini->_puzzleStatus = 1;
 	zoombini->_inputEnabled = false;
 	_activeRunnerIndex = -1;
@@ -635,6 +636,10 @@ void PuzzleSnowboard::onRenderActors(ManagedSurface32 *screen) {
 	renderZoombinis(screen);
 }
 
+bool PuzzleSnowboard::canUseGoButton() const {
+	return _vm->_zoombiniWalkingFlag;
+}
+
 bool PuzzleSnowboard::onGoButtonPressed() {
 	if (!_vm->_isSavedGame)
 		return true;
@@ -666,15 +671,15 @@ void PuzzleSnowboard::onActorsRendered() {
 
 EventHandleResult PuzzleSnowboard::onLButtonUp(const Common::Point &pos) {
 	const bool acceptRelease = !_finished && _activeRunnerIndex == -1;
-	const ZoombiniInputResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y),
+	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y),
 																		  acceptRelease, _zoombiniAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
-	return result == ZoombiniInputResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 
 EventHandleResult PuzzleSnowboard::onMouseMove(const Common::Point &pos) {
-	const ZoombiniInputResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), false,
+	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), false,
 																		  _zoombiniAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
-	return result == ZoombiniInputResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 
 Common::String PuzzleSnowboard::debugGetAnswer() const {

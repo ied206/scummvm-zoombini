@@ -430,6 +430,7 @@ void PuzzleWallOfFleens::finishCatch() {
 		_caughtTargets += 1;
 	} else {
 		_finished = true;
+		_vm->_zoombiniWalkingFlag = !_puzzleZoombinis.empty();
 		debug(2, "WallOfFleens: completed level=%d survivors=%u", _level, _puzzleZoombinis.size());
 		queueSpeech(static_cast<int>(_puzzleZoombinis.size()) == _initialPartyCount ? kSuccessSpeechPath : kLossSpeechPath);
 	}
@@ -742,7 +743,12 @@ void PuzzleWallOfFleens::applyDebugPuzzleCompletion() {
 		_puzzleZoombinis[i]->_puzzleStatus = 1;
 		_puzzleZoombinis[i]->_hidden = false;
 	}
+	_vm->_zoombiniWalkingFlag = !_puzzleZoombinis.empty();
 	_vm->restartGoBlink();
+}
+
+bool PuzzleWallOfFleens::canUseGoButton() const {
+	return _vm->_zoombiniWalkingFlag;
 }
 
 bool PuzzleWallOfFleens::onGoButtonPressed() {

@@ -73,6 +73,7 @@ namespace Zoombini2 {
 
 constexpr const char *Zoombini2Engine::kCursorSpritePath;
 constexpr const char *Zoombini2Engine::kInteractiveCursorSpritePath;
+constexpr const char *Zoombini2Engine::kQuitConfirmationPath;
 
 /** Resolve original logical resource names against their distinct physical roots. */
 class Zoombini2Engine::ResourceFileResolver {
@@ -255,15 +256,20 @@ Common::StringArray Zoombini2Engine::listGameSaves() const {
 	return savegameManager.listProfiles();
 }
 
-bool Zoombini2Engine::takePracticePuzzleLaunch(int &pageId, int &level) {
-	if (_practicePuzzlePageId == kPageNone || _practicePuzzleLevel == 0)
+bool Zoombini2Engine::takePracticePuzzleLaunch(PageId &pageId, int &level) {
+	if (_practicePageId == kPageNone || _practicePuzzleLevel == 0)
 		return false;
 
-	pageId = _practicePuzzlePageId;
+	pageId = _practicePageId;
 	level = _practicePuzzleLevel;
-	_practicePuzzlePageId = kPageNone;
+	_practicePageId = kPageNone;
 	_practicePuzzleLevel = 0;
 	return true;
+}
+
+void Zoombini2Engine::setPracticeLevel(int level) {
+	if (1 <= level && level <= 3)
+		_practiceLevel = level;
 }
 
 int Zoombini2Engine::getMusicVolume() const {
@@ -295,15 +301,16 @@ void Zoombini2Engine::saveSoundVolumes(int music, int sfx, int speech) {
 }
 
 /**
- * Gate an Alt+F4 or window-close request like the original WM_CLOSE handler.
- * The original drains pending input, then swallows the close without a
- * dialog while a Help modal is active, while the credits page is active, or
- * while the shared message box is open; otherwise it opens the shared quit
- * confirmation. Alt+F4 reaches this handler as EVENT_QUIT through the
- * backend. The debug dialog has no original counterpart; it suppresses the
- * confirmation like any other modal so two engine modals never stack.
+ * Exit the demo immediately on an Alt+F4 or window-close request.
+ * Retail releases suppress confirmation while another modal or credits is active.
+ * Otherwise they drain pending input and open the shared quit confirmation.
+ * The backend delivers Alt+F4 through EVENT_QUIT.
  */
 void Zoombini2Engine::handleQuitRequest() {
+	if (isDemo()) {
+		quitGame();
+		return;
+	}
 	if (getCurrentPageId() == kPageCredits)
 		return;
 
@@ -318,13 +325,18 @@ void Zoombini2Engine::handleQuitRequest() {
 }
 
 void Zoombini2Engine::requestQuitConfirmation() {
-	_msgBoxDialog->request(Common::Path("bmp/menu/Quit_panel_text_quit"),
-						   new Common::Callback<Zoombini2Engine, DialogMsgBoxButton>(this, &Zoombini2Engine::handleQuitConfirmation));
+	const Common::Point32 position = isDemo() ? Common::Point32(212, 270) : Common::Point32(-1, -1);
+	_msgBoxDialog->request(Common::Path(kQuitConfirmationPath),
+						   new Common::Callback<Zoombini2Engine, DialogMsgBoxButton>(this, &Zoombini2Engine::handleQuitConfirmation), position);
 }
 
 void Zoombini2Engine::handleQuitConfirmation(DialogMsgBoxButton button) {
-	if (button == DialogMsgBoxButton::kOkay01)
-		requestPageChange(kPageCredits);
+	if (button == DialogMsgBoxButton::kOkay01) {
+		if (isDemo())
+			quitGame();
+		else
+			requestPageChange(kPageCredits);
+	}
 }
 
 bool Zoombini2Engine::hasFeature(EngineFeature f) const {
@@ -398,8 +410,8 @@ void Zoombini2Engine::initCursor() {
 		return;
 	}
 
-	// The default cursor hotspot is its top-left corner.
-	_cursorHotspot = Common::Point();
+	// The cursor click point is three pixels right and ten pixels below its draw origin.
+	_cursorHotspot = Common::Point(3, 10);
 	_cursorVisible = true;
 
 	// Register cursor with CursorMan so it's visible in the black border area.
@@ -454,15 +466,8 @@ void Zoombini2Engine::registerCursorSpriteWithCursorMan(const RleBlock *sprite) 
 	const int bufSize = size.width * size.height * 4;
 	byte *buf = new byte[bufSize](); // zero-initialized = transparent black
 
-	// Render RLE cursor sprite into the buffer.
-	// RLE format after expand3to4bpp:
-	//   2 bytes: effectiveHeight
-	//   Spans: xOff(i16) + yOff(i16) + pixelCount(i16) + mode(u8) + pixelData(count*4)
-	//   Mode 0: opaque pixels [B, G, R, pad]
-	//   Mode 1: premultiplied alpha [premultB, premultG, premultR, invAlpha]
-
-	// Access internal RLE data via drawToScreen onto a temporary surface,
-	// then extract the alpha channel by rendering to both black and white backgrounds.
+	// Render the RLE cursor through its public drawing path,
+	// then extract the alpha channel by comparing the result over black and white backgrounds.
 
 	// Render onto black background
 	ManagedSurface32 blackSurf(size, Graphics::PixelFormat(4, 8, 8, 8, 8, 16, 8, 0, 24));
@@ -595,6 +600,7 @@ void Zoombini2Engine::refreshEngineSettings() {
 	_debugHotkeysEnabled = ConfMan.getBool(::Zoombini2MetaEngine::kConfigDebugHotkeys);
 	_stereoOutputEnabled = ConfMan.getBool(::Zoombini2MetaEngine::kConfigStereoOutput);
 	_useGreedyWaterslidePairing = ConfMan.getBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing);
+	_useAquacubeSafeFirstMove = ConfMan.getBool(::Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove);
 	_useFloatingPointPaths = ConfMan.getBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths);
 	_enhancedKbdShortcuts = ConfMan.getBool(::Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts);
 	if (!_debugHotkeysEnabled) {
@@ -729,7 +735,7 @@ void Zoombini2Engine::applyPendingPageChange() {
 	if (_nextPageId == kPageNone)
 		return;
 
-	const int requestedPage = _nextPageId;
+	const PageId requestedPage = _nextPageId;
 	switchPage(requestedPage);
 
 	// Input collected for the previous page must not reach the replacement page.
@@ -793,8 +799,9 @@ void Zoombini2Engine::drawFrame() {
 	const bool debugDialogActive = _debugDialog && _debugDialog->isActive();
 	const bool sidebarDialogActive = _sidebar && _sidebar->hasActiveDialog();
 	const bool pageRendered = !sharedDialogWasActive && !msgBoxActive && !debugDialogActive && !sidebarDialogActive;
+	const bool advanceState = _nextPageId == kPageNone;
 	if (pageRendered)
-		_currentPage->onFrame(_screen, _nextPageId == kPageNone);
+		_currentPage->onFrame(_screen, advanceState);
 
 	// The shared sidebar polls the final frame mouse state before drawing its controls.
 	if (_sidebar && !msgBoxActive && !debugDialogActive)
@@ -803,7 +810,7 @@ void Zoombini2Engine::drawFrame() {
 		_msgBoxDialog->render(_screen);
 	if (debugDialogActive)
 		_debugDialog->render(_screen);
-	updateDragOverlay();
+	updateDragOverlay(pageRendered && advanceState);
 }
 
 const ZoombiniRunner *Zoombini2Engine::getDraggedGlobalZoombini() const {
@@ -815,7 +822,7 @@ const ZoombiniRunner *Zoombini2Engine::getDraggedGlobalZoombini() const {
 	return nullptr;
 }
 
-void Zoombini2Engine::updateDragOverlay() {
+void Zoombini2Engine::updateDragOverlay(bool advanceState) {
 	const ZoombiniRunner *dragged = getDraggedGlobalZoombini();
 	const bool dragging = dragged != nullptr;
 	if (_cursorVisible == dragging) {
@@ -830,6 +837,7 @@ void Zoombini2Engine::updateDragOverlay() {
 		return;
 	if (!_gfx)
 		return;
+	_currentPage->renderDragOverlay(_screen, advanceState);
 	_gfx->drawDragNameTooltip(_screen, Common::String(dragged->_name));
 }
 
@@ -881,7 +889,9 @@ void Zoombini2Engine::runFrame() {
 }
 
 void Zoombini2Engine::mainGameLoop() {
-	if (configurePracticeBootParamLaunch()) {
+	if (isDemo()) {
+		_nextPageId = kPageTitleScreen;
+	} else if (configurePracticeBootParamLaunch()) {
 		_nextPageId = kPageMenuPractice;
 	} else {
 		// The Korean release starts with the ArisuMedia logo before the TLC and Polygon logos.
@@ -898,16 +908,17 @@ bool Zoombini2Engine::configurePracticeBootParamLaunch() {
 	if (bootParam == 0)
 		return false;
 
-	const int pageId = bootParam / kPracticeBootParamPageFactor;
+	const PageId pageId = static_cast<PageId>(bootParam / kPracticeBootParamPageFactor);
 	const int level = bootParam % kPracticeBootParamPageFactor;
 	if (InteractiveMap::getPracticePartySize(pageId) == 0 || level < 1 || 3 < level) {
 		warning("Zoombini2: unsupported practice boot parameter %d", bootParam);
 		return false;
 	}
 
-	_practicePuzzlePageId = pageId;
+	_practicePageId = pageId;
 	_practicePuzzleLevel = level;
-	debug(1, "Zoombini2: practice boot parameter=%d page=%d level=%d", bootParam, pageId, level);
+	_practiceLevel = level;
+	debug(1, "Zoombini2: practice boot parameter=%d page=%d level=%d", bootParam, static_cast<int>(pageId), level);
 	return true;
 }
 
@@ -936,8 +947,8 @@ void Zoombini2Engine::destroyCurrentPage() {
 /**
  * Destroy the current page and instantiate the requested page.
  */
-void Zoombini2Engine::switchPage(int pageId) {
-	debug(1, "Zoombini2: Switching from page %d to page %d", _currentPageId, pageId);
+void Zoombini2Engine::switchPage(PageId pageId) {
+	debug(1, "Zoombini2: Switching from page %d to page %d", static_cast<int>(_currentPageId), static_cast<int>(pageId));
 	if (_currentPageId == kPageBoolies && pageId == kPageMapTrans)
 		_state->recordBooliesCompletion();
 	destroyCurrentPage();
@@ -1034,7 +1045,7 @@ void Zoombini2Engine::switchPage(int pageId) {
 		_currentPage = new TransitionVideo(this, kPageLogoArisuMedia);
 		break;
 	default:
-		warning("Zoombini2: Unknown page %d", pageId);
+		warning("Zoombini2: Unknown page %d", static_cast<int>(pageId));
 		break;
 	}
 

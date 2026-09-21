@@ -34,10 +34,12 @@ class Random;
 /** Rules and simultaneous bubble movement for Mystic Marsh. */
 class MysticMarshGrid {
 public:
+	/** Grid dimensions in logical device cells. */
 	static constexpr int kColumns = 16;
 	static constexpr int kRows = 12;
 	static constexpr int kCellCount = kColumns * kRows;
 	struct Cell {
+		/** Template type, output direction, trigger number, trait test, value, and mutable visual state. */
 		int type;
 		int direction;
 		int trigger;
@@ -47,10 +49,13 @@ public:
 		constexpr Cell(int t = 0, int d = 4, int g = 0, int f = 0, int v = 0, int s = 0)
 			: type(t), direction(d), trigger(g), trait(f), value(v), state(s) {}
 	};
+	/** A Zoombini position before or after one simultaneous grid tick. */
 	struct Occupant {
+		/** Puzzle-roster index and direction used by its pending move. */
 		int index = -1;
 		int direction = -1;
 	};
+	/** One resolved simultaneous move from source cell to destination cell. */
 	struct Move {
 		int index;
 		int from;
@@ -59,11 +64,13 @@ public:
 	};
 	/** Construction records retained with the selected board, independently of live device changes. */
 	struct GenerationInfo {
+		/** Candidate-selection records retained from the successful generation branch. */
 		Common::Array<int> selectionOrder;
 		Common::Array<int> upper;
 		Common::Array<int> lower;
 		Common::Array<int> group;
 		Common::Array<int> subset;
+		/** Actors used as generator references and primary filter examples. */
 		int referenceActors[2] = {
 			-1,
 			-1,
@@ -72,8 +79,10 @@ public:
 			-1,
 			-1,
 		};
+		/** Whether retry recovery restored the selected filter values. */
 		bool restoredFilterValues = false;
 	};
+	/** Return retained generation data and the immutable initial device layout. */
 	const GenerationInfo &generationInfo() const { return _generation; }
 	const Cell &initialCell(int cellIndex) const { return _initialCells[cellIndex]; }
 	/** Generate rules using the party and the shared random stream. */
@@ -82,9 +91,11 @@ public:
 	bool place(int cellIndex, int zoombiniIndex);
 	/** Advance one complete grid step and replace the result queues. */
 	void tick();
+	/** Return current cell state, selected layout, and its matching background index. */
 	const Cell &cell(int index) const { return _cells[index]; }
 	int layout() const { return _layout; }
 	int background() const;
+	/** Return results produced by the last simultaneous tick. */
 	const Common::Array<Move> &moves() const { return _moves; }
 	const Common::Array<int> &exits() const { return _exits; }
 	const Common::Array<int> &lost() const { return _lost; }
@@ -95,10 +106,12 @@ public:
 
 private:
 	struct Feature {
+		/** One trait/value predicate used while selecting generator groups. */
 		int trait;
 		int value;
 		Feature(int t = 0, int v = 0) : trait(t), value(v) {}
 	};
+	/** Decoded cell templates and layout-indexed template maps. */
 	static const Cell kCellTemplates[];
 	static constexpr byte kLayouts[8][kRows][kColumns] = {
 		{
@@ -214,40 +227,49 @@ private:
 			{2, 16, 40, 16, 16, 16, 1, 1, 14, 1, 1, 1, 1, 1, 13, 0},
 		},
 	};
+	/** Convert coordinates, sample generation values, and inspect party traits. */
 	static int index(int column, int row) { return column * kRows + row; }
 	int randomBelow(int count);
 	int trait(int zoombini, int feature) const;
 	bool matches(int zoombini, Feature feature) const;
+	/** Load/reset layout cells and assign a generated trait predicate to one device. */
 	void loadLayout(int layout);
 	void clearCell(int column, int row);
 	void setFeature(int column, int row, Feature feature);
+	/** Count party features and select predicates/actors for the difficulty generator. */
 	void tally(const Common::Array<int> &group, int counts[5][6]) const;
 	Feature singleton(const Common::Array<int> &group) const;
 	Feature popular(const Common::Array<int> &group, int limit) const;
 	Feature unusedFeature(const Common::Array<int> &group);
 	int pick(const Common::Array<int> &candidates, Common::Array<int> &used);
 	int select(Common::Array<int> &used, Feature a, bool matchA, Feature b = Feature(), bool matchB = true, Feature c = Feature(), bool matchC = true);
+	/** Generate each difficulty branch and select distinct party actors as needed. */
 	int generateEasy(int layout);
 	void generateMedium();
 	void generateHard();
 	int pickUnique(Common::Array<int> &used);
 	int pickDifferent(int first, Common::Array<int> &used, int minimum);
+	/** Resolve a move, remove a collision pair, and rotate triggered devices. */
 	void move(int cellIndex, int direction);
 	void removeCollision(int first, int second);
 	void rotateCells(const bool triggers[7]);
 
+	/** Shared generator RNG, party traits, live cells, and their initial snapshot. */
 	Random *_random = nullptr;
 	Common::Array<ZmbTrait> _party;
 	Cell _cells[kCellCount];
 	Cell _initialCells[kCellCount];
+	/** Generation record and before/after occupant buffers used for simultaneous ticks. */
 	GenerationInfo _generation;
 	Occupant _before[kCellCount];
 	Occupant _after[kCellCount];
+	/** Moved, exited, lost, and collided roster indices plus their resolved moves. */
 	Common::Array<int> _moved;
 	Common::Array<Move> _moves;
 	Common::Array<int> _exits;
 	Common::Array<int> _lost;
 	Common::Array<int> _collisions;
+	/** Selected layout and tick-level signal flags returned to the page renderer. */
 	int _layout = 0;
 	bool _turned = false;
 	bool _caught = false;
@@ -257,18 +279,28 @@ private:
 /** Bubble Bumpers: simultaneous bubble paths through a mutable device grid. */
 class PuzzleMysticMarsh : public PuzzleBase {
 public:
+	/** Construct Bubble Bumpers for @p vm. */
 	explicit PuzzleMysticMarsh(Zoombini2Engine *vm);
+	/** Release bubble paths and page-local animation runners. */
 	~PuzzleMysticMarsh() override;
+	/** Generate a grid, load resources, and place the selectable roster. */
 	void init() override;
+	/** Place a dropped Zoombini in a crater or update the held-rider pointer. */
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
+	/** Start retreat speech or return through the map transition. */
 	bool onGoButtonPressed() override;
+	/** Return whether enough grid outcomes allow departure. */
+	bool canUseGoButton() const override;
+	/** Mark all remaining party members free for console completion. */
 	void applyDebugPuzzleCompletion() override;
+	/** Describe retained generation intent and a bounded current-state forecast. */
 	Common::String debugGetAnswer() const override;
 	PuzzleChanceInfo debugGetChances() const override { return PuzzleChanceInfo(PuzzleChanceInfo::Type::kAmorphous); }
 	Common::String debugGetChanceDetails() const override;
 
 protected:
+	/** Advance grid ticks, bubble paths, effects, speech, and completion state. */
 	void onUpdate() override;
 	void onRenderBackground(ManagedSurface32 *screen) override;
 	void onRenderContent(ManagedSurface32 *screen) override;
@@ -277,6 +309,7 @@ protected:
 	void onRenderForeground(ManagedSurface32 *screen) override;
 
 private:
+	/** Music, layout background/mask, device symbols, trait icons, and bubble art. */
 	static constexpr const char *kMusicPath = "#sounds/music/04-BS01.wav";
 	static constexpr const char *kBackgroundFormat = "#bmp/mystic_marsh/background%d";
 	static constexpr const char *kAreaFormat = "bmp/mystic_marsh/area%d.bmt";
@@ -289,6 +322,7 @@ private:
 	static constexpr const char *kFloatPath = "bmp/zombis/flotte/flotte.anm";
 	static constexpr const char *kPickupPath = "bmp/zombis/pris/pris.anm";
 	static constexpr const char *kCelebratePath = "bmp/zombis/attente/attenteZomb.anm";
+	/** Effects, departure speech, completion speech, and symbol resource names. */
 	static constexpr const char *kSfxFormat = "sounds/fx/04-BS%02d.wav";
 	static constexpr const char *kGoSpeechFormat = "wld11.%d";
 	static constexpr const char *kCaveSpeech = "DW-Cave";
@@ -355,6 +389,7 @@ private:
 		"ENTRY1",
 		"ENTRY2",
 	};
+	/** Page-space starting and exit positions selected by the generated layout. */
 	static constexpr Common::Point32 kStartingPositions[6][8] = {
 		{Common::Point32(127, 397), Common::Point32(176, 411), Common::Point32(232, 411), Common::Point32(99, 437), Common::Point32(151, 449), Common::Point32(210, 447), Common::Point32(117, 484), Common::Point32(186, 490)},
 		{Common::Point32(127, 397), Common::Point32(176, 411), Common::Point32(232, 411), Common::Point32(99, 437), Common::Point32(151, 449), Common::Point32(210, 447), Common::Point32(117, 484), Common::Point32(186, 490)},
@@ -373,25 +408,31 @@ private:
 	};
 
 	struct Bubble {
+		/** Visibility, current position, and path for one moving bubble. */
 		bool active = false;
 		Common::Point32 position;
 		PathObject *path = nullptr;
 	};
+	/** A selectable crater and its page-space location. */
 	struct Slot {
 		int cell;
 		Common::Point32 position;
 	};
+	/** One short-lived crater or whirlpool visual effect. */
 	struct Effect {
 		Common::Point32 position;
 		uint32 start;
 	};
+	/** Convert a grid cell or drag/drop callback into a page placement. */
 	static Common::Point32 cellPosition(int index);
 	static void slotDropCallback(void *context, int slotIndex, int zoombiniIndex);
 	void placeZoombini(int slotIndex, int zoombiniIndex);
+	/** Create bubble path segments, resolve grid results, and free or lose riders. */
 	PathObject *createPath(const Common::Point32 &from, const Common::Point32 &to, int step) const;
 	void advanceGrid(uint32 now);
 	void freeZoombini(int index, uint32 now);
 	void loseZoombini(int index, bool whirlpool, uint32 now);
+	/** Play indexed effects, serialize speech, load resources, and format console diagnostics. */
 	void playSfx(int index);
 	void enqueueSpeech(const Common::String &name);
 	void pumpSpeech();
@@ -399,13 +440,16 @@ private:
 	Common::String debugGroup(const char *label, const Common::Array<int> &actors) const;
 	Common::String debugGeneration() const;
 
+	/** Logical grid and its cell snapshot for the current render frame. */
 	MysticMarshGrid _grid;
 	MysticMarshGrid::Cell _drawCells[MysticMarshGrid::kCellCount];
+	/** Crater slots, associated drop targets, moving bubbles, effects, and speech queue. */
 	Common::Array<Slot> _slots;
-	Common::Array<ZoombiniDropTarget> _dropTargets;
+	Common::Array<ZmbDropTarget> _dropTargets;
 	Common::Array<Bubble> _bubbles;
 	Common::Array<Effect> _effects;
 	Common::Array<Common::String> _speechQueue;
+	/** Background variant, released count, active placement, tick/lock timing, and Go state. */
 	int _backgroundIndex = 1;
 	int _freed = 0;
 	int _placingZoombini = -1;
@@ -416,6 +460,7 @@ private:
 	bool _finished = false;
 	bool _goPending = false;
 	int _speechSound = -1;
+	/** Device/bubble visual resources, Zoombini grids, and indexed effect handles. */
 	Animation *_craterAnimation = nullptr;
 	Animation *_whirlpoolAnimation = nullptr;
 	const ZoombiniAnimation *_floatAnimation = nullptr;

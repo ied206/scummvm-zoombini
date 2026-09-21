@@ -42,7 +42,7 @@ constexpr const char *TransitionVideo::kCutsceneThirdPath;
 constexpr const char *TransitionVideo::kCutsceneThirdHalfPath;
 constexpr const char *TransitionVideo::kLogoArisuPath;
 
-TransitionVideo::TransitionVideo(Zoombini2Engine *vm, int pageId)
+TransitionVideo::TransitionVideo(Zoombini2Engine *vm, PageId pageId)
 	: TransitionBase(vm) {
 	_pageId = pageId;
 
@@ -72,7 +72,7 @@ TransitionVideo::TransitionVideo(Zoombini2Engine *vm, int pageId)
 		_nextPageId = kPageLogoTLC;
 		break;
 	default:
-		warning("TransitionVideo: Unknown page %d", pageId);
+		warning("TransitionVideo: Unknown page %d", static_cast<int>(pageId));
 		break;
 	}
 }

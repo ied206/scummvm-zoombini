@@ -42,8 +42,10 @@ void Zoombini2MetaEngine::registerDefaultSettings(const Common::String &target) 
 	ConfMan.registerDefault(kConfigStereoOutput, false);
 	ConfMan.registerDefault(kConfigUseFloatingPointPaths, false);
 	ConfMan.registerDefault(kConfigEnhancedKbdShortcuts, true);
+	ConfMan.registerDefault(kConfigTransparentHelpPages, true);
 	ConfMan.registerDefault(kConfigDebugHotkeys, false);
 	ConfMan.registerDefault(kConfigGreedyWaterslidePairing, false);
+	ConfMan.registerDefault(kConfigAquacubeSafeFirstMove, false);
 	ConfMan.registerDefault(kConfigOriginalPRNG, true);
 	ConfMan.registerDefault(kConfigFrameRate, kDefaultFrameRate);
 	ConfMan.registerDefault(kConfigUnlockFrameRate, false);

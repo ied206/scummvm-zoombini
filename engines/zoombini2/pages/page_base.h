@@ -263,6 +263,8 @@ public:
 	void onFrame(ManagedSurface32 *screen, bool advanceState);
 	/** Recompose the selected visuals without advancing simulation or completion callbacks. */
 	void render(ManagedSurface32 *screen);
+	/** Draw a page-specific held actor above shared controls, then optionally advance it. */
+	virtual void renderDragOverlay(ManagedSurface32 *screen, bool advanceState) { (void)screen; (void)advanceState; }
 
 	/** Initialize page-local state and resources. */
 	virtual void init() = 0;
@@ -272,7 +274,7 @@ public:
 	virtual bool hasActiveDialog() const { return false; }
 
 	/** Return the numeric dispatcher identifier assigned by the concrete page. */
-	int getPageId() const { return _pageId; }
+	PageId getPageId() const { return _pageId; }
 	/** Return the lifecycle category recorded when this page was constructed. */
 	PageCategory getCategory() const { return _pageCategory; }
 	/** Return whether the shared sidebar is visible over this page. */
@@ -281,6 +283,8 @@ public:
 	virtual bool hasGoButton() const { return hasSidebar(); }
 	/** Return whether the visible Go button currently accepts input. */
 	virtual bool canUseGoButton() const { return hasGoButton(); }
+	/** Apply page-local state that must be settled before Map saves or leaves the page. */
+	virtual void onMapButtonPressed() {}
 	/** Handle page-local Go speech; return true to continue the shared transition. */
 	virtual bool onGoButtonPressed() { return true; }
 	/** Return whether page-local state prevents the sidebar from accepting pointer input. */
@@ -321,7 +325,7 @@ protected:
 	/** Category assigned to this page for lifecycle and UI policy. */
 	PageCategory _pageCategory;
 	/** Numeric dispatcher identifier for this page. */
-	int _pageId = -1;
+	PageId _pageId = kPageNone;
 	/** Optional page-area mask released with this page. */
 	AreaMask *_areaMask = nullptr;
 
