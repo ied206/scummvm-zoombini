@@ -35,6 +35,8 @@
 
 namespace Zoombini2 {
 
+constexpr int SoundBuffer::kSampleSlotCount;
+
 /** Convert stereo samples to one mono sample per source frame. */
 class SoundManager::MonoAudioStream : public Audio::AudioStream {
 public:
@@ -131,6 +133,39 @@ void SoundManager::unloadAll() {
 		delete _buffers[i];
 	}
 	_buffers.clear();
+	_speechQueue.clear();
+	_speechSoundId = -1;
+}
+
+void SoundManager::queueSpeech(const Common::Path &path) {
+	_speechQueue.push_back(path);
+	updateSpeechQueue();
+}
+
+void SoundManager::updateSpeechQueue() {
+	if (0 <= _speechSoundId) {
+		if (isPlaying(_speechSoundId))
+			return;
+		unload(_speechSoundId);
+		_speechSoundId = -1;
+	}
+	if (_speechQueue.empty())
+		return;
+
+	_speechSoundId = load(true, _speechQueue[0], false);
+	_speechQueue.remove_at(0);
+	playWithVolume(_speechSoundId, _volumeSpeech);
+}
+
+void SoundManager::skipSpeechQueue() {
+	if (0 <= _speechSoundId)
+		unload(_speechSoundId);
+	_speechSoundId = -1;
+	_speechQueue.clear();
+}
+
+bool SoundManager::hasPendingSpeech() const {
+	return 0 <= _speechSoundId || !_speechQueue.empty();
 }
 
 void SoundManager::play(int id) {
@@ -141,15 +176,10 @@ void SoundManager::play(int id) {
 	Audio::SoundHandle *handle = &buf->streamHandle;
 	int sampleSlot = -1;
 	if (!buf->isStream) {
-		for (int i = 0; i < kMaxSampleSlots; i++) {
-			if (!_mixer->isSoundHandleActive(buf->handles[i])) {
-				handle = &buf->handles[i];
-				sampleSlot = i;
-				break;
-			}
-		}
+		sampleSlot = findFreeSampleSlot(*buf);
 		if (sampleSlot < 0 || buf->sampleData.empty())
 			return;
+		handle = &buf->handles[sampleSlot];
 	}
 
 	Common::SeekableReadStream *f;
@@ -201,7 +231,7 @@ void SoundManager::playLoop(int id) {
 	}
 }
 
-void SoundManager::stop(int id) {
+void SoundManager::stop(int id, int sampleSlot) {
 	SoundBuffer *buf = findBuffer(id);
 	if (!buf)
 		return;
@@ -214,11 +244,23 @@ void SoundManager::stop(int id) {
 		return;
 	}
 
-	for (int i = 0; i < kMaxSampleSlots; i++) {
-		if (_mixer->isSoundHandleActive(buf->handles[i]))
-			_mixer->stopHandle(buf->handles[i]);
-		buf->handlesPaused[i] = false;
+	if (sampleSlot == -1) {
+		for (int activeSlot = 0; activeSlot < SoundBuffer::kSampleSlotCount; activeSlot++) {
+			if (_mixer->isSoundHandleActive(buf->handles[activeSlot]))
+				_mixer->stopHandle(buf->handles[activeSlot]);
+			buf->handlesPaused[activeSlot] = false;
+		}
+		return;
 	}
+	if (!isValidSampleSlot(sampleSlot))
+		return;
+	if (_mixer->isSoundHandleActive(buf->handles[sampleSlot]))
+		_mixer->stopHandle(buf->handles[sampleSlot]);
+	buf->handlesPaused[sampleSlot] = false;
+}
+
+void SoundManager::stopAll(int id) {
+	stop(id, -1);
 }
 
 void SoundManager::pause(int id) {
@@ -234,7 +276,7 @@ void SoundManager::pause(int id) {
 		return;
 	}
 
-	for (int i = 0; i < kMaxSampleSlots; i++) {
+	for (int i = 0; i < SoundBuffer::kSampleSlotCount; i++) {
 		if (!buf->handlesPaused[i] && _mixer->isSoundHandleActive(buf->handles[i])) {
 			_mixer->pauseHandle(buf->handles[i], true);
 			buf->handlesPaused[i] = true;
@@ -256,7 +298,7 @@ void SoundManager::resume(int id) {
 		return;
 	}
 
-	for (int i = 0; i < kMaxSampleSlots; i++) {
+	for (int i = 0; i < SoundBuffer::kSampleSlotCount; i++) {
 		if (buf->handlesPaused[i]) {
 			if (_mixer->isSoundHandleActive(buf->handles[i]))
 				_mixer->pauseHandle(buf->handles[i], false);
@@ -265,7 +307,7 @@ void SoundManager::resume(int id) {
 	}
 }
 
-bool SoundManager::isPlaying(int id) const {
+bool SoundManager::isPlaying(int id, int sampleSlot) const {
 	SoundBuffer *buf = findBuffer(id);
 	if (!buf)
 		return false;
@@ -273,11 +315,9 @@ bool SoundManager::isPlaying(int id) const {
 	if (buf->isStream)
 		return !buf->streamPaused && _mixer->isSoundHandleActive(buf->streamHandle);
 
-	for (int i = 0; i < kMaxSampleSlots; i++) {
-		if (!buf->handlesPaused[i] && _mixer->isSoundHandleActive(buf->handles[i]))
-			return true;
-	}
-	return false;
+	if (!isValidSampleSlot(sampleSlot))
+		return false;
+	return !buf->handlesPaused[sampleSlot] && _mixer->isSoundHandleActive(buf->handles[sampleSlot]);
 }
 
 void SoundManager::setVolume(int id, int volume) {
@@ -291,7 +331,7 @@ void SoundManager::setVolume(int id, int volume) {
 	if (buf->usesCategoryVolume)
 		channelVolume = static_cast<byte>(Audio::Mixer::kMaxChannelVolume);
 
-	for (int i = 0; i < kMaxSampleSlots; i++) {
+	for (int i = 0; i < SoundBuffer::kSampleSlotCount; i++) {
 		if (_mixer->isSoundHandleActive(buf->handles[i]))
 			_mixer->setChannelVolume(buf->handles[i], channelVolume);
 	}
@@ -347,8 +387,20 @@ SoundBuffer *SoundManager::findBuffer(int id) const {
 	return nullptr;
 }
 
+int SoundManager::findFreeSampleSlot(const SoundBuffer &buffer) const {
+	for (int sampleSlot = 0; sampleSlot < SoundBuffer::kSampleSlotCount; sampleSlot++) {
+		if (!_mixer->isSoundHandleActive(buffer.handles[sampleSlot]))
+			return sampleSlot;
+	}
+	return -1;
+}
+
+bool SoundManager::isValidSampleSlot(int sampleSlot) {
+	return 0 <= sampleSlot && sampleSlot < SoundBuffer::kSampleSlotCount;
+}
+
 void SoundManager::releasePlayback(SoundBuffer &buffer) {
-	for (int i = 0; i < kMaxSampleSlots; i++) {
+	for (int i = 0; i < SoundBuffer::kSampleSlotCount; i++) {
 		if (_mixer->isSoundHandleActive(buffer.handles[i]))
 			_mixer->stopHandle(buffer.handles[i]);
 		buffer.handlesPaused[i] = false;

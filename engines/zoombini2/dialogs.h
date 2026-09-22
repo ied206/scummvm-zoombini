@@ -34,6 +34,7 @@ class CheckboxWidget;
 class CommandSender;
 class ContainerWidget;
 class EditTextWidget;
+class PopUpWidget;
 class RadiobuttonGroup;
 class RadiobuttonWidget;
 class ScrollContainerWidget;
@@ -231,6 +232,8 @@ private:
 	GUI::CheckboxWidget *_aquacubeSafeFirstMoveCheckbox = nullptr;
 	/** Toggle selecting the original Windows random-number generator. */
 	GUI::CheckboxWidget *_originalPrngCheckbox = nullptr;
+	/** Logic pacing selector showing the 60Hz LCD and 75Hz CRT choices. */
+	GUI::PopUpWidget *_pacingPopUp = nullptr;
 	/** Frame-rate limit in frames per second. */
 	FrameRateNumberBox *_frameRateNumberBox = nullptr;
 	/** Disable the engine-side frame-rate limit. */

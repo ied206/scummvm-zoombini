@@ -1157,10 +1157,8 @@ PuzzleMysticMarsh::~PuzzleMysticMarsh() {
 			if (0 <= _sounds[i])
 				sound->unload(_sounds[i]);
 		}
-		if (0 <= _speechSound)
-			sound->unload(_speechSound);
 	}
-	finishPuzzleRoster(_vm->_state->_rescue1Board);
+	finishPuzzleRoster(_vm->_state->_rescue1Storage);
 }
 
 Common::Point32 PuzzleMysticMarsh::cellPosition(int index) {
@@ -1349,8 +1347,8 @@ void PuzzleMysticMarsh::onUpdate() {
 	// Cell changes become visible after the frame which advances the grid.
 	for (int i = 0; i < MysticMarshGrid::kCellCount; i++)
 		_drawCells[i] = _grid.cell(i);
-	pumpSpeech();
-	if (_goPending && _speechSound < 0 && _speechQueue.empty()) {
+	SoundManager *sound = _vm->getSoundManager();
+	if (_goPending && (!sound || !sound->hasPendingSpeech())) {
 		_goPending = false;
 		_vm->_mapTransitionSourcePageId = kPageMysticMarsh;
 		_vm->requestPageChange(kPageMapTrans);
@@ -1474,42 +1472,20 @@ void PuzzleMysticMarsh::onRenderForeground(ManagedSurface32 *screen) {
 
 EventHandleResult PuzzleMysticMarsh::onLButtonUp(const Common::Point &pos) {
 	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), true,
-																		  _pickupAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
+																	_pickupAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
 	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 
 EventHandleResult PuzzleMysticMarsh::onMouseMove(const Common::Point &pos) {
 	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), false,
-																		  _pickupAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
+																	_pickupAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
 	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 
 void PuzzleMysticMarsh::enqueueSpeech(const Common::String &name) {
-	_speechQueue.push_back(name);
-	pumpSpeech();
-}
-
-void PuzzleMysticMarsh::pumpSpeech() {
 	SoundManager *sound = _vm->getSoundManager();
-	if (!sound) {
-		_speechSound = -1;
-		_speechQueue.clear();
-		return;
-	}
-	if (0 <= _speechSound) {
-		if (sound->isPlaying(_speechSound))
-			return;
-		sound->unload(_speechSound);
-		_speechSound = -1;
-	}
-	while (!_speechQueue.empty()) {
-		_speechSound = sound->load(true, Common::Path(_speechQueue[0]), false);
-		_speechQueue.remove_at(0);
-		if (0 <= _speechSound) {
-			sound->playWithVolume(_speechSound, sound->_volumeSpeech);
-			return;
-		}
-	}
+	if (sound)
+		sound->queueSpeech(Common::Path(name));
 }
 
 bool PuzzleMysticMarsh::onGoButtonPressed() {

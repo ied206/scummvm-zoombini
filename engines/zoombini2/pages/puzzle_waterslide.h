@@ -261,8 +261,6 @@ private:
 	Common::Point32 _cascadePos;
 	uint32 _dischargeStart = 0;
 	bool _goPending = false;
-	int _goSpeech = -1;
-	int _praiseSpeech = -1;
 	/** Indexed pipe and valve effects. */
 	int _sounds[6] = {
 		-1,

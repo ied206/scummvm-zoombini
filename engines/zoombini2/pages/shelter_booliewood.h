@@ -73,6 +73,8 @@ private:
 	static constexpr const char *kWalkingAnimationPath = "bmp/boolies/marche.an";
 	static constexpr const char *kWaitingAnimationPath = "bmp/boolies/attend.an";
 	static constexpr const char *kCrowdRouteFormat = "bmp/booliewood/path%d.pat";
+	static constexpr const char *kScrollRightCursorPath = "bmp/cursor/cursor03.rb";
+	static constexpr const char *kScrollLeftCursorPath = "bmp/cursor/cursor04.rb";
 	/** Music and narration resource paths. */
 	static constexpr const char *kMusicPath = "#sounds/music/Booliewood_Level1.wav";
 	static constexpr const char *kIntroSpeechPath = "sounds/zbv21.2.wav";
@@ -229,8 +231,10 @@ private:
 	/** Return the waiting-animation delay for @p frame. */
 	static uint32 getWaitingFrameDelay(int frame);
 
-	/** Apply one frame of edge-driven cyclic panorama scrolling. */
-	void updateScroll();
+	/** Advance edge scrolling at the displacement of 60 frames per second. */
+	void updateScroll(uint32 now);
+	/** Convert a scene actor's anchor to the current viewport. */
+	int getActorScreenX(int sceneX) const;
 	/** Schedule the next randomized crowd speech deadline. */
 	void scheduleAmbientSpeech(uint32 now);
 	/** Play one randomized crowd speech clip. */
@@ -257,8 +261,10 @@ private:
 								const Common::Point32 &pos, ManagedSurface32 *screen) const;
 
 	/** Current horizontal origin within the cyclic panorama. */
-	int _scrollX = 0;
+	int _scrollX = 10;
 	int _pendingScrollDelta = 0;
+	uint32 _lastScrollTime = 0;
+	int _scrollRemainder = 0;
 	/** Development stage selected from the rescued total. */
 	int _developmentStage = 1;
 	/** Seat allocation state. */

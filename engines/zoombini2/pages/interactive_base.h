@@ -33,8 +33,8 @@ enum class DialogMsgBoxButton;
 /** Interactive screens, including menus, maps, shelters, and puzzles. */
 class InteractiveBase : public PageBase {
 public:
-	/** Bind an interactive page to @p vm. */
-	explicit InteractiveBase(Zoombini2Engine *vm) : PageBase(vm, PageCategory::kInteractive) {}
+	/** Bind an interactive page to @p vm, recording @p category. */
+	explicit InteractiveBase(Zoombini2Engine *vm, PageCategory category = PageCategory::kInteractive);
 
 protected:
 	/** Shared map soundtrack used by interactive pages that present the route map. */

@@ -79,12 +79,12 @@ const char *PuzzleBase::getPuzzleDir(PageId pageId) {
 }
 
 PuzzleBase::PuzzleBase(Zoombini2Engine *vm, PageId pageId)
-	: InteractiveBase(vm), _puzzleLevel(vm->_state->_level) {
+	: InteractiveBase(vm, PageCategory::kPuzzle), _puzzleLevel(vm->_state->_level) {
 	_pageId = pageId;
 }
 
-void PuzzleBase::finishPuzzleRoster(BoardRecord **board) {
-	_vm->_state->finishPuzzleRoster(_pageId, board, _vm->isStartingMapTransition(), _vm->_isSavedGame);
+void PuzzleBase::finishPuzzleRoster(StorageRecord **storage, bool perfectClearEligible) {
+	_vm->_state->finishPuzzleRoster(_pageId, storage, _vm->isStartingMapTransition(), _vm->_isSavedGame, perfectClearEligible);
 }
 
 void PuzzleBase::init() {

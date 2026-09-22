@@ -74,14 +74,14 @@ enum PageId : int {
 /** Save-file version accepted by @ref GameState. */
 const int kSaveFileMagic = 262;
 
-/** Number of serialized rows in each sparse storage board. */
-const int kBoardRows = 125;
+/** Number of serialized rows in each sparse storage area. */
+const int kStorageRows = 125;
 
-/** Number of serialized columns in each sparse storage board. */
-const int kBoardCols = 5;
+/** Number of serialized columns in each sparse storage area. */
+const int kStorageCols = 5;
 
-/** Board allocation size, including one unused sentinel row. */
-const int kBoardSize = 630;
+/** Storage allocation size, including one unused sentinel row. */
+const int kStorageSize = 630;
 
 /** Number of distinct Zoombinis represented by the four visible traits. */
 const int kZoombiniCombinationCount = 625;
@@ -226,15 +226,15 @@ struct VolumeSettings {
 	int _initialSpeech = kMaxVolumePercent;
 };
 
-/** Twenty-byte representation of one Zoombini stored in a sparse board cell. */
-struct BoardRecord {
+/** Twenty-byte representation of one Zoombini stored in a sparse storage cell. */
+struct StorageRecord {
 	/** NUL-terminated character name copied from the active Zoombini. */
 	char _name[kZoombiniNameSize] = {};
 	/** Unused slot zero followed by Feet, Nose, Hair, and Eyes. */
 	ZmbTrait _traits;
 
 	/** Initialize the record to an empty name and unset stored traits. */
-	BoardRecord() = default;
+	StorageRecord() = default;
 	/** Copy the persistent fields from @p zoombini into this record. */
 	void store(const ZoombiniRunner &zoombini);
 	/** Return the complete trait tuple stored in this record. */
@@ -269,11 +269,11 @@ struct TraitComboTable {
 };
 
 /**
- * Owns one profile's progress, local roster, sparse boards, and trait-combo table.
+ * Owns one profile's progress, local roster, sparse storage, and trait-combo table.
  *
  * Loads are transactional: a complete temporary state is validated before it
  * replaces the active instance. The class also owns every pointer stored in
- * @ref GameState::_rescue1Board, @ref GameState::_rescue2Board, and
+ * @ref GameState::_rescue1Storage, @ref GameState::_rescue2Storage, and
  * @ref GameState::_savedRoster.
  */
 class GameState {
@@ -282,7 +282,7 @@ public:
 	static Common::String generateZoombiniName(Random &random);
 	/** Construct a fresh profile state. */
 	GameState();
-	/** Release all board records and local-roster entries. */
+	/** Release all storage records and local-roster entries. */
 	~GameState();
 
 	/** Reset all serialized and runtime profile fields to their initial values. */
@@ -298,16 +298,16 @@ public:
 	void restoreSavedZoombinis();
 	/** Retain the live party as saved roster entries on return to the map. */
 	void stashActiveZoombinis();
-	/** Retain puzzle leavers in the saved roster or @p board and keep successful route members active. */
-	void finishPuzzleRoster(PageId pageId, BoardRecord **board, bool advancing, bool savedGame);
-	/** Delete every record in @p board and clear its cells. */
-	static void clearBoard(BoardRecord **board);
-	/** Store @p zoombini in the first available cell of @p board. */
-	static bool storeInBoard(BoardRecord **board, ZoombiniRunner &zoombini);
-	/** Restore up to @p count Zoombinis from @p board into @p roster. */
-	static void refillFromBoard(BoardRecord **board, Common::Array<ZoombiniRunner *> &roster, uint count);
-	/** Return the board row used to initialize the shelter scroll position. */
-	static int findBoardScrollRow(BoardRecord *const *board);
+	/** Retain puzzle leavers in the saved roster or @p storage, keep successful route members active, and record an eligible perfect clear. */
+	void finishPuzzleRoster(PageId pageId, StorageRecord **storage, bool advancing, bool savedGame, bool perfectClearEligible);
+	/** Delete every record in @p storage and clear its cells. */
+	static void clearStorage(StorageRecord **storage);
+	/** Store @p zoombini in the first available cell of @p storage. */
+	static bool storeInStorage(StorageRecord **storage, ZoombiniRunner &zoombini);
+	/** Restore up to @p count Zoombinis from @p storage into @p roster. */
+	static void refillFromStorage(StorageRecord **storage, Common::Array<ZoombiniRunner *> &roster, uint count);
+	/** Return the storage row used to initialize the shelter scroll position. */
+	static int findStorageScrollRow(StorageRecord *const *storage);
 	/** Return the four shelter-stage counts and serialized active-party count. */
 	Zoombini2PopulationSummary getPopulationSummary() const;
 	/** Append one Booliewood completion snapshot while history capacity remains. */
@@ -345,6 +345,10 @@ public:
 
 	/** Increment a page's selected visit counter, saturating at 250. */
 	void registerPageVisit(PageId pageId, int visitKind = 1);
+	/** Return the serialized level for @p pageId, or zero when the page ID is outside the state table. */
+	int getPageLevel(PageId pageId) const;
+	/** Select @p pageId's serialized level for the next saved-adventure puzzle, initializing an unvisited page to level one. */
+	int activatePageLevel(PageId pageId);
 
 	/** Return whether the first rescue movie has already played. */
 	bool hasPlayedRescue1Movie() const { return _rescue1MoviePlayed != 0; }
@@ -376,16 +380,16 @@ public:
 	byte _hasReachedRescue2;
 	/** Whether the saved party has reached Booliewood. */
 	byte _hasReachedBooliewood;
-	/** Rescue Site I sparse storage board, including its unused sentinel row. */
-	BoardRecord *_rescue1Board[kBoardSize] = {};
-	/** Rescue Site II sparse storage board, including its unused sentinel row. */
-	BoardRecord *_rescue2Board[kBoardSize] = {};
+	/** Rescue Site I sparse storage, including its unused sentinel row. */
+	StorageRecord *_rescue1Storage[kStorageSize] = {};
+	/** Rescue Site II sparse storage, including its unused sentinel row. */
+	StorageRecord *_rescue2Storage[kStorageSize] = {};
 	/** Saved level for each page; a nonzero value also marks the page visited. */
 	int32 _pageLevel[100];
 	/** Saturating visit counters indexed by `5 * pageId + visitKind`. */
 	byte _pageVisitCounts[500];
-	/** Serialized compatibility array with no other known Z2-v1.1KR consumer. */
-	int32 _legacyData[100];
+	/** Per-page perfect-clear counts toward the next difficulty increase; each count resets after three. */
+	int32 _perfectClearCount[100];
 	/** Total rescued Boolies used for Booliewood development and the 400-point finale. */
 	int32 _rescuedBoolieCount;
 	/** Cumulative active-party arrivals at Rescue Site I. */
@@ -413,7 +417,7 @@ private:
 	/** Disallow assigning pointers stored in this profile. */
 	GameState &operator=(const GameState &) = delete;
 
-	/** Delete all owned board and roster entries. */
+	/** Delete all retained storage and roster entries. */
 	void clearOwnedData();
 	/** Copy runner identity into another roster and release the source entries. */
 	static void transferRoster(Common::Array<ZoombiniRunner *> &src, Common::Array<ZoombiniRunner *> &dest);
@@ -425,12 +429,12 @@ private:
 	bool readState(Common::SeekableReadStream *stream);
 	/** Return whether @p bytes can be read from the stream's current position. */
 	static bool canRead(Common::SeekableReadStream *stream, uint64 bytes);
-	/** Parse one sparse board from @p stream. */
-	static bool readBoard(Common::SeekableReadStream *stream, BoardRecord **board);
-	/** Serialize one sparse board and return its occupied-cell count. */
-	static int writeBoard(Common::WriteStream *stream, BoardRecord *const *board);
-	/** Count occupied cells in one sparse storage board, excluding its sentinel row. */
-	static int countBoardEntries(BoardRecord *const *board);
+	/** Parse one sparse storage area from @p stream. */
+	static bool readStorage(Common::SeekableReadStream *stream, StorageRecord **storage);
+	/** Serialize one sparse storage area and return its occupied-cell count. */
+	static int writeStorage(Common::WriteStream *stream, StorageRecord *const *storage);
+	/** Count occupied storage cells, excluding the sentinel row. */
+	static int countStorageEntries(StorageRecord *const *storage);
 	/** Exchange two fixed-size arrays element by element. */
 	template<typename T, uint N>
 	static void swapArray(T (&a)[N], T (&b)[N]) {
@@ -455,6 +459,8 @@ public:
 
 	/** Return valid profile names in case-insensitive sort order. */
 	Common::StringArray listProfiles() const;
+	/** Return whether the listed local save file for @p profileName is not writable. */
+	bool isProfileReadOnly(const Common::String &profileName) const;
 	/** Return every listed profile with counts parsed directly from its independent .mk file. */
 	Common::Array<Zoombini2ProfileSummary> listProfileSummaries() const;
 	/** Serialize @p state and its eligible active party under @p profileName. */

@@ -22,6 +22,10 @@
 #include "zoombini2/pages/dialog_msgbox.h"
 #include "common/debug.h"
 #include "common/system.h"
+#include "graphics/font.h"
+#include "graphics/fontman.h"
+#include "gui/ThemeEngine.h"
+#include "gui/gui-manager.h"
 #include "zoombini2/graphics.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/zoombini2.h"
@@ -38,16 +42,33 @@ DialogMsgBox::~DialogMsgBox() {
 	close();
 }
 
-bool DialogMsgBox::request(const Common::Path &textPath, Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &position,
-						   const Common::Point32 &textOffset) {
+bool DialogMsgBox::request(const Common::Path &textPath, Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &pos, const Common::Point32 &textOffset) {
+	if (!beginRequest(callback, pos))
+		return false;
+
+	_textPath = textPath.toString('/');
+	_uiText.clear();
+	_textOffset = textOffset;
+	return true;
+}
+
+bool DialogMsgBox::requestUiText(const Common::U32String &text, Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &pos) {
+	if (!beginRequest(callback, pos))
+		return false;
+
+	_textPath.clear();
+	_uiText = text;
+	_textOffset = Common::Point32();
+	return true;
+}
+
+bool DialogMsgBox::beginRequest(Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &position) {
 	if (isActive()) {
 		delete callback;
 		return false;
 	}
 
-	_textPath = textPath.toString('/');
 	_position = position;
-	_textOffset = textOffset;
 	_callback = callback;
 	_hoveredButton = DialogMsgBoxButton::kNone00;
 	_redrawNeeded = true;
@@ -62,13 +83,16 @@ bool DialogMsgBox::openDialog() {
 	bool loaded = true;
 	for (int i = 0; i < 3; i++)
 		loaded = _vm->_gfx->loadPageRleBlock(kPanelPaths[i]) && loaded;
-	loaded = _vm->_gfx->loadPageBitBlock(_textPath) && loaded;
+	if (!_textPath.empty())
+		loaded = _vm->_gfx->loadPageBitBlock(_textPath) && loaded;
 
 	if (!loaded) {
 		warning("DialogMsgBox: Failed to load confirmation resources for '%s'", _textPath.c_str());
 		close();
 		return false;
 	}
+
+	resolveUiFont();
 
 	const Size32 panelSize = _vm->_gfx->getPageRleBlockSize(kPanelPaths[1]);
 	if (_position.x == -1)
@@ -85,6 +109,14 @@ bool DialogMsgBox::openDialog() {
 	return true;
 }
 
+void DialogMsgBox::resolveUiFont() {
+	_uiFont = nullptr;
+	if (g_gui.theme()->loadExtraFont(GUI::ThemeEngine::kFontStyleNormal, _vm->getLanguage()))
+		_uiFont = g_gui.theme()->getFont(GUI::ThemeEngine::kFontStyleLangExtra);
+	if (!_uiFont)
+		_uiFont = FontMan.getFontByUsage(Graphics::FontManager::kLocalizedFont);
+}
+
 void DialogMsgBox::close() {
 	if (_state == DialogMsgBoxState::kOpen02) {
 		if (_savedBackground && _vm->getCurrentScreen()) {
@@ -99,11 +131,33 @@ void DialogMsgBox::close() {
 	delete _callback;
 	_callback = nullptr;
 	releaseResources();
+	_textPath.clear();
+	_uiText.clear();
+	_uiFont = nullptr;
 }
 
 void DialogMsgBox::releaseResources() {
 	delete _savedBackground;
 	_savedBackground = nullptr;
+}
+
+void DialogMsgBox::drawUiText(ManagedSurface32 *screen) const {
+	if (_uiText.empty() || !_uiFont)
+		return;
+
+	const int lineHeight = _uiFont->getFontHeight();
+	if (lineHeight <= 0)
+		return;
+
+	Common::Array<Common::U32String> lines;
+	_uiFont->wordWrapText(_uiText, kUiTextWidth, lines);
+	const int maxLines = kUiTextHeight / lineHeight;
+	const uint32 textColor = screen->format.RGBToColor(0, 0, 0);
+	for (uint i = 0; i < lines.size() && static_cast<int>(i) < maxLines; i++) {
+		const int x = _position.x + kUiTextMarginX;
+		const int y = _position.y + kUiTextOffsetY + static_cast<int>(i) * lineHeight;
+		_uiFont->drawString(screen, lines[i], x, y, kUiTextWidth, textColor, Graphics::kTextAlignCenter);
+	}
 }
 
 DialogMsgBoxButton DialogMsgBox::hitTest(const Common::Point &pos) const {
@@ -141,7 +195,10 @@ void DialogMsgBox::onRenderContent(ManagedSurface32 *screen) {
 		return;
 	screen->copyRectToSurface(*_savedBackground, _position.x, _position.y, Common::Rect(_savedBackground->w, _savedBackground->h));
 	_vm->_gfx->drawPageRleBlock(screen, kPanelPaths[static_cast<int>(_hoveredButton)], _position);
-	_vm->_gfx->drawPageBitBlock(screen, _textPath, _position + _textOffset);
+	if (!_textPath.empty())
+		_vm->_gfx->drawPageBitBlock(screen, _textPath, _position + _textOffset);
+	else
+		drawUiText(screen);
 	_redrawNeeded = false;
 }
 

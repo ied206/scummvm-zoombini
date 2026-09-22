@@ -48,6 +48,19 @@ constexpr const char *Sidebar::kHelpClickSoundPath;
 constexpr const char *Sidebar::kMapClickSoundPath;
 constexpr const char *Sidebar::kAbandonConfirmationPath;
 
+InteractiveBase::InteractiveBase(Zoombini2Engine *vm, PageCategory category)
+	: PageBase(vm, category) {
+	switch (category) {
+	case PageCategory::kInteractive:
+	case PageCategory::kPuzzle:
+	case PageCategory::kShelter:
+		break;
+	default:
+		error("InteractiveBase: invalid pageCategory(%d)", static_cast<int>(category));
+		break;
+	}
+}
+
 Sidebar::Sidebar(Zoombini2Engine *vm)
 	: _vm(vm) {
 

@@ -1058,10 +1058,9 @@ private:
 	void finishShot();
 	void finishCatch();
 	void startRetreat();
-	/** Play effects, serialize speech, and draw each mirror cell. */
+	/** Play effects, queue engine-lifetime speech, and draw each mirror cell. */
 	void playEffect(int index);
 	void queueSpeech(const Common::String &path);
-	void updateSpeech();
 	void drawCell(ManagedSurface32 *screen, const Cell &cell, bool active) const;
 	/** Convert a rail vector to an animation direction, clear Fleen completion, or make a line path. */
 	static int direction(const Common::Point32 &start, const Common::Point32 &end, int sectors);
@@ -1093,6 +1092,8 @@ private:
 	int _shoutCount = 0;
 	bool _resetting = false;
 	bool _finished = false;
+	/** Whether at least one Fleen catch makes this visit eligible for perfect-clear progression. */
+	bool _perfectClearEligible = false;
 	bool _retreating = false;
 	bool _shotConsumed = true;
 	bool _foundPrimary = false;
@@ -1121,11 +1122,9 @@ private:
 	/** Mirror-reaction animation resources. */
 	Animation *_rotate = nullptr;
 	Animation *_explode = nullptr;
-	/** Indexed effects, randomized ambient handles, active speech handle, and queued speech paths. */
+	/** Indexed effects and randomized ambient handles. */
 	int _sounds[8];
 	int _ambientSounds[3];
-	int _speechSound = -1;
-	Common::Array<Common::String> _speechQueue;
 };
 
 } // namespace Zoombini2

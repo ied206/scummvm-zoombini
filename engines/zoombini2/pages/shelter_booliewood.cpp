@@ -40,6 +40,8 @@ constexpr const char *ShelterBooliewood::kPascontentMarkerPath;
 constexpr const char *ShelterBooliewood::kWalkingAnimationPath;
 constexpr const char *ShelterBooliewood::kWaitingAnimationPath;
 constexpr const char *ShelterBooliewood::kCrowdRouteFormat;
+constexpr const char *ShelterBooliewood::kScrollRightCursorPath;
+constexpr const char *ShelterBooliewood::kScrollLeftCursorPath;
 constexpr const char *ShelterBooliewood::kMusicPath;
 constexpr const char *ShelterBooliewood::kIntroSpeechPath;
 constexpr const char *ShelterBooliewood::kAmbientSpeechFormat;
@@ -54,6 +56,7 @@ ShelterBooliewood::ShelterBooliewood(Zoombini2Engine *vm)
 }
 
 ShelterBooliewood::~ShelterBooliewood() {
+	_vm->setPageCursorSprite(nullptr);
 	SoundManager *sound = _vm->getSoundManager();
 	if (sound) {
 		if (0 <= _introSpeechId)
@@ -106,6 +109,7 @@ void ShelterBooliewood::init() {
 	_vm->_gfx->loadPageRleBlock(kPascontentMarkerPath);
 
 	const uint32 now = _vm->getGameTickCount();
+	_lastScrollTime = now;
 	resetSeats();
 	buildSeatedCommunity(now);
 	loadAttractions(now);
@@ -133,7 +137,7 @@ void ShelterBooliewood::init() {
 
 void ShelterBooliewood::onUpdate() {
 	const uint32 now = _vm->getGameTickCount();
-	updateScroll();
+	updateScroll(now);
 	updateAttractions(now);
 	updateSeatedAnimations(now);
 	updateCrowdActors(now);
@@ -148,7 +152,6 @@ void ShelterBooliewood::onRenderBackground(ManagedSurface32 *screen) {
 }
 
 void ShelterBooliewood::onRenderContent(ManagedSurface32 *screen) {
-	drawAttractions(screen);
 	drawRescuedCrowd(screen);
 }
 
@@ -164,6 +167,7 @@ void ShelterBooliewood::onActorsRendered() {
 }
 
 void ShelterBooliewood::onRenderForeground(ManagedSurface32 *screen) {
+	drawAttractions(screen);
 	drawCrowdActors(screen);
 }
 
@@ -409,22 +413,46 @@ EventHandleResult ShelterBooliewood::onLButtonDown(const Common::Point &pos) {
 	return EventHandleResult::kConsumed;
 }
 
-void ShelterBooliewood::updateScroll() {
+void ShelterBooliewood::updateScroll(uint32 now) {
+	const uint32 elapsed = now - _lastScrollTime;
+	_lastScrollTime = now;
 	const Common::Point32 mousePos = _vm->getMousePos();
+	const RleBlock *cursor = nullptr;
+	if (760 < mousePos.x)
+		cursor = _vm->_gfx->loadPageRleBlock(kScrollRightCursorPath);
+	else if (mousePos.x < 30 && mousePos.y < 475)
+		cursor = _vm->_gfx->loadPageRleBlock(kScrollLeftCursorPath);
+	_vm->setPageCursorSprite(cursor);
 	int delta = _pendingScrollDelta;
 	_pendingScrollDelta = 0;
 	if (delta != 0) {
-		// A click supplies the complete scroll step for this frame.
-	} else if (760 < mousePos.x) {
-		delta = 30;
-	} else if (mousePos.x < 30 && mousePos.y < 475) {
-		delta = -30;
+		_scrollRemainder = 0;
+	} else {
+		int speed = 0;
+		if (760 < mousePos.x)
+			speed = 30 * _vm->getLogicPacingHz();
+		else if (mousePos.x < 30 && mousePos.y < 475)
+			speed = -30 * _vm->getLogicPacingHz();
+		if (speed != 0) {
+			const int64 displacement = static_cast<int64>(speed) * elapsed + _scrollRemainder;
+			delta = static_cast<int>(displacement / 1000);
+			_scrollRemainder = static_cast<int>(displacement % 1000);
+		} else {
+			_scrollRemainder = 0;
+		}
 	}
 	_scrollX += delta;
-	while (_scrollX < 0)
+	while (_scrollX < -ManagedSurface32::kScreenSize.width)
 		_scrollX += kPanoramaWidth;
 	while (kPanoramaWidth <= _scrollX)
-		_scrollX -= kPanoramaWidth;
+		_scrollX -= kPanoramaWidth - 1;
+}
+
+int ShelterBooliewood::getActorScreenX(int sceneX) const {
+	int screenX = sceneX - _scrollX;
+	if (kPanoramaWidth - ManagedSurface32::kScreenSize.width < _scrollX)
+		screenX += kPanoramaWidth;
+	return screenX;
 }
 
 void ShelterBooliewood::scheduleAmbientSpeech(uint32 now) {
@@ -448,7 +476,7 @@ void ShelterBooliewood::drawBackground(ManagedSurface32 *screen) const {
 		_vm->_gfx->drawPageBitBlock(screen, kBackgroundPath, Common::Point32(0, 0));
 		return;
 	}
-	const int origin = _scrollX % width;
+	const int origin = (_scrollX + width) % width;
 	const int tailWidth = width - origin;
 	if (ManagedSurface32::kScreenSize.width <= tailWidth) {
 		_vm->_gfx->drawPageBitBlockSubRect(screen, kBackgroundPath, Common::Point32(0, 0), Common::Rect(origin, 0, origin + ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height));
@@ -468,10 +496,7 @@ void ShelterBooliewood::drawAnimationInPanorama(const Animation *animation, int 
 void ShelterBooliewood::drawRleInPanorama(const RleBlock *frame, const Common::Point32 &pos, ManagedSurface32 *screen) const {
 	if (!frame)
 		return;
-	const int baseX = pos.x - _scrollX;
-	_vm->_gfx->drawRleBlock(screen, frame, Common::Point32(baseX - kPanoramaWidth, pos.y));
-	_vm->_gfx->drawRleBlock(screen, frame, Common::Point32(baseX, pos.y));
-	_vm->_gfx->drawRleBlock(screen, frame, Common::Point32(baseX + kPanoramaWidth, pos.y));
+	_vm->_gfx->drawRleBlock(screen, frame, Common::Point32(getActorScreenX(pos.x), pos.y));
 }
 
 void ShelterBooliewood::drawPageRleInPanorama(const Common::String &path, const Common::Point32 &pos, ManagedSurface32 *screen) const {
@@ -499,7 +524,7 @@ void ShelterBooliewood::drawRescuedCrowd(ManagedSurface32 *screen) const {
 			if (marker == '0')
 				continue;
 			const Common::String path(marker == '1' ? kContentMarkerPath : kPascontentMarkerPath);
-			drawPageRleInPanorama(path, Common::Point32(3450 + column * 16, y), screen);
+			drawPageRleInPanorama(path, Common::Point32(3440 + column * 16, y), screen);
 			drawn += 1;
 		}
 	}
@@ -533,9 +558,7 @@ void ShelterBooliewood::drawCrowdActors(ManagedSurface32 *screen) const {
 void ShelterBooliewood::drawZoombiniInPanorama(const ZoombiniRunner &zoombini, const ZoombiniAnimation *animation, int cell, int animationFrame, const Common::Point32 &pos, ManagedSurface32 *screen) const {
 	if (!animation)
 		return;
-	const int baseX = pos.x - _scrollX;
-	for (int copy = -1; copy <= 1; copy++)
-		_vm->_gfx->drawZoombini(screen, animation, zoombini._traits, Common::Point32(baseX + copy * kPanoramaWidth, pos.y), cell, animationFrame);
+	_vm->_gfx->drawZoombini(screen, animation, zoombini._traits, Common::Point32(getActorScreenX(pos.x), pos.y), cell, animationFrame);
 }
 
 } // End of namespace Zoombini2

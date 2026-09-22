@@ -23,8 +23,10 @@
 
 #include "common/algorithm.h"
 #include "common/callback.h"
+#include "common/config-manager.h"
 #include "common/debug.h"
 #include "zoombini2/graphics.h"
+#include "zoombini2/metaengine.h"
 #include "zoombini2/pages/dialog_msgbox.h"
 #include "zoombini2/pages/interactive_menu.h"
 #include "zoombini2/sound.h"
@@ -59,6 +61,10 @@ constexpr const char *InteractiveMenu::kQuitNormalPath;
 constexpr const char *InteractiveMenu::kQuitHighlightPath;
 constexpr const char *InteractiveMenu::kDeleteConfirmationPath;
 constexpr const char *InteractiveMenu::kQuitConfirmationPath;
+constexpr const char *InteractiveMenu::kCaseCollisionConfirmationEnglish;
+constexpr const char *InteractiveMenu::kCaseCollisionConfirmationKorean;
+constexpr const char *InteractiveMenu::kReadOnlyLoadConfirmationEnglish;
+constexpr const char *InteractiveMenu::kReadOnlyLoadConfirmationKorean;
 
 constexpr Common::Point32 InteractiveMenu::kFileListPos;
 constexpr Size32 InteractiveMenu::kSelectorSize;
@@ -163,7 +169,7 @@ void InteractiveMenu::scanSaveFiles() {
 	_fileList->clear();
 	const Common::StringArray profiles = _vm->listGameSaves();
 	for (uint i = 0; i < profiles.size() && _fileList->getItemCount() < SaveFileList::kMaximumItems; i++)
-		_fileList->addItemSorted(profiles[i]);
+		_fileList->addItemSorted(profiles[i], _vm->isGameSaveReadOnly(profiles[i]));
 }
 
 void InteractiveMenu::onUpdate() {
@@ -359,20 +365,48 @@ void InteractiveMenu::startSelectedSave() {
 	if (saveName.empty())
 		return;
 
-	GameState *gameState = _vm->_state;
-	bool success = false;
 	if (_fileList->isEditing()) {
-		gameState->init();
-		gameState->_playerName = saveName;
-		success = _vm->createGameSave(saveName);
-	} else {
-		success = _vm->readGameSave(saveName);
-		if (!success)
-			_fileList->deleteSelected();
+		const Common::String conflictingName = _fileList->getCaseInsensitiveConflictName();
+		if (!conflictingName.empty()) {
+			requestCaseCollisionConfirmation(saveName, conflictingName);
+			return;
+		}
+		startNewSave(saveName, saveName);
+		return;
 	}
 
+	if (_fileList->isSelectedReadOnly()) {
+		requestReadOnlyLoadConfirmation(saveName);
+		return;
+	}
+	loadSelectedSave(saveName);
+}
+
+void InteractiveMenu::loadSelectedSave(const Common::String &saveName) {
+	if (!_vm->readGameSave(saveName)) {
+		_fileList->deleteSelected();
+		return;
+	}
+	continueSelectedSave();
+}
+
+void InteractiveMenu::startNewSave(const Common::String &playerName, const Common::String &storageName) {
+	GameState *gameState = _vm->_state;
+	gameState->init();
+	gameState->_playerName = playerName;
+
+	bool success = false;
+	if (playerName == storageName)
+		success = _vm->createGameSave(storageName);
+	else
+		success = _vm->overwriteGameSave(storageName);
 	if (!success)
 		return;
+	continueSelectedSave();
+}
+
+void InteractiveMenu::continueSelectedSave() {
+	GameState *gameState = _vm->_state;
 	if (gameState->hasPageVisit(kPageZombiniville, 1))
 		_vm->requestPageChange(kPageMenuLoad);
 	else
@@ -389,6 +423,25 @@ void InteractiveMenu::requestDeleteConfirmation() {
 	_vm->getMsgBoxDialog()->request(Common::Path(kDeleteConfirmationPath), new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleDeleteConfirmation));
 }
 
+void InteractiveMenu::requestCaseCollisionConfirmation(const Common::String &playerName, const Common::String &storageName) {
+	_pendingCaseCollisionPlayerName = playerName;
+	_pendingCaseCollisionStorageName = storageName;
+	Common::BaseCallback<DialogMsgBoxButton> *callback =
+		new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleCaseCollisionConfirmation);
+	if (!_vm->getMsgBoxDialog()->requestUiText(getCaseCollisionConfirmationText(), callback)) {
+		_pendingCaseCollisionPlayerName.clear();
+		_pendingCaseCollisionStorageName.clear();
+	}
+}
+
+void InteractiveMenu::requestReadOnlyLoadConfirmation(const Common::String &saveName) {
+	_pendingReadOnlyProfileName = saveName;
+	Common::BaseCallback<DialogMsgBoxButton> *callback =
+		new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleReadOnlyLoadConfirmation);
+	if (!_vm->getMsgBoxDialog()->requestUiText(getReadOnlyLoadConfirmationText(), callback))
+		_pendingReadOnlyProfileName.clear();
+}
+
 void InteractiveMenu::requestQuitConfirmation() {
 	_vm->getMsgBoxDialog()->request(Common::Path(kQuitConfirmationPath), new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleQuitConfirmation));
 }
@@ -399,9 +452,35 @@ void InteractiveMenu::handleDeleteConfirmation(DialogMsgBoxButton button) {
 	_pendingDeleteProfileName.clear();
 }
 
+void InteractiveMenu::handleCaseCollisionConfirmation(DialogMsgBoxButton button) {
+	const Common::String playerName = _pendingCaseCollisionPlayerName;
+	const Common::String storageName = _pendingCaseCollisionStorageName;
+	_pendingCaseCollisionPlayerName.clear();
+	_pendingCaseCollisionStorageName.clear();
+	if (button == DialogMsgBoxButton::kOkay01)
+		startNewSave(playerName, storageName);
+}
+
+void InteractiveMenu::handleReadOnlyLoadConfirmation(DialogMsgBoxButton button) {
+	const Common::String saveName = _pendingReadOnlyProfileName;
+	_pendingReadOnlyProfileName.clear();
+	if (button == DialogMsgBoxButton::kOkay01)
+		loadSelectedSave(saveName);
+}
+
 void InteractiveMenu::handleQuitConfirmation(DialogMsgBoxButton button) {
 	if (button == DialogMsgBoxButton::kOkay01)
 		_vm->requestPageChange(kPageCredits);
+}
+
+Common::U32String InteractiveMenu::getCaseCollisionConfirmationText() const {
+	const char *text = _vm->isKorean() ? kCaseCollisionConfirmationKorean : kCaseCollisionConfirmationEnglish;
+	return Common::U32String(text, Common::kUtf8);
+}
+
+Common::U32String InteractiveMenu::getReadOnlyLoadConfirmationText() const {
+	const char *text = _vm->isKorean() ? kReadOnlyLoadConfirmationKorean : kReadOnlyLoadConfirmationEnglish;
+	return Common::U32String(text, Common::kUtf8);
 }
 
 void InteractiveMenu::openOptionsDialog() {
@@ -457,11 +536,13 @@ InteractiveMenu::SaveFileList::SaveFileList(Zoombini2Engine *vm, const Common::P
 bool InteractiveMenu::SaveFileList::init() {
 	return _vm->_gfx->loadTextFont(Gfx::TextColor::kDark00) &&
 		   _vm->_gfx->loadTextFont(Gfx::TextColor::kBlue01) &&
-		   _vm->_gfx->loadTextFont(Gfx::TextColor::kGreen02);
+		   _vm->_gfx->loadTextFont(Gfx::TextColor::kGreen02) &&
+		   _vm->_gfx->loadTextFont(Gfx::TextColor::kRed04);
 }
 
 void InteractiveMenu::SaveFileList::clear() {
 	_items.clear();
+	_readOnly.clear();
 	_editBuffer.clear();
 	_editState = kEditIdle00;
 	_selectedIndex = 0;
@@ -469,12 +550,12 @@ void InteractiveMenu::SaveFileList::clear() {
 	_validSelection = false;
 }
 
-bool InteractiveMenu::SaveFileList::addItemSorted(const Common::String &name) {
+bool InteractiveMenu::SaveFileList::addItemSorted(const Common::String &name, bool readOnly) {
 	if (kMaximumItems <= static_cast<int>(_items.size()) || name.empty() ||
 		kMaximumNameLength < static_cast<int>(name.size()))
 		return false;
 
-	insertItem(findInsertionPoint(name), name);
+	insertItem(findInsertionPoint(name), name, readOnly);
 	_selectedIndex = 0;
 	_scrollOffset = 0;
 	_validSelection = true;
@@ -482,6 +563,7 @@ bool InteractiveMenu::SaveFileList::addItemSorted(const Common::String &name) {
 }
 
 void InteractiveMenu::SaveFileList::draw(ManagedSurface32 *screen) const {
+	const bool savefilesReadOnly = ConfMan.getBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, ConfMan.getActiveDomainName());
 	for (int row = 0; row < kVisibleRows; ++row) {
 		const int itemIndex = _scrollOffset + row;
 		if (static_cast<int>(_items.size()) <= itemIndex)
@@ -491,11 +573,12 @@ void InteractiveMenu::SaveFileList::draw(ManagedSurface32 *screen) const {
 		if (selected)
 			_vm->_gfx->drawPageRleBlock(screen, kSelectionBarPath, Common::Point32(_pos.x + kSelectionOffsetX, _pos.y + kSelectionOffsetY + row * kRowStride));
 
-		Gfx::TextColor color = Gfx::TextColor::kDark00;
-		if (selected && _editState == kEditPrefixMatch01)
-			color = Gfx::TextColor::kBlue01;
-		else if (selected && kEditProvisional02 <= _editState)
+		const bool readOnly = savefilesReadOnly || _readOnly[itemIndex];
+		Gfx::TextColor color = readOnly ? Gfx::TextColor::kRed04 : Gfx::TextColor::kDark00;
+		if (selected && kEditProvisional02 <= _editState)
 			color = Gfx::TextColor::kGreen02;
+		else if (!readOnly && selected && _editState == kEditPrefixMatch01)
+			color = Gfx::TextColor::kBlue01;
 
 		const Common::Point32 textPos(_pos.x + kSelectionOffsetX + kTextOffsetX, _pos.y + kSelectionOffsetY + kTextOffsetY + row * kRowStride);
 		_vm->_gfx->drawText(screen, color, textPos, _items[itemIndex]);
@@ -705,6 +788,27 @@ Common::String InteractiveMenu::SaveFileList::getSelectedName() const {
 	return _items[_selectedIndex];
 }
 
+bool InteractiveMenu::SaveFileList::isSelectedReadOnly() const {
+	if (!_validSelection || isEditing() || _selectedIndex < 0 || static_cast<int>(_readOnly.size()) <= _selectedIndex)
+		return false;
+	return ConfMan.getBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, ConfMan.getActiveDomainName()) || _readOnly[_selectedIndex];
+}
+
+Common::String InteractiveMenu::SaveFileList::getCaseInsensitiveConflictName() const {
+	if (!isEditing())
+		return Common::String();
+
+	const Common::String selectedName = getSelectedName();
+	if (selectedName.empty())
+		return Common::String();
+
+	for (int i = 0; i < static_cast<int>(_items.size()); ++i) {
+		if (i != _selectedIndex && _items[i] != selectedName && _items[i].equalsIgnoreCase(selectedName))
+			return _items[i];
+	}
+	return Common::String();
+}
+
 void InteractiveMenu::SaveFileList::deleteSelected() {
 	if (_selectedIndex < 0 || static_cast<int>(_items.size()) <= _selectedIndex)
 		return;
@@ -718,14 +822,14 @@ void InteractiveMenu::SaveFileList::deleteSelected() {
 
 int InteractiveMenu::SaveFileList::findInsertionPoint(const Common::String &name) const {
 	int index = 0;
-	while (index < static_cast<int>(_items.size()) && _items[index].compareToIgnoreCase(name) < 0)
+	while (index < static_cast<int>(_items.size()) && strcmp(_items[index].c_str(), name.c_str()) < 0)
 		index += 1;
 	return index;
 }
 
 int InteractiveMenu::SaveFileList::findPrefix(const Common::String &prefix, int ignoredIndex) const {
 	for (int i = 0; i < static_cast<int>(_items.size()); ++i) {
-		if (i != ignoredIndex && _items[i].hasPrefixIgnoreCase(prefix))
+		if (i != ignoredIndex && strncmp(_items[i].c_str(), prefix.c_str(), prefix.size()) == 0)
 			return i;
 	}
 	return -1;
@@ -733,7 +837,7 @@ int InteractiveMenu::SaveFileList::findPrefix(const Common::String &prefix, int 
 
 bool InteractiveMenu::SaveFileList::isDuplicate(const Common::String &name, int ignoredIndex) const {
 	for (int i = 0; i < static_cast<int>(_items.size()); ++i) {
-		if (i != ignoredIndex && _items[i].equalsIgnoreCase(name))
+		if (i != ignoredIndex && strcmp(_items[i].c_str(), name.c_str()) == 0)
 			return true;
 	}
 	return false;
@@ -745,30 +849,29 @@ bool InteractiveMenu::SaveFileList::canAppendCharacter(char c) const {
 	if (c == ' ' && (_editBuffer.empty() || _editBuffer.lastChar() == ' '))
 		return false;
 
-	Common::String prospective = _editBuffer;
-	prospective += normalizeCharacter(c);
 	const int barWidth = _vm->_gfx->getPageRleBlockSize(kSelectionBarPath).width;
 	if (!_vm->_gfx->hasTextFont(Gfx::TextColor::kDark00) || barWidth == 0)
 		return true;
-	return _vm->_gfx->getTextWidth(prospective, Gfx::TextColor::kDark00) <= barWidth - 5;
+	return _vm->_gfx->getTextWidth(_editBuffer, Gfx::TextColor::kDark00) < barWidth - 5;
 }
 
 char InteractiveMenu::SaveFileList::normalizeCharacter(char c) const {
 	const bool capitalize = _editBuffer.empty() || _editBuffer.lastChar() == ' ';
 	if ('a' <= c && c <= 'z')
 		return capitalize ? c - 'a' + 'A' : c;
-	if ('A' <= c && c <= 'Z')
-		return capitalize ? c : c - 'A' + 'a';
 	return c;
 }
 
-void InteractiveMenu::SaveFileList::insertItem(int index, const Common::String &name) {
+void InteractiveMenu::SaveFileList::insertItem(int index, const Common::String &name, bool readOnly) {
 	_items.insert_at(index, name);
+	_readOnly.insert_at(index, readOnly);
 }
 
 void InteractiveMenu::SaveFileList::removeItem(int index) {
-	if (0 <= index && index < static_cast<int>(_items.size()))
+	if (0 <= index && index < static_cast<int>(_items.size())) {
 		_items.remove_at(index);
+		_readOnly.remove_at(index);
+	}
 }
 
 void InteractiveMenu::SaveFileList::revealSelection() {

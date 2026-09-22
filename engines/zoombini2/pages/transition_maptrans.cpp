@@ -398,6 +398,19 @@ void TransitionMapTrans::finishTransition() {
 	_transitionFinished = true;
 
 	const PageId nextPage = getPostTransitionPage();
+	const bool targetUsesPageLevel =
+		(kPageCrazyTurtle <= _targetPageId && _targetPageId <= kPageAquacube) ||
+		(kPageMysticMarsh <= _targetPageId && _targetPageId <= kPageChezNorf) ||
+		(kPageSnowboard <= _targetPageId && _targetPageId <= kPageBoolies);
+	if (_vm->_isSavedGame && targetUsesPageLevel) {
+		GameState *state = _vm->_state;
+		const int storedLevel = state->getPageLevel(_targetPageId);
+		const int activeLevel = state->activatePageLevel(_targetPageId);
+		if (storedLevel != 0 && (storedLevel < 1 || 4 < storedLevel)) {
+			warning("MapTransition: dest page %d has invalid stored level %d; using level %d", static_cast<int>(_targetPageId), storedLevel, activeLevel);
+		}
+		debug(1, "MapTransition: dest page %d selects stored level %d", static_cast<int>(_targetPageId), activeLevel);
+	}
 	_vm->_mapTransitionSourcePageId = _targetPageId;
 	_vm->requestPageChange(nextPage);
 }

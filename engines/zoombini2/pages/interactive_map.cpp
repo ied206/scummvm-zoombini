@@ -468,20 +468,20 @@ void InteractiveMap::loadButtons() {
 void InteractiveMap::computeStats() {
 	GameState *gs = _vm->_state;
 
-	// The four rows are remaining, board A, board B, and completed counts.
-	int boardA = 0;
-	int boardB = 0;
+	// The four rows are remaining, Rescue I storage, Rescue II storage, and completed counts.
+	int rescue1StorageCount = 0;
+	int rescue2StorageCount = 0;
 
-	for (int i = 0; i < kBoardSize - kBoardCols; i++) {
-		if (gs->_rescue1Board[i] != nullptr)
-			boardA += 1;
-		if (gs->_rescue2Board[i] != nullptr)
-			boardB += 1;
+	for (int i = 0; i < kStorageSize - kStorageCols; i++) {
+		if (gs->_rescue1Storage[i] != nullptr)
+			rescue1StorageCount += 1;
+		if (gs->_rescue2Storage[i] != nullptr)
+			rescue2StorageCount += 1;
 	}
 
 	_stats[3] = gs->_completedZoombiniCount;
-	_stats[2] = boardB;
-	_stats[1] = boardA;
+	_stats[2] = rescue2StorageCount;
+	_stats[1] = rescue1StorageCount;
 	_stats[0] = kMaxCombinations - _stats[3] - _stats[2] - _stats[1];
 }
 
