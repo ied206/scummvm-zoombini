@@ -28,6 +28,7 @@
 #include "common/hashmap.h"
 #include "common/rect.h"
 #include "common/scummsys.h"
+#include "common/str.h"
 
 #include "engines/engine.h"
 
@@ -110,6 +111,8 @@ public:
 
 	/** Return the detected release language. */
 	Common::Language getLanguage() const { return _gameDescription->desc.language; }
+	/** Return whether the detected game is the Korean release. */
+	bool isKorean() const { return getLanguage() == Common::KO_KOR; }
 	/** Return the detected release feature flags. */
 	uint32 getFeatures() const { return _gameDescription->features; }
 	/** Return whether the detected release is the playable demo. */
@@ -145,6 +148,10 @@ public:
 	bool useFloatingPointPaths() const { return _useFloatingPointPaths; }
 	/** Return whether the enhanced keyboard shortcut set is enabled. */
 	bool useEnhancedKbdShortcuts() const { return _enhancedKbdShortcuts; }
+	/** Return the logic pacing rate in Hz selected for frame-derived speeds.
+	 * It gates only Booliewood panorama scrolling and the banked idle-roll quota;
+	 * millisecond-deadline animations are unaffected. */
+	int getLogicPacingHz() const { return _logicPacingHz; }
 	/** Return whether the Chez Norf diagnostic overlay key is currently held. */
 	bool showChezNorfDebugOverlay() const { return _debugHotkeysEnabled && _debugOverlayKeyDown; }
 
@@ -164,16 +171,20 @@ public:
 	/** Pause or resume the gameplay clock for a game dialog. */
 	void setDialogPaused(bool paused);
 
-	/** Write the current profile under @p name unless automatic saves are locked. */
+	/** Write the current profile to its active storage slot, or succeed without writing for a physically read-only loaded profile. */
 	bool writeGameSave(const Common::String &name);
 	/** Create a new player-selected profile without overwriting another one. */
 	bool createGameSave(const Common::String &name);
+	/** Replace a player-selected profile after the caller obtains explicit confirmation. */
+	bool overwriteGameSave(const Common::String &name);
 	/** Replace the current profile with the profile stored under @p name. */
 	bool readGameSave(const Common::String &name);
 	/** Delete the active target's profile named @p name. */
 	bool deleteGameSave(const Common::String &name);
 	/** Return the active target's valid profile names in display order. */
 	Common::StringArray listGameSaves() const;
+	/** Return whether the active target's listed save for @p name is read-only. */
+	bool isGameSaveReadOnly(const Common::String &name) const;
 	/** Current profile state, including its active party and rescue storage. */
 	GameState *_state = nullptr;
 
@@ -194,6 +205,8 @@ public:
 	uint32 getGameTickCount() const;
 	/** Return the gameplay millisecond snapshot captured before the current page pass. */
 	uint32 getFrameTickCount() const { return _cachedGameTickCount; }
+	/** Return gameplay milliseconds elapsed between the last two page passes. */
+	uint32 getFrameDeltaMs() const { return _cachedGameTickCount - _prevFrameTickCount; }
 
 	/** Gameplay random generator for this game instance. */
 	Random *_rnd;
@@ -245,6 +258,11 @@ private:
 	static constexpr const char *kInteractiveCursorSpritePath = "bmp/cursor/cursor02.rb";
 	static constexpr const char *kQuitConfirmationPath = "bmp/menu/Quit_panel_text_quit";
 
+	/** Physical storage profile selected by a load, create, or confirmed overwrite. */
+	Common::String _activeSaveProfileName;
+	/** Whether the active loaded storage profile must retain its original bytes. */
+	bool _activeSaveProfileReadOnly = false;
+
 	/** Serialize the current profile after the caller applies its save policy. */
 	bool saveGameProfile(const Common::String &name);
 
@@ -289,6 +307,8 @@ private:
 	Common::Point32 _mousePos = Common::Point32();
 	/** Ordered input events awaiting the current page's dispatch boundary. */
 	Common::Array<Common::Event> _pendingPageEvents;
+	/** Whether the tracked press began inside a modal dialog. Its release belongs to that gesture even if the press dismissed the modal. */
+	bool _modalOwnedPress = false;
 
 	/** Active page identifier. */
 	PageId _currentPageId = kPageNone;
@@ -307,6 +327,8 @@ private:
 	uint32 _startTime = 0;
 	/** Gameplay tick snapshot refreshed once per main-loop pass. */
 	uint32 _cachedGameTickCount = 0;
+	/** Gameplay tick snapshot from the previous main-loop pass. */
+	uint32 _prevFrameTickCount = 0;
 	/** Last backend millisecond accepted for presentation. */
 	uint32 _lastPresentTimeMs = 0;
 	/** Host-time origin used to number frame slots at the selected rate. */
@@ -330,6 +352,8 @@ private:
 	bool _useFloatingPointPaths = false;
 	/** Whether the enhanced keyboard shortcut set is enabled. */
 	bool _enhancedKbdShortcuts = false;
+	/** Logic pacing rate in Hz selected for frame-derived speeds. */
+	int _logicPacingHz = 75;
 	/** Held state of the global puzzle-completion key. */
 	bool _debugCompletionKeyDown = false;
 	/** Held state of the Chez Norf diagnostic-overlay key. */

@@ -303,11 +303,10 @@ PuzzleMagicWall::~PuzzleMagicWall() {
 		sound->unload(_bugSound);
 		sound->unload(_gateSound);
 		sound->unload(_leverSound);
-		sound->unload(_speechSound);
 	}
 	for (ZoombiniRunner *runner : _puzzleZoombinis)
 		runner->clearMovement();
-	finishPuzzleRoster(_vm->_state->_rescue1Board);
+	finishPuzzleRoster(_vm->_state->_rescue1Storage);
 }
 
 void PuzzleMagicWall::loadResources() {
@@ -524,7 +523,7 @@ void PuzzleMagicWall::onUpdate() {
 	const uint32 now = _vm->getGameTickCount();
 	if (_speechPending) {
 		SoundManager *sound = _vm->getSoundManager();
-		if (!sound || !sound->isPlaying(_speechSound)) {
+		if (!sound || !sound->hasPendingSpeech()) {
 			_speechPending = false;
 			_vm->_mapTransitionSourcePageId = kPageMagicWall;
 			_vm->requestPageChange(kPageMapTrans);
@@ -563,7 +562,7 @@ void PuzzleMagicWall::onUpdate() {
 			delete beetle.path;
 			beetle.path = nullptr;
 			if (SoundManager *sound = _vm->getSoundManager())
-				sound->stop(_bugSound);
+				sound->stopAll(_bugSound);
 		}
 	}
 	if (wasMoving && !beetlesMoving())
@@ -792,10 +791,7 @@ bool PuzzleMagicWall::onGoButtonPressed() {
 	SoundManager *sound = _vm->getSoundManager();
 	if (!sound)
 		return true;
-	_speechSound = sound->load(true, Common::Path(path), false);
-	if (_speechSound < 0)
-		return true;
-	sound->play(_speechSound);
+	sound->queueSpeech(Common::Path(path));
 	_speechPending = true;
 	return false;
 }

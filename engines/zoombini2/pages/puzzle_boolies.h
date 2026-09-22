@@ -62,6 +62,8 @@ public:
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
 	/** Return whether at least one Boolie group has boarded and may depart. */
 	bool canUseGoButton() const override;
+	/** Return immediately or wait for saved-game retreat narration before departure. */
+	bool onGoButtonPressed() override;
 	/** Describe active rows and the current/next ball cohorts for the puzzle console. */
 	Common::String debugGetAnswer() const override;
 	/** Report remaining challenges as the puzzle's chance count. */
@@ -101,11 +103,15 @@ private:
 	static constexpr const char *kPreviewEntryPath = "bmp/boolies/b_boolies1.pat";
 	static constexpr const char *kFeederPathFormat = "bmp/boolies/b_boolies1bis_%d.pat";
 	static constexpr const char *kLanePathFormat = "bmp/boolies/b_boolies%d.pat";
+	static constexpr const char *kBallExitPathFormat = "bmp/boolies/b_boolies%d_exit.pat";
 	static constexpr const char *kJumpPathFormat = "bmp/boolies/Jump%d_%d.pat";
 	/** Row and polarity select effects 01 through 06; effect 07 accompanies a hit. */
 	static constexpr const char *kEffectPathFormat = "sounds/fx/09-BS%02d.wav";
 	/** Four Boolie voices used as members start boarding paths. */
 	static constexpr const char *kBoardVoicePathFormat = "sounds/blp15.%d.wav";
+	/** Terminal boat and saved-game retreat narration. */
+	static constexpr const char *kCompleteSpeechPath = "sounds/BLP31.wav";
+	static constexpr const char *kRetreatSpeechPath = "sounds/DW-Cave.wav";
 	/** Duration of each frame in the original Boolie roll sequence. */
 	static constexpr uint32 kRollFrameTime = 30;
 	/** Duration of each frame in the opening blocker sequence. */
@@ -197,7 +203,9 @@ private:
 		/** Follow the cave-to-preview path. */
 		kPreviewEntry06 = 6,
 		/** Remain at the left preview position until the current turn ends. */
-		kPreviewHeld07 = 7
+		kPreviewHeld07 = 7,
+		/** Leave the struck row while the impact effect continues. */
+		kExit08 = 8
 	};
 
 	/** One Boolie's current value and ledge visibility. */
@@ -307,10 +315,14 @@ private:
 	void advanceFlips(uint32 now);
 	/** Start the selected row's jumps after every ball and portrait roll finishes. */
 	void startRowJumps(uint32 now);
+	/** Initialize a jumping member's path and anchor before its first draw. */
+	void startJump(Jump &jump, uint32 now);
 	/** Advance one Boolie jump and start the next at @p now. */
 	void advanceJumps(uint32 now);
 	/** Advance the selected row's replacement walkers one animation cycle. */
 	void advanceRefill(uint32 now);
+	/** Bring the retained values into @p row one member at a time. */
+	void startRefill(int row, const byte (&values)[kSlotCount], uint32 now);
 	/** End the selected challenge, starting the boat or the next round. */
 	void finishRound(uint32 now);
 	/** Mark the active Zoombini successful and start boat departure at @p now. */
@@ -348,6 +360,8 @@ private:
 	int _boardVoiceIds[4] = {};
 	/** Replacement values generated when a row becomes ready to board. */
 	byte _replacementValues[kRowCount][kSlotCount] = {};
+	/** Values retained for the currently entering row. */
+	byte _refillValues[kSlotCount] = {};
 	/** Start tick of the current visible roll. */
 	uint32 _flipStart = 0;
 	/** Start tick of the opening blocker transition. */
@@ -360,6 +374,8 @@ private:
 	uint32 _boardingCheckAt = 0;
 	/** Whether one replacement Boolie is walking from the left edge. */
 	bool _refillActive = false;
+	/** Whether saved-game departure is waiting for the serialized speech queue. */
+	bool _goPending = false;
 	/** Replacement walker source row/slot, screen X, and animation-cycle start tick. */
 	int _refillRow = -1;
 	int _refillSlot = 0;
@@ -397,6 +413,9 @@ private:
 	int _requiredTurns = 0;
 	/** Current horizontal screen position of the boat sprite. */
 	int _boatX = 80;
+	/** Independent next boat, entering while the loaded boat leaves. */
+	int _returnBoatX = -251;
+	bool _returnBoatActive = false;
 };
 
 } // End of namespace Zoombini2

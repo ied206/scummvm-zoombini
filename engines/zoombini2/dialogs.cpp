@@ -32,6 +32,7 @@
 #include "gui/gui-manager.h"
 #include "gui/message.h"
 #include "gui/widgets/edittext.h"
+#include "gui/widgets/popup.h"
 #include "gui/widgets/scrollcontainer.h"
 
 #include "zoombini2/dialogs.h"
@@ -567,6 +568,13 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	_frameRateNumberBox = new FrameRateNumberBox(widgetsBoss(), "Zoombini2EngineOptionsDialog.FrameRate",
 												 ::Zoombini2MetaEngine::kDefaultFrameRate,
 												 Common::U32String("Enter a whole number from 30 to 240 FPS."));
+	GUI::StaticTextWidget *pacingLabel = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.PacingLabel",
+																   Common::U32String("Logic pacing:"));
+	pacingLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
+	_pacingPopUp = new GUI::PopUpWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.Pacing",
+										Common::U32String("Select 60Hz LCD or 75Hz CRT logic pacing. Affects Booliewood panorama scrolling speed and idle animation trigger rates. Rendering frame rate is unaffected."));
+	_pacingPopUp->appendEntry(Common::U32String("60Hz LCD"), 60);
+	_pacingPopUp->appendEntry(Common::U32String("75Hz CRT"), 75);
 	_unlockFrameRateCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.UnlockFrameRate",
 													   Common::U32String("Unlock frame rate"),
 													   Common::U32String("Removes the engine frame-rate limit. Display VSync may still limit presentation."),
@@ -599,6 +607,10 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 		.addWidget("AquacubeSafeFirstMove", "Checkbox")
 		.addWidget("OriginalPRNG", "Checkbox")
 		.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
+		.addWidget("PacingLabel", "OptionsLabel")
+		.addWidget("Pacing", "", 120, lineHeight)
+		.closeLayout()
+		.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
 		.addWidget("FrameRateLabel", "OptionsLabel")
 		.addWidget("FrameRate", "", 64, lineHeight)
 		.closeLayout()
@@ -618,6 +630,7 @@ void Zoombini2OptionsWidget::load() {
 	_greedyWaterslideCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _domain));
 	_aquacubeSafeFirstMoveCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove, _domain));
 	_originalPrngCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _domain));
+	_pacingPopUp->setSelectedTag(ConfMan.getInt(::Zoombini2MetaEngine::kConfigLogicPacingHz, _domain) == 75 ? 75 : 60);
 	const int frameRate = CLIP<int>(ConfMan.getInt(::Zoombini2MetaEngine::kConfigFrameRate, _domain),
 									::Zoombini2MetaEngine::kMinFrameRate, ::Zoombini2MetaEngine::kMaxFrameRate);
 	_frameRateNumberBox->setValue(frameRate);
@@ -641,6 +654,7 @@ bool Zoombini2OptionsWidget::save() {
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _greedyWaterslideCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove, _aquacubeSafeFirstMoveCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _originalPrngCheckbox->getState(), _domain);
+	ConfMan.setInt(::Zoombini2MetaEngine::kConfigLogicPacingHz, _pacingPopUp->getSelectedTag() == 75 ? 75 : 60, _domain);
 	ConfMan.setInt(::Zoombini2MetaEngine::kConfigFrameRate, frameRate, _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigUnlockFrameRate, _unlockFrameRateCheckbox->getState(), _domain);
 	if (originalPrngChanged && g_engine) {

@@ -246,9 +246,9 @@ public:
 	/** Compose the same picker preview with an explicit blend table. */
 	static void drawZoombiniPreview(ManagedSurface32 *destSurface, const ZoombiniAnimation *animation,
 									const int (&selectedValues)[ZmbTrait::kTraitCount], const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT);
-	/** Draw one visible runner at its scrolled or dragged anchor without advancing animation. */
+	/** Draw one visible runner and its available drop-target glow at the scrolled or dragged anchor without advancing animation. */
 	void drawZoombiniRunner(ManagedSurface32 *destSurface, const ZoombiniRunner *runner, const Common::Rect32 *clip = nullptr,
-							int scrollX = 0, int backgroundWidth = 800, const RleBlock *dropTargetIndicator = nullptr) const;
+							int scrollX = 0, int backgroundWidth = 800) const;
 	/** Apply runner visibility, bounds and frame selection with an explicit blend table. */
 	static void drawZoombiniRunner(ManagedSurface32 *destSurface, const ZoombiniRunner *runner, const AlphaBlendLUT &alphaLUT,
 								   const Common::Rect32 *clip = nullptr, int scrollX = 0, int backgroundWidth = 800,
@@ -258,7 +258,8 @@ public:
 		kDark00 = 0,
 		kBlue01 = 1,
 		kGreen02 = 2,
-		kWhite03 = 3
+		kWhite03 = 3,
+		kRed04 = 4
 	};
 
 	/** Load the shared text strip on demand; failed loads can be retried by the caller. */
@@ -308,6 +309,8 @@ private:
 	static constexpr const char *kTextFontPath = "bmp/typo";
 	/** Name plate sprite shown while dragging a Zoombini. */
 	static constexpr const char *kNameBoxSpritePath = "bmp/menu/name_box.rb";
+	/** Yellow mask drawn beneath a held Zoombini over an available drop target. */
+	static constexpr const char *kDropTargetGlowPath = "bmp/cursor/glow";
 	/** Path format for one map transition overlay. */
 	static constexpr const char *kMapTransitionOverlayPathFormat = "bmp/maptrans/%s.bmp";
 	/** Path format for the map transition background. */
@@ -323,6 +326,8 @@ private:
 	static void textColorRGB(TextColor color, byte &red, byte &green, byte &blue);
 	/** Name-plate sprite drawn under the held Zoombini name. */
 	RleBlock *_nameBoxSprite = nullptr;
+	/** Shared drop-target glow retained for the game instance. */
+	RleBlock *_dropTargetGlowSprite = nullptr;
 	/** Active page background borrowed from the page bitmap cache. */
 	BitBlock *_background = nullptr;
 	/** Decoded bitmaps borrowed by the current page and its transient controls. */
