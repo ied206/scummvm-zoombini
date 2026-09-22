@@ -62,10 +62,6 @@ PuzzleCrazyTurtle::PuzzleCrazyTurtle(Zoombini2Engine *vm)
 }
 
 PuzzleCrazyTurtle::~PuzzleCrazyTurtle() {
-	if (0 <= _goSpeech && _vm->getSoundManager())
-		_vm->getSoundManager()->unload(_goSpeech);
-	if (0 <= _motherSpeechSound && _vm->getSoundManager())
-		_vm->getSoundManager()->unload(_motherSpeechSound);
 	for (int type = 0; type < kFeatureCount; type++) {
 		delete _turtleIdleAnimations[type];
 		delete _turtleSpinAnimations[type];
@@ -325,7 +321,8 @@ void PuzzleCrazyTurtle::placeZoombinis() {
 
 void PuzzleCrazyTurtle::onUpdate() {
 	const uint32 tick = _vm->getGameTickCount();
-	if (_goPending && (_goSpeech < 0 || !_vm->getSoundManager()->isPlaying(_goSpeech))) {
+	SoundManager *sound = _vm->getSoundManager();
+	if (_goPending && (!sound || !sound->hasPendingSpeech())) {
 		_vm->_mapTransitionSourcePageId = kPageCrazyTurtle;
 		_vm->requestPageChange(kPageMapTrans);
 		return;
@@ -510,11 +507,8 @@ bool PuzzleCrazyTurtle::onGoButtonPressed() {
 		speech = Common::String::format(kGoSpeechFormat, variant);
 	}
 	SoundManager *sound = _vm->getSoundManager();
-	if (sound) {
-		_goSpeech = sound->load(true, Common::Path(speech), false);
-		if (0 <= _goSpeech)
-			sound->playWithVolume(_goSpeech, sound->_volumeSpeech);
-	}
+	if (sound)
+		sound->queueSpeech(Common::Path(speech));
 	_goPending = true;
 	return false;
 }
@@ -652,11 +646,8 @@ void PuzzleCrazyTurtle::onMotherAnimationComplete(void *context, AnimationRunner
 	page->_motherFinished = true;
 	const char *speechPath = page->countFreeZoombinis() == 0 ? kMotherSuccessSpeechPath : kMotherPartialSpeechPath;
 	SoundManager *sound = page->_vm->getSoundManager();
-	if (sound) {
-		page->_motherSpeechSound = sound->load(true, Common::Path(speechPath), false);
-		if (0 <= page->_motherSpeechSound)
-			sound->playWithVolume(page->_motherSpeechSound, sound->_volumeSpeech);
-	}
+	if (sound)
+		sound->queueSpeech(Common::Path(speechPath));
 }
 
 void PuzzleCrazyTurtle::drawBridgeState(ManagedSurface32 *screen) {

@@ -61,6 +61,8 @@ public:
 	static constexpr const char *kConfigAquacubeSafeFirstMove = "aquacube_safe_first_move";
 	/** Target configuration key selecting the original Windows random-number generator. */
 	static constexpr const char *kConfigOriginalPRNG = "original_prng";
+	/** Target configuration key selecting the logic pacing rate in Hz. */
+	static constexpr const char *kConfigLogicPacingHz = "logic_pacing_hz";
 	/** Target frame rate for the engine's presentation loop. */
 	static constexpr const char *kConfigFrameRate = "frame_rate";
 	/** Disable the engine's frame-rate limiter. */

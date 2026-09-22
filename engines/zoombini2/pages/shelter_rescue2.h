@@ -42,7 +42,7 @@ public:
 	void init() override;
 	/** Drain pending releases, animate the roster scroll, and refresh occupancy. */
 	void onUpdate() override;
-	/** Draw the scroll controls, waiting board, and boarding actives. */
+	/** Draw the scroll controls, waiting storage, and boarding actives. */
 	void onRenderContent(ManagedSurface32 *screen) override;
 	/** Leave button presses pending until the release event. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
@@ -54,8 +54,8 @@ public:
 	bool canUseGoButton() const override;
 
 protected:
-	/** Return the Rescue Site II waiting board. */
-	BoardRecord **getRescueBoard() const override;
+	/** Return the Rescue Site II storage. */
+	StorageRecord **getRescueStorage() const override;
 	/** Return whether @p zoombini occupies a departure seat. */
 	bool isDepartingMember(const ZoombiniRunner *zoombini) const override;
 
@@ -74,7 +74,7 @@ private:
 	static constexpr const char *kMissingArrivalsSpeechFormat = "sounds/BC222.%u.wav";
 	static constexpr const char *kReadyDepartureSpeechPath = "sounds/BC213.11.wav";
 
-	/** Number of waiting-grid drop records mirroring the visible board cells. */
+	/** Number of waiting-grid drop records mirroring the visible storage cells. */
 	static constexpr int kGridTargetCount = 20;
 	/** First drop-record index of the departure seats. */
 	static constexpr int kSeatTargetBase = 20;
@@ -113,9 +113,9 @@ private:
 	static constexpr int kNoPendingRelease = -1;
 	/** Resting scroll phase with no animation in progress. */
 	static constexpr int kScrollIdle = -1;
-	/** Scroll phase toward earlier board rows. */
+	/** Scroll phase toward earlier storage rows. */
 	static constexpr int kScrollPhaseLeft04 = 4;
-	/** Scroll phase toward later board rows. */
+	/** Scroll phase toward later storage rows. */
 	static constexpr int kScrollPhaseRight06 = 6;
 	/** Scroll animation length in pixels, matching one grid column. */
 	static constexpr int kScrollPixelLength = 40;
@@ -140,39 +140,39 @@ private:
 
 	/** Restore the Rescue Site II visit and departure-roster state. */
 	void initRescueRoster();
-	/** Refill boarding actives from the board and seat the first eight. */
+	/** Refill boarding actives from storage and seat the first eight. */
 	void refillBoardingRoster();
 	/** Build the waiting-grid and departure-seat drop records. */
 	void buildDropTargets();
-	/** Refresh waiting-grid record occupancy from the visible board cells. */
+	/** Refresh waiting-grid record occupancy from the visible storage cells. */
 	void refreshGridOccupancy();
-	/** Return the board cell index for a grid record. */
-	int getGridRecordBoardIndex(int recordIndex) const;
+	/** Return the storage-cell index for a grid record. */
+	int getGridRecordStorageIndex(int recordIndex) const;
 	/** Return whether all eight departure seats are occupied. */
 	bool seatsFullyOccupied() const;
 	/** Return the currently held Zoombini, if any. */
 	ZoombiniRunner *getDraggedZoombini() const;
 	/**
-	 * Store a grid-dropped Zoombini in the board and schedule deferred roster
+	 * Store a grid-dropped Zoombini in storage and schedule deferred roster
 	 * removal, which runs on the next update like the original release index.
 	 */
-	void captureToBoard(int recordIndex, int zoombiniIndex);
+	void captureToStorage(int recordIndex, int zoombiniIndex);
 	/** Erase the pending-release roster member without further index fixup. */
 	void releasePendingZoombini();
 	/** Materialize a held boarding active from a nonempty grid cell. */
-	bool materializeFromBoard(int gridCol, int gridRow, const Common::Point &pointerPos);
+	bool materializeFromStorage(int gridCol, int gridRow, const Common::Point &pointerPos);
 	/** Attempt a leftward roster scroll and flash the scroll button. */
 	void triggerScrollLeft();
 	/** Attempt a rightward roster scroll and flash the scroll button. */
 	void triggerScrollRight();
-	/** Return whether any board cell in rows @p firstRow through @p lastRow is occupied. */
-	bool hasBoardCellsInRows(int firstRow, int lastRow) const;
+	/** Return whether any storage cell in rows @p firstRow through @p lastRow is occupied. */
+	bool hasStorageCellsInRows(int firstRow, int lastRow) const;
 	/** Advance the roster scroll animation by one frame. */
 	void stepScrollAnimation();
 	/** Present the interactive cursor while hovering a nonempty grid cell. */
 	void updateHoverCursor();
-	/** Draw the waiting-board pictures with the current scroll shift. */
-	void drawWaitingBoard(ManagedSurface32 *screen, int pixelShiftX) const;
+	/** Draw the waiting-storage pictures with the current scroll shift. */
+	void drawWaitingStorage(ManagedSurface32 *screen, int pixelShiftX) const;
 	/** Collect the visible boarding draw order with the held Zoombini last. */
 	void buildBoardingDrawOrder(Common::Array<uint> &order, ZoombiniRunner *&draggedZoombini) const;
 	/** Draw the seated and waiting boarding actives. */
@@ -190,7 +190,7 @@ private:
 	const ZoombiniAnimation *_idleZombAnimation = nullptr;
 	/** Waiting-grid and departure-seat drop records. */
 	Common::Array<ZmbDropTarget> _dropTargets;
-	/** First board row shown in the visible roster grid. */
+	/** First storage row shown in the visible roster grid. */
 	int _scrollRow = 0;
 	/** Roster scroll phase: idle, scrolling left, or scrolling right. */
 	int _scrollPhase = kScrollIdle;

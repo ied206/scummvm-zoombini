@@ -324,9 +324,9 @@ private:
 	static constexpr const char *kCelebratePath = "bmp/zombis/attente/attenteZomb.anm";
 	/** Effects, departure speech, completion speech, and symbol resource names. */
 	static constexpr const char *kSfxFormat = "sounds/fx/04-BS%02d.wav";
-	static constexpr const char *kGoSpeechFormat = "wld11.%d";
-	static constexpr const char *kCaveSpeech = "DW-Cave";
-	static constexpr const char *kCompleteSpeech = "8-E1";
+	static constexpr const char *kGoSpeechFormat = "sounds/WLD11.%d.wav";
+	static constexpr const char *kCaveSpeech = "sounds/DW-Cave.wav";
+	static constexpr const char *kCompleteSpeech = "sounds/8-E1.wav";
 	static constexpr const char *kSymbolNames[60] = {
 		"S_DIV1",
 		"S_DIV2",
@@ -435,7 +435,6 @@ private:
 	/** Play indexed effects, serialize speech, load resources, and format console diagnostics. */
 	void playSfx(int index);
 	void enqueueSpeech(const Common::String &name);
-	void pumpSpeech();
 	void loadResources();
 	Common::String debugGroup(const char *label, const Common::Array<int> &actors) const;
 	Common::String debugGeneration() const;
@@ -448,7 +447,6 @@ private:
 	Common::Array<ZmbDropTarget> _dropTargets;
 	Common::Array<Bubble> _bubbles;
 	Common::Array<Effect> _effects;
-	Common::Array<Common::String> _speechQueue;
 	/** Background variant, released count, active placement, tick/lock timing, and Go state. */
 	int _backgroundIndex = 1;
 	int _freed = 0;
@@ -459,7 +457,6 @@ private:
 	uint32 _unlockTime = 0;
 	bool _finished = false;
 	bool _goPending = false;
-	int _speechSound = -1;
 	/** Device/bubble visual resources, Zoombini grids, and indexed effect handles. */
 	Animation *_craterAnimation = nullptr;
 	Animation *_whirlpoolAnimation = nullptr;

@@ -62,6 +62,9 @@ public:
 	/** Handle navigation or close-button input while the modal is active. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 
+	/** Close the overlay when a close-button press is released inside it. */
+	EventHandleResult onLButtonUp(const Common::Point &pos) override;
+
 	/** Update navigation-control hover state for @p pos. */
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
 
@@ -110,6 +113,8 @@ private:
 	bool _leftArrowHovered = false;
 	/** Whether the pointer is over the next-sheet button. */
 	bool _rightArrowHovered = false;
+	/** Whether the close button press is waiting for its release. */
+	bool _okButtonArmed = false;
 	/** System tick captured when the help overlay paused gameplay. */
 };
 

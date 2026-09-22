@@ -25,8 +25,13 @@
 #include "common/callback.h"
 #include "common/path.h"
 #include "common/rect.h"
+#include "common/ustr.h"
 
 #include "zoombini2/pages/dialog_base.h"
+
+namespace Graphics {
+class Font;
+}
 
 namespace Zoombini2 {
 
@@ -47,10 +52,10 @@ enum class DialogMsgBoxState {
 /**
  * Reusable two-button confirmation dialog shared by pages and controls.
  *
- * A request supplies only its text resource, position, text offset, and
- * completion callback. The dialog borrows its panel resources from the graphics
- * page cache and retains the saved screen rectangle, pause lifecycle, hover
- * state, and exclusive input routing.
+ * A request supplies either a game text resource or UI text, position, text
+ * offset, and completion callback. The dialog borrows its panel resources from
+ * the graphics page cache and retains the saved screen rectangle, pause
+ * lifecycle, hover state, and exclusive input routing.
  */
 class DialogMsgBox : public DialogBase {
 public:
@@ -67,6 +72,11 @@ public:
 	 */
 	bool request(const Common::Path &textPath, Common::BaseCallback<DialogMsgBoxButton> *callback,
 				 const Common::Point32 &position = Common::Point32(-1, -1), const Common::Point32 &textOffset = Common::Point32(17, 17));
+
+	/**
+	 * Queue a confirmation whose text is drawn with the release language font.
+	 */
+	bool requestUiText(const Common::U32String &text, Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &position = Common::Point32(-1, -1));
 
 	/** Return whether a request is pending or its dialog is open. */
 	bool isActive() const override { return _state != DialogMsgBoxState::kClosed00; }
@@ -93,11 +103,25 @@ private:
 		"bmp/menu/QUIT_panel_ok.rb",
 		"bmp/menu/QUIT_panel_cancel.rb",
 	};
+	/** Horizontal margin around UI text within the panel. */
+	static constexpr int kUiTextMarginX = 14;
+	/** Vertical offset of UI text within the panel. */
+	static constexpr int kUiTextOffsetY = 12;
+	/** Width reserved for wrapped UI text. */
+	static constexpr int kUiTextWidth = 348;
+	/** Height reserved for wrapped UI text above the buttons. */
+	static constexpr int kUiTextHeight = 60;
 
+	/** Begin a request after rejecting any conflicting active request. */
+	bool beginRequest(Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &position);
 	/** Load request-specific resources and retain the covered screen rectangle. */
 	bool openDialog();
+	/** Select the UI font for the current request from the release language. */
+	void resolveUiFont();
 	/** Release the saved screen pixels for the current request. */
 	void releaseResources();
+	/** Draw the current UI-font text request over the panel. */
+	void drawUiText(ManagedSurface32 *screen) const;
 	/** Return the dialog button under @p pos. */
 	DialogMsgBoxButton hitTest(const Common::Point &pos) const;
 	/** Close the dialog, then invoke the request callback with @p button. */
@@ -111,6 +135,10 @@ private:
 	Common::Point32 _textOffset = Common::Point32(17, 17);
 	/** Request-specific text bitmap path. */
 	Common::String _textPath;
+	/** Request-specific text drawn with the release language font. */
+	Common::U32String _uiText;
+	/** UI font borrowed from the theme for the current request, or nullptr. */
+	const Graphics::Font *_uiFont = nullptr;
 	/** Callback owned for the lifetime of the request. */
 	Common::BaseCallback<DialogMsgBoxButton> *_callback = nullptr;
 	/** Button currently under the pointer. */

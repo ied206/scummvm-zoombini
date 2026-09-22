@@ -72,10 +72,6 @@ PuzzleWaterslide::~PuzzleWaterslide() {
 		for (int handle : _sounds)
 			if (0 <= handle)
 				sound->unload(handle);
-		if (0 <= _goSpeech)
-			sound->unload(_goSpeech);
-		if (0 <= _praiseSpeech)
-			sound->unload(_praiseSpeech);
 	}
 	finishPuzzleRoster(nullptr);
 }
@@ -803,17 +799,14 @@ void PuzzleWaterslide::onCascadeComplete(void *context, AnimationRunner *runner)
 void PuzzleWaterslide::onUpdate() {
 	const uint32 tick = _vm->getGameTickCount();
 	SoundManager *sound = _vm->getSoundManager();
-	if (_goPending && (_goSpeech < 0 || !sound || !sound->isPlaying(_goSpeech))) {
+	if (_goPending && (!sound || !sound->hasPendingSpeech())) {
 		_vm->_mapTransitionSourcePageId = kPageWaterslide;
 		_vm->requestPageChange(kPageMapTrans);
 		return;
 	}
 	if (_phase == kValve01 && (_sounds[4] < 0 || !sound || !sound->isPlaying(_sounds[4]))) {
-		if (sound && 3 <= _connectionCount) {
-			_praiseSpeech = sound->load(true, Common::Path(8 <= _connectionCount ? kPraisePath : kPartialPraisePath), false);
-			if (0 <= _praiseSpeech)
-				sound->playWithVolume(_praiseSpeech, sound->_volumeSpeech);
-		}
+		if (sound && 3 <= _connectionCount)
+			sound->queueSpeech(Common::Path(8 <= _connectionCount ? kPraisePath : kPartialPraisePath));
 		_phase = kDischarge02;
 	}
 	if (_phase == kDischarge02) {
@@ -864,11 +857,9 @@ void PuzzleWaterslide::drawBoard(ManagedSurface32 *screen) const {
 			if (edge.connected)
 				pipeColor = kPipeColors[1];
 			if (edge.a == 15)
-				gfx->drawPageRleBlock(screen,
-																  Common::String::format(kSelectorFormat, pipeColor, arm + 1), Common::Point32(280, 270));
+				gfx->drawPageRleBlock(screen, Common::String::format(kSelectorFormat, pipeColor, arm + 1), Common::Point32(280, 270));
 			else
-				gfx->drawPageRleBlock(screen, Common::String::format(kHorizontalFormat, pipeColor),
-																  Common::Point32(345 + edge.a / 5 * 100 + arm * 30, 265 + arm * 60));
+				gfx->drawPageRleBlock(screen, Common::String::format(kHorizontalFormat, pipeColor), Common::Point32(345 + edge.a / 5 * 100 + arm * 30, 265 + arm * 60));
 		}
 	} else {
 		static constexpr int offsetX[4] = {
@@ -892,8 +883,7 @@ void PuzzleWaterslide::drawBoard(ManagedSurface32 *screen) const {
 			const char *pipeColor = kHardPipeColors[0];
 			if (edge.connected)
 				pipeColor = kHardPipeColors[1];
-			gfx->drawPageRleBlock(screen,
-																  Common::String::format(kHardPipeFormat, pipeColor, type + 1), pos);
+			gfx->drawPageRleBlock(screen, Common::String::format(kHardPipeFormat, pipeColor, type + 1), pos);
 		}
 		gfx->drawPageRleBlock(screen, Common::String::format(kHardPipeFormat, kHardPipeColors[1], 1), Common::Point32(625, 430));
 		gfx->drawPageRleBlock(screen, kOutletPath, Common::Point32(432, 517));
@@ -996,7 +986,7 @@ EventHandleResult PuzzleWaterslide::onLButtonUp(const Common::Point &pos) {
 		return EventHandleResult::kConsumed;
 	}
 	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), true,
-																		  _pickup, _vm->getGameTickCount(), &_targets, getAreaMask());
+																	_pickup, _vm->getGameTickCount(), &_targets, getAreaMask());
 	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 
@@ -1004,7 +994,7 @@ EventHandleResult PuzzleWaterslide::onMouseMove(const Common::Point &pos) {
 	if (_phase != kInteractive00)
 		return EventHandleResult::kPassthrough;
 	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), false,
-																		  _pickup, _vm->getGameTickCount(), &_targets, getAreaMask());
+																	_pickup, _vm->getGameTickCount(), &_targets, getAreaMask());
 	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 
@@ -1037,11 +1027,8 @@ bool PuzzleWaterslide::onGoButtonPressed() {
 		const int variant = _vm->_rnd->getRandomNumber(4) + 1;
 		speech = Common::String::format(kGoSpeechFormat, variant);
 	}
-	if (SoundManager *sound = _vm->getSoundManager()) {
-		_goSpeech = sound->load(true, Common::Path(speech), false);
-		if (0 <= _goSpeech)
-			sound->playWithVolume(_goSpeech, sound->_volumeSpeech);
-	}
+	if (SoundManager *sound = _vm->getSoundManager())
+		sound->queueSpeech(Common::Path(speech));
 	_goPending = true;
 	return false;
 }

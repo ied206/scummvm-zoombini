@@ -289,11 +289,10 @@ private:
 	int _ripplePhase = 0;
 	/** Latest pointer location used for tablet hover feedback. */
 	Common::Point _pointer;
-	/** Looping beetle, gate, lever, and departure-speech mixer handles. */
+	/** Looping beetle, gate, and lever mixer handles. */
 	int _bugSound = -1;
 	int _gateSound = -1;
 	int _leverSound = -1;
-	int _speechSound = -1;
 };
 
 } // End of namespace Zoombini2

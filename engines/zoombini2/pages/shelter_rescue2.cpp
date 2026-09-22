@@ -54,7 +54,7 @@ ShelterRescueSite2::ShelterRescueSite2(Zoombini2Engine *vm) : ShelterRescueSiteB
 }
 
 ShelterRescueSite2::~ShelterRescueSite2() {
-	saveRescueRoster(getRescueBoard());
+	saveRescueRoster(getRescueStorage());
 
 	_vm->setHoverCursorActive(false);
 }
@@ -93,13 +93,13 @@ void ShelterRescueSite2::init() {
 
 void ShelterRescueSite2::initRescueRoster() {
 	GameState *state = _vm->_state;
-	BoardRecord **board = state->_rescue2Board;
-	prepareWaitingBoard(board);
-	_scrollRow = GameState::findBoardScrollRow(board);
+	StorageRecord **storage = state->_rescue2Storage;
+	prepareWaitingStorage(storage);
+	_scrollRow = GameState::findStorageScrollRow(storage);
 	if (_vm->_isSavedGame)
 		state->_hasReachedRescue2 = 1;
 	state->registerPageVisit(kPageRescue2);
-	const uint population = countBoardMembers(board) + _vm->_state->_activeZoombinis.size();
+	const uint population = countStorageMembers(storage) + _vm->_state->_activeZoombinis.size();
 	if (population < 8)
 		enqueueSpeech(Common::String::format(kMissingArrivalsSpeechFormat, 8 - population));
 	else
@@ -107,7 +107,7 @@ void ShelterRescueSite2::initRescueRoster() {
 }
 
 void ShelterRescueSite2::refillBoardingRoster() {
-	GameState::refillFromBoard(getRescueBoard(), _vm->_state->_activeZoombinis, 8);
+	GameState::refillFromStorage(getRescueStorage(), _vm->_state->_activeZoombinis, 8);
 	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
 		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
 		zoombini->_puzzleStatus = 0;
@@ -160,17 +160,17 @@ void ShelterRescueSite2::buildDropTargets() {
 }
 
 void ShelterRescueSite2::refreshGridOccupancy() {
-	BoardRecord *const *board = getRescueBoard();
+	StorageRecord *const *storage = getRescueStorage();
 	for (int record = 0; record < kGridTargetCount; record++) {
-		const int boardIndex = (_scrollRow + record / 5) * kBoardCols + record % 5;
-		const bool occupied = 0 <= boardIndex && boardIndex < kBoardRows * kBoardCols && board[boardIndex];
+		const int storageIndex = (_scrollRow + record / 5) * kStorageCols + record % 5;
+		const bool occupied = 0 <= storageIndex && storageIndex < kStorageRows * kStorageCols && storage[storageIndex];
 		_dropTargets[record].occupied = occupied;
 		_dropTargets[record].zoombiniIndex = occupied ? 0 : -1;
 	}
 }
 
-int ShelterRescueSite2::getGridRecordBoardIndex(int recordIndex) const {
-	return (_scrollRow + recordIndex / 5) * kBoardCols + recordIndex % 5;
+int ShelterRescueSite2::getGridRecordStorageIndex(int recordIndex) const {
+	return (_scrollRow + recordIndex / 5) * kStorageCols + recordIndex % 5;
 }
 
 bool ShelterRescueSite2::seatsFullyOccupied() const {
@@ -208,7 +208,7 @@ void ShelterRescueSite2::gridDropCallback(void *context, int targetIndex, int zo
 		return;
 	if (0 <= zoombiniIndex && static_cast<uint>(zoombiniIndex) < page->_vm->_state->_activeZoombinis.size())
 		page->_vm->_state->_activeZoombinis[zoombiniIndex]->setPosition(Common::Point32(target.rect.left - 8, target.rect.top - 15));
-	page->captureToBoard(targetIndex, zoombiniIndex);
+	page->captureToStorage(targetIndex, zoombiniIndex);
 }
 
 void ShelterRescueSite2::seatDropCallback(void *context, int targetIndex, int zoombiniIndex) {
@@ -224,17 +224,17 @@ void ShelterRescueSite2::seatDropCallback(void *context, int targetIndex, int zo
 		page->_vm->restartGoBlink();
 }
 
-void ShelterRescueSite2::captureToBoard(int recordIndex, int zoombiniIndex) {
+void ShelterRescueSite2::captureToStorage(int recordIndex, int zoombiniIndex) {
 	if (zoombiniIndex < 0 || _vm->_state->_activeZoombinis.size() <= static_cast<uint>(zoombiniIndex))
 		return;
-	const int boardIndex = getGridRecordBoardIndex(recordIndex);
-	BoardRecord **board = getRescueBoard();
-	if (boardIndex < 0 || kBoardRows * kBoardCols <= boardIndex)
+	const int storageIndex = getGridRecordStorageIndex(recordIndex);
+	StorageRecord **storage = getRescueStorage();
+	if (storageIndex < 0 || kStorageRows * kStorageCols <= storageIndex)
 		return;
 	ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[zoombiniIndex];
-	delete board[boardIndex];
-	board[boardIndex] = new BoardRecord();
-	board[boardIndex]->store(*zoombini);
+	delete storage[storageIndex];
+	storage[storageIndex] = new StorageRecord();
+	storage[storageIndex]->store(*zoombini);
 	for (uint record = 0; record < _dropTargets.size(); record++) {
 		if (_dropTargets[record].zoombiniIndex > zoombiniIndex)
 			_dropTargets[record].zoombiniIndex -= 1;
@@ -257,28 +257,29 @@ void ShelterRescueSite2::releasePendingZoombini() {
 	_vm->_state->_activeZoombinis.remove_at(releaseIndex);
 }
 
-bool ShelterRescueSite2::hasBoardCellsInRows(int firstRow, int lastRow) const {
-	BoardRecord *const *board = getRescueBoard();
+bool ShelterRescueSite2::hasStorageCellsInRows(int firstRow, int lastRow) const {
+	StorageRecord *const *storage = getRescueStorage();
 	for (int row = firstRow; row <= lastRow; row++) {
-		if (row < 0 || kBoardRows <= row)
+		if (row < 0 || kStorageRows <= row)
 			continue;
-		for (int col = 0; col < kBoardCols; col++) {
-			if (board[row * kBoardCols + col])
+		for (int col = 0; col < kStorageCols; col++) {
+			if (storage[row * kStorageCols + col])
 				return true;
 		}
 	}
 	return false;
 }
 
-bool ShelterRescueSite2::materializeFromBoard(int gridCol, int gridRow, const Common::Point &pointerPos) {
-	BoardRecord *const *board = getRescueBoard();
-	const int boardIndex = (_scrollRow + gridCol) * kBoardCols + gridRow;
-	if (boardIndex < 0 || kBoardRows * kBoardCols <= boardIndex || !board[boardIndex])
+bool ShelterRescueSite2::materializeFromStorage(int gridCol, int gridRow, const Common::Point &pointerPos) {
+	StorageRecord *const *storage = getRescueStorage();
+	const int storageIndex = (_scrollRow + gridCol) * kStorageCols + gridRow;
+	if (storageIndex < 0 || kStorageRows * kStorageCols <= storageIndex || !storage[storageIndex])
 		return false;
 	const uint32 tick = _vm->getGameTickCount();
 	ZoombiniRunner *zoombini = new ZoombiniRunner();
-	zoombini->setTraits(board[boardIndex]->getTraits());
-	Common::strlcpy(zoombini->_name, board[boardIndex]->_name, sizeof(zoombini->_name));
+	zoombini->_inputEnabled = true;
+	zoombini->setTraits(storage[storageIndex]->getTraits());
+	Common::strlcpy(zoombini->_name, storage[storageIndex]->_name, sizeof(zoombini->_name));
 	zoombini->setDefaultAnimation(_littleZombAnimation, 33);
 	zoombini->setPosition(Common::Point32(kRosterGridBasePos.x + gridCol * 40 + 24, kRosterGridBasePos.y + gridRow * 57 + 30));
 	zoombini->_dragOrigin = zoombini->_screenPos;
@@ -287,21 +288,21 @@ bool ShelterRescueSite2::materializeFromBoard(int gridCol, int gridRow, const Co
 	zoombini->_dragging = true;
 	zoombini->startAnimation(_pickupZombAnimation, 33, tick);
 	_vm->_state->_activeZoombinis.push_back(zoombini);
-	delete board[boardIndex];
-	getRescueBoard()[boardIndex] = nullptr;
+	delete storage[storageIndex];
+	getRescueStorage()[storageIndex] = nullptr;
 	refreshGridOccupancy();
 	return true;
 }
 
 void ShelterRescueSite2::triggerScrollLeft() {
-	if (0 < _scrollRow && hasBoardCellsInRows(0, _scrollRow)) {
+	if (0 < _scrollRow && hasStorageCellsInRows(0, _scrollRow)) {
 		_scrollPhase = kScrollPhaseLeft04;
 		_scrollPixelsLeft = kScrollPixelLength;
 	}
 }
 
 void ShelterRescueSite2::triggerScrollRight() {
-	if (_scrollRow + 4 < kBoardRows && hasBoardCellsInRows(_scrollRow + 3, kBoardRows - 1)) {
+	if (_scrollRow + 4 < kStorageRows && hasStorageCellsInRows(_scrollRow + 3, kStorageRows - 1)) {
 		_scrollPhase = kScrollPhaseRight06;
 		_scrollPixelsLeft = kScrollPixelLength;
 	}
@@ -330,7 +331,7 @@ void ShelterRescueSite2::stepScrollAnimation() {
 
 void ShelterRescueSite2::updateHoverCursor() {
 	const Common::Point32 mousePos = _vm->getMousePos();
-	BoardRecord *const *board = getRescueBoard();
+	StorageRecord *const *storage = getRescueStorage();
 	bool hover = false;
 	for (int col = 0; col < 4 && !hover; col++) {
 		for (int row = 0; row < 5 && !hover; row++) {
@@ -338,8 +339,8 @@ void ShelterRescueSite2::updateHoverCursor() {
 			const int top = kRosterGridBasePos.y + row * 57;
 			if (mousePos.x <= left + 24 || left + 64 <= mousePos.x || mousePos.y <= top + 30 || top + 87 <= mousePos.y)
 				continue;
-			const int boardIndex = (_scrollRow + col) * kBoardCols + row;
-			if (0 <= boardIndex && boardIndex < kBoardRows * kBoardCols && board[boardIndex])
+			const int storageIndex = (_scrollRow + col) * kStorageCols + row;
+			if (0 <= storageIndex && storageIndex < kStorageRows * kStorageCols && storage[storageIndex])
 				hover = true;
 		}
 	}
@@ -362,8 +363,8 @@ bool ShelterRescueSite2::canUseGoButton() const {
 	return seatsFullyOccupied();
 }
 
-BoardRecord **ShelterRescueSite2::getRescueBoard() const {
-	return _vm->_state->_rescue2Board;
+StorageRecord **ShelterRescueSite2::getRescueStorage() const {
+	return _vm->_state->_rescue2Storage;
 }
 
 void ShelterRescueSite2::buildBoardingDrawOrder(Common::Array<uint> &order, ZoombiniRunner *&draggedZoombini) const {
@@ -387,7 +388,7 @@ void ShelterRescueSite2::drawBoardingActives(ManagedSurface32 *screen) const {
 		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[order[i]];
 		if (zoombini->_hidden)
 			continue;
-		zoombini->tryStartIdleAnimation(_idleZombAnimation, *_vm->_rnd, _vm->getGameTickCount());
+		zoombini->tryStartIdleAnimation(_idleZombAnimation, *_vm->_rnd, _vm->getGameTickCount(), _vm->getFrameDeltaMs(), _vm->getLogicPacingHz());
 		_vm->_gfx->drawZoombiniRunner(screen, zoombini);
 		zoombini->advanceAnimationAfterDraw();
 	}
@@ -397,27 +398,27 @@ void ShelterRescueSite2::drawBoardingActives(ManagedSurface32 *screen) const {
 	}
 }
 
-void ShelterRescueSite2::drawWaitingBoard(ManagedSurface32 *screen, int pixelShiftX) const {
+void ShelterRescueSite2::drawWaitingStorage(ManagedSurface32 *screen, int pixelShiftX) const {
 	if (!_littleZombAnimation)
 		return;
-	BoardRecord *const *board = getRescueBoard();
+	StorageRecord *const *storage = getRescueStorage();
 	int startCol = -2;
 	if (_scrollRow == 1)
 		startCol = -1;
 	if (_scrollRow == 0)
 		startCol = 0;
 	int maxCol = 6;
-	if (_scrollRow + 5 >= kBoardRows)
+	if (_scrollRow + 5 >= kStorageRows)
 		maxCol = 5;
-	if (_scrollRow + 4 >= kBoardRows)
+	if (_scrollRow + 4 >= kStorageRows)
 		maxCol = 4;
 	const Common::Rect32 clip(kRosterGridBasePos.x, 0, kRosterGridBasePos.x + 223, ManagedSurface32::kScreenSize.height);
 	for (int col = startCol; col < maxCol; col++) {
 		for (int row = 0; row < 5; row++) {
-			const int boardIndex = (_scrollRow + col) * kBoardCols + row;
-			if (boardIndex < 0 || kBoardRows * kBoardCols <= boardIndex || !board[boardIndex])
+			const int storageIndex = (_scrollRow + col) * kStorageCols + row;
+			if (storageIndex < 0 || kStorageRows * kStorageCols <= storageIndex || !storage[storageIndex])
 				continue;
-			_vm->_gfx->drawZoombini(screen, _littleZombAnimation, board[boardIndex]->getTraits(),
+			_vm->_gfx->drawZoombini(screen, _littleZombAnimation, storage[storageIndex]->getTraits(),
 									Common::Point32(kRosterGridBasePos.x + col * 40 + 18 + pixelShiftX, kRosterGridBasePos.y + row * 57 + 30),
 									33, 0, &clip);
 		}
@@ -432,9 +433,9 @@ void ShelterRescueSite2::onRenderContent(ManagedSurface32 *screen) {
 
 	if (_scrollPhase != kScrollIdle) {
 		const int shift = (_scrollPhase == kScrollPhaseLeft04 ? 1 : -1) * (kScrollPixelLength - _scrollPixelsLeft);
-		drawWaitingBoard(screen, shift);
+		drawWaitingStorage(screen, shift);
 	} else {
-		drawWaitingBoard(screen, 0);
+		drawWaitingStorage(screen, 0);
 	}
 	// The original draws the door-selection overlay over the waiting grid on every grid update, beneath the scroll controls.
 	_vm->_gfx->drawPageRleBlock(screen, kPorteSelectorPath, kRosterGridBasePos);
@@ -482,15 +483,15 @@ EventHandleResult ShelterRescueSite2::onLButtonUp(const Common::Point &pos) {
 		return EventHandleResult::kConsumed;
 	}
 
-	BoardRecord *const *board = getRescueBoard();
+	StorageRecord *const *storage = getRescueStorage();
 	for (int col = 0; col < 4; col++) {
 		for (int row = 0; row < 5; row++) {
 			const Common::Rect slotHit(kRosterGridBasePos.x + col * 40 + 24, kRosterGridBasePos.y + row * 57 + 30,
 									   kRosterGridBasePos.x + col * 40 + 64, kRosterGridBasePos.y + row * 57 + 87);
 			if (slotHit.contains(pos)) {
-				const int boardIndex = (_scrollRow + col) * kBoardCols + row;
-				if (0 <= boardIndex && boardIndex < kBoardRows * kBoardCols && board[boardIndex])
-					materializeFromBoard(col, row, pos);
+				const int storageIndex = (_scrollRow + col) * kStorageCols + row;
+				if (0 <= storageIndex && storageIndex < kStorageRows * kStorageCols && storage[storageIndex])
+					materializeFromStorage(col, row, pos);
 				return EventHandleResult::kConsumed;
 			}
 		}

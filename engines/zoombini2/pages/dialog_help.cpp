@@ -93,12 +93,6 @@ bool DialogHelp::open(PageId pageId, int level) {
 		return false; // Already open
 	}
 
-	// Check if sheet 1 exists
-	if (!isPageValid(pageId, level, 1)) {
-		debug("No help available for page %d, level %d", static_cast<int>(pageId), level);
-		return false;
-	}
-
 	_isActive = true;
 	_currentPageId = pageId;
 	_currentLevel = level;
@@ -110,11 +104,11 @@ bool DialogHelp::open(PageId pageId, int level) {
 	// Save current screen
 	_vm->_gfx->captureScreen(_savedScreen);
 
-	// Load first help sheet
+	// The original opens the help frame unconditionally and only logs
+	// "No help screen for this level!" when the first sheet is missing,
+	// leaving the frame open with no sheet drawn.
 	if (!loadPage(pageId, level, 1)) {
-		// Failed to load - close and return
-		close();
-		return false;
+		warning("No help screen for page %d, level %d", static_cast<int>(pageId), level);
 	}
 
 	return true;
@@ -223,9 +217,10 @@ EventHandleResult DialogHelp::onLButtonDown(const Common::Point &pos) {
 		return EventHandleResult::kPassthrough;
 	}
 
-	// OK button - close help
-	if (_okButtonRect.contains(pos)) {
-		close();
+	// The close button fires on release, so a press only arms it. Pressing
+	// anywhere else cancels a previously armed close.
+	_okButtonArmed = _okButtonRect.contains(pos);
+	if (_okButtonArmed) {
 		return EventHandleResult::kConsumed;
 	}
 
@@ -251,6 +246,19 @@ EventHandleResult DialogHelp::onLButtonDown(const Common::Point &pos) {
 
 	// Clicks outside buttons retain the active modal and do not reach its page.
 	return EventHandleResult::kPassthrough;
+}
+
+EventHandleResult DialogHelp::onLButtonUp(const Common::Point &pos) {
+	if (!_isActive) {
+		return EventHandleResult::kPassthrough;
+	}
+
+	const bool shouldClose = _okButtonArmed && _okButtonRect.contains(pos);
+	_okButtonArmed = false;
+	if (shouldClose) {
+		close();
+	}
+	return EventHandleResult::kConsumed;
 }
 
 } // End of namespace Zoombini2

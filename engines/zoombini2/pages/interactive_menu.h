@@ -25,6 +25,7 @@
 #include "common/array.h"
 #include "common/rect.h"
 #include "common/str.h"
+#include "common/ustr.h"
 
 #include "zoombini2/graphics.h"
 #include "zoombini2/pages/interactive_base.h"
@@ -104,12 +105,12 @@ private:
 		/** Construct a list for @p vm at @p pos using the borrowed @p selectionBar. */
 		SaveFileList(Zoombini2Engine *vm, const Common::Point32 &pos);
 
-		/** Prepare the normal, prefix-match, and edit colors through @ref Gfx::loadTextFont. */
+		/** Prepare the normal, prefix-match, edit, and read-only colors through @ref Gfx::loadTextFont. */
 		bool init();
 		/** Remove every item and reset selection and editing state. */
 		void clear();
-		/** Insert @p name in case-insensitive order unless it is invalid or duplicated. */
-		bool addItemSorted(const Common::String &name);
+		/** Insert @p name and its @p readOnly status in case-sensitive order unless it is invalid or duplicated. */
+		bool addItemSorted(const Common::String &name, bool readOnly);
 
 		/** Draw the visible rows and the borrowed selection bar. */
 		void draw(ManagedSurface32 *screen) const;
@@ -145,11 +146,15 @@ private:
 		bool hasValidSelection() const { return _validSelection; }
 		/** Return whether a provisional or explicit new row is active. */
 		bool isEditing() const { return kEditProvisional02 <= _editState; }
+		/** Return whether the selected existing item is displayed as read-only. */
+		bool isSelectedReadOnly() const;
 		/** Return whether the edit buffer contains at least one character. */
 		bool hasEditBuffer() const { return !_editBuffer.empty(); }
 
 		/** Return the selected existing name or active edit buffer. */
 		Common::String getSelectedName() const;
+		/** Return an existing name differing from the active new entry only by letter case. */
+		Common::String getCaseInsensitiveConflictName() const;
 		/** Return the active editing stage. */
 		EditState getEditState() const { return _editState; }
 		/** Return the number of profile rows. */
@@ -179,8 +184,10 @@ private:
 		/** Signed screen origin of the list. */
 		Common::Point32 _pos;
 
-		/** Profile names in case-insensitive display order. */
+		/** Profile names in case-sensitive display order. */
 		Common::Array<Common::String> _items;
+		/** Read-only status for each corresponding stored profile name. */
+		Common::Array<bool> _readOnly;
 		/** Text being used for prefix matching or a new profile row. */
 		Common::String _editBuffer;
 		/** Active editing stage. */
@@ -202,8 +209,8 @@ private:
 		bool canAppendCharacter(char c) const;
 		/** Convert @p c to the list's accepted display form, or zero when invalid. */
 		char normalizeCharacter(char c) const;
-		/** Insert @p name at @p index and select it. */
-		void insertItem(int index, const Common::String &name);
+		/** Insert @p name and its @p readOnly status at @p index and select it. */
+		void insertItem(int index, const Common::String &name, bool readOnly = false);
 		/** Remove the item at @p index. */
 		void removeItem(int index);
 		/** Adjust the viewport so the selected row is visible. */
@@ -264,6 +271,18 @@ private:
 	static constexpr const char *kDeleteConfirmationPath = "bmp/menu/Quit_panel_text_suppr";
 	/** Resource path. */
 	static constexpr const char *kQuitConfirmationPath = "bmp/menu/Quit_panel_text_quit";
+	/** English confirmation text for a case-only save-name collision. */
+	static constexpr const char *kCaseCollisionConfirmationEnglish =
+		"A save that differs only in letter case exists.\nThe new save will overwrite it.\nAre you sure to overwrite?";
+	/** Korean confirmation text for a case-only save-name collision. */
+	static constexpr const char *kCaseCollisionConfirmationKorean =
+		u8"대소문자만 다른 저장파일 이름이 있습니다.\n새 파일은 기존 저장파일을 덮어씁니다.\n덮어쓸까요?";
+	/** English confirmation text for opening a save without progress writes. */
+	static constexpr const char *kReadOnlyLoadConfirmationEnglish =
+		"This saved game will open in read-only mode.\nProgress will not be saved.\nContinue?";
+	/** Korean confirmation text for opening a save without progress writes. */
+	static constexpr const char *kReadOnlyLoadConfirmationKorean =
+		u8"이 저장파일은 읽기 전용 모드로 열립니다.\n진행 상황은 저장되지 않습니다.\n계속할까요?";
 
 	void updateButtonAvailability();
 	EventHandleResult handleVolumePanelInput(const Common::Point &pos, bool mouseReleased);
@@ -292,6 +311,12 @@ private:
 	VolumePanel *_volumePanel = nullptr;
 	/** Selected profile retained while the shared delete confirmation is active. */
 	Common::String _pendingDeleteProfileName;
+	/** New embedded player name retained while the case-collision confirmation is active. */
+	Common::String _pendingCaseCollisionPlayerName;
+	/** Existing storage profile retained while the case-collision confirmation is active. */
+	Common::String _pendingCaseCollisionStorageName;
+	/** Existing profile retained while its read-only load confirmation is active. */
+	Common::String _pendingReadOnlyProfileName;
 
 	/** Load page graphics and sounds. */
 	void loadResources();
@@ -314,14 +339,32 @@ private:
 	void handleKeyInput(uint32 keyCode);
 	/** Load the selected profile, or create it when it does not exist. */
 	void startSelectedSave();
+	/** Load @p saveName and continue only after its serialized state is valid. */
+	void loadSelectedSave(const Common::String &saveName);
+	/** Initialize and save a new profile under @p storageName. */
+	void startNewSave(const Common::String &playerName, const Common::String &storageName);
+	/** Continue into a loaded or newly created profile. */
+	void continueSelectedSave();
 	/** Open deletion confirmation for the selected profile. */
 	void requestDeleteConfirmation();
+	/** Open a confirmation before replacing a profile whose name differs only by case. */
+	void requestCaseCollisionConfirmation(const Common::String &playerName, const Common::String &storageName);
+	/** Open a confirmation before entering the selected red read-only profile. */
+	void requestReadOnlyLoadConfirmation(const Common::String &saveName);
 	/** Open the shared quit confirmation. */
 	void requestQuitConfirmation();
 	/** Apply the shared delete-confirmation result. */
 	void handleDeleteConfirmation(DialogMsgBoxButton button);
+	/** Apply the case-collision confirmation result. */
+	void handleCaseCollisionConfirmation(DialogMsgBoxButton button);
+	/** Apply the read-only load confirmation result. */
+	void handleReadOnlyLoadConfirmation(DialogMsgBoxButton button);
 	/** Apply the shared quit-confirmation result. */
 	void handleQuitConfirmation(DialogMsgBoxButton button);
+	/** Return release-appropriate case-collision confirmation text. */
+	Common::U32String getCaseCollisionConfirmationText() const;
+	/** Return release-appropriate read-only load confirmation text. */
+	Common::U32String getReadOnlyLoadConfirmationText() const;
 
 	/** Open the volume options panel. */
 	void openOptionsDialog();

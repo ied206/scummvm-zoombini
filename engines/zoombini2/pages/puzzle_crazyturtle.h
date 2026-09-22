@@ -71,9 +71,8 @@ private:
 	/** Perfect and retreat Go speech selected after the player leaves Turtle Hurdle. */
 	static constexpr const char *kGoSpeechFormat = "sounds/wld11.%d.wav";
 	static constexpr const char *kRetreatSpeech = "sounds/DW-Zville.wav";
-	/** Deferred Go transition flag and its currently playing speech handle. */
+	/** Deferred Go transition flag. */
 	bool _goPending = false;
-	int _goSpeech = -1;
 	/** Music, turtle/mother/dock art, trait icons, area mask, and Zoombini animations. */
 	static constexpr const char *kMusicPath = "#sounds/music/08-BS01.wav";
 	static constexpr const char *kTurtleIdleFormat = "Bmp/crazy_turtle/TORTUES/ATTENTE/%d/%d.AN";
@@ -317,9 +316,6 @@ private:
 	Animation *_smokeAnimation = nullptr;
 	/** Whether the mother turtle has completed its neck animation. */
 	bool _motherFinished = false;
-	/** Speech started when the mother turtle animation finishes. */
-	int _motherSpeechSound = -1;
-
 	/** Zoombini grid for walking in place on a settled turtle. */
 	const ZoombiniAnimation *_idleZombAnimation = nullptr;
 	/** Zoombini grid used while a Zoombini is held. */

@@ -29,7 +29,7 @@
 
 namespace Zoombini2 {
 
-struct BoardRecord;
+struct StorageRecord;
 class ZoombiniRunner;
 class ZoombiniAnimation;
 
@@ -87,7 +87,7 @@ public:
 	void init() override;
 	/** Accept the whole current party and use the regular practice or adventure departure. */
 	void debugForceFinish();
-	/** Describe generated rules without changing the board or consuming random numbers. */
+	/** Describe generated rules without changing puzzle state or consuming random numbers. */
 	virtual Common::String debugGetAnswer() const = 0;
 	/** Describe the page's actual opportunity model. */
 	virtual PuzzleChanceInfo debugGetChances() const { return PuzzleChanceInfo(PuzzleChanceInfo::Type::kInfinite); }
@@ -136,8 +136,8 @@ protected:
 	Common::String debugActorDescription(int index) const;
 	/** Whether a forced departure has already been requested. */
 	bool _debugFinishPending = false;
-	/** Finish this puzzle's roster using the board selected by the concrete puzzle. */
-	void finishPuzzleRoster(BoardRecord **board);
+	/** Finish this puzzle's roster using the selected storage and its page-specific perfect-clear eligibility. */
+	void finishPuzzleRoster(StorageRecord **storage, bool perfectClearEligible = true);
 	/** Replace the first page layer's background and refresh the borrowed compatibility pointer. */
 	bool loadPrimaryLayerBackground(const Common::Path &path);
 	/**
