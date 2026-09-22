@@ -714,7 +714,7 @@ void ShelterZombiniville::onActorsRendered() {
 		ZoombiniRunner *zoombini = _boardingZoombinis[order[i]];
 		if (zoombini->_hidden)
 			continue;
-		zoombini->tryStartIdleAnimation(_idleZombAnimation, *_vm->_rnd, tick);
+		zoombini->tryStartIdleAnimation(_idleZombAnimation, *_vm->_rnd, tick, _vm->getFrameDeltaMs(), _vm->getLogicPacingHz());
 		zoombini->advanceAnimationAfterDraw();
 	}
 }

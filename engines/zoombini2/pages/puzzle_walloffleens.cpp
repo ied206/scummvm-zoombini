@@ -74,13 +74,12 @@ PuzzleWallOfFleens::~PuzzleWallOfFleens() {
 			sound->unload(_sounds[i]);
 		for (int i = 0; i < 3; i++)
 			sound->unload(_ambientSounds[i]);
-		sound->unload(_speechSound);
 	}
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
 		_puzzleZoombinis[i]->clearMovement();
 		_puzzleZoombinis[i]->setAnimationCompleteCallback(nullptr);
 	}
-	finishPuzzleRoster(_vm->_state->_rescue1Board);
+	finishPuzzleRoster(_vm->_state->_rescue1Storage, _perfectClearEligible);
 }
 
 void PuzzleWallOfFleens::loadResources() {
@@ -381,7 +380,7 @@ void PuzzleWallOfFleens::finishShot() {
 	} else {
 		ZoombiniRunner *lost = _puzzleZoombinis[_loadedRunner];
 		if (_vm->_isSavedGame)
-			GameState::storeInBoard(_vm->_state->_rescue1Board, *lost);
+			GameState::storeInStorage(_vm->_state->_rescue1Storage, *lost);
 		for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
 			if (_vm->_state->_activeZoombinis[i] == lost) {
 				_vm->_state->_activeZoombinis.remove_at(i);
@@ -414,6 +413,7 @@ void PuzzleWallOfFleens::onFleenAnimationDone(void *context, ZoombiniRunner *run
 }
 
 void PuzzleWallOfFleens::finishCatch() {
+	_perfectClearEligible = true;
 	_cells[_selected].empty = true;
 	_foundPrimary = _foundPrimary || _cells[_selected].score % 10 == 4;
 	_foundSecondary = _foundSecondary || (_level == 4 && _cells[_selected].score / 10 == 4);
@@ -460,39 +460,23 @@ void PuzzleWallOfFleens::startRetreat() {
 void PuzzleWallOfFleens::playEffect(int index) {
 	SoundManager *sound = _vm->getSoundManager();
 	if (sound && 0 <= _sounds[index])
-		sound->play(_sounds[index]);
+		sound->playWithVolume(_sounds[index], sound->_volumeSFX);
 }
 
 void PuzzleWallOfFleens::queueSpeech(const Common::String &path) {
-	_speechQueue.push_back(path);
-}
-
-void PuzzleWallOfFleens::updateSpeech() {
 	SoundManager *sound = _vm->getSoundManager();
-	if (!sound) {
-		_speechQueue.clear();
-		return;
-	}
-	if (0 <= _speechSound && sound->isPlaying(_speechSound))
-		return;
-	sound->unload(_speechSound);
-	_speechSound = -1;
-	if (!_speechQueue.empty()) {
-		_speechSound = sound->load(true, Common::Path(_speechQueue[0]), false);
-		_speechQueue.remove_at(0);
-		sound->play(_speechSound);
-	}
+	if (sound)
+		sound->queueSpeech(Common::Path(path));
 }
 
 void PuzzleWallOfFleens::onUpdate() {
 	const uint32 now = _vm->getGameTickCount();
-	updateSpeech();
-	if (_goTransitionPending && _speechSound < 0 && _speechQueue.empty()) {
+	SoundManager *sound = _vm->getSoundManager();
+	if (_goTransitionPending && (!sound || !sound->hasPendingSpeech())) {
 		_goTransitionPending = false;
 		_vm->_mapTransitionSourcePageId = kPageWallOfFleens;
 		_vm->requestPageChange(kPageMapTrans);
 	}
-	SoundManager *sound = _vm->getSoundManager();
 	if (!_finished && !_retreating && _mirrorPhase != MirrorPhase::kShouting03 && _mirrorPhase != MirrorPhase::kLeaving04 && _nextAmbientTick < now) {
 		const int variant = _vm->_rnd->getRandomNumber(2);
 		if (sound)
@@ -595,7 +579,7 @@ void PuzzleWallOfFleens::onUpdate() {
 		_shoutCount = 0;
 		_fleensRunner.setTraits(_cells[_selected].traits);
 		_fleensRunner.setDefaultAnimation(_fleensAnimation, 55);
-		_fleensRunner.setPosition(_cells[_selected].pos);
+		_fleensRunner.setPosition(Common::Point32(_cells[_selected].pos.x + 2, _cells[_selected].pos.y + 2));
 		if (_vocif1 && _vocif2) {
 			_fleensRunner.startAnimation(_vocif1, 55, now);
 			_fleensRunner.setAnimationCompleteCallback(onFleenAnimationDone, this);
@@ -603,6 +587,8 @@ void PuzzleWallOfFleens::onUpdate() {
 			finishCatch();
 		}
 	}
+	if (_mirrorPhase == MirrorPhase::kRotating01)
+		playEffect(1);
 }
 
 void PuzzleWallOfFleens::drawCell(ManagedSurface32 *screen, const Cell &cell, bool active) const {
@@ -612,7 +598,14 @@ void PuzzleWallOfFleens::drawCell(ManagedSurface32 *screen, const Cell &cell, bo
 	}
 	const bool reacting = active && _selected != -1 && &cell == &_cells[_selected] && _mirrorPhase != MirrorPhase::kNone00;
 	if (reacting && _mirrorPhase != MirrorPhase::kRotating01) {
-		_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[4], cell.pos);
+		if (_mirrorPhase == MirrorPhase::kExploding02) {
+			_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[4], cell.pos);
+			if (_fleensAnimation)
+				_vm->_gfx->drawZoombini(screen, _fleensAnimation, cell.traits, Common::Point32(cell.pos.x + 2, cell.pos.y + 2), 55, 0);
+			_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[3], cell.pos);
+		} else {
+			_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[4], cell.pos);
+		}
 		if (_mirrorPhase == MirrorPhase::kExploding02 && _explode) {
 			const int frame = MIN<int>((_vm->getGameTickCount() - _mirrorTick) / 100, 5);
 			_vm->_gfx->drawAnimationFrame(screen, _explode, frame, cell.pos);
@@ -736,6 +729,7 @@ Common::String PuzzleWallOfFleens::debugGetChanceDetails() const {
 }
 
 void PuzzleWallOfFleens::applyDebugPuzzleCompletion() {
+	_perfectClearEligible = true;
 	_finished = true;
 	_shotPhase = ShotPhase::kStopped05;
 	_mirrorPhase = MirrorPhase::kNone00;

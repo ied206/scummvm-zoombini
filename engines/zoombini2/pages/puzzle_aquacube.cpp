@@ -78,10 +78,6 @@ PuzzleAquacube::~PuzzleAquacube() {
 		for (int handle : _sounds)
 			if (0 <= handle)
 				sound->unload(handle);
-		if (0 <= _praiseSpeech)
-			sound->unload(_praiseSpeech);
-		if (0 <= _goSpeech)
-			sound->unload(_goSpeech);
 	}
 	finishPuzzleRoster(nullptr);
 }
@@ -293,9 +289,7 @@ void PuzzleAquacube::finishPuzzle() {
 		_vm->_zoombiniWalkingFlag = true;
 		if (SoundManager *sound = _vm->getSoundManager()) {
 			const bool allRescued = _freedCount == static_cast<int>(_puzzleZoombinis.size());
-			_praiseSpeech = sound->load(true, Common::Path(kPraisePaths[allRescued ? 1 : 0]), false);
-			if (0 <= _praiseSpeech)
-				sound->playWithVolume(_praiseSpeech, sound->_volumeSpeech);
+			sound->queueSpeech(Common::Path(kPraisePaths[allRescued ? 1 : 0]));
 		}
 	}
 	_vm->restartGoBlink();
@@ -396,7 +390,7 @@ void PuzzleAquacube::updateBubbles(uint32 elapsed) {
 void PuzzleAquacube::onUpdate() {
 	const uint32 tick = _vm->getGameTickCount();
 	SoundManager *sound = _vm->getSoundManager();
-	if (_goPending && (_goSpeech < 0 || !sound || !sound->isPlaying(_goSpeech))) {
+	if (_goPending && (!sound || !sound->hasPendingSpeech())) {
 		_vm->_mapTransitionSourcePageId = kPageAquacube;
 		_vm->requestPageChange(kPageMapTrans);
 		return;
@@ -588,11 +582,8 @@ bool PuzzleAquacube::onGoButtonPressed() {
 		return true;
 	if (_goPending)
 		return false;
-	if (SoundManager *sound = _vm->getSoundManager()) {
-		_goSpeech = sound->load(true, Common::Path(kRetreatPath), false);
-		if (0 <= _goSpeech)
-			sound->playWithVolume(_goSpeech, sound->_volumeSpeech);
-	}
+	if (SoundManager *sound = _vm->getSoundManager())
+		sound->queueSpeech(Common::Path(kRetreatPath));
 	_goPending = true;
 	return false;
 }

@@ -975,13 +975,21 @@ void ZoombiniRunner::startDirectionTrackedAnimation(uint32 tickCount) {
 	startAnimation(nullptr, 33, tickCount);
 }
 
-bool ZoombiniRunner::tryStartIdleAnimation(const ZoombiniAnimation *animation, Random &randomSrc, uint32 tickCount) {
+bool ZoombiniRunner::tryStartIdleAnimation(const ZoombiniAnimation *animation, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz) {
 	if (!animation || _hidden || !_idleAnimationEnabled || _animationActive || _movementPath || _dragging)
 		return false;
-	if (randomSrc.getRandomNumber(249) != 1)
-		return false;
-	startAnimation(animation, 33, tickCount, AnimationCompletionPolicy::kBypassCallbackAndCorrection01);
-	return true;
+	// Bank quota so the original one-in-250 roll runs pacingHz times per second.
+	// The remainder spreads double-roll frames evenly when pacing exceeds the render rate.
+	_idleRollQuota += static_cast<int64>(elapsedMs) * pacingHz;
+	while (1000 <= _idleRollQuota) {
+		_idleRollQuota -= 1000;
+		if (randomSrc.getRandomNumber(249) == 1) {
+			_idleRollQuota = 0;
+			startAnimation(animation, 33, tickCount, AnimationCompletionPolicy::kBypassCallbackAndCorrection01);
+			return true;
+		}
+	}
+	return false;
 }
 
 void ZoombiniRunner::resetAnimation() {

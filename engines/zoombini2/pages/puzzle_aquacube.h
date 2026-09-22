@@ -394,11 +394,6 @@ private:
 		-1,
 		-1,
 	};
-	/** Loaded praise speech handle, or -1 when no praise is active. */
-	int _praiseSpeech = -1;
-	/** Loaded saved-game departure speech handle, or -1 when no departure is pending. */
-	int _goSpeech = -1;
-
 	/** Timed runner that bounds warp-lever selection. */
 	AnimationRunner *_timer = nullptr;
 	/** First and second rescue flare runners. */

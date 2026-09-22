@@ -47,6 +47,7 @@ void Zoombini2MetaEngine::registerDefaultSettings(const Common::String &target) 
 	ConfMan.registerDefault(kConfigGreedyWaterslidePairing, false);
 	ConfMan.registerDefault(kConfigAquacubeSafeFirstMove, false);
 	ConfMan.registerDefault(kConfigOriginalPRNG, true);
+	ConfMan.registerDefault(kConfigLogicPacingHz, 75);
 	ConfMan.registerDefault(kConfigFrameRate, kDefaultFrameRate);
 	ConfMan.registerDefault(kConfigUnlockFrameRate, false);
 }

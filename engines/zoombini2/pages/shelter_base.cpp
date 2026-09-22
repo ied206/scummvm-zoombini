@@ -92,15 +92,15 @@ void ShelterRescueSiteBase::resetRescueState() {
 	_readyToDepart = false;
 }
 
-void ShelterRescueSiteBase::prepareWaitingBoard(BoardRecord **board) {
+void ShelterRescueSiteBase::prepareWaitingStorage(StorageRecord **storage) {
 	GameState *state = _vm->_state;
 	if (!state->hasPageVisit(_pageId, 1))
-		GameState::clearBoard(board);
-	_scrollOffset = GameState::findBoardScrollRow(board);
+		GameState::clearStorage(storage);
+	_scrollOffset = GameState::findStorageScrollRow(storage);
 }
 
-void ShelterRescueSiteBase::refillDepartureRoster(BoardRecord **board) {
-	GameState::refillFromBoard(board, _vm->_state->_activeZoombinis, 8);
+void ShelterRescueSiteBase::refillDepartureRoster(StorageRecord **storage) {
+	GameState::refillFromStorage(storage, _vm->_state->_activeZoombinis, 8);
 	_departureRoster.clear();
 	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
 		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
@@ -112,7 +112,7 @@ void ShelterRescueSiteBase::refillDepartureRoster(BoardRecord **board) {
 	_readyToDepart = _departureRoster.size() == 8;
 }
 
-void ShelterRescueSiteBase::saveRescueRoster(BoardRecord **board) {
+void ShelterRescueSiteBase::saveRescueRoster(StorageRecord **storage) {
 	GameState *state = _vm->_state;
 	Common::Array<ZoombiniRunner *> &roster = _vm->_state->_activeZoombinis;
 	for (uint i = 0; i < roster.size();) {
@@ -124,7 +124,7 @@ void ShelterRescueSiteBase::saveRescueRoster(BoardRecord **board) {
 		if (departing) {
 			i += 1;
 		} else {
-			GameState::storeInBoard(board, *zoombini);
+			GameState::storeInStorage(storage, *zoombini);
 			delete zoombini;
 			roster.remove_at(i);
 		}
@@ -175,10 +175,10 @@ void ShelterRescueSiteBase::clearSpeechQueue() {
 	_speechQueue.clear();
 }
 
-uint ShelterRescueSiteBase::countBoardMembers(BoardRecord *const *board) {
+uint ShelterRescueSiteBase::countStorageMembers(StorageRecord *const *storage) {
 	uint count = 0;
-	for (int i = 0; i < kBoardRows * kBoardCols; i++) {
-		if (board[i])
+	for (int i = 0; i < kStorageRows * kStorageCols; i++) {
+		if (storage[i])
 			count += 1;
 	}
 	return count;
@@ -215,15 +215,15 @@ void ShelterRescueSiteBase::onRenderContent(ManagedSurface32 *screen) {
 
 	static constexpr int kStandingCell = 33;
 	const int clipRight = _gridBasePos.x + 223;
-	BoardRecord *const *board = getRescueBoard();
+	StorageRecord *const *storage = getRescueStorage();
 	for (int col = 0; col < kGridCols; col++) {
 		const int colSlotBase = (col + _scrollOffset) * kGridRows;
 		for (int row = 0; row < kGridRows; row++) {
 			const int slotIdx = colSlotBase + row;
-			if (slotIdx < 0 || kBoardRows * kBoardCols <= slotIdx)
+			if (slotIdx < 0 || kStorageRows * kStorageCols <= slotIdx)
 				continue;
 
-			const BoardRecord *record = board[slotIdx];
+			const StorageRecord *record = storage[slotIdx];
 			if (!record)
 				continue;
 
@@ -250,7 +250,7 @@ EventHandleResult ShelterRescueSiteBase::onLButtonDown(const Common::Point &pos)
 	}
 
 	if (_scrollDownRect.contains(pos)) {
-		if (_scrollOffset < kBoardRows - kGridCols)
+		if (_scrollOffset < kStorageRows - kGridCols)
 			_scrollOffset += 1;
 		debug(2, "RescueSite: Scroll down/right, offset=%d", _scrollOffset);
 		return EventHandleResult::kConsumed;
@@ -266,8 +266,8 @@ EventHandleResult ShelterRescueSiteBase::onLButtonDown(const Common::Point &pos)
 			const Common::Rect slotHit(slotPos.x + 24, slotPos.y + 30, slotPos.x + 64, slotPos.y + 87);
 			if (slotHit.contains(pos)) {
 				const int slotIdx = (col + _scrollOffset) * kGridRows + row;
-				BoardRecord *const *board = getRescueBoard();
-				if (0 <= slotIdx && slotIdx < kBoardRows * kBoardCols && board[slotIdx]) {
+				StorageRecord *const *storage = getRescueStorage();
+				if (0 <= slotIdx && slotIdx < kStorageRows * kStorageCols && storage[slotIdx]) {
 					_selectedZoombini = slotIdx;
 					debug(2, "RescueSite: Selected zoombini %d at slot %d", slotIdx, slotIdx);
 				} else {
