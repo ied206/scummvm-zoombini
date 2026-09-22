@@ -34,7 +34,7 @@ namespace Zoombini2 {
 class ShelterBase : public InteractiveBase {
 public:
 	/** Bind a shelter page to @p vm. */
-	explicit ShelterBase(Zoombini2Engine *vm) : InteractiveBase(vm) {}
+	explicit ShelterBase(Zoombini2Engine *vm) : InteractiveBase(vm, PageCategory::kShelter) {}
 	/** Return whether the shared sidebar is visible. */
 	bool hasSidebar() const override { return true; }
 	/** Identify this page as a shelter for global page policy. */
@@ -44,7 +44,7 @@ public:
 class Animation;
 class ZoombiniAnimation;
 class ZoombiniRunner;
-struct BoardRecord;
+struct StorageRecord;
 
 /** Common waiting-roster, scrolling, and departure lifecycle for both rescue sites. */
 class ShelterRescueSiteBase : public ShelterBase {
@@ -79,12 +79,12 @@ protected: /** Bind a concrete rescue site to @p vm. */
 	void loadScrollButtons(const char *buttonUpPath, const char *buttonDownPath);
 	/** Reset common selection and departure state after presentation resources load. */
 	void resetRescueState();
-	/** Clear an unvisited waiting board and restore its saved scroll position. */
-	void prepareWaitingBoard(BoardRecord **board);
-	/** Refill the eight-member departure roster from @p board. */
-	void refillDepartureRoster(BoardRecord **board);
-	/** Persist every non-departing member in @p board and write the active save. */
-	void saveRescueRoster(BoardRecord **board);
+	/** Clear unvisited waiting storage and restore its saved scroll position. */
+	void prepareWaitingStorage(StorageRecord **storage);
+	/** Refill the eight-member departure roster from @p storage. */
+	void refillDepartureRoster(StorageRecord **storage);
+	/** Persist every non-departing member in @p storage and write the active save. */
+	void saveRescueRoster(StorageRecord **storage);
 	/** Load the shared little-Zoombini animation through the engine cache. */
 	void loadRosterAnimation();
 	/** Queue an arrival speech for sequential playback. */
@@ -93,8 +93,8 @@ protected: /** Bind a concrete rescue site to @p vm. */
 	void pumpSpeechQueue();
 	/** Stop arrival speech playback and discard the queue. */
 	void clearSpeechQueue();
-	/** Count the occupied cells of @p board. */
-	static uint countBoardMembers(BoardRecord *const *board);
+	/** Count the occupied cells of @p storage. */
+	static uint countStorageMembers(StorageRecord *const *storage);
 	/** Begin the delayed map transition used by Rescue Site I's branch controls. */
 	void beginDeparture();
 	/** Return whether the delayed departure phase is active. */
@@ -102,8 +102,8 @@ protected: /** Bind a concrete rescue site to @p vm. */
 	/** Draw the wrapping waiting-roster backdrop beneath its Zoombinis. */
 	void drawRosterBackdrop(ManagedSurface32 *screen, int scrollX) const;
 
-	/** Return the concrete site's waiting board. */
-	virtual BoardRecord **getRescueBoard() const = 0;
+	/** Return the concrete site's waiting storage. */
+	virtual StorageRecord **getRescueStorage() const = 0;
 	/** Draw site-specific layers before the common scroll controls and waiting roster. */
 	virtual void onRenderSite(ManagedSurface32 *screen);
 	/** Handle site-specific controls before common waiting-roster selection. */

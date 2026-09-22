@@ -49,9 +49,12 @@ constexpr const char *PuzzleBoolies::kBoolieWalkTwoPath;
 constexpr const char *PuzzleBoolies::kPreviewEntryPath;
 constexpr const char *PuzzleBoolies::kFeederPathFormat;
 constexpr const char *PuzzleBoolies::kLanePathFormat;
+constexpr const char *PuzzleBoolies::kBallExitPathFormat;
 constexpr const char *PuzzleBoolies::kJumpPathFormat;
 constexpr const char *PuzzleBoolies::kEffectPathFormat;
 constexpr const char *PuzzleBoolies::kBoardVoicePathFormat;
+constexpr const char *PuzzleBoolies::kCompleteSpeechPath;
+constexpr const char *PuzzleBoolies::kRetreatSpeechPath;
 constexpr int PuzzleBoolies::kRefillStartX[kSlotCount];
 constexpr int PuzzleBoolies::kRefillY[kRowCount];
 constexpr int PuzzleBoolies::kPreviewHoldX[kMaxChallengeBalls];
@@ -81,7 +84,7 @@ PuzzleBoolies::~PuzzleBoolies() {
 				soundManager->unload(_boardVoiceIds[index]);
 		}
 	}
-	finishPuzzleRoster(_vm->_state->_rescue2Board);
+	finishPuzzleRoster(_vm->_state->_rescue2Storage);
 }
 
 int PuzzleBoolies::getRescuedBooliesPerZoombini(int level) {
@@ -387,6 +390,10 @@ void PuzzleBoolies::init() {
 	}
 	for (int row = 0; row < kRowCount; row++)
 		generateRow(row);
+	byte entryValues[kSlotCount];
+	for (int slot = 0; slot < kSlotCount; slot++)
+		entryValues[slot] = _boolies[kRowCount - 1][slot].value;
+	startRefill(kRowCount - 1, entryValues, _vm->getGameTickCount());
 	switch (_puzzleLevel) {
 	case 1:
 		_requiredTurns = (rosterCount + 3) / 4 + 2 * rosterCount + 1;
@@ -422,7 +429,7 @@ void PuzzleBoolies::startLaneBall(Ball &ball, uint32 now) {
 	ball.path->start(now);
 	ball.pos = ball.path->segments[0]->getStartPosition();
 	ball.stage = BallStage::kLane03;
-	const int effectIndex = 2 * (kRowCount - 1 - _selectedRow) + (_challengeType < 0 ? 1 : 0);
+	const int effectIndex = 2 * _selectedRow + (_challengeType < 0 ? 1 : 0);
 	playEffect(_effectIds[effectIndex]);
 }
 
@@ -442,10 +449,23 @@ void PuzzleBoolies::advanceBall(Ball &ball, uint32 now) {
 			ball.stage = BallStage::kHeld02;
 		}
 	} else if (ball.stage == BallStage::kLane03) {
-		if (!ball.path->advance(now, ball.pos)) {
+		const bool moving = ball.path->advance(now, ball.pos);
+		if (!moving || ball.pos.x - 17 <= 180) {
 			resolveBall(ball, now);
-			ball.stage = BallStage::kDone04;
+			delete ball.path;
+			ball.path = PathObject::loadFromPAT(_vm, Common::Path(Common::String::format(kBallExitPathFormat, _selectedRow + 2)));
+			if (ball.path) {
+				ball.path->start(now);
+				ball.stage = BallStage::kExit08;
+			} else {
+				ball.stage = BallStage::kDone04;
+			}
 		}
+	} else if (ball.stage == BallStage::kExit08) {
+		// The finite exit path keeps requesting the impact sample as voices become available.
+		playEffect(_effectIds[6]);
+		if (!ball.path->advance(now, ball.pos) || 810 < ball.pos.x - 17)
+			ball.stage = BallStage::kDone04;
 	}
 }
 
@@ -492,7 +512,6 @@ void PuzzleBoolies::resolveBall(const Ball &ball, uint32 now) {
 	(void)ball;
 	if (_selectedRow < 0)
 		return;
-	playEffect(_effectIds[6]);
 	for (int slot = 0; slot < kSlotCount; slot++) {
 		Boolie &boolie = _boolies[_selectedRow][slot];
 		if (boolie.removed || boolie.jumping)
@@ -546,12 +565,16 @@ void PuzzleBoolies::startRowJumps(uint32 now) {
 		}
 	}
 	if (!_jumps.empty()) {
-		Jump &first = _jumps[0];
-		playBoardVoice();
-		first.path->start(now);
-		first.started = true;
-		_boolies[first.row][first.slot].jumping = true;
+		startJump(_jumps[0], now);
 	}
+}
+
+void PuzzleBoolies::startJump(Jump &jump, uint32 now) {
+	playBoardVoice();
+	jump.path->start(now);
+	jump.pos = jump.path->segments[0]->getStartPosition();
+	jump.started = true;
+	_boolies[jump.row][jump.slot].jumping = true;
 }
 
 void PuzzleBoolies::advanceJumps(uint32 now) {
@@ -569,12 +592,24 @@ void PuzzleBoolies::advanceJumps(uint32 now) {
 	delete jump.path;
 	_jumps.remove_at(0);
 	if (!_jumps.empty()) {
-		Jump &next = _jumps[0];
-		playBoardVoice();
-		next.path->start(now);
-		next.started = true;
-		_boolies[next.row][next.slot].jumping = true;
+		startJump(_jumps[0], now);
 	}
+}
+
+void PuzzleBoolies::startRefill(int row, const byte (&values)[kSlotCount], uint32 now) {
+	for (int slot = 0; slot < kSlotCount; slot++) {
+		_refillValues[slot] = values[slot];
+		Boolie &boolie = _boolies[row][slot];
+		boolie.value = values[slot];
+		boolie.visibleValue = values[slot];
+		boolie.jumping = false;
+		boolie.removed = true;
+	}
+	_refillRow = row;
+	_refillSlot = 0;
+	_refillX = kRefillStartX[0];
+	_refillCycleStart = now;
+	_refillActive = true;
 }
 
 void PuzzleBoolies::advanceRefill(uint32 now) {
@@ -611,22 +646,12 @@ bool PuzzleBoolies::isRowEmpty(int row) const {
 }
 
 void PuzzleBoolies::startBoat(uint32 now) {
-	for (int slot = 0; slot < kSlotCount; slot++) {
-		Boolie &boolie = _boolies[_selectedRow][slot];
-		boolie.value = _replacementValues[0][slot];
-		boolie.visibleValue = boolie.value;
-		boolie.jumping = false;
-		boolie.removed = true;
-	}
-	_refillRow = _selectedRow;
-	_refillSlot = 0;
-	_refillX = kRefillStartX[0];
-	_refillCycleStart = now;
-	_refillActive = true;
+	startRefill(_selectedRow, _replacementValues[0], now);
 	if (_activeRunnerIndex < static_cast<int>(_puzzleZoombinis.size()) && _puzzleZoombinis[_activeRunnerIndex])
 		_puzzleZoombinis[_activeRunnerIndex]->_puzzleStatus = 1;
 	_phase = Phase::kBoatLeaving03;
 	_phaseTime = now;
+	_returnBoatActive = false;
 }
 
 void PuzzleBoolies::finishRound(uint32 now) {
@@ -647,33 +672,46 @@ void PuzzleBoolies::finishRound(uint32 now) {
 
 void PuzzleBoolies::advanceBoat(uint32 now) {
 	static constexpr double kPixelsPerMillisecond = 800.0 / 4500.0;
-	const int distance = static_cast<int>((now - _phaseTime) * kPixelsPerMillisecond);
+	const double distance = (now - _phaseTime) * kPixelsPerMillisecond;
+	_phaseTime = now;
+	const bool returning = _returnBoatActive;
 	if (_phase == Phase::kBoatLeaving03) {
-		_boatX = 80 + distance;
+		_boatX = static_cast<int>(_boatX + distance);
 		if (_activeRunnerIndex < static_cast<int>(_puzzleZoombinis.size()) && _puzzleZoombinis[_activeRunnerIndex])
 			_puzzleZoombinis[_activeRunnerIndex]->setPosition(Common::Point32(_boatX + 35, 495));
 		const bool lastRunner = _activeRunnerIndex + 1 == static_cast<int>(_puzzleZoombinis.size());
-		if (_boatX < (lastRunner ? 810 : 549))
-			return;
-		if (lastRunner) {
+		if (!lastRunner && !_returnBoatActive && 549 <= _boatX) {
+			_returnBoatX = -251;
+			_returnBoatActive = true;
+			_puzzleZoombinis[_activeRunnerIndex + 1]->_hidden = false;
+			_puzzleZoombinis[_activeRunnerIndex + 1]->setPosition(Common::Point32(_returnBoatX + 35, 495));
+			_vm->_zoombiniWalkingFlag = true;
+		}
+		if (810 < _boatX && lastRunner) {
 			_phase = Phase::kFinished05;
 			_vm->_zoombiniWalkingFlag = true;
 			_vm->restartGoBlink();
+			if (_vm->_isSavedGame) {
+				if (SoundManager *sound = _vm->getSoundManager())
+					sound->queueSpeech(Common::Path(kCompleteSpeechPath));
+			}
 			return;
 		}
-		_puzzleZoombinis[_activeRunnerIndex]->_hidden = true;
-		_activeRunnerIndex += 1;
-		_boatX = -251;
-		_passengers.clear();
-		_phase = Phase::kBoatReturning04;
-		_phaseTime = now;
-		_puzzleZoombinis[_activeRunnerIndex]->_hidden = false;
-		return;
+		if (810 < _boatX) {
+			_puzzleZoombinis[_activeRunnerIndex]->_hidden = true;
+			_phase = Phase::kBoatReturning04;
+		}
 	}
-	_boatX = -251 + distance;
-	_puzzleZoombinis[_activeRunnerIndex]->setPosition(Common::Point32(_boatX + 35, 495));
-	if (_boatX < 80)
+	if (!returning)
 		return;
+	_returnBoatX = static_cast<int>(_returnBoatX + distance);
+	_puzzleZoombinis[_activeRunnerIndex + 1]->setPosition(Common::Point32(_returnBoatX + 35, 495));
+	if (_returnBoatX < 80)
+		return;
+	_puzzleZoombinis[_activeRunnerIndex]->_hidden = true;
+	_activeRunnerIndex += 1;
+	_returnBoatActive = false;
+	_passengers.clear();
 	_boatX = 80;
 	_puzzleZoombinis[_activeRunnerIndex]->setPosition(Common::Point32(115, 495));
 	_vm->_zoombiniWalkingFlag = true;
@@ -687,6 +725,14 @@ void PuzzleBoolies::advanceBoat(uint32 now) {
 
 void PuzzleBoolies::onUpdate() {
 	const uint32 now = _vm->getGameTickCount();
+	if (_goPending) {
+		SoundManager *sound = _vm->getSoundManager();
+		if (!sound || !sound->hasPendingSpeech()) {
+			_vm->_mapTransitionSourcePageId = kPageBoolies;
+			_vm->requestPageChange(kPageMapTrans);
+		}
+		return;
+	}
 	advanceRefill(now);
 	for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
 		if (_puzzleZoombinis[index])
@@ -710,7 +756,7 @@ void PuzzleBoolies::onUpdate() {
 		_nextLaneBallIndex += 1;
 		_nextLaneLaunchAt = now + kBallLaunchInterval;
 	}
-	for (uint index = 0; index < _balls.size(); index++)
+	for (int index = static_cast<int>(_balls.size()) - 1; 0 <= index; index--)
 		advanceBall(_balls[index], now);
 	advanceFlips(now);
 	advanceJumps(now);
@@ -808,7 +854,7 @@ void PuzzleBoolies::onRenderContent(ManagedSurface32 *screen) {
 		}
 	}
 	if (_refillActive) {
-		const byte value = _replacementValues[0][_refillSlot];
+		const byte value = _refillValues[_refillSlot];
 		const Animation *animation = _walkAnimations[value - 1];
 		if (animation && 0 < animation->getFrameCount()) {
 			const uint32 frame = MIN<uint32>((now - _refillCycleStart) / kWalkFrameTime, MIN<uint32>(kWalkFrameCount, animation->getFrameCount()) - 1);
@@ -851,6 +897,8 @@ void PuzzleBoolies::onRenderContent(ManagedSurface32 *screen) {
 			_vm->_gfx->drawAnimationFrame(screen, _blockerAnimation, elapsed / kBlockerFrameTime, Common::Point32(244, 38));
 	}
 	_vm->_gfx->drawPageRleBlock(screen, kBoatPath, Common::Point32(_boatX, 410));
+	if (_returnBoatActive)
+		_vm->_gfx->drawPageRleBlock(screen, kBoatPath, Common::Point32(_returnBoatX, 410));
 	for (uint index = 0; index < _passengers.size(); index++) {
 		const Passenger &passenger = _passengers[index];
 		_vm->_gfx->drawPageRleBlock(screen, passenger.value == 1 ? kFixePath : kFixe2Path,
@@ -935,7 +983,25 @@ Common::String PuzzleBoolies::debugGetAnswer() const {
 }
 
 bool PuzzleBoolies::canUseGoButton() const {
-	return _vm->_zoombiniWalkingFlag;
+	return !_goPending && _vm->_zoombiniWalkingFlag;
+}
+
+bool PuzzleBoolies::onGoButtonPressed() {
+	if (!_vm->_isSavedGame)
+		return true;
+	if (_goPending)
+		return false;
+	int remaining = 0;
+	for (const ZoombiniRunner *runner : _puzzleZoombinis) {
+		if (runner->_puzzleStatus == 0)
+			remaining += 1;
+	}
+	if (remaining < 4)
+		return true;
+	if (SoundManager *sound = _vm->getSoundManager())
+		sound->queueSpeech(Common::Path(kRetreatSpeechPath));
+	_goPending = true;
+	return false;
 }
 
 PuzzleChanceInfo PuzzleBoolies::debugGetChances() const {

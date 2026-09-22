@@ -54,6 +54,7 @@ constexpr const char *PuzzleSnowboard::kSuccessSpeechPath;
 constexpr const char *PuzzleSnowboard::kFailureSpeechPath;
 constexpr const char *PuzzleSnowboard::kPerfectGoSpeechFormat;
 constexpr const char *PuzzleSnowboard::kCaveGoSpeechPath;
+constexpr const char *PuzzleSnowboard::kPickupAnimationPath;
 constexpr const char *PuzzleSnowboard::kCelebrationAnimationPath;
 
 constexpr Common::Point32 PuzzleSnowboard::kStartPositions[8];
@@ -76,16 +77,12 @@ PuzzleSnowboard::~PuzzleSnowboard() {
 		sound->unload(_obstacleHitSound);
 		sound->unload(_obstacleRevealSound);
 		sound->unload(_obstacleHideSound);
-		if (0 <= _speechSoundId) {
-			sound->stop(_speechSoundId);
-			sound->unload(_speechSoundId);
-		}
 	}
 	delete _boardAnim;
 	delete _engineAnim;
 	for (int index = 0; index < 5; index++)
 		delete _obstacleAnims[index];
-	finishPuzzleRoster(_vm->_state->_rescue2Board);
+	finishPuzzleRoster(_vm->_state->_rescue2Storage);
 }
 
 void PuzzleSnowboard::loadGraphics() {
@@ -206,6 +203,7 @@ void PuzzleSnowboard::init() {
 	}
 	_collisionQuota = _puzzleLevel == 1 ? 2 : 4;
 	loadGraphics();
+	_pickupAnimation = _vm->loadZoombiniAnimation(Common::Path(kPickupAnimationPath), 100);
 	_celebrationAnimation = _vm->loadZoombiniAnimation(Common::Path(kCelebrationAnimationPath), 50);
 	loadAreaMask(Common::Path(kAreaMaskPath));
 	if (SoundManager *sound = _vm->getSoundManager()) {
@@ -262,7 +260,7 @@ void PuzzleSnowboard::captureZoombini(int zoombiniIndex) {
 		_obstacleHit[lane] = false;
 	zoombini->_inputEnabled = false;
 	zoombini->startMovement(ridePath, now);
-	zoombini->startDirectionTrackedAnimation(now);
+	zoombini->resetAnimation();
 	bool hasSelectableRider = false;
 	for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
 		if (_puzzleZoombinis[index] && _puzzleZoombinis[index]->_inputEnabled) {
@@ -348,43 +346,12 @@ void PuzzleSnowboard::checkObstacleCollision(ZoombiniRunner *zoombini) {
 }
 
 void PuzzleSnowboard::enqueueSpeech(const Common::String &path, bool collision) {
-	SpeechEntry entry;
-	entry.path = path;
-	entry.collision = collision;
-	_speechQueue.push_back(entry);
+	SoundManager *sound = _vm->getSoundManager();
+	if (!sound)
+		return;
+	sound->queueSpeech(Common::Path(path));
 	if (collision)
 		_collisionSpeechPending = true;
-	pumpSpeechQueue();
-}
-
-void PuzzleSnowboard::pumpSpeechQueue() {
-	SoundManager *sound = _vm->getSoundManager();
-	if (!sound) {
-		_speechSoundId = -1;
-		_nextSpeechIndex = _speechQueue.size();
-		_collisionSpeechPending = false;
-		return;
-	}
-	if (0 <= _speechSoundId) {
-		if (sound->isPlaying(_speechSoundId))
-			return;
-		sound->unload(_speechSoundId);
-		_speechSoundId = -1;
-		if (_activeSpeechIsCollision)
-			_collisionSpeechPending = false;
-	}
-	while (_nextSpeechIndex < _speechQueue.size()) {
-		const SpeechEntry &entry = _speechQueue[_nextSpeechIndex];
-		_nextSpeechIndex += 1;
-		_speechSoundId = sound->load(true, Common::Path(entry.path), false);
-		if (0 <= _speechSoundId) {
-			_activeSpeechIsCollision = entry.collision;
-			sound->playWithVolume(_speechSoundId, sound->_volumeSpeech);
-			return;
-		}
-		if (entry.collision)
-			_collisionSpeechPending = false;
-	}
 }
 
 bool PuzzleSnowboard::hasActiveHitAnimation(uint32 now) const {
@@ -419,6 +386,7 @@ void PuzzleSnowboard::startExitPath(ZoombiniRunner *zoombini) {
 		path->appendSegment(start, Common::Point32(start.x + dx / 3, start.y + dy / 3),
 							Common::Point32(end.x - dx / 3, end.y - dy / 3), end, 10, 0);
 		zoombini->startMovement(path, now);
+		zoombini->startDirectionTrackedAnimation(now);
 		_onExitPath = true;
 		return;
 	}
@@ -459,8 +427,10 @@ void PuzzleSnowboard::finishRide(ZoombiniRunner *zoombini) {
 
 void PuzzleSnowboard::onUpdate() {
 	const uint32 now = _vm->getGameTickCount();
-	pumpSpeechQueue();
-	if (_goTransitionPending && _speechSoundId < 0 && _nextSpeechIndex == _speechQueue.size()) {
+	SoundManager *sound = _vm->getSoundManager();
+	if (_collisionSpeechPending && (!sound || !sound->hasPendingSpeech()))
+		_collisionSpeechPending = false;
+	if (_goTransitionPending && (!sound || !sound->hasPendingSpeech())) {
 		_goTransitionPending = false;
 		_vm->_mapTransitionSourcePageId = kPageSnowboard;
 		_vm->requestPageChange(kPageMapTrans);
@@ -672,13 +642,13 @@ void PuzzleSnowboard::onActorsRendered() {
 EventHandleResult PuzzleSnowboard::onLButtonUp(const Common::Point &pos) {
 	const bool acceptRelease = !_finished && _activeRunnerIndex == -1;
 	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y),
-																		  acceptRelease, _zoombiniAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
+																	acceptRelease, _pickupAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
 	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 
 EventHandleResult PuzzleSnowboard::onMouseMove(const Common::Point &pos) {
 	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), false,
-																		  _zoombiniAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
+																	_pickupAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
 	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 

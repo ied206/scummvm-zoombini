@@ -222,14 +222,31 @@ void Zoombini2Engine::clearZoombiniAnimationCache() {
 bool Zoombini2Engine::writeGameSave(const Common::String &name) {
 	if (ConfMan.getBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, ConfMan.getActiveDomainName()))
 		return false;
-	return saveGameProfile(name);
+	if (_activeSaveProfileReadOnly)
+		return true;
+	const Common::String &storageName = _activeSaveProfileName.empty() ? name : _activeSaveProfileName;
+	return saveGameProfile(storageName);
 }
 
 bool Zoombini2Engine::createGameSave(const Common::String &name) {
 	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName());
 	if (savegameManager.profileExists(name))
 		return false;
-	return saveGameProfile(name);
+	const bool saved = saveGameProfile(name);
+	if (saved) {
+		_activeSaveProfileName = name;
+		_activeSaveProfileReadOnly = false;
+	}
+	return saved;
+}
+
+bool Zoombini2Engine::overwriteGameSave(const Common::String &name) {
+	const bool saved = saveGameProfile(name);
+	if (saved) {
+		_activeSaveProfileName = name;
+		_activeSaveProfileReadOnly = false;
+	}
+	return saved;
 }
 
 bool Zoombini2Engine::saveGameProfile(const Common::String &name) {
@@ -243,17 +260,32 @@ bool Zoombini2Engine::readGameSave(const Common::String &name) {
 	if (!_state)
 		return false;
 	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName());
-	return savegameManager.loadProfile(name, *_state);
+	const bool loaded = savegameManager.loadProfile(name, *_state);
+	if (loaded) {
+		_activeSaveProfileName = name;
+		_activeSaveProfileReadOnly = isGameSaveReadOnly(name);
+	}
+	return loaded;
 }
 
 bool Zoombini2Engine::deleteGameSave(const Common::String &name) {
 	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName());
-	return savegameManager.deleteProfile(name);
+	const bool deleted = savegameManager.deleteProfile(name);
+	if (deleted && _activeSaveProfileName == name) {
+		_activeSaveProfileName.clear();
+		_activeSaveProfileReadOnly = false;
+	}
+	return deleted;
 }
 
 Common::StringArray Zoombini2Engine::listGameSaves() const {
 	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName());
 	return savegameManager.listProfiles();
+}
+
+bool Zoombini2Engine::isGameSaveReadOnly(const Common::String &name) const {
+	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName());
+	return savegameManager.isProfileReadOnly(name);
 }
 
 bool Zoombini2Engine::takePracticePuzzleLaunch(PageId &pageId, int &level) {
@@ -387,6 +419,7 @@ Common::Error Zoombini2Engine::run() {
 
 	_startTime = g_system->getMillis();
 	_cachedGameTickCount = 0;
+	_prevFrameTickCount = 0;
 	_frameTimeOriginMs = _startTime;
 	_lastFrameElapsedMs = 0;
 	_hasFrameIndex = false;
@@ -603,6 +636,7 @@ void Zoombini2Engine::refreshEngineSettings() {
 	_useAquacubeSafeFirstMove = ConfMan.getBool(::Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove);
 	_useFloatingPointPaths = ConfMan.getBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths);
 	_enhancedKbdShortcuts = ConfMan.getBool(::Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts);
+	_logicPacingHz = ConfMan.getInt(::Zoombini2MetaEngine::kConfigLogicPacingHz) == 75 ? 75 : 60;
 	if (!_debugHotkeysEnabled) {
 		_debugCompletionKeyDown = false;
 		_debugOverlayKeyDown = false;
@@ -754,12 +788,18 @@ bool Zoombini2Engine::dispatchPageEvents() {
 	for (const Common::Event &event : _pendingPageEvents) {
 		if (_nextPageId != kPageNone)
 			break;
+		const bool speechSkipInput = event.type == Common::EVENT_LBUTTONDOWN ||
+									 (event.type == Common::EVENT_KEYDOWN && event.kbd.keycode == Common::KEYCODE_SPACE);
+		if (speechSkipInput && _soundManager && _soundManager->hasPendingSpeech())
+			_soundManager->skipSpeechQueue();
 
 		const bool msgBoxEventWasActive = _msgBoxDialog && _msgBoxDialog->isActive();
 		const bool debugDialogEventWasActive = _debugDialog && _debugDialog->isActive();
 		const bool sidebarDialogEventWasActive = _sidebar && _sidebar->hasActiveDialog();
 		const bool pageDialogWasActive = _currentPage->hasActiveDialog();
 		modalInputBlocked = modalInputBlocked || msgBoxEventWasActive || debugDialogEventWasActive || sidebarDialogEventWasActive;
+		if (event.type == Common::EVENT_LBUTTONDOWN)
+			_modalOwnedPress = msgBoxEventWasActive || debugDialogEventWasActive || sidebarDialogEventWasActive || pageDialogWasActive;
 
 		if (event.type == Common::EVENT_LBUTTONDOWN || event.type == Common::EVENT_LBUTTONUP || event.type == Common::EVENT_MOUSEMOVE)
 			_mousePos = event.mouse;
@@ -771,8 +811,13 @@ bool Zoombini2Engine::dispatchPageEvents() {
 			result = _debugDialog->handleEvent(event);
 		else if (_sidebar)
 			result = _sidebar->handleEvent(event);
-		if (result == EventHandleResult::kPassthrough && !modalInputBlocked)
+		// A press that began inside a modal owns its release. The press may
+		// have dismissed the modal, but the release must still not reach the page.
+		const bool releaseAfterModalPress = event.type == Common::EVENT_LBUTTONUP && _modalOwnedPress;
+		if (result == EventHandleResult::kPassthrough && !modalInputBlocked && !releaseAfterModalPress)
 			_currentPage->handleEvent(event);
+		if (event.type == Common::EVENT_LBUTTONUP)
+			_modalOwnedPress = false;
 
 		const bool msgBoxEventIsActive = _msgBoxDialog && _msgBoxDialog->isActive();
 		const bool debugDialogEventIsActive = _debugDialog && _debugDialog->isActive();
@@ -882,7 +927,10 @@ void Zoombini2Engine::runFrame() {
 	if (shouldQuit())
 		return;
 	// Keep one gameplay-time snapshot for every active pass.
+	_prevFrameTickCount = _cachedGameTickCount;
 	_cachedGameTickCount = calculateGameTickCount();
+	if (_soundManager)
+		_soundManager->updateSpeechQueue();
 	applyPendingPageChange();
 	drawFrame();
 	presentFrame();
@@ -1050,6 +1098,13 @@ void Zoombini2Engine::switchPage(PageId pageId) {
 	}
 
 	if (_currentPage) {
+		// The original publishes one effective difficulty per page switch. Puzzle
+		// destinations carry their stored world difficulty, while shelter, movie,
+		// and transition destinations pass 0, which is coerced to level 1. Mirror
+		// that coercion so non-puzzle pages (e.g. Booliewood) always resolve the
+		// easy help sheet instead of a missing medium/hard one.
+		if (_state && _currentPage->getCategory() != PageCategory::kPuzzle)
+			_state->_level = 1;
 		_currentPage->init();
 		if (_state && kPageZombiniville <= pageId && pageId <= kPageBooliewood)
 			_state->_currentGameplayPageId = pageId;

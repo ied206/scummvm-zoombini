@@ -282,8 +282,10 @@ private:
 	void clearSelection();
 	/** Queue a Norf's spoken clue and its optional directional gestures. */
 	void sayClue(int index);
-	/** Start a non-looping speech resource and retain its mixer handle. */
-	void playSpeech(const Common::Path &path);
+	/** Play an interruptible Norf clue outside the serialized narration queue. */
+	void playClue(const Common::Path &path);
+	/** Add feedback, completion, or departure speech to the serialized game narration queue. */
+	void queueSpeech(const Common::Path &path);
 	/** Play one indexed service effect. */
 	void playSound(int index);
 	/** Start a body/cap motion for the Norf seated at @p table. */
@@ -312,7 +314,7 @@ private:
 	bool canSubmitTo(int table) const;
 	/** Return whether a Norf animation is active, optionally ignoring idle animation. */
 	bool motionActive(bool includeIdle = true) const;
-	/** Return whether queued speech still occupies the speech sound handle. */
+	/** Return whether the serialized speech queue is still active. */
 	bool speechPlaying() const;
 	/** Return whether @p pos lies inside a page-space rectangle. */
 	static bool inside(const Common::Point32 &pos, int x, int y, int width, int height);
@@ -368,8 +370,8 @@ private:
 	bool _departAfterSpeech = false;
 	bool _dismissPending = false;
 	bool _releasePending = false;
-	/** Current speech handle and the indexed service-effect handles. */
-	int _speechSound = -1;
+	/** Interruptible clue speech and indexed service-effect handles. */
+	int _clueSpeechSound = -1;
 	int _sounds[8] = {
 		-1,
 		-1,

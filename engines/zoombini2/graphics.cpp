@@ -856,10 +856,14 @@ void RleBlock::drawToScreenInternal(ManagedSurface32 *destSurface, const Common:
 
 constexpr const char *Gfx::kTextFontPath;
 constexpr const char *Gfx::kNameBoxSpritePath;
+constexpr const char *Gfx::kDropTargetGlowPath;
 constexpr const char *Gfx::kMapTransitionOverlayPathFormat;
 constexpr const char *Gfx::kMapTransitionBackgroundPathFormat;
 
 Gfx::Gfx(Zoombini2Engine *vm) : _vm(vm), _pageLayerStack(new PageLayerStack(vm)) {
+	_dropTargetGlowSprite = loadSharedRleBlock(kDropTargetGlowPath);
+	if (!_dropTargetGlowSprite)
+		warning("Gfx: Failed to load shared drop-target glow");
 }
 
 Gfx::~Gfx() {
@@ -1106,9 +1110,8 @@ void Gfx::drawZoombiniPreview(ManagedSurface32 *screen, const ZoombiniAnimation 
 	}
 }
 
-void Gfx::drawZoombiniRunner(ManagedSurface32 *screen, const ZoombiniRunner *runner, const Common::Rect32 *clip,
-							 int scrollX, int backgroundWidth, const RleBlock *dropTargetIndicator) const {
-	drawZoombiniRunner(screen, runner, _vm->getAlphaLUT(), clip, scrollX, backgroundWidth, dropTargetIndicator);
+void Gfx::drawZoombiniRunner(ManagedSurface32 *screen, const ZoombiniRunner *runner, const Common::Rect32 *clip, int scrollX, int backgroundWidth) const {
+	drawZoombiniRunner(screen, runner, _vm->getAlphaLUT(), clip, scrollX, backgroundWidth, _dropTargetGlowSprite);
 }
 
 void Gfx::drawZoombiniRunner(ManagedSurface32 *screen, const ZoombiniRunner *runner, const AlphaBlendLUT &alphaLUT,
@@ -1126,11 +1129,12 @@ void Gfx::drawZoombiniRunner(ManagedSurface32 *screen, const ZoombiniRunner *run
 }
 
 void Gfx::textColorRGB(TextColor color, byte &red, byte &green, byte &blue) {
-	static constexpr byte kColors[4][3] = {
+	static constexpr byte kColors[5][3] = {
 		{16, 16, 16},
 		{0, 0, 255},
 		{0, 255, 0},
 		{255, 255, 255},
+		{255, 0, 0},
 	};
 	const int index = static_cast<int>(color);
 	red = kColors[index][0];
@@ -1140,7 +1144,7 @@ void Gfx::textColorRGB(TextColor color, byte &red, byte &green, byte &blue) {
 
 bool Gfx::loadTextFont(TextColor color) {
 	const int index = static_cast<int>(color);
-	if (index < 0 || 4 <= index)
+	if (index < 0 || 5 <= index)
 		return false;
 	if (hasTextFont(color))
 		return true;
@@ -1151,7 +1155,7 @@ bool Gfx::loadTextFont(TextColor color) {
 
 bool Gfx::hasTextFont(TextColor color) const {
 	const int index = static_cast<int>(color);
-	return 0 <= index && index < 4 && _textFont && _textFont->isLoaded();
+	return 0 <= index && index < 5 && _textFont && _textFont->isLoaded();
 }
 
 int Gfx::drawText(ManagedSurface32 *destSurface, TextColor color, const Common::Point32 &pos, const Common::String &text) const {

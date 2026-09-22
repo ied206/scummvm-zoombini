@@ -108,6 +108,7 @@ private:
 	static constexpr const char *kFailureSpeechPath = "sounds/8-E2.wav";
 	static constexpr const char *kPerfectGoSpeechFormat = "sounds/WLD11.%d.wav";
 	static constexpr const char *kCaveGoSpeechPath = "sounds/DW-Cave.wav";
+	static constexpr const char *kPickupAnimationPath = "bmp/zombis/pris/pris.anm";
 	static constexpr const char *kCelebrationAnimationPath = "bmp/zombis/attente/attenteZomb.anm";
 	/** Counts for physical lanes, decision tests, exit slots, and animation-bank frame roles. */
 	static constexpr int kLaneCount = 4;
@@ -137,13 +138,6 @@ private:
 		int y;
 		/** Decision-tree leaf code associated with this point. */
 		int routeCode;
-	};
-
-	/** One page-local speech request and whether it gates another collision. */
-	struct SpeechEntry {
-		/** Resource path and collision gate associated with one queued speech item. */
-		Common::String path;
-		bool collision;
 	};
 
 	/** Starting positions for the eight-member route party. */
@@ -236,9 +230,8 @@ private:
 	void finishRide(ZoombiniRunner *zoombini);
 	/** Count contact between @p zoombini and each visible obstacle. */
 	void checkObstacleCollision(ZoombiniRunner *zoombini);
-	/** Queue and advance collision or completion speech. */
+	/** Queue collision or completion speech through the serialized game queue. */
 	void enqueueSpeech(const Common::String &path, bool collision);
-	void pumpSpeechQueue();
 	/** Whether a collision reaction still blocks an obstacle change. */
 	bool hasActiveHitAnimation(uint32 now) const;
 	/** Advance the board pose toward the active rider's path direction. */
@@ -254,6 +247,8 @@ private:
 	Common::Array<ZmbDropTarget> _dropTargets;
 	/** Shared celebration grid for successful riders after completion. */
 	const ZoombiniAnimation *_celebrationAnimation = nullptr;
+	/** Shared held-Zoombini grid used while a rider follows the pointer. */
+	const ZoombiniAnimation *_pickupAnimation = nullptr;
 	/** One-shot board cover after the final rider is captured. */
 	Animation *_boardAnim = nullptr;
 	/** Lift engine animation at the upper station. */
@@ -308,13 +303,9 @@ private:
 	uint32 _obstacleHitStart[kLaneCount] = {};
 	/** Tick at which the page began its completion animation. */
 	uint32 _finishAnimationStart = 0;
-	/** Page-local speech playback and queued paths. */
-	Common::Array<SpeechEntry> _speechQueue;
-	uint _nextSpeechIndex = 0;
-	int _speechSoundId = -1;
-	bool _activeSpeechIsCollision = false;
+	/** Whether the shared speech queue still gates another collision. */
 	bool _collisionSpeechPending = false;
-	/** Whether Go is waiting for its page speech before transition. */
+	/** Whether Go is waiting for serialized speech before transition. */
 	bool _goTransitionPending = false;
 	/** Sound handles for board creation, riding, obstacle contact, and lane changes. */
 	int _boardReadySound = -1;

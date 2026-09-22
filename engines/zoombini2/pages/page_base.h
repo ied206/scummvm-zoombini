@@ -194,12 +194,16 @@ private:
 
 /** Page lifecycle categories used by engine and sidebar policy. */
 enum class PageCategory {
-	/** Player-controlled map, shelter, menu, or puzzle. */
+	/** Player-controlled map or menu screen. */
 	kInteractive = 1,
 	/** Timed travel, title, video, or credits page. */
 	kTransition = 2,
 	/** Modal overlay retaining its underlying page. */
 	kDialog = 3,
+	/** Difficulty-dependent rescue-mission puzzle. */
+	kPuzzle = 4,
+	/** Party assembly, storage, or arrival hub. */
+	kShelter = 5,
 };
 
 /** Result returned by an input handler after it processes one event. */
