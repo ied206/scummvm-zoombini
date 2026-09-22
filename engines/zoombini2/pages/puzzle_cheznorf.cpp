@@ -68,7 +68,7 @@ PuzzleChezNorf::~PuzzleChezNorf() {
 			delete _capAnimations[table][motion];
 	}
 	if (SoundManager *sound = _vm->getSoundManager()) {
-		sound->unload(_speechSound);
+		sound->unload(_clueSpeechSound);
 		for (int id : _sounds)
 			sound->unload(id);
 	}
@@ -76,7 +76,7 @@ PuzzleChezNorf::~PuzzleChezNorf() {
 		runner->clearMovement();
 		runner->resetAnimation();
 	}
-	finishPuzzleRoster(_vm->_state->_rescue1Board);
+	finishPuzzleRoster(_vm->_state->_rescue1Storage);
 }
 
 Common::Point32 PuzzleChezNorf::tablePosition(int index, int y) {
@@ -259,7 +259,7 @@ bool PuzzleChezNorf::motionActive(bool includeIdle) const {
 
 bool PuzzleChezNorf::speechPlaying() const {
 	SoundManager *sound = _vm->getSoundManager();
-	return sound && sound->isPlaying(_speechSound);
+	return sound && (sound->isPlaying(_clueSpeechSound) || sound->hasPendingSpeech());
 }
 
 void PuzzleChezNorf::playSound(int index) {
@@ -267,12 +267,17 @@ void PuzzleChezNorf::playSound(int index) {
 		sound->play(_sounds[index]);
 }
 
-void PuzzleChezNorf::playSpeech(const Common::Path &path) {
+void PuzzleChezNorf::playClue(const Common::Path &path) {
 	if (SoundManager *sound = _vm->getSoundManager()) {
-		sound->unload(_speechSound);
-		_speechSound = sound->load(true, path, false);
-		sound->play(_speechSound);
+		sound->unload(_clueSpeechSound);
+		_clueSpeechSound = sound->load(true, path, false);
+		sound->playWithVolume(_clueSpeechSound, sound->_volumeSpeech);
 	}
+}
+
+void PuzzleChezNorf::queueSpeech(const Common::Path &path) {
+	if (SoundManager *sound = _vm->getSoundManager())
+		sound->queueSpeech(path);
 }
 
 void PuzzleChezNorf::sayClue(int index) {
@@ -286,7 +291,7 @@ void PuzzleChezNorf::sayClue(int index) {
 	if (_layout == 33 && index == 1)
 		path += "-C0";
 	path += ".wav";
-	playSpeech(Common::Path(path));
+	playClue(Common::Path(path));
 	if (_idleNorf == index && _bodyRunners[kIdle04]->isActive()) {
 		_bodyRunners[kIdle04]->stop();
 		_capRunners[index][kIdle04]->stop();
@@ -518,7 +523,7 @@ void PuzzleChezNorf::checkMeal() {
 		feedback = 3;
 	else if (_submissions == 8)
 		feedback = 2;
-	playSpeech(Common::Path(Common::String::format(kFeedbackFormat, _recipient + 7 - _tableCount, feedback)));
+	queueSpeech(Common::Path(Common::String::format(kFeedbackFormat, _recipient + 7 - _tableCount, feedback)));
 	debug(1, "ChezNorf: result=%s submissions=%d", accepted ? "accepted" : "rejected", _submissions);
 }
 
@@ -541,7 +546,7 @@ void PuzzleChezNorf::releaseCohort() {
 	_phase = kRelease05;
 	if (_remaining == 0) {
 		_vm->restartGoBlink();
-		playSpeech(Common::Path(kCompleteSpeechPath));
+		queueSpeech(Common::Path(kCompleteSpeechPath));
 	}
 	debug(1, "ChezNorf: release ordinal=%d count=%d remaining=%d", _successCount, count, _remaining);
 }
@@ -566,7 +571,8 @@ void PuzzleChezNorf::dismissWaiter() {
 
 void PuzzleChezNorf::onUpdate() {
 	const uint32 now = _vm->getGameTickCount();
-	if (_departAfterSpeech && !speechPlaying()) {
+	SoundManager *sound = _vm->getSoundManager();
+	if (_departAfterSpeech && (!sound || !sound->hasPendingSpeech())) {
 		_vm->_returningFromPuzzle = true;
 		_vm->_mapTransitionSourcePageId = kPageChezNorf;
 		_vm->requestPageChange(kPageMapTrans);
@@ -768,7 +774,7 @@ bool PuzzleChezNorf::onGoButtonPressed() {
 	if (_departAfterSpeech)
 		return false;
 	if (_vm->_isSavedGame && 4 <= _remaining) {
-		playSpeech(Common::Path(kRetreatSpeechPath));
+		queueSpeech(Common::Path(kRetreatSpeechPath));
 		_departAfterSpeech = true;
 		return false;
 	}

@@ -23,6 +23,7 @@
 
 #include "common/config-manager.h"
 #include "common/debug.h"
+#include "common/fs.h"
 #include "common/memstream.h"
 #include "common/savefile.h"
 
@@ -183,16 +184,16 @@ ZmbTrait ZmbTrait::fromHash(uint16 traitHash) {
 	return ZmbTrait(feet, nose, hair, eyes);
 }
 
-void BoardRecord::store(const ZoombiniRunner &zoombini) {
+void StorageRecord::store(const ZoombiniRunner &zoombini) {
 	memcpy(_name, zoombini._name, sizeof(_name));
 	_traits = zoombini._traits;
 }
 
-ZmbTrait BoardRecord::getTraits() const {
+ZmbTrait StorageRecord::getTraits() const {
 	return _traits;
 }
 
-ZoombiniRunner *BoardRecord::restore() const {
+ZoombiniRunner *StorageRecord::restore() const {
 	ZoombiniRunner *zoombini = new ZoombiniRunner();
 	memcpy(zoombini->_name, _name, sizeof(zoombini->_name));
 	zoombini->setTraits(getTraits());
@@ -201,27 +202,27 @@ ZoombiniRunner *BoardRecord::restore() const {
 	return zoombini;
 }
 
-void GameState::clearBoard(BoardRecord **board) {
-	for (int i = 0; i < kBoardRows * kBoardCols; i++) {
-		delete board[i];
-		board[i] = nullptr;
+void GameState::clearStorage(StorageRecord **storage) {
+	for (int i = 0; i < kStorageRows * kStorageCols; i++) {
+		delete storage[i];
+		storage[i] = nullptr;
 	}
 }
 
-bool GameState::storeInBoard(BoardRecord **board, ZoombiniRunner &zoombini) {
+bool GameState::storeInStorage(StorageRecord **storage, ZoombiniRunner &zoombini) {
 	int startRow = 62;
-	for (int i = 0; i < kBoardRows * kBoardCols; i++) {
-		if (board[i]) {
-			startRow = i / kBoardCols;
+	for (int i = 0; i < kStorageRows * kStorageCols; i++) {
+		if (storage[i]) {
+			startRow = i / kStorageCols;
 			break;
 		}
 	}
 	for (int direction = 1; -1 <= direction; direction -= 2) {
-		for (int row = startRow; 0 <= row && row < kBoardRows; row += direction) {
-			for (int col = 0; col < kBoardCols; col++) {
-				BoardRecord *&cell = board[row * kBoardCols + col];
+		for (int row = startRow; 0 <= row && row < kStorageRows; row += direction) {
+			for (int col = 0; col < kStorageCols; col++) {
+				StorageRecord *&cell = storage[row * kStorageCols + col];
 				if (!cell) {
-					cell = new BoardRecord();
+					cell = new StorageRecord();
 					cell->store(zoombini);
 					zoombini._puzzleStatus = 0;
 					return true;
@@ -232,10 +233,10 @@ bool GameState::storeInBoard(BoardRecord **board, ZoombiniRunner &zoombini) {
 	return false;
 }
 
-void GameState::refillFromBoard(BoardRecord **board, Common::Array<ZoombiniRunner *> &roster, uint count) {
-	for (int col = 0; col < kBoardCols && roster.size() < count; col++) {
-		for (int row = 0; row < kBoardRows && roster.size() < count; row++) {
-			BoardRecord *&cell = board[row * kBoardCols + col];
+void GameState::refillFromStorage(StorageRecord **storage, Common::Array<ZoombiniRunner *> &roster, uint count) {
+	for (int col = 0; col < kStorageCols && roster.size() < count; col++) {
+		for (int row = 0; row < kStorageRows && roster.size() < count; row++) {
+			StorageRecord *&cell = storage[row * kStorageCols + col];
 			if (cell) {
 				roster.push_back(cell->restore());
 				delete cell;
@@ -245,12 +246,12 @@ void GameState::refillFromBoard(BoardRecord **board, Common::Array<ZoombiniRunne
 	}
 }
 
-int GameState::findBoardScrollRow(BoardRecord *const *board) {
+int GameState::findStorageScrollRow(StorageRecord *const *storage) {
 	for (int direction = 1; -1 <= direction; direction -= 2) {
-		for (int col = 0; col < kBoardCols; col++) {
-			for (int row = 62; 0 <= row && row < kBoardRows; row += direction) {
-				if (board[row * kBoardCols + col])
-					return kBoardRows < row + 6 ? 121 : row;
+		for (int col = 0; col < kStorageCols; col++) {
+			for (int row = 62; 0 <= row && row < kStorageRows; row += direction) {
+				if (storage[row * kStorageCols + col])
+					return kStorageRows < row + 6 ? 121 : row;
 			}
 		}
 	}
@@ -356,11 +357,11 @@ void GameState::clearActiveZoombinis() {
 
 void GameState::clearOwnedData() {
 	clearActiveZoombinis();
-	for (int i = 0; i < kBoardSize; i++) {
-		delete _rescue1Board[i];
-		delete _rescue2Board[i];
-		_rescue1Board[i] = nullptr;
-		_rescue2Board[i] = nullptr;
+	for (int i = 0; i < kStorageSize; i++) {
+		delete _rescue1Storage[i];
+		delete _rescue2Storage[i];
+		_rescue1Storage[i] = nullptr;
+		_rescue2Storage[i] = nullptr;
 	}
 	for (uint i = 0; i < _savedRoster.size(); i++)
 		delete _savedRoster[i];
@@ -378,7 +379,7 @@ void GameState::init() {
 	_hasReachedBooliewood = 0;
 	memset(_pageLevel, 0, sizeof(_pageLevel));
 	memset(_pageVisitCounts, 0, sizeof(_pageVisitCounts));
-	memset(_legacyData, 0, sizeof(_legacyData));
+	memset(_perfectClearCount, 0, sizeof(_perfectClearCount));
 	_rescuedBoolieCount = 0;
 	_rescue1ArrivalCount = 0;
 	_legacyStatistic = 0;
@@ -404,11 +405,11 @@ void GameState::swapState(GameState &other) {
 	SWAP(_hasReachedRescue1, other._hasReachedRescue1);
 	SWAP(_hasReachedRescue2, other._hasReachedRescue2);
 	SWAP(_hasReachedBooliewood, other._hasReachedBooliewood);
-	swapArray(_rescue1Board, other._rescue1Board);
-	swapArray(_rescue2Board, other._rescue2Board);
+	swapArray(_rescue1Storage, other._rescue1Storage);
+	swapArray(_rescue2Storage, other._rescue2Storage);
 	swapArray(_pageLevel, other._pageLevel);
 	swapArray(_pageVisitCounts, other._pageVisitCounts);
-	swapArray(_legacyData, other._legacyData);
+	swapArray(_perfectClearCount, other._perfectClearCount);
 	SWAP(_rescuedBoolieCount, other._rescuedBoolieCount);
 	SWAP(_rescue1ArrivalCount, other._rescue1ArrivalCount);
 	SWAP(_legacyStatistic, other._legacyStatistic);
@@ -449,15 +450,15 @@ void GameState::stashActiveZoombinis() {
 	transferRoster(_activeZoombinis, _savedRoster);
 }
 
-void GameState::finishPuzzleRoster(PageId pageId, BoardRecord **board, bool advancing, bool savedGame) {
+void GameState::finishPuzzleRoster(PageId pageId, StorageRecord **storage, bool advancing, bool savedGame, bool perfectClearEligible) {
 	if (!savedGame) {
 		clearActiveZoombinis();
 		return;
 	}
 
-	const uint expectedPartySize = board ? 8 : 16;
+	const uint expectedPartySize = storage ? 8 : 16;
 	const int pageIndex = static_cast<int>(pageId);
-	if (0 <= pageIndex && pageIndex < 100 && _activeZoombinis.size() == expectedPartySize) {
+	if (perfectClearEligible && 0 <= pageIndex && pageIndex < 100 && _activeZoombinis.size() == expectedPartySize) {
 		bool allSucceeded = true;
 		for (uint i = 0; i < _activeZoombinis.size(); i++) {
 			if (!_activeZoombinis[i] || _activeZoombinis[i]->_puzzleStatus == 0) {
@@ -466,9 +467,9 @@ void GameState::finishPuzzleRoster(PageId pageId, BoardRecord **board, bool adva
 			}
 		}
 		if (allSucceeded) {
-			_legacyData[pageIndex] += 1;
-			if (_legacyData[pageIndex] == 3) {
-				_legacyData[pageIndex] = 0;
+			_perfectClearCount[pageIndex] += 1;
+			if (_perfectClearCount[pageIndex] == 3) {
+				_perfectClearCount[pageIndex] = 0;
 				if (_pageLevel[pageIndex] < 3)
 					_pageLevel[pageIndex] += 1;
 			}
@@ -478,8 +479,8 @@ void GameState::finishPuzzleRoster(PageId pageId, BoardRecord **board, bool adva
 	for (uint i = 0; i < _activeZoombinis.size();) {
 		ZoombiniRunner *zoombini = _activeZoombinis[i];
 		if (!advancing || zoombini->_puzzleStatus == 0) {
-			if (board)
-				storeInBoard(board, *zoombini);
+			if (storage)
+				storeInStorage(storage, *zoombini);
 			else
 				_savedRoster.push_back(cloneRosterMember(*zoombini));
 			delete zoombini;
@@ -508,22 +509,22 @@ void GameState::transferRoster(Common::Array<ZoombiniRunner *> &src, Common::Arr
 	src.clear();
 }
 
-bool GameState::readBoard(Common::SeekableReadStream *stream, BoardRecord **board) {
+bool GameState::readStorage(Common::SeekableReadStream *stream, StorageRecord **storage) {
 	if (!canRead(stream, 4))
 		return false;
 	const int32 count = stream->readSint32LE();
-	if (count < 0 || kBoardRows * kBoardCols < count || !canRead(stream, static_cast<uint64>(count) * 28))
+	if (count < 0 || kStorageRows * kStorageCols < count || !canRead(stream, static_cast<uint64>(count) * 28))
 		return false;
 	for (int32 i = 0; i < count; i++) {
 		const int32 row = stream->readSint32LE();
 		const int32 col = stream->readSint32LE();
-		if (row < 0 || kBoardRows <= row || col < 0 || kBoardCols <= col)
+		if (row < 0 || kStorageRows <= row || col < 0 || kStorageCols <= col)
 			return false;
-		const int index = row * kBoardCols + col;
-		if (board[index])
+		const int index = row * kStorageCols + col;
+		if (storage[index])
 			return false;
-		board[index] = new BoardRecord();
-		BoardRecord &record = *board[index];
+		storage[index] = new StorageRecord();
+		StorageRecord &record = *storage[index];
 		if (stream->read(record._name, sizeof(record._name)) != sizeof(record._name))
 			return false;
 		const byte unusedSlot0 = stream->readByte();
@@ -557,7 +558,7 @@ bool GameState::readState(Common::SeekableReadStream *stream) {
 	for (int i = 0; i < 100; i++)
 		_pageLevel[i] = stream->readSint32LE();
 	for (int i = 0; i < 100; i++)
-		_legacyData[i] = stream->readSint32LE();
+		_perfectClearCount[i] = stream->readSint32LE();
 	_hasReachedRescue1 = stream->readByte();
 	_hasReachedRescue2 = stream->readByte();
 	_hasReachedBooliewood = stream->readByte();
@@ -577,12 +578,12 @@ bool GameState::readState(Common::SeekableReadStream *stream) {
 		stream->read(_traitComboTable._unusedTail, sizeof(_traitComboTable._unusedTail)) != sizeof(_traitComboTable._unusedTail))
 		return false;
 
-	if (!readBoard(stream, _rescue1Board) || !readBoard(stream, _rescue2Board) || !canRead(stream, 4))
+	if (!readStorage(stream, _rescue1Storage) || !readStorage(stream, _rescue2Storage) || !canRead(stream, 4))
 		return false;
 	const int32 count = stream->readSint32LE();
 	if (count < 0 || !canRead(stream, static_cast<uint64>(count) * 20))
 		return false;
-	// The party is stored in two passes, unlike the interleaved sparse board records.
+	// The party is stored in two passes, unlike the interleaved sparse storage records.
 	for (int32 i = 0; i < count; i++) {
 		ZoombiniRunner *zoombini = new ZoombiniRunner();
 		_savedRoster.push_back(zoombini);
@@ -603,18 +604,18 @@ bool GameState::readState(Common::SeekableReadStream *stream) {
 	return !stream->err() && !stream->eos();
 }
 
-int GameState::writeBoard(Common::WriteStream *stream, BoardRecord *const *board) {
+int GameState::writeStorage(Common::WriteStream *stream, StorageRecord *const *storage) {
 	int count = 0;
-	for (int i = 0; i < kBoardRows * kBoardCols; i++) {
-		if (board[i])
+	for (int i = 0; i < kStorageRows * kStorageCols; i++) {
+		if (storage[i])
 			count += 1;
 	}
 	stream->writeSint32LE(count);
-	for (int i = 0; i < kBoardRows * kBoardCols; i++) {
-		if (board[i]) {
-			stream->writeSint32LE(i / kBoardCols);
-			stream->writeSint32LE(i % kBoardCols);
-			const BoardRecord &record = *board[i];
+	for (int i = 0; i < kStorageRows * kStorageCols; i++) {
+		if (storage[i]) {
+			stream->writeSint32LE(i / kStorageCols);
+			stream->writeSint32LE(i % kStorageCols);
+			const StorageRecord &record = *storage[i];
 			stream->write(record._name, sizeof(record._name));
 			stream->writeByte(record._traits._unusedSlot0);
 			stream->writeByte(record._traits._feet);
@@ -626,10 +627,10 @@ int GameState::writeBoard(Common::WriteStream *stream, BoardRecord *const *board
 	return count;
 }
 
-int GameState::countBoardEntries(BoardRecord *const *board) {
+int GameState::countStorageEntries(StorageRecord *const *storage) {
 	int count = 0;
-	for (int i = 0; i < kBoardRows * kBoardCols; i++) {
-		if (board[i])
+	for (int i = 0; i < kStorageRows * kStorageCols; i++) {
+		if (storage[i])
 			count += 1;
 	}
 	return count;
@@ -637,8 +638,8 @@ int GameState::countBoardEntries(BoardRecord *const *board) {
 
 Zoombini2PopulationSummary GameState::getPopulationSummary() const {
 	Zoombini2PopulationSummary summary;
-	summary._rescue1Count = countBoardEntries(_rescue1Board);
-	summary._rescue2Count = countBoardEntries(_rescue2Board);
+	summary._rescue1Count = countStorageEntries(_rescue1Storage);
+	summary._rescue2Count = countStorageEntries(_rescue2Storage);
 	summary._booliewoodCount = _completedZoombiniCount;
 	summary._zombinivilleCount = kZoombiniCombinationCount - summary._rescue1Count - summary._rescue2Count - summary._booliewoodCount;
 	summary._activePartyCount = static_cast<int>(_savedRoster.size());
@@ -662,7 +663,7 @@ bool GameState::save(Common::WriteStream *stream) const {
 	for (int i = 0; i < 100; i++)
 		stream->writeSint32LE(_pageLevel[i]);
 	for (int i = 0; i < 100; i++)
-		stream->writeSint32LE(_legacyData[i]);
+		stream->writeSint32LE(_perfectClearCount[i]);
 	stream->writeByte(_hasReachedRescue1);
 	stream->writeByte(_hasReachedRescue2);
 	stream->writeByte(_hasReachedBooliewood);
@@ -679,8 +680,8 @@ bool GameState::save(Common::WriteStream *stream) const {
 	stream->writeSint32LE(_traitComboTable._twiceRegisteredCombinationCount);
 	stream->write(_traitComboTable._combinationUseCounts, sizeof(_traitComboTable._combinationUseCounts));
 	stream->write(_traitComboTable._unusedTail, sizeof(_traitComboTable._unusedTail));
-	const int rescue1BoardCount = writeBoard(stream, _rescue1Board);
-	const int rescue2BoardCount = writeBoard(stream, _rescue2Board);
+	const int rescue1StorageCount = writeStorage(stream, _rescue1Storage);
+	const int rescue2StorageCount = writeStorage(stream, _rescue2Storage);
 	stream->writeUint32LE(static_cast<uint32>(count));
 	for (uint64 i = 0; i < count; i++) {
 		const ZoombiniRunner *zoombini;
@@ -705,7 +706,7 @@ bool GameState::save(Common::WriteStream *stream) const {
 			zoombini = _activeZoombinis[i - _savedRoster.size()];
 		stream->write(zoombini->_name, sizeof(zoombini->_name));
 	}
-	const int64 expectedSize = 2822 + static_cast<int64>(nameLength) + (rescue1BoardCount + rescue2BoardCount) * 28 + count * 20;
+	const int64 expectedSize = 2822 + static_cast<int64>(nameLength) + (rescue1StorageCount + rescue2StorageCount) * 28 + count * 20;
 	return !stream->err() && 0 <= startPosition && stream->pos() - startPosition == expectedSize;
 }
 
@@ -716,6 +717,24 @@ void GameState::registerPageVisit(PageId pageId, int visitKind) {
 	byte &visits = _pageVisitCounts[5 * pageIndex + visitKind];
 	if (visits < 250)
 		visits += 1;
+}
+
+int GameState::getPageLevel(PageId pageId) const {
+	const int pageIndex = static_cast<int>(pageId);
+	if (pageIndex < 0 || 100 <= pageIndex)
+		return 0;
+	return _pageLevel[pageIndex];
+}
+
+int GameState::activatePageLevel(PageId pageId) {
+	const int pageIndex = static_cast<int>(pageId);
+	if (pageIndex < 0 || 100 <= pageIndex)
+		return 0;
+
+	if (_pageLevel[pageIndex] == 0)
+		_pageLevel[pageIndex] = 1;
+	_level = _pageLevel[pageIndex];
+	return getLevel();
 }
 
 Zoombini2SavegameManager::Zoombini2SavegameManager(Common::SaveFileManager *saveFileManager, const Common::String &target)
@@ -775,6 +794,19 @@ Common::StringArray Zoombini2SavegameManager::listProfiles() const {
 		addProfileSorted(profiles, profileName);
 	}
 	return profiles;
+}
+
+bool Zoombini2SavegameManager::isProfileReadOnly(const Common::String &profileName) const {
+	if (!_saveFileManager || !isValidProfileName(profileName))
+		return false;
+
+	const Common::String saveFileName = makeSaveFileName(profileName);
+	if (!_saveFileManager->exists(saveFileName))
+		return false;
+
+	const Common::FSNode saveDirectory(ConfMan.getPath("savepath"));
+	const Common::FSNode saveFile = saveDirectory.getChild(saveFileName);
+	return saveFile.exists() && !saveFile.isWritable();
 }
 
 Common::Array<Zoombini2ProfileSummary> Zoombini2SavegameManager::listProfileSummaries() const {

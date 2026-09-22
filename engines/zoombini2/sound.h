@@ -45,9 +45,6 @@ class Zoombini2Engine;
 /** Maximum volume accepted by the game-facing sound API. */
 const int kMaxVolumePercent = 100;
 
-/** Number of sample handles reserved for one logical sound. */
-const int kMaxSampleSlots = 5;
-
 /** Logical mixer category derived from a loose-file resource path. */
 enum class SoundCategory {
 	kMusic00 = 0,
@@ -57,6 +54,9 @@ enum class SoundCategory {
 
 /** Retains the path, playback policy, volume, and mixer handles for one sound. */
 struct SoundBuffer {
+	/** Number of simultaneous sample handles retained by one logical sound. */
+	static constexpr int kSampleSlotCount = 5;
+
 	/** Manager-assigned sound identifier. */
 	int id;
 	/** Original logical resource name, including any installed-root marker. */
@@ -74,9 +74,9 @@ struct SoundBuffer {
 	/** Whether the channel should use the complete volume of its mixer category. */
 	bool usesCategoryVolume;
 	/** Mixer handles reserved for overlapping sample playback. */
-	Audio::SoundHandle handles[kMaxSampleSlots];
+	Audio::SoundHandle handles[kSampleSlotCount];
 	/** Whether each active sample handle is paused. */
-	bool handlesPaused[kMaxSampleSlots] = {};
+	bool handlesPaused[kSampleSlotCount] = {};
 	/** Mixer handle reserved for streamed playback. */
 	Audio::SoundHandle streamHandle;
 	/** Whether the active streamed handle is paused. */
@@ -90,7 +90,9 @@ struct SoundBuffer {
  * reproduces the sample and stream lifecycle required by the game on top of
  * ScummVM's @ref Audio::Mixer.
  *
- * Loading retains non-stream file images for overlapping sample playback.
+ * Loading retains non-stream file images for up to five overlapping plays of
+ * each logical sample. The limit belongs to one loaded sound rather than the
+ * complete mixer. A streamed sound uses one handle instead.
  * Streamed sounds are opened and decoded on demand through the engine resource
  * resolver. Numbered installed-music paths may resolve to the extracted CD
  * sound-effects directory when that compatibility resource exists.
@@ -108,6 +110,14 @@ public:
 	void unload(int id);
 	/** Stop and release every loaded sound. */
 	void unloadAll();
+	/** Append speech to the game-instance queue and start it when the queue is idle. */
+	void queueSpeech(const Common::Path &path);
+	/** Retire completed speech and start the next queued item. */
+	void updateSpeechQueue();
+	/** Stop the active narration and discard the remaining serialized speech. */
+	void skipSpeechQueue();
+	/** Return whether active or queued speech remains. */
+	bool hasPendingSpeech() const;
 
 	/** Start the sound identified by @p id with its stored volume and loop policy. */
 	void play(int id);
@@ -115,15 +125,17 @@ public:
 	void playWithVolume(int id, int volume);
 	/** Enable looping and start the sound identified by @p id. */
 	void playLoop(int id);
-	/** Stop sample handles or preserve and pause the streamed handle belonging to @p id. */
-	void stop(int id);
+	/** Stop @p sampleSlot or preserve and pause the streamed handle belonging to @p id. */
+	void stop(int id, int sampleSlot = 0);
+	/** Stop every sample slot or preserve and pause the streamed handle belonging to @p id. */
+	void stopAll(int id);
 	/** Pause every active handle belonging to @p id. */
 	void pause(int id);
 	/** Resume every paused handle belonging to @p id. */
 	void resume(int id);
 
-	/** Return whether any handle belonging to @p id is actively playing rather than paused. */
-	bool isPlaying(int id) const;
+	/** Return whether @p sampleSlot or the streamed handle belonging to @p id is actively playing rather than paused. */
+	bool isPlaying(int id, int sampleSlot = 0) const;
 
 	/** Store and apply @p volume to every active handle belonging to @p id. */
 	void setVolume(int id, int volume);
@@ -161,6 +173,10 @@ private:
 	Audio::Mixer *_mixer;
 	/** Loaded sound records retained for the game instance. */
 	Common::Array<SoundBuffer *> _buffers;
+	/** Game-instance narration serialized for the active page flow. */
+	Common::Array<Common::Path> _speechQueue;
+	/** Active streamed narration, or -1 while the queue is idle. */
+	int _speechSoundId = -1;
 	/** Identifier assigned to the next loaded sound. */
 	int _nextId = 1;
 	/** Nested mute-request count. */
@@ -170,6 +186,10 @@ private:
 
 	/** Return the borrowed sound record for @p id, or nullptr. */
 	SoundBuffer *findBuffer(int id) const;
+	/** Return the first inactive sample slot in @p buffer, or -1 when all five are active. */
+	int findFreeSampleSlot(const SoundBuffer &buffer) const;
+	/** Return whether @p sampleSlot selects one of a sample buffer's five handles. */
+	static bool isValidSampleSlot(int sampleSlot);
 	/** Stop and release every mixer handle retained by @p buffer. */
 	void releasePlayback(SoundBuffer &buffer);
 	/** Decode a WAV while retaining only complete PCM sample frames. */
