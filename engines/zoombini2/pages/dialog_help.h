@@ -26,6 +26,10 @@
 #include "common/str.h"
 #include "zoombini2/pages/dialog_base.h"
 
+namespace Graphics {
+class Font;
+}
+
 namespace Zoombini2 {
 
 class Zoombini2Engine;
@@ -79,13 +83,22 @@ private:
 	static constexpr const char *kRightArrowNormalPath = "Bmp/MENU/help_screen_rightarro_norma.bb";
 	static constexpr const char *kRightArrowEmptyPath = "Bmp/MENU/help_screen_rightarro_empty.bb";
 	static constexpr const char *kHelpPageFormat = "Bmp/help/%02d_help_%s_%02d.bb";
+	static constexpr const char *kMissingHelpTextEnglish = "No help resource is available for level 4.";
+	static constexpr const char *kMissingHelpTextKorean = u8"4단계는 도움말 리소스가 없습니다.";
+	static constexpr int kMissingHelpTextX = 135;
+	static constexpr int kMissingHelpTextWidth = 530;
+	static constexpr int kMissingHelpTextCenterY = 285;
 
 	/** Replace the active help-sheet path with the requested sheet. */
 	bool loadPage(PageId pageId, int level, int sheet);
 	/** Forget the active help-sheet path. */
 	void freePage();
-	/** Return the resource-directory label for @p level. */
-	const char *getLevelString(int level);
+	/** Return the help-resource filename suffix for @p level, or null when none exists. */
+	static const char *getLevelHelpFileSuffix(int level);
+	/** Select a localized font for the level-four resource notice. */
+	void resolveUiFont();
+	/** Draw the level-four notice inside the empty help frame. */
+	void drawMissingHelpText(ManagedSurface32 *screen) const;
 
 	/** Whether the help overlay is active. */
 	bool _isActive = false;
@@ -99,6 +112,8 @@ private:
 	ManagedSurface32 *_savedScreen = nullptr;
 	/** Path of the active help-sheet bitmap in the graphics page cache. */
 	Common::String _helpPagePath;
+	/** UI font borrowed from the theme while a level-four help dialog is open. */
+	const Graphics::Font *_uiFont = nullptr;
 	/** Whether the active release and target enable help-sheet color keying. */
 	bool _transparentHelpPages = false;
 	/** Close-button hit rectangle. */

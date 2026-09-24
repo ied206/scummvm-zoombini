@@ -617,6 +617,10 @@ public:
 	 * with @p alphaLUT.
 	 */
 	void drawToScreenClipped(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &clip, const AlphaBlendLUT &alphaLUT) const;
+	/** Draw this frame mirrored horizontally within its own width. */
+	void drawToScreenMirrored(ManagedSurface32 *destSurface, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const;
+	/** Draw the RLE coverage using one color while retaining inverse-alpha edges. */
+	void drawToScreenSolidColor(ManagedSurface32 *destSurface, const Common::Point32 &pos, byte red, byte green, byte blue, const AlphaBlendLUT &alphaLUT) const;
 
 	/** Return the frame dimensions in pixels. */
 	const Size32 &getSize() const { return _size; }

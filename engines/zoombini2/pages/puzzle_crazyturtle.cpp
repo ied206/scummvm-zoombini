@@ -344,10 +344,7 @@ void PuzzleCrazyTurtle::onUpdate() {
 	if (_idlePhaseEnabled) {
 		for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
 			ZoombiniRunner *zoombini = _puzzleZoombinis[index];
-			if (zoombini->_puzzleStatus != 1 || zoombini->_animationActive)
-				continue;
-			if (_vm->_rnd->getRandomNumber(19) == 1)
-				zoombini->startAnimation(_idleZombAnimation, 33, tick);
+			zoombini->tryStartCelebrationAnimation(_idleZombAnimation, *_vm->_rnd, tick, _vm->getFrameDeltaMs(), _vm->getLogicPacingHz());
 		}
 		updateZoombiniAnimations(tick);
 		return;
@@ -711,7 +708,11 @@ void PuzzleCrazyTurtle::drawTurtleRunners(ManagedSurface32 *screen) const {
 }
 
 void PuzzleCrazyTurtle::drawMother(ManagedSurface32 *screen) const {
-	_vm->_gfx->drawPageRleBlock(screen, _motherFinished ? kMotherEndPath : kMotherStartPath, kMotherPos);
+	if (_motherFinished) {
+		_vm->_gfx->drawPageRleBlock(screen, kMotherEndPath, kMotherPos);
+	} else if (!_motherRunner || !_motherRunner->isActive()) {
+		_vm->_gfx->drawPageRleBlock(screen, kMotherStartPath, kMotherPos);
+	}
 }
 
 EventHandleResult PuzzleCrazyTurtle::onLButtonDown(const Common::Point &pos) {
@@ -743,18 +744,20 @@ EventHandleResult PuzzleCrazyTurtle::onMouseMove(const Common::Point &pos) {
 
 Common::String PuzzleCrazyTurtle::debugGetAnswer() const {
 	Common::String answer = debugAnswerHeader();
-	static constexpr const char *traits[4] = {
-		"feet",
-		"nose",
-		"hair",
-		"eyes",
-	};
-	answer += Common::String::format("Primary rule: %s\n", traits[_primaryFeature]);
-	if (3 <= _level)
-		answer += Common::String::format("Secondary rule: %s\n", traits[_secondaryFeature]);
-	for (uint i = 0; i < _puzzleZoombinis.size(); i++)
-		answer += Common::String::format("Turtle %u: %s\n", i + 1, debugActorDescription(_turtleAssignments[i]).c_str());
-	answer += "Actors with the same required traits are interchangeable.\n";
+	answer += "\n  Ordering rules:\n";
+	const ZmbTrait::TraitIndex primaryFeature = static_cast<ZmbTrait::TraitIndex>(_primaryFeature);
+	answer += Common::String::format("    Primary: %s\n", ZmbTrait::debugTraitName(primaryFeature));
+	if (3 <= _level) {
+		const ZmbTrait::TraitIndex secondaryFeature = static_cast<ZmbTrait::TraitIndex>(_secondaryFeature);
+		answer += Common::String::format("    Secondary: %s\n", ZmbTrait::debugTraitName(secondaryFeature));
+	}
+	answer += "  Place Zoombinis on turtles from the starting bank onward:\n";
+	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
+		const Common::Point32 &pos = kTurtlePlacements[i].pos;
+		answer += Common::String::format("    Turtle %u near (%d, %d): %s\n", i + 1, pos.x, pos.y,
+										 debugActorDescription(_turtleAssignments[i]).c_str());
+	}
+	answer += "  Zoombinis with the same required traits are interchangeable.\n";
 	return answer;
 }
 

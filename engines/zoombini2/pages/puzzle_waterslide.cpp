@@ -82,9 +82,13 @@ void PuzzleWaterslide::init() {
 	PuzzleBase::init();
 	_level = CLIP(_puzzleLevel, 1, 4);
 	const int count = _puzzleZoombinis.size();
-	for (int i = 0; i < 16; i++)
+	const int slots = _level == 1 ? count : 16;
+	_solution.resize(slots);
+	_eligible.resize(count);
+	for (int i = 0; i < slots; i++)
 		_solution[i] = -1;
-	bool used[16] = {};
+	Common::Array<bool> used;
+	used.resize(count);
 	while (static_cast<int>(_generationOrder.size()) < count) {
 		const int index = _vm->_rnd->getRandomNumber(count - 1);
 		if (!used[index]) {
@@ -241,7 +245,7 @@ int PuzzleWaterslide::sharedAxis(int first, int second, bool rejectLast) {
 	return -1;
 }
 
-bool PuzzleWaterslide::findPair(int source, bool *available, Pair &pair) {
+bool PuzzleWaterslide::findPair(int source, Common::Array<bool> &available, Pair &pair) {
 	if (source < 0)
 		return false;
 	for (int candidate = 0; candidate < static_cast<int>(_generationOrder.size()); candidate++) {
@@ -280,7 +284,8 @@ void PuzzleWaterslide::generateEasy() {
 	if (greedyPairing) {
 		for (int attempt = 0; attempt < 10; attempt++) {
 			pairs.clear();
-			bool available[16];
+			Common::Array<bool> available;
+			available.resize(count);
 			for (int i = 0; i < count; i++)
 				available[i] = true;
 			int source = 0;
@@ -397,7 +402,8 @@ void PuzzleWaterslide::generateEasy() {
 			_solution[rows + row] = _generationOrder[pair.b];
 	}
 	// Fill unlabeled positions from the actors not used by the displayed pair rules.
-	bool assigned[16] = {};
+	Common::Array<bool> assigned;
+	assigned.resize(count);
 	for (int i = 0; i < count; i++)
 		if (0 <= _solution[i])
 			assigned[_solution[i]] = true;
@@ -419,7 +425,8 @@ void PuzzleWaterslide::generateMedium() {
 	Pair records[3][5];
 	int root = 0;
 	for (int attempt = 0; attempt < 100; attempt++) {
-		bool available[16];
+		Common::Array<bool> available;
+		available.resize(count);
 		for (int i = 0; i < count; i++)
 			available[i] = true;
 		for (int layer = 0; layer < 3; layer++)
@@ -457,12 +464,14 @@ void PuzzleWaterslide::generateMedium() {
 int PuzzleWaterslide::generateGraph(bool randomRoot) {
 	const int count = _generationOrder.size();
 	int nodes[16];
-	bool available[16];
+	Common::Array<bool> available;
+	available.resize(count);
 	for (int i = 0; i < 16; i++) {
 		nodes[i] = -1;
 		_solution[i] = -1;
-		available[i] = true;
 	}
+	for (int i = 0; i < count; i++)
+		available[i] = true;
 	_edges.clear();
 	const int root = randomRoot ? _vm->_rnd->getRandomNumber(count - 1) : 0;
 	nodes[0] = root;
@@ -526,9 +535,11 @@ void PuzzleWaterslide::generateHard() {
 		_solution[0] = _generationOrder[0];
 		return;
 	}
-	int degrees[16] = {};
+	Common::Array<int> degrees;
+	degrees.resize(count);
 	for (int source = 0; source < count; source++) {
-		bool available[16];
+		Common::Array<bool> available;
+		available.resize(count);
 		for (int i = 0; i < count; i++)
 			available[i] = true;
 		for (int i = 0; i < count; i++) {
@@ -588,6 +599,7 @@ void PuzzleWaterslide::setupTargets() {
 	const int count = _puzzleZoombinis.size();
 	const int slots = _level == 1 ? count : 16;
 	_targets.resize(slots);
+	_activeSlot.resize(slots);
 	for (int slot = 0; slot < slots; slot++) {
 		Common::Point32 pos;
 		if (_level == 1) {
@@ -639,7 +651,7 @@ bool PuzzleWaterslide::matches(const Edge &edge) const {
 void PuzzleWaterslide::evaluateConnections() {
 	if (_phase != kInteractive00)
 		return;
-	for (int i = 0; i < 16; i++)
+	for (uint i = 0; i < _eligible.size(); i++)
 		_eligible[i] = false;
 	const int previous = _connectionCount;
 	_connectionCount = 0;
@@ -732,7 +744,8 @@ void PuzzleWaterslide::activateValve() {
 }
 
 void PuzzleWaterslide::dischargeNext() {
-	int order[16];
+	Common::Array<int> order;
+	order.resize(_targets.size());
 	int size = 0;
 	if (_vm->isDemo()) {
 		for (int slot = 0; slot < 16; slot++)
@@ -950,7 +963,7 @@ void PuzzleWaterslide::drawDecorations(ManagedSurface32 *screen) {
 	else
 		_vm->_gfx->drawAnimationFrame(screen, _cascade, 0, _cascadePos);
 	// The valve overlaps the cascade's left edge and must remain in front of it.
-	if (!_valveRunner->isActive() && _level != 4)
+	if (!_valveRunner->isActive())
 		_vm->_gfx->drawAnimationFrame(screen, _valve, 0, _valvePos);
 	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _valveRunner, tick, 0, ManagedSurface32::kScreenSize.width);
 }
@@ -1033,7 +1046,7 @@ bool PuzzleWaterslide::onGoButtonPressed() {
 	return false;
 }
 
-bool PuzzleWaterslide::debugPlacementMatches(int slot, int actor, const int *assignment) const {
+bool PuzzleWaterslide::debugPlacementMatches(int slot, int actor, const Common::Array<int> &assignment) const {
 	for (const Edge &edge : _edges) {
 		if (edge.axis < 0 || (edge.a != slot && edge.b != slot))
 			continue;
@@ -1047,14 +1060,14 @@ bool PuzzleWaterslide::debugPlacementMatches(int slot, int actor, const int *ass
 	return true;
 }
 
-bool PuzzleWaterslide::debugFindPlacement(int *assignment, uint32 used, int &budget) const {
+bool PuzzleWaterslide::debugFindPlacement(Common::Array<int> &assignment, uint32 used, int &budget) const {
 	if (budget <= 0)
 		return false;
 	budget -= 1;
 	int bestSlot = -1;
 	int bestCount = 17;
 	uint32 bestCandidates = 0;
-	for (int slot = 0; slot < 16; slot++) {
+	for (uint slot = 0; slot < assignment.size(); slot++) {
 		if (!_activeSlot[slot] || 0 <= assignment[slot])
 			continue;
 		int count = 0;
@@ -1088,22 +1101,12 @@ bool PuzzleWaterslide::debugFindPlacement(int *assignment, uint32 used, int &bud
 
 Common::String PuzzleWaterslide::debugGetAnswer() const {
 	Common::String answer = debugAnswerHeader();
-	static constexpr const char *axes[] = {
-		"feet",
-		"nose",
-		"hair",
-		"eyes",
-	};
-	for (const Edge &edge : _edges) {
-		const char *axis = "any trait";
-		if (0 <= edge.axis)
-			axis = axes[edge.axis];
-		answer += Common::String::format("Slots %d <-> %d: %s\n", edge.a + 1, edge.b + 1, axis);
-	}
-	int assignment[16];
+	answer += "\n";
+	Common::Array<int> assignment;
+	assignment.resize(_activeSlot.size());
 	uint32 used = 0;
 	bool generatedValid = true;
-	for (int slot = 0; slot < 16; slot++) {
+	for (uint slot = 0; slot < assignment.size(); slot++) {
 		assignment[slot] = _activeSlot[slot] ? _solution[slot] : -1;
 		if (!_activeSlot[slot])
 			continue;
@@ -1115,26 +1118,39 @@ Common::String PuzzleWaterslide::debugGetAnswer() const {
 		}
 	}
 	if (generatedValid) {
-		for (int slot = 0; slot < 16; slot++)
+		for (uint slot = 0; slot < assignment.size(); slot++)
 			if (_activeSlot[slot] && !debugPlacementMatches(slot, assignment[slot], assignment))
 				generatedValid = false;
 	}
+	bool hasPlacement = generatedValid;
 	if (generatedValid) {
-		answer += "Generation placement (validated against the displayed constraints):\n";
+		answer += "  Place Zoombinis at these pipe mouths (validated generation placement):\n";
 	} else {
-		answer += "Generation placement is incomplete or inconsistent; searching for a replacement.\n";
-		for (int slot = 0; slot < 16; slot++)
+		for (uint slot = 0; slot < assignment.size(); slot++)
 			assignment[slot] = -1;
 		int budget = 200000;
-		if (!debugFindPlacement(assignment, 0, budget))
-			return answer + "No complete placement found within the debugger search limit. Use the constraints above.\n";
-		answer += "One complete placement (searched replacement):\n";
+		hasPlacement = debugFindPlacement(assignment, 0, budget);
+		if (hasPlacement)
+			answer += "  Place Zoombinis at these pipe mouths (searched replacement):\n";
+		else
+			answer += "  No complete placement found within the debugger search limit.\n";
 	}
-	for (int slot = 0; slot < 16; slot++) {
-		if (!_activeSlot[slot])
-			continue;
-		const Common::Rect32 &rect = _targets[slot].rect;
-		answer += Common::String::format("Slot %d (%d,%d): %s\n", slot + 1, rect.left, rect.top, debugActorDescription(assignment[slot]).c_str());
+	if (hasPlacement) {
+		for (uint slot = 0; slot < assignment.size(); slot++) {
+			if (!_activeSlot[slot])
+				continue;
+			const Common::Rect32 &rect = _targets[slot].rect;
+			answer += Common::String::format("    Near (%d, %d): %s\n", rect.left, rect.top, debugActorDescription(assignment[slot]).c_str());
+		}
+	}
+	answer += "  Pipe connections (trait shared by both ends):\n";
+	for (const Edge &edge : _edges) {
+		const char *axis = "any trait";
+		if (0 <= edge.axis)
+			axis = ZmbTrait::debugTraitName(static_cast<ZmbTrait::TraitIndex>(edge.axis));
+		const Common::Rect32 &first = _targets[edge.a].rect;
+		const Common::Rect32 &second = _targets[edge.b].rect;
+		answer += Common::String::format("    (%d, %d) <-> (%d, %d): %s\n", first.left, first.top, second.left, second.top, axis);
 	}
 	return answer;
 }

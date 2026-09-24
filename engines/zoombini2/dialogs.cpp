@@ -559,6 +559,9 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	_aquacubeSafeFirstMoveCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.AquacubeSafeFirstMove",
 															 Common::U32String("Protect Aqua Cube's first lever move"),
 															 Common::U32String("On level three, swaps the hidden axes of two levers if the first direct lever press would enter a Fleen cell."));
+	_allowCutLevel4PracticePuzzlesCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.AllowCutLevel4PracticePuzzles",
+																	 Common::U32String("Allow cut level 4 puzzles in practice mode"),
+																	 Common::U32String("Adds a level 4 practice-map tab. Puzzles without a recovered level 4 remain at level three."));
 	_originalPrngCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.OriginalPRNG",
 													Common::U32String("Use original random number generator (requires restart)"),
 													Common::U32String("Uses the original Windows engine's Visual C++ 6.0 CRT generator instead of ScummVM's default."));
@@ -605,6 +608,7 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 		.addWidget("DebugHotkeys", "Checkbox")
 		.addWidget("GreedyWaterslide", "Checkbox")
 		.addWidget("AquacubeSafeFirstMove", "Checkbox")
+		.addWidget("AllowCutLevel4PracticePuzzles", "Checkbox")
 		.addWidget("OriginalPRNG", "Checkbox")
 		.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
 		.addWidget("PacingLabel", "OptionsLabel")
@@ -629,6 +633,7 @@ void Zoombini2OptionsWidget::load() {
 	_debugHotkeysCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigDebugHotkeys, _domain));
 	_greedyWaterslideCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _domain));
 	_aquacubeSafeFirstMoveCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove, _domain));
+	_allowCutLevel4PracticePuzzlesCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigAllowCutLevel4PracticePuzzles, _domain));
 	_originalPrngCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _domain));
 	_pacingPopUp->setSelectedTag(ConfMan.getInt(::Zoombini2MetaEngine::kConfigLogicPacingHz, _domain) == 75 ? 75 : 60);
 	const int frameRate = CLIP<int>(ConfMan.getInt(::Zoombini2MetaEngine::kConfigFrameRate, _domain),
@@ -653,6 +658,7 @@ bool Zoombini2OptionsWidget::save() {
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigDebugHotkeys, _debugHotkeysCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _greedyWaterslideCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove, _aquacubeSafeFirstMoveCheckbox->getState(), _domain);
+	ConfMan.setBool(::Zoombini2MetaEngine::kConfigAllowCutLevel4PracticePuzzles, _allowCutLevel4PracticePuzzlesCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _originalPrngCheckbox->getState(), _domain);
 	ConfMan.setInt(::Zoombini2MetaEngine::kConfigLogicPacingHz, _pacingPopUp->getSelectedTag() == 75 ? 75 : 60, _domain);
 	ConfMan.setInt(::Zoombini2MetaEngine::kConfigFrameRate, frameRate, _domain);

@@ -110,7 +110,8 @@ bool MagicWallMaze::isIdentity(const Common::Array<int> &positions) {
 }
 
 void MagicWallMaze::applyRule(const Rule &rule, Common::Array<int> &positions, bool simultaneous) {
-	bool consumed[10] = {};
+	Common::Array<bool> consumed;
+	consumed.resize(positions.size());
 	for (const Edge &edge : rule) {
 		int from = -1;
 		int to = -1;
@@ -294,8 +295,8 @@ PuzzleMagicWall::PuzzleMagicWall(Zoombini2Engine *vm) : PuzzleBase(vm, kPageMagi
 
 PuzzleMagicWall::~PuzzleMagicWall() {
 	_vm->setHoverCursorActive(false);
-	for (int i = 0; i < 10; i++)
-		delete _beetles[i].path;
+	for (Beetle &beetle : _beetles)
+		delete beetle.path;
 	for (int i = 0; i < 4; i++)
 		delete _gateAnimations[i];
 	delete _leverAnimation;
@@ -383,9 +384,11 @@ void PuzzleMagicWall::newPuzzle() {
 	_ready = _maze.generate(_puzzleLevel, *_vm->_rnd);
 	if (!_ready)
 		error("MagicWall: no usable layout for difficulty %d", _puzzleLevel);
+	for (Beetle &beetle : _beetles)
+		delete beetle.path;
+	_beetles.clear();
+	_beetles.resize(_maze.positions().size());
 	for (uint i = 0; i < _maze.positions().size(); i++) {
-		delete _beetles[i].path;
-		_beetles[i].path = nullptr;
 		_beetles[i].position = dotPosition(_maze.positions()[i]) + Common::Point32(5, 8);
 		_beetles[i].direction = 0;
 	}
@@ -407,8 +410,8 @@ Common::Point32 PuzzleMagicWall::dotPosition(int index) const {
 }
 
 bool PuzzleMagicWall::beetlesMoving() const {
-	for (int i = 0; i < 10; i++) {
-		if (_beetles[i].path)
+	for (const Beetle &beetle : _beetles) {
+		if (beetle.path)
 			return true;
 	}
 	return false;
@@ -483,7 +486,8 @@ void PuzzleMagicWall::startRunnerPath(int index, int gate, bool exit) {
 void PuzzleMagicWall::submit() {
 	if (!_ready || gatesActive() || runnersMoving() || beetlesMoving() || _phase == Phase::kFinished)
 		return;
-	_leverRunner->start(_vm->getGameTickCount());
+	const uint32 frameTick = _vm->getFrameTickCount();
+	_leverRunner->start(frameTick);
 	SoundManager *sound = _vm->getSoundManager();
 	if (sound)
 		sound->play(_leverSound);
@@ -497,7 +501,7 @@ void PuzzleMagicWall::submit() {
 		startRunnerPath(index, gate, true);
 		if (index < 4)
 			startRunnerPath(index + 4, gate, false);
-		_gateRunners[gate]->start(_vm->getGameTickCount());
+		_gateRunners[gate]->start(frameTick);
 		if (sound)
 			sound->play(_gateSound);
 		accepted = true;
@@ -556,8 +560,7 @@ void PuzzleMagicWall::onUpdate() {
 		newPuzzle();
 	}
 	const bool wasMoving = beetlesMoving();
-	for (int i = 0; i < 10; i++) {
-		Beetle &beetle = _beetles[i];
+	for (Beetle &beetle : _beetles) {
 		if (beetle.path && !beetle.path->advance(now, beetle.position)) {
 			delete beetle.path;
 			beetle.path = nullptr;
@@ -704,6 +707,10 @@ void PuzzleMagicWall::onRenderContent(ManagedSurface32 *screen) {
 	}
 	if (allMatched && _phase != Phase::kFinished && !_leverRunner->isActive())
 		_vm->_gfx->drawPageBitBlock(screen, kLeverGlowPath, Common::Point32(279, 362));
+	for (int i = 0; i < 4; i++) {
+		if (_gateRunners[i]->isActive())
+			_vm->_gfx->drawPageBitBlock(screen, Common::String::format(kGateBackFormat, 'A' + i), kGatePositions[i]);
+	}
 }
 
 void PuzzleMagicWall::onRenderActors(ManagedSurface32 *screen) {
@@ -716,10 +723,6 @@ void PuzzleMagicWall::onActorsRendered() {
 }
 
 void PuzzleMagicWall::onRenderForeground(ManagedSurface32 *screen) {
-	for (int i = 0; i < 4; i++) {
-		if (_gateRunners[i]->isActive())
-			_vm->_gfx->drawPageBitBlock(screen, Common::String::format(kGateBackFormat, 'A' + i), kGatePositions[i]);
-	}
 	_vm->_gfx->getPageLayerStack()->getLayer(1)->drawAndUpdate(screen);
 	if (_ready && !_nextPuzzlePending && _phase != Phase::kFinished && gatesActive())
 		drawBeetles(screen);
@@ -799,32 +802,38 @@ bool PuzzleMagicWall::onGoButtonPressed() {
 Common::String PuzzleMagicWall::debugGetAnswer() const {
 	Common::String answer = debugAnswerHeader();
 	if (!_ready)
-		return answer + "Board resources are unavailable.\n";
-	answer += "Goal: each beetle occupies the dot of its own color.\n";
-	answer += "Generation scramble from that goal (sequential construction rules):";
-	for (int tablet : _maze.generationSequence())
-		answer += Common::String::format(" %d", tablet + 1);
-	answer += "\nThis is construction history, not a solution. Player presses use simultaneous moves; reversing this list is not guaranteed to solve.\n";
-	for (uint color = 0; color < _maze.positions().size(); color++)
-		answer += Common::String::format("%s beetle: initial dot %d; current dot %d; target dot %u\n", kColors[color],
-										 _maze.initialPositions()[color] + 1, _maze.positions()[color] + 1, color + 1);
-	answer += "Solution search from the current position:\n";
+		return answer + "\n  Board resources are unavailable.\n";
+	answer += "\n  Goal: move each beetle onto the dot of its own color.\n";
 	Common::Array<int> sequence;
 	if (_maze.debugSolution(sequence)) {
-		answer += "Tablets (left to right), then pull the lever:";
-		for (int tablet : sequence)
-			answer += Common::String::format(" %d", tablet + 1);
-		answer += "\n";
+		answer += "  Solution from the current board:\n";
+		if (sequence.empty()) {
+			answer += "    The beetles already match their dots; pull the lever.\n";
+		} else {
+			answer += "    Press tablets (numbered left to right):";
+			for (int tablet : sequence)
+				answer += Common::String::format(" %d", tablet + 1);
+			answer += "\n    Then pull the lever.\n";
+		}
 	} else {
-		answer += "No full solution found within 8 presses / 200000 search nodes. Tablet mappings:\n";
+		answer += "  No full solution found within 8 presses / 200000 search nodes.\n";
+		answer += "  Tablet mappings:\n";
 		for (uint rule = 0; rule < _maze.rules().size(); rule++)
 			for (const MagicWallMaze::Edge &edge : _maze.rules()[rule]) {
 				const char *arrow = "->";
 				if (edge.swap)
 					arrow = "<->";
-				answer += Common::String::format("  Tablet %u: dot %d %s dot %d\n", rule + 1, edge.from + 1, arrow, edge.to + 1);
+				answer += Common::String::format("    Tablet %u: %s %s %s\n", rule + 1, kColors[edge.from], arrow, kColors[edge.to]);
 			}
 	}
+	answer += "  Current beetle positions:\n";
+	for (uint color = 0; color < _maze.positions().size(); color++)
+		answer += Common::String::format("    %s beetle: %s dot (started on %s dot)\n", kColors[color],
+										 kColors[_maze.positions()[color]], kColors[_maze.initialPositions()[color]]);
+	answer += "  Construction history (sequential rules, not a player solution):";
+	for (int tablet : _maze.generationSequence())
+		answer += Common::String::format(" %d", tablet + 1);
+	answer += "\n  Player presses move beetles simultaneously, so reversing that history may fail.\n";
 	return answer;
 }
 
