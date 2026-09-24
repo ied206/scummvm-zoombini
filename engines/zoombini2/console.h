@@ -27,6 +27,8 @@
 namespace Zoombini2 {
 
 class Zoombini2Engine;
+enum PageId : int;
+enum class RouteBranch : int;
 
 /**
  * Debug console for the Mountain Rescue engine.
@@ -44,9 +46,26 @@ public:
 	~Zoombini2Console() override;
 
 private:
+	struct GoDestination {
+		const char *name;
+		PageId target;
+		PageId source;
+		RouteBranch branch;
+	};
+	static const GoDestination kGoDestinations[];
+	static constexpr const char *kCmdGo = "go";
+	static constexpr const char *kSubCmdGoXfer = "xfer";
+	static constexpr const char *kSubCmdGoPractice = "practice";
+	bool Cmd_Go(int argc, const char **argv);
+	bool CmdSub_GoXfer(int argc, const char **argv);
+	bool CmdSub_GoPractice(int argc, const char **argv);
+	static const GoDestination *findGoDestination(const char *name, bool puzzleOnly);
+	void printGoDestinations(bool puzzleOnly);
 	bool Cmd_Puzzle(int argc, const char **argv);
 	bool CmdSub_PuzzleFinish(int argc, const char **argv);
 	bool CmdSub_PuzzleAnswer(int argc, const char **argv);
+	/** Wrap puzzle answers to the debugger width while retaining section indentation. */
+	static Common::String formatPuzzleAnswer(const Common::String &answer);
 	bool CmdSub_PuzzleChance(int argc, const char **argv);
 	/** Top-level debugger command for drawing debug views. */
 	static constexpr const char *kCmdDraw = "draw";

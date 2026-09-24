@@ -148,6 +148,8 @@ public:
 	bool useFloatingPointPaths() const { return _useFloatingPointPaths; }
 	/** Return whether the enhanced keyboard shortcut set is enabled. */
 	bool useEnhancedKbdShortcuts() const { return _enhancedKbdShortcuts; }
+	/** Return whether the practice map exposes recoverable level 4 puzzles. */
+	bool allowCutLevel4PracticePuzzles() const { return _allowCutLevel4PracticePuzzles; }
 	/** Return the logic pacing rate in Hz selected for frame-derived speeds.
 	 * It gates only Booliewood panorama scrolling and the banked idle-roll quota;
 	 * millisecond-deadline animations are unaffected. */
@@ -162,7 +164,11 @@ public:
 	/** Return whether @p path resolves through the engine's CD/installed-root resolver. */
 	bool hasResource(const Common::String &path) const;
 	/** Return and clear the validated direct-practice request, if the startup command supplied one. */
-	bool takePracticePuzzleLaunch(PageId &pageId, int &level);
+	bool takePracticePuzzleLaunch(PageId &pageId, int &level, uint &partySize);
+	/** Queue a console-only practice launch without exposing an unsupported map tier. */
+	void queueDebugPracticeLaunch(PageId pageId, int level, uint partySize);
+	/** Return whether this page supports the debug-only level 4 practice tier. */
+	static bool supportsInternalPracticeLevel4(PageId pageId);
 	/** Return the practice-map level retained for this engine session. */
 	int getPracticeLevel() const { return _practiceLevel; }
 	/** Retain a validated practice-map level for later map visits. */
@@ -223,6 +229,14 @@ public:
 	RouteBranch _routeDirection = RouteBranch::kNone00;
 	/** Gameplay page shown as the source of the next map transition. */
 	PageId _mapTransitionSourcePageId = kPageZombiniville;
+	/** Destination whose debug map transition needs a fallback traveling party. */
+	PageId _debugXferDestination = kPageNone;
+	/** Explicit console transition level applied after the outgoing page is destroyed. */
+	int _debugXferPracticeLevel = 0;
+	/** Destination that receives the retained practice level after the transition. */
+	PageId _debugXferPracticeTarget = kPageNone;
+	/** Whether the debug transition starts a fresh practice session. */
+	bool _debugXferResetState = false;
 	/** Total paused time excluded from @ref Zoombini2Engine::getGameTickCount. */
 	uint32 _pauseTimeAccum = 0;
 	/** System tick captured when the current pause began. */
@@ -320,6 +334,10 @@ private:
 	PageId _practicePageId = kPageNone;
 	/** Validated direct-practice level pending the practice-map setup. */
 	int _practicePuzzleLevel = 0;
+	/** Optional console-requested party size; zero selects the route default. */
+	uint _practicePartySize = 0;
+	/** Reset the current adventure only after its active page releases borrowed state. */
+	bool _debugPracticeResetState = false;
 	/** Practice-map level retained while puzzle pages replace the map. */
 	int _practiceLevel = 1;
 
@@ -352,6 +370,8 @@ private:
 	bool _useFloatingPointPaths = false;
 	/** Whether the enhanced keyboard shortcut set is enabled. */
 	bool _enhancedKbdShortcuts = false;
+	/** Whether the practice map exposes recoverable level 4 puzzles. */
+	bool _allowCutLevel4PracticePuzzles = false;
 	/** Logic pacing rate in Hz selected for frame-derived speeds. */
 	int _logicPacingHz = 75;
 	/** Held state of the global puzzle-completion key. */

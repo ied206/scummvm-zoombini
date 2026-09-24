@@ -70,6 +70,8 @@ public:
 	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
 	/** Return the required practice-party size for @p pageId, or zero for a shelter or unsupported page. */
 	static uint getPracticePartySize(PageId pageId);
+	/** Create a route-sized or explicitly sized debugging party using the map's practice rules. */
+	static void createPracticeParty(Zoombini2Engine *vm, PageId pageId, uint partySize = 0);
 	bool hasActiveDialog() const override { return _volumePanel != nullptr; }
 
 private:
@@ -124,6 +126,12 @@ private:
 	static constexpr int kNumLevelTiers = 4;
 	/** Number of legend bitmaps, including the inactive legend. */
 	static constexpr int kNumLegends = 4;
+	/** Level 4 practice tab drawn beyond the three original legend rows. */
+	static constexpr int kLevel4TabLeft = 590;
+	static constexpr int kLevel4TabRight = 625;
+	static constexpr int kLevel4TabTop = 497;
+	static constexpr int kLevel4TabBottom = 508;
+	static constexpr int kLevel4TabSlant = 3;
 
 	/** Icon hit-test rectangles in map coordinates. */
 	static const Common::Rect kIconHitRects[kNumIcons];
@@ -221,7 +229,7 @@ private:
 	MapScreenMode _mode;
 	/** Currently hovered icon, or `-1` when none is hovered. */
 	int _hoveredIcon = -1;
-	/** Practice or selected-page level in the range one through three. */
+	/** Practice or selected-page level in the range one through four. */
 	int _currentLevel = 1;
 	/** Hovered level legend, or zero when none is hovered. */
 	int _hoveredLegendTab = 0;
@@ -269,13 +277,17 @@ private:
 	int hitTestButton(const Common::Point &pos) const;
 	/** Return the level legend tab at @p pos, or zero. */
 	int hitTestLegendTab(const Common::Point32 &pos) const;
+	/** Apply a practice-map level after checking the optional level 4 tier. */
+	bool selectPracticeLevel(int level);
+	/** Return the effective practice difficulty for one puzzle. */
+	int getPracticePuzzleLevel(PageId pageId) const;
+	/** Draw the optional dark level 4 tab beneath the original legend. */
+	void drawLevel4LegendTab(ManagedSurface32 *screen) const;
 
 	/** Return whether this page uses direct practice selection. */
 	bool isPracticeMode() const { return _mode == kMapScreenPractice; }
-	/** Replace the active roster with the route-sized practice party for @p pageId. */
-	void createPracticeParty(PageId pageId);
 	/** Return whether @p traits satisfy the practice party's trait distribution limits. */
-	bool practiceCandidateFitsPack(const ZmbTrait &traits) const;
+	static bool practiceCandidateFitsPack(const Zoombini2Engine *vm, const ZmbTrait &traits);
 	/** Draw every route segment at the practice level. */
 	void drawPracticeSegments(ManagedSurface32 *screen);
 	/** Draw visited route segments at their stored page levels. */

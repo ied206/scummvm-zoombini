@@ -89,6 +89,15 @@ private:
 		/** Move a found Fleen away from the board. */
 		kLeaving04 = 4
 	};
+	/** Select the score digits displayed for a mirror. */
+	enum ScoreMask {
+		/** No score is being displayed. */
+		kScoreNone00 = 0,
+		/** Score to the primary actual fleen, always active */
+		kShowPrimaryScore01 = 1,
+		/** Score to the secondary actual fleen, only active in level 4 */
+		kShowSecondaryScore02 = 2
+	};
 	struct Cell {
 		/** Target-comparison traits, screen origin, score, and display flags for one mirror cell. */
 		ZmbTrait traits;
@@ -97,7 +106,7 @@ private:
 		bool tried = false;
 		bool revealed = false;
 		bool empty = false;
-		byte scoreMask = 1;
+		byte scoreMask = kShowPrimaryScore01;
 	};
 	/** Music, cannon/mirror/projectile art, overlays, and score marker format. */
 	static constexpr const char *kMusicPath = "#sounds/music/05-BB01.wav";
@@ -180,7 +189,7 @@ private:
 		{379, 459},
 	};
 	/** Original easy-mode trait pattern corpus, indexed by pattern, cell, and trait. */
-	static constexpr byte kEasyPatterns[123][5][4] = {
+	static constexpr byte kL1Patterns[123][5][4] = {
 		{
 			{0, 1, 1, 1},
 			{0, 0, 0, 1},
@@ -1067,9 +1076,10 @@ private:
 	static void onFleenAnimationDone(void *context, ZoombiniRunner *runner);
 	PathObject *makeLine(const Common::Point32 &start, const Common::Point32 &end, int step);
 
-	/** Live board cells and the six-panel easy-mode history. */
-	Cell _cells[72];
-	Cell _easyHistory[36];
+	/** Live cells: level 1 uses 6, level 2 uses 54, and level 3 and internal level 4 use 72. */
+	Common::Array<Cell> _cells;
+	/** Completed level-1 panels retain 0 to 30 cells in groups of 6; other levels retain none. */
+	Common::Array<Cell> _easyHistory;
 	/** Difficulty/grid dimensions, active panel/targets, player input, and ammunition state. */
 	int _level = 1;
 	int _columns = 3;
@@ -1107,8 +1117,10 @@ private:
 	uint32 _nextAmbientTick = 0;
 	/** Active projectile path and the per-direction cannon rail paths/positions. */
 	PathObject *_projectilePath = nullptr;
-	PathObject *_railPaths[12] = {};
-	Common::Point32 _railPositions[12];
+	/** Initial rail entries: level 1 uses 12, level 2 uses 8, level 3 uses 6, and internal level 4 uses 8. */
+	Common::Array<PathObject *> _railPaths;
+	/** Initial rail positions: level 1 uses 12, level 2 uses 8, level 3 uses 6, and internal level 4 uses 8. */
+	Common::Array<Common::Point32> _railPositions;
 	Common::Point32 _projectilePos;
 	/** Fleen/projectile runners and their animation grids. */
 	ZoombiniRunner _fleensRunner;

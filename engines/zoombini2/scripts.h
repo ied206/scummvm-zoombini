@@ -550,6 +550,8 @@ public:
 	void startDirectionTrackedAnimation(uint32 tickCount);
 	/** Bank quota from @p elapsedMs and @p pacingHz, then run the original one-in-250 idle rolls owed. */
 	bool tryStartIdleAnimation(const ZoombiniAnimation *animation, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz);
+	/** Bank quota from @p elapsedMs and @p pacingHz, then run the original one-in-20 celebrate rolls owed. */
+	bool tryStartCelebrationAnimation(const ZoombiniAnimation *animation, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz);
 	/** Restore the saved grid and cell 33 after an animation. */
 	void resetAnimation();
 	/** Schedule a due frame advance while preserving the frame drawn by the current render pass. */
@@ -617,6 +619,8 @@ public:
 	bool _idleAnimationEnabled = true;
 	/** Banked idle-roll quota; the original one-in-250 roll runs once per 1000 banked units. */
 	int64 _idleRollQuota = 0;
+	/** Banked celebrate-roll quota; the original one-in-20 roll runs once per 1000 banked units. */
+	int64 _celebrateRollQuota = 0;
 	/** Gameplay tick at which the next animation frame becomes due. */
 	uint32 _nextAnimationFrameTime = 0;
 	/** Progress value assigned by the active page; zero and one meanings depend on the active puzzle. */

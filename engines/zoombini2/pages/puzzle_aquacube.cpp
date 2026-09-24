@@ -154,6 +154,7 @@ void PuzzleAquacube::putFleen(int coordinates, int type) {
 }
 
 void PuzzleAquacube::setupBoard() {
+	_nodes.resize(_numNodes);
 	bool used[4] = {};
 	int flips[4] = {};
 	for (int button = 0; button < _dimensions; button++) {
@@ -374,15 +375,24 @@ void PuzzleAquacube::updateBubbles(uint32 elapsed) {
 				if (6.283 < bubble.phase)
 					bubble.phase = 0;
 			}
-		} else if (_vm->_rnd->getRandomNumber(599) < 2) {
-			bubble.active = true;
-			bubble.originX = _vm->_rnd->getRandomNumber(769);
-			bubble.type = _vm->_rnd->getRandomNumber(2);
-			bubble.y = 600 - 100 * bubble.type;
-			while (400 < bubble.y && 600 < bubble.originX)
-				bubble.originX = _vm->_rnd->getRandomNumber(769);
-			bubble.x = bubble.originX;
-			bubble.phase = 0;
+		} else {
+			// Bank quota so the original two-in-600 roll runs pacingHz times per second.
+			bubble._spawnQuota += static_cast<int64>(elapsed) * _vm->getLogicPacingHz();
+			while (1000 <= bubble._spawnQuota) {
+				bubble._spawnQuota -= 1000;
+				if (_vm->_rnd->getRandomNumber(599) < 2) {
+					bubble._spawnQuota = 0;
+					bubble.active = true;
+					bubble.originX = _vm->_rnd->getRandomNumber(769);
+					bubble.type = _vm->_rnd->getRandomNumber(2);
+					bubble.y = 600 - 100 * bubble.type;
+					while (400 < bubble.y && 600 < bubble.originX)
+						bubble.originX = _vm->_rnd->getRandomNumber(769);
+					bubble.x = bubble.originX;
+					bubble.phase = 0;
+					break;
+				}
+			}
 		}
 	}
 }
@@ -397,8 +407,7 @@ void PuzzleAquacube::onUpdate() {
 	}
 	if (_finished)
 		for (ZoombiniRunner *actor : _puzzleZoombinis)
-			if (actor->_puzzleStatus == 1 && !actor->_animationActive && _vm->_rnd->getRandomNumber(19) == 1)
-				actor->startAnimation(_idle, 33, tick);
+			actor->tryStartCelebrationAnimation(_idle, *_vm->_rnd, tick, _vm->getFrameDeltaMs(), _vm->getLogicPacingHz());
 	updateBubbles(tick - _lastTick);
 	_lastTick = tick;
 	if (_pendingInitialArrival) {
@@ -590,20 +599,33 @@ bool PuzzleAquacube::onGoButtonPressed() {
 
 Common::String PuzzleAquacube::debugGetAnswer() const {
 	Common::String answer = debugAnswerHeader();
-	answer += Common::String::format("Ball: node %d. Levers below are numbered left to right.\n", _ballNode + 1);
+	answer += "\n";
+	const Node &current = _nodes[_ballNode];
+	answer += Common::String::format("  Ball at (%d, %d).\n", current.pos.x, current.pos.y);
+	answer += "  Levers from this bubble (left to right):\n";
+	for (int lever = 0; lever < _dimensions; lever++) {
+		const Node &next = _nodes[current.adj[_axisMap[lever]]];
+		const char *status = next.state == kFleen03 ? "Fleen" : next.occupantCount ? "Zoombinis" : "empty";
+		answer += Common::String::format("    Lever %d -> (%d, %d): %s\n", lever + 1, next.pos.x, next.pos.y, status);
+		for (int occupant = 0; occupant < next.occupantCount; occupant++)
+			answer += Common::String::format("      %s\n", debugActorDescription(next.occupants[occupant]).c_str());
+	}
 	if (_level == 3 && _stepsUsed == 0 && _vm->useAquacubeSafeFirstMove())
-		answer += "Adjustment armed: a first direct lever leading to a Fleen will swap axes with the lowest-numbered safe lever.\n";
+		answer += "  First-move adjustment: a Fleen lever can swap with the first lever leading to Zoombinis.\n";
+	answer += "  Other occupied bubbles:\n";
+	bool foundOther = false;
 	for (int i = 0; i < _numNodes; i++) {
 		const Node &node = _nodes[i];
-		answer += Common::String::format("Node %d (%d,%d): %s", i + 1, node.pos.x, node.pos.y,
-										 node.state == kFleen03 ? "FLEEN" : "safe");
+		if (i == _ballNode || !node.occupantCount)
+			continue;
+		foundOther = true;
+		answer += Common::String::format("    (%d, %d):\n", node.pos.x, node.pos.y);
 		for (int occupant = 0; occupant < node.occupantCount; occupant++)
-			answer += Common::String::format("; %s", debugActorDescription(node.occupants[occupant]).c_str());
-		answer += "\n";
-		for (int lever = 0; lever < _dimensions; lever++)
-			answer += Common::String::format("  Lever %d -> node %d\n", lever + 1, node.adj[_axisMap[lever]] + 1);
+			answer += Common::String::format("      %s\n", debugActorDescription(node.occupants[occupant]).c_str());
 	}
-	answer += "A warp visits selected levers in ascending order and resolves only its final destination, using one move.\n";
+	if (!foundOther)
+		answer += "    (none)\n";
+	answer += "  A warp visits selected levers from left to right and resolves only its final bubble.\n";
 	return answer;
 }
 

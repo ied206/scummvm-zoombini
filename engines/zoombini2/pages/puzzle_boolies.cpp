@@ -94,6 +94,7 @@ int PuzzleBoolies::getRescuedBooliesPerZoombini(int level) {
 	case 2:
 		return 3;
 	case 3:
+	case 4:
 		return 4;
 	default:
 		error("PuzzleBoolies::getResucedBooliesPerZoombini: invalid level(%d)", level);
@@ -247,6 +248,7 @@ void PuzzleBoolies::clearBallArray(Common::Array<Ball> &balls) {
 void PuzzleBoolies::clearBalls() {
 	clearBallArray(_balls);
 	clearBallArray(_nextBalls);
+	clearBallArray(_followingBalls);
 }
 
 void PuzzleBoolies::clearJumps() {
@@ -259,14 +261,17 @@ void PuzzleBoolies::beginRound(uint32 now) {
 	clearBalls();
 	clearJumps();
 	_flips.clear();
-	_rowJumpsStarted = false;
+	_boardingCheckPending = false;
 	_boardingCheckScheduled = false;
 	_selectedRow = -1;
+	_boardingRow = -1;
 	_nextLaneBallIndex = 0;
 	_nextPrepared = false;
+	_followingPrepared = false;
 	_nextFeedingRequested = false;
 	_nextFeeding = false;
 	_nextChallengeType = 0;
+	_followingChallengeType = 0;
 	_challengeType = pickChallengeType();
 	const int count = _challengeType < 0 ? -_challengeType : _challengeType;
 	for (int index = 0; index < count && index < kMaxChallengeBalls; index++) {
@@ -282,15 +287,25 @@ void PuzzleBoolies::beginRound(uint32 now) {
 		_balls.push_back(ball);
 	}
 	_phase = Phase::kFeeding00;
-	_phaseTime = now;
 }
 
 void PuzzleBoolies::prepareNextChallenge(uint32 now) {
 	if (_nextPrepared)
 		return;
-	_nextChallengeType = pickChallengeType();
+	stagePreviewChallenge(_nextBalls, _nextChallengeType, now);
 	_nextPrepared = true;
-	const int count = _nextChallengeType < 0 ? -_nextChallengeType : _nextChallengeType;
+}
+
+void PuzzleBoolies::prepareFollowingChallenge(uint32 now) {
+	if (_followingPrepared)
+		return;
+	stagePreviewChallenge(_followingBalls, _followingChallengeType, now);
+	_followingPrepared = true;
+}
+
+void PuzzleBoolies::stagePreviewChallenge(Common::Array<Ball> &balls, int &challengeType, uint32 now) {
+	challengeType = pickChallengeType();
+	const int count = challengeType < 0 ? -challengeType : challengeType;
 	for (int index = 0; index < count && index < kMaxChallengeBalls; index++) {
 		Ball ball;
 		ball.index = index;
@@ -303,7 +318,7 @@ void PuzzleBoolies::prepareNextChallenge(uint32 now) {
 			ball.pos = getPreviewHoldPosition(index);
 			ball.stage = BallStage::kPreviewHeld07;
 		}
-		_nextBalls.push_back(ball);
+		balls.push_back(ball);
 	}
 }
 
@@ -328,26 +343,28 @@ void PuzzleBoolies::startNextFeeder(uint32 now) {
 
 void PuzzleBoolies::promoteNextChallenge(uint32 now) {
 	if (!_nextPrepared) {
-		beginRound(now);
+		prepareNextChallenge(now);
 		return;
 	}
 	if (!_nextFeeding)
-		startNextFeeder(now);
+		return;
 	clearBallArray(_balls);
 	for (uint index = 0; index < _nextBalls.size(); index++)
 		_balls.push_back(_nextBalls[index]);
 	_nextBalls.clear();
 	_challengeType = _nextChallengeType;
-	_nextChallengeType = 0;
-	_nextPrepared = false;
+	_nextChallengeType = _followingChallengeType;
+	_nextPrepared = _followingPrepared;
+	for (uint index = 0; index < _followingBalls.size(); index++)
+		_nextBalls.push_back(_followingBalls[index]);
+	_followingBalls.clear();
+	_followingChallengeType = 0;
+	_followingPrepared = false;
 	_nextFeedingRequested = false;
 	_nextFeeding = false;
-	_rowJumpsStarted = false;
-	_boardingCheckScheduled = false;
 	_selectedRow = -1;
 	_nextLaneBallIndex = 0;
 	_phase = Phase::kFeeding00;
-	_phaseTime = now;
 }
 
 void PuzzleBoolies::playEffect(int soundId) const {
@@ -470,8 +487,31 @@ void PuzzleBoolies::advanceBall(Ball &ball, uint32 now) {
 }
 
 void PuzzleBoolies::advanceNextBalls(uint32 now) {
+	advancePreviewBalls(_nextBalls, now);
+	advancePreviewBalls(_followingBalls, now);
+	if (_nextFeeding) {
+		for (uint index = 0; index < _nextBalls.size(); index++)
+			advanceBall(_nextBalls[index], now);
+		bool allHeld = !_nextBalls.empty();
+		for (uint index = 0; index < _nextBalls.size(); index++)
+			allHeld = allHeld && _nextBalls[index].stage == BallStage::kHeld02;
+		const int pendingTurn = _phase == Phase::kRolling01 ? 1 : 0;
+		if (allHeld && !_followingPrepared && _completedTurns + pendingTurn + 1 < _requiredTurns)
+			prepareFollowingChallenge(now);
+		return;
+	}
+	if (!_nextFeedingRequested)
+		return;
 	for (uint index = 0; index < _nextBalls.size(); index++) {
-		Ball &ball = _nextBalls[index];
+		if (_nextBalls[index].stage != BallStage::kPreviewHeld07)
+			return;
+	}
+	startNextFeeder(now);
+}
+
+void PuzzleBoolies::advancePreviewBalls(Common::Array<Ball> &balls, uint32 now) {
+	for (uint index = 0; index < balls.size(); index++) {
+		Ball &ball = balls[index];
 		if (ball.stage == BallStage::kPreviewWaiting05 && ball.startAt <= now) {
 			ball.path->start(now);
 			ball.stage = BallStage::kPreviewEntry06;
@@ -483,17 +523,8 @@ void PuzzleBoolies::advanceNextBalls(uint32 now) {
 				ball.pos = hold;
 				ball.stage = BallStage::kPreviewHeld07;
 			}
-		} else if (_nextFeeding) {
-			advanceBall(ball, now);
 		}
 	}
-	if (!_nextFeedingRequested || _nextFeeding)
-		return;
-	for (uint index = 0; index < _nextBalls.size(); index++) {
-		if (_nextBalls[index].stage != BallStage::kPreviewHeld07)
-			return;
-	}
-	startNextFeeder(now);
 }
 
 bool PuzzleBoolies::isBlockerLowered() const {
@@ -544,20 +575,20 @@ void PuzzleBoolies::advanceFlips(uint32 now) {
 	_flipStart = now;
 }
 
-void PuzzleBoolies::startRowJumps(uint32 now) {
-	_rowJumpsStarted = true;
-	for (int row = 0; row < kRowCount; row++)
-		sampleRowValues(_replacementValues[row]);
+void PuzzleBoolies::startRowJumps(int row, uint32 now) {
+	_boardingRow = row;
+	for (int replacementRow = 0; replacementRow < kRowCount; replacementRow++)
+		sampleRowValues(_replacementValues[replacementRow]);
 	for (int slot = 0; slot < kSlotCount; slot++) {
-		Boolie &boolie = _boolies[_selectedRow][slot];
+		Boolie &boolie = _boolies[row][slot];
 		if (boolie.removed || boolie.jumping)
 			continue;
 		Jump jump;
-		jump.row = _selectedRow;
+		jump.row = row;
 		jump.slot = slot;
 		jump.value = boolie.value;
-		jump.pos = getBooliePosition(_selectedRow, slot);
-		jump.path = PathObject::loadFromPAT(_vm, Common::Path(Common::String::format(kJumpPathFormat, _selectedRow, slot + 1)));
+		jump.pos = getBooliePosition(row, slot);
+		jump.path = PathObject::loadFromPAT(_vm, Common::Path(Common::String::format(kJumpPathFormat, row, slot + 1)));
 		if (jump.path) {
 			_jumps.push_back(jump);
 		} else {
@@ -566,6 +597,8 @@ void PuzzleBoolies::startRowJumps(uint32 now) {
 	}
 	if (!_jumps.empty()) {
 		startJump(_jumps[0], now);
+	} else {
+		startBoat(now);
 	}
 }
 
@@ -593,6 +626,8 @@ void PuzzleBoolies::advanceJumps(uint32 now) {
 	_jumps.remove_at(0);
 	if (!_jumps.empty()) {
 		startJump(_jumps[0], now);
+	} else {
+		startBoat(now);
 	}
 }
 
@@ -631,6 +666,8 @@ void PuzzleBoolies::advanceRefill(uint32 now) {
 		traitCount = 3;
 	if (traitCount <= _refillSlot) {
 		_refillActive = false;
+		if (_refillRow == _boardingRow)
+			_boardingRow = -1;
 		return;
 	}
 	_refillX = kRefillStartX[_refillSlot];
@@ -646,36 +683,36 @@ bool PuzzleBoolies::isRowEmpty(int row) const {
 }
 
 void PuzzleBoolies::startBoat(uint32 now) {
-	startRefill(_selectedRow, _replacementValues[0], now);
+	startRefill(_boardingRow, _replacementValues[0], now);
 	if (_activeRunnerIndex < static_cast<int>(_puzzleZoombinis.size()) && _puzzleZoombinis[_activeRunnerIndex])
 		_puzzleZoombinis[_activeRunnerIndex]->_puzzleStatus = 1;
-	_phase = Phase::kBoatLeaving03;
-	_phaseTime = now;
+	_boatState = BoatState::kLeaving01;
+	_boatTime = now;
 	_returnBoatActive = false;
 }
 
-void PuzzleBoolies::finishRound(uint32 now) {
+void PuzzleBoolies::finishRound() {
 	_completedTurns += 1;
-	if (isRowEmpty(_selectedRow)) {
-		startBoat(now);
-		return;
-	}
+	_boardingCheckPending = true;
 	if (_requiredTurns < _completedTurns) {
 		_phase = Phase::kFinished05;
-		_vm->_zoombiniWalkingFlag = true;
-		_vm->restartGoBlink();
+		if (!isRowEmpty(_selectedRow)) {
+			_vm->_zoombiniWalkingFlag = true;
+			_vm->restartGoBlink();
+		}
 		return;
 	}
 	_phase = Phase::kBetweenRounds02;
-	_phaseTime = now;
 }
 
 void PuzzleBoolies::advanceBoat(uint32 now) {
+	if (_boatState == BoatState::kReady00)
+		return;
 	static constexpr double kPixelsPerMillisecond = 800.0 / 4500.0;
-	const double distance = (now - _phaseTime) * kPixelsPerMillisecond;
-	_phaseTime = now;
+	const double distance = (now - _boatTime) * kPixelsPerMillisecond;
+	_boatTime = now;
 	const bool returning = _returnBoatActive;
-	if (_phase == Phase::kBoatLeaving03) {
+	if (_boatState == BoatState::kLeaving01) {
 		_boatX = static_cast<int>(_boatX + distance);
 		if (_activeRunnerIndex < static_cast<int>(_puzzleZoombinis.size()) && _puzzleZoombinis[_activeRunnerIndex])
 			_puzzleZoombinis[_activeRunnerIndex]->setPosition(Common::Point32(_boatX + 35, 495));
@@ -688,6 +725,7 @@ void PuzzleBoolies::advanceBoat(uint32 now) {
 			_vm->_zoombiniWalkingFlag = true;
 		}
 		if (810 < _boatX && lastRunner) {
+			_boatState = BoatState::kReady00;
 			_phase = Phase::kFinished05;
 			_vm->_zoombiniWalkingFlag = true;
 			_vm->restartGoBlink();
@@ -699,7 +737,7 @@ void PuzzleBoolies::advanceBoat(uint32 now) {
 		}
 		if (810 < _boatX) {
 			_puzzleZoombinis[_activeRunnerIndex]->_hidden = true;
-			_phase = Phase::kBoatReturning04;
+			_boatState = BoatState::kReturning02;
 		}
 	}
 	if (!returning)
@@ -713,13 +751,35 @@ void PuzzleBoolies::advanceBoat(uint32 now) {
 	_returnBoatActive = false;
 	_passengers.clear();
 	_boatX = 80;
+	_boatState = BoatState::kReady00;
 	_puzzleZoombinis[_activeRunnerIndex]->setPosition(Common::Point32(115, 495));
 	_vm->_zoombiniWalkingFlag = true;
 	if (_requiredTurns < _completedTurns) {
 		_phase = Phase::kFinished05;
 		_vm->restartGoBlink();
-	} else {
-		promoteNextChallenge(now);
+	}
+}
+
+void PuzzleBoolies::advanceBoardingCheck(uint32 now) {
+	if (_boardingCheckPending && _flips.empty()) {
+		_boardingCheckPending = false;
+		_boardingCheckScheduled = true;
+		_boardingCheckAt = now + kBoardingCheckDelay;
+	}
+	if (!_boardingCheckScheduled || now < _boardingCheckAt || !_flips.empty())
+		return;
+	if (_boardingRow != -1 || !_jumps.empty() || _refillActive || _boatState != BoatState::kReady00)
+		return;
+	_boardingCheckScheduled = false;
+	for (int row = 0; row < kRowCount; row++) {
+		if (isRowEmpty(row)) {
+			startRowJumps(row, now);
+			return;
+		}
+	}
+	if (_phase == Phase::kFinished05) {
+		_vm->_zoombiniWalkingFlag = true;
+		_vm->restartGoBlink();
 	}
 }
 
@@ -734,59 +794,42 @@ void PuzzleBoolies::onUpdate() {
 		return;
 	}
 	advanceRefill(now);
+	advanceBoat(now);
 	for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
 		if (_puzzleZoombinis[index])
 			_puzzleZoombinis[index]->updateAnimation(now);
 	}
 	if (_nextPrepared)
 		advanceNextBalls(now);
-	if (_phase == Phase::kBoatLeaving03 || _phase == Phase::kBoatReturning04) {
-		advanceBoat(now);
-		return;
+	if (_phase == Phase::kFeeding00 || _phase == Phase::kRolling01) {
+		if (_phase == Phase::kRolling01 && _nextLaneBallIndex < _balls.size() && _nextLaneLaunchAt <= now) {
+			startLaneBall(_balls[_nextLaneBallIndex], now);
+			_nextLaneBallIndex += 1;
+			_nextLaneLaunchAt = now + kBallLaunchInterval;
+		}
+		for (int index = static_cast<int>(_balls.size()) - 1; 0 <= index; index--)
+			advanceBall(_balls[index], now);
+		if (_phase == Phase::kFeeding00) {
+			bool allHeld = !_balls.empty();
+			for (uint index = 0; index < _balls.size(); index++)
+				allHeld = allHeld && _balls[index].stage == BallStage::kHeld02;
+			if (allHeld && !_nextPrepared && _completedTurns + 1 < _requiredTurns)
+				prepareNextChallenge(now);
+		} else {
+			bool allDone = true;
+			for (uint index = 0; index < _balls.size(); index++)
+				allDone = allDone && _balls[index].stage == BallStage::kDone04;
+			if (allDone) {
+				_nextFeedingRequested = true;
+				finishRound();
+			}
+		}
 	}
-	if (_phase == Phase::kBetweenRounds02) {
-		if (900 <= now - _phaseTime && (!_nextPrepared || _nextFeeding))
-			promoteNextChallenge(now);
-		return;
-	}
-	if (_phase != Phase::kFeeding00 && _phase != Phase::kRolling01)
-		return;
-	if (_phase == Phase::kRolling01 && _nextLaneBallIndex < _balls.size() && _nextLaneLaunchAt <= now) {
-		startLaneBall(_balls[_nextLaneBallIndex], now);
-		_nextLaneBallIndex += 1;
-		_nextLaneLaunchAt = now + kBallLaunchInterval;
-	}
-	for (int index = static_cast<int>(_balls.size()) - 1; 0 <= index; index--)
-		advanceBall(_balls[index], now);
 	advanceFlips(now);
 	advanceJumps(now);
-	if (_selectedRow < 0) {
-		bool allHeld = !_balls.empty();
-		for (uint index = 0; index < _balls.size(); index++)
-			allHeld = allHeld && _balls[index].stage == BallStage::kHeld02;
-		if (allHeld && !_nextPrepared && _completedTurns + 1 < _requiredTurns)
-			prepareNextChallenge(now);
-		return;
-	}
-	for (uint index = 0; index < _balls.size(); index++) {
-		if (_balls[index].stage != BallStage::kDone04)
-			return;
-	}
-	_nextFeedingRequested = true;
-	if (!_flips.empty())
-		return;
-	if (isRowEmpty(_selectedRow) && !_rowJumpsStarted) {
-		if (!_boardingCheckScheduled) {
-			_boardingCheckScheduled = true;
-			_boardingCheckAt = now + kBoardingCheckDelay;
-		}
-		if (now < _boardingCheckAt)
-			return;
-		startRowJumps(now);
-	}
-	if (!_jumps.empty())
-		return;
-	finishRound(now);
+	advanceBoardingCheck(now);
+	if (_phase == Phase::kBetweenRounds02 && _nextFeeding)
+		promoteNextChallenge(now);
 }
 
 void PuzzleBoolies::onRenderBackground(ManagedSurface32 *screen) {
@@ -868,7 +911,7 @@ void PuzzleBoolies::onRenderContent(ManagedSurface32 *screen) {
 	}
 	drawPinSections(screen);
 	drawSpotHighlights(screen);
-	for (uint index = 0; index < _balls.size(); index++) {
+	for (int index = static_cast<int>(_balls.size()) - 1; 0 <= index; index--) {
 		const Ball &ball = _balls[index];
 		if (ball.stage != BallStage::kDone04) {
 			const char *path = kBallPosPath;
@@ -877,11 +920,20 @@ void PuzzleBoolies::onRenderContent(ManagedSurface32 *screen) {
 			_vm->_gfx->drawPageRleBlock(screen, path, Common::Point32(ball.pos.x - 17, ball.pos.y - 35));
 		}
 	}
-	for (uint index = 0; index < _nextBalls.size(); index++) {
+	for (int index = static_cast<int>(_nextBalls.size()) - 1; 0 <= index; index--) {
 		const Ball &ball = _nextBalls[index];
 		if (ball.stage != BallStage::kPreviewWaiting05 && ball.stage != BallStage::kDone04) {
 			const char *path = kBallPosPath;
 			if (_nextChallengeType <= 0)
+				path = kBallNegPath;
+			_vm->_gfx->drawPageRleBlock(screen, path, Common::Point32(ball.pos.x - 17, ball.pos.y - 35));
+		}
+	}
+	for (int index = static_cast<int>(_followingBalls.size()) - 1; 0 <= index; index--) {
+		const Ball &ball = _followingBalls[index];
+		if (ball.stage != BallStage::kPreviewWaiting05 && ball.stage != BallStage::kDone04) {
+			const char *path = kBallPosPath;
+			if (_followingChallengeType <= 0)
 				path = kBallNegPath;
 			_vm->_gfx->drawPageRleBlock(screen, path, Common::Point32(ball.pos.x - 17, ball.pos.y - 35));
 		}
@@ -920,6 +972,9 @@ void PuzzleBoolies::onActorsRendered() {
 EventHandleResult PuzzleBoolies::onLButtonDown(const Common::Point &pos) {
 	if (_phase != Phase::kFeeding00 || _selectedRow != -1 || _requiredTurns < _completedTurns)
 		return EventHandleResult::kPassthrough;
+	const bool lastRunner = _activeRunnerIndex + 1 == static_cast<int>(_puzzleZoombinis.size());
+	if (lastRunner && (!_jumps.empty() || _boatState != BoatState::kReady00))
+		return EventHandleResult::kPassthrough;
 	for (uint index = 0; index < _balls.size(); index++) {
 		if (_balls[index].stage != BallStage::kHeld02)
 			return EventHandleResult::kPassthrough;
@@ -943,17 +998,20 @@ EventHandleResult PuzzleBoolies::onMouseMove(const Common::Point &pos) {
 
 Common::String PuzzleBoolies::debugGetAnswer() const {
 	Common::String answer = debugAnswerHeader();
-	answer += Common::String::format("Current signed challenge: %d; preview: %d%s. Rows are top to bottom; values follow ball impact order.\n",
-									 _challengeType, _nextChallengeType, _nextPrepared ? "" : " (not prepared)");
+	answer += "\n";
+	answer += Common::String::format("  Current balls: %+d. Rows run from top to bottom.\n", _challengeType);
+	if (_nextPrepared)
+		answer += Common::String::format("  Next balls: %+d.\n", _nextChallengeType);
 	if (_phase != Phase::kFeeding00 || _selectedRow != -1)
-		return answer + "A challenge or boat transfer is active. Query again before choosing the next row.\n";
+		return answer + "  Balls are moving. Query again before choosing another row.\n";
+	answer += "  Result of choosing each row:\n";
 	for (int row = 0; row < kRowCount; row++) {
 		if (isRowEmpty(row) || (_refillActive && row == _refillRow)) {
-			answer += Common::String::format("Row %d: unavailable\n", row + 1);
+			answer += Common::String::format("    Row %d: unavailable\n", row + 1);
 			continue;
 		}
 		byte values[kSlotCount];
-		answer += Common::String::format("Row %d:", row + 1);
+		answer += Common::String::format("    Row %d:", row + 1);
 		for (int slot = 0; slot < kSlotCount; slot++) {
 			values[slot] = _boolies[row][slot].value;
 			if (!_boolies[row][slot].removed)
@@ -977,7 +1035,7 @@ Common::String PuzzleBoolies::debugGetAnswer() const {
 			answer += Common::String::format(" %d", values[slot]);
 			cleared = cleared && values[slot] != 2;
 		}
-		answer += cleared ? " (boards the boat)\n" : " (does not clear)\n";
+		answer += cleared ? " (boards the boat)\n" : " (stays)\n";
 	}
 	return answer;
 }

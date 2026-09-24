@@ -146,11 +146,12 @@ void InteractiveMap::init() {
 	if (isPracticeMode()) {
 		PageId practicePageId = kPageNone;
 		int practiceLevel = 0;
-		if (_vm->takePracticePuzzleLaunch(practicePageId, practiceLevel)) {
+		uint practicePartySize = 0;
+		if (_vm->takePracticePuzzleLaunch(practicePageId, practiceLevel, practicePartySize)) {
 			_currentLevel = practiceLevel;
 			gs->_level = _currentLevel;
 			_vm->_returningFromPuzzle = false;
-			createPracticeParty(practicePageId);
+			createPracticeParty(_vm, practicePageId, practicePartySize);
 			_vm->_mapTransitionSourcePageId = practicePageId;
 			_vm->requestPageChange(practicePageId);
 			return;
@@ -210,6 +211,10 @@ void InteractiveMap::init() {
 	// --- Set initial level ---
 	if (isPracticeMode()) {
 		_currentLevel = _vm->getPracticeLevel();
+		if (_currentLevel == 4 && !_vm->allowCutLevel4PracticePuzzles()) {
+			_currentLevel = 3;
+			_vm->setPracticeLevel(_currentLevel);
+		}
 	} else {
 		// Saved-game routes use per-page levels.
 		_currentLevel = gs->getLevel();
@@ -298,7 +303,7 @@ void InteractiveMap::setupIcons() {
 	}
 }
 
-bool InteractiveMap::practiceCandidateFitsPack(const ZmbTrait &traits) const {
+bool InteractiveMap::practiceCandidateFitsPack(const Zoombini2Engine *vm, const ZmbTrait &traits) {
 	int counts[ZmbTrait::kTraitCount][ZmbTrait::kTraitValueCount + 1] = {};
 	if (!traits.hasValidValues())
 		return false;
@@ -309,8 +314,8 @@ bool InteractiveMap::practiceCandidateFitsPack(const ZmbTrait &traits) const {
 
 	const uint16 candidateHash = traits.calculateHash();
 	int matchingCombinations = 0;
-	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
-		const ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
+	for (uint i = 0; i < vm->_state->_activeZoombinis.size(); i++) {
+		const ZoombiniRunner *zoombini = vm->_state->_activeZoombinis[i];
 		for (int traitOrdinal = 0; traitOrdinal < ZmbTrait::kTraitCount; traitOrdinal++) {
 			const ZmbTrait::TraitIndex traitIndex = static_cast<ZmbTrait::TraitIndex>(traitOrdinal);
 			const byte value = zoombini->_traits.getValue(traitIndex);
@@ -331,19 +336,21 @@ bool InteractiveMap::practiceCandidateFitsPack(const ZmbTrait &traits) const {
 	return matchingCombinations < 2;
 }
 
-void InteractiveMap::createPracticeParty(PageId pageId) {
-	const uint partySize = getPracticePartySize(pageId);
-	_vm->_state->clearActiveZoombinis();
-	if (partySize == 0)
+void InteractiveMap::createPracticeParty(Zoombini2Engine *vm, PageId pageId, uint partySize) {
+	const uint maxPartySize = getPracticePartySize(pageId);
+	vm->_state->clearActiveZoombinis();
+	if (maxPartySize == 0)
 		return;
+	if (partySize == 0)
+		partySize = maxPartySize;
 
-	while (_vm->_state->_activeZoombinis.size() < partySize) {
-		const byte hair = static_cast<byte>(_vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
-		const byte eyes = static_cast<byte>(_vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
-		const byte nose = static_cast<byte>(_vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
-		const byte feet = static_cast<byte>(_vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
+	while (vm->_state->_activeZoombinis.size() < partySize) {
+		const byte hair = static_cast<byte>(vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
+		const byte eyes = static_cast<byte>(vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
+		const byte nose = static_cast<byte>(vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
+		const byte feet = static_cast<byte>(vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
 		const ZmbTrait traits(feet, nose, hair, eyes);
-		if (!practiceCandidateFitsPack(traits))
+		if (!practiceCandidateFitsPack(vm, traits))
 			continue;
 
 		ZoombiniRunner *zoombini = new ZoombiniRunner();
@@ -351,12 +358,12 @@ void InteractiveMap::createPracticeParty(PageId pageId) {
 		zoombini->_inputEnabled = 1;
 		zoombini->_puzzleStatus = 0;
 		zoombini->_animationCell = 33;
-		_vm->_state->_activeZoombinis.push_back(zoombini);
+		vm->_state->_activeZoombinis.push_back(zoombini);
 	}
 
-	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
-		const Common::String name = GameState::generateZoombiniName(*_vm->_rnd);
-		Common::strlcpy(_vm->_state->_activeZoombinis[i]->_name, name.c_str(), sizeof(_vm->_state->_activeZoombinis[i]->_name));
+	for (uint i = 0; i < vm->_state->_activeZoombinis.size(); i++) {
+		const Common::String name = GameState::generateZoombiniName(*vm->_rnd);
+		Common::strlcpy(vm->_state->_activeZoombinis[i]->_name, name.c_str(), sizeof(vm->_state->_activeZoombinis[i]->_name));
 	}
 }
 
@@ -490,6 +497,10 @@ void InteractiveMap::computeStats() {
 // ============================================================================
 
 void InteractiveMap::onUpdate() {
+	if (isPracticeMode() && _currentLevel == 4 && !_vm->allowCutLevel4PracticePuzzles()) {
+		_currentLevel = 3;
+		_vm->setPracticeLevel(_currentLevel);
+	}
 	const Common::Point32 mousePos = _vm->getMousePos();
 	const Common::Point mouseEventPos(mousePos.x, mousePos.y);
 
@@ -576,6 +587,8 @@ void InteractiveMap::onRenderContent(ManagedSurface32 *screen) {
 			if (!_legends[tabToShow].empty())
 				_vm->_gfx->drawPageBitBlock(screen, _legends[tabToShow], Common::Point32(590, 427));
 		}
+		if (_vm->allowCutLevel4PracticePuzzles())
+			drawLevel4LegendTab(screen);
 	}
 
 	// 5. Page icons
@@ -621,17 +634,63 @@ void InteractiveMap::onRenderForeground(ManagedSurface32 *screen) {
 // ============================================================================
 
 void InteractiveMap::drawPracticeSegments(ManagedSurface32 *screen) {
-	// Practice uses one level for the full route and skips duplicate slot 13.
-	int tier = _currentLevel;
-	if (tier < 0 || kNumLevelTiers <= tier)
-		tier = 0;
+	// Practice skips duplicate slot 13 and uses each puzzle's available level.
 
 	for (int slot = 0; slot < kNumSegments; slot++) {
 		if (slot == 13)
 			continue;
-		if (!_segments[tier][slot].empty())
+		const int level = getPracticePuzzleLevel(kSegmentPageIds[slot]);
+		const int tier = MIN(level, kNumLevelTiers - 1);
+		if (_segments[tier][slot].empty())
+			continue;
+		if (level == 4) {
+			RleBlock *segment = _vm->_gfx->loadPageRleBlock(_segments[tier][slot]);
+			if (segment)
+				segment->drawToScreenSolidColor(screen, kSegmentPos[slot], 24, 25, 30, _vm->getAlphaLUT());
+		} else {
 			_vm->_gfx->drawPageRleBlock(screen, _segments[tier][slot], kSegmentPos[slot]);
+		}
 	}
+}
+
+int InteractiveMap::getPracticePuzzleLevel(PageId pageId) const {
+	if (_currentLevel == 4 && !Zoombini2Engine::supportsInternalPracticeLevel4(pageId))
+		return 3;
+	return _currentLevel;
+}
+
+bool InteractiveMap::selectPracticeLevel(int level) {
+	if (level < 1 || 4 < level || (level == 4 && !_vm->allowCutLevel4PracticePuzzles()))
+		return false;
+	_currentLevel = level;
+	_vm->setPracticeLevel(level);
+	if (0 <= _blipSoundId)
+		_vm->getSoundManager()->play(_blipSoundId);
+	return true;
+}
+
+void InteractiveMap::drawLevel4LegendTab(ManagedSurface32 *screen) const {
+	const uint32 fill = screen->format.ARGBToColor(255, 17, 18, 22);
+	const uint32 border = screen->format.ARGBToColor(255, 95, 98, 103);
+	const uint32 activeBorder = screen->format.ARGBToColor(255, 235, 196, 80);
+	const uint32 hoverBorder = screen->format.ARGBToColor(255, 240, 240, 240);
+	uint32 outline = border;
+	if (_hoveredLegendTab == 4)
+		outline = hoverBorder;
+	else if (_currentLevel == 4)
+		outline = activeBorder;
+
+	for (int y = kLevel4TabTop; y < kLevel4TabBottom; y++) {
+		const int slant = (y - kLevel4TabTop) * kLevel4TabSlant / (kLevel4TabBottom - kLevel4TabTop);
+		screen->fillRect(Common::Rect32(kLevel4TabLeft - slant, y, kLevel4TabRight - slant, y + 1), fill);
+	}
+	_vm->_gfx->drawLine(screen, Common::Point32(kLevel4TabLeft, kLevel4TabTop), Common::Point32(kLevel4TabRight, kLevel4TabTop), outline);
+	_vm->_gfx->drawLine(screen, Common::Point32(kLevel4TabLeft - kLevel4TabSlant, kLevel4TabBottom),
+						Common::Point32(kLevel4TabRight - kLevel4TabSlant, kLevel4TabBottom), outline);
+	_vm->_gfx->drawLine(screen, Common::Point32(kLevel4TabLeft, kLevel4TabTop),
+						Common::Point32(kLevel4TabLeft - kLevel4TabSlant, kLevel4TabBottom), outline);
+	_vm->_gfx->drawLine(screen, Common::Point32(kLevel4TabRight, kLevel4TabTop),
+						Common::Point32(kLevel4TabRight - kLevel4TabSlant, kLevel4TabBottom), outline);
 }
 
 // ============================================================================
@@ -703,13 +762,50 @@ EventHandleResult InteractiveMap::onMouseMove(const Common::Point &pos) {
 }
 
 EventHandleResult InteractiveMap::onKeyDown(const Common::KeyState &key, bool repeat) {
-	(void)repeat;
-	if (!_volumePanel)
-		return EventHandleResult::kPassthrough;
-	if (key.keycode == Common::KEYCODE_ESCAPE) {
-		closeVolumePanel(false);
+	if (_volumePanel) {
+		if (key.keycode == Common::KEYCODE_ESCAPE)
+			closeVolumePanel(false);
+		return EventHandleResult::kConsumed;
 	}
-	return EventHandleResult::kConsumed;
+	if (!_vm->useEnhancedKbdShortcuts())
+		return EventHandleResult::kPassthrough;
+	if (repeat)
+		return EventHandleResult::kConsumed;
+	if ((key.flags & Common::KBD_CTRL) != 0 && key.keycode == Common::KEYCODE_p) {
+		if (isPracticeMode()) {
+			if (_buttons[2].enabled)
+				_vm->requestPageChange(kPageMenuLoad);
+		} else {
+			_vm->requestPageChange(kPageMenuPractice);
+		}
+		return EventHandleResult::kConsumed;
+	}
+	if (isPracticeMode() && key.hasFlags(0)) {
+		int level = 0;
+		switch (key.keycode) {
+		case Common::KEYCODE_1:
+		case Common::KEYCODE_KP1:
+			level = 1;
+			break;
+		case Common::KEYCODE_2:
+		case Common::KEYCODE_KP2:
+			level = 2;
+			break;
+		case Common::KEYCODE_3:
+		case Common::KEYCODE_KP3:
+			level = 3;
+			break;
+		case Common::KEYCODE_4:
+		case Common::KEYCODE_KP4:
+			level = 4;
+			break;
+		default:
+			break;
+		}
+		if (selectPracticeLevel(level))
+			return EventHandleResult::kConsumed;
+	}
+	return EventHandleResult::kPassthrough;
 }
 EventHandleResult InteractiveMap::onLButtonDown(const Common::Point &pos) {
 	if (_volumePanel) {
@@ -720,12 +816,8 @@ EventHandleResult InteractiveMap::onLButtonDown(const Common::Point &pos) {
 
 	// Check practice level tabs.
 	if (isPracticeMode()) {
-		int tab = hitTestLegendTab(Common::Point32(pos));
-		if (1 <= tab && tab <= 3) {
-			_currentLevel = tab;
-			_vm->setPracticeLevel(_currentLevel);
-			if (0 <= _blipSoundId)
-				_vm->getSoundManager()->play(_blipSoundId);
+		const int tab = hitTestLegendTab(Common::Point32(pos));
+		if (selectPracticeLevel(tab)) {
 			return EventHandleResult::kConsumed;
 		}
 	}
@@ -780,7 +872,7 @@ EventHandleResult InteractiveMap::onLButtonDown(const Common::Point &pos) {
 		}
 		if (_currentLevel == 0)
 			return EventHandleResult::kConsumed;
-		gs->_level = _currentLevel;
+		gs->_level = isPracticeMode() ? getPracticePuzzleLevel(static_cast<PageId>(clicked)) : _currentLevel;
 
 		switch (clicked) {
 		case 0:
@@ -798,7 +890,7 @@ EventHandleResult InteractiveMap::onLButtonDown(const Common::Point &pos) {
 		default:
 			_vm->_returningFromPuzzle = false;
 			if (isPracticeMode())
-				createPracticeParty(static_cast<PageId>(clicked));
+				createPracticeParty(_vm, static_cast<PageId>(clicked));
 			_vm->_mapTransitionSourcePageId = static_cast<PageId>(clicked);
 			_vm->requestPageChange(static_cast<PageId>(clicked));
 			break;
@@ -853,7 +945,7 @@ int InteractiveMap::hitTestIcon(const Common::Point &pos) const {
 
 /**
  * Hit-test practice level tabs.
- * Returns 1-3 for the level tab, or 0 if none hit.
+ * Returns 1-4 for the level tab, or 0 if none hit.
  */
 
 int InteractiveMap::hitTestLegendTab(const Common::Point32 &pos) const {
@@ -866,6 +958,9 @@ int InteractiveMap::hitTestLegendTab(const Common::Point32 &pos) const {
 	// Level 3: x in (597, 734), y in (472, 488)
 	if (597 < pos.x && pos.x < 734 && 472 < pos.y && pos.y < 488)
 		return 3;
+	if (_vm->allowCutLevel4PracticePuzzles() && kLevel4TabLeft - kLevel4TabSlant < pos.x && pos.x < kLevel4TabRight &&
+		kLevel4TabTop < pos.y && pos.y < kLevel4TabBottom)
+		return 4;
 	return 0;
 }
 
