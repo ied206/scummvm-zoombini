@@ -170,20 +170,23 @@ private:
 		9,
 	};
 
-	/** Runtime phase of the Boolie challenge and boat transfer. */
+	/** Runtime phase of the current ball challenge. */
 	enum class Phase {
 		/** Feed balls and accept one row selection. */
 		kFeeding00 = 0,
 		/** Move the selected challenge balls through the row. */
 		kRolling01 = 1,
-		/** Delay the next challenge after an uncleared row. */
+		/** Wait for the following challenge to enter the upper feeder. */
 		kBetweenRounds02 = 2,
-		/** Carry the successful group away from the ledges. */
-		kBoatLeaving03 = 3,
-		/** Bring the boat back for the next Zoombini. */
-		kBoatReturning04 = 4,
 		/** Stop accepting row input and enable the Go control. */
 		kFinished05 = 5
+	};
+
+	/** Boat travel continues independently of ball challenges. */
+	enum class BoatState {
+		kReady00 = 0,
+		kLeaving01 = 1,
+		kReturning02 = 2
 	};
 
 	/** Position of one challenge ball in its feeder and row paths. */
@@ -285,6 +288,10 @@ private:
 	void beginRound(uint32 now);
 	/** Stage the following challenge at the left preview holding positions. */
 	void prepareNextChallenge(uint32 now);
+	/** Stage another preview while the prepared challenge moves to the right hold. */
+	void prepareFollowingChallenge(uint32 now);
+	/** Choose and place one signed challenge on cave-to-preview paths. */
+	void stagePreviewChallenge(Common::Array<Ball> &balls, int &challengeType, uint32 now);
 	/** Start the prepared preview cohort across the upper feeder. */
 	void startNextFeeder(uint32 now);
 	/** Replace the completed cohort with the already prepared one. */
@@ -307,14 +314,16 @@ private:
 	void advanceBall(Ball &ball, uint32 now);
 	/** Advance cave entry and feeder movement for the following challenge. */
 	void advanceNextBalls(uint32 now);
+	/** Advance cave entry for one preview cohort. */
+	void advancePreviewBalls(Common::Array<Ball> &balls, uint32 now);
 	/** Return whether the upper gate must be lowered for scheduled feeder balls. */
 	bool isBlockerLowered() const;
 	/** Apply the completed @p ball to the selected Boolie row at @p now. */
 	void resolveBall(const Ball &ball, uint32 now);
 	/** Complete queued portrait rolls one at a time. */
 	void advanceFlips(uint32 now);
-	/** Start the selected row's jumps after every ball and portrait roll finishes. */
-	void startRowJumps(uint32 now);
+	/** Start @p row's jumps after its all-1 check can proceed. */
+	void startRowJumps(int row, uint32 now);
 	/** Initialize a jumping member's path and anchor before its first draw. */
 	void startJump(Jump &jump, uint32 now);
 	/** Advance one Boolie jump and start the next at @p now. */
@@ -323,8 +332,10 @@ private:
 	void advanceRefill(uint32 now);
 	/** Bring the retained values into @p row one member at a time. */
 	void startRefill(int row, const byte (&values)[kSlotCount], uint32 now);
-	/** End the selected challenge, starting the boat or the next round. */
-	void finishRound(uint32 now);
+	/** Check for a completed all-1 row after the timed portrait rolls. */
+	void advanceBoardingCheck(uint32 now);
+	/** End the selected ball challenge and schedule its row check. */
+	void finishRound();
 	/** Mark the active Zoombini successful and start boat departure at @p now. */
 	void startBoat(uint32 now);
 	/** Move the boat and choose the next Zoombini at @p now. */
@@ -342,6 +353,8 @@ private:
 	Common::Array<Ball> _balls;
 	/** Following challenge, visible at the left while the current balls wait or roll. */
 	Common::Array<Ball> _nextBalls;
+	/** New left preview while the following challenge travels to the right hold. */
+	Common::Array<Ball> _followingBalls;
 	/** Pending visible transitions in impact order. */
 	Common::Array<Flip> _flips;
 	/** Group members waiting to jump or currently jumping. */
@@ -366,8 +379,8 @@ private:
 	uint32 _flipStart = 0;
 	/** Start tick of the opening blocker transition. */
 	uint32 _blockerStart = 0;
-	/** Whether the selected row has started boarding. */
-	bool _rowJumpsStarted = false;
+	/** Whether the last completed lane still has visible rolls to finish. */
+	bool _boardingCheckPending = false;
 	/** Whether the post-roll boarding check has been scheduled. */
 	bool _boardingCheckScheduled = false;
 	/** Deadline for the scheduled post-roll boarding check. */
@@ -381,14 +394,17 @@ private:
 	int _refillSlot = 0;
 	int _refillX = 0;
 	uint32 _refillCycleStart = 0;
-	/** Current challenge or boat-transfer phase. */
+	/** Current ball-challenge phase. */
 	Phase _phase = Phase::kFeeding00;
-	/** Tick when the current timed phase began. */
-	uint32 _phaseTime = 0;
+	/** Boat travel phase and last movement tick. */
+	BoatState _boatState = BoatState::kReady00;
+	uint32 _boatTime = 0;
 	/** Puzzle-roster entry currently riding in the boat. */
 	int _activeRunnerIndex = 0;
 	/** Selected row, or -1 before the player has chosen one. */
 	int _selectedRow = -1;
+	/** Row boarding or refilling, or -1 when the boat is available for a new group. */
+	int _boardingRow = -1;
 	/** Persistent clipped PIN route selected by the most recent lane click. */
 	int _pinRoute = 0;
 	/** Index and deadline of the next ball to launch into the selected lane. */
@@ -401,8 +417,12 @@ private:
 	int _challengeType = 0;
 	/** Signed type selected for the following preview cohort. */
 	int _nextChallengeType = 0;
+	/** Signed type selected while the following cohort travels to the right. */
+	int _followingChallengeType = 0;
 	/** Whether the following challenge has been selected and staged. */
 	bool _nextPrepared = false;
+	/** Whether a further left preview has been selected and staged. */
+	bool _followingPrepared = false;
 	/** Whether the following challenge should cross the upper feeder. */
 	bool _nextFeedingRequested = false;
 	/** Whether the following cohort has started its upper feeder paths. */

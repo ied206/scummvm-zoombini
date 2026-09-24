@@ -23,6 +23,8 @@
 #define ZOOMBINI2_PAGES_PUZZLE_MYSTICMARSH_H
 
 #include "common/array.h"
+#include "common/hashmap.h"
+#include "common/str.h"
 #include "zoombini2/pages/puzzle_base.h"
 #include "zoombini2/scripts.h"
 #include "zoombini2/state.h"
@@ -70,6 +72,8 @@ public:
 		Common::Array<int> lower;
 		Common::Array<int> group;
 		Common::Array<int> subset;
+		Common::Array<int> level4Order;
+		int level4Features[3][2] = {};
 		/** Actors used as generator references and primary filter examples. */
 		int referenceActors[2] = {
 			-1,
@@ -103,8 +107,25 @@ public:
 	bool turned() const { return _turned; }
 	bool caught() const { return _caught; }
 	bool released() const { return _released; }
+	/** One launch from the initial board; wait for all bubbles to stop before the next launch. */
+	struct AnswerLaunch {
+		int actor;
+		int cell;
+		AnswerLaunch(int a, int c) : actor(a), cell(c) {}
+	};
+	/** Find and replay-check an initial-board answer without consuming random numbers or changing live state. */
+	bool findAnswer(Common::Array<AnswerLaunch> &answer, bool &fromGeneration) const;
 
 private:
+	/** Search only launches separated by stationary grid states, with a bounded tick budget. */
+	bool searchAnswer(uint used, uint exited, const Common::Array<int> &order, Common::Array<AnswerLaunch> &answer,
+					  Common::HashMap<Common::String, bool> &visited, int &budget) const;
+	Common::String answerStateKey(uint used, uint exited) const;
+	bool equivalentAnswerActors(int first, int second) const;
+	static void appendAnswerValue(Common::String &key, int value);
+	bool settleAnswer(uint &exited, int &budget);
+	bool sameAnswerState(const MysticMarshGrid &other) const;
+	void resetAnswerState();
 	struct Feature {
 		/** One trait/value predicate used while selecting generator groups. */
 		int trait;
@@ -113,8 +134,9 @@ private:
 	};
 	/** Decoded cell templates and layout-indexed template maps. */
 	static const Cell kCellTemplates[];
-	static constexpr byte kLayouts[8][kRows][kColumns] = {
+	static constexpr byte kLayouts[9][kRows][kColumns] = {
 		{
+			// Level 1 layout 0
 			{0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
 			{0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
 			{0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
@@ -129,6 +151,7 @@ private:
 			{0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
 		},
 		{
+			// Level 1 layout 1
 			{0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
 			{0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
 			{0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
@@ -143,6 +166,7 @@ private:
 			{0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
 		},
 		{
+			// Level 2 layout 2
 			{0, 0, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 2, 1, 13},
 			{0, 0, 2, 1, 1, 1, 1, 1, 1, 18, 18, 1, 1, 1, 6, 0},
 			{0, 0, 1, 1, 1, 2, 1, 1, 1, 1, 1, 6, 1, 1, 6, 0},
@@ -157,6 +181,7 @@ private:
 			{0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
 		},
 		{
+			// Level 2 layout 3
 			{0, 0, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 2, 1, 13},
 			{0, 0, 2, 1, 1, 1, 1, 1, 1, 18, 18, 1, 1, 1, 6, 0},
 			{0, 0, 1, 1, 1, 2, 1, 1, 1, 1, 1, 6, 1, 1, 1, 0},
@@ -171,6 +196,7 @@ private:
 			{0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
 		},
 		{
+			// Level 2 layout 4
 			{0, 0, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 2, 1, 13},
 			{0, 0, 2, 1, 1, 1, 1, 1, 1, 18, 18, 1, 1, 1, 6, 0},
 			{0, 0, 1, 1, 1, 2, 1, 1, 1, 1, 1, 6, 1, 1, 1, 0},
@@ -185,6 +211,7 @@ private:
 			{0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
 		},
 		{
+			// Level 2 layout 5
 			{0, 0, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 2, 1, 13},
 			{0, 0, 2, 1, 1, 1, 1, 1, 1, 18, 18, 1, 1, 1, 6, 0},
 			{0, 0, 1, 1, 1, 2, 1, 1, 1, 1, 1, 6, 1, 1, 1, 0},
@@ -199,6 +226,7 @@ private:
 			{0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0},
 		},
 		{
+			// Level 3 layout 6
 			{0, 0, 8, 32, 18, 18, 1, 1, 1, 1, 1, 1, 1, 1, 33, 0},
 			{0, 0, 0, 1, 2, 2, 1, 1, 34, 1, 1, 34, 1, 1, 6, 0},
 			{0, 0, 0, 1, 1, 1, 1, 1, 15, 1, 1, 3, 1, 1, 1, 0},
@@ -213,6 +241,7 @@ private:
 			{2, 17, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 13},
 		},
 		{
+			// Level 3 layout 7
 			{0, 0, 1, 10, 2, 1, 1, 34, 1, 1, 34, 1, 1, 6, 0, 0},
 			{0, 0, 1, 1, 1, 1, 1, 3, 1, 1, 15, 1, 1, 1, 0, 0},
 			{0, 0, 1, 1, 1, 1, 1, 15, 1, 1, 15, 1, 1, 1, 0, 0},
@@ -225,6 +254,21 @@ private:
 			{1, 39, 17, 1, 17, 1, 1, 34, 30, 5, 34, 1, 1, 30, 0, 0},
 			{12, 2, 1, 1, 1, 1, 1, 19, 19, 10, 1, 1, 1, 1, 0, 0},
 			{2, 16, 40, 16, 16, 16, 1, 1, 14, 1, 1, 1, 1, 1, 13, 0},
+		},
+		{
+			// Cut Level4 layout
+			{0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
+			{0, 0, 0, 1, 41, 1, 42, 1, 31, 14, 1, 34, 1, 14, 13, 0},
+			{0, 0, 0, 1, 5, 1, 1, 1, 1, 1, 1, 16, 1, 1, 0, 0},
+			{0, 0, 0, 1, 24, 6, 1, 1, 1, 1, 18, 31, 1, 10, 0, 0},
+			{0, 0, 0, 1, 43, 30, 1, 1, 1, 1, 1, 29, 1, 1, 0, 0},
+			{0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 44, 13, 0},
+			{0, 0, 0, 1, 21, 1, 1, 2, 1, 1, 1, 43, 1, 1, 0, 0},
+			{0, 0, 8, 1, 20, 1, 1, 17, 45, 1, 46, 28, 1, 10, 0, 0},
+			{0, 0, 0, 1, 22, 17, 1, 1, 30, 1, 1, 27, 1, 1, 0, 0},
+			{0, 0, 0, 1, 47, 1, 26, 48, 1, 23, 1, 41, 1, 1, 0, 0},
+			{0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0},
+			{0, 0, 8, 1, 1, 1, 1, 1, 1, 1, 17, 1, 1, 1, 0, 0},
 		},
 	};
 	/** Convert coordinates, sample generation values, and inspect party traits. */
@@ -247,6 +291,12 @@ private:
 	int generateEasy(int layout);
 	void generateMedium();
 	void generateHard();
+	void generateLevel4();
+	/** Correct the level 4 conditional arrow after generation, before retaining the initial board. */
+	void correctLevel4Arrow();
+	int pickLevel4Singleton(Feature &feature);
+	bool pickLevel4Constrained(int excludedActor, Feature &feature);
+	Feature pickLevel4Pair(Feature primary, Feature secondary, int excludedActor);
 	int pickUnique(Common::Array<int> &used);
 	int pickDifferent(int first, Common::Array<int> &used, int minimum);
 	/** Resolve a move, remove a collision pair, and rotate triggered devices. */
@@ -261,6 +311,7 @@ private:
 	Cell _initialCells[kCellCount];
 	/** Generation record and before/after occupant buffers used for simultaneous ticks. */
 	GenerationInfo _generation;
+	bool _answerSimulation = false;
 	Occupant _before[kCellCount];
 	Occupant _after[kCellCount];
 	/** Moved, exited, lost, and collided roster indices plus their resolved moves. */
@@ -274,6 +325,30 @@ private:
 	bool _turned = false;
 	bool _caught = false;
 	bool _released = false;
+};
+
+/** Compose and draw the level 4 Mystic Marsh background and cell outlines. */
+class MysticMarshL4Background {
+public:
+	static void compose(ManagedSurface32 *surface);
+	static void drawGrid(ManagedSurface32 *screen, const MysticMarshGrid::Cell *cells);
+	/** Convert a grid cell or drag/drop callback into a page placement. */
+	static Common::Point32 cellPosition(int index);
+
+private:
+	struct WaterNeighbor {
+		int distance = 0;
+		uint8 red = 0;
+		uint8 green = 0;
+		uint8 blue = 0;
+	};
+	static bool isWaterPixel(uint8 red, uint8 blue);
+	static WaterNeighbor findWaterNeighbor(ManagedSurface32 *surface, const Common::Array<byte> &mask, const Common::Point32 &position, const Common::Point32 &step);
+	static void eraseBakedGrid(ManagedSurface32 *surface);
+	static void antialiasUpperShore(ManagedSurface32 *surface);
+	static bool isCellBorderVisible(int column, int row);
+	static bool isPortalCellType(int type);
+	static void drawGridEdge(ManagedSurface32 *screen, const Common::Point32 &start, const Common::Point32 &end, uint32 lineColor);
 };
 
 /** Bubble Bumpers: simultaneous bubble paths through a mutable device grid. */
@@ -303,6 +378,7 @@ protected:
 	/** Advance grid ticks, bubble paths, effects, speech, and completion state. */
 	void onUpdate() override;
 	void onRenderBackground(ManagedSurface32 *screen) override;
+	bool needsScreenClear() const override { return _backgroundIndex == 6; }
 	void onRenderContent(ManagedSurface32 *screen) override;
 	void onRenderActors(ManagedSurface32 *screen) override;
 	void onActorsRendered() override;
@@ -312,6 +388,9 @@ private:
 	/** Music, layout background/mask, device symbols, trait icons, and bubble art. */
 	static constexpr const char *kMusicPath = "#sounds/music/04-BS01.wav";
 	static constexpr const char *kBackgroundFormat = "#bmp/mystic_marsh/background%d";
+	static constexpr int kLevel4FallbackBackgroundIndex = 1;
+	static constexpr int kLevel4RejectVisualCellIndex = 8 * MysticMarshGrid::kRows;
+	static constexpr int kRejectCellType = 58;
 	static constexpr const char *kAreaFormat = "bmp/mystic_marsh/area%d.bmt";
 	static constexpr const char *kSymbolFormat = "bmp/mystic_marsh/symbols/%s";
 	static constexpr const char *kTraitFormat = "bmp/mystic_marsh/traits/%d-%d";
@@ -423,8 +502,6 @@ private:
 		Common::Point32 position;
 		uint32 start;
 	};
-	/** Convert a grid cell or drag/drop callback into a page placement. */
-	static Common::Point32 cellPosition(int index);
 	static void slotDropCallback(void *context, int slotIndex, int zoombiniIndex);
 	void placeZoombini(int slotIndex, int zoombiniIndex);
 	/** Create bubble path segments, resolve grid results, and free or lose riders. */
@@ -436,8 +513,8 @@ private:
 	void playSfx(int index);
 	void enqueueSpeech(const Common::String &name);
 	void loadResources();
-	Common::String debugGroup(const char *label, const Common::Array<int> &actors) const;
-	Common::String debugGeneration() const;
+	/** Cache the answer for this puzzle's initial board until the page is initialized again. */
+	mutable Common::String _initialAnswer;
 
 	/** Logical grid and its cell snapshot for the current render frame. */
 	MysticMarshGrid _grid;
@@ -449,6 +526,7 @@ private:
 	Common::Array<Effect> _effects;
 	/** Background variant, released count, active placement, tick/lock timing, and Go state. */
 	int _backgroundIndex = 1;
+	ManagedSurface32 *_level4Background = nullptr;
 	int _freed = 0;
 	int _placingZoombini = -1;
 	int _placingSlot = -1;

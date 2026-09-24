@@ -262,7 +262,8 @@ private:
 
 	/** Resource-defined board, displayed beetles, and gate/lever animation state. */
 	MagicWallMaze _maze;
-	Beetle _beetles[10];
+	/** KR layout beetles: levels 1 and 2 use 5-8, level 3 uses 6-9, and internal level 4 uses 8-9. */
+	Common::Array<Beetle> _beetles;
 	Animation *_gateAnimations[4] = {};
 	Animation *_leverAnimation = nullptr;
 	AnimationRunner *_gateRunners[4] = {};

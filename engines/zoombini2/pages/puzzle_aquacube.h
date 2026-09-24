@@ -220,6 +220,8 @@ private:
 		float y = 640;
 		/** Sine-wave phase in radians. */
 		float phase = 0;
+		/** Banked spawn-roll quota; the original two-in-600 roll runs once per 1000 banked units. */
+		int64 _spawnQuota = 0;
 	};
 	/** Eight-node cube layout used by the first two difficulty tables. */
 	static constexpr NodeLayout kEasyNodes[8] = {
@@ -372,8 +374,8 @@ private:
 	bool _actorsEscaping = false;
 	/** Whether the first update must resolve the initial node without consuming a move. */
 	bool _pendingInitialArrival = false;
-	/** Active graph nodes for the selected difficulty layout. */
-	Node _nodes[16];
+	/** Active graph nodes: levels 1 and 2 use 8; level 3 and internal level 4 use 16. */
+	Common::Array<Node> _nodes;
 	/** Cosmetic bubbles updated and drawn independently of graph nodes. */
 	Bubble _bubbles[12];
 	/** Roster indices revealed when the first rescue flare completes. */
