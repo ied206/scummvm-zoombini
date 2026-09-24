@@ -171,13 +171,14 @@ const char *PuzzleChanceInfo::typeName(Type type) {
 }
 
 Common::String PuzzleBase::debugAnswerHeader() const {
-	return Common::String::format("%s (level %d, party %u)\nIndices below are one-based.\n", getPuzzleName(_pageId), _puzzleLevel, _puzzleZoombinis.size());
+	return Common::String::format("%s (level %d, party %u)\n", getPuzzleName(_pageId), _puzzleLevel, _puzzleZoombinis.size());
 }
 
 Common::String PuzzleBase::debugActorDescription(int index) const {
 	if (index < 0 || static_cast<int>(_puzzleZoombinis.size()) <= index)
 		return "(none)";
-	return Common::String::format("Zoombini %d [%s]", index + 1, _puzzleZoombinis[index]->_traits.toStr().c_str());
+	const ZoombiniRunner *actor = _puzzleZoombinis[index];
+	return Common::String::format("Zoombini near (%d, %d): %s", actor->_screenPos.x, actor->_screenPos.y, actor->_traits.toStr().c_str());
 }
 
 void PuzzleBase::debugForceFinish() {

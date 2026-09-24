@@ -46,14 +46,14 @@ void Zoombini2MetaEngine::registerDefaultSettings(const Common::String &target) 
 	ConfMan.registerDefault(kConfigDebugHotkeys, false);
 	ConfMan.registerDefault(kConfigGreedyWaterslidePairing, false);
 	ConfMan.registerDefault(kConfigAquacubeSafeFirstMove, false);
+	ConfMan.registerDefault(kConfigAllowCutLevel4PracticePuzzles, false);
 	ConfMan.registerDefault(kConfigOriginalPRNG, true);
 	ConfMan.registerDefault(kConfigLogicPacingHz, 75);
 	ConfMan.registerDefault(kConfigFrameRate, kDefaultFrameRate);
 	ConfMan.registerDefault(kConfigUnlockFrameRate, false);
 }
 
-GUI::OptionsContainerWidget *Zoombini2MetaEngine::buildEngineOptionsWidget(GUI::GuiObject *boss, const Common::String &name,
-																		   const Common::String &target) const {
+GUI::OptionsContainerWidget *Zoombini2MetaEngine::buildEngineOptionsWidget(GUI::GuiObject *boss, const Common::String &name, const Common::String &target) const {
 	return new Zoombini2::Zoombini2OptionsWidget(boss, name, target);
 }
 

@@ -59,6 +59,8 @@ public:
 	static constexpr const char *kConfigGreedyWaterslidePairing = "greedy_waterslide_pairing";
 	/** Target configuration key protecting Aqua Cube's first direct lever move from a Fleen. */
 	static constexpr const char *kConfigAquacubeSafeFirstMove = "aquacube_safe_first_move";
+	/** Target configuration key exposing recoverable level 4 puzzles on the practice map. */
+	static constexpr const char *kConfigAllowCutLevel4PracticePuzzles = "allow_cut_level4_practice_puzzles";
 	/** Target configuration key selecting the original Windows random-number generator. */
 	static constexpr const char *kConfigOriginalPRNG = "original_prng";
 	/** Target configuration key selecting the logic pacing rate in Hz. */

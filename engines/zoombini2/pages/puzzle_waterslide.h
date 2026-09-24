@@ -211,7 +211,7 @@ private:
 	/** Return a usable common trait axis for two generated Zoombinis. */
 	int sharedAxis(int first, int second, bool rejectLast);
 	/** Find a still-available partner for @p source and record it in @p pair. */
-	bool findPair(int source, bool *available, Pair &pair);
+	bool findPair(int source, Common::Array<bool> &available, Pair &pair);
 	/** Return generated Zoombini @p generatedIndex's value on trait @p axis. */
 	int trait(int generatedIndex, int axis) const;
 	/** Add one logical connection and its screen placement to the board graph. */
@@ -226,8 +226,8 @@ private:
 	/** Return whether both occupants of @p edge match its required trait axis. */
 	bool matches(const Edge &edge) const;
 	/** Test and search an assignment for console answer generation. */
-	bool debugPlacementMatches(int slot, int actor, const int *assignment) const;
-	bool debugFindPlacement(int *assignment, uint32 used, int &budget) const;
+	bool debugPlacementMatches(int slot, int actor, const Common::Array<int> &assignment) const;
+	bool debugFindPlacement(Common::Array<int> &assignment, uint32 used, int &budget) const;
 	/** Start the valve animation and the following cascade sequence. */
 	void activateValve();
 	/** Start the next eligible Zoombini's drain animation. */
@@ -248,13 +248,17 @@ private:
 	Phase _phase = kInteractive00;
 	int _connectionCount = 0;
 	int _heldZoombini = -1;
-	/** Slot eligibility/activity, generated solution, and generation order. */
-	bool _eligible[16] = {};
-	bool _activeSlot[16] = {};
-	int _solution[16] = {};
+	/** Levels 1-3 and internal level 4 keep one eligibility flag per party member, up to 16. */
+	Common::Array<bool> _eligible;
+	/** Active flags: level 1 uses party size, up to 16; levels 2 and 3 and internal level 4 use all 16 slots. */
+	Common::Array<bool> _activeSlot;
+	/** Solution entries: level 1 uses party size, up to 16; levels 2 and 3 and internal level 4 use all 16 slots. */
+	Common::Array<int> _solution;
+	/** Levels 1-3 and internal level 4 keep one generation-order entry per party member, up to 16. */
 	Common::Array<int> _generationOrder;
-	/** Graph connections and drag/drop targets for the generated board. */
+	/** Graph connections for the generated board. */
 	Common::Array<Edge> _edges;
+	/** Targets: level 1 uses party size, up to 16; levels 2 and 3 and internal level 4 use all 16 slots. */
 	Common::Array<ZmbDropTarget> _targets;
 	/** Valve/cascade placement, discharge timing, and deferred Go/speech state. */
 	Common::Point32 _valvePos;

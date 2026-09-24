@@ -64,7 +64,7 @@ PuzzleWallOfFleens::PuzzleWallOfFleens(Zoombini2Engine *vm) : PuzzleBase(vm, kPa
 
 PuzzleWallOfFleens::~PuzzleWallOfFleens() {
 	delete _projectilePath;
-	for (int i = 0; i < 12; i++)
+	for (uint i = 0; i < _railPaths.size(); i++)
 		delete _railPaths[i];
 	delete _rotate;
 	delete _explode;
@@ -144,6 +144,9 @@ void PuzzleWallOfFleens::init() {
 		_ballsLeft = 12;
 	else if (_level == 3)
 		_ballsLeft = 6;
+	_railPaths.resize(_ballsLeft);
+	_railPositions.resize(_ballsLeft);
+	_easyHistory.clear();
 	for (int i = 0; i < _ballsLeft; i++)
 		_railPositions[i] = Common::Point32(690 + 23 * (_ballsLeft - 1 - i), 424);
 	buildGrid();
@@ -176,7 +179,7 @@ void PuzzleWallOfFleens::generateEasyPanel() {
 		permute(values[i], 5);
 	for (int i = 0; i < 6; i++) {
 		for (int t = 0; t < 4; t++) {
-			const int valueIndex = i == 5 ? 0 : kEasyPatterns[pattern][i][t];
+			const int valueIndex = i == 5 ? 0 : kL1Patterns[pattern][i][t];
 			ZmbTrait &tuple = _cells[slots[i]].traits;
 			byte *fields[4] = {
 				&tuple._feet,
@@ -198,6 +201,7 @@ void PuzzleWallOfFleens::buildGrid() {
 	else if (_level == 2)
 		_columns = 9;
 	_cellCount = _columns * (_level == 1 ? 2 : 6);
+	_cells.resize(_cellCount);
 	const Common::Point32 origin = _level == 1 ? kPanelOrigins[_panel] : kGridOrigins[_level];
 	for (int i = 0; i < _cellCount; i++) {
 		_cells[i] = Cell();
@@ -422,7 +426,7 @@ void PuzzleWallOfFleens::finishCatch() {
 	_vm->restartGoBlink();
 	if (_level == 1 && _panel < 5) {
 		for (int i = 0; i < 6; i++)
-			_easyHistory[_panel * 6 + i] = _cells[i];
+			_easyHistory.push_back(_cells[i]);
 		_panel += 1;
 		buildGrid();
 		_selected = -1;
@@ -496,8 +500,8 @@ void PuzzleWallOfFleens::onUpdate() {
 				playEffect(3);
 			}
 		}
-		if (_finished && !z->_animationActive && _celebrationAnimation && _vm->_rnd->getRandomNumber(19) == 1)
-			z->startAnimation(_celebrationAnimation, 33, now, ZoombiniRunner::AnimationCompletionPolicy::kBypassCallbackAndCorrection01);
+		if (_finished)
+			z->tryStartCelebrationAnimation(_celebrationAnimation, *_vm->_rnd, now, _vm->getFrameDeltaMs(), _vm->getLogicPacingHz());
 		z->updateAnimation(now);
 	}
 	_fleensRunner.updateAnimation(now);
@@ -555,11 +559,11 @@ void PuzzleWallOfFleens::onUpdate() {
 	if (_mirrorPhase == MirrorPhase::kRotating01 && 1140 <= now - _mirrorTick) {
 		_cells[_selected].revealed = true;
 		if (_level == 4) {
-			_cells[_selected].scoreMask = 0;
+			_cells[_selected].scoreMask = kScoreNone00;
 			if (!_foundPrimary)
-				_cells[_selected].scoreMask |= 1;
+				_cells[_selected].scoreMask |= kShowPrimaryScore01;
 			if (!_foundSecondary)
-				_cells[_selected].scoreMask |= 2;
+				_cells[_selected].scoreMask |= kShowSecondaryScore02;
 		}
 		if (sound)
 			sound->stop(_sounds[1]);
@@ -579,7 +583,7 @@ void PuzzleWallOfFleens::onUpdate() {
 		_shoutCount = 0;
 		_fleensRunner.setTraits(_cells[_selected].traits);
 		_fleensRunner.setDefaultAnimation(_fleensAnimation, 55);
-		_fleensRunner.setPosition(Common::Point32(_cells[_selected].pos.x + 2, _cells[_selected].pos.y + 2));
+		_fleensRunner.setPosition(_cells[_selected].pos);
 		if (_vocif1 && _vocif2) {
 			_fleensRunner.startAnimation(_vocif1, 55, now);
 			_fleensRunner.setAnimationCompleteCallback(onFleenAnimationDone, this);
@@ -646,10 +650,13 @@ void PuzzleWallOfFleens::drawCell(ManagedSurface32 *screen, const Cell &cell, bo
 		index = MIN(index, 20);
 		_vm->_gfx->drawAnimationFrame(screen, _rotate, kFrames[index], cell.pos);
 	} else if (revealed && 0 <= cell.score) {
-		if (cell.scoreMask & 1)
+		if (cell.scoreMask & kShowPrimaryScore01)
 			_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kScoreFormat, cell.score % 10), cell.pos);
-		if (cell.scoreMask & 2)
-			_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kScoreFormat, cell.score / 10), cell.pos);
+		if (cell.scoreMask & kShowSecondaryScore02) {
+			RleBlock *scoreSprite = _vm->_gfx->loadPageRleBlock(Common::String::format(kScoreFormat, cell.score / 10));
+			if (scoreSprite)
+				scoreSprite->drawToScreenMirrored(screen, cell.pos, _vm->getAlphaLUT());
+		}
 	}
 }
 
@@ -712,13 +719,17 @@ void PuzzleWallOfFleens::onActorsRendered() {
 
 Common::String PuzzleWallOfFleens::debugGetAnswer() const {
 	Common::String answer = debugAnswerHeader();
-	answer += Common::String::format("Panel %d. Cells are row-major, starting at the upper left.\n", _panel + 1);
+	answer += "\n";
+	if (_level == 1)
+		answer += Common::String::format("  Panel %d of 6.\n", _panel + 1);
+	answer += "  Target mirrors (rows from top, columns from left):\n";
 	for (int target = 0; target < (_level == 4 ? 2 : 1); target++) {
 		const int index = target == 0 ? _target : _alternateTarget;
 		const Cell &cell = _cells[index];
-		answer += Common::String::format("Target %d: cell %d, row %d column %d (%d,%d), [%s], %s\n", target + 1,
-										 index + 1, index / _columns + 1, index % _columns + 1, cell.pos.x, cell.pos.y, cell.traits.toStr().c_str(),
-										 cell.empty ? "already caught" : "hidden");
+		const char *status = cell.empty ? "caught" : cell.revealed ? "revealed" : "hidden";
+		answer += Common::String::format("    %s: row %d, column %d, near (%d, %d)\n", target == 0 ? "Primary" : "Alternate",
+										 index / _columns + 1, index % _columns + 1, cell.pos.x, cell.pos.y);
+		answer += Common::String::format("      Appearance: %s; status: %s\n", cell.traits.toStr().c_str(), status);
 	}
 	return answer;
 }
@@ -761,6 +772,6 @@ bool PuzzleWallOfFleens::onGoButtonPressed() {
 	return false;
 }
 
-constexpr byte PuzzleWallOfFleens::kEasyPatterns[123][5][4];
+constexpr byte PuzzleWallOfFleens::kL1Patterns[123][5][4];
 
 } // namespace Zoombini2
