@@ -230,6 +230,8 @@ private:
 	GUI::CheckboxWidget *_greedyWaterslideCheckbox = nullptr;
 	/** Toggle protecting Aqua Cube's first direct lever move from a Fleen. */
 	GUI::CheckboxWidget *_aquacubeSafeFirstMoveCheckbox = nullptr;
+	/** Toggle access to recoverable level 4 puzzles from the practice map. */
+	GUI::CheckboxWidget *_allowCutLevel4PracticePuzzlesCheckbox = nullptr;
 	/** Toggle selecting the original Windows random-number generator. */
 	GUI::CheckboxWidget *_originalPrngCheckbox = nullptr;
 	/** Logic pacing selector showing the 60Hz LCD and 75Hz CRT choices. */

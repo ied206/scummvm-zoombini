@@ -793,6 +793,87 @@ void RleBlock::drawToScreenClipped(ManagedSurface32 *destSurface, const Common::
 	drawToScreenInternal(destSurface, pos, clip, alphaLUT, false, 0, 0, 0);
 }
 
+void RleBlock::drawToScreenMirrored(ManagedSurface32 *destSurface, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const {
+	if (!_loaded || !destSurface)
+		return;
+	assert(destSurface->format.bytesPerPixel == 4);
+	static constexpr Graphics::PixelFormat kOpaqueRleFormat = Graphics::PixelFormat::createFormatBGRA32(false);
+	for (uint spanIndex = 0; spanIndex < _spans.size(); spanIndex++) {
+		const Span &span = _spans[spanIndex];
+		assert(span.pixelOffset <= _pixelCount);
+		assert(span.pixelCount <= _pixelCount - span.pixelOffset);
+
+		const int32 screenX = pos.x + _size.width - span.xOffset - static_cast<int32>(span.pixelCount);
+		const int32 screenY = pos.y + span.yOffset;
+		if (screenY < 0 || destSurface->h <= screenY)
+			continue;
+		const int32 left = MAX<int32>(screenX, 0);
+		const int32 right = MIN<int32>(screenX + static_cast<int32>(span.pixelCount), destSurface->w);
+		if (right <= left)
+			continue;
+
+		const int32 sourceCol = screenX + static_cast<int32>(span.pixelCount) - 1 - left;
+		const byte *sourcePixels = reinterpret_cast<const byte *>(_pixels + span.pixelOffset);
+		byte *dstPixel = static_cast<byte *>(destSurface->getBasePtr(left, screenY));
+		for (int32 x = left; x < right; x++) {
+			const byte *srcPixel = sourcePixels + (sourceCol - (x - left)) * 4;
+			if (span.mode == SpanMode::kOpaqueBgr00) {
+				if (!Graphics::crossBlit(dstPixel, srcPixel, destSurface->pitch, 4, 1, 1, destSurface->format, kOpaqueRleFormat)) {
+					warning("RleBlock: unsupported mirrored opaque pixel conversion");
+					return;
+				}
+			} else {
+				assert(span.mode == SpanMode::kInverseAlphaBgr01);
+				const byte invAlpha = srcPixel[3];
+				dstPixel[0] = blendChannel(srcPixel[0], dstPixel[0], invAlpha, alphaLUT);
+				dstPixel[1] = blendChannel(srcPixel[1], dstPixel[1], invAlpha, alphaLUT);
+				dstPixel[2] = blendChannel(srcPixel[2], dstPixel[2], invAlpha, alphaLUT);
+				dstPixel[3] = 255;
+			}
+			dstPixel += 4;
+		}
+		destSurface->addDirtyRect(Common::Rect(left, screenY, right, screenY + 1));
+	}
+}
+
+void RleBlock::drawToScreenSolidColor(ManagedSurface32 *destSurface, const Common::Point32 &pos, byte red, byte green, byte blue,
+										 const AlphaBlendLUT &alphaLUT) const {
+	if (!_loaded || !destSurface)
+		return;
+	assert(destSurface->format.bytesPerPixel == 4);
+	for (uint spanIndex = 0; spanIndex < _spans.size(); spanIndex++) {
+		const Span &span = _spans[spanIndex];
+		const int32 screenX = pos.x + span.xOffset;
+		const int32 screenY = pos.y + span.yOffset;
+		if (screenY < 0 || destSurface->h <= screenY)
+			continue;
+		const int32 left = MAX<int32>(screenX, 0);
+		const int32 right = MIN<int32>(screenX + static_cast<int32>(span.pixelCount), destSurface->w);
+		if (right <= left)
+			continue;
+		const int startCol = static_cast<int>(left - screenX);
+		const byte *srcPixel = reinterpret_cast<const byte *>(_pixels + span.pixelOffset + startCol);
+		byte *dstPixel = static_cast<byte *>(destSurface->getBasePtr(left, screenY));
+		for (int x = left; x < right; x++) {
+			if (span.mode == SpanMode::kOpaqueBgr00) {
+				dstPixel[0] = blue;
+				dstPixel[1] = green;
+				dstPixel[2] = red;
+			} else {
+				const byte inverseAlpha = srcPixel[3];
+				const byte forwardAlpha = 255 - inverseAlpha;
+				dstPixel[0] = static_cast<byte>(MIN<int>(alphaLUT.scale(forwardAlpha, blue) + alphaLUT.scale(inverseAlpha, dstPixel[0]), 255));
+				dstPixel[1] = static_cast<byte>(MIN<int>(alphaLUT.scale(forwardAlpha, green) + alphaLUT.scale(inverseAlpha, dstPixel[1]), 255));
+				dstPixel[2] = static_cast<byte>(MIN<int>(alphaLUT.scale(forwardAlpha, red) + alphaLUT.scale(inverseAlpha, dstPixel[2]), 255));
+			}
+			dstPixel[3] = 255;
+			srcPixel += 4;
+			dstPixel += 4;
+		}
+		destSurface->addDirtyRect(Common::Rect(left, screenY, right, screenY + 1));
+	}
+}
+
 void RleBlock::drawToScreenInternal(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &clip,
 									const AlphaBlendLUT &alphaLUT, bool useColorKey, byte red, byte green, byte blue) const {
 	if (!_loaded || !clip.isValidRect())

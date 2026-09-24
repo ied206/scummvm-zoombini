@@ -975,6 +975,24 @@ void ZoombiniRunner::startDirectionTrackedAnimation(uint32 tickCount) {
 	startAnimation(nullptr, 33, tickCount);
 }
 
+bool ZoombiniRunner::tryStartCelebrationAnimation(const ZoombiniAnimation *animation, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz) {
+	if (!animation || _puzzleStatus != 1 || _animationActive)
+		return false;
+	// Bank quota so the original one-in-20 roll runs pacingHz times per second.
+	// The remainder spreads multi-roll frames evenly when pacing exceeds the render rate.
+	// The celebrate grid is an ordinary page-selected grid, so it repeats like the original.
+	_celebrateRollQuota += static_cast<int64>(elapsedMs) * pacingHz;
+	while (1000 <= _celebrateRollQuota) {
+		_celebrateRollQuota -= 1000;
+		if (randomSrc.getRandomNumber(19) == 1) {
+			_celebrateRollQuota = 0;
+			startAnimation(animation, 33, tickCount);
+			return true;
+		}
+	}
+	return false;
+}
+
 bool ZoombiniRunner::tryStartIdleAnimation(const ZoombiniAnimation *animation, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz) {
 	if (!animation || _hidden || !_idleAnimationEnabled || _animationActive || _movementPath || _dragging)
 		return false;

@@ -28,6 +28,11 @@
 #include "common/config-manager.h"
 #include "common/file.h"
 #include "common/system.h"
+#include "common/ustr.h"
+#include "graphics/font.h"
+#include "graphics/fontman.h"
+#include "gui/ThemeEngine.h"
+#include "gui/gui-manager.h"
 
 namespace Zoombini2 {
 
@@ -40,6 +45,8 @@ constexpr const char *DialogHelp::kLeftArrowEmptyPath;
 constexpr const char *DialogHelp::kRightArrowNormalPath;
 constexpr const char *DialogHelp::kRightArrowEmptyPath;
 constexpr const char *DialogHelp::kHelpPageFormat;
+constexpr const char *DialogHelp::kMissingHelpTextEnglish;
+constexpr const char *DialogHelp::kMissingHelpTextKorean;
 
 DialogHelp::DialogHelp(Zoombini2Engine *vm)
 	: DialogBase(vm) {
@@ -67,7 +74,7 @@ DialogHelp::~DialogHelp() {
 	delete _savedScreen;
 }
 
-const char *DialogHelp::getLevelString(int level) {
+const char *DialogHelp::getLevelHelpFileSuffix(int level) {
 	switch (level) {
 	case 1:
 		return "easy";
@@ -76,13 +83,17 @@ const char *DialogHelp::getLevelString(int level) {
 	case 3:
 		return "hard";
 	default:
-		return "easy";
+		return nullptr;
 	}
 }
 
 bool DialogHelp::isPageValid(PageId pageId, int level, int sheet) {
+	const char *difficultySuffix = getLevelHelpFileSuffix(level);
+	if (!difficultySuffix)
+		return false;
+
 	// Construct help page path
-	Common::String path = Common::String::format(kHelpPageFormat, static_cast<int>(pageId), getLevelString(level), sheet);
+	Common::String path = Common::String::format(kHelpPageFormat, static_cast<int>(pageId), difficultySuffix, sheet);
 
 	// Check if file exists in archive
 	return _vm->hasResource(path);
@@ -98,6 +109,8 @@ bool DialogHelp::open(PageId pageId, int level) {
 	_currentLevel = level;
 	_currentSheet = 1;
 	_transparentHelpPages = (_vm->getFeatures() & GF_Z2_SOLID_HELP_PAGES) != 0 && ConfMan.getBool(::Zoombini2MetaEngine::kConfigTransparentHelpPages);
+	if (level == 4)
+		resolveUiFont();
 
 	_vm->setDialogPaused(true);
 
@@ -133,14 +146,19 @@ void DialogHelp::close() {
 	_currentLevel = -1;
 	_currentSheet = 1;
 	_transparentHelpPages = false;
+	_uiFont = nullptr;
 }
 
 bool DialogHelp::loadPage(PageId pageId, int level, int sheet) {
 	// Free existing sheet
 	freePage();
 
+	const char *difficultySuffix = getLevelHelpFileSuffix(level);
+	if (!difficultySuffix)
+		return false;
+
 	// Construct help sheet path
-	Common::String path = Common::String::format(kHelpPageFormat, static_cast<int>(pageId), getLevelString(level), sheet);
+	Common::String path = Common::String::format(kHelpPageFormat, static_cast<int>(pageId), difficultySuffix, sheet);
 
 	// Load help page
 	if (!_vm->_gfx->loadPageBitBlock(path))
@@ -151,6 +169,25 @@ bool DialogHelp::loadPage(PageId pageId, int level, int sheet) {
 
 void DialogHelp::freePage() {
 	_helpPagePath.clear();
+}
+
+void DialogHelp::resolveUiFont() {
+	_uiFont = nullptr;
+	if (g_gui.theme()->loadExtraFont(GUI::ThemeEngine::kFontStyleNormal, _vm->getLanguage()))
+		_uiFont = g_gui.theme()->getFont(GUI::ThemeEngine::kFontStyleLangExtra);
+	if (!_uiFont)
+		_uiFont = FontMan.getFontByUsage(Graphics::FontManager::kLocalizedFont);
+}
+
+void DialogHelp::drawMissingHelpText(ManagedSurface32 *screen) const {
+	if (!_uiFont)
+		return;
+
+	const char *text = _vm->isKorean() ? kMissingHelpTextKorean : kMissingHelpTextEnglish;
+	const Common::U32String message(text, Common::kUtf8);
+	const int y = kMissingHelpTextCenterY - _uiFont->getFontHeight() / 2;
+	const uint32 textColor = screen->format.RGBToColor(0, 0, 0);
+	_uiFont->drawString(screen, message, kMissingHelpTextX, y, kMissingHelpTextWidth, textColor, Graphics::kTextAlignCenter);
 }
 
 void DialogHelp::onRenderContent(ManagedSurface32 *screen) {
@@ -175,9 +212,11 @@ void DialogHelp::onRenderContent(ManagedSurface32 *screen) {
 			_vm->_gfx->drawPageBitBlockColorKey(screen, _helpPagePath, Common::Point32(135, 191));
 		else
 			_vm->_gfx->drawPageBitBlock(screen, _helpPagePath, Common::Point32(135, 191));
-	} else {
-		// Show placeholder if no help page loaded
+	} else if (getLevelHelpFileSuffix(_currentLevel)) {
+		// Show the placeholder only for a supported help tier with a missing sheet.
 		_vm->_gfx->drawSharedRleBlock(screen, kPlaceholderPath, Common::Point32(0, 0));
+	} else if (_currentLevel == 4) {
+		drawMissingHelpText(screen);
 	}
 
 	// Draw OK button

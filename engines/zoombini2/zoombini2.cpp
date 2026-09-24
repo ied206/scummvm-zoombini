@@ -288,19 +288,47 @@ bool Zoombini2Engine::isGameSaveReadOnly(const Common::String &name) const {
 	return savegameManager.isProfileReadOnly(name);
 }
 
-bool Zoombini2Engine::takePracticePuzzleLaunch(PageId &pageId, int &level) {
+bool Zoombini2Engine::takePracticePuzzleLaunch(PageId &pageId, int &level, uint &partySize) {
 	if (_practicePageId == kPageNone || _practicePuzzleLevel == 0)
 		return false;
 
 	pageId = _practicePageId;
 	level = _practicePuzzleLevel;
+	partySize = _practicePartySize;
 	_practicePageId = kPageNone;
 	_practicePuzzleLevel = 0;
+	_practicePartySize = 0;
 	return true;
 }
 
+void Zoombini2Engine::queueDebugPracticeLaunch(PageId pageId, int level, uint partySize) {
+	_practicePageId = pageId;
+	_practicePuzzleLevel = level;
+	_practicePartySize = partySize;
+	_debugPracticeResetState = true;
+	_isSavedGame = false;
+	requestPageChange(kPageMenuPractice);
+}
+
+bool Zoombini2Engine::supportsInternalPracticeLevel4(PageId pageId) {
+	switch (pageId) {
+	case kPageCrazyTurtle:
+	case kPageWaterslide:
+	case kPageAquacube:
+	case kPageMysticMarsh:
+	case kPageMagicWall:
+	case kPageWallOfFleens:
+	case kPageBoolies:
+		return true;
+	case kPageChezNorf:
+	case kPageSnowboard:
+	default:
+		return false;
+	}
+}
+
 void Zoombini2Engine::setPracticeLevel(int level) {
-	if (1 <= level && level <= 3)
+	if ((1 <= level && level <= 3) || (level == 4 && _allowCutLevel4PracticePuzzles))
 		_practiceLevel = level;
 }
 
@@ -636,6 +664,7 @@ void Zoombini2Engine::refreshEngineSettings() {
 	_useAquacubeSafeFirstMove = ConfMan.getBool(::Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove);
 	_useFloatingPointPaths = ConfMan.getBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths);
 	_enhancedKbdShortcuts = ConfMan.getBool(::Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts);
+	_allowCutLevel4PracticePuzzles = ConfMan.getBool(::Zoombini2MetaEngine::kConfigAllowCutLevel4PracticePuzzles);
 	_logicPacingHz = ConfMan.getInt(::Zoombini2MetaEngine::kConfigLogicPacingHz) == 75 ? 75 : 60;
 	if (!_debugHotkeysEnabled) {
 		_debugCompletionKeyDown = false;
@@ -788,11 +817,6 @@ bool Zoombini2Engine::dispatchPageEvents() {
 	for (const Common::Event &event : _pendingPageEvents) {
 		if (_nextPageId != kPageNone)
 			break;
-		const bool speechSkipInput = event.type == Common::EVENT_LBUTTONDOWN ||
-									 (event.type == Common::EVENT_KEYDOWN && event.kbd.keycode == Common::KEYCODE_SPACE);
-		if (speechSkipInput && _soundManager && _soundManager->hasPendingSpeech())
-			_soundManager->skipSpeechQueue();
-
 		const bool msgBoxEventWasActive = _msgBoxDialog && _msgBoxDialog->isActive();
 		const bool debugDialogEventWasActive = _debugDialog && _debugDialog->isActive();
 		const bool sidebarDialogEventWasActive = _sidebar && _sidebar->hasActiveDialog();
@@ -958,7 +982,7 @@ bool Zoombini2Engine::configurePracticeBootParamLaunch() {
 
 	const PageId pageId = static_cast<PageId>(bootParam / kPracticeBootParamPageFactor);
 	const int level = bootParam % kPracticeBootParamPageFactor;
-	if (InteractiveMap::getPracticePartySize(pageId) == 0 || level < 1 || 3 < level) {
+	if (InteractiveMap::getPracticePartySize(pageId) == 0 || level < 1 || 4 < level || (level == 4 && !supportsInternalPracticeLevel4(pageId))) {
 		warning("Zoombini2: unsupported practice boot parameter %d", bootParam);
 		return false;
 	}
@@ -1000,6 +1024,35 @@ void Zoombini2Engine::switchPage(PageId pageId) {
 	if (_currentPageId == kPageBoolies && pageId == kPageMapTrans)
 		_state->recordBooliesCompletion();
 	destroyCurrentPage();
+	_zoombiniWalkingFlag = false;
+	if (pageId == kPageMenuPractice && _debugPracticeResetState) {
+		_state->init();
+		_activeSaveProfileName.clear();
+		_activeSaveProfileReadOnly = false;
+		_debugPracticeResetState = false;
+	}
+	if (pageId == kPageMapTrans && _debugXferDestination != kPageNone) {
+		if (_debugXferResetState) {
+			_state->init();
+			_activeSaveProfileName.clear();
+			_activeSaveProfileReadOnly = false;
+			_state->_level = _debugXferPracticeLevel;
+			_debugXferResetState = false;
+		}
+		const uint routePartySize = InteractiveMap::getPracticePartySize(_debugXferDestination);
+		while (routePartySize < _state->_activeZoombinis.size()) {
+			delete _state->_activeZoombinis.back();
+			_state->_activeZoombinis.pop_back();
+		}
+		if (_state && _state->_activeZoombinis.empty())
+			InteractiveMap::createPracticeParty(this, _debugXferDestination);
+		_debugXferDestination = kPageNone;
+	}
+	if (pageId == _debugXferPracticeTarget && _debugXferPracticeLevel != 0) {
+		_state->_level = _debugXferPracticeLevel;
+		_debugXferPracticeLevel = 0;
+		_debugXferPracticeTarget = kPageNone;
+	}
 	_nextPageId = kPageNone;
 	_currentPageId = pageId;
 

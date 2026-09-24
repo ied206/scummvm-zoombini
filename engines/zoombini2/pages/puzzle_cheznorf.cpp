@@ -310,7 +310,7 @@ void PuzzleChezNorf::clearSelection() {
 }
 
 void PuzzleChezNorf::updateCursor() {
-	const bool available = _phase != kRelease05 && _phase != kDismiss06 && _phase != kFinished07 && !_departAfterSpeech;
+	const bool available = _phase == kReady00 && !_departAfterSpeech;
 	const int tray = trayAt(_pointer);
 	_vm->setHoverCursorActive(available && (0 <= foodAt(_pointer) || 0 <= norfAt(_pointer) || (0 <= tray && mealComplete(_trays[tray]))));
 	if (0 <= _selectedFood)
@@ -328,7 +328,7 @@ EventHandleResult PuzzleChezNorf::onMouseMove(const Common::Point &pos) {
 
 EventHandleResult PuzzleChezNorf::onLButtonDown(const Common::Point &pos) {
 	_pointer = Common::Point32(pos);
-	_buttonArmed = true;
+	_buttonArmed = _phase == kReady00 && !_departAfterSpeech;
 	return EventHandleResult::kPassthrough;
 }
 
@@ -345,7 +345,7 @@ EventHandleResult PuzzleChezNorf::onLButtonUp(const Common::Point &pos) {
 }
 
 void PuzzleChezNorf::handleClick(const Common::Point32 &pos) {
-	if (_phase == kRelease05 || _phase == kDismiss06 || _phase == kFinished07 || _departAfterSpeech)
+	if (_phase != kReady00 || _departAfterSpeech)
 		return;
 	const int norf = norfAt(pos);
 	if (_phase == kReady00 && 0 <= norf) {
@@ -622,13 +622,16 @@ void PuzzleChezNorf::onActorsRendered() {
 				startMotion(table, kIdle04);
 		}
 		if (_phase == kRejectFall03) {
-			_flyingPosition.y += 20;
-			if (360 < _flyingPosition.y) {
-				_flyingPosition.y = 360;
-				_norfs[_recipient].rejectedTray = true;
-				_norfs[_recipient].rejected = _flyingMeal;
-				_phase = kReady00;
+			if (!_norfs[_recipient].rejectedTray) {
+				_flyingPosition.y += 20;
+				if (360 < _flyingPosition.y) {
+					_flyingPosition.y = 360;
+					_norfs[_recipient].rejectedTray = true;
+					_norfs[_recipient].rejected = _flyingMeal;
+				}
 			}
+			if (_norfs[_recipient].rejectedTray && !_bodyRunners[kRejectReturn01]->isActive())
+				_phase = kReady00;
 		}
 		if (_trayPath) {
 			if (_trayPath->finished) {
@@ -687,22 +690,12 @@ void PuzzleChezNorf::onRenderContent(ManagedSurface32 *screen) {
 		}
 	}
 	for (int i = 0; i < _tableCount; i++) {
-		const bool idle = i == _idleNorf && _bodyRunners[kIdle04]->isActive();
-		const bool reacting = i == _animatedNorf && motionActive(false);
-		if (!idle && !reacting) {
-			_vm->_gfx->drawPageRleBlock(screen, kNorfPath, tablePosition(i, 205));
-			_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kCapPath, i + 1), tablePosition(i, 205));
-		}
 		if (_trayAvailable[i]) {
 			if ((_phase == kThrow01 || _phase == kLand02) && _selectedTray == i)
 				drawTray(screen, tablePosition(i, 500), Meal());
 			else
 				drawTray(screen, tablePosition(i, 500), _trays[i]);
 		}
-		if (_norfs[i].acceptedTray)
-			drawTray(screen, tablePosition(i, 260), _norfs[i].accepted);
-		if (_norfs[i].rejectedTray)
-			drawTray(screen, tablePosition(i, 360), _norfs[i].rejected);
 	}
 }
 
@@ -711,9 +704,23 @@ void PuzzleChezNorf::onRenderActors(ManagedSurface32 *screen) {
 }
 
 void PuzzleChezNorf::onRenderForeground(ManagedSurface32 *screen) {
+	for (int i = 0; i < _tableCount; i++) {
+		const bool idle = i == _idleNorf && _bodyRunners[kIdle04]->isActive();
+		const bool reacting = i == _animatedNorf && motionActive(false);
+		if (!idle && !reacting) {
+			_vm->_gfx->drawPageRleBlock(screen, kNorfPath, tablePosition(i, 205));
+			_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kCapPath, i + 1), tablePosition(i, 205));
+		}
+		if (_norfs[i].acceptedTray)
+			drawTray(screen, tablePosition(i, 260), _norfs[i].accepted);
+		if (_norfs[i].rejectedTray)
+			drawTray(screen, tablePosition(i, 360), _norfs[i].rejected);
+	}
 	if (_phase == kThrow01 || _phase == kLand02 || _phase == kRejectFall03 ||
-		(_phase == kFeedback04 && !_norfs[_recipient].served))
-		drawTray(screen, _flyingPosition, _flyingMeal);
+		(_phase == kFeedback04 && !_norfs[_recipient].served)) {
+		if (!_norfs[_recipient].rejectedTray)
+			drawTray(screen, _flyingPosition, _flyingMeal);
+	}
 	_vm->_gfx->getPageLayerStack()->getLayer(1)->drawAndUpdate(screen);
 	if (0 <= _selectedFood) {
 		const int tray = trayAt(_pointer);
@@ -795,12 +802,13 @@ Common::String PuzzleChezNorf::debugGetAnswer() const {
 		"none",
 	};
 	Common::String answer = debugAnswerHeader();
+	answer += "\n  Norf orders (tables from left to right):\n";
 	for (int i = 0; i < _tableCount; i++) {
 		const Norf &norf = _norfs[i];
 		const char *servedSuffix = "";
 		if (norf.served)
 			servedSuffix = " (served)";
-		answer += Common::String::format("Norf %d (left to right): %s, %s, %s%s\n", i + 1,
+		answer += Common::String::format("    Table %d: %s, %s, %s%s\n", i + 1,
 										 foods[norf.answer.food[0]], foods[norf.answer.food[1]], foods[norf.answer.food[2]], servedSuffix);
 	}
 	return answer;
