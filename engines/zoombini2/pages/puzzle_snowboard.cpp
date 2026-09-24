@@ -443,11 +443,11 @@ void PuzzleSnowboard::onUpdate() {
 	}
 	if (_obstacleChangePending && !_finished && !_collisionSpeechPending && !hasActiveHitAnimation(now))
 		chooseOpenLane();
-	if (_finished && _celebrationAnimation) {
+	if (_finished) {
 		for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
 			ZoombiniRunner *zoombini = _puzzleZoombinis[index];
-			if (zoombini && zoombini->_puzzleStatus == 1 && !zoombini->_animationActive && _vm->_rnd->getRandomNumber(19) == 1)
-				zoombini->startAnimation(_celebrationAnimation, 33, now, ZoombiniRunner::AnimationCompletionPolicy::kBypassCallbackAndCorrection01);
+			if (zoombini)
+				zoombini->tryStartCelebrationAnimation(_celebrationAnimation, *_vm->_rnd, now, _vm->getFrameDeltaMs(), _vm->getLogicPacingHz());
 		}
 	}
 	for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
@@ -523,8 +523,14 @@ void PuzzleSnowboard::drawObstacle(ManagedSurface32 *screen, int lane, uint32 no
 	const Common::Point32 &position = kObstaclePositions[lane];
 	if (_finished) {
 		const Animation *finish = _obstacleAnims[kFinishAnimIndex];
-		if (finish && now - _finishAnimationStart < static_cast<uint32>(finish->getFrameCount() * 50))
-			_vm->_gfx->drawAnimationFrame(screen, finish, (now - _finishAnimationStart) / 50, position);
+		const Animation *hide = _obstacleAnims[kHideAnimIndex];
+		const uint32 elapsed = now - _finishAnimationStart;
+		const uint32 finishDuration = finish ? static_cast<uint32>(finish->getFrameCount()) * 50 : 0;
+		if (finish && elapsed < finishDuration) {
+			_vm->_gfx->drawAnimationFrame(screen, finish, elapsed / 50, position);
+		} else if (hide && elapsed - finishDuration < static_cast<uint32>(hide->getFrameCount()) * 50) {
+			_vm->_gfx->drawAnimationFrame(screen, hide, (elapsed - finishDuration) / 50, position);
+		}
 		return;
 	}
 	if (_obstacleHiding[lane]) {
@@ -654,22 +660,27 @@ EventHandleResult PuzzleSnowboard::onMouseMove(const Common::Point &pos) {
 
 Common::String PuzzleSnowboard::debugGetAnswer() const {
 	Common::String answer = debugAnswerHeader();
+	answer += "\n  Lanes (left to right):\n";
 	for (int lane = 0; lane < kLaneCount; lane++)
-		answer += Common::String::format("Lane %d, obstacle (%d,%d): %s\n", lane + 1, kObstaclePositions[lane].x,
+		answer += Common::String::format("    Lane %d near (%d, %d): %s\n", lane + 1, kObstaclePositions[lane].x,
 										 kObstaclePositions[lane].y, _obstacleVisible[lane] ? "blocked" : "open");
-	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
-		const ZoombiniRunner *actor = _puzzleZoombinis[i];
-		const int lane = classifyZoombini(actor);
-		const char *obstacleState = "open";
-		if (_obstacleVisible[lane])
-			obstacleState = "blocked";
-		const char *inputState = "";
-		if (actor->_inputEnabled)
-			inputState = " - waiting";
-		answer += Common::String::format("%s -> lane %d (%s)%s\n", debugActorDescription(i).c_str(), lane + 1,
-										 obstacleState, inputState);
+	for (int blocked = 0; blocked < 2; blocked++) {
+		answer += blocked ? "  Waiting for a lane change:\n" : "  Safe to send now:\n";
+		bool found = false;
+		for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
+			const ZoombiniRunner *actor = _puzzleZoombinis[i];
+			if (!actor->_inputEnabled)
+				continue;
+			const int lane = classifyZoombini(actor);
+			if (_obstacleVisible[lane] != static_cast<bool>(blocked))
+				continue;
+			found = true;
+			answer += Common::String::format("    %s -> lane %d\n", debugActorDescription(i).c_str(), lane + 1);
+		}
+		if (!found)
+			answer += "    (none)\n";
 	}
-	return answer + "Recheck after a lane change; safe riders depend on the current obstacle positions.\n";
+	return answer + "  Recheck after a lane change.\n";
 }
 
 PuzzleChanceInfo PuzzleSnowboard::debugGetChances() const {

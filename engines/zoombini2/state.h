@@ -123,6 +123,21 @@ struct ZmbTrait {
 	uint16 calculateHash() const;
 	/** Decode a packed identifier into feet, nose, hair, eyes storage order. */
 	static ZmbTrait fromHash(uint16 traitHash);
+	/** Return the ScummVM-internal diagnostic name for one visible trait. */
+	static const char *debugTraitName(TraitIndex index) {
+		switch (index) {
+		case TraitIndex::kFeet00:
+			return "feet";
+		case TraitIndex::kNose01:
+			return "nose";
+		case TraitIndex::kHair02:
+			return "hair";
+		case TraitIndex::kEyes03:
+			return "eyes";
+		default:
+			return "?";
+		}
+	}
 	/** Return the ScummVM-internal diagnostic name for one visible trait value. */
 	static const char *debugTraitValueName(TraitIndex index, int value) {
 		static constexpr const char *kZoombiniTraitNames[kTraitCount][kTraitValueCount] = {
