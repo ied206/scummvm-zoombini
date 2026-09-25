@@ -53,38 +53,43 @@ public:
 
 	/** Save the current screen and open the first help sheet. */
 	bool open(PageId pageId, int level);
-
 	/** Close the overlay, restore the saved screen, and resume gameplay timing. */
 	void close() override;
-
 	/** Return whether this overlay currently owns drawing and input. */
 	bool isActive() const override { return _isActive; }
-
 	/** Draw the frame, current help sheet, and navigation controls. */
 	void onRenderContent(ManagedSurface32 *screen) override;
-
 	/** Handle navigation or close-button input while the modal is active. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
-
 	/** Close the overlay when a close-button press is released inside it. */
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
-
 	/** Update navigation-control hover state for @p pos. */
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
 
 private:
 	/** Resource paths and formats used by the help overlay. */
+	/** RLE frame drawn behind the active help sheet and navigation controls. */
 	static constexpr const char *kHelpFramePath = "Bmp/MENU/help_screen_main.rb";
+	/** RLE placeholder shown when a supported difficulty has no loaded help sheet. */
 	static constexpr const char *kPlaceholderPath = "Bmp/MENU/help_screen_placeholder.rb";
+	/** Default bit-block image for the OK button. */
 	static constexpr const char *kOkButtonNormalPath = "Bmp/MENU/help_screen_okbutton_normal.bb";
+	/** Alternate bit-block image drawn while the pointer hovers over the OK button. */
 	static constexpr const char *kOkButtonPushedPath = "Bmp/MENU/help_screen_okbutton_pushed.bb";
+	/** Enabled bit-block image for the previous-sheet arrow. */
 	static constexpr const char *kLeftArrowNormalPath = "Bmp/MENU/help_screen_leftarro_norma.bb";
+	/** Disabled bit-block image for the previous-sheet arrow. */
 	static constexpr const char *kLeftArrowEmptyPath = "Bmp/MENU/help_screen_leftarro_empty.bb";
+	/** Enabled bit-block image for the next-sheet arrow. */
 	static constexpr const char *kRightArrowNormalPath = "Bmp/MENU/help_screen_rightarro_norma.bb";
+	/** Disabled bit-block image for the next-sheet arrow. */
 	static constexpr const char *kRightArrowEmptyPath = "Bmp/MENU/help_screen_rightarro_empty.bb";
+	/** Format for page help-sheet paths: page ID, difficulty suffix, and one-based sheet number. */
 	static constexpr const char *kHelpPageFormat = "Bmp/help/%02d_help_%s_%02d.bb";
+	/** Localized notices added by ScummVM; the original engine provides no level 4 help message or help sheet. */
 	static constexpr const char *kMissingHelpTextEnglish = "No help resource is available for level 4.";
 	static constexpr const char *kMissingHelpTextKorean = u8"4단계는 도움말 리소스가 없습니다.";
+	/** Layout values added by ScummVM to center its level 4 notice in the otherwise empty help frame. */
 	static constexpr int kMissingHelpTextX = 135;
 	static constexpr int kMissingHelpTextWidth = 530;
 	static constexpr int kMissingHelpTextCenterY = 285;
@@ -95,9 +100,9 @@ private:
 	void freePage();
 	/** Return the help-resource filename suffix for @p level, or null when none exists. */
 	static const char *getLevelHelpFileSuffix(int level);
-	/** Select a localized font for the level-four resource notice. */
+	/** Select a localized font for the ScummVM-added level 4 notice, which has no original-engine equivalent. */
 	void resolveUiFont();
-	/** Draw the level-four notice inside the empty help frame. */
+	/** Draw the ScummVM-added level 4 notice; the original engine leaves the frame without text when no sheet exists. */
 	void drawMissingHelpText(ManagedSurface32 *screen) const;
 
 	/** Whether the help overlay is active. */
@@ -117,11 +122,11 @@ private:
 	/** Whether the active release and target enable help-sheet color keying. */
 	bool _transparentHelpPages = false;
 	/** Close-button hit rectangle. */
-	Common::Rect _okButtonRect = Common::Rect(597, 400, 671, 444);
+	const Common::Rect _okButtonRect = Common::Rect(597, 400, 671, 444);
 	/** Previous-sheet button hit rectangle. */
-	Common::Rect _leftArrowRect = Common::Rect(135, 400, 181, 444);
+	const Common::Rect _leftArrowRect = Common::Rect(135, 400, 181, 444);
 	/** Next-sheet button hit rectangle. */
-	Common::Rect _rightArrowRect = Common::Rect(209, 400, 253, 444);
+	const Common::Rect _rightArrowRect = Common::Rect(209, 400, 253, 444);
 	/** Whether the pointer is over the close button. */
 	bool _okButtonHovered = false;
 	/** Whether the pointer is over the previous-sheet button. */

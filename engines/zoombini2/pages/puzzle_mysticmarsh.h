@@ -385,27 +385,43 @@ protected:
 	void onRenderForeground(ManagedSurface32 *screen) override;
 
 private:
-	/** Music, layout background/mask, device symbols, trait icons, and bubble art. */
+	/** Looping Bubble Bumpers soundtrack. */
 	static constexpr const char *kMusicPath = "#sounds/music/04-BS01.wav";
+	/** Path format for the board backdrop selected by the generated layout. */
 	static constexpr const char *kBackgroundFormat = "#bmp/mystic_marsh/background%d";
+	/** Existing backdrop used when the internal Level 4 layout selects missing background 6. */
 	static constexpr int kLevel4FallbackBackgroundIndex = 1;
 	static constexpr int kLevel4RejectVisualCellIndex = 8 * MysticMarshGrid::kRows;
 	static constexpr int kRejectCellType = 58;
+	/** Path format for the drop-area mask corresponding to the generated background index. */
 	static constexpr const char *kAreaFormat = "bmp/mystic_marsh/area%d.bmt";
+	/** Path format for the RLE device and tile symbols selected by grid-cell type. */
 	static constexpr const char *kSymbolFormat = "bmp/mystic_marsh/symbols/%s";
+	/** Path format for RLE icons identifying a numbered Zoombini feature and value. */
 	static constexpr const char *kTraitFormat = "bmp/mystic_marsh/traits/%d-%d";
+	/** RLE crater artwork drawn beneath Zoombinis entering the bubble grid. */
 	static constexpr const char *kCraterPath = "bmp/mystic_marsh/crater";
+	/** Animation played over a crater while a Zoombini enters the grid. */
 	static constexpr const char *kCraterAnimationPath = "bmp/mystic_marsh/BubbleCrater";
+	/** Animation over a whirlpool when a bubble and its rider are lost. */
 	static constexpr const char *kWhirlpoolPath = "bmp/mystic_marsh/symbols/tourbi_anim";
+	/** RLE bubble sprite drawn along each active movement path. */
 	static constexpr const char *kBubblePath = "bmp/mystic_marsh/bubble1";
+	/** Shared Zoombini flotation animation used while a member rides a bubble. */
 	static constexpr const char *kFloatPath = "bmp/zombis/flotte/flotte.anm";
+	/** Shared Zoombini pick-up animation used while a member is dragged to a crater. */
 	static constexpr const char *kPickupPath = "bmp/zombis/pris/pris.anm";
+	/** Shared Zoombini celebration animation after a member exits the grid. */
 	static constexpr const char *kCelebratePath = "bmp/zombis/attente/attenteZomb.anm";
-	/** Effects, departure speech, completion speech, and symbol resource names. */
+	/** Path format for launch, collision, turn, catch, release, and whirlpool sound effects. */
 	static constexpr const char *kSfxFormat = "sounds/fx/04-BS%02d.wav";
+	/** Path format for one of five randomized perfect-completion praise lines. */
 	static constexpr const char *kGoSpeechFormat = "sounds/WLD11.%d.wav";
+	/** Retreat speech played before leaving with four or more Zoombinis still in the roster. */
 	static constexpr const char *kCaveSpeech = "sounds/DW-Cave.wav";
+	/** Completion speech queued after the party has escaped the marsh. */
 	static constexpr const char *kCompleteSpeech = "sounds/8-E1.wav";
+	/** Suffixes used by the 60 cell-type RLE symbols loaded from the symbols directory. */
 	static constexpr const char *kSymbolNames[60] = {
 		"S_DIV1",
 		"S_DIV2",

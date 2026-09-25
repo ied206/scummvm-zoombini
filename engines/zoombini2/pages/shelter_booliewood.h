@@ -49,7 +49,7 @@ public:
 	/** Release this page's scene, path, visual, and audio resources. */
 	~ShelterBooliewood() override;
 
-	/** Build the community scene from the active profile's rescue history. */
+	/** Build the community scene from the active saved game's rescue history. */
 	void init() override;
 	/** Advance scrolling, attractions, walking Boolies, and crowd speech. */
 	void onUpdate() override;
@@ -64,22 +64,33 @@ public:
 	bool hasGoButton() const override { return false; }
 
 private:
-	/** Scene artwork and actor resource paths. */
+	/** Installed 4000-by-600 panorama used as the scrolling Booliewood scene background. */
 	static constexpr const char *kBackgroundPath = "#bmp/booliewood/background";
+	/** Little-Zoombini sprite grid used for the seated community members. */
 	static constexpr const char *kSeatedAnimationPath = "bmp/zombis/littleZomb.anm";
+	/** Standard idle Zoombini sprite grid used for community members who animate while seated. */
 	static constexpr const char *kWalkingZoombiniAnimationPath = "bmp/zombis/attente/attenteZomb.anm";
+	/** Crowd marker for Boolies recorded as content in the historical arrival mask. */
 	static constexpr const char *kContentMarkerPath = "bmp/booliewood/piti_bool/content.rb";
+	/** Crowd marker for Boolies recorded as pas-content in the historical arrival mask. */
 	static constexpr const char *kPascontentMarkerPath = "bmp/booliewood/piti_bool/pascontent.rb";
+	/** Boolie sprite animation used while the seventeen decorative crowd actors walk. */
 	static constexpr const char *kWalkingAnimationPath = "bmp/boolies/marche.an";
+	/** Boolie sprite animation used while the decorative crowd actors wait. */
 	static constexpr const char *kWaitingAnimationPath = "bmp/boolies/attend.an";
+	/** PAT route format for the decorative crowd actors; the argument is the route number. */
 	static constexpr const char *kCrowdRouteFormat = "bmp/booliewood/path%d.pat";
+	/** Cursor shown at the right edge when the panorama can scroll toward later scenery. */
 	static constexpr const char *kScrollRightCursorPath = "bmp/cursor/cursor03.rb";
+	/** Cursor shown at the left edge when the panorama can scroll toward earlier scenery. */
 	static constexpr const char *kScrollLeftCursorPath = "bmp/cursor/cursor04.rb";
-	/** Music and narration resource paths. */
+	/** Background music for the Booliewood community panorama. */
 	static constexpr const char *kMusicPath = "#sounds/music/Booliewood_Level1.wav";
+	/** First-visit greeting played when the player enters Booliewood. */
 	static constexpr const char *kIntroSpeechPath = "sounds/zbv21.2.wav";
+	/** Ambient Booliewood voice format; the argument selects one of six clips. */
 	static constexpr const char *kAmbientSpeechFormat = "sounds/blw22.%d.wav";
-	/** Attraction resources in scene order. */
+	/** Stage-gated attraction animations in scene order: three bear-rail segments, two horror-ride effects, horror-ride fire, and mushroom lights. */
 	static constexpr const char *kAttractionPaths[] = {
 		"bmp/booliewood/atraction_ourson_rail1.an",
 		"bmp/booliewood/atraction_ourson_rail2.an",
@@ -210,7 +221,7 @@ private:
 	void resetSeats();
 	/** Assign one randomized available seat to @p pos. */
 	bool assignSeat(Common::Point32 &pos);
-	/** Seat incoming and historical Zoombinis from the active profile. */
+	/** Seat incoming and historical Zoombinis from the active savefile. */
 	void buildSeatedCommunity(uint32 now);
 	/** Reconstruct one historical Zoombini from @p traitHash. */
 	static ZoombiniRunner *createHistoricalZoombini(int32 traitHash);

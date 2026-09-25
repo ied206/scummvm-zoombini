@@ -219,73 +219,97 @@ void Zoombini2Engine::clearZoombiniAnimationCache() {
 	_zoombiniAnimationCache.clear();
 }
 
-bool Zoombini2Engine::writeGameSave(const Common::String &name) {
-	if (ConfMan.getBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, ConfMan.getActiveDomainName()))
-		return false;
-	if (_activeSaveProfileReadOnly)
+bool Zoombini2Engine::writeGameSave(const Common::String &savefileName) {
+	const Common::String &activeSavefileName = _activeSavefileName.empty() ? savefileName : _activeSavefileName;
+	if (isGameSaveWriteLocked(activeSavefileName) || _activeSavefileReadOnly)
 		return true;
-	const Common::String &storageName = _activeSaveProfileName.empty() ? name : _activeSaveProfileName;
-	return saveGameProfile(storageName);
+	return writeGameSavefile(activeSavefileName);
 }
 
-bool Zoombini2Engine::createGameSave(const Common::String &name) {
-	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName());
-	if (savegameManager.profileExists(name))
+bool Zoombini2Engine::isSavefileReadOnlyToggleEnabled() const {
+	return ConfMan.getBool(::Zoombini2MetaEngine::kConfigEnableSavefileReadOnlyToggle, ConfMan.getActiveDomainName());
+}
+
+bool Zoombini2Engine::isGameSaveWriteLocked(const Common::String &savefileName) const {
+	Common::HashMap<Common::String, bool>::const_iterator entry = _saveWriteLockOverrides.find(savefileName);
+	return entry != _saveWriteLockOverrides.end() && entry->_value;
+}
+
+bool Zoombini2Engine::toggleGameSaveWriteLock(const Common::String &savefileName) {
+	if (!isSavefileReadOnlyToggleEnabled() || savefileName.empty())
 		return false;
-	const bool saved = saveGameProfile(name);
+	if (isGameSaveReadOnly(savefileName)) {
+		g_system->displayMessageOnOSD(Common::U32String("This savefile is read-only on disk"));
+		return false;
+	}
+	const bool locked = !isGameSaveWriteLocked(savefileName);
+	_saveWriteLockOverrides[savefileName] = locked;
+	debug(1, "Zoombini2: automatic writes %s for savefile '%s'", locked ? "locked" : "unlocked", savefileName.c_str());
+	g_system->displayMessageOnOSD(Common::U32String(locked ? "Savefile locked" : "Savefile unlocked"));
+	return true;
+}
+
+bool Zoombini2Engine::createGameSave(const Common::String &savefileName) {
+	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName(), getLanguage());
+	if (savegameManager.savefileExists(savefileName))
+		return false;
+	const bool saved = writeGameSavefile(savefileName);
 	if (saved) {
-		_activeSaveProfileName = name;
-		_activeSaveProfileReadOnly = false;
+		_saveWriteLockOverrides.erase(savefileName);
+		_activeSavefileName = savefileName;
+		_activeSavefileReadOnly = false;
 	}
 	return saved;
 }
 
-bool Zoombini2Engine::overwriteGameSave(const Common::String &name) {
-	const bool saved = saveGameProfile(name);
+bool Zoombini2Engine::overwriteGameSave(const Common::String &savefileName) {
+	const bool saved = writeGameSavefile(savefileName);
 	if (saved) {
-		_activeSaveProfileName = name;
-		_activeSaveProfileReadOnly = false;
+		_activeSavefileName = savefileName;
+		_activeSavefileReadOnly = false;
 	}
 	return saved;
 }
 
-bool Zoombini2Engine::saveGameProfile(const Common::String &name) {
+bool Zoombini2Engine::writeGameSavefile(const Common::String &savefileName) {
 	if (!_state)
 		return false;
-	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName());
-	return savegameManager.saveProfile(name, *_state);
+	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName(), getLanguage());
+	return savegameManager.writeSavefile(savefileName, *_state);
 }
 
-bool Zoombini2Engine::readGameSave(const Common::String &name) {
+bool Zoombini2Engine::readGameSave(const Common::String &savefileName) {
 	if (!_state)
 		return false;
-	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName());
-	const bool loaded = savegameManager.loadProfile(name, *_state);
+	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName(), getLanguage());
+	const bool loaded = savegameManager.loadSavefile(savefileName, *_state);
 	if (loaded) {
-		_activeSaveProfileName = name;
-		_activeSaveProfileReadOnly = isGameSaveReadOnly(name);
+		_activeSavefileName = savefileName;
+		_activeSavefileReadOnly = isGameSaveReadOnly(savefileName);
 	}
 	return loaded;
 }
 
-bool Zoombini2Engine::deleteGameSave(const Common::String &name) {
-	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName());
-	const bool deleted = savegameManager.deleteProfile(name);
-	if (deleted && _activeSaveProfileName == name) {
-		_activeSaveProfileName.clear();
-		_activeSaveProfileReadOnly = false;
+bool Zoombini2Engine::deleteGameSave(const Common::String &savefileName) {
+	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName(), getLanguage());
+	const bool deleted = savegameManager.deleteSavefile(savefileName);
+	if (deleted && _activeSavefileName == savefileName) {
+		_activeSavefileName.clear();
+		_activeSavefileReadOnly = false;
 	}
+	if (deleted)
+		_saveWriteLockOverrides.erase(savefileName);
 	return deleted;
 }
 
 Common::StringArray Zoombini2Engine::listGameSaves() const {
-	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName());
-	return savegameManager.listProfiles();
+	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName(), getLanguage());
+	return savegameManager.listSavefiles();
 }
 
-bool Zoombini2Engine::isGameSaveReadOnly(const Common::String &name) const {
-	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName());
-	return savegameManager.isProfileReadOnly(name);
+bool Zoombini2Engine::isGameSaveReadOnly(const Common::String &savefileName) const {
+	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName(), getLanguage());
+	return savegameManager.isSavefileReadOnly(savefileName);
 }
 
 bool Zoombini2Engine::takePracticePuzzleLaunch(PageId &pageId, int &level, uint &partySize) {
@@ -746,10 +770,8 @@ void Zoombini2Engine::processEvents() {
 			break;
 		case Common::EVENT_RETURN_TO_LAUNCHER:
 			return;
-		case Common::EVENT_MAINMENU:
-			openMainMenuDialog();
-			break;
 		case Common::EVENT_LBUTTONDOWN:
+		case Common::EVENT_RBUTTONDOWN:
 			_pendingPageEvents.push_back(event);
 			_mousePos = event.mouse;
 			break;
@@ -765,8 +787,16 @@ void Zoombini2Engine::processEvents() {
 			_mousePos = event.mouse;
 			break;
 		case Common::EVENT_KEYDOWN:
+			// The global Ctrl+F5 mapping opens the menu before its event reaches this engine.
 			if (event.kbd.keycode == Common::KEYCODE_F5) {
 				openMainMenuDialog();
+				break;
+			}
+			if (event.kbd.keycode == Common::KEYCODE_k && event.kbd.hasFlags(Common::KBD_CTRL) && isSavefileReadOnlyToggleEnabled()) {
+				if (_currentPageId == kPageMenuOptions || _currentPageId == kPageMenuAlt)
+					_pendingPageEvents.push_back(event);
+				else if (!event.kbdRepeat && !_activeSavefileName.empty())
+					toggleGameSaveWriteLock(_activeSavefileName);
 				break;
 			}
 			if (_debugHotkeysEnabled) {
@@ -825,7 +855,7 @@ bool Zoombini2Engine::dispatchPageEvents() {
 		if (event.type == Common::EVENT_LBUTTONDOWN)
 			_modalOwnedPress = msgBoxEventWasActive || debugDialogEventWasActive || sidebarDialogEventWasActive || pageDialogWasActive;
 
-		if (event.type == Common::EVENT_LBUTTONDOWN || event.type == Common::EVENT_LBUTTONUP || event.type == Common::EVENT_MOUSEMOVE)
+		if (event.type == Common::EVENT_LBUTTONDOWN || event.type == Common::EVENT_RBUTTONDOWN || event.type == Common::EVENT_LBUTTONUP || event.type == Common::EVENT_MOUSEMOVE)
 			_mousePos = event.mouse;
 
 		EventHandleResult result = EventHandleResult::kPassthrough;
@@ -1027,15 +1057,15 @@ void Zoombini2Engine::switchPage(PageId pageId) {
 	_zoombiniWalkingFlag = false;
 	if (pageId == kPageMenuPractice && _debugPracticeResetState) {
 		_state->init();
-		_activeSaveProfileName.clear();
-		_activeSaveProfileReadOnly = false;
+		_activeSavefileName.clear();
+		_activeSavefileReadOnly = false;
 		_debugPracticeResetState = false;
 	}
 	if (pageId == kPageMapTrans && _debugXferDestination != kPageNone) {
 		if (_debugXferResetState) {
 			_state->init();
-			_activeSaveProfileName.clear();
-			_activeSaveProfileReadOnly = false;
+			_activeSavefileName.clear();
+			_activeSavefileReadOnly = false;
 			_state->_level = _debugXferPracticeLevel;
 			_debugXferResetState = false;
 		}

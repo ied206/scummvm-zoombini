@@ -60,18 +60,29 @@ protected:
 	bool isDepartingMember(const ZoombiniRunner *zoombini) const override;
 
 private:
-	/** Resource paths used by the scene and arrival speech. */
+	/** Installed background bitmap for the Rescue Site II scene. */
 	static constexpr const char *kBackgroundPath = "#bmp/rescue2/background";
+	/** RLE selection backdrop drawn behind the shared waiting roster. */
 	static constexpr const char *kSelectorPath = "bmp/rescue2/selector.rb";
+	/** RLE overlay marking the door-selection area over the waiting roster. */
 	static constexpr const char *kPorteSelectorPath = "bmp/rescue2/porte_select.rb";
+	/** Leftward waiting-roster scroll button animation. */
 	static constexpr const char *kScrollLeftPath = "bmp/rescue2/button_left.an";
+	/** Rightward waiting-roster scroll button animation. */
 	static constexpr const char *kScrollRightPath = "bmp/rescue2/button_right.an";
+	/** Background music played at Rescue Site II. */
 	static constexpr const char *kMusicPath = "#sounds/music/C2-BB02.wav";
+	/** Little-Zoombini sprite grid used for the rescue-site party. */
 	static constexpr const char *kLittleZombAnimationPath = "bmp/zombis/littleZomb.anm";
+	/** Zoombini animation used while dragging party members between roster slots. */
 	static constexpr const char *kPickupZombAnimationPath = "bmp/zombis/pris/pris.anm";
+	/** Alternate idle Zoombini sprite grid used by the rescue-site party. */
 	static constexpr const char *kIdleZombAnimationPath = "bmp/zombis/attente2/attenteZomb2.anm";
+	/** Area mask used to constrain rescue-site Zoombini drag-and-drop hit testing. */
 	static constexpr const char *kAreaMaskPath = "bmp/rescue2/area.bmt";
+	/** Missing-arrivals speech format; the argument is the number of arrivals still needed. */
 	static constexpr const char *kMissingArrivalsSpeechFormat = "sounds/BC222.%u.wav";
+	/** Speech queued when at least eight Zoombinis are ready to depart. */
 	static constexpr const char *kReadyDepartureSpeechPath = "sounds/BC213.11.wav";
 
 	/** Number of waiting-grid drop records mirroring the visible storage cells. */

@@ -43,13 +43,13 @@
 
 namespace Zoombini2 {
 
-constexpr uint32 Zoombini2SaveManagementDialog::kEditProfileCommand;
-constexpr uint32 Zoombini2SaveManagementDialog::kDuplicateProfileCommand;
-constexpr uint32 Zoombini2SaveManagementDialog::kDeleteProfileCommand;
-constexpr uint32 Zoombini2SaveManagementDialog::kImportProfileCommand;
-constexpr uint32 Zoombini2SaveManagementDialog::kExportProfileCommand;
-constexpr uint32 Zoombini2SaveManagementDialog::kProfileSelectionChangedCommand;
-constexpr uint32 Zoombini2OptionsWidget::kManageProfilesCommand;
+constexpr uint32 Zoombini2SaveManagementDialog::kEditSavefileCommand;
+constexpr uint32 Zoombini2SaveManagementDialog::kDuplicateSavefileCommand;
+constexpr uint32 Zoombini2SaveManagementDialog::kDeleteSavefileCommand;
+constexpr uint32 Zoombini2SaveManagementDialog::kImportSavefileCommand;
+constexpr uint32 Zoombini2SaveManagementDialog::kExportSavefileCommand;
+constexpr uint32 Zoombini2SaveManagementDialog::kSavefileSelectionChangedCommand;
+constexpr uint32 Zoombini2OptionsWidget::kManageSavefilesCommand;
 constexpr uint32 Zoombini2OptionsWidget::kUnlockFrameRateCommand;
 
 class Zoombini2OptionsWidget::SeparatorWidget : public GUI::Widget {
@@ -117,28 +117,29 @@ void Zoombini2MenuDialog::handleCommand(GUI::CommandSender *sender, uint32 cmd, 
 	MainMenuDialog::handleCommand(sender, cmd, data);
 }
 
-Zoombini2ProfileNameDialog::Zoombini2ProfileNameDialog(const Common::U32String &title, const Common::U32String &initialName)
+Zoombini2SavefileNameDialog::Zoombini2SavefileNameDialog(const Common::U32String &title, const Common::U32String &initialName, Common::Language language)
 	: GUI::Dialog(0, 0, 360, 144) {
 	new GUI::StaticTextWidget(this, 12, 10, 336, 24, title, Graphics::kTextAlignStart);
-	new GUI::StaticTextWidget(this, 12, 38, 336, 20, false, Common::U32String("Use 1 to 16 letters, digits, or spaces"), Graphics::kTextAlignStart,
+	const Common::U32String nameHint(language == Common::HE_ISR ? "1-16 letters or spaces; , . ; also allowed" : "Use 1 to 16 letters, digits, or spaces");
+	new GUI::StaticTextWidget(this, 12, 38, 336, 20, false, nameHint, Graphics::kTextAlignStart,
 							  Common::U32String(), GUI::ThemeEngine::kFontStyleNormal, Common::UNK_LANG, false);
 	_edit = new GUI::EditTextWidget(this, 12, 62, 336, 28, false, initialName);
 	new GUI::ButtonWidget(this, 12, 104, 150, 28, false, Common::U32String("OK"), Common::U32String(), GUI::kOKCmd);
 	new GUI::ButtonWidget(this, 198, 104, 150, 28, false, Common::U32String("Cancel"), Common::U32String(), GUI::kCloseCmd);
 }
 
-Common::U32String Zoombini2ProfileNameDialog::getProfileName() const {
+Common::U32String Zoombini2SavefileNameDialog::getSavefileName() const {
 	return _edit->getEditString();
 }
 
-void Zoombini2ProfileNameDialog::reflowLayout() {
+void Zoombini2SavefileNameDialog::reflowLayout() {
 	const Size32 screenSize(g_system->getOverlayWidth(), g_system->getOverlayHeight());
 	_x = MAX<int>(0, (screenSize.width - _w) / 2);
 	_y = MAX<int>(0, (screenSize.height - _h) / 2);
 	GUI::Dialog::reflowLayout();
 }
 
-void Zoombini2ProfileNameDialog::handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) {
+void Zoombini2SavefileNameDialog::handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) {
 	if (cmd == GUI::kOKCmd) {
 		setResult(GUI::kOKCmd);
 		close();
@@ -151,7 +152,12 @@ void Zoombini2ProfileNameDialog::handleCommand(GUI::CommandSender *sender, uint3
 }
 
 Zoombini2SaveManagementDialog::Zoombini2SaveManagementDialog(const Common::String &domain)
-	: GUI::Dialog(0, 0, 1, 1), _domain(domain), _profileSelectionGroup(this, kProfileSelectionChangedCommand) {
+	: GUI::Dialog(0, 0, 1, 1), _domain(domain), _savefileSelectionGroup(this, kSavefileSelectionChangedCommand) {
+	_language = Common::parseLanguage(ConfMan.get("language", _domain));
+	if (g_engine && ConfMan.getActiveDomainName() == _domain && Common::String(g_engine->getMetaEngine()->getName()) == "zoombini2") {
+		const Zoombini2Engine *vm = static_cast<const Zoombini2Engine *>(g_engine);
+		_language = vm->getLanguage();
+	}
 
 	new GUI::StaticTextWidget(this, kDialogMargin, 8, kTableWidth, 24, true, Common::U32String("Manage saved games"), Graphics::kTextAlignStart);
 
@@ -160,53 +166,53 @@ Zoombini2SaveManagementDialog::Zoombini2SaveManagementDialog(const Common::Strin
 	static constexpr int kActionButtonWidth = (kTableWidth - (kActionButtonCount - 1) * kActionButtonGap) / kActionButtonCount;
 	int actionX = kDialogMargin;
 	_editButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kActionButtonWidth, kButtonHeight, true, Common::U32String("Rename"),
-										Common::U32String(), kEditProfileCommand);
+										Common::U32String(), kEditSavefileCommand);
 	actionX += kActionButtonWidth + kActionButtonGap;
 	_duplicateButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kActionButtonWidth, kButtonHeight, true, Common::U32String("Clone"),
-											 Common::U32String(), kDuplicateProfileCommand);
+											 Common::U32String(), kDuplicateSavefileCommand);
 	actionX += kActionButtonWidth + kActionButtonGap;
 	_importButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kActionButtonWidth, kButtonHeight, true, Common::U32String("Import"),
-										  Common::U32String(), kImportProfileCommand);
+										  Common::U32String(), kImportSavefileCommand);
 	actionX += kActionButtonWidth + kActionButtonGap;
 	_exportButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kActionButtonWidth, kButtonHeight, true, Common::U32String("Export"),
-										  Common::U32String(), kExportProfileCommand);
+										  Common::U32String(), kExportSavefileCommand);
 	actionX += kActionButtonWidth + kActionButtonGap;
 	_deleteButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kTableWidth - actionX + kDialogMargin, kButtonHeight, true,
-										  Common::U32String("Delete"), Common::U32String(), kDeleteProfileCommand);
+										  Common::U32String("Delete"), Common::U32String(), kDeleteSavefileCommand);
 
-	GUI::ContainerWidget *profileHeader = new GUI::ContainerWidget(this, kDialogMargin, kHeaderTop, kTableWidth, kTableRowHeight, true);
-	profileHeader->setBackgroundType(GUI::ThemeEngine::kWidgetBackgroundNo);
-	new GUI::StaticTextWidget(profileHeader, kNameX, 0, kNameWidth, kTableRowHeight, true, Common::U32String("Name"), Graphics::kTextAlignCenter);
-	new GUI::StaticTextWidget(profileHeader, kZombinivilleX, 0, kZombinivilleWidth, kTableRowHeight, true, Common::U32String("Zombiniville"),
+	GUI::ContainerWidget *savefileHeader = new GUI::ContainerWidget(this, kDialogMargin, kHeaderTop, kTableWidth, kTableRowHeight, true);
+	savefileHeader->setBackgroundType(GUI::ThemeEngine::kWidgetBackgroundNo);
+	new GUI::StaticTextWidget(savefileHeader, kNameX, 0, kNameWidth, kTableRowHeight, true, Common::U32String("Name"), Graphics::kTextAlignCenter);
+	new GUI::StaticTextWidget(savefileHeader, kZombinivilleX, 0, kZombinivilleWidth, kTableRowHeight, true, Common::U32String("Zombiniville"),
 							  Graphics::kTextAlignCenter);
-	new GUI::StaticTextWidget(profileHeader, kRescue1X, 0, kRescueWidth, kTableRowHeight, true, Common::U32String("Rescue I"), Graphics::kTextAlignCenter);
-	new GUI::StaticTextWidget(profileHeader, kRescue2X, 0, kRescueWidth, kTableRowHeight, true, Common::U32String("Rescue II"), Graphics::kTextAlignCenter);
-	new GUI::StaticTextWidget(profileHeader, kBooliewoodX, 0, kBooliewoodWidth, kTableRowHeight, true, Common::U32String("Booliewood"),
+	new GUI::StaticTextWidget(savefileHeader, kRescue1X, 0, kRescueWidth, kTableRowHeight, true, Common::U32String("Rescue I"), Graphics::kTextAlignCenter);
+	new GUI::StaticTextWidget(savefileHeader, kRescue2X, 0, kRescueWidth, kTableRowHeight, true, Common::U32String("Rescue II"), Graphics::kTextAlignCenter);
+	new GUI::StaticTextWidget(savefileHeader, kBooliewoodX, 0, kBooliewoodWidth, kTableRowHeight, true, Common::U32String("Booliewood"),
 							  Graphics::kTextAlignCenter);
-	new GUI::StaticTextWidget(profileHeader, kActivePartyX, 0, kActivePartyWidth, kTableRowHeight, true, Common::U32String("Active"),
+	new GUI::StaticTextWidget(savefileHeader, kActivePartyX, 0, kActivePartyWidth, kTableRowHeight, true, Common::U32String("Active"),
 							  Graphics::kTextAlignCenter);
 
-	_profileList = new GUI::ScrollContainerWidget(this, scaleDialogValue(kDialogMargin), scaleDialogValue(kListTop), scaleDialogValue(kTableWidth),
-												  scaleDialogValue(kListHeight));
-	_profileTable = new GUI::ContainerWidget(_profileList, 0, 0, kTableWidth, 0, true);
+	_savefileList = new GUI::ScrollContainerWidget(this, scaleDialogValue(kDialogMargin), scaleDialogValue(kListTop), scaleDialogValue(kTableWidth),
+												   scaleDialogValue(kListHeight));
+	_savefileTable = new GUI::ContainerWidget(_savefileList, 0, 0, kTableWidth, 0, true);
 	const int fontHeight = MAX<int>(1, static_cast<int>(g_gui.getFontHeight() / g_gui.getScaleFactor()));
 	const int selectionHeight = MIN<int>(kTableRowHeight, fontHeight);
 	const int selectionOffset = (kTableRowHeight - selectionHeight) / 2;
-	for (int i = 0; i < kMaximumProfileRows; i++) {
+	for (int i = 0; i < kMaximumSavefileRows; i++) {
 		const int y = i * kTableRowHeight;
-		_profileSelectionButtons[i] = new GUI::RadiobuttonWidget(_profileTable, kSelectionX, y + selectionOffset, kSelectionWidth, selectionHeight, true,
-																 &_profileSelectionGroup, i, Common::U32String(), Common::U32String());
-		_profileNameLabels[i] = new GUI::StaticTextWidget(_profileTable, kNameX, y, kNameWidth, kTableRowHeight, true, Common::U32String(),
-														  Graphics::kTextAlignLeft, Common::U32String(), GUI::ThemeEngine::kFontStyleNormal);
-		_zombinivilleLabels[i] = new GUI::StaticTextWidget(_profileTable, kZombinivilleX, y, kZombinivilleWidth, kTableRowHeight, true,
+		_savefileSelectionButtons[i] = new GUI::RadiobuttonWidget(_savefileTable, kSelectionX, y + selectionOffset, kSelectionWidth, selectionHeight, true,
+																  &_savefileSelectionGroup, i, Common::U32String(), Common::U32String());
+		_savefileNameLabels[i] = new GUI::StaticTextWidget(_savefileTable, kNameX, y, kNameWidth, kTableRowHeight, true, Common::U32String(),
+														   Graphics::kTextAlignLeft, Common::U32String(), GUI::ThemeEngine::kFontStyleNormal);
+		_zombinivilleLabels[i] = new GUI::StaticTextWidget(_savefileTable, kZombinivilleX, y, kZombinivilleWidth, kTableRowHeight, true,
 														   Common::U32String(), Graphics::kTextAlignCenter, Common::U32String(), GUI::ThemeEngine::kFontStyleNormal);
-		_rescue1Labels[i] = new GUI::StaticTextWidget(_profileTable, kRescue1X, y, kRescueWidth, kTableRowHeight, true, Common::U32String(),
+		_rescue1Labels[i] = new GUI::StaticTextWidget(_savefileTable, kRescue1X, y, kRescueWidth, kTableRowHeight, true, Common::U32String(),
 													  Graphics::kTextAlignCenter, Common::U32String(), GUI::ThemeEngine::kFontStyleNormal);
-		_rescue2Labels[i] = new GUI::StaticTextWidget(_profileTable, kRescue2X, y, kRescueWidth, kTableRowHeight, true, Common::U32String(),
+		_rescue2Labels[i] = new GUI::StaticTextWidget(_savefileTable, kRescue2X, y, kRescueWidth, kTableRowHeight, true, Common::U32String(),
 													  Graphics::kTextAlignCenter, Common::U32String(), GUI::ThemeEngine::kFontStyleNormal);
-		_booliewoodLabels[i] = new GUI::StaticTextWidget(_profileTable, kBooliewoodX, y, kBooliewoodWidth, kTableRowHeight, true, Common::U32String(),
+		_booliewoodLabels[i] = new GUI::StaticTextWidget(_savefileTable, kBooliewoodX, y, kBooliewoodWidth, kTableRowHeight, true, Common::U32String(),
 														 Graphics::kTextAlignCenter, Common::U32String(), GUI::ThemeEngine::kFontStyleNormal);
-		_activePartyLabels[i] = new GUI::StaticTextWidget(_profileTable, kActivePartyX, y, kActivePartyWidth, kTableRowHeight, true, Common::U32String(),
+		_activePartyLabels[i] = new GUI::StaticTextWidget(_savefileTable, kActivePartyX, y, kActivePartyWidth, kTableRowHeight, true, Common::U32String(),
 														  Graphics::kTextAlignCenter, Common::U32String(), GUI::ThemeEngine::kFontStyleNormal);
 	}
 
@@ -216,8 +222,8 @@ Zoombini2SaveManagementDialog::Zoombini2SaveManagementDialog(const Common::Strin
 
 void Zoombini2SaveManagementDialog::open() {
 	GUI::Dialog::open();
-	refreshProfiles();
-	_profileList->reflowLayout();
+	refreshSavefiles();
+	_savefileList->reflowLayout();
 	g_gui.scheduleTopDialogRedraw();
 }
 
@@ -232,39 +238,39 @@ void Zoombini2SaveManagementDialog::reflowLayout() {
 	GUI::Dialog::reflowLayout();
 }
 
-void Zoombini2SaveManagementDialog::refreshProfiles(const Common::String &selectedProfile) {
-	Common::String profileToSelect = selectedProfile;
-	if (profileToSelect.empty() && 0 <= _selectedProfileIndex && _selectedProfileIndex < static_cast<int>(_profileNames.size()))
-		profileToSelect = _profileNames[_selectedProfileIndex];
+void Zoombini2SaveManagementDialog::refreshSavefiles(const Common::String &selectedSavefile) {
+	Common::String savefileNameToSelect = selectedSavefile;
+	if (savefileNameToSelect.empty() && 0 <= _selectedSavefileIndex && _selectedSavefileIndex < static_cast<int>(_savefileNames.size()))
+		savefileNameToSelect = _savefileNames[_selectedSavefileIndex];
 
-	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain);
-	const Common::Array<Zoombini2ProfileSummary> summaries = savegameManager.listProfileSummaries();
-	_profileNames.clear();
-	_profileRowCount = MIN<int>(summaries.size(), kMaximumProfileRows);
-	_selectedProfileIndex = -1;
-	for (int i = 0; i < _profileRowCount; i++) {
-		_profileNames.push_back(summaries[i]._profileName);
-		if (!profileToSelect.empty() && summaries[i]._profileName.equalsIgnoreCase(profileToSelect))
-			_selectedProfileIndex = i;
+	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language);
+	const Common::Array<Zoombini2SavefileSummary> summaries = savegameManager.listSavefileSummaries();
+	_savefileNames.clear();
+	_savefileRowCount = MIN<int>(summaries.size(), kMaximumSavefileRows);
+	_selectedSavefileIndex = -1;
+	for (int i = 0; i < _savefileRowCount; i++) {
+		_savefileNames.push_back(summaries[i]._savefileName);
+		if (!savefileNameToSelect.empty() && summaries[i]._savefileName.equalsIgnoreCase(savefileNameToSelect))
+			_selectedSavefileIndex = i;
 	}
-	if (_selectedProfileIndex < 0 && 0 < _profileRowCount)
-		_selectedProfileIndex = 0;
+	if (_selectedSavefileIndex < 0 && 0 < _savefileRowCount)
+		_selectedSavefileIndex = 0;
 
-	for (int i = 0; i < kMaximumProfileRows; i++) {
-		const bool visible = i < _profileRowCount;
-		_profileSelectionButtons[i]->setVisible(visible);
-		_profileNameLabels[i]->setVisible(visible);
+	for (int i = 0; i < kMaximumSavefileRows; i++) {
+		const bool visible = i < _savefileRowCount;
+		_savefileSelectionButtons[i]->setVisible(visible);
+		_savefileNameLabels[i]->setVisible(visible);
 		_zombinivilleLabels[i]->setVisible(visible);
 		_rescue1Labels[i]->setVisible(visible);
 		_rescue2Labels[i]->setVisible(visible);
 		_booliewoodLabels[i]->setVisible(visible);
 		_activePartyLabels[i]->setVisible(visible);
-		_profileStateValid[i] = visible && summaries[i]._stateValid;
+		_savefileStateValid[i] = visible && summaries[i]._stateValid;
 		if (!visible)
 			continue;
 
-		const Zoombini2ProfileSummary &summary = summaries[i];
-		_profileNameLabels[i]->setLabel(Common::U32String(summary._profileName.c_str()));
+		const Zoombini2SavefileSummary &summary = summaries[i];
+		_savefileNameLabels[i]->setLabel(savegameManager.decodeSavefileName(summary._savefileName));
 		if (summary._stateValid) {
 			_zombinivilleLabels[i]->setLabel(Common::U32String::format("%d", summary._population._zombinivilleCount));
 			_rescue1Labels[i]->setLabel(Common::U32String::format("%d", summary._population._rescue1Count));
@@ -283,7 +289,7 @@ void Zoombini2SaveManagementDialog::refreshProfiles(const Common::String &select
 		if (summary._stateValid)
 			fontColor = GUI::ThemeEngine::kFontColorNormal;
 		GUI::StaticTextWidget *rowLabels[] = {
-			_profileNameLabels[i],
+			_savefileNameLabels[i],
 			_zombinivilleLabels[i],
 			_rescue1Labels[i],
 			_rescue2Labels[i],
@@ -296,69 +302,71 @@ void Zoombini2SaveManagementDialog::refreshProfiles(const Common::String &select
 		}
 	}
 
-	_profileSelectionGroup.setValue(_selectedProfileIndex);
-	updateProfileTableLayout();
+	_savefileSelectionGroup.setValue(_selectedSavefileIndex);
+	updateSavefileTableLayout();
 	updateButtons();
 }
 
-void Zoombini2SaveManagementDialog::updateProfileTableLayout() {
-	_profileTable->setSize(scaleDialogValue(kTableWidth), scaleDialogValue(_profileRowCount * kTableRowHeight));
+void Zoombini2SaveManagementDialog::updateSavefileTableLayout() {
+	_savefileTable->setSize(scaleDialogValue(kTableWidth), scaleDialogValue(_savefileRowCount * kTableRowHeight));
 }
 
 void Zoombini2SaveManagementDialog::updateButtons() {
-	const bool hasSelection = 0 <= _selectedProfileIndex && _selectedProfileIndex < _profileRowCount;
-	const bool stateValid = hasSelection && _profileStateValid[_selectedProfileIndex];
+	const bool hasSelection = 0 <= _selectedSavefileIndex && _selectedSavefileIndex < _savefileRowCount;
+	const bool stateValid = hasSelection && _savefileStateValid[_selectedSavefileIndex];
 	_editButton->setEnabled(stateValid);
-	_duplicateButton->setEnabled(stateValid && _profileRowCount < kMaximumProfileRows);
+	_duplicateButton->setEnabled(stateValid && _savefileRowCount < kMaximumSavefileRows);
 	_importButton->setEnabled(true);
 	_exportButton->setEnabled(stateValid);
 	_deleteButton->setEnabled(hasSelection);
 }
 
-void Zoombini2SaveManagementDialog::renameSelectedProfile() {
-	if (_selectedProfileIndex < 0 || static_cast<int>(_profileNames.size()) <= _selectedProfileIndex || !_profileStateValid[_selectedProfileIndex])
+void Zoombini2SaveManagementDialog::renameSelectedSavefile() {
+	if (_selectedSavefileIndex < 0 || static_cast<int>(_savefileNames.size()) <= _selectedSavefileIndex || !_savefileStateValid[_selectedSavefileIndex])
 		return;
 
-	const Common::String oldProfileName = _profileNames[_selectedProfileIndex];
-	Zoombini2ProfileNameDialog nameDialog(Common::U32String("Rename saved game"), Common::U32String(oldProfileName.c_str()));
+	const Common::String oldSavefileName = _savefileNames[_selectedSavefileIndex];
+	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language);
+	Zoombini2SavefileNameDialog nameDialog(Common::U32String("Rename saved game"), savegameManager.decodeSavefileName(oldSavefileName), _language);
 	if (nameDialog.runModal() != GUI::kOKCmd)
 		return;
 
-	const Common::String newProfileName = nameDialog.getProfileName().encode();
-	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain);
-	if (!savegameManager.renameProfile(oldProfileName, newProfileName)) {
+	Common::String newSavefileName;
+	if (!savegameManager.encodeSavefileName(nameDialog.getSavefileName(), newSavefileName) ||
+		!savegameManager.renameSavefile(oldSavefileName, newSavefileName)) {
 		GUI::MessageDialog errorDialog(Common::U32String("Invalid file name for saving"));
 		errorDialog.runModal();
 		return;
 	}
-	refreshProfiles(newProfileName);
-	_profileList->reflowLayout();
+	refreshSavefiles(newSavefileName);
+	_savefileList->reflowLayout();
 	g_gui.scheduleTopDialogRedraw();
 }
 
-void Zoombini2SaveManagementDialog::duplicateSelectedProfile() {
-	if (_selectedProfileIndex < 0 || static_cast<int>(_profileNames.size()) <= _selectedProfileIndex || !_profileStateValid[_selectedProfileIndex] ||
-		kMaximumProfileRows <= _profileRowCount)
+void Zoombini2SaveManagementDialog::duplicateSelectedSavefile() {
+	if (_selectedSavefileIndex < 0 || static_cast<int>(_savefileNames.size()) <= _selectedSavefileIndex || !_savefileStateValid[_selectedSavefileIndex] ||
+		kMaximumSavefileRows <= _savefileRowCount)
 		return;
 
-	const Common::String srcProfileName = _profileNames[_selectedProfileIndex];
-	Zoombini2ProfileNameDialog nameDialog(Common::U32String("Clone saved game"), Common::U32String());
+	const Common::String srcSavefileName = _savefileNames[_selectedSavefileIndex];
+	Zoombini2SavefileNameDialog nameDialog(Common::U32String("Clone saved game"), Common::U32String(), _language);
 	if (nameDialog.runModal() != GUI::kOKCmd)
 		return;
 
-	const Common::String newProfileName = nameDialog.getProfileName().encode();
-	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain);
-	if (!savegameManager.duplicateProfile(srcProfileName, newProfileName)) {
-		GUI::MessageDialog errorDialog(Common::U32String("Enter a unique name containing 1 to 16 letters, digits, or spaces"));
+	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language);
+	Common::String newSavefileName;
+	if (!savegameManager.encodeSavefileName(nameDialog.getSavefileName(), newSavefileName) ||
+		!savegameManager.duplicateSavefile(srcSavefileName, newSavefileName)) {
+		GUI::MessageDialog errorDialog(Common::U32String("Enter a unique name using the allowed characters for this language"));
 		errorDialog.runModal();
 		return;
 	}
-	refreshProfiles(newProfileName);
-	_profileList->reflowLayout();
+	refreshSavefiles(newSavefileName);
+	_savefileList->reflowLayout();
 	g_gui.scheduleTopDialogRedraw();
 }
 
-void Zoombini2SaveManagementDialog::importProfile() {
+void Zoombini2SaveManagementDialog::importSavefile() {
 	GUI::BrowserDialog browser(Common::U32String("Select one Zoombini2 .mk saved game"), false);
 	if (browser.runModal() <= 0)
 		return;
@@ -373,15 +381,25 @@ void Zoombini2SaveManagementDialog::importProfile() {
 		return;
 	}
 
-	const Common::String profileName = srcName.substr(0, extensionPosition);
-	if (!Zoombini2SavegameManager::isValidProfileName(profileName)) {
-		GUI::MessageDialog errorDialog(Common::U32String("Imported save names must use 1 to 16 letters, digits, or spaces"));
-		errorDialog.runModal();
-		return;
+	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language);
+	Common::String savefileName;
+	Common::U32String displayName = srcName.substr(0, extensionPosition).decode(Common::kUtf8);
+	bool validName = savegameManager.encodeSavefileName(displayName, savefileName) &&
+					 Zoombini2SavegameManager::isValidSavefileName(savefileName, _language);
+	while (!validName) {
+		Zoombini2SavefileNameDialog nameDialog(Common::U32String("Choose compatible save name"), displayName, _language);
+		if (nameDialog.runModal() != GUI::kOKCmd)
+			return;
+		displayName = nameDialog.getSavefileName();
+		validName = savegameManager.encodeSavefileName(displayName, savefileName) &&
+					Zoombini2SavegameManager::isValidSavefileName(savefileName, _language);
+		if (!validName) {
+			GUI::MessageDialog errorDialog(Common::U32String("The name contains characters unavailable in this language"));
+			errorDialog.runModal();
+		}
 	}
 
-	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain);
-	if (savegameManager.profileExists(profileName)) {
+	if (savegameManager.savefileExists(savefileName)) {
 		GUI::MessageDialog confirmation(Common::U32String("A saved game with this name already exists. Replace it?"),
 										Common::U32String("Replace"), Common::U32String("Cancel"));
 		if (confirmation.runModal() != GUI::kMessageOK)
@@ -389,7 +407,7 @@ void Zoombini2SaveManagementDialog::importProfile() {
 	}
 
 	Common::SeekableReadStream *stream = src.createReadStream();
-	const bool imported = savegameManager.importProfile(profileName, stream, true);
+	const bool imported = savegameManager.importSavefile(savefileName, stream, true);
 	delete stream;
 	if (!imported) {
 		GUI::MessageDialog errorDialog(Common::U32String("The selected file is not a valid Zoombini2 saved game"));
@@ -397,15 +415,15 @@ void Zoombini2SaveManagementDialog::importProfile() {
 		return;
 	}
 
-	refreshProfiles(profileName);
-	_profileList->reflowLayout();
+	refreshSavefiles(savefileName);
+	_savefileList->reflowLayout();
 	g_gui.scheduleTopDialogRedraw();
 	GUI::MessageDialog successDialog(Common::U32String("The saved game was imported"));
 	successDialog.runModal();
 }
 
-void Zoombini2SaveManagementDialog::exportSelectedProfile() {
-	if (_selectedProfileIndex < 0 || static_cast<int>(_profileNames.size()) <= _selectedProfileIndex || !_profileStateValid[_selectedProfileIndex])
+void Zoombini2SaveManagementDialog::exportSelectedSavefile() {
+	if (_selectedSavefileIndex < 0 || static_cast<int>(_savefileNames.size()) <= _selectedSavefileIndex || !_savefileStateValid[_selectedSavefileIndex])
 		return;
 
 	GUI::BrowserDialog browser(Common::U32String("Select the directory for the exported Zoombini2 .mk save"), true);
@@ -419,8 +437,10 @@ void Zoombini2SaveManagementDialog::exportSelectedProfile() {
 		return;
 	}
 
-	const Common::String profileName = _profileNames[_selectedProfileIndex];
-	const Common::FSNode dest = findChild(directory, profileName + ".mk");
+	const Common::String savefileName = _savefileNames[_selectedSavefileIndex];
+	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language);
+	const Common::String exportName = savegameManager.decodeSavefileName(savefileName).encode(Common::kUtf8) + ".mk";
+	const Common::FSNode dest = findChild(directory, exportName);
 	if (dest.exists()) {
 		GUI::MessageDialog confirmation(Common::U32String("The .mk file already exists. Replace it?"),
 										Common::U32String("Replace"), Common::U32String("Cancel"));
@@ -429,8 +449,7 @@ void Zoombini2SaveManagementDialog::exportSelectedProfile() {
 	}
 
 	Common::SeekableWriteStream *stream = dest.createWriteStream(false);
-	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain);
-	bool exported = stream && savegameManager.exportProfile(profileName, stream);
+	bool exported = stream && savegameManager.exportSavefile(savefileName, stream);
 	if (stream) {
 		stream->finalize();
 		exported = exported && !stream->err();
@@ -446,8 +465,8 @@ void Zoombini2SaveManagementDialog::exportSelectedProfile() {
 	successDialog.runModal();
 }
 
-void Zoombini2SaveManagementDialog::deleteSelectedProfile() {
-	if (_selectedProfileIndex < 0 || static_cast<int>(_profileNames.size()) <= _selectedProfileIndex)
+void Zoombini2SaveManagementDialog::deleteSelectedSavefile() {
+	if (_selectedSavefileIndex < 0 || static_cast<int>(_savefileNames.size()) <= _selectedSavefileIndex)
 		return;
 
 	GUI::MessageDialog confirmation(Common::U32String("Do you really want to delete this saved game?"), Common::U32String("Delete"),
@@ -455,15 +474,15 @@ void Zoombini2SaveManagementDialog::deleteSelectedProfile() {
 	if (confirmation.runModal() != GUI::kMessageOK)
 		return;
 
-	const Common::String profileName = _profileNames[_selectedProfileIndex];
-	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain);
-	if (!savegameManager.deleteProfile(profileName)) {
+	const Common::String savefileName = _savefileNames[_selectedSavefileIndex];
+	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language);
+	if (!savegameManager.deleteSavefile(savefileName)) {
 		GUI::MessageDialog errorDialog(Common::U32String("Error deleting saved game"));
 		errorDialog.runModal();
 		return;
 	}
-	refreshProfiles();
-	_profileList->reflowLayout();
+	refreshSavefiles();
+	_savefileList->reflowLayout();
 	g_gui.scheduleTopDialogRedraw();
 }
 
@@ -488,27 +507,27 @@ int Zoombini2SaveManagementDialog::scaleDialogValue(int value) {
 
 void Zoombini2SaveManagementDialog::handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) {
 	switch (cmd) {
-	case kProfileSelectionChangedCommand:
-		if (data < static_cast<uint32>(_profileRowCount))
-			_selectedProfileIndex = static_cast<int>(data);
+	case kSavefileSelectionChangedCommand:
+		if (data < static_cast<uint32>(_savefileRowCount))
+			_selectedSavefileIndex = static_cast<int>(data);
 		else
-			_selectedProfileIndex = -1;
+			_selectedSavefileIndex = -1;
 		updateButtons();
 		break;
-	case kEditProfileCommand:
-		renameSelectedProfile();
+	case kEditSavefileCommand:
+		renameSelectedSavefile();
 		break;
-	case kDuplicateProfileCommand:
-		duplicateSelectedProfile();
+	case kDuplicateSavefileCommand:
+		duplicateSelectedSavefile();
 		break;
-	case kImportProfileCommand:
-		importProfile();
+	case kImportSavefileCommand:
+		importSavefile();
 		break;
-	case kExportProfileCommand:
-		exportSelectedProfile();
+	case kExportSavefileCommand:
+		exportSelectedSavefile();
 		break;
-	case kDeleteProfileCommand:
-		deleteSelectedProfile();
+	case kDeleteSavefileCommand:
+		deleteSelectedSavefile();
 		break;
 	default:
 		GUI::Dialog::handleCommand(sender, cmd, data);
@@ -522,12 +541,13 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	GUI::StaticTextWidget *header = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.SaveFilesHeader",
 															  Common::U32String("Save management"), Common::U32String(), GUI::ThemeEngine::kFontStyleBold);
 	header->setAlign(Graphics::TextAlign::kTextAlignStart);
-	GUI::ButtonWidget *manageProfilesButton = new GUI::ButtonWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ManageProfiles",
-																	Common::U32String("Saved games"), Common::U32String(), kManageProfilesCommand);
-	manageProfilesButton->setTarget(this);
-	_savefilesReadOnlyCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.SavefilesReadOnly",
-														 Common::U32String("Lock automatic savefile writes"),
-														 Common::U32String("Prevents automatic progress saves during tests. New profiles and deletion remain available; import and rename are blocked."));
+	GUI::ButtonWidget *manageSavefilesButton = new GUI::ButtonWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ManageSavefiles",
+																	 Common::U32String("Saved games"), Common::U32String(), kManageSavefilesCommand);
+	manageSavefilesButton->setTarget(this);
+	_savefileReadOnlyToggleCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.SavefileReadOnlyToggle",
+															  Common::U32String("Enable savefile readonly toggle (Ctrl-K)"),
+															  Common::U32String("Ctrl+K or right-click toggles automatic save writes for one savefile during this game session. "
+																				"A file without write permission remains read-only."));
 
 	new SeparatorWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayEnhancementsSeparator");
 	header = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayEnhancements",
@@ -593,8 +613,8 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 		.addSpace(10)
 		.addWidget("SaveFilesSeparator", "", -1, 2)
 		.addWidget("SaveFilesHeader", "", -1, lineHeight)
-		.addWidget("ManageProfiles", "Button")
-		.addWidget("SavefilesReadOnly", "Checkbox")
+		.addWidget("ManageSavefiles", "Button")
+		.addWidget("SavefileReadOnlyToggle", "Checkbox")
 		.addSpace(10)
 		.addWidget("GameplayEnhancementsSeparator", "", -1, 2)
 		.addWidget("GameplayEnhancements", "", -1, lineHeight)
@@ -624,7 +644,7 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 }
 
 void Zoombini2OptionsWidget::load() {
-	_savefilesReadOnlyCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, _domain));
+	_savefileReadOnlyToggleCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigEnableSavefileReadOnlyToggle, _domain));
 	_stereoOutputCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigStereoOutput, _domain));
 	_floatingPointPathsCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths, _domain));
 	_enhancedKbdShortcutsCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _domain));
@@ -649,7 +669,7 @@ bool Zoombini2OptionsWidget::save() {
 
 	const bool originalPrngChanged = ConfMan.getBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _domain) != _originalPrngCheckbox->getState();
 
-	ConfMan.setBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, _savefilesReadOnlyCheckbox->getState(), _domain);
+	ConfMan.setBool(::Zoombini2MetaEngine::kConfigEnableSavefileReadOnlyToggle, _savefileReadOnlyToggleCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigStereoOutput, _stereoOutputCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths, _floatingPointPathsCheckbox->getState(), _domain);
 	ConfMan.setBool(::Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _enhancedKbdShortcutsCheckbox->getState(), _domain);
@@ -675,7 +695,7 @@ void Zoombini2OptionsWidget::handleCommand(GUI::CommandSender *sender, uint32 cm
 		updateFrameRateControls();
 		return;
 	}
-	if (cmd == kManageProfilesCommand) {
+	if (cmd == kManageSavefilesCommand) {
 		Zoombini2SaveManagementDialog dialog(_domain);
 		dialog.runModal();
 		return;

@@ -40,7 +40,8 @@ public:
 	/** Return whether this dialog currently owns drawing and input. */
 	virtual bool isActive() const = 0;
 	/** Close the dialog and restore any retained page state. */
-	virtual void close() = 0;	/** Draw the dialog over @p screen. */
+	virtual void close() = 0;
+	/** Draw the dialog over @p screen. */
 	virtual void onRenderContent(ManagedSurface32 *screen) override = 0;
 	/** Handle a game-space click while the modal blocks its underlying page. */
 	virtual EventHandleResult onLButtonDown(const Common::Point &pos) override = 0;

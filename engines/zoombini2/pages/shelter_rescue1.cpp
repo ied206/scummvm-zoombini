@@ -80,11 +80,6 @@ void ShelterRescueSite1::init() {
 	_vm->_gfx->drawBackground(_vm->getScreen(), Common::Point32(0, 0));
 	configureRosterLayout(kRosterGridBasePos, _rosterScrollUpRect, _rosterScrollDownRect, kRosterButtonUpPos, kRosterButtonDownPos);
 
-	_arrowLeftPos = Common::Point32(525, 248);
-	_arrowRightPos = Common::Point32(641, 253);
-	_portalPos = Common::Point32(520, 84);
-	_portalTopPos = Common::Point32(518, 99);
-
 	loadSelector(kSelectorPath);
 
 	_vm->_gfx->loadPageRleBlock(kPortalPath);

@@ -73,9 +73,16 @@ protected: /** Bind a concrete rescue site to @p vm. */
 
 	/** Configure the site-specific roster and scroll-control geometry. */
 	void configureRosterLayout(const Common::Point32 &gridBasePos, const Common::Rect32 &scrollUpRect, const Common::Rect32 &scrollDownRect, const Common::Point32 &buttonUpPos, const Common::Point32 &buttonDownPos);
-	/** Load the selection marker used by the waiting roster. */
+	/**
+	 * Load the RLE selection marker used as the wrapping waiting-roster backdrop.
+	 * @param path RLE resource path supplied by the concrete rescue site.
+	 */
 	void loadSelector(const char *path);
-	/** Load the two roster scroll animations. */
+	/**
+	 * Load the upward and downward waiting-roster scroll animations.
+	 * @param buttonUpPath Animation resource path for scrolling to earlier entries.
+	 * @param buttonDownPath Animation resource path for scrolling to later entries.
+	 */
 	void loadScrollButtons(const char *buttonUpPath, const char *buttonDownPath);
 	/** Reset common selection and departure state after presentation resources load. */
 	void resetRescueState();
@@ -85,9 +92,12 @@ protected: /** Bind a concrete rescue site to @p vm. */
 	void refillDepartureRoster(StorageRecord **storage);
 	/** Persist every non-departing member in @p storage and write the active save. */
 	void saveRescueRoster(StorageRecord **storage);
-	/** Load the shared little-Zoombini animation through the engine cache. */
+	/** Load the shared little-Zoombini sprite grid from @ref kRosterAnimationPath through the engine cache. */
 	void loadRosterAnimation();
-	/** Queue an arrival speech for sequential playback. */
+	/**
+	 * Queue an arrival speech for sequential playback.
+	 * @param path Audio resource path to play after earlier arrival speech.
+	 */
 	void enqueueSpeech(const Common::String &path);
 	/** Start the next queued arrival speech once the current one finishes. */
 	void pumpSpeechQueue();
@@ -125,7 +135,7 @@ private:
 	static constexpr int kGridRows = 5;
 	/** Dimensions of one visible roster slot. */
 	static constexpr Size32 kSlotSize = Size32(40, 57);
-	/** Shared little-Zoombini animation loaded for the waiting roster. */
+	/** Shared little-Zoombini sprite grid used to draw Zoombinis in the waiting roster. */
 	static constexpr const char *kRosterAnimationPath = "bmp/zombis/littleZomb.anm";
 
 	/** Selection marker path for the current rescue site. */

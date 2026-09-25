@@ -69,6 +69,8 @@ public:
 	 *
 	 * A request made while another confirmation is active is rejected and its
 	 * callback is deleted.
+	 *
+	 * @param textPath Bit-block resource path for the confirmation message.
 	 */
 	bool request(const Common::Path &textPath, Common::BaseCallback<DialogMsgBoxButton> *callback,
 				 const Common::Point32 &position = Common::Point32(-1, -1), const Common::Point32 &textOffset = Common::Point32(17, 17));
@@ -97,7 +99,7 @@ public:
 	EventHandleResult onKeyUp(const Common::KeyState &key) override;
 
 private:
-	/** Confirmation panel resource paths indexed by button state. */
+	/** RLE panel paths indexed by button result: no button, OK, and Cancel. */
 	static constexpr const char *kPanelPaths[3] = {
 		"bmp/menu/QUIT_panel_nothing.rb",
 		"bmp/menu/QUIT_panel_ok.rb",

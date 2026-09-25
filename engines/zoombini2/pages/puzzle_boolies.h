@@ -83,34 +83,51 @@ private:
 	static constexpr int kSlotCount = 4;
 	/** Maximum number of balls in one challenge. */
 	static constexpr int kMaxChallengeBalls = 6;
-	/** Music played while this page is active. */
+	/** Looping Boolie Boggle soundtrack. */
 	static constexpr const char *kMusicPath = "#sounds/music/09-BB01.wav";
-	/** Boolie and ball sprites in the release-matched resource tree. */
+	/** RLE Boolie portrait for value 1. */
 	static constexpr const char *kFixePath = "bmp/boolies/FIXE";
+	/** RLE Boolie portrait for value 2. */
 	static constexpr const char *kFixe2Path = "bmp/boolies/FIXE2";
+	/** RLE positive-polarity challenge ball. */
 	static constexpr const char *kBallPosPath = "bmp/boolies/BALL_POS";
+	/** RLE negative-polarity challenge ball. */
 	static constexpr const char *kBallNegPath = "bmp/boolies/BALL_NEG";
+	/** RLE artwork for the three pin-route sections. */
 	static constexpr const char *kPinPath = "bmp/boolies/PIN";
+	/** RLE highlight for the currently illuminated pin route. */
 	static constexpr const char *kPinLightedPath = "bmp/boolies/pin_lighted";
+	/** RLE boat that carries rescued Boolies across the bottom of the page. */
 	static constexpr const char *kBoatPath = "bmp/boolies/BATEAU";
+	/** Path format for numbered RLE markers highlighted over the hovered row. */
 	static constexpr const char *kSpotFormat = "bmp/boolies/SPOT%02d";
+	/** Shared RLE blocker artwork and opening animation resource. */
 	static constexpr const char *kBlockerPath = "bmp/boolies/BLOCKER";
+	/** Value-1-to-value-2 Boolie roll animation. */
 	static constexpr const char *kRollPath = "bmp/boolies/ROLL";
+	/** Value-2-to-value-1 Boolie roll animation. */
 	static constexpr const char *kRoll2Path = "bmp/boolies/ROLL2";
+	/** Value-1 Boolie walking animation used during row refill. */
 	static constexpr const char *kBoolieWalkOnePath = "bmp/boolies/MARCHE";
+	/** Value-2 Boolie walking animation used during row refill. */
 	static constexpr const char *kBoolieWalkTwoPath = "bmp/boolies/MARCHE2";
-	/** Paths used to feed, route, and board balls and Boolies. */
+	/** PAT route that moves the next challenge into its preview position from the cave. */
 	static constexpr const char *kPreviewEntryPath = "bmp/boolies/b_boolies1.pat";
+	/** PAT path format for feeding each numbered challenge ball from the upper entry. */
 	static constexpr const char *kFeederPathFormat = "bmp/boolies/b_boolies1bis_%d.pat";
+	/** PAT path format for routing balls through one of the three selectable rows. */
 	static constexpr const char *kLanePathFormat = "bmp/boolies/b_boolies%d.pat";
+	/** PAT path format for moving challenge balls out of the selected row. */
 	static constexpr const char *kBallExitPathFormat = "bmp/boolies/b_boolies%d_exit.pat";
+	/** PAT path format for jumping one Boolie from a row slot toward the boat. */
 	static constexpr const char *kJumpPathFormat = "bmp/boolies/Jump%d_%d.pat";
-	/** Row and polarity select effects 01 through 06; effect 07 accompanies a hit. */
+	/** Sound path format for row and polarity selection effects 01-06 and the hit effect 07. */
 	static constexpr const char *kEffectPathFormat = "sounds/fx/09-BS%02d.wav";
-	/** Four Boolie voices used as members start boarding paths. */
+	/** Path format for four randomly selected Boolie voices played as rescued members board. */
 	static constexpr const char *kBoardVoicePathFormat = "sounds/blp15.%d.wav";
-	/** Terminal boat and saved-game retreat narration. */
+	/** Narration played when the completed boat reaches its terminal departure. */
 	static constexpr const char *kCompleteSpeechPath = "sounds/BLP31.wav";
+	/** Narration played before leaving the puzzle for the saved-game map. */
 	static constexpr const char *kRetreatSpeechPath = "sounds/DW-Cave.wav";
 	/** Duration of each frame in the original Boolie roll sequence. */
 	static constexpr uint32 kRollFrameTime = 30;

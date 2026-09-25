@@ -23,10 +23,12 @@
 #define ZOOMBINI2_STATE_H
 
 #include "common/array.h"
+#include "common/language.h"
 #include "common/scummsys.h"
 #include "common/str-array.h"
 #include "common/str.h"
 #include "common/stream.h"
+#include "common/ustr.h"
 #include "common/util.h"
 
 namespace Common {
@@ -86,10 +88,10 @@ const int kStorageSize = 630;
 /** Number of distinct Zoombinis represented by the four visible traits. */
 const int kZoombiniCombinationCount = 625;
 
-/** Bytes reserved for a NUL-terminated Zoombini name in profile saves. */
+/** Bytes reserved for a NUL-terminated Zoombini name in saved games. */
 const int kZoombiniNameSize = 15;
 
-/** Number of completed-Zoombini trait hashes retained in one profile. */
+/** Number of completed-Zoombini trait hashes retained in one saved game. */
 const int kCompletedTraitHashCount = 210;
 
 /** Stored Zoombini traits with an unused slot zero followed by the four visible values. */
@@ -178,7 +180,7 @@ struct ZmbTrait {
 	byte _eyes = 0;
 };
 
-/** Population counts displayed for one saved profile. */
+/** Population counts displayed for one saved game. */
 struct Zoombini2PopulationSummary {
 	Zoombini2PopulationSummary() = default;
 
@@ -194,15 +196,15 @@ struct Zoombini2PopulationSummary {
 	int _activePartyCount = 0;
 };
 
-/** Name, validation state, and population counts for one independent profile save. */
-struct Zoombini2ProfileSummary {
-	Zoombini2ProfileSummary() = default;
+/** Name, validation state, and population counts for one independent .mk savefile. */
+struct Zoombini2SavefileSummary {
+	Zoombini2SavefileSummary() = default;
 
-	/** Profile name derived from the target-scoped .mk filename. */
-	Common::String _profileName;
+	/** Savefile name derived from the target-scoped .mk filename. */
+	Common::String _savefileName;
 	/** Whether the complete .mk stream could be parsed. */
 	bool _stateValid = false;
-	/** Counts parsed from the independent .mk stream when @ref Zoombini2ProfileSummary::_stateValid is true. */
+	/** Counts parsed from the independent .mk stream when @ref Zoombini2SavefileSummary::_stateValid is true. */
 	Zoombini2PopulationSummary _population;
 };
 
@@ -258,7 +260,7 @@ struct StorageRecord {
 	ZoombiniRunner *restore() const;
 };
 
-/** Per-combination use-count table retained by the profile. */
+/** Per-combination use-count table retained by the game state. */
 struct TraitComboTable {
 	/** Total accepted registrations, including repeated combinations. */
 	int32 _totalCount;
@@ -284,7 +286,7 @@ struct TraitComboTable {
 };
 
 /**
- * Owns one profile's progress, local roster, sparse storage, and trait-combo table.
+ * Tracks one game's progress, local roster, sparse storage, and trait-combo table.
  *
  * Loads are transactional: a complete temporary state is validated before it
  * replaces the active instance. The class also owns every pointer stored in
@@ -295,21 +297,21 @@ class GameState {
 public:
 	/** Generate a short name for a newly created Zoombini. */
 	static Common::String generateZoombiniName(Random &random);
-	/** Construct a fresh profile state. */
+	/** Construct a fresh game state. */
 	GameState();
 	/** Release all storage records and local-roster entries. */
 	~GameState();
 
-	/** Reset all serialized and runtime profile fields to their initial values. */
+	/** Reset all serialized and runtime game fields to their initial values. */
 	void init();
 
-	/** Load and validate a complete profile from @p stream. */
+	/** Load and validate a complete game state from @p stream. */
 	bool load(Common::SeekableReadStream *stream);
-	/** Serialize this profile and the eligible active party to @p stream. */
+	/** Serialize this game state and the eligible active party to @p stream. */
 	bool save(Common::WriteStream *stream) const;
-	/** Delete and clear the live party retained by this profile. */
+	/** Delete and clear the live party retained by this game state. */
 	void clearActiveZoombinis();
-	/** Restore the profile's saved party as live runners. */
+	/** Restore the saved party as live runners. */
 	void restoreSavedZoombinis();
 	/** Retain the live party as saved roster entries on return to the map. */
 	void stashActiveZoombinis();
@@ -327,9 +329,9 @@ public:
 	Zoombini2PopulationSummary getPopulationSummary() const;
 	/** Append one Booliewood completion snapshot while history capacity remains. */
 	bool recordCompletedZoombini(const ZoombiniRunner &zoombini);
-	/** Apply one completed Booliewood trip to this profile and its active party. */
+	/** Apply one completed Booliewood trip to this game state and its active party. */
 	void recordBooliesCompletion();
-	/** Return whether the profile has accepted its 625th Zoombini registration. */
+	/** Return whether this game state has accepted its 625th Zoombini registration. */
 	bool hasReachedZoombiniRegistrationLimit() const { return _traitComboTable._totalCount == kZoombiniCombinationCount; }
 	/** Return whether accumulated progress has unlocked relaxed party trait limits. */
 	bool hasRelaxedPackTraitLimits() const { return 600 <= _traitComboTable._twiceRegisteredCombinationCount; }
@@ -381,7 +383,7 @@ public:
 		return 1;
 	}
 
-	/** Player-visible profile name stored in the save file. */
+	/** Player name serialized in the savefile. */
 	Common::String _playerName;
 	/** Runtime level selected for the active gameplay page. */
 	int _level;
@@ -421,15 +423,15 @@ public:
 	byte _rescue2MoviePlayed;
 	/** Trait-combination use-count table and aggregate totals. */
 	TraitComboTable _traitComboTable;
-	/** Zoombini roster stored in this profile. */
+	/** Zoombini roster retained by this game state. */
 	Common::Array<ZoombiniRunner *> _savedRoster;
 	/** Live party for the current page, separate from the serialized saved roster. */
 	Common::Array<ZoombiniRunner *> _activeZoombinis;
 
 private:
-	/** Disallow copying pointers stored in this profile. */
+	/** Disallow copying because this game state retains runner pointers. */
 	GameState(const GameState &) = delete;
-	/** Disallow assigning pointers stored in this profile. */
+	/** Disallow assigning because this game state retains runner pointers. */
 	GameState &operator=(const GameState &) = delete;
 
 	/** Delete all retained storage and roster entries. */
@@ -459,50 +461,56 @@ private:
 };
 
 /**
- * Target-scoped storage for named player profiles.
+ * Target-scoped storage for independent `.mk` savefiles.
  *
- * The manager validates portable profile names, serializes @ref GameState, and
- * verifies newly written bytes before reporting success.
+ * The manager validates single-byte savefile names, serializes @ref GameState,
+ * and verifies newly written bytes before reporting success.
  */
 class Zoombini2SavegameManager {
 public:
-	/** Maximum number of characters accepted in a profile name. */
-	static constexpr int kMaximumProfileNameLength = 16;
+	/** Maximum number of characters accepted in a savefile name. */
+	static constexpr int kMaximumSavefileNameLength = 16;
 
-	/** Bind profile operations to @p saveFileManager and @p target. */
-	Zoombini2SavegameManager(Common::SaveFileManager *saveFileManager, const Common::String &target);
+	/** Bind savefile operations to @p saveFileManager and @p target with @p language's name encoding. */
+	Zoombini2SavegameManager(Common::SaveFileManager *saveFileManager, const Common::String &target, Common::Language language);
 
-	/** Return valid profile names in case-insensitive sort order. */
-	Common::StringArray listProfiles() const;
-	/** Return whether the listed local save file for @p profileName is not writable. */
-	bool isProfileReadOnly(const Common::String &profileName) const;
-	/** Return every listed profile with counts parsed directly from its independent .mk file. */
-	Common::Array<Zoombini2ProfileSummary> listProfileSummaries() const;
-	/** Serialize @p state and its eligible active party under @p profileName. */
-	bool saveProfile(const Common::String &profileName, const GameState &state) const;
-	/** Load @p profileName transactionally into @p state. */
-	bool loadProfile(const Common::String &profileName, GameState &state) const;
-	/** Validate an external Z2 stream and store it under @p profileName. */
-	bool importProfile(const Common::String &profileName, Common::SeekableReadStream *src, bool overwrite) const;
-	/** Validate and copy @p profileName's original-format bytes to @p dest. */
-	bool exportProfile(const Common::String &profileName, Common::WriteStream *dest) const;
-	/** Delete the save belonging to @p profileName. */
-	bool deleteProfile(const Common::String &profileName) const;
-	/** Rename a profile without overwriting another profile. */
-	bool renameProfile(const Common::String &oldProfileName, const Common::String &newProfileName) const;
-	/** Create a distinct copy of one profile without overwriting another profile. */
-	bool duplicateProfile(const Common::String &srcProfileName, const Common::String &newProfileName) const;
-	/** Return whether a valid profile has a target-scoped save file. */
-	bool profileExists(const Common::String &profileName) const;
+	/** Return safe stored savefile names in case-insensitive sort order, including names unavailable through game input. */
+	Common::StringArray listSavefiles() const;
+	/** Return whether the listed local savefile for @p savefileName is not writable. */
+	bool isSavefileReadOnly(const Common::String &savefileName) const;
+	/** Return every listed savefile with counts parsed directly from its independent .mk file. */
+	Common::Array<Zoombini2SavefileSummary> listSavefileSummaries() const;
+	/** Serialize @p state and its eligible active party under @p savefileName. */
+	bool writeSavefile(const Common::String &savefileName, const GameState &state) const;
+	/** Load @p savefileName transactionally into @p state. */
+	bool loadSavefile(const Common::String &savefileName, GameState &state) const;
+	/** Validate an external Z2 stream and store it under @p savefileName. */
+	bool importSavefile(const Common::String &savefileName, Common::SeekableReadStream *src, bool overwrite) const;
+	/** Validate and copy @p savefileName's original-format bytes to @p dest. */
+	bool exportSavefile(const Common::String &savefileName, Common::WriteStream *dest) const;
+	/** Delete the saved game named @p savefileName. */
+	bool deleteSavefile(const Common::String &savefileName) const;
+	/** Rename a savefile without overwriting another savefile. */
+	bool renameSavefile(const Common::String &oldSavefileName, const Common::String &newSavefileName) const;
+	/** Create a distinct copy of one savefile without overwriting another savefile. */
+	bool duplicateSavefile(const Common::String &srcSavefileName, const Common::String &newSavefileName) const;
+	/** Return whether a safe stored savefile has a target-scoped save file. */
+	bool savefileExists(const Common::String &savefileName) const;
 
-	/** Return whether @p profileName is portable and valid for the profile UI. */
-	static bool isValidProfileName(const Common::String &profileName);
+	/** Validate a new name against @p language's single-byte typing set. */
+	static bool isValidSavefileName(const Common::String &savefileName, Common::Language language);
+	/** Convert a GUI name to the language's single-byte form without losing characters. */
+	bool encodeSavefileName(const Common::U32String &displayName, Common::String &savefileName) const;
+	/** Convert a stored single-byte name for display in the ScummVM GUI. */
+	Common::U32String decodeSavefileName(const Common::String &savefileName) const;
 
 private:
-	/** Build the target-scoped filename for @p profileName. */
-	Common::String makeSaveFileName(const Common::String &profileName) const;
-	/** Insert @p profileName into @p profiles unless it is already present. */
-	static void addProfileSorted(Common::StringArray &profiles, const Common::String &profileName);
+	/** Check length and path safety for a previously stored name without imposing the typing whitelist. */
+	static bool isSafeStoredSavefileName(const Common::String &savefileName);
+	/** Build the target-scoped filename for @p savefileName. */
+	Common::String makeSaveFileName(const Common::String &savefileName) const;
+	/** Insert @p savefileName into @p savefiles unless it is already present. */
+	static void addSavefileSorted(Common::StringArray &savefiles, const Common::String &savefileName);
 	/** Verify that a completed save contains exactly @p size bytes from @p data. */
 	bool verifySaveData(const Common::String &saveFileName, const byte *data, uint32 size) const;
 
@@ -510,6 +518,8 @@ private:
 	Common::SaveFileManager *_saveFileManager;
 	/** ScummVM target identifier used as the save-file namespace. */
 	Common::String _target;
+	/** Language used to encode, decode, and validate savefile names. */
+	Common::Language _language;
 };
 
 } // End of namespace Zoombini2

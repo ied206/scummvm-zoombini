@@ -23,6 +23,7 @@
 #define ZOOMBINI2_DIALOGS_H
 
 #include "common/fs.h"
+#include "common/language.h"
 #include "common/str-array.h"
 #include "engines/dialogs.h"
 #include "gui/dialog.h"
@@ -60,39 +61,39 @@ private:
 	Zoombini2Engine *_vm;
 };
 
-/** Modal dialog for entering a Zoombini2 profile name. */
-class Zoombini2ProfileNameDialog : public GUI::Dialog {
+/** Modal dialog for entering a Zoombini2 savefile name. */
+class Zoombini2SavefileNameDialog : public GUI::Dialog {
 public:
 	/** Construct the editor titled @p title with @p initialName. */
-	Zoombini2ProfileNameDialog(const Common::U32String &title, const Common::U32String &initialName);
+	Zoombini2SavefileNameDialog(const Common::U32String &title, const Common::U32String &initialName, Common::Language language);
 
-	/** Return the entered profile name. */
-	Common::U32String getProfileName() const;
+	/** Return the entered savefile name. */
+	Common::U32String getSavefileName() const;
 	/** Keep the editor centered in the current overlay. */
 	void reflowLayout() override;
-	/** Accept or cancel the edited profile name. */
+	/** Accept or cancel the edited savefile name. */
 	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
 
 private:
-	/** Profile-name editor managed by this dialog. */
+	/** Savefile-name editor managed by this dialog. */
 	GUI::EditTextWidget *_edit = nullptr;
 };
 
-/** Modal ScummVM dialog for managing one target's player-profile files. */
+/** Modal ScummVM dialog for managing one target's independent .mk savefiles. */
 class Zoombini2SaveManagementDialog : public GUI::Dialog {
 public:
-	/** Construct a profile manager for the target configuration @p domain. */
+	/** Construct the save-management dialog for target configuration @p domain. */
 	explicit Zoombini2SaveManagementDialog(const Common::String &domain);
 
-	/** Populate the profile table and enter the modal dialog. */
+	/** Populate the savefile table and enter the modal dialog. */
 	void open() override;
 	/** Keep the save-management table centered in the current overlay. */
 	void reflowLayout() override;
-	/** Handle table selection, profile actions, and ordinary dialog commands. */
+	/** Handle table selection, savefile actions, and ordinary dialog commands. */
 	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
 
 private:
-	static constexpr int kMaximumProfileRows = 99;
+	static constexpr int kMaximumSavefileRows = 99;
 	static constexpr int kSelectionX = 0;
 	static constexpr int kSelectionWidth = 24;
 	static constexpr int kNameX = kSelectionX + kSelectionWidth;
@@ -117,54 +118,56 @@ private:
 	static constexpr int kButtonHeight = 28;
 	static constexpr int kDialogHeight = 344;
 
-	/** Command used to rename the selected profile. */
-	static constexpr uint32 kEditProfileCommand = 'z2ed';
-	/** Command used to clone the selected profile. */
-	static constexpr uint32 kDuplicateProfileCommand = 'z2cp';
-	/** Command used to delete the selected profile. */
-	static constexpr uint32 kDeleteProfileCommand = 'z2dl';
+	/** Command used to rename the selected savefile. */
+	static constexpr uint32 kEditSavefileCommand = 'z2ed';
+	/** Command used to clone the selected savefile. */
+	static constexpr uint32 kDuplicateSavefileCommand = 'z2cp';
+	/** Command used to delete the selected savefile. */
+	static constexpr uint32 kDeleteSavefileCommand = 'z2dl';
 	/** Command used to import one independent Z2 save file. */
-	static constexpr uint32 kImportProfileCommand = 'z2im';
+	static constexpr uint32 kImportSavefileCommand = 'z2im';
 	/** Command used to export the selected independent Z2 save file. */
-	static constexpr uint32 kExportProfileCommand = 'z2ex';
-	/** Command emitted when a profile-table radio button changes selection. */
-	static constexpr uint32 kProfileSelectionChangedCommand = 'z2sl';
+	static constexpr uint32 kExportSavefileCommand = 'z2ex';
+	/** Command emitted when a savefile-table radio button changes selection. */
+	static constexpr uint32 kSavefileSelectionChangedCommand = 'z2sl';
 
-	/** Reload the sorted profile table and optionally reselect @p selectedProfile. */
-	void refreshProfiles(const Common::String &selectedProfile = Common::String());
+	/** Reload the sorted savefile table and optionally reselect @p selectedSavefile. */
+	void refreshSavefiles(const Common::String &selectedSavefile = Common::String());
 	/** Resize the scrollable row container to its populated row count. */
-	void updateProfileTableLayout();
+	void updateSavefileTableLayout();
 	/** Enable or disable actions for the current selection. */
 	void updateButtons();
-	/** Prompt for and commit a new name for the selected profile. */
-	void renameSelectedProfile();
-	/** Prompt for and create a distinct copy of the selected profile. */
-	void duplicateSelectedProfile();
+	/** Prompt for and commit a new name for the selected savefile. */
+	void renameSelectedSavefile();
+	/** Prompt for and create a distinct copy of the selected savefile. */
+	void duplicateSelectedSavefile();
 	/** Choose, validate, and import one external Z2 .mk file. */
-	void importProfile();
-	/** Copy the selected profile to an external Z2 .mk file. */
-	void exportSelectedProfile();
-	/** Confirm and delete the selected profile. */
-	void deleteSelectedProfile();
+	void importSavefile();
+	/** Copy the selected savefile to an external Z2 .mk file. */
+	void exportSelectedSavefile();
+	/** Confirm and delete the selected savefile. */
+	void deleteSelectedSavefile();
 	/** Return an existing case-insensitive child, or the normal child when absent. */
 	static Common::FSNode findChild(const Common::FSNode &directory, const Common::String &name);
 	/** Scale a fixed dialog measurement for the active GUI scale. */
 	static int scaleDialogValue(int value);
 
-	/** Target configuration domain used to namespace profile files. */
+	/** Target configuration domain whose savefiles this dialog manages. */
 	Common::String _domain;
-	/** Profile names mirrored by the visible profile rows. */
-	Common::StringArray _profileNames;
-	/** Exclusive selection group for the profile-table rows. */
-	GUI::RadiobuttonGroup _profileSelectionGroup;
-	/** Selected row in @ref Zoombini2SaveManagementDialog::_profileNames, or -1. */
-	int _selectedProfileIndex = -1;
-	/** Scroll container holding profile rows. */
-	GUI::ScrollContainerWidget *_profileList = nullptr;
+	/** Language selected for savefile-name encoding and input validation. */
+	Common::Language _language = Common::UNK_LANG;
+	/** Savefile names mirrored by the visible savefile rows. */
+	Common::StringArray _savefileNames;
+	/** Exclusive selection group for the savefile-table rows. */
+	GUI::RadiobuttonGroup _savefileSelectionGroup;
+	/** Selected row in @ref Zoombini2SaveManagementDialog::_savefileNames, or -1. */
+	int _selectedSavefileIndex = -1;
+	/** Scroll container holding savefile rows. */
+	GUI::ScrollContainerWidget *_savefileList = nullptr;
 	/** Container holding the fixed-column row widgets. */
-	GUI::ContainerWidget *_profileTable = nullptr;
+	GUI::ContainerWidget *_savefileTable = nullptr;
 	/** Number of rows currently populated in the table. */
-	int _profileRowCount = 0;
+	int _savefileRowCount = 0;
 	/** Rename button managed by this dialog. */
 	GUI::ButtonWidget *_editButton = nullptr;
 	/** Clone button managed by this dialog. */
@@ -175,25 +178,25 @@ private:
 	GUI::ButtonWidget *_exportButton = nullptr;
 	/** Delete button managed by this dialog. */
 	GUI::ButtonWidget *_deleteButton = nullptr;
-	/** Uncaptioned selection controls for visible profile rows. */
-	GUI::RadiobuttonWidget *_profileSelectionButtons[kMaximumProfileRows] = {};
-	/** Profile-name cells. */
-	GUI::StaticTextWidget *_profileNameLabels[kMaximumProfileRows] = {};
+	/** Uncaptioned selection controls for visible savefile rows. */
+	GUI::RadiobuttonWidget *_savefileSelectionButtons[kMaximumSavefileRows] = {};
+	/** Savefile-name cells. */
+	GUI::StaticTextWidget *_savefileNameLabels[kMaximumSavefileRows] = {};
 	/** Zombiniville-stage population cells. */
-	GUI::StaticTextWidget *_zombinivilleLabels[kMaximumProfileRows] = {};
+	GUI::StaticTextWidget *_zombinivilleLabels[kMaximumSavefileRows] = {};
 	/** Rescue Site I population cells. */
-	GUI::StaticTextWidget *_rescue1Labels[kMaximumProfileRows] = {};
+	GUI::StaticTextWidget *_rescue1Labels[kMaximumSavefileRows] = {};
 	/** Rescue Site II population cells. */
-	GUI::StaticTextWidget *_rescue2Labels[kMaximumProfileRows] = {};
+	GUI::StaticTextWidget *_rescue2Labels[kMaximumSavefileRows] = {};
 	/** Booliewood population cells. */
-	GUI::StaticTextWidget *_booliewoodLabels[kMaximumProfileRows] = {};
+	GUI::StaticTextWidget *_booliewoodLabels[kMaximumSavefileRows] = {};
 	/** Serialized active-party population cells. */
-	GUI::StaticTextWidget *_activePartyLabels[kMaximumProfileRows] = {};
-	/** Whether each visible profile row contains a valid parsed .mk stream. */
-	bool _profileStateValid[kMaximumProfileRows] = {};
+	GUI::StaticTextWidget *_activePartyLabels[kMaximumSavefileRows] = {};
+	/** Whether each visible savefile row contains a valid parsed .mk stream. */
+	bool _savefileStateValid[kMaximumSavefileRows] = {};
 };
 
-/** Engine-options entry point for target-scoped profiles and compatibility switches. */
+/** Engine-options entry point for target-scoped savefiles and compatibility switches. */
 class Zoombini2OptionsWidget : public GUI::OptionsContainerWidget {
 public:
 	/** Construct the options container under @p boss for @p domain. */
@@ -203,7 +206,7 @@ public:
 	void load() override;
 	/** Store every compatibility switch in the target configuration. */
 	bool save() override;
-	/** Open the profile manager or forward an ordinary widget command. */
+	/** Open the savefile manager or forward an ordinary widget command. */
 	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
 
 private:
@@ -212,10 +215,10 @@ private:
 	/** Numeric frame-rate entry. */
 	class FrameRateNumberBox;
 	/** Command used to open @ref Zoombini2SaveManagementDialog. */
-	static constexpr uint32 kManageProfilesCommand = 'z2mg';
+	static constexpr uint32 kManageSavefilesCommand = 'z2mg';
 	static constexpr uint32 kUnlockFrameRateCommand = 'z2ul';
-	/** Keep saved game files unchanged during repeatable tests. */
-	GUI::CheckboxWidget *_savefilesReadOnlyCheckbox = nullptr;
+	/** Enable per-savefile write-lock controls for repeatable tests. */
+	GUI::CheckboxWidget *_savefileReadOnlyToggleCheckbox = nullptr;
 	/** Toggle selecting stereo rather than mono game-audio streams. */
 	GUI::CheckboxWidget *_stereoOutputCheckbox = nullptr;
 	/** Toggle selecting floating-point rather than original Q10 Bezier calculations. */
