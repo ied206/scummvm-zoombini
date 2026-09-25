@@ -61,29 +61,51 @@ protected:
 	bool isDepartingMember(const ZoombiniRunner *zoombini) const override;
 
 private:
-	/** Resource paths used by the scene and arrival speech. */
+	/** Installed background bitmap for the Rescue Site I scene. */
 	static constexpr const char *kBackgroundPath = "#bmp/rescue1/background";
+	/** RLE selection backdrop drawn behind the shared waiting roster. */
 	static constexpr const char *kSelectorPath = "bmp/rescue1/SELECTOR.RB";
+	/** Closed stone portal door, raised out of view after the ship arrives. */
 	static constexpr const char *kPortalPath = "bmp/rescue1/PORTE.RB";
+	/** Static upper cap drawn over the portal door. */
 	static constexpr const char *kPortalTopPath = "bmp/rescue1/portal_top.rb";
+	/** RLE overlay that marks the door-selection area over the waiting roster. */
 	static constexpr const char *kPorteSelectorPath = "bmp/rescue1/porte_select.rb";
+	/** Cached crack/stone artwork; the current page does not composite this image. */
 	static constexpr const char *kCramurePath = "bmp/rescue1/CRAMURE.RB";
+	/** Bitmap shown for the left route branch when it is not selected. */
 	static constexpr const char *kArrowLeftOffPath = "bmp/rescue1/inside_arrow_left_off.bb";
+	/** Bitmap shown for the left route branch when it is selected. */
 	static constexpr const char *kArrowLeftOnPath = "bmp/rescue1/inside_arrow_left_on.bb";
+	/** Bitmap shown for the right route branch when it is not selected. */
 	static constexpr const char *kArrowRightOffPath = "bmp/rescue1/inside_arrow_right_off.bb";
+	/** Bitmap shown for the right route branch when it is selected. */
 	static constexpr const char *kArrowRightOnPath = "bmp/rescue1/inside_arrow_right_on.bb";
+	/** Leftward waiting-roster scroll button animation. */
 	static constexpr const char *kScrollLeftPath = "bmp/rescue1/button_left.an";
+	/** Rightward waiting-roster scroll button animation. */
 	static constexpr const char *kScrollRightPath = "bmp/rescue1/button_right.an";
+	/** Background music played at Rescue Site I. */
 	static constexpr const char *kMusicPath = "#sounds/music/C1-BB02.wav";
+	/** Little-Zoombini sprite grid used for the rescue-site party. */
 	static constexpr const char *kLittleZombAnimationPath = "bmp/zombis/littleZomb.anm";
+	/** Zoombini animation used while dragging party members between roster slots. */
 	static constexpr const char *kPickupZombAnimationPath = "bmp/zombis/pris/pris.anm";
+	/** Alternate idle Zoombini sprite grid used by the rescue-site party. */
 	static constexpr const char *kIdleZombAnimationPath = "bmp/zombis/attente2/attenteZomb2.anm";
+	/** Area mask used to constrain rescue-site Zoombini drag-and-drop hit testing. */
 	static constexpr const char *kAreaMaskPath = "bmp/rescue1/area.bmt";
+	/** Missing-arrivals speech format; the argument is the number of arrivals still needed. */
 	static constexpr const char *kMissingArrivalsSpeechFormat = "sounds/BC121.%d.wav";
+	/** Greeting queued when the player first arrives before the party is complete. */
 	static constexpr const char *kFirstArrivalSpeechPath = "sounds/BC111.wav";
+	/** Follow-up explanation queued after the first-arrival greeting. */
 	static constexpr const char *kFirstArrivalFollowupSpeechPath = "sounds/BC111B.wav";
+	/** Speech queued when the eighth Zoombini arrives and the ship first becomes available. */
 	static constexpr const char *kFirstDepartureSpeechPath = "sounds/BC123.7.wav";
+	/** Speech queued when at least eight Zoombinis are ready to depart. */
 	static constexpr const char *kReadyDepartureSpeechPath = "sounds/BC125.wav";
+	/** Speech queued when fewer than eight Zoombinis are ready to depart. */
 	static constexpr const char *kIncompleteDepartureSpeechPath = "sounds/BC124.wav";
 
 	/** Number of waiting-grid drop records mirroring the visible storage cells. */
@@ -188,13 +210,13 @@ private:
 	static void seatDropCallback(void *context, int targetIndex, int zoombiniIndex);
 
 	/** Left route-arrow draw position. */
-	Common::Point32 _arrowLeftPos = Common::Point32();
+	const Common::Point32 _arrowLeftPos = Common::Point32(525, 248);
 	/** Right route-arrow draw position. */
-	Common::Point32 _arrowRightPos = Common::Point32();
+	const Common::Point32 _arrowRightPos = Common::Point32(641, 253);
 	/** Portal-body draw position. */
-	Common::Point32 _portalPos = Common::Point32();
+	const Common::Point32 _portalPos = Common::Point32(520, 84);
 	/** Portal-foreground draw position. */
-	Common::Point32 _portalTopPos = Common::Point32();
+	const Common::Point32 _portalTopPos = Common::Point32(518, 99);
 	/** Shared little-Zoombini grid borrowed for boarding actives. */
 	const ZoombiniAnimation *_littleZombAnimation = nullptr;
 	/** Shared pickup grid borrowed for boarding actives. */

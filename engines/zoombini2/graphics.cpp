@@ -67,7 +67,7 @@ void ManagedSurface32::fillRect(const Common::Rect32 &rect, uint32 color) {
 	clip32.clip(w, h);
 	if (clip32.isEmpty())
 		return;
-	Common::Rect clip16 = Common::Rect(clip32.left, clip32.top, clip32.right, clip32.bottom);
+	const Common::Rect clip16 = Common::Rect(clip32.left, clip32.top, clip32.right, clip32.bottom);
 	Graphics::ManagedSurface::fillRect(clip16, color);
 }
 
@@ -79,7 +79,7 @@ void ManagedSurface32::frameRect(const Common::Rect32 &rect, uint32 color) {
 	clip32.clip(w, h);
 	if (clip32.isEmpty())
 		return;
-	Common::Rect clip16 = Common::Rect(clip32.left, clip32.top, clip32.right, clip32.bottom);
+	const Common::Rect clip16 = Common::Rect(clip32.left, clip32.top, clip32.right, clip32.bottom);
 	Graphics::ManagedSurface::frameRect(clip16, color);
 }
 
@@ -837,7 +837,7 @@ void RleBlock::drawToScreenMirrored(ManagedSurface32 *destSurface, const Common:
 }
 
 void RleBlock::drawToScreenSolidColor(ManagedSurface32 *destSurface, const Common::Point32 &pos, byte red, byte green, byte blue,
-										 const AlphaBlendLUT &alphaLUT) const {
+									  const AlphaBlendLUT &alphaLUT) const {
 	if (!_loaded || !destSurface)
 		return;
 	assert(destSurface->format.bytesPerPixel == 4);
@@ -2111,8 +2111,13 @@ bool BitmapFont::load(const Common::Path &basePath) {
 		glyphIndex += 1;
 	}
 
-	if (glyphIndex != kNumGlyphs) {
-		warning("BitmapFont: expected %d glyphs but found %d in '%s'", kNumGlyphs, glyphIndex, colorPath.toString().c_str());
+	int expectedGlyphs = 81;
+	if (_vm->isHebrew())
+		expectedGlyphs = 80;
+	else if (_vm->isSwedish())
+		expectedGlyphs = 84;
+	if (glyphIndex != expectedGlyphs) {
+		warning("BitmapFont: expected %d glyphs but found %d in '%s'", expectedGlyphs, glyphIndex, colorPath.toString().c_str());
 		return false;
 	}
 
@@ -2122,7 +2127,67 @@ bool BitmapFont::load(const Common::Path &basePath) {
 	return true;
 }
 
-int BitmapFont::charToGlyphIndex(char c) {
+int BitmapFont::charToGlyphIndex(char c) const {
+	const byte value = static_cast<byte>(c);
+	const bool hebrew = _vm->isHebrew();
+	if (hebrew && 0xE0 <= value && value <= 0xFA) {
+		static constexpr byte kHebrewGlyphs[] = {
+			45,
+			28,
+			29,
+			44,
+			47,
+			46,
+			51,
+			35,
+			50,
+			33,
+			37,
+			31,
+			36,
+			40,
+			39,
+			34,
+			27,
+			49,
+			32,
+			64,
+			41,
+			62,
+			38,
+			30,
+			43,
+			26,
+			63,
+		};
+		return kHebrewGlyphs[value - 0xE0];
+	}
+	if (_vm->isSwedish()) {
+		switch (value) {
+		case 0xC6:
+			return 62;
+		case 0xD8:
+			return 63;
+		case 0xC5:
+			return 64;
+		case 0xC4:
+			return 65;
+		case 0xD6:
+			return 66;
+		case 0xE6:
+			return 67;
+		case 0xF8:
+			return 68;
+		case 0xE5:
+			return 69;
+		case 0xE4:
+			return 70;
+		case 0xF6:
+			return 71;
+		default:
+			break;
+		}
+	}
 	if (c >= 'A' && c <= 'Z') {
 		return c - 'A'; // 0-25
 	}
@@ -2132,6 +2197,8 @@ int BitmapFont::charToGlyphIndex(char c) {
 	if (c >= '0' && c <= '9') {
 		return c - '0' + 52; // 52-61
 	}
+	if (_vm->isSwedish())
+		return -1;
 
 	switch (c) {
 	case '.':
@@ -2224,23 +2291,27 @@ int BitmapFont::drawString(ManagedSurface32 *dst, const Common::Point32 &pos,
 	}
 
 	int curX = pos.x;
+	const bool hebrew = _vm->isHebrew();
 
 	for (uint i = 0; i < text.size(); i++) {
-		char c = text[i];
+		const char c = hebrew ? text[text.size() - i - 1] : text[i];
 
 		if (c == ' ') {
 			curX += kSpaceWidth;
 			continue;
 		}
 
-		int glyphIdx = charToGlyphIndex(c);
+		const int glyphIdx = charToGlyphIndex(c);
 		if (glyphIdx < 0 || glyphIdx >= kNumGlyphs || !_glyphs[glyphIdx].mask) {
-			curX += kSpaceWidth; // Unknown character, treat as space
 			continue;
 		}
 
 		drawGlyph(dst, _glyphs[glyphIdx], Common::Point32(curX, pos.y), red, green, blue, alphaLUT);
-		curX += _glyphs[glyphIdx].width + 2;
+		const int advance = _glyphs[glyphIdx].width + 2;
+		if (hebrew && '0' <= c && c <= '9')
+			curX -= advance;
+		else
+			curX += advance;
 	}
 
 	return curX - pos.x;
@@ -2252,6 +2323,7 @@ int BitmapFont::getStringWidth(const Common::String &text) const {
 	}
 
 	int width = 0;
+	const bool hebrew = _vm->isHebrew();
 
 	for (uint i = 0; i < text.size(); i++) {
 		char c = text[i];
@@ -2261,13 +2333,17 @@ int BitmapFont::getStringWidth(const Common::String &text) const {
 			continue;
 		}
 
-		int glyphIdx = charToGlyphIndex(c);
+		if (_vm->isSwedish() && 0x80 <= static_cast<byte>(c))
+			continue;
+		const int glyphIdx = charToGlyphIndex(c);
 		if (glyphIdx < 0 || glyphIdx >= kNumGlyphs || !_glyphs[glyphIdx].mask) {
-			width += kSpaceWidth;
 			continue;
 		}
 
-		width += _glyphs[glyphIdx].width + 2;
+		if (hebrew && (('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z')))
+			width -= _glyphs[glyphIdx].width + 2;
+		else if (!hebrew || (static_cast<byte>(c) < 0x80 && c != '_'))
+			width += _glyphs[glyphIdx].width + 2;
 	}
 
 	return width;

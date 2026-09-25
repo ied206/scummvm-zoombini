@@ -74,15 +74,25 @@ public:
 	bool debugSetChances(int remaining) override;
 
 private:
-	/** Music, trait icons, PAT ride paths, board art, scenery, and obstacle art. */
+	/** Looping Snowboard Gulch soundtrack. */
 	static constexpr const char *kMusicPath = "#sounds/music/01-BS06.wav";
+	/** Path format for the RLE icon of a feature and one of its values. */
 	static constexpr const char *kTraitFormat = "bmp/snowboard/traits/%d-%d";
+	/** PAT route format for the hill ride selected by a decision-tree leaf code. */
 	static constexpr const char *kPatFormat = "bmp/snowboard/pat/easy/%d.pat";
+	/** RLE cover drawn over the finish area on Levels 2 and 3. */
 	static constexpr const char *kBoardPath = "bmp/snowboard/BOARD01";
+	/** One-shot animation that covers the finish area during the ride sequence. */
 	static constexpr const char *kBoardAnimPath = "bmp/snowboard/BOARD";
+	/** Lift-engine animation shown while the upper station prepares a rider. */
 	static constexpr const char *kEngineAnimPath = "bmp/snowboard/ENGINE";
+	/** Path format for numbered trail-obstacle animations.
+	 * IDs 1, 3, 4, 5, and 6 provide reveal, hit, completion, hide, and idle states.
+	 */
 	static constexpr const char *kDecorFormat = "bmp/snowboard/N1So-%d";
+	/** Path format for the parked snowboard and the rider-facing board sprites. */
 	static constexpr const char *kSurfFormat = "bmp/snowboard/SURF/SN%d";
+	/** Resource IDs indexed by parked-board state or rider-facing sector. */
 	static constexpr int kSurfIds[9] = {
 		66,
 		36,
@@ -94,21 +104,35 @@ private:
 		41,
 		44,
 	};
-	/** Area mask, board and obstacle effects, collision/completion speech, and celebration animation. */
+	/** One-bit mask that limits where a dragged Zoombini can be dropped onto the board. */
 	static constexpr const char *kAreaMaskPath = "bmp/snowboard/AREA.BMT";
+	/** Sound played when the lift board is ready for another rider. */
 	static constexpr const char *kBoardReadySoundPath = "sounds/fx/01-BB02.wav";
+	/** Sound played when a Zoombini starts down the hill. */
 	static constexpr const char *kRideSoundPath = "sounds/fx/01-BS01.wav";
+	/** Sound played on contact with a trail obstacle. */
 	static constexpr const char *kObstacleHitSoundPath = "sounds/fx/01-BS02.wav";
+	/** Sound played when a lane obstacle becomes visible. */
 	static constexpr const char *kObstacleRevealSoundPath = "sounds/fx/01-BS03.wav";
+	/** Sound played when a lane obstacle is hidden. */
 	static constexpr const char *kObstacleHideSoundPath = "sounds/fx/01-BS04.wav";
+	/** Collision speech path format, selected by lane number and one of three voice variants. */
 	static constexpr const char *kCollisionSpeechFormat = "sounds/SWB13%d-%d.wav";
+	/** Speech path format used one collision before the allowed quota is reached. */
 	static constexpr const char *kNearQuotaSpeechFormat = "sounds/SWB14-%d.wav";
+	/** Speech path format used when the collision quota is reached. */
 	static constexpr const char *kQuotaSpeechFormat = "sounds/SWB15-%d.wav";
+	/** Arrival speech queued when all eight riders reach the finish. */
 	static constexpr const char *kSuccessSpeechPath = "sounds/8-E1.wav";
+	/** Arrival speech queued when fewer than eight riders reach the finish. */
 	static constexpr const char *kFailureSpeechPath = "sounds/8-E2.wav";
+	/** One of five randomized praise lines queued for a perfect saved-game departure. */
 	static constexpr const char *kPerfectGoSpeechFormat = "sounds/WLD11.%d.wav";
+	/** Retreat speech queued before leaving with four or more riders unresolved. */
 	static constexpr const char *kCaveGoSpeechPath = "sounds/DW-Cave.wav";
+	/** Shared pick-up animation played while the pointer carries a Zoombini. */
 	static constexpr const char *kPickupAnimationPath = "bmp/zombis/pris/pris.anm";
+	/** Shared celebration animation used for successful riders after the run. */
 	static constexpr const char *kCelebrationAnimationPath = "bmp/zombis/attente/attenteZomb.anm";
 	/** Counts for physical lanes, decision tests, exit slots, and animation-bank frame roles. */
 	static constexpr int kLaneCount = 4;
