@@ -43,8 +43,8 @@ class OSystem;
 /** Meta-engine settings and factory for the Zoombini2 engine. */
 class Zoombini2MetaEngine : public AdvancedMetaEngine<Zoombini2::Zoombini2GameDescription> {
 public:
-	/** Target configuration key that blocks automatic progress writes during tests. */
-	static constexpr const char *kConfigSavefilesReadOnly = "savefiles_read_only";
+	/** Target configuration key enabling per-savefile write-lock controls. */
+	static constexpr const char *kConfigEnableSavefileReadOnlyToggle = "enable_savefile_readonly_toggle";
 	/** Target configuration key selecting stereo game-audio streams. */
 	static constexpr const char *kConfigStereoOutput = "stereo_output";
 	/** Target configuration key selecting floating-point Bezier path calculations. */

@@ -328,8 +328,7 @@ void Sidebar::onMapClick() {
 		returnToMap();
 		return;
 	}
-	if (!ConfMan.getBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, ConfMan.getActiveDomainName()) &&
-		!_vm->writeGameSave(_vm->_state->_playerName))
+	if (!_vm->writeGameSave(_vm->_state->_playerName))
 		return;
 	bool hasActive = false;
 	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {

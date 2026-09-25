@@ -947,18 +947,18 @@ private:
 
 /** Button indices used by the seven controls on the sign-in screen. */
 enum MenuButtonId {
-	kMenuButtonNext = 0,     ///< Scroll toward the preceding visible profile rows.
-	kMenuButtonPrev = 1,     ///< Scroll toward the following visible profile rows.
+	kMenuButtonNext = 0,     ///< Scroll toward the preceding visible savefile rows.
+	kMenuButtonPrev = 1,     ///< Scroll toward the following visible savefile rows.
 	kMenuButtonStart = 2,    ///< Start the selected saved adventure.
 	kMenuButtonOptions = 3,  ///< Open the volume panel.
-	kMenuButtonNew = 4,      ///< Begin entry of a new profile name.
-	kMenuButtonTraining = 5, ///< Open the practice map.
+	kMenuButtonNew = 4,      ///< Begin entry of a new savefile name.
+	kMenuButtonPractice = 5, ///< Open the practice map.
 	kMenuButtonQuit = 6,     ///< Request exit from the sign-in screen.
 	kMenuButtonCount = 7     ///< Number of sign-in buttons.
 };
 
 /**
- * Renders text with the 81 glyphs extracted from one bitmap-font strip.
+ * Renders text with the glyphs extracted from one bitmap-font strip.
  *
  * A font uses two files whose `.bmt` extension still contains standard BMP data:
  * @code
@@ -971,9 +971,11 @@ enum MenuButtonId {
  * run of nonzero columns forms the next glyph in the fixed character sequence.
  * The retained glyph width includes two trailing pixels beyond that nonzero run.
  *
- * The supported glyph sequence contains uppercase letters, lowercase letters,
- * digits, and eighteen punctuation characters. Spaces and unsupported bytes
- * advance by @ref BitmapFont::kSpaceWidth without drawing.
+ * The usual strip has 81 glyphs.
+ * The v1.1SE strip has 84.
+ * The v1.0HE strip has 80 and puts Hebrew
+ * shapes in both Latin letter ranges, while Hebrew bytes select matching
+ * slots directly. Spaces advance by @ref BitmapFont::kSpaceWidth.
  *
  * The strip is loaded once and only its per-pixel coverage masks are retained.
  * The glyph color is a uniform tint applied at draw time, so this single glyph
@@ -981,9 +983,9 @@ enum MenuButtonId {
  */
 class BitmapFont {
 public:
-	/** Number of glyphs in the fixed font-strip mapping. */
-	static constexpr int kNumGlyphs = 81;
-	/** Horizontal advance used for spaces and unsupported characters. */
+	/** Maximum number of glyphs in the font-strip mapping. */
+	static constexpr int kNumGlyphs = 84;
+	/** Horizontal advance used for spaces. */
 	static constexpr int kSpaceWidth = 10;
 
 	/** Construct an unloaded font bound to @p vm. */
@@ -996,7 +998,7 @@ public:
 	/** Return the horizontal pixel advance for @p text without drawing it. */
 	int getStringWidth(const Common::String &text) const;
 	/** Return the glyph index for @p character, or -1 when it is unsupported. */
-	static int charToGlyphIndex(char character);
+	int charToGlyphIndex(char character) const;
 	/** Return whether glyph extraction completed. */
 	bool isLoaded() const { return _loaded; }
 

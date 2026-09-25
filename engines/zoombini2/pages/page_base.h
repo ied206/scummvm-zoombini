@@ -40,12 +40,16 @@ class ManagedSurface32;
 /** One background and its page-managed general-object animation runners. */
 class PageLayer : public Common::NonCopyable {
 public:
-	/** Initialize a layer with its horizontal scroll direction and optional background. */
+	/** Initialize a layer with its horizontal scroll direction and optional bit-block background.
+	 * @param backgroundPath Scrolling or fixed background bitmap for this layer, or empty for a backgroundless layer.
+	 */
 	PageLayer(Zoombini2Engine *vm, byte scrollDirection, const Common::Path &backgroundPath = Common::Path());
 	/** Release every animation runner registered with this layer. */
 	~PageLayer();
 
-	/** Replace the background and refresh its dimensions. */
+	/** Replace the bit-block background and refresh its dimensions.
+	 * @param path Bitmap resource used as this layer's background.
+	 */
 	bool loadBackground(const Common::Path &path);
 	/** Return the background dimensions copied from the first layer when this layer has no bitmap. */
 	const Size32 &getBackgroundSize() const { return _backgroundSize; }
@@ -149,13 +153,17 @@ public:
 
 	/** Remove every page layer and the optional area mask, and reset transient stack state. */
 	void clear();
-	/** Create and append one page layer. */
+	/** Create and append one page layer.
+	 * @param backgroundPath Optional bit-block background resource for the new layer.
+	 */
 	PageLayer *addLayer(byte scrollDirection, const Common::Path &backgroundPath = Common::Path());
 	/** Return a page layer, or nullptr when @p layerIndex is outside the collection. */
 	PageLayer *getLayer(int layerIndex) const;
 	/** Return the number of page layers. */
 	uint getLayerCount() const { return _layers.size(); }
-	/** Replace one layer's background and propagate first-layer dimensions to backgroundless followers. */
+	/** Replace one layer's bit-block background and propagate first-layer dimensions to backgroundless followers.
+	 * @param path Bitmap resource used as the selected layer's background.
+	 */
 	bool loadLayerBackground(int layerIndex, const Common::Path &path);
 
 	/** Dispatch the first pressed state to all layers and reset the latch on release. */
@@ -225,6 +233,11 @@ public:
 		(void)pos;
 		return EventHandleResult::kPassthrough;
 	}
+	/** Handle a right-button press. */
+	virtual EventHandleResult onRButtonDown(const Common::Point &pos) {
+		(void)pos;
+		return EventHandleResult::kPassthrough;
+	}
 	/** Handle a left-button release. */
 	virtual EventHandleResult onLButtonUp(const Common::Point &pos) {
 		(void)pos;
@@ -268,7 +281,10 @@ public:
 	/** Recompose the selected visuals without advancing simulation or completion callbacks. */
 	void render(ManagedSurface32 *screen);
 	/** Draw a page-specific held actor above shared controls, then optionally advance it. */
-	virtual void renderDragOverlay(ManagedSurface32 *screen, bool advanceState) { (void)screen; (void)advanceState; }
+	virtual void renderDragOverlay(ManagedSurface32 *screen, bool advanceState) {
+		(void)screen;
+		(void)advanceState;
+	}
 
 	/** Initialize page-local state and resources. */
 	virtual void init() = 0;
@@ -297,7 +313,9 @@ public:
 	virtual bool isShelter() const { return false; }
 	/** Apply any page-local state required by the global debug-completion hotkey. */
 	virtual void applyDebugPuzzleCompletion() {}
-	/** Load or replace the 1-bit area mask used by Zoombini drop handling. */
+	/** Load or replace the 1-bit area mask used by Zoombini drop handling.
+	 * @param path Resource file whose set pixels mark the permitted drop area.
+	 */
 	bool loadAreaMask(const Common::Path &path);
 	/** Release the area mask retained by this page. */
 	void clearAreaMask();
@@ -307,7 +325,9 @@ public:
 	const AreaMask *getAreaMask() const { return _areaMask; }
 
 protected:
-	/** Start or replace this page's looping music. */
+	/** Start or replace this page's looping music and retain it until replacement or page destruction.
+	 * @param path Audio resource played at the configured music volume.
+	 */
 	void startPageMusic(const Common::Path &path);
 	/** Advance this page's simulation before rendering. */
 	virtual void onUpdate() {}
@@ -327,7 +347,7 @@ protected:
 	/** Reference to the engine interface. */
 	Zoombini2Engine *_vm;
 	/** Category assigned to this page for lifecycle and UI policy. */
-	PageCategory _pageCategory;
+	const PageCategory _pageCategory;
 	/** Numeric dispatcher identifier for this page. */
 	PageId _pageId = kPageNone;
 	/** Optional page-area mask released with this page. */

@@ -108,9 +108,11 @@ private:
 		bool empty = false;
 		byte scoreMask = kShowPrimaryScore01;
 	};
-	/** Music, cannon/mirror/projectile art, overlays, and score marker format. */
+	/** Background music played while the Magic Mirrors board is active. */
 	static constexpr const char *kMusicPath = "#sounds/music/05-BB01.wav";
+	/** Cannon muzzle frames, selected from the current aim angle. */
 	static constexpr const char *kCannonFormat = "bmp/wall_of_fleens/canon0%d";
+	/** Mirror art: gray/normal for hidden cells, black/cracked for revealed cells, and an empty tunnel. */
 	static constexpr const char *kMirrorPaths[5] = {
 		"bmp/wall_of_fleens/mirror_GRIS",
 		"bmp/wall_of_fleens/mirror_nomal",
@@ -118,6 +120,7 @@ private:
 		"bmp/wall_of_fleens/mirror_felure",
 		"bmp/wall_of_fleens/mirror_empty_tunnel",
 	};
+	/** Cannonball art: the loaded ball followed by five direction-specific projectile images. */
 	static constexpr const char *kBallPaths[6] = {
 		"bmp/wall_of_fleens/boulet/boulet",
 		"bmp/wall_of_fleens/boulet/boulet4",
@@ -126,23 +129,34 @@ private:
 		"bmp/wall_of_fleens/boulet/boulet8",
 		"bmp/wall_of_fleens/boulet/boulet9",
 	};
+	/** Foreground overlays for the cannon nozzle and cannon body, in that order. */
 	static constexpr const char *kOverlayPaths[2] = {
 		"bmp/wall_of_fleens/tuyere",
 		"bmp/wall_of_fleens/canon_cache",
 	};
+	/** Red score digit sprites drawn over a revealed mirror; the format value is one digit. */
 	static constexpr const char *kScoreFormat = "bmp/wall_of_fleens/LevelRED%d";
+	/** Animation played when a mirror rotates to reveal its score. */
 	static constexpr const char *kRotatePath = "bmp/wall_of_fleens/mirror_rotate";
+	/** Animation played when a mirror containing a Fleen is destroyed. */
 	static constexpr const char *kExplodePath = "bmp/wall_of_fleens/mirror_explode";
-	/** Projectile rails, Fleen/cannon/Zoombini grids, and mirror reaction animations. */
+	/** PAT path that carries a cannonball from the loading rail into the cannon. */
 	static constexpr const char *kBallLoadPath = "bmp/wall_of_fleens/bullet_on_cannon.pat";
+	/** PAT path that carries the final Zoombini from the loading rail into the cannon. */
 	static constexpr const char *kJumpPath = "bmp/wall_of_fleens/jump_in_cannon.pat";
+	/** Fleen sprite grid used to render Fleens in the mirror catch animation. */
 	static constexpr const char *kFleenPath = "bmp/fleens/fleens.anm";
+	/** First Fleen shouting animation grid used after a mirror hit. */
 	static constexpr const char *kVocif1Path = "bmp/fleens/vocif/vocif1.anm";
+	/** Follow-up Fleen shouting animation grid used after the first shout. */
 	static constexpr const char *kVocif2Path = "bmp/fleens/vocif/vocif2.anm";
+	/** Zoombini animation grid for the runner loaded into the cannon. */
 	static constexpr const char *kCannonZombPath = "bmp/wall_of_fleens/cannon_zomb/cannon_zomb.anm";
+	/** Zoombini animation grid for the leap into the cannon on the final shot. */
 	static constexpr const char *kJumpAnimationPath = "bmp/zombis/saut/saut.anm";
+	/** Zoombini idle animation grid used for the board-completion celebration. */
 	static constexpr const char *kCelebratePath = "bmp/zombis/attente/attenteZomb.anm";
-	/** Effects, success/loss/retreat/ambient speech, and perfect-Go speech. */
+	/** Sound effects in order: cannon aim, mirror rotation, reload, runner load, firing, impact, explosion, Fleen departure. */
 	static constexpr const char *kSoundPaths[8] = {
 		"sounds/fx/05-BB03.wav",
 		"sounds/fx/05-BB04.wav",
@@ -153,13 +167,18 @@ private:
 		"sounds/fx/05-BS05.wav",
 		"sounds/fx/FleenLeavesWall.wav",
 	};
+	/** Completion speech used when no Zoombini was lost on this board. */
 	static constexpr const char *kSuccessSpeechPath = "sounds/8-E1.wav";
+	/** Completion speech used when at least one Zoombini was lost on this board. */
 	static constexpr const char *kLossSpeechPath = "sounds/8-E2.wav";
+	/** Retreat speech variants selected for the final Zoombini, indexed by retreat outcome. */
 	static constexpr const char *kRetreatSpeechPaths[2] = {
 		"sounds/wlf15.1.wav",
 		"sounds/wlf15.3.wav",
 	};
+	/** Random Fleen idle voice format; the argument is the voice variant number. */
 	static constexpr const char *kAmbientFormat = "sounds/wlf12.%d.wav";
+	/** Perfect-clear Go-button speech format; the argument is the voice variant number. */
 	static constexpr const char *kPerfectGoFormat = "sounds/wld11.%d.wav";
 	/** Difficulty-specific score-panel/grid origins and cannon muzzle positions. */
 	static constexpr Common::Point32 kPanelOrigins[6] = {

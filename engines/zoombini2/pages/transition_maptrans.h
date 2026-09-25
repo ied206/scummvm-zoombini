@@ -56,42 +56,75 @@ public:
 	static PageId getDestPage(PageId src, RouteBranch routeBranch, int rescuedBoolies);
 
 private:
-	/** Resource paths and formats used by the map transition. */
+	/** Audio path format that appends a speech clip name and .wav extension. */
 	static constexpr const char *kSpeechFormat = "sounds/%s.wav";
+	/** PAT route format for the source page's mountain-map travel path. */
 	static constexpr const char *kRouteFormat = "bmp/maptrans/%s";
+	/** Zoombini sprite grid used while the party walks along the mountain map. */
 	static constexpr const char *kZoombiniAnimationPath = "bmp/transition1/PitiZomb3.anm";
+	/** Background music played during map travel and queued travel speech. */
 	static constexpr const char *kMusicPath = "#sounds/music/ZMR-Transition.wav";
-	
+	/** First-visit speech queued when leaving Zoombiniville for Crazy Turtle. */
 	static constexpr const char *kSpeechTur11 = "tur11";
+	/** Revisit greeting queued when leaving Zoombiniville before Booliewood was visited. */
 	static constexpr const char *kSpeechZbv31_2 = "zbv31.2";
+	/** Revisit greeting queued when leaving Zoombiniville after Booliewood was visited. */
 	static constexpr const char *kSpeechZbv31_3 = "zbv31.3";
+	/** Random revisit speech format queued after the Zoombiniville greeting. */
 	static constexpr const char *kSpeechTur21Format = "tur21.%d";
+	/** First-visit speech queued when leaving Crazy Turtle for Waterslide. */
 	static constexpr const char *kSpeechWsl11 = "wsl11";
+	/** Random revisit speech format queued when leaving Crazy Turtle for Waterslide. */
 	static constexpr const char *kSpeechWsl21Format = "wsl21.%d";
+	/** First clip of the three-part first-visit Waterslide-to-AquaCube speech. */
 	static constexpr const char *kSpeechAqu11_1_1 = "aqu11.1.1";
+	/** Second clip of the three-part first-visit Waterslide-to-AquaCube speech. */
 	static constexpr const char *kSpeechAqu11_1_2 = "aqu11.1.2";
+	/** Third clip of the three-part first-visit Waterslide-to-AquaCube speech. */
 	static constexpr const char *kSpeechAqu11_1_3 = "aqu11.1.3";
+	/** Random revisit speech format queued when leaving Waterslide for AquaCube. */
 	static constexpr const char *kSpeechAqu21Format = "aqu21.%d";
+	/** Speech queued when leaving AquaCube for Rescue Site I. */
 	static constexpr const char *kSpeechAqu31 = "aqu31";
+	/** First-visit speech queued for the north branch from Rescue Site I to Magic Wall. */
 	static constexpr const char *kSpeechMgw11 = "mgw11";
+	/** Random revisit speech format for the north branch to Magic Wall. */
 	static constexpr const char *kSpeechMgw21Format = "mgw21.%d";
+	/** First-visit speech queued for the south branch from Rescue Site I to Mystic Marsh. */
 	static constexpr const char *kSpeechMym11 = "mym11";
+	/** Random revisit speech format for the south branch to Mystic Marsh. */
 	static constexpr const char *kSpeechMym21Format = "mym21.%d";
+	/** First-visit speech queued when leaving Mystic Marsh for Wall of Fleens. */
 	static constexpr const char *kSpeechWlf11 = "wlf11";
+	/** Random revisit speech format when leaving Mystic Marsh for Wall of Fleens. */
 	static constexpr const char *kSpeechWlf21Format = "wlf21.%d";
+	/** First clip of the two-part first-visit Magic Wall-to-Chez Norf speech. */
 	static constexpr const char *kSpeechCzn11_1 = "czn11.1";
+	/** Second clip of the two-part first-visit Magic Wall-to-Chez Norf speech. */
 	static constexpr const char *kSpeechCzn11_2 = "czn11.2";
+	/** Random revisit speech format when leaving Magic Wall for Chez Norf. */
 	static constexpr const char *kSpeechCzn21Format = "czn21.%d";
+	/** Speech queued when leaving Wall of Fleens for Rescue Site II. */
 	static constexpr const char *kSpeechBc211 = "bc211";
+	/** Speech queued when leaving Chez Norf for Rescue Site II. */
 	static constexpr const char *kSpeechBc212 = "bc212";
+	/** First clip of the two-part first-visit Rescue Site II-to-Snowboard speech. */
 	static constexpr const char *kSpeechSwb11 = "swb11";
+	/** Second clip of the two-part first-visit Rescue Site II-to-Snowboard speech. */
 	static constexpr const char *kSpeechSwb11B = "swb11B";
+	/** Random revisit speech format when leaving Rescue Site II for Snowboard. */
 	static constexpr const char *kSpeechSwb21Format = "swb21.%d";
+	/** First clip of the two-part first-visit Snowboard-to-Boolies speech. */
 	static constexpr const char *kSpeechBlp11 = "blp11";
+	/** Second clip of the two-part first-visit Snowboard-to-Boolies speech. */
 	static constexpr const char *kSpeechBlp11B = "blp11B";
+	/** Random revisit speech format when leaving Snowboard for Boolies. */
 	static constexpr const char *kSpeechBlp21Format = "blp21.%d";
+	/** First clip of the two-part first-visit Boolies-to-Booliewood speech. */
 	static constexpr const char *kSpeechBlw11_1 = "blw11.1";
+	/** Second clip of the two-part first-visit Boolies-to-Booliewood speech. */
 	static constexpr const char *kSpeechBlw11_3 = "blw11.3";
+	/** Ambient revisit speech format when leaving Boolies for Booliewood. */
 	static constexpr const char *kSpeechBlw12Format = "blw12.%d";
 
 	/** Start any due walkers and update all active party paths. */

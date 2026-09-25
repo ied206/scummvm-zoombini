@@ -37,7 +37,7 @@ public:
 	explicit InteractiveBase(Zoombini2Engine *vm, PageCategory category = PageCategory::kInteractive);
 
 protected:
-	/** Shared map soundtrack used by interactive pages that present the route map. */
+	/** Looped route-map music used by the World Map and menu pages. */
 	static constexpr const char *kMapMusicPath = "#sounds/music/ZMR-MapScreen.wav";
 	/** Start this page's map soundtrack. */
 	void startMapMusic() { startPageMusic(Common::Path(kMapMusicPath)); }
@@ -80,25 +80,25 @@ public:
 	void restartGoBlink();
 
 private:
-	/** Normal Help control sprite. */
+	/** RLE sprite drawn for the idle Help control in the sidebar. */
 	static constexpr const char *kHelpNormalPath = "Bmp/BARRE/QUOI.RB";
-	/** Highlighted Help control sprite. */
+	/** RLE sprite drawn while the pointer hovers over the Help control. */
 	static constexpr const char *kHelpHighlightPath = "Bmp/BARRE/QUOIROLL.RB";
-	/** Normal Map control sprite. */
+	/** RLE sprite drawn for the idle Map control in the sidebar. */
 	static constexpr const char *kMapNormalPath = "Bmp/BARRE/PATH.RB";
-	/** Highlighted Map control sprite. */
+	/** RLE sprite drawn while the pointer hovers over the Map control. */
 	static constexpr const char *kMapHighlightPath = "Bmp/BARRE/PATHROLL.RB";
-	/** Normal enabled Go control sprite. */
+	/** RLE sprite drawn for the enabled Go control when it is idle. */
 	static constexpr const char *kGoNormalPath = "Bmp/BARRE/Next.rb";
-	/** Highlighted Go control sprite. */
+	/** RLE sprite drawn for the Go control while hovered or during its attention blink. */
 	static constexpr const char *kGoHighlightPath = "Bmp/BARRE/NextRoll.rb";
-	/** Disabled Go control sprite. */
+	/** RLE sprite drawn when the active page exposes Go but cannot use it yet. */
 	static constexpr const char *kGoDisabledPath = "Bmp/BARRE/NextInvisible.rb";
-	/** Sound played when the Help control opens its overlay. */
+	/** Sound effect played when the Help control opens the help overlay. */
 	static constexpr const char *kHelpClickSoundPath = "sounds/fx/I-BS2.wav";
-	/** Sound played when the Map control begins map-return handling. */
+	/** Sound effect played when the Map control begins its return-to-map handling. */
 	static constexpr const char *kMapClickSoundPath = "sounds/fx/I-BS1.wav";
-	/** Confirmation panel shown before abandoning active gameplay for the map. */
+	/** Bit-block message shown when returning to the map requires confirmation to abandon gameplay. */
 	static constexpr const char *kAbandonConfirmationPath = "bmp/menu/Quit_panel_text_abandon";
 
 	/** Return the active modal overlay, or nullptr. */
@@ -141,11 +141,11 @@ private:
 	int _mapClickSoundId = -1;
 
 	/** Help button hit rectangle. */
-	Common::Rect _helpButtonRect = Common::Rect(5, 480, 39, 514);
+	const Common::Rect _helpButtonRect = Common::Rect(5, 480, 39, 514);
 	/** Map button hit rectangle. */
-	Common::Rect _mapButtonRect = Common::Rect(5, 514, 39, 548);
+	const Common::Rect _mapButtonRect = Common::Rect(5, 514, 39, 548);
 	/** Go button hit rectangle. */
-	Common::Rect _goButtonRect = Common::Rect(5, 548, 39, 582);
+	const Common::Rect _goButtonRect = Common::Rect(5, 548, 39, 582);
 
 	/** Whether the pointer is over the Help button. */
 	bool _helpHovered = false;

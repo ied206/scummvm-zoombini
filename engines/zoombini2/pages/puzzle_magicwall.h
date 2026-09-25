@@ -146,29 +146,45 @@ public:
 	Common::String debugGetChanceDetails() const override;
 
 private:
-	/** Resource-defined tablet layout and the page's background music. */
+	/** ZTL board data containing weighted layouts, tablet points, and rule variants. */
 	static constexpr const char *kLayoutPath = "bmp/magic_wall/default.ztl";
+	/** Looping Beetle Bug Alley soundtrack. */
 	static constexpr const char *kMusicPath = "#sounds/music/06-BB01.wav";
-	/** Formats for beetle endpoints, colored beetles, direction markers, lights, and gates. */
+	/** Path format for colored endpoint markers on the board and tablets. */
 	static constexpr const char *kDotFormat = "bmp/magic_wall/DOT-%s";
+	/** Path format for the colored beetle sprite assigned to each endpoint color. */
 	static constexpr const char *kBugFormat = "bmp/magic_wall/bug_c_%s";
+	/** Path format for one of eight beetle-facing direction overlays. */
 	static constexpr const char *kDirectionFormat = "bmp/magic_wall/bug_%d";
+	/** Path format for matched-color lamps and the neutral stone lamp. */
 	static constexpr const char *kLightFormat = "bmp/magic_wall/mini-light-%s";
+	/** RLE image drawn as the frame for each rule tablet. */
 	static constexpr const char *kTabletPath = "bmp/magic_wall/mini-map";
+	/** RLE point marker drawn at each node on a rule tablet. */
 	static constexpr const char *kTabletDotPath = "bmp/magic_wall/mini-map-dot";
+	/** Lever animation played when the player submits the current beetle positions. */
 	static constexpr const char *kLeverPath = "bmp/magic_wall/le_vier";
+	/** BitBlock glow drawn over the lever when every beetle matches its endpoint. */
 	static constexpr const char *kLeverGlowPath = "bmp/magic_wall/le_vier_luisant";
+	/** Animation path format for the four lettered gates opening and closing. */
 	static constexpr const char *kGateFormat = "bmp/magic_wall/porte-%c";
+	/** BitBlock wall and entrance artwork drawn behind runners at each gate. */
 	static constexpr const char *kGateBackFormat = "bmp/magic_wall/porte-%csingle";
-	/** Runner exit/movement paths, page effects, and departure speech. */
+	/** PAT route format for a rescued Zoombini to pass through a matched gate and leave. */
 	static constexpr const char *kExitFormat = "bmp/magic_wall/PAT/EXIT%d.PAT";
+	/** PAT route format for a Zoombini to move from its roster position to a matched gate. */
 	static constexpr const char *kMoveFormat = "bmp/magic_wall/PAT/BOUGE%d.PAT";
+	/** Looped sound played while beetles move along a tablet rule. */
 	static constexpr const char *kBugLoopPath = "sounds/fx/06-BB02.wav";
+	/** Sound played when a matched gate opens for a rescue. */
 	static constexpr const char *kGateSoundPath = "sounds/fx/06-BS03.wav";
+	/** Sound played when the lever submits the current board. */
 	static constexpr const char *kLeverSoundPath = "sounds/fx/06-BS05.wav";
+	/** Retreat speech played before leaving with four or more Zoombinis still in the roster. */
 	static constexpr const char *kRetreatSpeechPath = "sounds/DW-Cave.wav";
+	/** One of four randomized praise lines played after all Zoombinis are rescued. */
 	static constexpr const char *kPerfectSpeechFormat = "sounds/wld11.%d.wav";
-	/** Resource color suffixes for the ten beetles plus the stone marker. */
+	/** Resource color suffixes for ten beetles plus the neutral stone lamp used for unmatched endpoints. */
 	static constexpr const char *kColors[11] = {
 		"blue",
 		"green",
