@@ -106,27 +106,27 @@ public:
 	static const char *getPuzzleDir(PageId pageId);
 
 private:
-	/** Format the common primary background path from a page resource-directory name. */
+	/** BitBlock key format for each puzzle's primary backdrop under the bitmap resource tree. */
 	static constexpr const char *kPuzzleBackgroundFormat = "#bmp/%s";
-	/** Shared small-Zoombini animation used to compose each puzzle roster. */
+	/** Shared small-Zoombini sprite animation drawn for the party roster on every puzzle page. */
 	static constexpr const char *kZoombiniAnimationPath = "bmp/zombis/littleZomb.anm";
-	/** Crazy Turtle primary background resource. */
+	/** Primary board backdrop selected for the Crazy Turtle puzzle. */
 	static constexpr const char *kCrazyTurtleBackgroundPath = "crazy_turtle/background";
-	/** Water Slide primary background resource. */
+	/** Primary board backdrop selected for the Water Slide puzzle. */
 	static constexpr const char *kWaterslideBackgroundPath = "waterslide/waterslides";
-	/** AquaCube primary background resource. */
+	/** Primary board backdrop selected for the AquaCube puzzle. */
 	static constexpr const char *kAquacubeBackgroundPath = "aquacube/background";
-	/** Mystic Marsh primary background resource. */
+	/** Primary board backdrop selected for the Mystic Marsh puzzle. */
 	static constexpr const char *kMysticMarshBackgroundPath = "mystic_marsh/background1";
-	/** Magic Wall primary background resource. */
+	/** Primary board backdrop selected for the Magic Wall puzzle. */
 	static constexpr const char *kMagicWallBackgroundPath = "magic_wall/magic wall";
-	/** Wall of Fleens primary background resource. */
+	/** Primary board backdrop selected for the Wall of Fleens puzzle. */
 	static constexpr const char *kWallOfFleensBackgroundPath = "wall_of_fleens/background";
-	/** Chez Norf primary background resource. */
+	/** Primary board backdrop selected for the Chez Norf puzzle. */
 	static constexpr const char *kChezNorfBackgroundPath = "chez_norf/baquegund";
-	/** Snowboard primary background resource. */
+	/** Primary board backdrop selected for the Snowboard puzzle. */
 	static constexpr const char *kSnowboardBackgroundPath = "snowboard/snowboard-EASY";
-	/** Boolies primary background resource. */
+	/** Primary board backdrop selected for the Boolies puzzle. */
 	static constexpr const char *kBooliesBackgroundPath = "Boolies/background";
 
 protected:

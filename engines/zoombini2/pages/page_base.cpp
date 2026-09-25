@@ -398,6 +398,8 @@ EventHandleResult PageEventHandler::handleEvent(const Common::Event &event) {
 	switch (event.type) {
 	case Common::EVENT_LBUTTONDOWN:
 		return onLButtonDown(event.mouse);
+	case Common::EVENT_RBUTTONDOWN:
+		return onRButtonDown(event.mouse);
 	case Common::EVENT_LBUTTONUP:
 		return onLButtonUp(event.mouse);
 	case Common::EVENT_MOUSEMOVE:

@@ -87,67 +87,81 @@ ShelterZombiniville::~ShelterZombiniville() {
 	}
 }
 
-void ShelterZombiniville::setupFeatureRects() {
-	// Bottom station: feet.
-	_stations[0].drawPos[0] = Common::Point32(237, 345);
-	_stations[0].drawPos[1] = Common::Point32(292, 351);
-	_stations[0].drawPos[2] = Common::Point32(398, 355);
-	_stations[0].drawPos[3] = Common::Point32(346, 349);
-	_stations[0].drawPos[4] = Common::Point32(438, 369);
-	_stations[0].buttonRects[0] = Common::Rect32(238, 349, 286, 390);
-	_stations[0].buttonRects[1] = Common::Rect32(291, 352, 344, 396);
-	_stations[0].buttonRects[2] = Common::Rect32(398, 359, 433, 403);
-	_stations[0].buttonRects[3] = Common::Rect32(349, 353, 394, 398);
-	_stations[0].buttonRects[4] = Common::Rect32(438, 365, 478, 406);
+const Common::Point32 &ShelterZombiniville::getFeatureDrawPosition(int feature, int value) {
+	static constexpr Common::Point32 kFeatureDrawPositions[ZmbTrait::kTraitCount][ZmbTrait::kTraitValueCount] = {
+		{
+			Common::Point32(237, 345),
+			Common::Point32(292, 351),
+			Common::Point32(398, 355),
+			Common::Point32(346, 349),
+			Common::Point32(438, 369),
+		},
+		{
+			Common::Point32(534, 126),
+			Common::Point32(529, 167),
+			Common::Point32(526, 214),
+			Common::Point32(522, 255),
+			Common::Point32(518, 296),
+		},
+		{
+			Common::Point32(229, 41),
+			Common::Point32(286, 45),
+			Common::Point32(404, 46),
+			Common::Point32(345, 44),
+			Common::Point32(453, 45),
+		},
+		{
+			Common::Point32(162, 155),
+			Common::Point32(165, 109),
+			Common::Point32(163, 195),
+			Common::Point32(157, 233),
+			Common::Point32(157, 275),
+		},
+	};
+	return kFeatureDrawPositions[feature][value];
+}
 
-	// Right station: noses.
-	_stations[1].drawPos[0] = Common::Point32(534, 126);
-	_stations[1].drawPos[1] = Common::Point32(529, 167);
-	_stations[1].drawPos[2] = Common::Point32(526, 214);
-	_stations[1].drawPos[3] = Common::Point32(522, 255);
-	_stations[1].drawPos[4] = Common::Point32(518, 296);
-	_stations[1].buttonRects[0] = Common::Rect32(534, 118, 570, 151);
-	_stations[1].buttonRects[1] = Common::Rect32(529, 159, 564, 197);
-	_stations[1].buttonRects[2] = Common::Rect32(522, 207, 561, 247);
-	_stations[1].buttonRects[3] = Common::Rect32(518, 255, 557, 298);
-	_stations[1].buttonRects[4] = Common::Rect32(511, 303, 552, 341);
-
-	// Top station: hair.
-	_stations[2].drawPos[0] = Common::Point32(229, 41);
-	_stations[2].drawPos[1] = Common::Point32(286, 45);
-	_stations[2].drawPos[2] = Common::Point32(404, 46);
-	_stations[2].drawPos[3] = Common::Point32(345, 44);
-	_stations[2].drawPos[4] = Common::Point32(453, 45);
-	_stations[2].buttonRects[0] = Common::Rect32(226, 40, 276, 85);
-	_stations[2].buttonRects[1] = Common::Rect32(284, 42, 335, 87);
-	_stations[2].buttonRects[2] = Common::Rect32(403, 44, 448, 85);
-	_stations[2].buttonRects[3] = Common::Rect32(345, 43, 396, 87);
-	_stations[2].buttonRects[4] = Common::Rect32(454, 44, 501, 85);
-
-	// Left station: eyes.
-	_stations[3].drawPos[0] = Common::Point32(162, 155);
-	_stations[3].drawPos[1] = Common::Point32(165, 109);
-	_stations[3].drawPos[2] = Common::Point32(163, 195);
-	_stations[3].drawPos[3] = Common::Point32(157, 233);
-	_stations[3].drawPos[4] = Common::Point32(157, 275);
-	_stations[3].buttonRects[0] = Common::Rect32(164, 153, 207, 186);
-	_stations[3].buttonRects[1] = Common::Rect32(162, 112, 203, 147);
-	_stations[3].buttonRects[2] = Common::Rect32(166, 190, 209, 223);
-	_stations[3].buttonRects[3] = Common::Rect32(166, 228, 212, 262);
-	_stations[3].buttonRects[4] = Common::Rect32(167, 271, 213, 304);
-
-	_quickFillRect = Common::Rect32(135, 399, 211, 448);
-	_batchFillRect = Common::Rect32(239, 416, 318, 477);
-	_createRect = Common::Rect32(404, 438, 491, 500);
+const Common::Rect32 &ShelterZombiniville::getFeatureButtonRect(int feature, int value) {
+	static const Common::Rect32 kFeatureButtonRects[ZmbTrait::kTraitCount][ZmbTrait::kTraitValueCount] = {
+		{
+			Common::Rect32(238, 349, 286, 390),
+			Common::Rect32(291, 352, 344, 396),
+			Common::Rect32(398, 359, 433, 403),
+			Common::Rect32(349, 353, 394, 398),
+			Common::Rect32(438, 365, 478, 406),
+		},
+		{
+			Common::Rect32(534, 118, 570, 151),
+			Common::Rect32(529, 159, 564, 197),
+			Common::Rect32(522, 207, 561, 247),
+			Common::Rect32(518, 255, 557, 298),
+			Common::Rect32(511, 303, 552, 341),
+		},
+		{
+			Common::Rect32(226, 40, 276, 85),
+			Common::Rect32(284, 42, 335, 87),
+			Common::Rect32(403, 44, 448, 85),
+			Common::Rect32(345, 43, 396, 87),
+			Common::Rect32(454, 44, 501, 85),
+		},
+		{
+			Common::Rect32(164, 153, 207, 186),
+			Common::Rect32(162, 112, 203, 147),
+			Common::Rect32(166, 190, 209, 223),
+			Common::Rect32(166, 228, 212, 262),
+			Common::Rect32(167, 271, 213, 304),
+		},
+	};
+	return kFeatureButtonRects[feature][value];
 }
 
 void ShelterZombiniville::setupHoverRunners() {
 	for (int feature = 0; feature < ZmbTrait::kTraitCount; feature++) {
 		for (int value = 0; value < ZmbTrait::kTraitValueCount; value++) {
-			AnimationRunner *runner = new AnimationRunner(_vm, _stations[feature].drawPos[value], AnimationRunnerMode::kPlayOnceAndHide02);
+			AnimationRunner *runner = new AnimationRunner(_vm, getFeatureDrawPosition(feature, value), AnimationRunnerMode::kPlayOnceAndHide02);
 			runner->setAnimation(_featureButtons[feature][value]);
 			runner->addTimedFrame(0, 60);
-			runner->setHitRect(_stations[feature].buttonRects[value]);
+			runner->setHitRect(getFeatureButtonRect(feature, value));
 			_featureButtonRunners[feature][value] = runner;
 		}
 	}
@@ -273,7 +287,6 @@ void ShelterZombiniville::init() {
 	if (!_vm->_gfx->loadTextFont(Gfx::TextColor::kDark00))
 		warning("ShelterZombiniville: Failed to load name font");
 
-	setupFeatureRects();
 	setupHoverRunners();
 	_vm->_gfx->getPageLayerStack()->setScrollLocked(true);
 	resetSelectedFeatures();

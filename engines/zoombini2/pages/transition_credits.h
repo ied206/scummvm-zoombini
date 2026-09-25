@@ -48,10 +48,13 @@ public:
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
 
 private:
-	/** Resource paths used by the credits presentation. */
+	/** Installed bitmap containing the vertically scrolling retail credits. */
 	static constexpr const char *kBackgroundPath = "#bmp/credits/credits";
+	/** Installed background music used during the retail credits. */
 	static constexpr const char *kMusicPath = "#sounds/music/ZMR-Transition.wav";
+	/** Demo-only static credits background bitmap. */
 	static constexpr const char *kDemoBackgroundPath = "bmp/credits/background";
+	/** Demo-only music played with the static credits background. */
 	static constexpr const char *kDemoMusicPath = "sounds/music/01niv12.wav";
 
 	/** Gameplay deadline for the active hold period. */

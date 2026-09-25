@@ -73,12 +73,12 @@ private:
 	static constexpr const char *kMusicPath = "#sounds/music/03-BB01.wav";
 	/** Glow drawn behind the moving light. */
 	static constexpr const char *kLightPath = "bmp/aquacube/light";
-	/** Node sprites indexed by easy or medium versus hard board rendering. */
+	/** RLE orb sprites for cube nodes, using large art on Levels 1-2 and small art on Levels 3-4. */
 	static constexpr const char *kBallPaths[2] = {
 		"bmp/aquacube/ballBIG",
 		"bmp/aquacube/ball",
 	};
-	/** Cube layer path format, parameterized by board kind and layer number. */
+	/** Cube-layer RLE path format, parameterized by easy or hard board art and a one-based layer number. */
 	static constexpr const char *kCubeFormat = "bmp/aquacube/kub_%s_%02d";
 	/** Lever sprites indexed by off and on state. */
 	static constexpr const char *kLeverPaths[2] = {
@@ -107,17 +107,17 @@ private:
 	static constexpr const char *kTimerPath = "bmp/aquacube/control_warpTIMER";
 	/** Rescue flare animation path format. */
 	static constexpr const char *kFlareFormat = "bmp/aquacube/flare%d";
-	/** Cosmetic bubble sprite path format. */
+	/** Path format for the three numbered decorative bubble sprites. */
 	static constexpr const char *kBubbleFormat = "bmp/aquacube/bubble%d";
-	/** Idle Fleen sprite path format. */
+	/** Path format for the numbered Fleen sprites shown while they are idle on the board. */
 	static constexpr const char *kFleenFormat = "bmp/aquacube/fleen/fixe/f%dfixe";
-	/** Angry Fleen animation path format. */
+	/** Path format for each numbered Fleen's angry animation before pursuit. */
 	static constexpr const char *kAngryFormat = "bmp/aquacube/fleen/vener/f%dma66";
-	/** Fleen chase animation path format. */
+	/** Path format for each numbered Fleen's running animation during pursuit. */
 	static constexpr const char *kChaseFormat = "bmp/aquacube/fleen/marche/f%dco66";
-	/** Small Zoombini animation used on the cube and during the chase. */
+	/** Small Zoombini animation drawn inside a cube and for actors fleeing during the chase. */
 	static constexpr const char *kSmallestPath = "bmp/aquacube/smallest/smallest.anm";
-	/** Small Zoombini idle animation used after puzzle completion. */
+	/** Small Zoombini idle animation used for the post-rescue completion scene. */
 	static constexpr const char *kIdlePath = "bmp/aquacube/smallest/attente/attente.anm";
 	/** Sound effects indexed by lever, rescue, warp, move, and Fleen chase start. */
 	static constexpr const char *kSoundPaths[5] = {

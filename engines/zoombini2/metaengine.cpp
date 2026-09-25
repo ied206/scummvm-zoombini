@@ -38,7 +38,7 @@ bool Zoombini2MetaEngine::hasFeature(MetaEngineFeature f) const {
 
 void Zoombini2MetaEngine::registerDefaultSettings(const Common::String &target) const {
 	(void)target;
-	ConfMan.registerDefault(kConfigSavefilesReadOnly, false);
+	ConfMan.registerDefault(kConfigEnableSavefileReadOnlyToggle, false);
 	ConfMan.registerDefault(kConfigStereoOutput, false);
 	ConfMan.registerDefault(kConfigUseFloatingPointPaths, false);
 	ConfMan.registerDefault(kConfigEnhancedKbdShortcuts, true);

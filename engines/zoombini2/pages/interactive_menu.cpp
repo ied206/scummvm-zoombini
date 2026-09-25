@@ -23,10 +23,8 @@
 
 #include "common/algorithm.h"
 #include "common/callback.h"
-#include "common/config-manager.h"
 #include "common/debug.h"
 #include "zoombini2/graphics.h"
-#include "zoombini2/metaengine.h"
 #include "zoombini2/pages/dialog_msgbox.h"
 #include "zoombini2/pages/interactive_menu.h"
 #include "zoombini2/sound.h"
@@ -70,6 +68,7 @@ constexpr Common::Point32 InteractiveMenu::kFileListPos;
 constexpr Size32 InteractiveMenu::kSelectorSize;
 
 constexpr const char *InteractiveMenu::kValidNameCharacters;
+constexpr const char *InteractiveMenu::kHebrewValidNameCharacters;
 
 InteractiveMenu::InteractiveMenu(Zoombini2Engine *vm)
 	: InteractiveBase(vm) {
@@ -167,9 +166,9 @@ void InteractiveMenu::loadButtons() {
 
 void InteractiveMenu::scanSaveFiles() {
 	_fileList->clear();
-	const Common::StringArray profiles = _vm->listGameSaves();
-	for (uint i = 0; i < profiles.size() && _fileList->getItemCount() < SaveFileList::kMaximumItems; i++)
-		_fileList->addItemSorted(profiles[i], _vm->isGameSaveReadOnly(profiles[i]));
+	const Common::StringArray savefiles = _vm->listGameSaves();
+	for (uint i = 0; i < savefiles.size() && _fileList->getItemCount() < SaveFileList::kMaximumItems; i++)
+		_fileList->addItemSorted(savefiles[i], _vm->isGameSaveReadOnly(savefiles[i]));
 }
 
 void InteractiveMenu::onUpdate() {
@@ -221,9 +220,15 @@ EventHandleResult InteractiveMenu::onMouseMove(const Common::Point &pos) {
 }
 
 EventHandleResult InteractiveMenu::onKeyDown(const Common::KeyState &key, bool repeat) {
-	(void)repeat;
 	if (_state == MenuScreenState::kMain00) {
-		const uint32 keyCode = key.ascii ? static_cast<uint32>(key.ascii) : static_cast<uint32>(key.keycode);
+		if (key.keycode == Common::KEYCODE_k && key.hasFlags(Common::KBD_CTRL) && _vm->isSavefileReadOnlyToggleEnabled()) {
+			if (!repeat && _fileList->hasValidSelection() && !_fileList->isEditing())
+				_vm->toggleGameSaveWriteLock(_fileList->getSelectedName());
+			return EventHandleResult::kConsumed;
+		}
+		uint32 keyCode = key.ascii ? static_cast<uint32>(key.ascii) : static_cast<uint32>(key.keycode);
+		if (_vm->isHebrew() && 0x05D0 <= keyCode && keyCode <= 0x05EA)
+			keyCode = keyCode - 0x05D0 + 0xE0;
 		handleKeyInput(keyCode);
 		updateButtonAvailability();
 	}
@@ -276,6 +281,15 @@ EventHandleResult InteractiveMenu::onLButtonDown(const Common::Point &pos) {
 	return EventHandleResult::kPassthrough;
 }
 
+EventHandleResult InteractiveMenu::onRButtonDown(const Common::Point &pos) {
+	debug(1, "MenuScreenPage: right-button down at %d,%d", pos.x, pos.y);
+	if (_state != MenuScreenState::kMain00 || !_vm->isSavefileReadOnlyToggleEnabled() || !_fileList->handleClick(pos))
+		return EventHandleResult::kPassthrough;
+	_vm->toggleGameSaveWriteLock(_fileList->getSelectedName());
+	updateButtonAvailability();
+	return EventHandleResult::kConsumed;
+}
+
 int InteractiveMenu::hitTestButton(const Common::Point &pos) const {
 	for (int i = 0; i < kMenuButtonCount; ++i) {
 		if (_buttons[i] && _buttons[i]->isEnabled() && _buttons[i]->containsPoint(pos))
@@ -306,7 +320,7 @@ void InteractiveMenu::handleButtonClick(int buttonId) {
 	case kMenuButtonNew:
 		_fileList->beginOrConfirmNewEntry();
 		break;
-	case kMenuButtonTraining:
+	case kMenuButtonPractice:
 		_vm->requestPageChange(kPageMenuPractice);
 		break;
 	case kMenuButtonQuit:
@@ -319,7 +333,13 @@ void InteractiveMenu::handleButtonClick(int buttonId) {
 }
 
 void InteractiveMenu::handleKeyInput(uint32 keyCode) {
-	if (keyCode < 128 && strchr(kValidNameCharacters, static_cast<char>(keyCode))) {
+	bool isNameCharacter = false;
+	if (_vm->isHebrew()) {
+		isNameCharacter = (0xE0 <= keyCode && keyCode <= 0xFA) || (keyCode < 128 && strchr(kHebrewValidNameCharacters, static_cast<char>(keyCode)));
+	} else {
+		isNameCharacter = keyCode < 128 && strchr(kValidNameCharacters, static_cast<char>(keyCode));
+	}
+	if (isNameCharacter) {
 		const SaveFileList::TextInputResult result = _fileList->handleCharacter(static_cast<char>(keyCode));
 		if (result == SaveFileList::kTextAccepted01)
 			playSound(_typeSoundId);
@@ -361,45 +381,45 @@ void InteractiveMenu::startSelectedSave() {
 	if (!_fileList->hasValidSelection())
 		return;
 
-	const Common::String saveName = _fileList->getSelectedName();
-	if (saveName.empty())
+	const Common::String savefileName = _fileList->getSelectedName();
+	if (savefileName.empty())
 		return;
 
 	if (_fileList->isEditing()) {
-		const Common::String conflictingName = _fileList->getCaseInsensitiveConflictName();
-		if (!conflictingName.empty()) {
-			requestCaseCollisionConfirmation(saveName, conflictingName);
+		const Common::String conflictingSavefileName = _fileList->getCaseInsensitiveConflictName();
+		if (!conflictingSavefileName.empty()) {
+			requestCaseCollisionConfirmation(savefileName, conflictingSavefileName);
 			return;
 		}
-		startNewSave(saveName, saveName);
+		startNewSave(savefileName, savefileName);
 		return;
 	}
 
 	if (_fileList->isSelectedReadOnly()) {
-		requestReadOnlyLoadConfirmation(saveName);
+		requestReadOnlyLoadConfirmation(savefileName);
 		return;
 	}
-	loadSelectedSave(saveName);
+	loadSelectedSave(savefileName);
 }
 
-void InteractiveMenu::loadSelectedSave(const Common::String &saveName) {
-	if (!_vm->readGameSave(saveName)) {
+void InteractiveMenu::loadSelectedSave(const Common::String &savefileName) {
+	if (!_vm->readGameSave(savefileName)) {
 		_fileList->deleteSelected();
 		return;
 	}
 	continueSelectedSave();
 }
 
-void InteractiveMenu::startNewSave(const Common::String &playerName, const Common::String &storageName) {
+void InteractiveMenu::startNewSave(const Common::String &playerName, const Common::String &savefileName) {
 	GameState *gameState = _vm->_state;
 	gameState->init();
 	gameState->_playerName = playerName;
 
 	bool success = false;
-	if (playerName == storageName)
-		success = _vm->createGameSave(storageName);
+	if (playerName == savefileName)
+		success = _vm->createGameSave(savefileName);
 	else
-		success = _vm->overwriteGameSave(storageName);
+		success = _vm->overwriteGameSave(savefileName);
 	if (!success)
 		return;
 	continueSelectedSave();
@@ -417,29 +437,29 @@ void InteractiveMenu::requestDeleteConfirmation() {
 	if (!_fileList->hasValidSelection() || _fileList->isEditing())
 		return;
 
-	_pendingDeleteProfileName = _fileList->getSelectedName();
-	if (_pendingDeleteProfileName.empty())
+	_pendingDeleteSavefileName = _fileList->getSelectedName();
+	if (_pendingDeleteSavefileName.empty())
 		return;
 	_vm->getMsgBoxDialog()->request(Common::Path(kDeleteConfirmationPath), new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleDeleteConfirmation));
 }
 
-void InteractiveMenu::requestCaseCollisionConfirmation(const Common::String &playerName, const Common::String &storageName) {
+void InteractiveMenu::requestCaseCollisionConfirmation(const Common::String &playerName, const Common::String &savefileName) {
 	_pendingCaseCollisionPlayerName = playerName;
-	_pendingCaseCollisionStorageName = storageName;
+	_pendingCaseCollisionSavefileName = savefileName;
 	Common::BaseCallback<DialogMsgBoxButton> *callback =
 		new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleCaseCollisionConfirmation);
 	if (!_vm->getMsgBoxDialog()->requestUiText(getCaseCollisionConfirmationText(), callback)) {
 		_pendingCaseCollisionPlayerName.clear();
-		_pendingCaseCollisionStorageName.clear();
+		_pendingCaseCollisionSavefileName.clear();
 	}
 }
 
-void InteractiveMenu::requestReadOnlyLoadConfirmation(const Common::String &saveName) {
-	_pendingReadOnlyProfileName = saveName;
+void InteractiveMenu::requestReadOnlyLoadConfirmation(const Common::String &savefileName) {
+	_pendingReadOnlySavefileName = savefileName;
 	Common::BaseCallback<DialogMsgBoxButton> *callback =
 		new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleReadOnlyLoadConfirmation);
 	if (!_vm->getMsgBoxDialog()->requestUiText(getReadOnlyLoadConfirmationText(), callback))
-		_pendingReadOnlyProfileName.clear();
+		_pendingReadOnlySavefileName.clear();
 }
 
 void InteractiveMenu::requestQuitConfirmation() {
@@ -449,23 +469,23 @@ void InteractiveMenu::requestQuitConfirmation() {
 void InteractiveMenu::handleDeleteConfirmation(DialogMsgBoxButton button) {
 	if (button == DialogMsgBoxButton::kOkay01)
 		deleteSelectedSave();
-	_pendingDeleteProfileName.clear();
+	_pendingDeleteSavefileName.clear();
 }
 
 void InteractiveMenu::handleCaseCollisionConfirmation(DialogMsgBoxButton button) {
 	const Common::String playerName = _pendingCaseCollisionPlayerName;
-	const Common::String storageName = _pendingCaseCollisionStorageName;
+	const Common::String savefileName = _pendingCaseCollisionSavefileName;
 	_pendingCaseCollisionPlayerName.clear();
-	_pendingCaseCollisionStorageName.clear();
+	_pendingCaseCollisionSavefileName.clear();
 	if (button == DialogMsgBoxButton::kOkay01)
-		startNewSave(playerName, storageName);
+		startNewSave(playerName, savefileName);
 }
 
 void InteractiveMenu::handleReadOnlyLoadConfirmation(DialogMsgBoxButton button) {
-	const Common::String saveName = _pendingReadOnlyProfileName;
-	_pendingReadOnlyProfileName.clear();
+	const Common::String savefileName = _pendingReadOnlySavefileName;
+	_pendingReadOnlySavefileName.clear();
 	if (button == DialogMsgBoxButton::kOkay01)
-		loadSelectedSave(saveName);
+		loadSelectedSave(savefileName);
 }
 
 void InteractiveMenu::handleQuitConfirmation(DialogMsgBoxButton button) {
@@ -512,14 +532,14 @@ void InteractiveMenu::applyOptionVolumes(bool usePanelValues, bool persistChange
 }
 
 void InteractiveMenu::deleteSelectedSave() {
-	if (_pendingDeleteProfileName.empty())
+	if (_pendingDeleteSavefileName.empty())
 		return;
 
-	if (_vm->deleteGameSave(_pendingDeleteProfileName)) {
+	if (_vm->deleteGameSave(_pendingDeleteSavefileName)) {
 		_fileList->deleteSelected();
 		playSound(_deleteSoundId);
 	} else {
-		warning("MenuScreenPage: Failed to delete profile '%s'", _pendingDeleteProfileName.c_str());
+		warning("MenuScreenPage: Failed to delete savefile '%s'", _pendingDeleteSavefileName.c_str());
 	}
 }
 
@@ -563,7 +583,6 @@ bool InteractiveMenu::SaveFileList::addItemSorted(const Common::String &name, bo
 }
 
 void InteractiveMenu::SaveFileList::draw(ManagedSurface32 *screen) const {
-	const bool savefilesReadOnly = ConfMan.getBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, ConfMan.getActiveDomainName());
 	for (int row = 0; row < kVisibleRows; ++row) {
 		const int itemIndex = _scrollOffset + row;
 		if (static_cast<int>(_items.size()) <= itemIndex)
@@ -573,7 +592,7 @@ void InteractiveMenu::SaveFileList::draw(ManagedSurface32 *screen) const {
 		if (selected)
 			_vm->_gfx->drawPageRleBlock(screen, kSelectionBarPath, Common::Point32(_pos.x + kSelectionOffsetX, _pos.y + kSelectionOffsetY + row * kRowStride));
 
-		const bool readOnly = savefilesReadOnly || _readOnly[itemIndex];
+		const bool readOnly = _readOnly[itemIndex] || _vm->isGameSaveWriteLocked(_items[itemIndex]);
 		Gfx::TextColor color = readOnly ? Gfx::TextColor::kRed04 : Gfx::TextColor::kDark00;
 		if (selected && kEditProvisional02 <= _editState)
 			color = Gfx::TextColor::kGreen02;
@@ -791,7 +810,7 @@ Common::String InteractiveMenu::SaveFileList::getSelectedName() const {
 bool InteractiveMenu::SaveFileList::isSelectedReadOnly() const {
 	if (!_validSelection || isEditing() || _selectedIndex < 0 || static_cast<int>(_readOnly.size()) <= _selectedIndex)
 		return false;
-	return ConfMan.getBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, ConfMan.getActiveDomainName()) || _readOnly[_selectedIndex];
+	return _readOnly[_selectedIndex] || _vm->isGameSaveWriteLocked(_items[_selectedIndex]);
 }
 
 Common::String InteractiveMenu::SaveFileList::getCaseInsensitiveConflictName() const {
@@ -852,7 +871,8 @@ bool InteractiveMenu::SaveFileList::canAppendCharacter(char c) const {
 	const int barWidth = _vm->_gfx->getPageRleBlockSize(kSelectionBarPath).width;
 	if (!_vm->_gfx->hasTextFont(Gfx::TextColor::kDark00) || barWidth == 0)
 		return true;
-	return _vm->_gfx->getTextWidth(_editBuffer, Gfx::TextColor::kDark00) < barWidth - 5;
+	const int fontHeight = _vm->isHebrew() ? kHebrewFontHeight : 0;
+	return _vm->_gfx->getTextWidth(_editBuffer, Gfx::TextColor::kDark00) < barWidth - fontHeight - 5;
 }
 
 char InteractiveMenu::SaveFileList::normalizeCharacter(char c) const {

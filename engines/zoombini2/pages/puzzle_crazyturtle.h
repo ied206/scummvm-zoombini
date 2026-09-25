@@ -68,38 +68,63 @@ public:
 	void onActorsRendered() override;
 
 private:
-	/** Perfect and retreat Go speech selected after the player leaves Turtle Hurdle. */
+	/** Five randomized praise lines played when all Zoombinis leave Turtle Hurdle successfully. */
 	static constexpr const char *kGoSpeechFormat = "sounds/wld11.%d.wav";
+	/** Retreat line played before a saved-game departure with Zoombinis still waiting. */
 	static constexpr const char *kRetreatSpeech = "sounds/DW-Zville.wav";
 	/** Deferred Go transition flag. */
 	bool _goPending = false;
-	/** Music, turtle/mother/dock art, trait icons, area mask, and Zoombini animations. */
+	/** Looping Turtle Hurdle soundtrack. */
 	static constexpr const char *kMusicPath = "#sounds/music/08-BS01.wav";
+	/** Path format for each numbered turtle's idle animation. */
 	static constexpr const char *kTurtleIdleFormat = "Bmp/crazy_turtle/TORTUES/ATTENTE/%d/%d.AN";
+	/** Path format for each numbered turtle's spinning animation. */
 	static constexpr const char *kTurtleSpinFormat = "Bmp/crazy_turtle/TORTUES/tourbillonne/%d/%d.AN";
+	/** Path format for each turtle's fixed RLE image, indexed by its variant. */
 	static constexpr const char *kTurtleFixedFormat = "Bmp/crazy_turtle/TORTUES/tourbillonne/%d/FIXE%d.RB";
+	/** Mother turtle's main animation played when she speaks at the dock. */
 	static constexpr const char *kMotherPath = "Bmp/crazy_turtle/TORTUES/MERE/mere.an";
+	/** Mother turtle's separate speech-animation resource. */
 	static constexpr const char *kMotherSpeechPath = "Bmp/crazy_turtle/TORTUES/MERE/PARLE/PARLE.AN";
+	/** Smoke animation played when a Zoombini falls from the dock. */
 	static constexpr const char *kSmokePath = "Bmp/crazy_turtle/smokey.an";
+	/** RLE image of the mother turtle before her dock sequence begins. */
 	static constexpr const char *kMotherStartPath = "Bmp/crazy_turtle/TORTUES/MERE/meredebut.rb";
+	/** RLE image of the mother turtle after her dock sequence completes. */
 	static constexpr const char *kMotherEndPath = "Bmp/crazy_turtle/TORTUES/MERE/MEREFIN.RB";
+	/** Intact dock bridge drawn while at least one mistake remains. */
 	static constexpr const char *kBridgePath = "Bmp/crazy_turtle/PONT.RB";
+	/** Collapsed bridge drawn after the mistake allowance is exhausted. */
 	static constexpr const char *kCollapsedBridgePath = "Bmp/crazy_turtle/pontKC.rb";
+	/** RLE beam segments removed as mistakes weaken the bridge. */
 	static constexpr const char *kBeamPath = "Bmp/crazy_turtle/poutrelle.rb";
+	/** Path format for RLE feature/value icons shown beside the turtle-order rules. */
 	static constexpr const char *kTraitFormat = "Bmp/mystic_marsh/TRAITS/%d-%d.RB";
+	/** One-bit drop-area mask used to accept or reject Zoombini placements. */
 	static constexpr const char *kAreaMaskPath = "bmp/crazy_turtle/area.bmt";
+	/** Shared idle and celebration animation used for waiting Zoombinis. */
 	static constexpr const char *kIdleZombAnimationPath = "bmp/zombis/attente/attenteZomb.anm";
+	/** Shared pick-up animation used while a Zoombini is held for placement. */
 	static constexpr const char *kPickupZombAnimationPath = "bmp/zombis/pris/pris.anm";
+	/** Shared tumbling animation played when a Zoombini falls from the dock. */
 	static constexpr const char *kTombeAnimationPath = "bmp/zombis/tombe/tombe.anm";
-	/** Turtle, dock, placement, completion, and partial-completion audio resources. */
+	/** Sound played when an idle turtle becomes active. */
 	static constexpr const char *kTurtleIdleSoundPath = "sounds/fx/08-BS02.wav";
+	/** Sound played with the falling smoke animation. */
 	static constexpr const char *kSmokeSoundPath = "sounds/fx/08-BS03.wav";
+	/** Sound played when a turtle spins after a Zoombini is placed. */
 	static constexpr const char *kTurtleSpinSoundPath = "sounds/fx/08-BS04.wav";
+	/** Sound accompanying the mother turtle and dock transition. */
 	static constexpr const char *kTransitionSoundPath = "sounds/fx/08-BS05.wav";
+	/** Sound played when a Zoombini fails the turtle's rule. */
 	static constexpr const char *kMismatchSoundPath = "sounds/fx/08-BS06.wav";
+	/** Sound played as a Zoombini falls from the dock. */
 	static constexpr const char *kFallSoundPath = "sounds/fx/08-BS07.wav";
+	/** Sound played when the bridge collapses. */
 	static constexpr const char *kCollapseSoundPath = "sounds/fx/PierCollapse.wav";
+	/** Mother turtle's speech when the full party is rescued. */
 	static constexpr const char *kMotherSuccessSpeechPath = "sounds/8-E1.wav";
+	/** Mother turtle's speech when the party is only partially rescued. */
 	static constexpr const char *kMotherPartialSpeechPath = "sounds/8-E2.wav";
 
 	/** Restore the dock background. */
