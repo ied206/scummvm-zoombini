@@ -574,9 +574,9 @@ public:
 	 * held onto the first overlapping free release target, then onto the area mask.
 	 */
 	static ZmbDropResult handlePointerInput(const Common::Array<ZoombiniRunner *> &zoombinis, const Common::Point32 &pointerPos,
-												  bool clickReleased, const ZoombiniAnimation *pickupAnimation, uint32 tickCount,
-												  Common::Array<ZmbDropTarget> *dropTargets = nullptr, const AreaMask *areaMask = nullptr,
-												  int scrollX = 0, int backgroundWidth = AnimationRunner::kDefaultBackgroundWidth);
+											bool clickReleased, const ZoombiniAnimation *pickupAnimation, uint32 tickCount,
+											Common::Array<ZmbDropTarget> *dropTargets = nullptr, const AreaMask *areaMask = nullptr,
+											int scrollX = 0, int backgroundWidth = AnimationRunner::kDefaultBackgroundWidth);
 	/** Stably sort selected roster indices by their logical screen Y position. */
 	static void sortDrawOrderByY(const Common::Array<ZoombiniRunner *> &zoombinis, Common::Array<uint> &order);
 	/** Return the current drawing anchor after applying page scrolling or the active grab offset. */
@@ -591,7 +591,7 @@ public:
 	ZmbTrait _traits = ZmbTrait();
 	/** Runtime-only packed cache derived from the four visible traits. */
 	uint16 _traitHash = 0xFFFF;
-	/** NUL-terminated character name retained by boards and profile saves. */
+	/** NUL-terminated Zoombini name retained by storage records and saved game data. */
 	char _name[kZoombiniNameSize] = {};
 	/** Countdown between direction-cell recalculations while movement tracking is enabled. */
 	int32 _directionUpdateCooldown = 0;

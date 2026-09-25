@@ -62,43 +62,63 @@ public:
 	Common::String debugGetChanceDetails() const override;
 
 private:
-	/** Page music and traits shown beside connected pipe endpoints. */
+	/** Background music played while Pipes of Paloo is active. */
 	static constexpr const char *kMusicPath = "#sounds/music/02-BS01.wav";
+	/** Trait icon format for the numbered Zoombini traits shown beside pipe endpoints. */
 	static constexpr const char *kTraitFormat = "bmp/waterslide/traits/%d";
-	/** Pipe art formats selected by difficulty, color, and graph edge type. */
+	/** Horizontal pipe segment selected by its color directory. */
 	static constexpr const char *kHorizontalFormat = "bmp/waterslide/pipes - %s/pipe - horizontal";
+	/** Large blue entrance/exit pipe art selected by the internal level number. */
 	static constexpr const char *kLargePipeFormat = "bmp/waterslide/pipes - blue/pipe - lev%d_bigone";
+	/** Large-pipe selector art, selected by pipe color and arm number. */
 	static constexpr const char *kSelectorFormat = "bmp/waterslide/pipes - %s/pipe_bigone_selector_%02d";
+	/** Hard-mode pipe segment art, selected by color and graph edge type. */
 	static constexpr const char *kHardPipeFormat = "bmp/waterslide/pipes - %s/pipe - hard %02d";
-	/** Color suffixes for easy/medium and hard pipe art. */
+	/** Directory suffixes for neutral gray and connected blue horizontal pipes. */
 	static constexpr const char *kPipeColors[2] = {
 		"grey",
 		"blue",
 	};
+	/** Directory suffixes for neutral gray and connected red hard-mode pipes. */
 	static constexpr const char *kHardPipeColors[2] = {
 		"grey",
 		"red",
 	};
-	/** Decorative pipe, outlet, landscape, valve, and cascade resources. */
+	/** Small diagonal connector segments used to draw the easy/medium pipe graph. */
 	static constexpr const char *kMiniDiagonalPath = "bmp/waterslide/pipes - blue/pipe - mini racord diagon";
+	/** Small horizontal connector segments used to draw the easy/medium pipe graph. */
 	static constexpr const char *kMiniHorizontalPath = "bmp/waterslide/pipes - blue/pipe - mini horizontal";
+	/** Red outlet artwork at the end of the hard-mode pipe graph. */
 	static constexpr const char *kOutletPath = "bmp/waterslide/pipes - red/truc_rouge";
+	/** Gray connector marker drawn beneath each pipe endpoint. */
 	static constexpr const char *kPastillePath = "bmp/waterslide/pastilles grey";
+	/** Neutral edge artwork used for unconnected pipe links. */
 	static constexpr const char *kEdgePath = "bmp/waterslide/edge neutre";
+	/** Animated fountain scenery beside the board. */
 	static constexpr const char *kFountainPath = "bmp/waterslide/blue funtain";
+	/** Animated tree scenery beside the board. */
 	static constexpr const char *kTreePath = "bmp/waterslide/little tree";
+	/** Animated valve that starts the discharge sequence when clicked. */
 	static constexpr const char *kValvePath = "bmp/waterslide/mr valve master";
+	/** Cascade animation format; levels below 3 use variant 1, level 3 and higher use variant 2. */
 	static constexpr const char *kCascadeFormat = "bmp/waterslide/pipe - cascade %d";
-	/** Hit-area mask and Zoombini pickup, idle, and drain animations. */
+	/** Area mask used to constrain Zoombini drag-and-drop hit testing. */
 	static constexpr const char *kAreaPath = "bmp/waterslide/area.bmt";
+	/** Zoombini animation used while dragging a character between pipe endpoints. */
 	static constexpr const char *kPickupPath = "bmp/zombis/pris/pris.anm";
+	/** Zoombini idle animation restored after the discharge sequence. */
 	static constexpr const char *kIdlePath = "bmp/zombis/attente/attenteZomb.anm";
+	/** Zoombini animation played as a connected character is pulled into the cascade. */
 	static constexpr const char *kAspirationPath = "bmp/zombis/aspiration/aspiration.anm";
-	/** Page effects plus success, partial-success, retreat, and Go speech. */
+	/** Sound-effects path format used for the six Waterslide effect identifiers. */
 	static constexpr const char *kSoundFormat = "sounds/fx/%s.wav";
+	/** Praise speech played when all eight expected connections are made. */
 	static constexpr const char *kPraisePath = "sounds/wsl31.wav";
+	/** Alternate praise speech played when the board is completed with fewer connections. */
 	static constexpr const char *kPartialPraisePath = "sounds/wsl31alt.wav";
+	/** Speech queued when the player leaves before starting the discharge. */
 	static constexpr const char *kRetreatSpeech = "sounds/DW-Zville.wav";
+	/** Perfect-clear Go speech format; the argument selects a voice variant. */
 	static constexpr const char *kGoSpeechFormat = "sounds/wld11.%d.wav";
 
 	enum Phase {

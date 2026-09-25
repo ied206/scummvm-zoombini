@@ -57,16 +57,25 @@ public:
 	bool needsScreenClear() const override { return true; }
 
 private:
-	/** Bink movie resources for the intro, cutscenes, and studio logos. */
+	/** Full-size TLC studio logo Bink movie shown during startup. */
 	static constexpr const char *kLogoTlcPath = "movies/tlclogo.bik";
+	/** Half-size TLC studio logo movie used when the full-size file is unavailable. */
 	static constexpr const char *kLogoTlcHalfPath = "movies/tlclogo50%.bik";
+	/** Polygon studio logo Bink movie shown after the TLC logo and before the title card. */
 	static constexpr const char *kLogoPolygonPath = "movies/logopoly.bik";
+	/** Full-size first story cutscene, followed by the Zoombiniville page. */
 	static constexpr const char *kCutsceneFirstPath = "movies/zoom_movie1_100%.bik";
+	/** Half-size first story cutscene used when the full-size file is unavailable. */
 	static constexpr const char *kCutsceneFirstHalfPath = "movies/zoom_movie1_50%.bik";
+	/** Full-size second story cutscene, followed by Rescue Site I. */
 	static constexpr const char *kCutsceneSecondPath = "movies/zoom_movie2_100%.bik";
+	/** Half-size second story cutscene used when the full-size file is unavailable. */
 	static constexpr const char *kCutsceneSecondHalfPath = "movies/zoom_movie2_50%.bik";
+	/** Full-size third story cutscene, followed by Rescue Site II. */
 	static constexpr const char *kCutsceneThirdPath = "movies/zoom_movie3_100%.bik";
+	/** Half-size third story cutscene used when the full-size file is unavailable. */
 	static constexpr const char *kCutsceneThirdHalfPath = "movies/zoom_movie3_50%.bik";
+	/** Arisu Media studio logo Bink movie shown before the TLC logo. */
 	static constexpr const char *kLogoArisuPath = "movies/arisu.bik";
 
 	EventHandleResult skip();

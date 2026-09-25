@@ -65,7 +65,7 @@ public:
 	Common::String debugGetChanceDetails() const override;
 
 private:
-	/** Format one main dish, drink, dessert, or note-symbol sprite by resource name. */
+	/** Path format for the food, note-symbol, and difficulty-specific order-panel RLE sprites. */
 	static constexpr const char *kFoodFormat = "bmp/chez_norf/%s";
 	/** Food resource names ordered as three mains, three drinks, then three desserts. */
 	static constexpr const char *kFoodNames[9] = {
@@ -85,32 +85,43 @@ private:
 		"symb_NO",
 		"symb_MAYBE",
 	};
-	/** Three note-panel sprites, one for each meal category. */
+	/** Order-panel RLE sprites indexed by Level 1, 2, and 3. */
 	static constexpr const char *kPanelNames[3] = {
 		"comande3",
 		"COMANDE1",
 		"comande2",
 	};
-	/** Full, cursor, and miniature tray sprites used while assembling and serving meals. */
+	/** Full-size RLE tray drawn for meal assembly and service on Levels 2 and 3. */
 	static constexpr const char *kPlatePath = "bmp/chez_norf/plato";
+	/** Compact RLE tray drawn for meal assembly and service on Level 1. */
 	static constexpr const char *kSmallPlatePath = "bmp/chez_norf/plato2";
+	/** Miniature RLE tray used as the pointer sprite while choosing a recipient table. */
 	static constexpr const char *kMiniPlatePath = "bmp/chez_norf/plato_mini";
-	/** Highlight drawn over the selected food, tray, or Norf. */
+	/** RLE hover or selection highlight for food, trays, and Norfs. */
 	static constexpr const char *kHighlightPath = "bmp/chez_norf/highlight";
-	/** Static Norf body and cap art, indexed by table and motion. */
+	/** Static RLE Norf body art shown beneath its table-specific motion animation. */
 	static constexpr const char *kNorfPath = "bmp/chez_norf/norf/norfDeBaz";
+	/** Path format for the static table-specific Norf cap sprites. */
 	static constexpr const char *kCapPath = "bmp/chez_norf/norf/cask/%d/cask2baz";
+	/** Animation path format for the shared Norf body motions. */
 	static constexpr const char *kNorfAnimationFormat = "bmp/chez_norf/norf/norf%d.an";
+	/** Animation path format for each table's matching Norf cap motions. */
 	static constexpr const char *kCapAnimationFormat = "bmp/chez_norf/norf/cask/%d/cask%d.an";
-	/** Paths used by released cohorts and the waiter dismissal. */
+	/** PAT path format for Zoombinis leaving after a successful meal service. */
 	static constexpr const char *kExitFormat = "bmp/chez_norf/out%d.pat";
+	/** PAT route for the waiter who leaves when the player retreats to the map. */
 	static constexpr const char *kWaiterExitPath = "bmp/chez_norf/out_special.pat";
-	/** Restaurant music, effects, clues, response speech, completion, and retreat audio. */
+	/** Looping restaurant soundtrack used while the puzzle is active. */
 	static constexpr const char *kMusicPath = "#sounds/music/07-BB02.wav";
+	/** Path format for short food-service and interaction sound effects. */
 	static constexpr const char *kSoundFormat = "sounds/fx/07-BS%02d.wav";
+	/** Path format for Norf clue speech, selected by puzzle level and generated meal layout. */
 	static constexpr const char *kClueFormat = "sounds/7-N%d-%d";
+	/** Path format for a Norf's rejected, final-rejection, or accepted meal response. */
 	static constexpr const char *kFeedbackFormat = "sounds/7-N%d-G%02d.wav";
+	/** Shared completion speech queued when the rescued party departs the restaurant. */
 	static constexpr const char *kCompleteSpeechPath = "sounds/CZN31.wav";
+	/** Retreat speech played before a saved-game return to the map. */
 	static constexpr const char *kRetreatSpeechPath = "sounds/DW-Cave.wav";
 
 	/** Indices in the paired body/cap animation bank. */
@@ -188,54 +199,79 @@ private:
 	};
 	/** Four release-matched variants for each of the three selectable difficulties. */
 	static constexpr Layout kLayouts[12] = {
-		{// Layout 11
-		 {{0, 3, 9}, {1, 3, 9}, {2, 5, 9}, {2, 3, 9}},
-		 {{0, 9, 9}, {2, 9, 9}, {3, 9, 9}, {4, 9, 9}},
-		 {{0, 0}, {1, 0}, {0, 0}, {0, 0}},},
-		{// Layout 12
-		 {{0, 5, 9}, {2, 3, 9}, {1, 5, 9}, {1, 4, 9}},
-		 {{0, 9, 9}, {5, 9, 9}, {2, 9, 9}, {4, 9, 9}},
-		 {{0, 0}, {0, 0}, {2, 0}, {0, 0}}},
-		{// Layout 13
-		 {{1, 5, 9}, {2, 5, 9}, {1, 5, 9}, {2, 4, 9}},
-		 {{3, 0, 9}, {1, 9, 9}, {9, 9, 9}, {5, 9, 9}},
-		 {{0, 0}, {0, 0}, {0, 0}, {0, 0}}},
-		{// Layout 14
-		 {{0, 5, 9}, {1, 5, 9}, {1, 5, 9}, {2, 5, 9}},
-		 {{2, 9, 9}, {2, 0, 9}, {1, 9, 9}, {3, 4, 9}},
-		 {{0, 0}, {0, 0}, {0, 0}, {0, 0}}},
-		{// Layout 21
-		 {{0, 4, 8}, {1, 4, 6}, {0, 5, 7}, {1, 3, 7}},
-		 {{0, 8, 9}, {7, 6, 9}, {5, 1, 9}, {3, 4, 9}},
-		 {{0, 0}, {1, 0}, {3, 0}, {0, 0}}},
-		{// Layout 22
-		 {{0, 5, 7}, {1, 5, 7}, {2, 3, 6}, {1, 5, 8}},
-		 {{2, 9, 9}, {1, 4, 9}, {5, 7, 9}, {1, 8, 9}},
-		 {{0, 0}, {0, 0}, {2, 0}, {0, 0}}},
-		{// Layout 23
-		 {{2, 3, 8}, {2, 5, 8}, {0, 5, 7}, {0, 4, 8}},
-		 {{0, 2, 9}, {7, 4, 9}, {6, 5, 9}, {0, 7, 9}},
-		 {{0, 0}, {1, 0}, {0, 0}, {0, 0}}},
-		{// Layout 24
-		 {{2, 5, 7}, {2, 3, 8}, {1, 5, 8}, {2, 3, 6}},
-		 {{4, 9, 9}, {2, 9, 9}, {1, 8, 9}, {0, 6, 5}},
-		 {{0, 0}, {0, 0}, {0, 0}, {0, 0}}},
-		{// Layout 31
-		 {{0, 3, 6}, {1, 5, 8}, {2, 3, 8}, {1, 4, 6}, {0, 5, 8}, {1, 5, 8}},
-		 {{8, 8, 4}, {1, 3, 9}, {7, 2, 9}, {4, 1, 9}, {1, 9, 9}, {5, 9, 9}},
-		 {{0, 0}, {3, 0}, {0, 0}, {0, 0}, {3, 0}, {3, 0}}},
-		{// Layout 32
-		 {{2, 4, 7}, {1, 3, 6}, {2, 5, 7}, {2, 4, 7}, {0, 3, 6}, {1, 4, 6}},
-		 {{2, 7, 8}, {6, 6, 9}, {4, 5, 9}, {0, 9, 9}, {2, 9, 9}, {3, 6, 9}},
-		 {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {2, 0}, {0, 0}}},
-		{// Layout 33
-		 {{0, 3, 8}, {0, 5, 6}, {2, 5, 7}, {2, 3, 6}, {2, 3, 6}, {0, 3, 6}},
-		 {{8, 5, 9}, {9, 9, 9}, {4, 9, 9}, {2, 1, 9}, {0, 9, 9}, {7, 9, 9}},
-		 {{0, 0}, {0, 0}, {1, 0}, {0, 0}, {0, 0}, {0, 0}}},
-		{// Layout 34
-		 {{1, 3, 8}, {2, 4, 8}, {2, 4, 7}, {1, 5, 6}, {1, 3, 6}, {1, 5, 6}},
-		 {{2, 9, 9}, {3, 1, 9}, {6, 8, 9}, {6, 1, 9}, {5, 9, 9}, {4, 9, 9}},
-		 {{0, 0}, {0, 0}, {1, 2}, {0, 0}, {0, 0}, {0, 0}}}};
+		{
+			// Layout 11
+			{{0, 3, 9}, {1, 3, 9}, {2, 5, 9}, {2, 3, 9}},
+			{{0, 9, 9}, {2, 9, 9}, {3, 9, 9}, {4, 9, 9}},
+			{{0, 0}, {1, 0}, {0, 0}, {0, 0}},
+		},
+		{
+			// Layout 12
+			{{0, 5, 9}, {2, 3, 9}, {1, 5, 9}, {1, 4, 9}},
+			{{0, 9, 9}, {5, 9, 9}, {2, 9, 9}, {4, 9, 9}},
+			{{0, 0}, {0, 0}, {2, 0}, {0, 0}},
+		},
+		{
+			// Layout 13
+			{{1, 5, 9}, {2, 5, 9}, {1, 5, 9}, {2, 4, 9}},
+			{{3, 0, 9}, {1, 9, 9}, {9, 9, 9}, {5, 9, 9}},
+			{{0, 0}, {0, 0}, {0, 0}, {0, 0}},
+		},
+		{
+			// Layout 14
+			{{0, 5, 9}, {1, 5, 9}, {1, 5, 9}, {2, 5, 9}},
+			{{2, 9, 9}, {2, 0, 9}, {1, 9, 9}, {3, 4, 9}},
+			{{0, 0}, {0, 0}, {0, 0}, {0, 0}},
+		},
+		{
+			// Layout 21
+			{{0, 4, 8}, {1, 4, 6}, {0, 5, 7}, {1, 3, 7}},
+			{{0, 8, 9}, {7, 6, 9}, {5, 1, 9}, {3, 4, 9}},
+			{{0, 0}, {1, 0}, {3, 0}, {0, 0}},
+		},
+		{
+			// Layout 22
+			{{0, 5, 7}, {1, 5, 7}, {2, 3, 6}, {1, 5, 8}},
+			{{2, 9, 9}, {1, 4, 9}, {5, 7, 9}, {1, 8, 9}},
+			{{0, 0}, {0, 0}, {2, 0}, {0, 0}},
+		},
+		{
+			// Layout 23
+			{{2, 3, 8}, {2, 5, 8}, {0, 5, 7}, {0, 4, 8}},
+			{{0, 2, 9}, {7, 4, 9}, {6, 5, 9}, {0, 7, 9}},
+			{{0, 0}, {1, 0}, {0, 0}, {0, 0}},
+		},
+		{
+			// Layout 24
+			{{2, 5, 7}, {2, 3, 8}, {1, 5, 8}, {2, 3, 6}},
+			{{4, 9, 9}, {2, 9, 9}, {1, 8, 9}, {0, 6, 5}},
+			{{0, 0}, {0, 0}, {0, 0}, {0, 0}},
+		},
+		{
+			// Layout 31
+			{{0, 3, 6}, {1, 5, 8}, {2, 3, 8}, {1, 4, 6}, {0, 5, 8}, {1, 5, 8}},
+			{{8, 8, 4}, {1, 3, 9}, {7, 2, 9}, {4, 1, 9}, {1, 9, 9}, {5, 9, 9}},
+			{{0, 0}, {3, 0}, {0, 0}, {0, 0}, {3, 0}, {3, 0}},
+		},
+		{
+			// Layout 32
+			{{2, 4, 7}, {1, 3, 6}, {2, 5, 7}, {2, 4, 7}, {0, 3, 6}, {1, 4, 6}},
+			{{2, 7, 8}, {6, 6, 9}, {4, 5, 9}, {0, 9, 9}, {2, 9, 9}, {3, 6, 9}},
+			{{0, 0}, {0, 0}, {0, 0}, {0, 0}, {2, 0}, {0, 0}},
+		},
+		{
+			// Layout 33
+			{{0, 3, 8}, {0, 5, 6}, {2, 5, 7}, {2, 3, 6}, {2, 3, 6}, {0, 3, 6}},
+			{{8, 5, 9}, {9, 9, 9}, {4, 9, 9}, {2, 1, 9}, {0, 9, 9}, {7, 9, 9}},
+			{{0, 0}, {0, 0}, {1, 0}, {0, 0}, {0, 0}, {0, 0}},
+		},
+		{
+			// Layout 34
+			{{1, 3, 8}, {2, 4, 8}, {2, 4, 7}, {1, 5, 6}, {1, 3, 6}, {1, 5, 6}},
+			{{2, 9, 9}, {3, 1, 9}, {6, 8, 9}, {6, 1, 9}, {5, 9, 9}, {4, 9, 9}},
+			{{0, 0}, {0, 0}, {1, 2}, {0, 0}, {0, 0}, {0, 0}},
+		},
+	};
 	/** Screen origins and tray-relative offsets for the nine food sprites. */
 	static constexpr Common::Point32 kFoodPositions[9] = {
 		{121, 412},

@@ -26,8 +26,8 @@
 #include "common/fs.h"
 #include "common/memstream.h"
 #include "common/savefile.h"
+#include "common/str-enc.h"
 
-#include "zoombini2/metaengine.h"
 #include "zoombini2/scripts.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
@@ -737,44 +737,83 @@ int GameState::activatePageLevel(PageId pageId) {
 	return getLevel();
 }
 
-Zoombini2SavegameManager::Zoombini2SavegameManager(Common::SaveFileManager *saveFileManager, const Common::String &target)
-	: _saveFileManager(saveFileManager), _target(target.empty() ? "zoombini2" : target) {
+Zoombini2SavegameManager::Zoombini2SavegameManager(Common::SaveFileManager *saveFileManager, const Common::String &target, Common::Language language)
+	: _saveFileManager(saveFileManager), _target(target.empty() ? "zoombini2" : target), _language(language) {
 }
 
-Common::String Zoombini2SavegameManager::makeSaveFileName(const Common::String &profileName) const {
-	return Common::String::format("%s-%s.mk", _target.c_str(), profileName.c_str());
+Common::String Zoombini2SavegameManager::makeSaveFileName(const Common::String &savefileName) const {
+	Common::String filesystemName = savefileName;
+	if (_language == Common::HE_ISR)
+		filesystemName = savefileName.decode(Common::kWindows1255).encode(Common::kUtf8);
+	else if (_language == Common::SV_SWE)
+		filesystemName = savefileName.decode(Common::kWindows1252).encode(Common::kUtf8);
+	return Common::String::format("%s-%s.mk", _target.c_str(), filesystemName.c_str());
 }
 
-bool Zoombini2SavegameManager::isValidProfileName(const Common::String &profileName) {
-	if (profileName.empty() || kMaximumProfileNameLength < static_cast<int>(profileName.size()) || profileName.firstChar() == ' ' || profileName.lastChar() == ' ')
+bool Zoombini2SavegameManager::isValidSavefileName(const Common::String &savefileName, Common::Language language) {
+	if (savefileName.empty() || kMaximumSavefileNameLength < static_cast<int>(savefileName.size()) || savefileName.firstChar() == ' ')
 		return false;
 
+	const bool hebrew = language == Common::HE_ISR;
 	bool previousWasSpace = false;
-	for (uint i = 0; i < profileName.size(); i++) {
-		const char character = profileName[i];
+	for (uint i = 0; i < savefileName.size(); i++) {
+		const byte character = static_cast<byte>(savefileName[i]);
 		const bool isLetter = ('A' <= character && character <= 'Z') || ('a' <= character && character <= 'z');
-		const bool isDigit = '0' <= character && character <= '9';
+		const bool isDigit = !hebrew && '0' <= character && character <= '9';
+		const bool isHebrewLetter = hebrew && 0xE0 <= character && character <= 0xFA;
+		const bool isHebrewPunctuation = hebrew && (character == ',' || character == '.' || character == ';');
 		const bool isSpace = character == ' ';
-		if ((!isLetter && !isDigit && !isSpace) || (isSpace && previousWasSpace))
+		if ((!isLetter && !isDigit && !isHebrewLetter && !isHebrewPunctuation && !isSpace) ||
+			(isSpace && previousWasSpace))
 			return false;
 		previousWasSpace = isSpace;
 	}
 	return true;
 }
 
-void Zoombini2SavegameManager::addProfileSorted(Common::StringArray &profiles, const Common::String &profileName) {
-	uint index = 0;
-	while (index < profiles.size() && profiles[index].compareToIgnoreCase(profileName) < 0)
-		index += 1;
-	if (index < profiles.size() && profiles[index].equalsIgnoreCase(profileName))
-		return;
-	profiles.insert_at(index, profileName);
+bool Zoombini2SavegameManager::isSafeStoredSavefileName(const Common::String &savefileName) {
+	static constexpr const char *kInvalidFileNameCharacters = "/\\:*?\"<>|";
+	if (savefileName.empty() || kMaximumSavefileNameLength < static_cast<int>(savefileName.size()))
+		return false;
+	for (uint i = 0; i < savefileName.size(); i++) {
+		const byte character = static_cast<byte>(savefileName[i]);
+		if (character < 0x20 || character == 0x7F || strchr(kInvalidFileNameCharacters, character) != nullptr)
+			return false;
+	}
+	return true;
 }
 
-Common::StringArray Zoombini2SavegameManager::listProfiles() const {
-	Common::StringArray profiles;
+bool Zoombini2SavegameManager::encodeSavefileName(const Common::U32String &displayName, Common::String &savefileName) const {
+	Common::CodePage codePage = Common::kUtf8;
+	if (_language == Common::HE_ISR)
+		codePage = Common::kWindows1255;
+	else if (_language == Common::SV_SWE)
+		codePage = Common::kWindows1252;
+	savefileName = displayName.encode(codePage);
+	return savefileName.decode(codePage) == displayName;
+}
+
+Common::U32String Zoombini2SavegameManager::decodeSavefileName(const Common::String &savefileName) const {
+	if (_language == Common::HE_ISR)
+		return savefileName.decode(Common::kWindows1255);
+	if (_language == Common::SV_SWE)
+		return savefileName.decode(Common::kWindows1252);
+	return savefileName.decode(Common::kUtf8);
+}
+
+void Zoombini2SavegameManager::addSavefileSorted(Common::StringArray &savefiles, const Common::String &savefileName) {
+	uint index = 0;
+	while (index < savefiles.size() && savefiles[index].compareToIgnoreCase(savefileName) < 0)
+		index += 1;
+	if (index < savefiles.size() && savefiles[index].equalsIgnoreCase(savefileName))
+		return;
+	savefiles.insert_at(index, savefileName);
+}
+
+Common::StringArray Zoombini2SavegameManager::listSavefiles() const {
+	Common::StringArray savefiles;
 	if (!_saveFileManager)
-		return profiles;
+		return savefiles;
 
 	const Common::String prefix = _target + "-";
 	const Common::String suffix = ".mk";
@@ -786,21 +825,28 @@ Common::StringArray Zoombini2SavegameManager::listProfiles() const {
 		if (!saveFileName.substr(0, prefix.size()).equalsIgnoreCase(prefix) || !saveFileName.substr(saveFileName.size() - suffix.size()).equalsIgnoreCase(suffix))
 			continue;
 
-		const Common::String profileName = saveFileName.substr(prefix.size(), saveFileName.size() - prefix.size() - suffix.size());
-		if (!isValidProfileName(profileName)) {
-			warning("Zoombini2SavegameManager: Ignoring invalid profile save '%s'", saveFileName.c_str());
+		const Common::String filesystemName = saveFileName.substr(prefix.size(), saveFileName.size() - prefix.size() - suffix.size());
+		Common::String savefileName = filesystemName;
+		if (_language == Common::HE_ISR)
+			savefileName = filesystemName.decode(Common::kUtf8).encode(Common::kWindows1255);
+		else if (_language == Common::SV_SWE)
+			savefileName = filesystemName.decode(Common::kUtf8).encode(Common::kWindows1252);
+		const bool invalidEncoding = (_language == Common::HE_ISR && savefileName.decode(Common::kWindows1255).encode(Common::kUtf8) != filesystemName) ||
+									 (_language == Common::SV_SWE && savefileName.decode(Common::kWindows1252).encode(Common::kUtf8) != filesystemName);
+		if (invalidEncoding || !isSafeStoredSavefileName(savefileName)) {
+			warning("Zoombini2SavegameManager: Ignoring invalid savefile '%s'", saveFileName.c_str());
 			continue;
 		}
-		addProfileSorted(profiles, profileName);
+		addSavefileSorted(savefiles, savefileName);
 	}
-	return profiles;
+	return savefiles;
 }
 
-bool Zoombini2SavegameManager::isProfileReadOnly(const Common::String &profileName) const {
-	if (!_saveFileManager || !isValidProfileName(profileName))
+bool Zoombini2SavegameManager::isSavefileReadOnly(const Common::String &savefileName) const {
+	if (!_saveFileManager || !isSafeStoredSavefileName(savefileName))
 		return false;
 
-	const Common::String saveFileName = makeSaveFileName(profileName);
+	const Common::String saveFileName = makeSaveFileName(savefileName);
 	if (!_saveFileManager->exists(saveFileName))
 		return false;
 
@@ -809,14 +855,14 @@ bool Zoombini2SavegameManager::isProfileReadOnly(const Common::String &profileNa
 	return saveFile.exists() && !saveFile.isWritable();
 }
 
-Common::Array<Zoombini2ProfileSummary> Zoombini2SavegameManager::listProfileSummaries() const {
-	const Common::StringArray profiles = listProfiles();
-	Common::Array<Zoombini2ProfileSummary> summaries;
-	for (uint i = 0; i < profiles.size(); i++) {
-		Zoombini2ProfileSummary summary;
-		summary._profileName = profiles[i];
+Common::Array<Zoombini2SavefileSummary> Zoombini2SavegameManager::listSavefileSummaries() const {
+	const Common::StringArray savefiles = listSavefiles();
+	Common::Array<Zoombini2SavefileSummary> summaries;
+	for (uint i = 0; i < savefiles.size(); i++) {
+		Zoombini2SavefileSummary summary;
+		summary._savefileName = savefiles[i];
 		GameState state;
-		summary._stateValid = loadProfile(summary._profileName, state);
+		summary._stateValid = loadSavefile(summary._savefileName, state);
 		if (summary._stateValid)
 			summary._population = state.getPopulationSummary();
 		summaries.push_back(summary);
@@ -840,15 +886,16 @@ bool Zoombini2SavegameManager::verifySaveData(const Common::String &saveFileName
 	return matches;
 }
 
-bool Zoombini2SavegameManager::saveProfile(const Common::String &profileName, const GameState &state) const {
-	if (!_saveFileManager || !isValidProfileName(profileName))
+bool Zoombini2SavegameManager::writeSavefile(const Common::String &savefileName, const GameState &state) const {
+	if (!_saveFileManager || !isSafeStoredSavefileName(savefileName) ||
+		(!isValidSavefileName(savefileName, _language) && !_saveFileManager->exists(makeSaveFileName(savefileName))))
 		return false;
 
 	Common::MemoryWriteStreamDynamic data(DisposeAfterUse::YES);
 	if (!state.save(&data))
 		return false;
 
-	const Common::String saveFileName = makeSaveFileName(profileName);
+	const Common::String saveFileName = makeSaveFileName(savefileName);
 	Common::OutSaveFile *stream = _saveFileManager->openForSaving(saveFileName, false);
 	if (!stream) {
 		warning("Zoombini2SavegameManager: Could not open '%s' for writing", saveFileName.c_str());
@@ -863,17 +910,17 @@ bool Zoombini2SavegameManager::saveProfile(const Common::String &profileName, co
 		ok = verifySaveData(saveFileName, data.getData(), data.size());
 
 	if (ok)
-		debug(1, "Saved Zoombini2 profile to %s", saveFileName.c_str());
+		debug(1, "Wrote Zoombini2 savefile to %s", saveFileName.c_str());
 	else
 		warning("Zoombini2SavegameManager: Failed to write '%s'", saveFileName.c_str());
 	return ok;
 }
 
-bool Zoombini2SavegameManager::loadProfile(const Common::String &profileName, GameState &state) const {
-	if (!_saveFileManager || !isValidProfileName(profileName))
+bool Zoombini2SavegameManager::loadSavefile(const Common::String &savefileName, GameState &state) const {
+	if (!_saveFileManager || !isSafeStoredSavefileName(savefileName))
 		return false;
 
-	const Common::String saveFileName = makeSaveFileName(profileName);
+	const Common::String saveFileName = makeSaveFileName(savefileName);
 	Common::InSaveFile *stream = _saveFileManager->openForLoading(saveFileName);
 	if (!stream) {
 		warning("Zoombini2SavegameManager: Could not open '%s' for reading", saveFileName.c_str());
@@ -883,37 +930,38 @@ bool Zoombini2SavegameManager::loadProfile(const Common::String &profileName, Ga
 	const bool ok = state.load(stream);
 	delete stream;
 	if (ok)
-		debug(1, "Loaded Zoombini2 profile from %s", saveFileName.c_str());
+		debug(1, "Loaded Zoombini2 savefile from %s", saveFileName.c_str());
 	else
 		warning("Zoombini2SavegameManager: Failed to load '%s'", saveFileName.c_str());
 	return ok;
 }
 
-bool Zoombini2SavegameManager::importProfile(const Common::String &profileName, Common::SeekableReadStream *src, bool overwrite) const {
-	if (ConfMan.getBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, _target) || !_saveFileManager || !src || !isValidProfileName(profileName) ||
-		(!overwrite && profileExists(profileName)))
+bool Zoombini2SavegameManager::importSavefile(const Common::String &savefileName, Common::SeekableReadStream *src, bool overwrite) const {
+	if (!_saveFileManager || !src ||
+		!isValidSavefileName(savefileName, _language) ||
+		(!overwrite && savefileExists(savefileName)))
 		return false;
 
 	GameState importedState;
 	if (!importedState.load(src)) {
-		warning("Zoombini2SavegameManager: Failed to validate imported profile '%s'", profileName.c_str());
+		warning("Zoombini2SavegameManager: Failed to validate imported savefile '%s'", savefileName.c_str());
 		return false;
 	}
 
 	// Z2 identifies an independent .mk file by its filename stem and embedded player name.
-	importedState._playerName = profileName;
-	return saveProfile(profileName, importedState);
+	importedState._playerName = savefileName;
+	return writeSavefile(savefileName, importedState);
 }
 
-bool Zoombini2SavegameManager::exportProfile(const Common::String &profileName, Common::WriteStream *dest) const {
-	if (!_saveFileManager || !dest || !isValidProfileName(profileName))
+bool Zoombini2SavegameManager::exportSavefile(const Common::String &savefileName, Common::WriteStream *dest) const {
+	if (!_saveFileManager || !dest || !isSafeStoredSavefileName(savefileName))
 		return false;
 
 	GameState savedState;
-	if (!loadProfile(profileName, savedState))
+	if (!loadSavefile(savefileName, savedState))
 		return false;
 
-	Common::InSaveFile *src = _saveFileManager->openForLoading(makeSaveFileName(profileName));
+	Common::InSaveFile *src = _saveFileManager->openForLoading(makeSaveFileName(savefileName));
 	if (!src)
 		return false;
 
@@ -931,49 +979,51 @@ bool Zoombini2SavegameManager::exportProfile(const Common::String &profileName, 
 	return ok;
 }
 
-bool Zoombini2SavegameManager::deleteProfile(const Common::String &profileName) const {
-	if (!_saveFileManager || !isValidProfileName(profileName))
+bool Zoombini2SavegameManager::deleteSavefile(const Common::String &savefileName) const {
+	if (!_saveFileManager || !isSafeStoredSavefileName(savefileName))
 		return false;
-	return _saveFileManager->removeSavefile(makeSaveFileName(profileName));
+	return _saveFileManager->removeSavefile(makeSaveFileName(savefileName));
 }
 
-bool Zoombini2SavegameManager::renameProfile(const Common::String &oldProfileName, const Common::String &newProfileName) const {
-	if (ConfMan.getBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, _target) || !_saveFileManager || !isValidProfileName(oldProfileName) ||
-		!isValidProfileName(newProfileName))
+bool Zoombini2SavegameManager::renameSavefile(const Common::String &oldSavefileName, const Common::String &newSavefileName) const {
+	if (!_saveFileManager ||
+		!isSafeStoredSavefileName(oldSavefileName) ||
+		!isValidSavefileName(newSavefileName, _language))
 		return false;
-	if (oldProfileName == newProfileName)
+	if (oldSavefileName == newSavefileName)
 		return true;
-	if (oldProfileName.equalsIgnoreCase(newProfileName) || profileExists(newProfileName))
+	if (oldSavefileName.equalsIgnoreCase(newSavefileName) || savefileExists(newSavefileName))
 		return false;
 
 	GameState renamedState;
-	if (!loadProfile(oldProfileName, renamedState))
+	if (!loadSavefile(oldSavefileName, renamedState))
 		return false;
-	renamedState._playerName = newProfileName;
-	if (!saveProfile(newProfileName, renamedState))
+	renamedState._playerName = newSavefileName;
+	if (!writeSavefile(newSavefileName, renamedState))
 		return false;
-	if (deleteProfile(oldProfileName))
+	if (deleteSavefile(oldSavefileName))
 		return true;
 
-	deleteProfile(newProfileName);
+	deleteSavefile(newSavefileName);
 	return false;
 }
 
-bool Zoombini2SavegameManager::duplicateProfile(const Common::String &srcProfileName, const Common::String &newProfileName) const {
-	if (ConfMan.getBool(::Zoombini2MetaEngine::kConfigSavefilesReadOnly, _target) || !_saveFileManager || !isValidProfileName(srcProfileName) ||
-		!isValidProfileName(newProfileName) || srcProfileName.equalsIgnoreCase(newProfileName) || profileExists(newProfileName))
+bool Zoombini2SavegameManager::duplicateSavefile(const Common::String &srcSavefileName, const Common::String &newSavefileName) const {
+	if (!_saveFileManager ||
+		!isSafeStoredSavefileName(srcSavefileName) ||
+		!isValidSavefileName(newSavefileName, _language) || srcSavefileName.equalsIgnoreCase(newSavefileName) || savefileExists(newSavefileName))
 		return false;
 
 	GameState duplicatedState;
-	if (!loadProfile(srcProfileName, duplicatedState))
+	if (!loadSavefile(srcSavefileName, duplicatedState))
 		return false;
 
-	duplicatedState._playerName = newProfileName;
-	return saveProfile(newProfileName, duplicatedState);
+	duplicatedState._playerName = newSavefileName;
+	return writeSavefile(newSavefileName, duplicatedState);
 }
 
-bool Zoombini2SavegameManager::profileExists(const Common::String &profileName) const {
-	return _saveFileManager && isValidProfileName(profileName) && _saveFileManager->exists(makeSaveFileName(profileName));
+bool Zoombini2SavegameManager::savefileExists(const Common::String &savefileName) const {
+	return _saveFileManager && isSafeStoredSavefileName(savefileName) && _saveFileManager->exists(makeSaveFileName(savefileName));
 }
 
 } // End of namespace Zoombini2

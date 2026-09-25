@@ -44,9 +44,11 @@ public:
 	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
 
 private:
-	/** Resource paths used by the title screen. */
+	/** Static title-screen background bitmap shown before the sign-in page. */
 	static constexpr const char *kBackgroundPath = "bmp/story_intro/title_screen";
+	/** Installed title music used by the retail game. */
 	static constexpr const char *kMusicPath = "#sounds/music/Booliewood_Level1.wav";
+	/** Demo-specific title music. */
 	static constexpr const char *kDemoMusicPath = "sounds/music/I_BB1.wav";
 
 	EventHandleResult dismiss();

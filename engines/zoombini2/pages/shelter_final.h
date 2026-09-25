@@ -42,7 +42,7 @@ class ShelterFinal : public ShelterBase {
 public:
 	/** Construct the final Booliewood shelter for @p vm. */
 	explicit ShelterFinal(Zoombini2Engine *vm);
-	/** Clear decorative Zoombinis, save the profile, and release celebration resources. */
+	/** Clear decorative Zoombinis, write the completed game state, and release celebration resources. */
 	~ShelterFinal() override;
 
 	/** Load the fixed celebration, decorative Zoombinis, music, and speech. */
@@ -64,25 +64,39 @@ public:
 private:
 	/** Number of independent firework animations. */
 	static constexpr int kFireworkCount = 3;
-	/** Resource paths used by the celebration scene and sound sequence. */
+	/** Static 800-by-600 background bitmap for the final Booliewood celebration. */
 	static constexpr const char *kBackgroundPath = "bmp/final/big BOOL";
+	/** Bitmap composited over the background to show the complete Grand Boolie. */
 	static constexpr const char *kFullBigBoolPath = "bmp/final/thefullbigbool";
+	/** RLE cell image used by the dormant progressive Grand Boolie reveal effect. */
 	static constexpr const char *kRevealBigBoolPath = "bmp/final/therealbigbool.rb";
+	/** Looping small Boolie animation drawn at the three lower-scene positions. */
 	static constexpr const char *kDancingBooliePath = "bmp/final/dancing_boolie.an";
+	/** Looping animation of the large Grand Boolie near the top of the scene. */
 	static constexpr const char *kBoolDancePath = "bmp/final/booldance.an";
+	/** First animation in the dormant reveal effect, played before the second flare. */
 	static constexpr const char *kRevealFlare1Path = "bmp/aquacube/flare1.an";
+	/** Second animation in the dormant reveal effect, played after the first flare. */
 	static constexpr const char *kRevealFlare2Path = "bmp/aquacube/flare2.an";
+	/** Blue, green, and red firework animations, indexed by firework slot. */
 	static constexpr const char *kFireworkPaths[kFireworkCount] = {
 		"bmp/final/FWBLUE.an",
 		"bmp/final/FWGREEN.an",
 		"bmp/final/FWRED.an",
 	};
+	/** Little-Zoombini sprite grid used by the two decorative celebration characters. */
 	static constexpr const char *kZoombiniAnimationPath = "bmp/zombis/littleZomb.anm";
+	/** Alternate idle Zoombini sprite grid used for decorative characters' idle motion. */
 	static constexpr const char *kWalkingZoombiniAnimationPath = "bmp/zombis/attente/attenteZomb.anm";
+	/** Background music for the final celebration. */
 	static constexpr const char *kMusicPath = "#sounds/music/Booliewood_Finale.wav";
+	/** Opening speech played when the celebration page starts. */
 	static constexpr const char *kOpeningSpeechPath = "sounds/Fin11.wav";
+	/** Closing speech queued one minute after the opening speech ends. */
 	static constexpr const char *kClosingSpeechPath = "sounds/INT11.17.wav";
+	/** First ambient voice clip, loaded separately from the numbered clip series. */
 	static constexpr const char *kFirstAmbientSoundPath = "sounds/zbv42.5.wav";
+	/** Remaining ambient voice clip format; the argument selects variants 1 through 6. */
 	static constexpr const char *kAmbientSoundFormat = "sounds/blw22.%d.wav";
 
 	/** Number of small dancing Boolies along the lower edge. */

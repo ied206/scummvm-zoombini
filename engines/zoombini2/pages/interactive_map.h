@@ -75,43 +75,43 @@ public:
 	bool hasActiveDialog() const override { return _volumePanel != nullptr; }
 
 private:
-	/** Resource path. */
+	/** Bit-block mountain-map backdrop drawn beneath icons and route overlays. */
 	static constexpr const char *kBackgroundPath = "#bmp/Map/background";
-	/** Resource path. */
+	/** RLE practice-mode panel that labels the map's practice controls. */
 	static constexpr const char *kPracticeStatsPath = "bmp/map/stats_scr3";
-	/** Resource path. */
+	/** RLE saved-game panel behind the player name and route statistics. */
 	static constexpr const char *kSavedGameStatsPath = "bmp/map/stats_scr1";
-	/** Resource path. */
+	/** Short selection sound played for map controls and practice-level changes. */
 	static constexpr const char *kBlipSoundPath = "sounds/blip.wav";
-	/** Resource path format. */
+	/** Path format for the gray, unavailable state of a destination icon, with a two-digit icon index. */
 	static constexpr const char *kDisabledIconFormat = "bmp/map/icon%02dgray";
-	/** Resource path format. */
+	/** Path format for the colored state of a destination icon, with a two-digit icon index. */
 	static constexpr const char *kIconFormat = "bmp/map/icon%02d";
-	/** Resource path format. */
+	/** Format joining a route-tier directory and segment filename into one RLE resource path. */
 	static constexpr const char *kSegmentPathFormat = "%s/%s";
-	/** Resource path. */
+	/** Normal BitBlock sprite for the Files and Parties control. */
 	static constexpr const char *kFilesNormalPath = "bmp/map/PANEL NL - Parties NORMAL";
-	/** Resource path. */
+	/** Hover BitBlock sprite for the Files and Parties control. */
 	static constexpr const char *kFilesHighlightPath = "bmp/map/PANEL NL - Parties HILITE";
-	/** Resource path. */
+	/** Normal BitBlock sprite for the Options control. */
 	static constexpr const char *kOptionsNormalPath = "bmp/map/PANEL NL - Options NORMAL";
-	/** Resource path. */
+	/** Hover BitBlock sprite for the Options control. */
 	static constexpr const char *kOptionsHighlightPath = "bmp/map/PANEL NL - Options HILITE";
-	/** Resource path. */
+	/** Normal RLE sprite for the Game control in practice mode. */
 	static constexpr const char *kGameNormalPath = "bmp/map/PANEL NL - Game NORMAL";
-	/** Resource path. */
+	/** Hover RLE sprite for the Game control in practice mode. */
 	static constexpr const char *kGameHighlightPath = "bmp/map/PANEL NL - Game HILITE";
-	/** Resource path. */
+	/** Disabled RLE sprite for the Game control before a saved game is available. */
 	static constexpr const char *kGameDisabledPath = "bmp/map/PANEL NL - Game Gray";
-	/** Resource path. */
+	/** Normal BitBlock sprite for switching from the saved-game map to practice mode. */
 	static constexpr const char *kPracticeNormalPath = "bmp/map/PANEL NL - Entraine NORMAL";
-	/** Resource path. */
+	/** Hover BitBlock sprite for switching from the saved-game map to practice mode. */
 	static constexpr const char *kPracticeHighlightPath = "bmp/map/PANEL NL - Entraine HILITE";
-	/** Resource path. */
+	/** Normal RLE sprite for the Quit control that opens the quit confirmation. */
 	static constexpr const char *kQuitNormalPath = "bmp/map/PANEL NL - Quitter NORMAL";
-	/** Resource path. */
+	/** Hover RLE sprite for the Quit control. */
 	static constexpr const char *kQuitHighlightPath = "bmp/map/PANEL NL - Quitter HILITE";
-	/** Resource path. */
+	/** Bit-block message shown when the Quit control asks to confirm leaving the game. */
 	static constexpr const char *kQuitConfirmationPath = "bmp/menu/Quit_panel_text_quit";
 
 	EventHandleResult handleVolumePanelInput(const Common::Point &pos, bool mouseReleased);
@@ -304,7 +304,7 @@ private:
 	/** Apply the shared quit-confirmation result. */
 	void handleQuitConfirmation(DialogMsgBoxButton button);
 
-	/** Title resource paths indexed by icon. */
+	/** RLE destination-name overlays indexed by map icon and drawn when that icon is hovered. */
 	static constexpr const char *kTitleFiles[] = {
 		"bmp/map/Title01",  //  0 ShelterZombiniville
 		"bmp/map/Title02",  //  1 CrazyTurtle
@@ -320,14 +320,14 @@ private:
 		"bmp/map/Title10",  // 11 Boolies
 		"bmp/map/Title12"   // 12 Booliewood
 	};
-	/** Route-segment directories indexed by level tier. */
+	/** Directories for neutral, Level 1, Level 2, and Level 3 route-segment RLE graphics, in tier order. */
 	static constexpr const char *kSegmentDirs[] = {
 		"bmp/map/04 neutral segments", // 0 = neutral (unvisited)
 		"bmp/map/01 Easy segments",    // 1 = easy level
 		"bmp/map/02 Medium segments",  // 2 = medium level
 		"bmp/map/03 Hard segments"     // 3 = hard level
 	};
-	/** Route-segment filenames indexed by segment slot. */
+	/** Route-segment RLE filenames indexed by map slot, including the duplicate final segment slot. */
 	static constexpr const char *kSegmentFiles[] = {
 		"segment_01",  //  0
 		"segment_02",  //  1
@@ -344,7 +344,7 @@ private:
 		"segment_10",  // 12
 		"segment_10"   // 13 (duplicate)
 	};
-	/** Legend resource paths indexed by inactive or active level. */
+	/** BitBlock practice-map legends indexed by inactive, Level 1-3 selection. */
 	static constexpr const char *kLegendFiles[] = {
 		"bmp/map/map_legend_off",    // 0
 		"bmp/map/map_legend_level1", // 1

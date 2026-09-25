@@ -78,37 +78,37 @@ public:
 private:
 	/** Number of fixed slots in the Zombiniville boarding area. */
 	static constexpr int kBoardingSlotCount = 16;
-	/** Resource path. */
+	/** Full-screen background bitmap for the Zoombiniville party picker. */
 	static constexpr const char *kBackgroundPath = "#bmp/zombiniville/zoombiniville";
-	/** Resource path. */
+	/** Area map defining the interactive regions used for drag-and-drop input. */
 	static constexpr const char *kAreaMaskPath = "bmp/zombiniville/area.bmt";
-	/** Resource path format. */
+	/** Trait-button animation format; arguments select one of four traits and five values. */
 	static constexpr const char *kFeatureAnimationFormat = "bmp/zombiniville/pikaroll/z1pi%d%d.an";
-	/** Resource path. */
+	/** Animation for choosing one random valid Zoombini feature combination. */
 	static constexpr const char *kQuickFillButtonPath = "bmp/zombiniville/BUMPER-1.AN";
-	/** Resource path. */
+	/** Animation for filling the remaining party slots with valid Zoombinis. */
 	static constexpr const char *kBatchFillButtonPath = "bmp/zombiniville/bumper-16.an";
-	/** Resource path. */
+	/** Animation for creating a Zoombini from the selected feature combination. */
 	static constexpr const char *kCreateButtonPath = "bmp/zombiniville/bumper-Valid.an";
-	/** Resource path. */
+	/** Layered sprite grid used to preview the selected Zoombini features. */
 	static constexpr const char *kBigZombAnimationPath = "bmp/zombiniville/BigZomb/BigZomb.anm";
-	/** Resource path. */
+	/** Little-Zoombini sprite grid used for characters in the boarding area. */
 	static constexpr const char *kLittleZombAnimationPath = "bmp/zombis/littleZomb.anm";
-	/** Resource path. */
+	/** Zoombini animation used while dragging a party member into or out of the boarding area. */
 	static constexpr const char *kPickupZombAnimationPath = "bmp/zombis/pris/pris.anm";
-	/** Resource path. */
+	/** Alternate idle Zoombini sprite grid used for party members in the boarding area. */
 	static constexpr const char *kIdleZombAnimationPath = "bmp/zombis/attente2/attenteZomb2.anm";
-	/** Resource path. */
+	/** Background music for the Zoombiniville picker page. */
 	static constexpr const char *kMusicPath = "#sounds/music/ZMR-PickerScreen.wav";
-	/** Resource path. */
+	/** Sound effect played when a trait value is selected. */
 	static constexpr const char *kFeatureSelectSoundPath = "sounds/fx/Z-BS11.wav";
-	/** Resource path. */
+	/** Sound effect played when Quick Fill selects a valid combination. */
 	static constexpr const char *kQuickFillSoundPath = "sounds/fx/Z-BS12.wav";
-	/** Resource path. */
+	/** Sound effect played when Batch Fill populates the remaining party slots. */
 	static constexpr const char *kBatchFillSoundPath = "sounds/fx/Z-BS13.wav";
-	/** Resource path. */
+	/** Sound effect played when a Zoombini is successfully created. */
 	static constexpr const char *kValidZoombiniSoundPath = "sounds/fx/Z-BS14.wav";
-	/** Resource path. */
+	/** Sound effect played when the selected combination cannot be created. */
 	static constexpr const char *kWrongZoombiniSoundPath = "sounds/fx/WrongZ.wav";
 
 	/** Feature selection controls indexed by feature and value. */
@@ -137,12 +137,8 @@ private:
 	/** Borrowed immutable random-idle sprite grid retained in the engine cache. */
 	const ZoombiniAnimation *_idleZombAnimation = nullptr;
 
-	/** Geometry and current value for one feature station. */
+	/** Current value for one feature station. */
 	struct FeatureStation {
-		/** 32-bit hit-test areas for the station's five values. */
-		Common::Rect32 buttonRects[ZmbTrait::kTraitValueCount];
-		/** Draw positions for the station's five controls. */
-		Common::Point32 drawPos[ZmbTrait::kTraitValueCount];
 		/** Currently selected feature value. */
 		int selectedValue = 0;
 	};
@@ -152,11 +148,11 @@ private:
 	int _featureCounts[ZmbTrait::kTraitCount][ZmbTrait::kTraitValueCount + 1] = {};
 
 	/** 32-bit Quick Fill control hit-test area. */
-	Common::Rect32 _quickFillRect = Common::Rect32();
+	const Common::Rect32 _quickFillRect = Common::Rect32(135, 399, 211, 448);
 	/** 32-bit Batch Fill control hit-test area. */
-	Common::Rect32 _batchFillRect = Common::Rect32();
+	const Common::Rect32 _batchFillRect = Common::Rect32(239, 416, 318, 477);
 	/** 32-bit Create Selected control hit-test area. */
-	Common::Rect32 _createRect = Common::Rect32();
+	const Common::Rect32 _createRect = Common::Rect32(404, 438, 491, 500);
 
 	/** Zoombini states assigned to departure slots. */
 	Common::Array<ZoombiniRunner *> _boardingZoombinis;
@@ -219,10 +215,12 @@ private:
 	void finishSendingZoombiniOff(ZoombiniRunner *zoombini);
 	/** Complete and release every Zoombini still following a return path. */
 	void finishAllZoombiniReturns();
-	/** Initialize station and action-control hit-test geometry. */
-	void setupFeatureRects();
 	/** Reconstruct the page-authored hover timing tables for all 23 controls. */
 	void setupHoverRunners();
+	/** Return the fixed draw position for one feature control. */
+	static const Common::Point32 &getFeatureDrawPosition(int feature, int value);
+	/** Return the fixed hit-test area for one feature control. */
+	static const Common::Rect32 &getFeatureButtonRect(int feature, int value);
 	/** Draw active hover overlays and advance their pointer-exit sequences. */
 	void drawHoverRunners(ManagedSurface32 *screen);
 	/** Apply availability gates and reset each runner under the final frame pointer. */

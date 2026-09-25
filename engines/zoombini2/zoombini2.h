@@ -113,6 +113,10 @@ public:
 	Common::Language getLanguage() const { return _gameDescription->desc.language; }
 	/** Return whether the detected game is the Korean release. */
 	bool isKorean() const { return getLanguage() == Common::KO_KOR; }
+	/** Return whether the detected language is Hebrew. */
+	bool isHebrew() const { return getLanguage() == Common::HE_ISR; }
+	/** Return whether the detected language is Swedish. */
+	bool isSwedish() const { return getLanguage() == Common::SV_SWE; }
 	/** Return the detected release feature flags. */
 	uint32 getFeatures() const { return _gameDescription->features; }
 	/** Return whether the detected release is the playable demo. */
@@ -177,21 +181,27 @@ public:
 	/** Pause or resume the gameplay clock for a game dialog. */
 	void setDialogPaused(bool paused);
 
-	/** Write the current profile to its active storage slot, or succeed without writing for a physically read-only loaded profile. */
-	bool writeGameSave(const Common::String &name);
-	/** Create a new player-selected profile without overwriting another one. */
-	bool createGameSave(const Common::String &name);
-	/** Replace a player-selected profile after the caller obtains explicit confirmation. */
-	bool overwriteGameSave(const Common::String &name);
-	/** Replace the current profile with the profile stored under @p name. */
-	bool readGameSave(const Common::String &name);
-	/** Delete the active target's profile named @p name. */
-	bool deleteGameSave(const Common::String &name);
-	/** Return the active target's valid profile names in display order. */
+	/** Write the current game state to its active savefile, or succeed without writing while that file is locked. */
+	bool writeGameSave(const Common::String &savefileName);
+	/** Return whether the per-savefile write-lock controls are enabled for this target. */
+	bool isSavefileReadOnlyToggleEnabled() const;
+	/** Return whether automatic writes are locked for @p savefileName during this game session. */
+	bool isGameSaveWriteLocked(const Common::String &savefileName) const;
+	/** Toggle automatic writes for one writable savefile and report whether its state changed. */
+	bool toggleGameSaveWriteLock(const Common::String &savefileName);
+	/** Create a savefile for a new saved game without overwriting another one. */
+	bool createGameSave(const Common::String &savefileName);
+	/** Replace a savefile after the caller obtains explicit confirmation. */
+	bool overwriteGameSave(const Common::String &savefileName);
+	/** Load the saved game stored under @p savefileName. */
+	bool readGameSave(const Common::String &savefileName);
+	/** Delete the active target's savefile named @p savefileName. */
+	bool deleteGameSave(const Common::String &savefileName);
+	/** Return the active target's valid savefile names in display order. */
 	Common::StringArray listGameSaves() const;
-	/** Return whether the active target's listed save for @p name is read-only. */
-	bool isGameSaveReadOnly(const Common::String &name) const;
-	/** Current profile state, including its active party and rescue storage. */
+	/** Return whether the active target's listed savefile for @p savefileName is read-only. */
+	bool isGameSaveReadOnly(const Common::String &savefileName) const;
+	/** Current game state, including its active party and rescue storage. */
 	GameState *_state = nullptr;
 
 	/** Request that the main loop replace the active page with @p pageId. */
@@ -219,7 +229,7 @@ public:
 	/** Shared graphics interface used by pages and engine rendering. */
 	Gfx *_gfx = nullptr;
 
-	/** Whether the next puzzle entry restores the profile's party. */
+	/** Whether the next puzzle entry restores the saved party retained by the current game state. */
 	bool _returningFromPuzzle = false;
 	/** Whether the active map-screen flow represents a saved adventure. */
 	bool _isSavedGame = false;
@@ -272,13 +282,15 @@ private:
 	static constexpr const char *kInteractiveCursorSpritePath = "bmp/cursor/cursor02.rb";
 	static constexpr const char *kQuitConfirmationPath = "bmp/menu/Quit_panel_text_quit";
 
-	/** Physical storage profile selected by a load, create, or confirmed overwrite. */
-	Common::String _activeSaveProfileName;
-	/** Whether the active loaded storage profile must retain its original bytes. */
-	bool _activeSaveProfileReadOnly = false;
+	/** Savefile selected by a load, create, or confirmed overwrite. */
+	Common::String _activeSavefileName;
+	/** Whether the active loaded savefile must retain its original bytes. */
+	bool _activeSavefileReadOnly = false;
+	/** Session-local automatic-write overrides keyed by savefile name. */
+	Common::HashMap<Common::String, bool> _saveWriteLockOverrides;
 
-	/** Serialize the current profile after the caller applies its save policy. */
-	bool saveGameProfile(const Common::String &name);
+	/** Write the current game state to @p savefileName after applying its save policy. */
+	bool writeGameSavefile(const Common::String &savefileName);
 
 	typedef Common::HashMap<Common::Path, ZoombiniAnimation *, Common::Path::IgnoreCase_Hash, Common::Path::IgnoreCase_EqualTo> ZoombiniAnimationCache;
 
