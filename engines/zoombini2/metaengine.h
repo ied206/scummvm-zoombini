@@ -49,6 +49,8 @@ public:
 	static constexpr const char *kConfigStereoOutput = "stereo_output";
 	/** Target configuration key selecting floating-point Bezier path calculations. */
 	static constexpr const char *kConfigUseFloatingPointPaths = "use_floating_point_paths";
+	/** Target configuration key hiding the stray Fleen departure streaks. */
+	static constexpr const char *kConfigFixFleenDepartureStreak = "fix_fleen_depart_streak";
 	/** Target configuration key enabling the enhanced keyboard shortcut set. */
 	static constexpr const char *kConfigEnhancedKbdShortcuts = "enhanced_kbd_shortcuts";
 	/** Target configuration key making solid help-sheet backgrounds transparent. */
@@ -63,6 +65,8 @@ public:
 	static constexpr const char *kConfigAllowCutLevel4PracticePuzzles = "allow_cut_level4_practice_puzzles";
 	/** Target configuration key selecting the original Windows random-number generator. */
 	static constexpr const char *kConfigOriginalPRNG = "original_prng";
+	/** Target configuration key selecting the optional color-only presentation. */
+	static constexpr const char *kConfigColorAssistMode = "color_assist_mode";
 	/** Target configuration key selecting the logic pacing rate in Hz. */
 	static constexpr const char *kConfigLogicPacingHz = "logic_pacing_hz";
 	/** Target frame rate for the engine's presentation loop. */

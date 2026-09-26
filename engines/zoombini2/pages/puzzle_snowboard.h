@@ -147,7 +147,7 @@ private:
 	/** One trait test in the four-leaf decision tree. */
 	struct TreeNode {
 		/** Trait index tested by this node. */
-		ZmbTrait::TraitIndex traitIndex;
+		ZmbTrait::TraitKind traitIndex;
 		/** Primary value that selects the matching branch. */
 		byte primaryValue;
 		/** Second matching value used at difficulty 3. */
@@ -241,7 +241,7 @@ private:
 	/** Generate the decision tree for the selected difficulty. */
 	void generateTree();
 	/** Pick a value for @p traitIndex that occurs in the active roster. */
-	byte pickPresentValue(ZmbTrait::TraitIndex traitIndex);
+	byte pickPresentValue(ZmbTrait::TraitKind traitIndex);
 	/** Count currently selectable Zoombinis in each classified lane. */
 	void countLanes(byte (&counts)[kLaneCount]) const;
 	/** Classify @p zoombini and return its destination lane. */

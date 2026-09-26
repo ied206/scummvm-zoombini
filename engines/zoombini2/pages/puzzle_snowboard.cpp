@@ -86,7 +86,7 @@ PuzzleSnowboard::~PuzzleSnowboard() {
 }
 
 void PuzzleSnowboard::loadGraphics() {
-	for (int trait = 0; trait < ZmbTrait::kTraitCount; trait++) {
+	for (int trait = 0; trait < ZmbTrait::kTraitKindCount; trait++) {
 		for (int value = 0; value < ZmbTrait::kTraitValueCount; value++) {
 			const Common::String path = Common::String::format(kTraitFormat, trait + 1, value + 1);
 			_vm->_gfx->loadPageRleBlock(path);
@@ -125,7 +125,7 @@ void PuzzleSnowboard::loadGraphics() {
 	}
 }
 
-byte PuzzleSnowboard::pickPresentValue(ZmbTrait::TraitIndex traitIndex) {
+byte PuzzleSnowboard::pickPresentValue(ZmbTrait::TraitKind traitIndex) {
 	for (;;) {
 		const byte value = static_cast<byte>(_vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
 		for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
@@ -160,7 +160,7 @@ void PuzzleSnowboard::generateTree() {
 	if (_puzzleZoombinis.empty())
 		return;
 	for (int attempt = 0; attempt < 5000; attempt++) {
-		_tree[0].traitIndex = static_cast<ZmbTrait::TraitIndex>(_vm->_rnd->getRandomNumber(ZmbTrait::kTraitCount - 1));
+		_tree[0].traitIndex = static_cast<ZmbTrait::TraitKind>(_vm->_rnd->getRandomNumber(ZmbTrait::kTraitKindCount - 1));
 		_tree[0].primaryValue = pickPresentValue(_tree[0].traitIndex);
 		if (_puzzleLevel == 3) {
 			do {
@@ -168,7 +168,7 @@ void PuzzleSnowboard::generateTree() {
 			} while (_tree[0].alternateValue == _tree[0].primaryValue);
 		}
 		do {
-			_tree[1].traitIndex = static_cast<ZmbTrait::TraitIndex>(_vm->_rnd->getRandomNumber(ZmbTrait::kTraitCount - 1));
+			_tree[1].traitIndex = static_cast<ZmbTrait::TraitKind>(_vm->_rnd->getRandomNumber(ZmbTrait::kTraitKindCount - 1));
 		} while (_tree[1].traitIndex == _tree[0].traitIndex);
 		_tree[1].primaryValue = pickPresentValue(_tree[1].traitIndex);
 		if (_puzzleLevel == 3) {
@@ -482,8 +482,13 @@ void PuzzleSnowboard::onRenderBackground(ManagedSurface32 *screen) {
 void PuzzleSnowboard::drawTraitHint(ManagedSurface32 *screen, const TreeNode &node, bool alternate, const Common::Point32 &pos) const {
 	const int trait = static_cast<int>(node.traitIndex);
 	const byte value = alternate ? node.alternateValue : node.primaryValue;
-	if (0 <= trait && trait < ZmbTrait::kTraitCount && 1 <= value && value <= ZmbTrait::kTraitValueCount)
-		_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kTraitFormat, trait + 1, value), pos);
+	if (trait < 0 || ZmbTrait::kTraitKindCount <= trait || value < 1 || ZmbTrait::kTraitValueCount < value)
+		return;
+	const Common::String key = Common::String::format(kTraitFormat, trait + 1, value);
+	if (trait == static_cast<int>(ZmbTrait::TraitKind::kNose01))
+		_vm->_gfx->drawPageNoseTraitSprite(screen, key, pos, value);
+	else
+		_vm->_gfx->drawPageRleBlock(screen, key, pos);
 }
 
 void PuzzleSnowboard::updateBoardFacing(ZoombiniRunner *zoombini) {

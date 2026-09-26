@@ -143,6 +143,13 @@ AlphaBlendLUT::AlphaBlendLUT() {
 	}
 }
 
+RGBColor RGBColor::blendWithAlphaLUT(const RGBColor &destColor, byte sourceFactor, byte destFactor, const AlphaBlendLUT &alphaLUT) const {
+	return RGBColor(
+		static_cast<byte>(MIN<int>(alphaLUT.scale(sourceFactor, r) + alphaLUT.scale(destFactor, destColor.r), 255)),
+		static_cast<byte>(MIN<int>(alphaLUT.scale(sourceFactor, g) + alphaLUT.scale(destFactor, destColor.g), 255)),
+		static_cast<byte>(MIN<int>(alphaLUT.scale(sourceFactor, b) + alphaLUT.scale(destFactor, destColor.b), 255)));
+}
+
 BitBlock::BitBlock(Zoombini2Engine *vm) : _vm(vm) {
 }
 
@@ -501,22 +508,14 @@ void BitBlock::drawRleMaskBlend(ManagedSurface32 *dst, const Common::Point32 &po
 				continue;
 			const byte *src = _pixels + (row * _size.width + column) * 4;
 			byte *destPtr = static_cast<byte *>(dst->getBasePtr(destX, destY));
+			RGBColor srcColor = RGBColor::fromBGR(src);
 			if (mask == 255) {
-				destPtr[0] = src[2];
-				destPtr[1] = src[1];
-				destPtr[2] = src[0];
+				srcColor.writeBGR(destPtr);
 			} else {
 				// Round the source and destination contributions separately through the LUT.
 				const byte invAlpha = 255 - mask;
-				const int srcBlue = alphaLUT.scale(mask, src[2]);
-				const int srcGreen = alphaLUT.scale(mask, src[1]);
-				const int srcRed = alphaLUT.scale(mask, src[0]);
-				const int destBlue = alphaLUT.scale(invAlpha, destPtr[0]);
-				const int destGreen = alphaLUT.scale(invAlpha, destPtr[1]);
-				const int destRed = alphaLUT.scale(invAlpha, destPtr[2]);
-				destPtr[0] = static_cast<byte>(MIN(srcBlue + destBlue, 255));
-				destPtr[1] = static_cast<byte>(MIN(srcGreen + destGreen, 255));
-				destPtr[2] = static_cast<byte>(MIN(srcRed + destRed, 255));
+				const RGBColor destColor = RGBColor::fromBGR(destPtr);
+				srcColor.blendWithAlphaLUT(destColor, mask, invAlpha, alphaLUT).writeBGR(destPtr);
 			}
 			destPtr[3] = 255;
 		}
@@ -777,20 +776,55 @@ byte RleBlock::blendChannel(byte src, byte dest, byte invAlpha, const AlphaBlend
 	return static_cast<byte>(MIN(static_cast<int>(src) + destPart, 255));
 }
 
+bool RleBlock::recolorPixel(const byte *source, bool premultiplied, const RGBColor &targetColor, byte srcBrightness, bool preserveGradient, RGBColor &adjustedColor) {
+	const int alpha = premultiplied ? 255 - source[3] : 255;
+	if (alpha < 8)
+		return false;
+	const RGBColor pixelColor = RGBColor::fromBGR(source);
+	const RGBColor sourceColor = pixelColor.unpremultiply(static_cast<byte>(alpha));
+	const int brightest = sourceColor.getMaxChannel();
+	const int darkest = sourceColor.getMinChannel();
+	if (brightest - darkest < 24)
+		return false;
+	if (preserveGradient) {
+		adjustedColor = Gfx::recolorNoseGradientRGB(sourceColor, targetColor);
+		return true;
+	}
+	adjustedColor.r = static_cast<byte>(MIN(255, targetColor.r * brightest / srcBrightness));
+	adjustedColor.g = static_cast<byte>(MIN(255, targetColor.g * brightest / srcBrightness));
+	adjustedColor.b = static_cast<byte>(MIN(255, targetColor.b * brightest / srcBrightness));
+	return true;
+}
+
 /**
  * Draw the RLE spans with opaque copying or lookup-table alpha blending.
  */
 void RleBlock::drawToScreen(ManagedSurface32 *destSurface, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const {
-	drawToScreenInternal(destSurface, pos, Common::Rect32(destSurface->w, destSurface->h), alphaLUT, false, 0, 0, 0);
+	drawToScreenInternal(destSurface, pos, Common::Rect32(destSurface->w, destSurface->h), alphaLUT);
 }
 
-void RleBlock::drawToScreenColorKey(ManagedSurface32 *destSurface, const Common::Point32 &pos, byte red, byte green, byte blue,
-									const AlphaBlendLUT &alphaLUT) const {
-	drawToScreenInternal(destSurface, pos, Common::Rect32(destSurface->w, destSurface->h), alphaLUT, true, red, green, blue);
+void RleBlock::drawToScreenColorKey(ManagedSurface32 *destSurface, const Common::Point32 &pos, const RGBColor &colorKey, const AlphaBlendLUT &alphaLUT) const {
+	drawToScreenInternal(destSurface, pos, Common::Rect32(destSurface->w, destSurface->h), alphaLUT, &colorKey);
 }
 
 void RleBlock::drawToScreenClipped(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &clip, const AlphaBlendLUT &alphaLUT) const {
-	drawToScreenInternal(destSurface, pos, clip, alphaLUT, false, 0, 0, 0);
+	drawToScreenInternal(destSurface, pos, clip, alphaLUT);
+}
+
+void RleBlock::drawToScreenRecolored(ManagedSurface32 *destSurface, const Common::Point32 &pos, const RGBColor &targetColor, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip, byte sourceBrightness) const {
+	if (!destSurface)
+		return;
+	const RecolorSettings recolor = {targetColor, sourceBrightness ? sourceBrightness : static_cast<byte>(1), false};
+	const Common::Rect32 drawClip = clip ? *clip : Common::Rect32(destSurface->w, destSurface->h);
+	drawToScreenInternal(destSurface, pos, drawClip, alphaLUT, nullptr, &recolor);
+}
+
+void RleBlock::drawToScreenRecoloredWithGradient(ManagedSurface32 *destSurface, const Common::Point32 &pos, const RGBColor &targetColor, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip) const {
+	if (!destSurface)
+		return;
+	const RecolorSettings recolor = {targetColor, 255, true};
+	const Common::Rect32 drawClip = clip ? *clip : Common::Rect32(destSurface->w, destSurface->h);
+	drawToScreenInternal(destSurface, pos, drawClip, alphaLUT, nullptr, &recolor);
 }
 
 void RleBlock::drawToScreenMirrored(ManagedSurface32 *destSurface, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const {
@@ -836,8 +870,7 @@ void RleBlock::drawToScreenMirrored(ManagedSurface32 *destSurface, const Common:
 	}
 }
 
-void RleBlock::drawToScreenSolidColor(ManagedSurface32 *destSurface, const Common::Point32 &pos, byte red, byte green, byte blue,
-									  const AlphaBlendLUT &alphaLUT) const {
+void RleBlock::drawToScreenSolidColor(ManagedSurface32 *destSurface, const Common::Point32 &pos, const RGBColor &color, const AlphaBlendLUT &alphaLUT) const {
 	if (!_loaded || !destSurface)
 		return;
 	assert(destSurface->format.bytesPerPixel == 4);
@@ -856,15 +889,13 @@ void RleBlock::drawToScreenSolidColor(ManagedSurface32 *destSurface, const Commo
 		byte *dstPixel = static_cast<byte *>(destSurface->getBasePtr(left, screenY));
 		for (int x = left; x < right; x++) {
 			if (span.mode == SpanMode::kOpaqueBgr00) {
-				dstPixel[0] = blue;
-				dstPixel[1] = green;
-				dstPixel[2] = red;
+				color.writeBGR(dstPixel);
 			} else {
 				const byte inverseAlpha = srcPixel[3];
 				const byte forwardAlpha = 255 - inverseAlpha;
-				dstPixel[0] = static_cast<byte>(MIN<int>(alphaLUT.scale(forwardAlpha, blue) + alphaLUT.scale(inverseAlpha, dstPixel[0]), 255));
-				dstPixel[1] = static_cast<byte>(MIN<int>(alphaLUT.scale(forwardAlpha, green) + alphaLUT.scale(inverseAlpha, dstPixel[1]), 255));
-				dstPixel[2] = static_cast<byte>(MIN<int>(alphaLUT.scale(forwardAlpha, red) + alphaLUT.scale(inverseAlpha, dstPixel[2]), 255));
+				const RGBColor destColor = RGBColor::fromBGR(dstPixel);
+				const RGBColor blendedColor = color.blendWithAlphaLUT(destColor, forwardAlpha, inverseAlpha, alphaLUT);
+				blendedColor.writeBGR(dstPixel);
 			}
 			dstPixel[3] = 255;
 			srcPixel += 4;
@@ -875,7 +906,7 @@ void RleBlock::drawToScreenSolidColor(ManagedSurface32 *destSurface, const Commo
 }
 
 void RleBlock::drawToScreenInternal(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &clip,
-									const AlphaBlendLUT &alphaLUT, bool useColorKey, byte red, byte green, byte blue) const {
+									const AlphaBlendLUT &alphaLUT, const RGBColor *colorKey, const RecolorSettings *recolor) const {
 	if (!_loaded || !clip.isValidRect())
 		return;
 
@@ -884,7 +915,7 @@ void RleBlock::drawToScreenInternal(ManagedSurface32 *destSurface, const Common:
 		return;
 	assert(destSurface->format.bytesPerPixel == 4);
 	static constexpr Graphics::PixelFormat kOpaqueRleFormat = Graphics::PixelFormat::createFormatBGRA32(false);
-	const uint32 colorKey = kOpaqueRleFormat.RGBToColor(red, green, blue);
+	const uint32 colorKeyPixel = colorKey ? kOpaqueRleFormat.RGBToColor(colorKey->r, colorKey->g, colorKey->b) : 0;
 
 	for (uint spanIndex = 0; spanIndex < _spans.size(); spanIndex++) {
 		const Span &span = _spans[spanIndex];
@@ -907,14 +938,28 @@ void RleBlock::drawToScreenInternal(ManagedSurface32 *destSurface, const Common:
 			byte *dstPixel = static_cast<byte *>(destSurface->getBasePtr(x, y));
 
 			if (span.mode == SpanMode::kOpaqueBgr00) {
-				bool converted = false;
-				if (useColorKey)
-					converted = Graphics::crossKeyBlit(dstPixel, srcPixel, destSurface->pitch, count * 4, count, 1, destSurface->format, kOpaqueRleFormat, colorKey);
-				else
-					converted = Graphics::crossBlit(dstPixel, srcPixel, destSurface->pitch, count * 4, count, 1, destSurface->format, kOpaqueRleFormat);
-				if (!converted) {
-					warning("RleBlock: unsupported opaque pixel conversion");
-					continue;
+				if (recolor) {
+					for (int i = 0; i < count; i++) {
+						RGBColor adjustedColor;
+						if (recolorPixel(srcPixel, false, recolor->targetColor, recolor->sourceBrightness, recolor->preserveGradient, adjustedColor)) {
+							adjustedColor.writeBGR(dstPixel);
+						} else {
+							RGBColor::fromBGR(srcPixel).writeBGR(dstPixel);
+						}
+						dstPixel[3] = 255;
+						srcPixel += 4;
+						dstPixel += 4;
+					}
+				} else {
+					bool converted = false;
+					if (colorKey)
+						converted = Graphics::crossKeyBlit(dstPixel, srcPixel, destSurface->pitch, count * 4, count, 1, destSurface->format, kOpaqueRleFormat, colorKeyPixel);
+					else
+						converted = Graphics::crossBlit(dstPixel, srcPixel, destSurface->pitch, count * 4, count, 1, destSurface->format, kOpaqueRleFormat);
+					if (!converted) {
+						warning("RleBlock: unsupported opaque pixel conversion");
+						continue;
+					}
 				}
 				destSurface->addDirtyRect(Common::Rect(x, y, x + count, y + 1));
 			} else {
@@ -922,9 +967,23 @@ void RleBlock::drawToScreenInternal(ManagedSurface32 *destSurface, const Common:
 				// Mode 1 stores premultiplied BGR followed by inverse alpha.
 				for (int i = 0; i < count; i++) {
 					const byte invAlpha = srcPixel[3];
-					dstPixel[0] = blendChannel(srcPixel[0], dstPixel[0], invAlpha, alphaLUT);
-					dstPixel[1] = blendChannel(srcPixel[1], dstPixel[1], invAlpha, alphaLUT);
-					dstPixel[2] = blendChannel(srcPixel[2], dstPixel[2], invAlpha, alphaLUT);
+					RGBColor sourceColor = RGBColor::fromBGR(srcPixel);
+					if (recolor) {
+						RGBColor adjustedColor;
+						if (recolorPixel(srcPixel, true, recolor->targetColor, recolor->sourceBrightness, recolor->preserveGradient, adjustedColor)) {
+							const byte alpha = 255 - invAlpha;
+							sourceColor = RGBColor(
+								alphaLUT.scale(alpha, adjustedColor.r),
+								alphaLUT.scale(alpha, adjustedColor.g),
+								alphaLUT.scale(alpha, adjustedColor.b));
+						}
+					}
+					const RGBColor destColor = RGBColor::fromBGR(dstPixel);
+					const RGBColor blendedColor(
+						blendChannel(sourceColor.r, destColor.r, invAlpha, alphaLUT),
+						blendChannel(sourceColor.g, destColor.g, invAlpha, alphaLUT),
+						blendChannel(sourceColor.b, destColor.b, invAlpha, alphaLUT));
+					blendedColor.writeBGR(dstPixel);
 					dstPixel[3] = 255;
 					srcPixel += 4;
 					dstPixel += 4;
@@ -1100,9 +1159,10 @@ void Gfx::drawRleBlock(ManagedSurface32 *destSurface, const RleBlock *sprite, co
 		sprite->drawToScreen(destSurface, pos, _vm->getAlphaLUT());
 }
 
-void Gfx::drawRleBlockColorKey(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos, byte red, byte green, byte blue) const {
+void Gfx::drawRleBlockColorKey(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos,
+							   const RGBColor &colorKey) const {
 	if (destSurface && sprite)
-		sprite->drawToScreenColorKey(destSurface, pos, red, green, blue, _vm->getAlphaLUT());
+		sprite->drawToScreenColorKey(destSurface, pos, colorKey, _vm->getAlphaLUT());
 }
 
 Size32 Gfx::getPageRleBlockSize(const Common::String &key) {
@@ -1122,6 +1182,17 @@ void Gfx::drawAnimationFrame(ManagedSurface32 *destSurface, const Animation *ani
 	drawRleBlock(destSurface, animation->getFrame(frameIndex), pos);
 }
 
+void Gfx::drawPageNoseTraitSprite(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos, byte value) {
+	RGBColor displayColor;
+	if (noseColorRGB(_vm->getColorAssistMode(), value, displayColor)) {
+		const RleBlock *sprite = loadPageRleBlock(key);
+		if (sprite)
+			sprite->drawToScreenRecoloredWithGradient(destSurface, pos, displayColor, _vm->getAlphaLUT());
+	} else {
+		drawPageRleBlock(destSurface, key, pos);
+	}
+}
+
 void Gfx::drawAndUpdateAnimationRunner(ManagedSurface32 *destSurface, AnimationRunner *runner, uint32 tickCount, int scrollX, int backgroundWidth) const {
 	if (destSurface && runner)
 		runner->drawAndUpdate(destSurface, _vm->getAlphaLUT(), tickCount, scrollX, backgroundWidth);
@@ -1137,10 +1208,11 @@ void Gfx::drawZoombini(ManagedSurface32 *screen, const ZoombiniAnimation *animat
 	if (!screen || !animation || cell < 0 || ZoombiniAnimation::kDim0 <= cell || frame < 0)
 		return;
 	const int baseIndex = cell * ZoombiniAnimation::kDim1 * ZoombiniAnimation::kDim2;
+	const ColorAssistMode colorAssistMode = animation->getColorAssistMode();
 	for (int layer = 0; layer < ZoombiniAnimation::kDim1; layer++) {
 		int variant = 0;
 		if (0 < layer)
-			variant = traits.getValue(static_cast<ZmbTrait::TraitIndex>(layer - 1));
+			variant = traits.getValue(static_cast<ZmbTrait::TraitKind>(layer - 1));
 		if (variant < 0 || ZoombiniAnimation::kDim2 <= variant)
 			continue;
 		const int entry = baseIndex + layer * ZoombiniAnimation::kDim2 + variant;
@@ -1148,7 +1220,10 @@ void Gfx::drawZoombini(ManagedSurface32 *screen, const ZoombiniAnimation *animat
 		const RleBlock *sprite = animation->getFrame(entry, selectedFrame);
 		if (!sprite)
 			continue;
-		if (clip)
+		RGBColor displayColor;
+		if (layer == 2 && noseColorRGB(colorAssistMode, traits._nose, displayColor))
+			sprite->drawToScreenRecoloredWithGradient(screen, pos, displayColor, alphaLUT, clip);
+		else if (clip)
 			sprite->drawToScreenClipped(screen, pos, *clip, alphaLUT);
 		else
 			sprite->drawToScreen(screen, pos, alphaLUT);
@@ -1156,22 +1231,22 @@ void Gfx::drawZoombini(ManagedSurface32 *screen, const ZoombiniAnimation *animat
 }
 
 void Gfx::drawZoombiniPreview(ManagedSurface32 *screen, const ZoombiniAnimation *animation,
-							  const int (&selectedValues)[ZmbTrait::kTraitCount], const Common::Point32 &pos) const {
+							  const byte (&selectedValues)[ZmbTrait::kTraitKindCount], const Common::Point32 &pos) const {
 	drawZoombiniPreview(screen, animation, selectedValues, pos, _vm->getAlphaLUT());
 }
 
 void Gfx::drawZoombiniPreview(ManagedSurface32 *screen, const ZoombiniAnimation *animation,
-							  const int (&selectedValues)[ZmbTrait::kTraitCount], const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) {
+							  const byte (&selectedValues)[ZmbTrait::kTraitKindCount], const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) {
 	if (!screen || !animation)
 		return;
 	static constexpr int kBaseCell = 990;
-	static constexpr int kFeatureCellBases[ZmbTrait::kTraitCount] = {
+	static constexpr int kFeatureCellBases[ZmbTrait::kTraitKindCount] = {
 		996,
 		1002,
 		1008,
 		1014,
 	};
-	static constexpr int kFeatureDrawOrder[ZmbTrait::kTraitCount] = {
+	static constexpr int kFeatureDrawOrder[ZmbTrait::kTraitKindCount] = {
 		0,
 		2,
 		3,
@@ -1180,23 +1255,78 @@ void Gfx::drawZoombiniPreview(ManagedSurface32 *screen, const ZoombiniAnimation 
 	const RleBlock *frame = animation->getFrame(kBaseCell, 0);
 	if (frame)
 		frame->drawToScreen(screen, pos, alphaLUT);
-	for (int i = 0; i < ZmbTrait::kTraitCount; i++) {
+	for (int i = 0; i < ZmbTrait::kTraitKindCount; i++) {
 		const int feature = kFeatureDrawOrder[i];
-		const int value = selectedValues[feature];
+		const byte value = selectedValues[feature];
 		if (1 <= value && value <= ZmbTrait::kTraitValueCount) {
 			frame = animation->getFrame(kFeatureCellBases[feature] + value, 0);
-			if (frame)
-				frame->drawToScreen(screen, pos, alphaLUT);
+			if (frame) {
+				RGBColor displayColor;
+				if (feature == static_cast<int>(ZmbTrait::TraitKind::kNose01) &&
+					noseColorRGB(animation->getColorAssistMode(), value, displayColor))
+					frame->drawToScreenRecoloredWithGradient(screen, pos, displayColor, alphaLUT);
+				else
+					frame->drawToScreen(screen, pos, alphaLUT);
+			}
 		}
 	}
+}
+
+bool Gfx::noseColorRGB(ColorAssistMode mode, byte value, RGBColor &color) {
+	if (value < 1 || ZmbTrait::kTraitValueCount < value)
+		return false;
+	if (mode == ColorAssistMode::kSmallScreen01) {
+		if (value != 5)
+			return false;
+		color = RGBColor(167, 108, 212);
+		return true;
+	}
+	if (mode != ColorAssistMode::kRedGreen02)
+		return false;
+	static constexpr RGBColor kNoseColors[ZmbTrait::kTraitValueCount] = {
+		RGBColor(230, 159, 0),
+		RGBColor(255, 255, 255),
+		RGBColor(0, 182, 217),
+		RGBColor(101, 121, 255),
+		RGBColor(102, 0, 68),
+	};
+	color = kNoseColors[value - 1];
+	return true;
+}
+
+RGBColor Gfx::recolorNoseGradientRGB(const RGBColor &sourceColor, const RGBColor &targetColor) {
+	const int sourceMaximum = sourceColor.getMaxChannel();
+	const int sourceMinimum = sourceColor.getMinChannel();
+	const int targetMaximum = targetColor.getMaxChannel();
+	const int targetMinimum = targetColor.getMinChannel();
+	if (sourceMaximum == 0 || targetMaximum == 0)
+		return RGBColor();
+	const int value = sourceMaximum * targetMaximum / 255;
+	const int targetRange = targetMaximum - targetMinimum;
+	if (targetRange == 0)
+		return RGBColor(static_cast<byte>(value), static_cast<byte>(value), static_cast<byte>(value));
+	const int sourceSaturation = (sourceMaximum - sourceMinimum) * 255 / sourceMaximum;
+	const int targetSaturation = targetRange * 255 / targetMaximum;
+	// Keep source value changes and half of its saturation variation in the new hue.
+	const int chroma = value * (sourceSaturation + targetSaturation) / 510;
+	const int base = value - chroma;
+	return RGBColor(static_cast<byte>(base + chroma * (targetColor.r - targetMinimum) / targetRange),
+					static_cast<byte>(base + chroma * (targetColor.g - targetMinimum) / targetRange),
+					static_cast<byte>(base + chroma * (targetColor.b - targetMinimum) / targetRange));
 }
 
 void Gfx::drawZoombiniRunner(ManagedSurface32 *screen, const ZoombiniRunner *runner, const Common::Rect32 *clip, int scrollX, int backgroundWidth) const {
 	drawZoombiniRunner(screen, runner, _vm->getAlphaLUT(), clip, scrollX, backgroundWidth, _dropTargetGlowSprite);
 }
 
+void Gfx::drawZoombiniRunnerWithTraits(ManagedSurface32 *screen, const ZoombiniRunner *runner, const ZmbTrait &presentationTraits,
+									   const Common::Rect32 *clip, int scrollX, int backgroundWidth) const {
+	drawZoombiniRunner(screen, runner, _vm->getAlphaLUT(), clip, scrollX, backgroundWidth, _dropTargetGlowSprite, &presentationTraits);
+}
+
 void Gfx::drawZoombiniRunner(ManagedSurface32 *screen, const ZoombiniRunner *runner, const AlphaBlendLUT &alphaLUT,
-							 const Common::Rect32 *clip, int scrollX, int backgroundWidth, const RleBlock *dropTargetIndicator) {
+							 const Common::Rect32 *clip, int scrollX, int backgroundWidth, const RleBlock *dropTargetIndicator,
+							 const ZmbTrait *presentationTraits) {
 	if (!screen || !runner || !runner->_activeAnimation || runner->_hidden)
 		return;
 	const Common::Rect32 spriteRect = runner->getSpriteRect(scrollX, backgroundWidth);
@@ -1206,21 +1336,20 @@ void Gfx::drawZoombiniRunner(ManagedSurface32 *screen, const ZoombiniRunner *run
 	if (runner->_dragging && runner->_hoveredDropTargetIndex != -1 && dropTargetIndicator)
 		dropTargetIndicator->drawToScreen(screen, drawPos, alphaLUT);
 	const int frame = runner->_animationActive ? runner->_animationFrame : 0;
-	drawZoombini(screen, runner->_activeAnimation, runner->_traits, drawPos, runner->_animationCell, frame, alphaLUT, clip);
+	const ZmbTrait &traitsToDraw = presentationTraits ? *presentationTraits : runner->_traits;
+	drawZoombini(screen, runner->_activeAnimation, traitsToDraw, drawPos, runner->_animationCell, frame, alphaLUT, clip);
 }
 
-void Gfx::textColorRGB(TextColor color, byte &red, byte &green, byte &blue) {
-	static constexpr byte kColors[5][3] = {
-		{16, 16, 16},
-		{0, 0, 255},
-		{0, 255, 0},
-		{255, 255, 255},
-		{255, 0, 0},
+RGBColor Gfx::textColor(TextColor color) {
+	static constexpr RGBColor kColors[5] = {
+		RGBColor(16, 16, 16),
+		RGBColor(0, 0, 255),
+		RGBColor(0, 255, 0),
+		RGBColor(255, 255, 255),
+		RGBColor(255, 0, 0),
 	};
 	const int index = static_cast<int>(color);
-	red = kColors[index][0];
-	green = kColors[index][1];
-	blue = kColors[index][2];
+	return kColors[index];
 }
 
 bool Gfx::loadTextFont(TextColor color) {
@@ -1242,9 +1371,8 @@ bool Gfx::hasTextFont(TextColor color) const {
 int Gfx::drawText(ManagedSurface32 *destSurface, TextColor color, const Common::Point32 &pos, const Common::String &text) const {
 	if (!destSurface || !hasTextFont(color))
 		return 0;
-	byte red, green, blue;
-	textColorRGB(color, red, green, blue);
-	return _textFont->drawString(destSurface, pos, text, red, green, blue, _vm->getAlphaLUT());
+	const RGBColor tint = textColor(color);
+	return _textFont->drawString(destSurface, pos, text, tint, _vm->getAlphaLUT());
 }
 
 int Gfx::getTextWidth(const Common::String &text, TextColor color) const {
@@ -1269,9 +1397,8 @@ void Gfx::drawDragNameTooltip(ManagedSurface32 *destSurface, const Common::Strin
 	static constexpr int kTextY = 570;
 	drawRleBlock(destSurface, _nameBoxSprite, Common::Point32(kPlateX, kPlateY));
 	const int width = _textFont->getStringWidth(name);
-	byte red, green, blue;
-	textColorRGB(TextColor::kDark00, red, green, blue);
-	_textFont->drawString(destSurface, Common::Point32(kTextCenterX - width / 2, kTextY), name, red, green, blue, _vm->getAlphaLUT());
+	const RGBColor tint = textColor(TextColor::kDark00);
+	_textFont->drawString(destSurface, Common::Point32(kTextCenterX - width / 2, kTextY), name, tint, _vm->getAlphaLUT());
 }
 
 void Gfx::maskRejectedArea(ManagedSurface32 *destSurface, const AreaMask *areaMask) {
@@ -1825,6 +1952,10 @@ int ZoombiniAnimation::getFrameCount(int cellIndex) const {
 	return _cells[cellIndex].frames.size();
 }
 
+ColorAssistMode ZoombiniAnimation::getColorAssistMode() const {
+	return _vm->getColorAssistMode();
+}
+
 Size32 ZoombiniAnimation::getSpriteSize(int cell, int frame) const {
 	if (cell < 0 || kDim0 <= cell || frame < 0)
 		return Size32();
@@ -2243,7 +2374,7 @@ int BitmapFont::charToGlyphIndex(char c) const {
 }
 
 void BitmapFont::drawGlyph(ManagedSurface32 *dst, const Glyph &glyph, const Common::Point32 &pos,
-						   byte red, byte green, byte blue, const AlphaBlendLUT &alphaLUT) const {
+						   const RGBColor &color, const AlphaBlendLUT &alphaLUT) const {
 	if (!glyph.mask)
 		return;
 
@@ -2261,22 +2392,14 @@ void BitmapFont::drawGlyph(ManagedSurface32 *dst, const Glyph &glyph, const Comm
 				continue;
 			byte *destPtr = static_cast<byte *>(dst->getBasePtr(destX, destY));
 			if (mask == 255) {
-				destPtr[0] = blue;
-				destPtr[1] = green;
-				destPtr[2] = red;
+				color.writeBGR(destPtr);
 			} else {
 				// The tint is uniform across the glyph, so scale it by the
 				// coverage and scale the destination by the coverage's inverse.
 				const byte invAlpha = 255 - mask;
-				const int srcBlue = alphaLUT.scale(mask, blue);
-				const int srcGreen = alphaLUT.scale(mask, green);
-				const int srcRed = alphaLUT.scale(mask, red);
-				const int destBlue = alphaLUT.scale(invAlpha, destPtr[0]);
-				const int destGreen = alphaLUT.scale(invAlpha, destPtr[1]);
-				const int destRed = alphaLUT.scale(invAlpha, destPtr[2]);
-				destPtr[0] = static_cast<byte>(MIN(srcBlue + destBlue, 255));
-				destPtr[1] = static_cast<byte>(MIN(srcGreen + destGreen, 255));
-				destPtr[2] = static_cast<byte>(MIN(srcRed + destRed, 255));
+				const RGBColor destColor = RGBColor::fromBGR(destPtr);
+				const RGBColor blendedColor = color.blendWithAlphaLUT(destColor, mask, invAlpha, alphaLUT);
+				blendedColor.writeBGR(destPtr);
 			}
 			destPtr[3] = 255;
 		}
@@ -2284,7 +2407,7 @@ void BitmapFont::drawGlyph(ManagedSurface32 *dst, const Glyph &glyph, const Comm
 }
 
 int BitmapFont::drawString(ManagedSurface32 *dst, const Common::Point32 &pos,
-						   const Common::String &text, byte red, byte green, byte blue,
+						   const Common::String &text, const RGBColor &color,
 						   const AlphaBlendLUT &alphaLUT) const {
 	if (!_loaded) {
 		return 0;
@@ -2306,7 +2429,7 @@ int BitmapFont::drawString(ManagedSurface32 *dst, const Common::Point32 &pos,
 			continue;
 		}
 
-		drawGlyph(dst, _glyphs[glyphIdx], Common::Point32(curX, pos.y), red, green, blue, alphaLUT);
+		drawGlyph(dst, _glyphs[glyphIdx], Common::Point32(curX, pos.y), color, alphaLUT);
 		const int advance = _glyphs[glyphIdx].width + 2;
 		if (hebrew && '0' <= c && c <= '9')
 			curX -= advance;

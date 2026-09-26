@@ -34,6 +34,7 @@ MODULE_OBJS := \
 	pages/shelter_rescue1.o \
 	pages/shelter_rescue2.o \
 	pages/shelter_zombiniville.o \
+	pages/transition_base.o \
 	pages/transition_credits.o \
 	pages/transition_maptrans.o \
 	pages/transition_title.o \

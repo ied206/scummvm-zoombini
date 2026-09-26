@@ -304,11 +304,11 @@ void InteractiveMap::setupIcons() {
 }
 
 bool InteractiveMap::practiceCandidateFitsPack(const Zoombini2Engine *vm, const ZmbTrait &traits) {
-	int counts[ZmbTrait::kTraitCount][ZmbTrait::kTraitValueCount + 1] = {};
+	int counts[ZmbTrait::kTraitKindCount][ZmbTrait::kTraitValueCount + 1] = {};
 	if (!traits.hasValidValues())
 		return false;
-	for (int traitOrdinal = 0; traitOrdinal < ZmbTrait::kTraitCount; traitOrdinal++) {
-		const ZmbTrait::TraitIndex traitIndex = static_cast<ZmbTrait::TraitIndex>(traitOrdinal);
+	for (int traitOrdinal = 0; traitOrdinal < ZmbTrait::kTraitKindCount; traitOrdinal++) {
+		const ZmbTrait::TraitKind traitIndex = static_cast<ZmbTrait::TraitKind>(traitOrdinal);
 		counts[traitOrdinal][traits.getValue(traitIndex)] += 1;
 	}
 
@@ -316,8 +316,8 @@ bool InteractiveMap::practiceCandidateFitsPack(const Zoombini2Engine *vm, const 
 	int matchingCombinations = 0;
 	for (uint i = 0; i < vm->_state->_activeZoombinis.size(); i++) {
 		const ZoombiniRunner *zoombini = vm->_state->_activeZoombinis[i];
-		for (int traitOrdinal = 0; traitOrdinal < ZmbTrait::kTraitCount; traitOrdinal++) {
-			const ZmbTrait::TraitIndex traitIndex = static_cast<ZmbTrait::TraitIndex>(traitOrdinal);
+		for (int traitOrdinal = 0; traitOrdinal < ZmbTrait::kTraitKindCount; traitOrdinal++) {
+			const ZmbTrait::TraitKind traitIndex = static_cast<ZmbTrait::TraitKind>(traitOrdinal);
 			const byte value = zoombini->_traits.getValue(traitIndex);
 			if (value < 1 || ZmbTrait::kTraitValueCount < value)
 				return false;
@@ -327,7 +327,7 @@ bool InteractiveMap::practiceCandidateFitsPack(const Zoombini2Engine *vm, const 
 			matchingCombinations += 1;
 	}
 
-	for (int traitOrdinal = 0; traitOrdinal < ZmbTrait::kTraitCount; traitOrdinal++) {
+	for (int traitOrdinal = 0; traitOrdinal < ZmbTrait::kTraitKindCount; traitOrdinal++) {
 		for (int value = 1; value <= ZmbTrait::kTraitValueCount; value++) {
 			if (5 < counts[traitOrdinal][value])
 				return false;
@@ -646,7 +646,7 @@ void InteractiveMap::drawPracticeSegments(ManagedSurface32 *screen) {
 		if (level == 4) {
 			RleBlock *segment = _vm->_gfx->loadPageRleBlock(_segments[tier][slot]);
 			if (segment)
-				segment->drawToScreenSolidColor(screen, kSegmentPos[slot], 24, 25, 30, _vm->getAlphaLUT());
+				segment->drawToScreenSolidColor(screen, kSegmentPos[slot], RGBColor(24, 25, 30), _vm->getAlphaLUT());
 		} else {
 			_vm->_gfx->drawPageRleBlock(screen, _segments[tier][slot], kSegmentPos[slot]);
 		}

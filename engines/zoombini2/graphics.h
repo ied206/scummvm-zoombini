@@ -39,7 +39,50 @@ namespace Zoombini2 {
 
 enum class RouteBranch : int;
 
-/** Signed width and height without positional semantics. */
+class AlphaBlendLUT;
+
+/** One RGB color with eight bits per channel and no alpha component. */
+struct RGBColor {
+	byte r;
+	byte g;
+	byte b;
+
+	constexpr RGBColor(byte red = 0, byte green = 0, byte blue = 0) : r(red), g(green), b(blue) {}
+	/** Read one BGR pixel from @p pixel. */
+	static RGBColor fromBGR(const byte *pixel) { return RGBColor(pixel[2], pixel[1], pixel[0]); }
+	/** Write this color to one BGR pixel at @p pixel. */
+	void writeBGR(byte *pixel) const {
+		pixel[0] = b;
+		pixel[1] = g;
+		pixel[2] = r;
+	}
+	/** Blend this source color with @p destColor using Zoombini2's lookup-table rule. */
+	RGBColor blendWithAlphaLUT(const RGBColor &destColor, byte sourceFactor, byte destFactor, const AlphaBlendLUT &alphaLUT) const;
+	/** Convert premultiplied channels to straight RGB for @p alpha. */
+	RGBColor unpremultiply(byte alpha) const {
+		if (alpha == 0)
+			return RGBColor();
+		return RGBColor(static_cast<byte>(MIN(255, static_cast<int>(r) * 255 / alpha)),
+						static_cast<byte>(MIN(255, static_cast<int>(g) * 255 / alpha)),
+						static_cast<byte>(MIN(255, static_cast<int>(b) * 255 / alpha)));
+	}
+	/** Return the greatest RGB channel value. */
+	byte getMaxChannel() const { return MAX(r, MAX(g, b)); }
+	/** Return the least RGB channel value. */
+	byte getMinChannel() const { return MIN(r, MIN(g, b)); }
+};
+
+/** Optional color presentation for small displays and red-green color vision deficiency. */
+enum class ColorAssistMode : byte {
+	kOriginal00 = 0,
+	kSmallScreen01 = 1,
+	kRedGreen02 = 2
+};
+
+/**
+ * Signed width and height without positional semantics.
+ * Modeled after @ref Common::PointBase struct.
+ */
 template<typename T, typename ConcreteSize>
 struct SizeBase {
 	T width;
@@ -110,7 +153,6 @@ constexpr Size32(const Size16 &size) : SizeBase(static_cast<int32>(size.width), 
 END_SIZE_TYPE(int32, Size32)
 
 class Zoombini2Engine;
-class AlphaBlendLUT;
 class SoundManager;
 class Animation;
 class AnimationRunner;
@@ -200,8 +242,8 @@ public:
 	void clearPageLayers();
 	/** Draw an RLE sprite through the shared Z2 rendering boundary. */
 	void drawRleBlock(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos) const;
-	/** Draw an RLE sprite while skipping opaque pixels matching @p red, @p green, and @p blue. */
-	void drawRleBlockColorKey(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos, byte red, byte green, byte blue) const;
+	/** Draw an RLE sprite while skipping opaque pixels matching @p colorKey. */
+	void drawRleBlockColorKey(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos, const RGBColor &colorKey) const;
 	/** Load and draw an RLE sprite from the current page cache. */
 	void drawPageRleBlock(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos) {
 		if (destSurface)
@@ -213,10 +255,9 @@ public:
 			drawRleBlock(destSurface, loadSharedRleBlock(key), pos);
 	}
 	/** Load and draw a shared RLE sprite while skipping one opaque RGB color. */
-	void drawSharedRleBlockColorKey(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos, byte red, byte green,
-									byte blue) {
+	void drawSharedRleBlockColorKey(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos, const RGBColor &colorKey) {
 		if (destSurface)
-			drawRleBlockColorKey(destSurface, loadSharedRleBlock(key), pos, red, green, blue);
+			drawRleBlockColorKey(destSurface, loadSharedRleBlock(key), pos, colorKey);
 	}
 	/** Return a page RLE sprite's dimensions, or an empty size when it cannot be loaded. */
 	Size32 getPageRleBlockSize(const Common::String &key);
@@ -229,6 +270,8 @@ public:
 	}
 	/** Draw one frame from an animation through the shared Z2 rendering boundary. */
 	void drawAnimationFrame(ManagedSurface32 *destSurface, const Animation *animation, int frameIndex, const Common::Point32 &pos) const;
+	/** Draw a nose-trait icon with the same display palette as Zoombini nose layers. */
+	void drawPageNoseTraitSprite(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos, byte value);
 	/** Draw and advance one general-object animation runner. */
 	void drawAndUpdateAnimationRunner(ManagedSurface32 *destSurface, AnimationRunner *runner, uint32 tickCount, int scrollX, int bgWidth) const;
 	/** Compose body, Feet, Nose, Hair and Eyes, retaining frame zero for single-frame entries. */
@@ -241,18 +284,22 @@ public:
 	 * Compose the large picker preview as body, Feet, Hair, Eyes and Nose at frame zero.
 	 * Unlike @ref Gfx::drawZoombini, only selected values 1 through 5 add feature layers.
 	 */
-	void drawZoombiniPreview(ManagedSurface32 *destSurface, const ZoombiniAnimation *animation,
-							 const int (&selectedValues)[ZmbTrait::kTraitCount], const Common::Point32 &pos) const;
+	void drawZoombiniPreview(ManagedSurface32 *destSurface, const ZoombiniAnimation *animation, const byte (&selectedValues)[ZmbTrait::kTraitKindCount], const Common::Point32 &pos) const;
 	/** Compose the same picker preview with an explicit blend table. */
-	static void drawZoombiniPreview(ManagedSurface32 *destSurface, const ZoombiniAnimation *animation,
-									const int (&selectedValues)[ZmbTrait::kTraitCount], const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT);
+	static void drawZoombiniPreview(ManagedSurface32 *destSurface, const ZoombiniAnimation *animation, const byte (&selectedValues)[ZmbTrait::kTraitKindCount], const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT);
+	/** Select the display color for a nose trait without changing its logical value. */
+	static bool noseColorRGB(ColorAssistMode mode, byte value, RGBColor &color);
+	/** Shift a nose pixel toward the display hue while retaining its value and saturation variation. */
+	static RGBColor recolorNoseGradientRGB(const RGBColor &sourceColor, const RGBColor &targetColor);
 	/** Draw one visible runner and its available drop-target glow at the scrolled or dragged anchor without advancing animation. */
-	void drawZoombiniRunner(ManagedSurface32 *destSurface, const ZoombiniRunner *runner, const Common::Rect32 *clip = nullptr,
-							int scrollX = 0, int backgroundWidth = 800) const;
-	/** Apply runner visibility, bounds and frame selection with an explicit blend table. */
+	void drawZoombiniRunner(ManagedSurface32 *destSurface, const ZoombiniRunner *runner, const Common::Rect32 *clip = nullptr, int scrollX = 0, int backgroundWidth = 800) const;
+	/** Draw one runner with temporary presentation traits without changing its gameplay traits. */
+	void drawZoombiniRunnerWithTraits(ManagedSurface32 *destSurface, const ZoombiniRunner *runner, const ZmbTrait &presentationTraits,
+									  const Common::Rect32 *clip = nullptr, int scrollX = 0, int backgroundWidth = 800) const;
+	/** Apply runner visibility, bounds and frame selection with an explicit blend table and optional presentation traits. */
 	static void drawZoombiniRunner(ManagedSurface32 *destSurface, const ZoombiniRunner *runner, const AlphaBlendLUT &alphaLUT,
 								   const Common::Rect32 *clip = nullptr, int scrollX = 0, int backgroundWidth = 800,
-								   const RleBlock *dropTargetIndicator = nullptr);
+								   const RleBlock *dropTargetIndicator = nullptr, const ZmbTrait *presentationTraits = nullptr);
 	/** Color variants of the shared bitmap text strip. */
 	enum class TextColor {
 		kDark00 = 0,
@@ -322,8 +369,8 @@ private:
 	void drawOverlaySprite(ManagedSurface32 *destSurface, const Common::String &name, const Common::Point32 &pos);
 	/** Compose the route-map overlays appropriate to the current progress. */
 	void drawMapOverlays(ManagedSurface32 *destSurface, PageId srcPageId, int mapRegion, RouteBranch routeBranch);
-	/** Return the tint channels for one text color. */
-	static void textColorRGB(TextColor color, byte &red, byte &green, byte &blue);
+	/** Return the tint for one text color. */
+	static RGBColor textColor(TextColor color);
 	/** Name-plate sprite drawn under the held Zoombini name. */
 	RleBlock *_nameBoxSprite = nullptr;
 	/** Shared drop-target glow retained for the game instance. */
@@ -608,8 +655,8 @@ public:
 	 * with @p alphaLUT.
 	 */
 	void drawToScreen(ManagedSurface32 *destSurface, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const;
-	/** Draw this frame while skipping opaque pixels matching @p red, @p green, and @p blue. */
-	void drawToScreenColorKey(ManagedSurface32 *destSurface, const Common::Point32 &pos, byte red, byte green, byte blue, const AlphaBlendLUT &alphaLUT) const;
+	/** Draw this frame while skipping opaque pixels matching @p colorKey. */
+	void drawToScreenColorKey(ManagedSurface32 *destSurface, const Common::Point32 &pos, const RGBColor &colorKey, const AlphaBlendLUT &alphaLUT) const;
 	/**
 	 * Draw this frame inside @p clip using opaque copies or lookup-table blending.
 	 *
@@ -617,10 +664,15 @@ public:
 	 * with @p alphaLUT.
 	 */
 	void drawToScreenClipped(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &clip, const AlphaBlendLUT &alphaLUT) const;
+	/** Draw this frame with its chromatic pixels shifted toward one RGB color, preserving shading and alpha. */
+	void drawToScreenRecolored(ManagedSurface32 *destSurface, const Common::Point32 &pos, const RGBColor &targetColor,
+							   const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip = nullptr, byte sourceBrightness = 255) const;
+	/** Draw this frame in a new hue while retaining each chromatic pixel's value and saturation variation. */
+	void drawToScreenRecoloredWithGradient(ManagedSurface32 *destSurface, const Common::Point32 &pos, const RGBColor &targetColor, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip = nullptr) const;
 	/** Draw this frame mirrored horizontally within its own width. */
 	void drawToScreenMirrored(ManagedSurface32 *destSurface, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const;
 	/** Draw the RLE coverage using one color while retaining inverse-alpha edges. */
-	void drawToScreenSolidColor(ManagedSurface32 *destSurface, const Common::Point32 &pos, byte red, byte green, byte blue, const AlphaBlendLUT &alphaLUT) const;
+	void drawToScreenSolidColor(ManagedSurface32 *destSurface, const Common::Point32 &pos, const RGBColor &color, const AlphaBlendLUT &alphaLUT) const;
 
 	/** Return the frame dimensions in pixels. */
 	const Size32 &getSize() const { return _size; }
@@ -653,6 +705,12 @@ private:
 		/** Serialized pixel layout and composition rule for this span. */
 		SpanMode mode = SpanMode::kOpaqueBgr00;
 	};
+	/** Target color and source adjustment used while drawing a recolored frame. */
+	struct RecolorSettings {
+		RGBColor targetColor;
+		byte sourceBrightness;
+		bool preserveGradient;
+	};
 
 	/** Borrowed vm used to resolve RLE resources. */
 	Zoombini2Engine *_vm;
@@ -677,9 +735,11 @@ private:
 	 * The sum is saturated at 255.
 	 */
 	static byte blendChannel(byte srcSurface, byte dest, byte inverseAlpha, const AlphaBlendLUT &alphaLUT);
+	/** Recolor a BGR pixel while retaining neutral highlights and optionally preserving source saturation variation. */
+	static bool recolorPixel(const byte *source, bool premultiplied, const RGBColor &targetColor, byte sourceBrightness, bool preserveGradient, RGBColor &adjustedColor);
 	/** Draw this frame with clipping and an optional opaque-span color key. */
 	void drawToScreenInternal(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &clip, const AlphaBlendLUT &alphaLUT,
-							  bool useColorKey, byte red, byte green, byte blue) const;
+							  const RGBColor *colorKey = nullptr, const RecolorSettings *recolor = nullptr) const;
 	/** Exchange frame buffer state with @p other. */
 	void swapData(RleBlock &other);
 };
@@ -796,7 +856,7 @@ public:
 	/** Number of movement and animation cells. */
 	static constexpr int kDim0 = 100;
 	/** Number of sprite layers per cell. */
-	static constexpr int kDim1 = ZmbTrait::kTraitCount + 1;
+	static constexpr int kDim1 = ZmbTrait::kTraitKindCount + 1;
 	/** Number of base-or-feature variants per layer. */
 	static constexpr int kDim2 = ZmbTrait::kTraitValueCount + 1;
 	/** Total number of independently framed grid entries. */
@@ -817,6 +877,8 @@ public:
 	const RleBlock *getFrame(int cellIndex, int frameIndex) const;
 	/** Return the number of frames in @p cellIndex, or zero for an invalid cell. */
 	int getFrameCount(int cellIndex) const;
+	/** Return the current presentation setting for this animation's game instance. */
+	ColorAssistMode getColorAssistMode() const;
 	/** Return the base layer's dimensions for one Zoombini cell and frame. */
 	Size32 getSpriteSize(int cell, int frame) const;
 	/** Forward legacy drawing calls to @ref Gfx::drawZoombini with the supplied blend table and clip. */
@@ -994,7 +1056,7 @@ public:
 	/** Load the BMT color-and-alpha pair and extract the coverage masks. */
 	bool load(const Common::Path &basePath);
 	/** Draw @p text tinted with @p color at @p pos and return its horizontal pixel advance. */
-	int drawString(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::String &text, byte red, byte green, byte blue, const AlphaBlendLUT &alphaLUT) const;
+	int drawString(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::String &text, const RGBColor &color, const AlphaBlendLUT &alphaLUT) const;
 	/** Return the horizontal pixel advance for @p text without drawing it. */
 	int getStringWidth(const Common::String &text) const;
 	/** Return the glyph index for @p character, or -1 when it is unsupported. */
@@ -1028,7 +1090,8 @@ private:
 	 * tint scaled by the coverage and the destination scaled by its inverse,
 	 * matching the RLE premultiplied blend rule.
 	 */
-	void drawGlyph(ManagedSurface32 *destSurface, const Glyph &glyph, const Common::Point32 &pos, byte red, byte green, byte blue, const AlphaBlendLUT &alphaLUT) const;
+	void drawGlyph(ManagedSurface32 *destSurface, const Glyph &glyph, const Common::Point32 &pos, const RGBColor &color,
+				   const AlphaBlendLUT &alphaLUT) const;
 };
 
 /** Result of one @ref VolumePanel input-and-draw pass. */
