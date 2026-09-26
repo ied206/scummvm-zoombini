@@ -41,6 +41,7 @@ void Zoombini2MetaEngine::registerDefaultSettings(const Common::String &target) 
 	ConfMan.registerDefault(kConfigEnableSavefileReadOnlyToggle, false);
 	ConfMan.registerDefault(kConfigStereoOutput, false);
 	ConfMan.registerDefault(kConfigUseFloatingPointPaths, false);
+	ConfMan.registerDefault(kConfigFixFleenDepartureStreak, true);
 	ConfMan.registerDefault(kConfigEnhancedKbdShortcuts, true);
 	ConfMan.registerDefault(kConfigTransparentHelpPages, true);
 	ConfMan.registerDefault(kConfigDebugHotkeys, false);
@@ -48,6 +49,7 @@ void Zoombini2MetaEngine::registerDefaultSettings(const Common::String &target) 
 	ConfMan.registerDefault(kConfigAquacubeSafeFirstMove, false);
 	ConfMan.registerDefault(kConfigAllowCutLevel4PracticePuzzles, false);
 	ConfMan.registerDefault(kConfigOriginalPRNG, true);
+	ConfMan.registerDefault(kConfigColorAssistMode, 0);
 	ConfMan.registerDefault(kConfigLogicPacingHz, 75);
 	ConfMan.registerDefault(kConfigFrameRate, kDefaultFrameRate);
 	ConfMan.registerDefault(kConfigUnlockFrameRate, false);

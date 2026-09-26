@@ -286,6 +286,8 @@ constexpr const char *PuzzleMagicWall::kLeverSoundPath;
 constexpr const char *PuzzleMagicWall::kRetreatSpeechPath;
 constexpr const char *PuzzleMagicWall::kPerfectSpeechFormat;
 constexpr const char *PuzzleMagicWall::kColors[11];
+constexpr byte PuzzleMagicWall::kDotSourceBrightness[10];
+constexpr byte PuzzleMagicWall::kBugSourceBrightness[10];
 constexpr Common::Point32 PuzzleMagicWall::kTabletPositions[5];
 constexpr Common::Point32 PuzzleMagicWall::kGatePositions[4];
 constexpr Common::Point32 PuzzleMagicWall::kRosterPositions[8];
@@ -677,8 +679,50 @@ void PuzzleMagicWall::drawBeetles(ManagedSurface32 *screen) {
 	if (_phase == Phase::kFinished || _nextPuzzlePending)
 		return;
 	for (uint i = 0; i < _maze.positions().size(); i++) {
-		_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kBugFormat, kColors[i]), _beetles[i].position);
+		drawColorSprite(screen, kBugFormat, i, _beetles[i].position, kBugSourceBrightness[i]);
 		_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kDirectionFormat, _beetles[i].direction + 1), _beetles[i].position);
+	}
+}
+
+bool PuzzleMagicWall::colorAssistRGB(ColorAssistMode mode, uint color, RGBColor &displayColor) {
+	if (10 <= color || mode == ColorAssistMode::kOriginal00)
+		return false;
+	if (mode == ColorAssistMode::kSmallScreen01) {
+		if (color == 6) {
+			displayColor = RGBColor(240, 32, 205);
+			return true;
+		}
+		if (color == 7) {
+			displayColor = RGBColor(178, 255, 212);
+			return true;
+		}
+		return false;
+	}
+	static constexpr RGBColor kRedGreenColors[10] = {
+		RGBColor(0, 64, 255),
+		RGBColor(65, 217, 141),
+		RGBColor(42, 91, 140),
+		RGBColor(178, 89, 0),
+		RGBColor(115, 115, 115),
+		RGBColor(100, 40, 32),
+		RGBColor(0, 217, 217),
+		RGBColor(0, 191, 255),
+		RGBColor(0, 108, 217),
+		RGBColor(217, 217, 65),
+	};
+	displayColor = kRedGreenColors[color];
+	return true;
+}
+
+void PuzzleMagicWall::drawColorSprite(ManagedSurface32 *screen, const char *format, uint color, const Common::Point32 &pos, byte sourceBrightness) const {
+	const Common::String key = Common::String::format(format, kColors[color]);
+	RGBColor displayColor;
+	if (colorAssistRGB(_vm->getColorAssistMode(), color, displayColor)) {
+		const RleBlock *sprite = _vm->_gfx->loadPageRleBlock(key);
+		if (sprite)
+			sprite->drawToScreenRecolored(screen, pos, displayColor, _vm->getAlphaLUT(), nullptr, sourceBrightness);
+	} else {
+		_vm->_gfx->drawPageRleBlock(screen, key, pos);
 	}
 }
 
@@ -693,15 +737,17 @@ void PuzzleMagicWall::onRenderContent(ManagedSurface32 *screen) {
 			const Common::Point32 pos = dotPosition(i);
 			if (!_backgroundPath.empty())
 				_vm->_gfx->drawPageBitBlockSubRect(screen, _backgroundPath, pos, Common::Rect(pos.x, pos.y, pos.x + 50, pos.y + 50));
-			_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kDotFormat, kColors[i]), dotPosition(i));
+			drawColorSprite(screen, kDotFormat, i, dotPosition(i), kDotSourceBrightness[i]);
 		}
 		drawBeetles(screen);
 	}
 	bool allMatched = true;
 	for (uint i = 0; i < _maze.positions().size(); i++) {
 		const bool lit = _phase != Phase::kFinished && _maze.matched(i);
-		_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kLightFormat, kColors[lit ? i : 10]),
-									kLightPositions[i] - Common::Point32(6, 5));
+		if (lit)
+			drawColorSprite(screen, kLightFormat, i, kLightPositions[i] - Common::Point32(6, 5), 255);
+		else
+			_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kLightFormat, kColors[10]), kLightPositions[i] - Common::Point32(6, 5));
 		if (!_maze.matched(i))
 			allMatched = false;
 	}

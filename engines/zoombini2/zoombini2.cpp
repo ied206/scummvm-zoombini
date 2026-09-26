@@ -684,9 +684,12 @@ void Zoombini2Engine::refreshEngineSettings() {
 	}
 	_debugHotkeysEnabled = ConfMan.getBool(::Zoombini2MetaEngine::kConfigDebugHotkeys);
 	_stereoOutputEnabled = ConfMan.getBool(::Zoombini2MetaEngine::kConfigStereoOutput);
+	const int colorAssistValue = ConfMan.getInt(::Zoombini2MetaEngine::kConfigColorAssistMode);
+	_colorAssistMode = 0 <= colorAssistValue && colorAssistValue <= 2 ? static_cast<ColorAssistMode>(colorAssistValue) : ColorAssistMode::kOriginal00;
 	_useGreedyWaterslidePairing = ConfMan.getBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing);
 	_useAquacubeSafeFirstMove = ConfMan.getBool(::Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove);
 	_useFloatingPointPaths = ConfMan.getBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths);
+	_fixFleenDepartStreak = ConfMan.getBool(::Zoombini2MetaEngine::kConfigFixFleenDepartureStreak);
 	_enhancedKbdShortcuts = ConfMan.getBool(::Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts);
 	_allowCutLevel4PracticePuzzles = ConfMan.getBool(::Zoombini2MetaEngine::kConfigAllowCutLevel4PracticePuzzles);
 	_logicPacingHz = ConfMan.getInt(::Zoombini2MetaEngine::kConfigLogicPacingHz) == 75 ? 75 : 60;
@@ -727,9 +730,9 @@ void Zoombini2Engine::importZoombiniSet() {
 	const uint importCount = MIN<uint>(fileCount, _state->_activeZoombinis.size());
 	for (uint i = 0; i < importCount && !input->eos(); i++) {
 		Common::StringTokenizer tokens(input->readLine());
-		byte values[ZmbTrait::kTraitCount];
+		byte values[ZmbTrait::kTraitKindCount];
 		bool completeTuple = true;
-		for (int traitIndex = 0; traitIndex < ZmbTrait::kTraitCount; traitIndex++) {
+		for (int traitIndex = 0; traitIndex < ZmbTrait::kTraitKindCount; traitIndex++) {
 			if (tokens.empty()) {
 				completeTuple = false;
 				break;
@@ -853,7 +856,7 @@ bool Zoombini2Engine::dispatchPageEvents() {
 		const bool pageDialogWasActive = _currentPage->hasActiveDialog();
 		modalInputBlocked = modalInputBlocked || msgBoxEventWasActive || debugDialogEventWasActive || sidebarDialogEventWasActive;
 		if (event.type == Common::EVENT_LBUTTONDOWN)
-			_modalOwnedPress = msgBoxEventWasActive || debugDialogEventWasActive || sidebarDialogEventWasActive || pageDialogWasActive;
+			_modalOwnedPress = msgBoxEventWasActive || debugDialogEventWasActive || sidebarDialogEventWasActive;
 
 		if (event.type == Common::EVENT_LBUTTONDOWN || event.type == Common::EVENT_RBUTTONDOWN || event.type == Common::EVENT_LBUTTONUP || event.type == Common::EVENT_MOUSEMOVE)
 			_mousePos = event.mouse;
@@ -865,7 +868,7 @@ bool Zoombini2Engine::dispatchPageEvents() {
 			result = _debugDialog->handleEvent(event);
 		else if (_sidebar)
 			result = _sidebar->handleEvent(event);
-		// A press that began inside a modal owns its release. The press may
+		// A press that began inside a shared modal owns its release. The press may
 		// have dismissed the modal, but the release must still not reach the page.
 		const bool releaseAfterModalPress = event.type == Common::EVENT_LBUTTONUP && _modalOwnedPress;
 		if (result == EventHandleResult::kPassthrough && !modalInputBlocked && !releaseAfterModalPress)
