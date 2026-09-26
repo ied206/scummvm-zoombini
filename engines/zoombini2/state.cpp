@@ -152,15 +152,15 @@ Common::String GameState::generateZoombiniName(Random &random) {
 	return Common::String(name);
 }
 
-byte ZmbTrait::getValue(TraitIndex index) const {
+byte ZmbTrait::getValue(TraitKind index) const {
 	switch (index) {
-	case TraitIndex::kFeet00:
+	case TraitKind::kFeet00:
 		return _feet;
-	case TraitIndex::kNose01:
+	case TraitKind::kNose01:
 		return _nose;
-	case TraitIndex::kHair02:
+	case TraitKind::kHair02:
 		return _hair;
-	case TraitIndex::kEyes03:
+	case TraitKind::kEyes03:
 		return _eyes;
 	default:
 		return 0;

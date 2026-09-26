@@ -35,6 +35,82 @@ class Random;
 
 /** Rules and simultaneous bubble movement for Mystic Marsh. */
 class MysticMarshGrid {
+private:
+	/** Cell codes 2 through 61 map to their matching cell symbol suffixes in order. */
+	enum CellType {
+		kEmptyType00 = 0,
+		kFollowIncomingDirectionType01 = 1,
+		kSymbolSDiv1Type02 = 2,
+		kSymbolSDiv2Type03 = 3,
+		kSymbolSDiv3Type04 = 4,
+		kSymbolSDiv4Type05 = 5,
+		kSymbolCDiv1Type06 = 6,
+		kSymbolCDiv2Type07 = 7,
+		kSymbolCDiv3Type08 = 8,
+		kSymbolCDiv4Type09 = 9,
+		kSymbolRdCyDiv2Type10 = 10,
+		kSymbolDrCyDiv2Type11 = 11,
+		kSymbolUdCyDiv2Type12 = 12,
+		kSymbolDuCyDiv2Type13 = 13,
+		kSymbolLrCyDiv2Type14 = 14,
+		kSymbolRlCyDiv2Type15 = 15,
+		kSymbolOtDiv1Type16 = 16,
+		kSymbolOtDiv2Type17 = 17,
+		kSymbolOtDiv3Type18 = 18,
+		kSymbolOtDiv4Type19 = 19,
+		kSymbolOldOtDiv1Type20 = 20,
+		kSymbolOldOtDiv2Type21 = 21,
+		kSymbolOldOtDiv3Type22 = 22,
+		kSymbolOldOtDiv4Type23 = 23,
+		kSymbolCcRotatorType24 = 24,
+		kSymbolCRotatorType25 = 25,
+		kSymbolLdElbowType26 = 26,
+		kSymbolLuElbowType27 = 27,
+		kSymbolLdConvergerType28 = 28,
+		kSymbolTrigger1Type29 = 29,
+		kSymbolTrigger2Type30 = 30,
+		kSymbolTrigger3Type31 = 31,
+		kSymbolTrigger4Type32 = 32,
+		kSymbolTrigger5Type33 = 33,
+		kSymbolTrigger6Type34 = 34,
+		kSymbolTrigger7Type35 = 35,
+		kSymbolUrTcyDiv2Type36 = 36,
+		kSymbolRuTcyDiv2Type37 = 37,
+		kSymbolRdTcyDiv2Type38 = 38,
+		kSymbolDrTcyDiv2Type39 = 39,
+		kSymbolLrTcyDiv2Type40 = 40,
+		kSymbolRlTcyDiv2Type41 = 41,
+		kSymbolLlTcyDiv3Type42 = 42,
+		kSymbolLuTcyDiv3Type43 = 43,
+		kSymbolLdTcyDiv3Type44 = 44,
+		kSymbolRrTcyDiv3Type45 = 45,
+		kSymbolRuTcyDiv3Type46 = 46,
+		kSymbolRdTcyDiv3Type47 = 47,
+		kSymbolUuTcyDiv3Type48 = 48,
+		kSymbolUlTcyDiv3Type49 = 49,
+		kSymbolUrTcyDiv3Type50 = 50,
+		kSymbolTsSpot1Type51 = 51,
+		kSymbolTsSpot2Type52 = 52,
+		kSymbolTsSpot3Type53 = 53,
+		kSymbolTsSpot4Type54 = 54,
+		kSymbolTsSpot5Type55 = 55,
+		kSymbolTsSpot6Type56 = 56,
+		kSymbolTsSpot7Type57 = 57,
+		kSymbolTourbiType58 = 58,
+		kSymbolEdgeType59 = 59,
+		kSymbolEntry1Type60 = 60,
+		kSymbolEntry2Type61 = 61,
+		kExitType62 = 62
+	};
+	/** Direction codes used by cell outputs and bubble movement. */
+	enum Direction {
+		kLeftDirection00 = 0,
+		kRightDirection01 = 1,
+		kUpDirection02 = 2,
+		kDownDirection03 = 3,
+		kNoFixedDirection04 = 4
+	};
+
 public:
 	/** Grid dimensions in logical device cells. */
 	static constexpr int kColumns = 16;
@@ -48,7 +124,7 @@ public:
 		int trait;
 		int value;
 		int state;
-		constexpr Cell(int t = 0, int d = 4, int g = 0, int f = 0, int v = 0, int s = 0)
+		constexpr Cell(int t = kEmptyType00, int d = kNoFixedDirection04, int g = 0, int f = 0, int v = 0, int s = 0)
 			: type(t), direction(d), trigger(g), trait(f), value(v), state(s) {}
 	};
 	/** A Zoombini position before or after one simultaneous grid tick. */
@@ -133,7 +209,60 @@ private:
 		Feature(int t = 0, int v = 0) : trait(t), value(v) {}
 	};
 	/** Decoded cell templates and layout-indexed template maps. */
-	static const Cell kCellTemplates[];
+	static const Cell *cellTemplates() {
+		static constexpr Cell kCellTemplates[] = {
+			{kEmptyType00, kLeftDirection00, 0, 0, 0, 0},
+			{kFollowIncomingDirectionType01, kNoFixedDirection04, 0, 0, 0, 0},
+			{kSymbolSDiv2Type03, kRightDirection01, 0, 0, 0, 0},
+			{kSymbolCDiv4Type09, kDownDirection03, 0, 0, 0, 0},
+			{kSymbolTsSpot2Type52, kNoFixedDirection04, 30, 0, 0, 0},
+			{kSymbolTrigger1Type29, kNoFixedDirection04, 0, 0, 0, 0},
+			{kSymbolSDiv4Type05, kDownDirection03, 0, 0, 0, 0},
+			{kSymbolTrigger2Type30, kNoFixedDirection04, 0, 0, 0, 0},
+			{kSymbolEntry1Type60, kRightDirection01, 0, 0, 0, 0},
+			{kSymbolUdCyDiv2Type12, kUpDirection02, 0, 0, 0, 0},
+			{kSymbolTourbiType58, kNoFixedDirection04, 0, 0, 0, 0},
+			{kSymbolOtDiv2Type17, kRightDirection01, 0, 0, 0, 0},
+			{kSymbolTsSpot1Type51, kNoFixedDirection04, 29, 0, 0, 0},
+			{kExitType62, kLeftDirection00, 0, 0, 0, 0},
+			{kSymbolTrigger3Type31, kNoFixedDirection04, 0, 0, 0, 0},
+			{kSymbolCDiv3Type08, kUpDirection02, 0, 0, 0, 0},
+			{kSymbolTsSpot3Type53, kNoFixedDirection04, 31, 0, 0, 0},
+			{kSymbolSDiv3Type04, kUpDirection02, 0, 0, 0, 0},
+			{kSymbolOtDiv4Type19, kDownDirection03, 0, 0, 0, 0},
+			{kSymbolOtDiv3Type18, kUpDirection02, 0, 0, 0, 0},
+			{kSymbolCDiv2Type07, kRightDirection01, 0, 0, 0, 0},
+			{kSymbolTrigger4Type32, kNoFixedDirection04, 0, 0, 0, 0},
+			{kSymbolTsSpot5Type55, kNoFixedDirection04, 33, 0, 0, 0},
+			{kSymbolTsSpot6Type56, kNoFixedDirection04, 34, 0, 0, 0},
+			{kSymbolTsSpot4Type54, kNoFixedDirection04, 32, 0, 0, 0},
+			{kSymbolLrCyDiv2Type14, kLeftDirection00, 0, 0, 0, 0},
+			{kSymbolTrigger5Type33, kNoFixedDirection04, 0, 0, 0, 0},
+			{kSymbolTrigger6Type34, kNoFixedDirection04, 0, 0, 0, 0},
+			{kSymbolTsSpot7Type57, kNoFixedDirection04, 35, 0, 0, 0},
+			{kSymbolTrigger7Type35, kNoFixedDirection04, 0, 0, 0, 0},
+			{kSymbolSDiv1Type02, kLeftDirection00, 0, 0, 0, 0},
+			{kSymbolCDiv1Type06, kLeftDirection00, 0, 0, 0, 0},
+			{kSymbolDrCyDiv2Type11, kDownDirection03, 0, 0, 0, 0},
+			{kSymbolTourbiType58, kLeftDirection00, 0, 0, 0, 0},
+			{kSymbolCcRotatorType24, kNoFixedDirection04, 0, 0, 0, 0},
+			{kSymbolCRotatorType25, kNoFixedDirection04, 0, 0, 0, 0},
+			{kSymbolEntry2Type61, kDownDirection03, 0, 0, 0, 0},
+			{kSymbolOtDiv1Type16, kLeftDirection00, 0, 0, 0, 0},
+			{kSymbolRdTcyDiv2Type38, kRightDirection01, 31, 0, 0, 0},
+			{kSymbolRdCyDiv2Type10, kRightDirection01, 0, 0, 0, 0},
+			{kSymbolUrTcyDiv2Type36, kUpDirection02, 30, 0, 0, 0},
+			{kSymbolLuElbowType27, kNoFixedDirection04, 0, 0, 0, 0},
+			{kSymbolTsSpot2Type52, kNoFixedDirection04, 29, 0, 0, 0},
+			{kSymbolLdConvergerType28, kNoFixedDirection04, 0, 0, 0, 0},
+			{kSymbolRdTcyDiv3Type47, kNoFixedDirection04, 33, 0, 0, 0},
+			{kSymbolLlTcyDiv3Type42, kLeftDirection00, 29, 0, 0, 0},
+			{kSymbolLrTcyDiv2Type40, kLeftDirection00, 34, 0, 0, 0},
+			{kSymbolLdElbowType26, kNoFixedDirection04, 0, 0, 0, 0},
+			{kSymbolCDiv2Type07, kNoFixedDirection04, 1, 0, 0, 0},
+		};
+		return kCellTemplates;
+	}
 	static constexpr byte kLayouts[9][kRows][kColumns] = {
 		{
 			// Level 1 layout 0
@@ -529,6 +658,8 @@ private:
 	void playSfx(int index);
 	void enqueueSpeech(const Common::String &name);
 	void loadResources();
+	/** Draw a trigger or matching spot with the same assisted color for its group. */
+	void drawColorSymbol(ManagedSurface32 *screen, int symbolIndex, const Common::Point32 &pos) const;
 	/** Cache the answer for this puzzle's initial board until the page is initialized again. */
 	mutable Common::String _initialAnswer;
 

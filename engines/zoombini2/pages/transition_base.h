@@ -30,7 +30,7 @@ namespace Zoombini2 {
 class TransitionBase : public PageBase {
 public:
 	/** Bind a transition page to @p vm. */
-	explicit TransitionBase(Zoombini2Engine *vm) : PageBase(vm, PageCategory::kTransition) {}
+	explicit TransitionBase(Zoombini2Engine *vm);
 };
 
 } // End of namespace Zoombini2

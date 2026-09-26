@@ -231,7 +231,7 @@ void PuzzleWaterslide::loadResources() {
 }
 
 int PuzzleWaterslide::trait(int generatedIndex, int axis) const {
-	return _puzzleZoombinis[_generationOrder[generatedIndex]]->_traits.getValue(static_cast<ZmbTrait::TraitIndex>(axis));
+	return _puzzleZoombinis[_generationOrder[generatedIndex]]->_traits.getValue(static_cast<ZmbTrait::TraitKind>(axis));
 }
 
 int PuzzleWaterslide::sharedAxis(int first, int second, bool rejectLast) {
@@ -644,7 +644,7 @@ bool PuzzleWaterslide::matches(const Edge &edge) const {
 		return false;
 	if (edge.axis < 0)
 		return true;
-	const ZmbTrait::TraitIndex axis = static_cast<ZmbTrait::TraitIndex>(edge.axis);
+	const ZmbTrait::TraitKind axis = static_cast<ZmbTrait::TraitKind>(edge.axis);
 	return _puzzleZoombinis[a.zoombiniIndex]->_traits.getValue(axis) == _puzzleZoombinis[b.zoombiniIndex]->_traits.getValue(axis);
 }
 
@@ -1053,7 +1053,7 @@ bool PuzzleWaterslide::debugPlacementMatches(int slot, int actor, const Common::
 		const int other = assignment[edge.a == slot ? edge.b : edge.a];
 		if (other < 0)
 			continue;
-		const ZmbTrait::TraitIndex axis = static_cast<ZmbTrait::TraitIndex>(edge.axis);
+		const ZmbTrait::TraitKind axis = static_cast<ZmbTrait::TraitKind>(edge.axis);
 		if (_puzzleZoombinis[actor]->_traits.getValue(axis) != _puzzleZoombinis[other]->_traits.getValue(axis))
 			return false;
 	}
@@ -1147,7 +1147,7 @@ Common::String PuzzleWaterslide::debugGetAnswer() const {
 	for (const Edge &edge : _edges) {
 		const char *axis = "any trait";
 		if (0 <= edge.axis)
-			axis = ZmbTrait::debugTraitName(static_cast<ZmbTrait::TraitIndex>(edge.axis));
+			axis = ZmbTrait::debugTraitName(static_cast<ZmbTrait::TraitKind>(edge.axis));
 		const Common::Rect32 &first = _targets[edge.a].rect;
 		const Common::Rect32 &second = _targets[edge.b].rect;
 		answer += Common::String::format("    (%d, %d) <-> (%d, %d): %s\n", first.left, first.top, second.left, second.top, axis);
