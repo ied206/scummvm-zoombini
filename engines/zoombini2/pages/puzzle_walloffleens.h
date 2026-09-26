@@ -50,12 +50,14 @@ public:
 	void onActorsRendered() override;
 	/** Fire the cannon or select a target mirror after a button release at @p pos. */
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
+	/** Select the interactive cursor over the active mirror grid. */
+	EventHandleResult onMouseMove(const Common::Point &pos) override;
 	/** Complete the current board for the puzzle-console command. */
 	void applyDebugPuzzleCompletion() override;
 	bool canUseGoButton() const override;
 	/** Return through retreat speech or the completed map transition. */
 	bool onGoButtonPressed() override;
-	/** Describe target traits and current mirror scores for the puzzle console. */
+	/** Describe each target Fleen and its mirror status for the puzzle console. */
 	Common::String debugGetAnswer() const override;
 	PuzzleChanceInfo debugGetChances() const override { return PuzzleChanceInfo(PuzzleChanceInfo::Type::kAmorphous); }
 	Common::String debugGetChanceDetails() const override;
@@ -89,6 +91,18 @@ private:
 		/** Move a found Fleen away from the board. */
 		kLeaving04 = 4
 	};
+	/** Discrete cannon aim positions from the right edge through center to the left edge. */
+	enum class CannonAimAngle : int {
+		kRight00 = 0,
+		kUpRight01 = 1,
+		kUpRight02 = 2,
+		kUpRight03 = 3,
+		kCenter04 = 4,
+		kUpLeft05 = 5,
+		kUpLeft06 = 6,
+		kUpLeft07 = 7,
+		kLeft08 = 8
+	};
 	/** Select the score digits displayed for a mirror. */
 	enum ScoreMask {
 		/** No score is being displayed. */
@@ -98,9 +112,16 @@ private:
 		/** Score to the secondary actual fleen, only active in level 4 */
 		kShowSecondaryScore02 = 2
 	};
+	/** Fleen feature values share the renderer's numeric trait layout but use Fleen names. */
+	struct FleenTrait : public ZmbTrait {
+		/** Return the diagnostic value name for one Fleen trait. */
+		static const char *debugTraitValueName(ZmbTrait::TraitKind index, int value);
+		/** Return Fleen feature names in hair, eyes, nose, feet order. */
+		Common::String toStr() const;
+	};
 	struct Cell {
 		/** Target-comparison traits, screen origin, score, and display flags for one mirror cell. */
-		ZmbTrait traits;
+		FleenTrait traits;
 		Common::Point32 pos;
 		int score = -1;
 		bool tried = false;
@@ -108,6 +129,11 @@ private:
 		bool empty = false;
 		byte scoreMask = kShowPrimaryScore01;
 	};
+	/** Departure animation cell and the white-nose frames whose artwork contains a stray streak. */
+	static constexpr int kFleenDepartureCell = 56;
+	static constexpr int kWhiteNoseTrait = 2;
+	static constexpr int kStreakFirstFrame = 2;
+	static constexpr int kStreakLastFrame = 5;
 	/** Background music played while the Magic Mirrors board is active. */
 	static constexpr const char *kMusicPath = "#sounds/music/05-BB01.wav";
 	/** Cannon muzzle frames, selected from the current aim angle. */
@@ -1090,8 +1116,10 @@ private:
 	void playEffect(int index);
 	void queueSpeech(const Common::String &path);
 	void drawCell(ManagedSurface32 *screen, const Cell &cell, bool active) const;
+	void updateHoverCursor(const Common::Point32 &pos);
 	/** Convert a rail vector to an animation direction, clear Fleen completion, or make a line path. */
 	static int direction(const Common::Point32 &start, const Common::Point32 &end, int sectors);
+	static CannonAimAngle stepCannonAimAngle(CannonAimAngle current, CannonAimAngle target);
 	static void onFleenAnimationDone(void *context, ZoombiniRunner *runner);
 	PathObject *makeLine(const Common::Point32 &start, const Common::Point32 &end, int step);
 
@@ -1112,8 +1140,8 @@ private:
 	int _initialPartyCount = 0;
 	/** Loaded party member and cannon/projectile orientation/image state. */
 	int _loadedRunner = -1;
-	int _angle = 4;
-	int _targetAngle = 4;
+	CannonAimAngle _angle = CannonAimAngle::kCenter04;
+	CannonAimAngle _targetAngle = CannonAimAngle::kCenter04;
 	int _projectileCell = 4;
 	int _projectileImage = 1;
 	/** Found targets, reset/finish/retreat flags, and the projectile-consumption outcome. */

@@ -36,7 +36,7 @@ int MysticMarshGrid::randomBelow(int count) {
 int MysticMarshGrid::trait(int zoombini, int feature) const {
 	if (zoombini < 0 || static_cast<int>(_party.size()) <= zoombini || feature < 1 || 4 < feature)
 		return 0;
-	return _party[zoombini].getValue(static_cast<ZmbTrait::TraitIndex>(feature - 1));
+	return _party[zoombini].getValue(static_cast<ZmbTrait::TraitKind>(feature - 1));
 }
 
 bool MysticMarshGrid::matches(int zoombini, Feature feature) const {
@@ -53,9 +53,10 @@ int MysticMarshGrid::background() const {
 
 void MysticMarshGrid::loadLayout(int layout) {
 	_layout = layout;
+	const Cell *templates = cellTemplates();
 	for (int col = 0; col < kColumns; col++) {
 		for (int row = 0; row < kRows; row++)
-			_cells[index(col, row)] = kCellTemplates[kLayouts[layout][row][col]];
+			_cells[index(col, row)] = templates[kLayouts[layout][row][col]];
 	}
 }
 
@@ -954,10 +955,11 @@ MysticMarshGrid::Feature MysticMarshGrid::pickLevel4Pair(Feature primary, Featur
 }
 
 void MysticMarshGrid::correctLevel4Arrow() {
-	// The original level 4 right-arrow template has an unchanged direction,
-	// which permanently traps the matching Zoombini in its own cell.
-	// Keep the authored data intact and correct only the generated board,
-	// before the initial snapshot used by @ref MysticMarshGrid::findAnswer is retained.
+	// The conditional right-arrow symbol communicates the intended rightward route.
+	// The original level 4 template sets direction 4, leaving matching Zoombinis in this cell.
+	// Correcting the generated cell is required to make its behavior match that intent.
+	// Keep the authored layout intact and apply the correction before the initial
+	// snapshot used by @ref MysticMarshGrid::findAnswer is retained.
 	Cell &arrow = _cells[index(7, 9)];
 	if (_layout == 8 && arrow.type == 7 && arrow.direction == 4) {
 		arrow.direction = 1;
@@ -1142,16 +1144,16 @@ void MysticMarshGrid::move(int cellIndex, int direction) {
 	int column = cellIndex / kRows;
 	int row = cellIndex % kRows;
 	switch (direction) {
-	case 0:
+	case kLeftDirection00:
 		column -= 1;
 		break;
-	case 1:
+	case kRightDirection01:
 		column += 1;
 		break;
-	case 2:
+	case kUpDirection02:
 		row -= 1;
 		break;
-	case 3:
+	case kDownDirection03:
 		row += 1;
 		break;
 	default:
@@ -1605,59 +1607,6 @@ bool MysticMarshGrid::findAnswer(Common::Array<AnswerLaunch> &answer, bool &from
 	}
 	return true;
 }
-
-// Immutable marsh cells and row-major layout maps.
-const MysticMarshGrid::Cell MysticMarshGrid::kCellTemplates[] = {
-	{0, 0, 0, 0, 0, 0},
-	{1, 4, 0, 0, 0, 0},
-	{3, 1, 0, 0, 0, 0},
-	{9, 3, 0, 0, 0, 0},
-	{52, 4, 30, 0, 0, 0},
-	{29, 4, 0, 0, 0, 0},
-	{5, 3, 0, 0, 0, 0},
-	{30, 4, 0, 0, 0, 0},
-	{60, 1, 0, 0, 0, 0},
-	{12, 2, 0, 0, 0, 0},
-	{58, 4, 0, 0, 0, 0},
-	{17, 1, 0, 0, 0, 0},
-	{51, 4, 29, 0, 0, 0},
-	{62, 0, 0, 0, 0, 0},
-	{31, 4, 0, 0, 0, 0},
-	{8, 2, 0, 0, 0, 0},
-	{53, 4, 31, 0, 0, 0},
-	{4, 2, 0, 0, 0, 0},
-	{19, 3, 0, 0, 0, 0},
-	{18, 2, 0, 0, 0, 0},
-	{7, 1, 0, 0, 0, 0},
-	{32, 4, 0, 0, 0, 0},
-	{55, 4, 33, 0, 0, 0},
-	{56, 4, 34, 0, 0, 0},
-	{54, 4, 32, 0, 0, 0},
-	{14, 0, 0, 0, 0, 0},
-	{33, 4, 0, 0, 0, 0},
-	{34, 4, 0, 0, 0, 0},
-	{57, 4, 35, 0, 0, 0},
-	{35, 4, 0, 0, 0, 0},
-	{2, 0, 0, 0, 0, 0},
-	{6, 0, 0, 0, 0, 0},
-	{11, 3, 0, 0, 0, 0},
-	{58, 0, 0, 0, 0, 0},
-	{24, 4, 0, 0, 0, 0},
-	{25, 4, 0, 0, 0, 0},
-	{61, 3, 0, 0, 0, 0},
-	{16, 0, 0, 0, 0, 0},
-	{38, 1, 31, 0, 0, 0},
-	{10, 1, 0, 0, 0, 0},
-	{36, 2, 30, 0, 0, 0},
-	{27, 4, 0, 0, 0, 0},
-	{52, 4, 29, 0, 0, 0},
-	{28, 4, 0, 0, 0, 0},
-	{47, 4, 33, 0, 0, 0},
-	{42, 0, 29, 0, 0, 0},
-	{40, 0, 34, 0, 0, 0},
-	{26, 4, 0, 0, 0, 0},
-	{7, 4, 1, 0, 0, 0},
-};
 
 constexpr byte MysticMarshGrid::kLayouts[9][kRows][kColumns];
 
@@ -2285,19 +2234,22 @@ void MysticMarshL4Background::drawGrid(ManagedSurface32 *screen, const MysticMar
 void PuzzleMysticMarsh::onRenderContent(ManagedSurface32 *screen) {
 	if (_backgroundIndex == 6) {
 		const Common::Point32 position = MysticMarshL4Background::cellPosition(kLevel4RejectVisualCellIndex);
-		_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kSymbolFormat, kSymbolNames[kRejectCellType - 2]),
-									Common::Point32(position.x + 3, position.y + 61));
+		drawColorSymbol(screen, kRejectCellType - 2, Common::Point32(position.x + 3, position.y + 61));
 	}
 	for (int i = 0; i < MysticMarshGrid::kCellCount; i++) {
 		const MysticMarshGrid::Cell &cell = _drawCells[i];
 		if (cell.type < 2 || 60 <= cell.type)
 			continue;
 		const Common::Point32 position = MysticMarshL4Background::cellPosition(i);
-		_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kSymbolFormat, kSymbolNames[cell.type - 2]),
-									Common::Point32(position.x + 3, position.y + 61));
-		if (6 <= cell.type && cell.type <= 9 && 1 <= cell.trait && cell.trait <= 4 && 1 <= cell.value && cell.value <= 5)
-			_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kTraitFormat, cell.trait, cell.value),
-										Common::Point32(position.x + 9, position.y + 62));
+		drawColorSymbol(screen, cell.type - 2, Common::Point32(position.x + 3, position.y + 61));
+		if (6 <= cell.type && cell.type <= 9 && 1 <= cell.trait && cell.trait <= 4 && 1 <= cell.value && cell.value <= 5) {
+			if (cell.trait - 1 == static_cast<int>(ZmbTrait::TraitKind::kNose01))
+				_vm->_gfx->drawPageNoseTraitSprite(screen, Common::String::format(kTraitFormat, cell.trait, cell.value),
+												   Common::Point32(position.x + 9, position.y + 62), static_cast<byte>(cell.value));
+			else
+				_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kTraitFormat, cell.trait, cell.value),
+											Common::Point32(position.x + 9, position.y + 62));
+		}
 	}
 	for (uint i = 0; i < _slots.size(); i++) {
 		const Slot &slot = _slots[i];
@@ -2315,6 +2267,31 @@ void PuzzleMysticMarsh::onRenderContent(ManagedSurface32 *screen) {
 			_vm->_gfx->drawAnimationFrame(screen, _whirlpoolAnimation, frame, effect.position);
 		}
 	}
+}
+
+void PuzzleMysticMarsh::drawColorSymbol(ManagedSurface32 *screen, int symbolIndex, const Common::Point32 &pos) const {
+	const Common::String key = Common::String::format(kSymbolFormat, kSymbolNames[symbolIndex]);
+	int group = -1;
+	if (27 <= symbolIndex && symbolIndex <= 33)
+		group = symbolIndex - 27;
+	else if (49 <= symbolIndex && symbolIndex <= 55)
+		group = symbolIndex - 49;
+	if (group < 0 || _vm->getColorAssistMode() != ColorAssistMode::kRedGreen02) {
+		_vm->_gfx->drawPageRleBlock(screen, key, pos);
+		return;
+	}
+	static constexpr RGBColor kGroupColors[7] = {
+		RGBColor(0, 64, 255),
+		RGBColor(42, 91, 140),
+		RGBColor(65, 217, 141),
+		RGBColor(178, 89, 0),
+		RGBColor(115, 115, 115),
+		RGBColor(0, 217, 217),
+		RGBColor(217, 217, 65),
+	};
+	const RleBlock *sprite = _vm->_gfx->loadPageRleBlock(key);
+	if (sprite)
+		sprite->drawToScreenRecolored(screen, pos, kGroupColors[group], _vm->getAlphaLUT());
 }
 
 void PuzzleMysticMarsh::onRenderActors(ManagedSurface32 *screen) {

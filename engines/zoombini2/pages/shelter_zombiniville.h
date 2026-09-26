@@ -85,9 +85,9 @@ private:
 	/** Trait-button animation format; arguments select one of four traits and five values. */
 	static constexpr const char *kFeatureAnimationFormat = "bmp/zombiniville/pikaroll/z1pi%d%d.an";
 	/** Animation for choosing one random valid Zoombini feature combination. */
-	static constexpr const char *kQuickFillButtonPath = "bmp/zombiniville/BUMPER-1.AN";
+	static constexpr const char *kOneRandomButtonPath = "bmp/zombiniville/BUMPER-1.AN";
 	/** Animation for filling the remaining party slots with valid Zoombinis. */
-	static constexpr const char *kBatchFillButtonPath = "bmp/zombiniville/bumper-16.an";
+	static constexpr const char *kAllRandomButtonPath = "bmp/zombiniville/bumper-16.an";
 	/** Animation for creating a Zoombini from the selected feature combination. */
 	static constexpr const char *kCreateButtonPath = "bmp/zombiniville/bumper-Valid.an";
 	/** Layered sprite grid used to preview the selected Zoombini features. */
@@ -103,26 +103,26 @@ private:
 	/** Sound effect played when a trait value is selected. */
 	static constexpr const char *kFeatureSelectSoundPath = "sounds/fx/Z-BS11.wav";
 	/** Sound effect played when Quick Fill selects a valid combination. */
-	static constexpr const char *kQuickFillSoundPath = "sounds/fx/Z-BS12.wav";
+	static constexpr const char *kOneRandomSoundPath = "sounds/fx/Z-BS12.wav";
 	/** Sound effect played when Batch Fill populates the remaining party slots. */
-	static constexpr const char *kBatchFillSoundPath = "sounds/fx/Z-BS13.wav";
+	static constexpr const char *kAllRandomSoundPath = "sounds/fx/Z-BS13.wav";
 	/** Sound effect played when a Zoombini is successfully created. */
 	static constexpr const char *kValidZoombiniSoundPath = "sounds/fx/Z-BS14.wav";
 	/** Sound effect played when the selected combination cannot be created. */
 	static constexpr const char *kWrongZoombiniSoundPath = "sounds/fx/WrongZ.wav";
 
-	/** Feature selection controls indexed by feature and value. */
-	Animation *_featureButtons[ZmbTrait::kTraitCount][ZmbTrait::kTraitValueCount] = {};
-	/** Play-once hover overlays indexed by feature and value. */
-	AnimationRunner *_featureButtonRunners[ZmbTrait::kTraitCount][ZmbTrait::kTraitValueCount] = {};
+	/** Feature selection controls indexed by trait kind and value. */
+	Animation *_featureButtons[ZmbTrait::kTraitKindCount][ZmbTrait::kTraitValueCount] = {};
+	/** Play-once hover overlays indexed by trait kind and value. */
+	AnimationRunner *_featureButtonRunners[ZmbTrait::kTraitKindCount][ZmbTrait::kTraitValueCount] = {};
 	/** Control that selects a random valid feature combination. */
-	Animation *_quickFillButton = nullptr;
+	Animation *_oneRandomButton = nullptr;
 	/** Hover and pointer-exit sequence for Quick Fill. */
-	AnimationRunner *_quickFillButtonRunner = nullptr;
+	AnimationRunner *_oneRandomButtonRunner = nullptr;
 	/** Control that fills the remaining party with valid Zoombinis. */
-	Animation *_batchFillButton = nullptr;
+	Animation *_allRandomButton = nullptr;
 	/** Hover and pointer-exit sequence for Batch Fill. */
-	AnimationRunner *_batchFillButtonRunner = nullptr;
+	AnimationRunner *_allRandomButtonRunner = nullptr;
 	/** Control that creates the currently selected Zoombini. */
 	Animation *_createButton = nullptr;
 	/** Hover and pointer-exit sequence for Create Selected. */
@@ -139,18 +139,18 @@ private:
 
 	/** Current value for one feature station. */
 	struct FeatureStation {
-		/** Currently selected feature value. */
-		int selectedValue = 0;
+		/** One-based selected feature value (1-5), or zero when none is selected. */
+		byte selectedValue = 0;
 	};
 	/** Four stations corresponding to the four visible features. */
-	FeatureStation _stations[ZmbTrait::kTraitCount] = {};
+	FeatureStation _stations[ZmbTrait::kTraitKindCount] = {};
 	/** Counts of each feature value already present in the party. */
-	int _featureCounts[ZmbTrait::kTraitCount][ZmbTrait::kTraitValueCount + 1] = {};
+	int _featureCounts[ZmbTrait::kTraitKindCount][ZmbTrait::kTraitValueCount + 1] = {};
 
 	/** 32-bit Quick Fill control hit-test area. */
-	const Common::Rect32 _quickFillRect = Common::Rect32(135, 399, 211, 448);
+	const Common::Rect32 _oneRandomRect = Common::Rect32(135, 399, 211, 448);
 	/** 32-bit Batch Fill control hit-test area. */
-	const Common::Rect32 _batchFillRect = Common::Rect32(239, 416, 318, 477);
+	const Common::Rect32 _allRandomRect = Common::Rect32(239, 416, 318, 477);
 	/** 32-bit Create Selected control hit-test area. */
 	const Common::Rect32 _createRect = Common::Rect32(404, 438, 491, 500);
 
@@ -168,9 +168,9 @@ private:
 	/** Sound played when a feature value is selected. */
 	int _sndFeatureSelect = -1;
 	/** Sound played by Quick Fill. */
-	int _sndQuickFill = -1;
+	int _sndOneRandom = -1;
 	/** Sound played by Batch Fill. */
-	int _sndBatchFill = -1;
+	int _sndAllRandom = -1;
 	/** Sound played when a valid Zoombini joins the party. */
 	int _sndValidZoombini = -1;
 	/** Sound played when the selected combination cannot join. */
@@ -217,12 +217,14 @@ private:
 	void finishAllZoombiniReturns();
 	/** Reconstruct the page-authored hover timing tables for all 23 controls. */
 	void setupHoverRunners();
-	/** Return the fixed draw position for one feature control. */
-	static const Common::Point32 &getFeatureDrawPosition(int feature, int value);
-	/** Return the fixed hit-test area for one feature control. */
-	static const Common::Rect32 &getFeatureButtonRect(int feature, int value);
+	/** Return the fixed draw position for one trait control. */
+	static const Common::Point32 &getFeatureDrawPosition(ZmbTrait::TraitKind traitKind, int traitVal);
+	/** Return the fixed hit-test area for one trait kind and value control. */
+	static const Common::Rect32 &getFeatureButtonRect(ZmbTrait::TraitKind traitKind, int traitVal);
 	/** Draw active hover overlays and advance their pointer-exit sequences. */
 	void drawHoverRunners(ManagedSurface32 *screen);
+	/** Recolor the picker disc for one 1-based nose trait value. */
+	void recolorPickerNose(ManagedSurface32 *screen, byte noseVal) const;
 	/** Apply availability gates and reset each runner under the final frame pointer. */
 	void updateHoverRunners();
 	/** Return the boarding-area pos for @p index. */

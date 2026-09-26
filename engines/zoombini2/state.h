@@ -97,12 +97,12 @@ const int kCompletedTraitHashCount = 210;
 /** Stored Zoombini traits with an unused slot zero followed by the four visible values. */
 struct ZmbTrait {
 	/** Number of visible traits in the tuple. */
-	static constexpr int kTraitCount = 4;
+	static constexpr int kTraitKindCount = 4;
 	/** Number of selectable values for each visible trait. */
 	static constexpr int kTraitValueCount = 5;
 
 	/** Identity and tuple index of one visible trait. */
-	enum class TraitIndex : byte {
+	enum class TraitKind : byte {
 		/** Feet at tuple index zero. */
 		kFeet00 = 0,
 		/** Nose at tuple index one. */
@@ -118,7 +118,7 @@ struct ZmbTrait {
 	ZmbTrait(byte feet, byte nose, byte hair, byte eyes) : _feet(feet), _nose(nose), _hair(hair), _eyes(eyes) {}
 
 	/** Return the trait identified by @p index. */
-	byte getValue(TraitIndex index) const;
+	byte getValue(TraitKind index) const;
 	/** Return whether every trait is in the inclusive range 1 through 5. */
 	bool hasValidValues() const;
 	/** Return the packed identifier derived from all four traits. */
@@ -126,40 +126,52 @@ struct ZmbTrait {
 	/** Decode a packed identifier into feet, nose, hair, eyes storage order. */
 	static ZmbTrait fromHash(uint16 traitHash);
 	/** Return the ScummVM-internal diagnostic name for one visible trait. */
-	static const char *debugTraitName(TraitIndex index) {
+	static const char *debugTraitName(TraitKind index) {
 		switch (index) {
-		case TraitIndex::kFeet00:
+		case TraitKind::kFeet00:
 			return "feet";
-		case TraitIndex::kNose01:
+		case TraitKind::kNose01:
 			return "nose";
-		case TraitIndex::kHair02:
+		case TraitKind::kHair02:
 			return "hair";
-		case TraitIndex::kEyes03:
+		case TraitKind::kEyes03:
 			return "eyes";
 		default:
 			return "?";
 		}
 	}
 	/** Return the ScummVM-internal diagnostic name for one visible trait value. */
-	static const char *debugTraitValueName(TraitIndex index, int value) {
-		static constexpr const char *kZoombiniTraitNames[kTraitCount][kTraitValueCount] = {
-			{"Sneakers", "RollerSkates", "Spring", "Wheels", "Propeller"},
+	static const char *debugTraitValueName(TraitKind index, int value) {
+		// Rows follow the Hair, Eyes, Nose, Feet display order used by toStr().
+		static constexpr const char *kZoombiniTraitNames[kTraitKindCount][kTraitValueCount] = {
+			{"Braids", "LongWavy", "Cap", "Ponytail", "Spikey"},
+			{"NormalEyed", "Cyclops", "SleepyEyed", "Glasses", "Sunglasses"},
 			{"Orange", "White", "Green", "Blue", "Pink"},
-			{"Braids", "LongHair", "BaseballCap", "Ponytail", "SpikyHair"},
-			{"NormalEyed", "OneEyed", "SleepyEyed", "Glasses", "Sunglasses"},
+			{"Sneakers", "RollerSkates", "Spring", "Wheels", "Propeller"},
 		};
-		const int traitOrdinal = static_cast<int>(index);
-		if (0 <= traitOrdinal && traitOrdinal < kTraitCount && 1 <= value && value <= kTraitValueCount)
-			return kZoombiniTraitNames[traitOrdinal][value - 1];
+		if (value < 1 || kTraitValueCount < value)
+			return "?";
+		switch (index) {
+		case TraitKind::kHair02:
+			return kZoombiniTraitNames[0][value - 1];
+		case TraitKind::kEyes03:
+			return kZoombiniTraitNames[1][value - 1];
+		case TraitKind::kNose01:
+			return kZoombiniTraitNames[2][value - 1];
+		case TraitKind::kFeet00:
+			return kZoombiniTraitNames[3][value - 1];
+		default:
+			break;
+		}
 		return "?";
 	}
 	/** Return ScummVM-internal trait names in the Z1 diagnostic output pattern. */
 	Common::String toStr() const {
 		return Common::String::format("%s, %s, %s, %s",
-									  debugTraitValueName(TraitIndex::kHair02, _hair),
-									  debugTraitValueName(TraitIndex::kEyes03, _eyes),
-									  debugTraitValueName(TraitIndex::kNose01, _nose),
-									  debugTraitValueName(TraitIndex::kFeet00, _feet));
+									  debugTraitValueName(TraitKind::kHair02, _hair),
+									  debugTraitValueName(TraitKind::kEyes03, _eyes),
+									  debugTraitValueName(TraitKind::kNose01, _nose),
+									  debugTraitValueName(TraitKind::kFeet00, _feet));
 	}
 	/** Return whether every trait equals the corresponding value in @p other. */
 	bool operator==(const ZmbTrait &other) const {

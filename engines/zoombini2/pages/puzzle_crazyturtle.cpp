@@ -216,9 +216,9 @@ void PuzzleCrazyTurtle::buildTurtleAssignments() {
 		for (int secondarySlot = 0; secondarySlot < secondarySlots; secondarySlot++) {
 			for (int index = 0; index < partySize && assignedCount < kTurtleCount; index++) {
 				const ZmbTrait &traits = _puzzleZoombinis[index]->_traits;
-				if (used[index] || traits.getValue(static_cast<ZmbTrait::TraitIndex>(_primaryFeature)) != _ruleValues[0][slot])
+				if (used[index] || traits.getValue(static_cast<ZmbTrait::TraitKind>(_primaryFeature)) != _ruleValues[0][slot])
 					continue;
-				if (3 <= _level && traits.getValue(static_cast<ZmbTrait::TraitIndex>(_secondaryFeature)) != _ruleValues[1][secondarySlot])
+				if (3 <= _level && traits.getValue(static_cast<ZmbTrait::TraitKind>(_secondaryFeature)) != _ruleValues[1][secondarySlot])
 					continue;
 				used[index] = true;
 				_turtleAssignments[assignedCount] = index;
@@ -519,9 +519,9 @@ bool PuzzleCrazyTurtle::evaluateTurtleMatch(const ZoombiniRunner *zoombini, int 
 	const ZoombiniRunner *required = _puzzleZoombinis[assigned];
 	if (!required)
 		return false;
-	if (zoombini->_traits.getValue(static_cast<ZmbTrait::TraitIndex>(_primaryFeature)) != required->_traits.getValue(static_cast<ZmbTrait::TraitIndex>(_primaryFeature)))
+	if (zoombini->_traits.getValue(static_cast<ZmbTrait::TraitKind>(_primaryFeature)) != required->_traits.getValue(static_cast<ZmbTrait::TraitKind>(_primaryFeature)))
 		return false;
-	if (3 <= _level && zoombini->_traits.getValue(static_cast<ZmbTrait::TraitIndex>(_secondaryFeature)) != required->_traits.getValue(static_cast<ZmbTrait::TraitIndex>(_secondaryFeature)))
+	if (3 <= _level && zoombini->_traits.getValue(static_cast<ZmbTrait::TraitKind>(_secondaryFeature)) != required->_traits.getValue(static_cast<ZmbTrait::TraitKind>(_secondaryFeature)))
 		return false;
 	return true;
 }
@@ -670,10 +670,18 @@ void PuzzleCrazyTurtle::drawRuleHints(ManagedSurface32 *screen) const {
 		if (!_primaryRuleActive[slot])
 			continue;
 		const Common::String primaryPath = Common::String::format(kTraitFormat, _primaryFeature + 1, _ruleValues[0][slot]);
-		_vm->_gfx->drawPageRleBlock(screen, primaryPath, Common::Point32(kPrimaryIconPos[slot].x - 5, kPrimaryIconPos[slot].y));
+		const Common::Point32 primaryPos(kPrimaryIconPos[slot].x - 5, kPrimaryIconPos[slot].y);
+		if (_primaryFeature == static_cast<int>(ZmbTrait::TraitKind::kNose01))
+			_vm->_gfx->drawPageNoseTraitSprite(screen, primaryPath, primaryPos, static_cast<byte>(_ruleValues[0][slot]));
+		else
+			_vm->_gfx->drawPageRleBlock(screen, primaryPath, primaryPos);
 		if (3 <= _level) {
 			const Common::String secondaryPath = Common::String::format(kTraitFormat, _secondaryFeature + 1, _ruleValues[1][slot]);
-			_vm->_gfx->drawPageRleBlock(screen, secondaryPath, Common::Point32(kSecondaryIconPos[slot].x - 5, kSecondaryIconPos[slot].y));
+			const Common::Point32 secondaryPos(kSecondaryIconPos[slot].x - 5, kSecondaryIconPos[slot].y);
+			if (_secondaryFeature == static_cast<int>(ZmbTrait::TraitKind::kNose01))
+				_vm->_gfx->drawPageNoseTraitSprite(screen, secondaryPath, secondaryPos, static_cast<byte>(_ruleValues[1][slot]));
+			else
+				_vm->_gfx->drawPageRleBlock(screen, secondaryPath, secondaryPos);
 		}
 	}
 }
@@ -745,10 +753,10 @@ EventHandleResult PuzzleCrazyTurtle::onMouseMove(const Common::Point &pos) {
 Common::String PuzzleCrazyTurtle::debugGetAnswer() const {
 	Common::String answer = debugAnswerHeader();
 	answer += "\n  Ordering rules:\n";
-	const ZmbTrait::TraitIndex primaryFeature = static_cast<ZmbTrait::TraitIndex>(_primaryFeature);
+	const ZmbTrait::TraitKind primaryFeature = static_cast<ZmbTrait::TraitKind>(_primaryFeature);
 	answer += Common::String::format("    Primary: %s\n", ZmbTrait::debugTraitName(primaryFeature));
 	if (3 <= _level) {
-		const ZmbTrait::TraitIndex secondaryFeature = static_cast<ZmbTrait::TraitIndex>(_secondaryFeature);
+		const ZmbTrait::TraitKind secondaryFeature = static_cast<ZmbTrait::TraitKind>(_secondaryFeature);
 		answer += Common::String::format("    Secondary: %s\n", ZmbTrait::debugTraitName(secondaryFeature));
 	}
 	answer += "  Place Zoombinis on turtles from the starting bank onward:\n";

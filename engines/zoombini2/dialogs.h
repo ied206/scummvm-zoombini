@@ -223,10 +223,14 @@ private:
 	GUI::CheckboxWidget *_stereoOutputCheckbox = nullptr;
 	/** Toggle selecting floating-point rather than original Q10 Bezier calculations. */
 	GUI::CheckboxWidget *_floatingPointPathsCheckbox = nullptr;
+	/** Toggle hiding the stray streaks in the Fleen departure animation. */
+	GUI::CheckboxWidget *_fixFleenDepartureStreakCheckbox = nullptr;
 	/** Toggle enabling the enhanced keyboard shortcut set. */
 	GUI::CheckboxWidget *_enhancedKbdShortcutsCheckbox = nullptr;
 	/** Toggle keying the solid color from affected help-sheet bitmaps. */
 	GUI::CheckboxWidget *_transparentHelpPagesCheckbox = nullptr;
+	/** Select the color-only presentation used for noses and colored puzzle pieces. */
+	GUI::PopUpWidget *_colorAssistPopUp = nullptr;
 	/** Toggle for the F2, F3, P, and Chez Norf C developer keys. */
 	GUI::CheckboxWidget *_debugHotkeysCheckbox = nullptr;
 	/** Toggle selecting the alternate level-one Waterslide pairing. */
