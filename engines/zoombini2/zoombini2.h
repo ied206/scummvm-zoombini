@@ -150,6 +150,8 @@ public:
 	bool useAquacubeSafeFirstMove() const { return _useAquacubeSafeFirstMove; }
 	/** Return whether Bezier paths use floating-point rather than original Q10 calculations. */
 	bool useFloatingPointPaths() const { return _useFloatingPointPaths; }
+	/** Return whether the Wall of Fleens departure artwork correction is enabled. */
+	bool fixFleenDepartStreak() const { return _fixFleenDepartStreak; }
 	/** Return whether the enhanced keyboard shortcut set is enabled. */
 	bool useEnhancedKbdShortcuts() const { return _enhancedKbdShortcuts; }
 	/** Return whether the practice map exposes recoverable level 4 puzzles. */
@@ -219,6 +221,8 @@ public:
 
 	/** Return gameplay milliseconds from the current clock read. */
 	uint32 getGameTickCount() const;
+	/** Return the active color-only presentation setting. */
+	ColorAssistMode getColorAssistMode() const { return _colorAssistMode; }
 	/** Return the gameplay millisecond snapshot captured before the current page pass. */
 	uint32 getFrameTickCount() const { return _cachedGameTickCount; }
 	/** Return gameplay milliseconds elapsed between the last two page passes. */
@@ -262,7 +266,7 @@ public:
 	RouteBranch _lastRouteDirection = RouteBranch::kNone00;
 
 	/** Selected ShelterZombiniville feature values, or -1 for an unselected slot. */
-	int16 _selectedFeatures[ZmbTrait::kTraitCount] = {
+	int16 _selectedFeatures[ZmbTrait::kTraitKindCount] = {
 		-1,
 		-1,
 		-1,
@@ -333,7 +337,10 @@ private:
 	Common::Point32 _mousePos = Common::Point32();
 	/** Ordered input events awaiting the current page's dispatch boundary. */
 	Common::Array<Common::Event> _pendingPageEvents;
-	/** Whether the tracked press began inside a modal dialog. Its release belongs to that gesture even if the press dismissed the modal. */
+	/**
+	 * Whether the tracked press began inside a shared modal dialog.
+	 * Its release belongs to that gesture even if the press dismissed the modal.
+	 */
 	bool _modalOwnedPress = false;
 
 	/** Active page identifier. */
@@ -374,12 +381,16 @@ private:
 	bool _debugHotkeysEnabled = false;
 	/** Whether newly started stereo game-audio streams retain both channels. */
 	bool _stereoOutputEnabled = false;
+	/** Color assist mode, mainly for colorblinds. */
+	ColorAssistMode _colorAssistMode = ColorAssistMode::kOriginal00;
 	/** Whether Waterslide level one uses the alternate greedy pairing. */
 	bool _useGreedyWaterslidePairing = false;
 	/** Whether Aqua Cube level three protects its first direct lever move from a Fleen. */
 	bool _useAquacubeSafeFirstMove = false;
 	/** Whether Bezier paths use the optional floating-point evaluator. */
 	bool _useFloatingPointPaths = false;
+	/** Whether the departing Fleen omits the malformed white-nose frames. */
+	bool _fixFleenDepartStreak = true;
 	/** Whether the enhanced keyboard shortcut set is enabled. */
 	bool _enhancedKbdShortcuts = false;
 	/** Whether the practice map exposes recoverable level 4 puzzles. */

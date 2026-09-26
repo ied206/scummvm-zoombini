@@ -63,6 +63,7 @@ PuzzleWallOfFleens::PuzzleWallOfFleens(Zoombini2Engine *vm) : PuzzleBase(vm, kPa
 }
 
 PuzzleWallOfFleens::~PuzzleWallOfFleens() {
+	_vm->setHoverCursorActive(false);
 	delete _projectilePath;
 	for (uint i = 0; i < _railPaths.size(); i++)
 		delete _railPaths[i];
@@ -180,7 +181,7 @@ void PuzzleWallOfFleens::generateEasyPanel() {
 	for (int i = 0; i < 6; i++) {
 		for (int t = 0; t < 4; t++) {
 			const int valueIndex = i == 5 ? 0 : kL1Patterns[pattern][i][t];
-			ZmbTrait &tuple = _cells[slots[i]].traits;
+			FleenTrait &tuple = _cells[slots[i]].traits;
 			byte *fields[4] = {
 				&tuple._feet,
 				&tuple._nose,
@@ -214,7 +215,7 @@ void PuzzleWallOfFleens::buildGrid() {
 		for (int i = 0; i < _cellCount; i++) {
 			bool duplicate;
 			do {
-				ZmbTrait &traits = _cells[i].traits;
+				FleenTrait &traits = _cells[i].traits;
 				traits._feet = _vm->_rnd->getRandomNumber(4) + 1;
 				traits._nose = _vm->_rnd->getRandomNumber(4) + 1;
 				traits._hair = _vm->_rnd->getRandomNumber(4) + 1;
@@ -238,8 +239,8 @@ void PuzzleWallOfFleens::buildGrid() {
 
 int PuzzleWallOfFleens::compareTraits(int first, int second) const {
 	int score = 0;
-	for (int i = 0; i < ZmbTrait::kTraitCount; i++) {
-		const ZmbTrait::TraitIndex trait = static_cast<ZmbTrait::TraitIndex>(i);
+	for (int i = 0; i < ZmbTrait::kTraitKindCount; i++) {
+		const ZmbTrait::TraitKind trait = static_cast<ZmbTrait::TraitKind>(i);
 		if (_cells[first].traits.getValue(trait) == _cells[second].traits.getValue(trait))
 			score += 1;
 	}
@@ -319,6 +320,14 @@ int PuzzleWallOfFleens::direction(const Common::Point32 &start, const Common::Po
 	return static_cast<int>(angle) / (360 / sectors);
 }
 
+PuzzleWallOfFleens::CannonAimAngle PuzzleWallOfFleens::stepCannonAimAngle(CannonAimAngle current, CannonAimAngle target) {
+	const int currentIndex = static_cast<int>(current);
+	const int targetIndex = static_cast<int>(target);
+	if (currentIndex < targetIndex)
+		return static_cast<CannonAimAngle>(currentIndex + 1);
+	return static_cast<CannonAimAngle>(currentIndex - 1);
+}
+
 void PuzzleWallOfFleens::startFlight(const Common::Point32 &start, const Common::Point32 &end, int step) {
 	delete _projectilePath;
 	_projectilePath = makeLine(start, end, step);
@@ -366,7 +375,9 @@ EventHandleResult PuzzleWallOfFleens::onLButtonUp(const Common::Point &pos) {
 		if (_level == 4)
 			cell.score += 10 * compareTraits(i, _alternateTarget);
 		_selected = i;
-		_targetAngle = CLIP(direction(Common::Point32(470, 550), Common::Point32(cell.pos.x + 26, cell.pos.y + 34), 18), 0, 8);
+		const int targetAngle = CLIP(direction(Common::Point32(470, 550), Common::Point32(cell.pos.x + 26, cell.pos.y + 34), 18),
+									 static_cast<int>(CannonAimAngle::kRight00), static_cast<int>(CannonAimAngle::kLeft08));
+		_targetAngle = static_cast<CannonAimAngle>(targetAngle);
 		_shotPhase = ShotPhase::kAiming02;
 		_resetting = false;
 		debug(2, "WallOfFleens: shot cell=%d score=%d balls=%d runner=%d", i, cell.score, _ballsLeft, _loadedRunner);
@@ -409,7 +420,7 @@ void PuzzleWallOfFleens::onFleenAnimationDone(void *context, ZoombiniRunner *run
 		runner->setAnimationCompleteCallback(onFleenAnimationDone, page);
 	} else if (page->_mirrorPhase == MirrorPhase::kShouting03) {
 		page->_mirrorPhase = MirrorPhase::kLeaving04;
-		runner->startAnimation(page->_vocif2, 56, page->_vm->getGameTickCount());
+		runner->startAnimation(page->_vocif2, kFleenDepartureCell, page->_vm->getGameTickCount());
 		runner->setAnimationCompleteCallback(onFleenAnimationDone, page);
 	} else {
 		page->finishCatch();
@@ -496,7 +507,7 @@ void PuzzleWallOfFleens::onUpdate() {
 				z->_hidden = true;
 				z->_puzzleStatus = 0;
 				_shotPhase = ShotPhase::kReady01;
-				_angle = 4;
+				_angle = CannonAimAngle::kCenter04;
 				playEffect(3);
 			}
 		}
@@ -517,25 +528,25 @@ void PuzzleWallOfFleens::onUpdate() {
 			delete _projectilePath;
 			_projectilePath = nullptr;
 			_shotPhase = ShotPhase::kReady01;
-			_angle = 4;
+			_angle = CannonAimAngle::kCenter04;
 		}
 	}
 	if (_shotPhase == ShotPhase::kAiming02) {
 		if (_angle == _targetAngle) {
-			startFlight(kMuzzles[_angle], _cells[_selected].pos, 14);
+			startFlight(kMuzzles[static_cast<int>(_angle)], _cells[_selected].pos, 14);
 			_shotPhase = ShotPhase::kOutbound03;
 			playEffect(4);
 		} else if (_aimTick < now) {
-			_angle += _angle < _targetAngle ? 1 : -1;
+			_angle = stepCannonAimAngle(_angle, _targetAngle);
 			_aimTick = now + 200;
 			playEffect(0);
 		}
 	}
 	if (_resetting) {
-		if (_angle == 4) {
+		if (_angle == CannonAimAngle::kCenter04) {
 			_resetting = false;
 		} else if (_aimTick < now) {
-			_angle += _angle < 4 ? 1 : -1;
+			_angle = stepCannonAimAngle(_angle, CannonAimAngle::kCenter04);
 			_aimTick = now + 200;
 			playEffect(0);
 		}
@@ -593,6 +604,26 @@ void PuzzleWallOfFleens::onUpdate() {
 	}
 	if (_mirrorPhase == MirrorPhase::kRotating01)
 		playEffect(1);
+	updateHoverCursor(_vm->getMousePos());
+}
+
+void PuzzleWallOfFleens::updateHoverCursor(const Common::Point32 &pos) {
+	bool hovered = false;
+	if (!_finished && !_retreating) {
+		for (int i = 0; i < _cellCount; i++) {
+			const Common::Point32 &cellPos = _cells[i].pos;
+			if (cellPos.x <= pos.x && pos.x < cellPos.x + 52 && cellPos.y <= pos.y && pos.y < cellPos.y + 68) {
+				hovered = true;
+				break;
+			}
+		}
+	}
+	_vm->setHoverCursorActive(hovered);
+}
+
+EventHandleResult PuzzleWallOfFleens::onMouseMove(const Common::Point &pos) {
+	updateHoverCursor(Common::Point32(pos));
+	return EventHandleResult::kPassthrough;
 }
 
 void PuzzleWallOfFleens::drawCell(ManagedSurface32 *screen, const Cell &cell, bool active) const {
@@ -606,7 +637,6 @@ void PuzzleWallOfFleens::drawCell(ManagedSurface32 *screen, const Cell &cell, bo
 			_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[4], cell.pos);
 			if (_fleensAnimation)
 				_vm->_gfx->drawZoombini(screen, _fleensAnimation, cell.traits, Common::Point32(cell.pos.x + 2, cell.pos.y + 2), 55, 0);
-			_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[3], cell.pos);
 		} else {
 			_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[4], cell.pos);
 		}
@@ -685,7 +715,9 @@ void PuzzleWallOfFleens::onRenderContent(ManagedSurface32 *screen) {
 			continue;
 		_vm->_gfx->drawPageRleBlock(screen, kBallPaths[0], _railPositions[i]);
 	}
-	_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kCannonFormat, 8 - _angle), Common::Point32(385, 465));
+	const int cannonAngleIndex = static_cast<int>(_angle);
+	const int cannonImageIndex = static_cast<int>(CannonAimAngle::kLeft08) - cannonAngleIndex;
+	_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kCannonFormat, cannonImageIndex), Common::Point32(385, 465));
 	_vm->_gfx->drawPageRleBlock(screen, kOverlayPaths[0], Common::Point32(475, 431));
 	if (_shotPhase == ShotPhase::kLoading00 && _loadedRunner < 0)
 		_vm->_gfx->drawPageRleBlock(screen, kBallPaths[0], _projectilePos);
@@ -704,9 +736,23 @@ void PuzzleWallOfFleens::onRenderActors(ManagedSurface32 *screen) {
 }
 
 void PuzzleWallOfFleens::onRenderForeground(ManagedSurface32 *screen) {
-	if (_mirrorPhase == MirrorPhase::kShouting03 || _mirrorPhase == MirrorPhase::kLeaving04)
-		_vm->_gfx->drawZoombiniRunner(screen, &_fleensRunner);
-	if (_angle == 4)
+	if (_mirrorPhase == MirrorPhase::kShouting03 || _mirrorPhase == MirrorPhase::kLeaving04) {
+		// A Fleen's white nose leaves brown streaks while it turns away to flee.
+		// Omit the white nose in the affected departure frames when the correction is enabled.
+		const bool omitWhiteNoseForDepartStreak = _vm->fixFleenDepartStreak() && _mirrorPhase == MirrorPhase::kLeaving04 &&
+												  _fleensRunner._activeAnimation == _vocif2 && _fleensRunner._animationCell == kFleenDepartureCell &&
+												  _fleensRunner._traits._nose == kWhiteNoseTrait && kStreakFirstFrame <= _fleensRunner._animationFrame &&
+												  _fleensRunner._animationFrame <= kStreakLastFrame;
+		if (omitWhiteNoseForDepartStreak) {
+			ZmbTrait traitsWithoutWhiteNose = _fleensRunner._traits;
+			traitsWithoutWhiteNose._nose = 0;
+			_vm->_gfx->drawZoombiniRunnerWithTraits(screen, &_fleensRunner, traitsWithoutWhiteNose);
+		} else {
+			_vm->_gfx->drawZoombiniRunner(screen, &_fleensRunner);
+		}
+	}
+
+	if (_angle == CannonAimAngle::kCenter04)
 		_vm->_gfx->drawPageRleBlock(screen, kOverlayPaths[1], Common::Point32(449, 465));
 }
 
@@ -715,6 +761,37 @@ void PuzzleWallOfFleens::onActorsRendered() {
 		_puzzleZoombinis[i]->advanceAnimationAfterDraw();
 	_fleensRunner.advanceAnimationAfterDraw();
 	_projectileRunner.advanceAnimationAfterDraw();
+}
+
+const char *PuzzleWallOfFleens::FleenTrait::debugTraitValueName(ZmbTrait::TraitKind index, int value) {
+	static constexpr const char *kFleenTraitNames[kTraitKindCount][kTraitValueCount] = {
+		{"Spikey", "TopKnot", "Pinwheel", "SideBuns", "Flattop"},
+		{"NormalEyed", "Eyepatch", "Zipper", "Visor", "Glasses"},
+		{"RedBrown", "White", "Yellow", "Red", "Pink"},
+		{"Skateboard", "Treads", "Drill", "Boots", "Rocket"},
+	};
+	if (value < 1 || kTraitValueCount < value)
+		return "?";
+	switch (index) {
+	case ZmbTrait::TraitKind::kHair02:
+		return kFleenTraitNames[0][value - 1];
+	case ZmbTrait::TraitKind::kEyes03:
+		return kFleenTraitNames[1][value - 1];
+	case ZmbTrait::TraitKind::kNose01:
+		return kFleenTraitNames[2][value - 1];
+	case ZmbTrait::TraitKind::kFeet00:
+		return kFleenTraitNames[3][value - 1];
+	default:
+		break;
+	}
+	return "?";
+}
+
+Common::String PuzzleWallOfFleens::FleenTrait::toStr() const {
+	return Common::String::format("%s, %s, %s, %s", debugTraitValueName(ZmbTrait::TraitKind::kHair02, _hair),
+								  debugTraitValueName(ZmbTrait::TraitKind::kEyes03, _eyes),
+								  debugTraitValueName(ZmbTrait::TraitKind::kNose01, _nose),
+								  debugTraitValueName(ZmbTrait::TraitKind::kFeet00, _feet));
 }
 
 Common::String PuzzleWallOfFleens::debugGetAnswer() const {
@@ -726,10 +803,9 @@ Common::String PuzzleWallOfFleens::debugGetAnswer() const {
 	for (int target = 0; target < (_level == 4 ? 2 : 1); target++) {
 		const int index = target == 0 ? _target : _alternateTarget;
 		const Cell &cell = _cells[index];
-		const char *status = cell.empty ? "caught" : cell.revealed ? "revealed" : "hidden";
 		answer += Common::String::format("    %s: row %d, column %d, near (%d, %d)\n", target == 0 ? "Primary" : "Alternate",
 										 index / _columns + 1, index % _columns + 1, cell.pos.x, cell.pos.y);
-		answer += Common::String::format("      Appearance: %s; status: %s\n", cell.traits.toStr().c_str(), status);
+		answer += Common::String::format("      Fleen appearance: %s\n", cell.traits.toStr().c_str());
 	}
 	return answer;
 }

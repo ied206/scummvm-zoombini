@@ -19,20 +19,12 @@
  *
  */
 
-#ifndef ZOOMBINI2_PAGES_TRANSITION_BASE_H
-#define ZOOMBINI2_PAGES_TRANSITION_BASE_H
-
-#include "zoombini2/pages/page_base.h"
+#include "zoombini2/pages/transition_base.h"
 
 namespace Zoombini2 {
 
-/** Movies and travel sequences that advance to another dispatched screen. */
-class TransitionBase : public PageBase {
-public:
-	/** Bind a transition page to @p vm. */
-	explicit TransitionBase(Zoombini2Engine *vm);
-};
+TransitionBase::TransitionBase(Zoombini2Engine *vm)
+	: PageBase(vm, PageCategory::kTransition) {
+}
 
 } // End of namespace Zoombini2
-
-#endif // ZOOMBINI2_PAGES_TRANSITION_BASE_H

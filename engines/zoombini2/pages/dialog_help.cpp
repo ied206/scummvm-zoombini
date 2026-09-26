@@ -201,7 +201,7 @@ void DialogHelp::onRenderContent(ManagedSurface32 *screen) {
 	if ((_vm->getFeatures() & GF_Z2_SOLID_HELP_FRAME) != 0) {
 		/** RGB component value of the v1.0NL frame's solid gray canvas. */
 		static constexpr byte nlBgKey = 128;
-		_vm->_gfx->drawSharedRleBlockColorKey(screen, kHelpFramePath, Common::Point32(0, 0), nlBgKey, nlBgKey, nlBgKey);
+		_vm->_gfx->drawSharedRleBlockColorKey(screen, kHelpFramePath, Common::Point32(0, 0), RGBColor(nlBgKey, nlBgKey, nlBgKey));
 	} else {
 		_vm->_gfx->drawSharedRleBlock(screen, kHelpFramePath, Common::Point32(0, 0));
 	}
