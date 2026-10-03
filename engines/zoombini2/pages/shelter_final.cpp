@@ -80,7 +80,7 @@ ShelterFinal::~ShelterFinal() {
 
 	GameState *state = _vm->_state;
 	if (state)
-		_vm->writeGameSave(state->_playerName);
+		_vm->writeGameSave(state->getPlayerName());
 }
 
 void ShelterFinal::init() {
@@ -150,7 +150,7 @@ void ShelterFinal::init() {
 	if (sound) {
 		_openingSpeechId = sound->load(false, Common::Path(kOpeningSpeechPath), false);
 		if (0 <= _openingSpeechId)
-			sound->playWithVolume(_openingSpeechId, sound->_volumeSpeech);
+			sound->playWithVolume(_openingSpeechId, sound->getSpeechVolume());
 		_closingSpeechId = sound->load(false, Common::Path(kClosingSpeechPath), false);
 		_ambientSoundIds[0] = sound->load(true, Common::Path(kFirstAmbientSoundPath), false);
 		for (int i = 1; i < kAmbientSoundCount; i++) {
@@ -170,7 +170,7 @@ void ShelterFinal::onUpdate() {
 	}
 	if (_closingSpeechTime != 0 && _closingSpeechTime < now) {
 		if (sound && 0 <= _closingSpeechId)
-			sound->playWithVolume(_closingSpeechId, sound->_volumeSpeech);
+			sound->playWithVolume(_closingSpeechId, sound->getSpeechVolume());
 		_closingSpeechTime = 0;
 	}
 
@@ -233,7 +233,7 @@ void ShelterFinal::createDecorativeZoombinis() {
 		zoombini->setTraits(ZmbTrait(feet, nose, hair, eyes));
 		zoombini->setPosition(kDecorativeZoombiniPos[i]);
 		zoombini->setDefaultAnimation(_zoombiniAnimation, kDecorativeZoombiniCells[i]);
-		zoombini->_inputEnabled = false;
+		zoombini->setInputEnabled(false);
 		_vm->_state->_activeZoombinis.push_back(zoombini);
 	}
 }
@@ -246,11 +246,11 @@ void ShelterFinal::updateDecorativeZoombinis(uint32 now) {
 void ShelterFinal::updateDecorativeZoombiniRunnersAfterDraw(uint32 now) {
 	for (uint i = 0; i < kDecorativeZoombiniCount && i < _vm->_state->_activeZoombinis.size(); i++) {
 		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
-		if (!zoombini->_animationActive && _vm->_rnd->getRandomNumber(99) == 10)
+		if (!zoombini->isAnimationActive() && _vm->_rnd->getRandomNumber(99) == 10)
 			zoombini->startAnimation(_walkingZoombiniAnimation, 33, now);
-		if (zoombini->_animationActive && _vm->_rnd->getRandomNumber(49) == 10) {
+		if (zoombini->isAnimationActive() && _vm->_rnd->getRandomNumber(49) == 10) {
 			zoombini->resetAnimation();
-			zoombini->_animationCell = kDecorativeZoombiniCells[i];
+			zoombini->setAnimationCell(kDecorativeZoombiniCells[i]);
 		}
 	}
 }
@@ -356,7 +356,7 @@ void ShelterFinal::playRandomAmbient() {
 		return;
 	const int index = _vm->_rnd->getRandomNumber(kAmbientSoundCount - 1);
 	if (0 <= _ambientSoundIds[index])
-		sound->playWithVolume(_ambientSoundIds[index], sound->_volumeSpeech);
+		sound->playWithVolume(_ambientSoundIds[index], sound->getSpeechVolume());
 }
 
 void ShelterFinal::drawAnimation(const Animation *animation, int frameIndex, const Common::Point32 &pos, ManagedSurface32 *screen) const {

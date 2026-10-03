@@ -42,7 +42,7 @@ enum class DialogMsgBoxButton {
 	kCancel02 = 2
 };
 
-/** Lifecycle of the engine-owned confirmation dialog. */
+/** Lifecycle of one engine-dispatched confirmation request. */
 enum class DialogMsgBoxState {
 	kClosed00 = 0,
 	kPendingOpen01 = 1,
@@ -50,7 +50,7 @@ enum class DialogMsgBoxState {
 };
 
 /**
- * Reusable two-button confirmation dialog shared by pages and controls.
+ * Two-button confirmation dialog requested by pages and controls.
  *
  * A request supplies either a game text resource or UI text, position, text
  * offset, and completion callback. The dialog borrows its panel resources from
@@ -59,7 +59,7 @@ enum class DialogMsgBoxState {
  */
 class DialogMsgBox : public DialogBase {
 public:
-	/** Bind the reusable confirmation dialog to @p vm. */
+	/** Bind one confirmation dialog to @p vm. */
 	explicit DialogMsgBox(Zoombini2Engine *vm);
 	/** Close the dialog and release any pending callback or resources. */
 	~DialogMsgBox() override;

@@ -28,6 +28,8 @@
 
 namespace Zoombini2 {
 
+constexpr const char *PuzzleWallOfFleens::kPuzzleName;
+constexpr const char *PuzzleWallOfFleens::kBackgroundPath;
 constexpr const char *PuzzleWallOfFleens::kMusicPath;
 constexpr const char *PuzzleWallOfFleens::kCannonFormat;
 constexpr const char *PuzzleWallOfFleens::kMirrorPaths[5];
@@ -56,6 +58,8 @@ constexpr Common::Point32 PuzzleWallOfFleens::kGridOrigins[5];
 constexpr Common::Point32 PuzzleWallOfFleens::kMuzzles[9];
 
 PuzzleWallOfFleens::PuzzleWallOfFleens(Zoombini2Engine *vm) : PuzzleBase(vm, kPageWallOfFleens) {
+	_puzzleName = kPuzzleName;
+	_initialBackgroundPath = kBackgroundPath;
 	for (int i = 0; i < 8; i++)
 		_sounds[i] = -1;
 	for (int i = 0; i < 3; i++)
@@ -63,7 +67,7 @@ PuzzleWallOfFleens::PuzzleWallOfFleens(Zoombini2Engine *vm) : PuzzleBase(vm, kPa
 }
 
 PuzzleWallOfFleens::~PuzzleWallOfFleens() {
-	_vm->setHoverCursorActive(false);
+	_vm->setCursor(Zoombini2Engine::CursorType::kDefault);
 	delete _projectilePath;
 	for (uint i = 0; i < _railPaths.size(); i++)
 		delete _railPaths[i];
@@ -136,9 +140,9 @@ void PuzzleWallOfFleens::init() {
 		z->setDefaultAnimation(_zoombiniAnimation);
 		z->resetAnimation();
 		z->setPosition(Common::Point32(50 + 30 * i, 490));
-		z->_hidden = false;
-		z->_inputEnabled = false;
-		z->_puzzleStatus = 1;
+		z->setHidden(false);
+		z->setInputEnabled(false);
+		z->setCanAdvanceFromPage(true);
 	}
 	_ballsLeft = 8;
 	if (_level == 1)
@@ -282,7 +286,7 @@ void PuzzleWallOfFleens::loadNextProjectile() {
 		}
 		for (int i = _loadedRunner - 1; 0 <= i; i--) {
 			ZoombiniRunner *waiting = _puzzleZoombinis[i];
-			waiting->startMovement(makeLine(waiting->_screenPos, _puzzleZoombinis[i + 1]->_screenPos, 7), now);
+			waiting->startMovement(makeLine(waiting->getScreenPosition(), _puzzleZoombinis[i + 1]->getScreenPosition(), 7), now);
 			waiting->startAnimation(_zoombiniAnimation, 66, now);
 		}
 		z->startMovement(path, now);
@@ -351,9 +355,9 @@ void PuzzleWallOfFleens::startFlight(const Common::Point32 &start, const Common:
 	_projectileCell = kCells[sector];
 	_projectileImage = kImages[sector];
 	if (0 <= _loadedRunner) {
-		_projectileRunner.setTraits(_puzzleZoombinis[_loadedRunner]->_traits);
+		_projectileRunner.setTraits(_puzzleZoombinis[_loadedRunner]->getTraits());
 		_projectileRunner.setDefaultAnimation(_cannonAnimation, _projectileCell);
-		_projectileRunner._animationCell = _projectileCell;
+		_projectileRunner.setAnimationCell(_projectileCell);
 	}
 }
 
@@ -460,11 +464,11 @@ void PuzzleWallOfFleens::startRetreat() {
 	debug(2, "WallOfFleens: last survivor retreat");
 	_shotPhase = ShotPhase::kStopped05;
 	ZoombiniRunner *z = _puzzleZoombinis[0];
-	const Common::Point32 end(-10 - z->_spriteSize.width, z->_screenPos.y);
-	z->startMovement(makeLine(z->_screenPos, end, 2), _vm->getGameTickCount());
+	const Common::Point32 end(-10 - z->getSpriteSize().width, z->getScreenPosition().y);
+	z->startMovement(makeLine(z->getScreenPosition(), end, 2), _vm->getGameTickCount());
 	z->setActiveAnimation(_zoombiniAnimation);
 	z->startDirectionTrackedAnimation(_vm->getGameTickCount());
-	z->_puzzleStatus = 0;
+	z->setCanAdvanceFromPage(false);
 	_vm->restartGoBlink();
 	if (_vm->_isSavedGame) {
 		queueSpeech(kRetreatSpeechPaths[0]);
@@ -475,7 +479,7 @@ void PuzzleWallOfFleens::startRetreat() {
 void PuzzleWallOfFleens::playEffect(int index) {
 	SoundManager *sound = _vm->getSoundManager();
 	if (sound && 0 <= _sounds[index])
-		sound->playWithVolume(_sounds[index], sound->_volumeSFX);
+		sound->playWithVolume(_sounds[index], sound->getSfxVolume());
 }
 
 void PuzzleWallOfFleens::queueSpeech(const Common::String &path) {
@@ -500,18 +504,18 @@ void PuzzleWallOfFleens::onUpdate() {
 	}
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
 		ZoombiniRunner *z = _puzzleZoombinis[i];
-		if (z->_movementPath && !z->advanceMovement(now)) {
+		if (z->hasMovementPath() && !z->advanceMovement(now)) {
 			z->clearMovement();
 			z->resetAnimation();
 			if (static_cast<int>(i) == _loadedRunner && _shotPhase == ShotPhase::kLoading00) {
-				z->_hidden = true;
-				z->_puzzleStatus = 0;
+				z->setHidden(true);
+				z->setCanAdvanceFromPage(false);
 				_shotPhase = ShotPhase::kReady01;
 				_angle = CannonAimAngle::kCenter04;
 				playEffect(3);
 			}
 		}
-		if (_finished)
+		if (z->canAdvanceFromPage())
 			z->tryStartCelebrationAnimation(_celebrationAnimation, *_vm->_rnd, now, _vm->getFrameDeltaMs(), _vm->getLogicPacingHz());
 		z->updateAnimation(now);
 	}
@@ -618,7 +622,7 @@ void PuzzleWallOfFleens::updateHoverCursor(const Common::Point32 &pos) {
 			}
 		}
 	}
-	_vm->setHoverCursorActive(hovered);
+	_vm->setCursor(hovered ? Zoombini2Engine::CursorType::kInteractive : Zoombini2Engine::CursorType::kDefault);
 }
 
 EventHandleResult PuzzleWallOfFleens::onMouseMove(const Common::Point &pos) {
@@ -740,11 +744,11 @@ void PuzzleWallOfFleens::onRenderForeground(ManagedSurface32 *screen) {
 		// A Fleen's white nose leaves brown streaks while it turns away to flee.
 		// Omit the white nose in the affected departure frames when the correction is enabled.
 		const bool omitWhiteNoseForDepartStreak = _vm->fixFleenDepartStreak() && _mirrorPhase == MirrorPhase::kLeaving04 &&
-												  _fleensRunner._activeAnimation == _vocif2 && _fleensRunner._animationCell == kFleenDepartureCell &&
-												  _fleensRunner._traits._nose == kWhiteNoseTrait && kStreakFirstFrame <= _fleensRunner._animationFrame &&
-												  _fleensRunner._animationFrame <= kStreakLastFrame;
+												  _fleensRunner.getActiveAnimation() == _vocif2 && _fleensRunner.getAnimationCell() == kFleenDepartureCell &&
+												  _fleensRunner.getTraits()._nose == kWhiteNoseTrait && kStreakFirstFrame <= _fleensRunner.getAnimationFrame() &&
+												  _fleensRunner.getAnimationFrame() <= kStreakLastFrame;
 		if (omitWhiteNoseForDepartStreak) {
-			ZmbTrait traitsWithoutWhiteNose = _fleensRunner._traits;
+			ZmbTrait traitsWithoutWhiteNose = _fleensRunner.getTraits();
 			traitsWithoutWhiteNose._nose = 0;
 			_vm->_gfx->drawZoombiniRunnerWithTraits(screen, &_fleensRunner, traitsWithoutWhiteNose);
 		} else {
@@ -817,15 +821,6 @@ Common::String PuzzleWallOfFleens::debugGetChanceDetails() const {
 
 void PuzzleWallOfFleens::applyDebugPuzzleCompletion() {
 	_perfectClearEligible = true;
-	_finished = true;
-	_shotPhase = ShotPhase::kStopped05;
-	_mirrorPhase = MirrorPhase::kNone00;
-	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
-		_puzzleZoombinis[i]->_puzzleStatus = 1;
-		_puzzleZoombinis[i]->_hidden = false;
-	}
-	_vm->_zoombiniWalkingFlag = !_puzzleZoombinis.empty();
-	_vm->restartGoBlink();
 }
 
 bool PuzzleWallOfFleens::canUseGoButton() const {

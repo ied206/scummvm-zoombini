@@ -68,6 +68,9 @@ public:
 	void onActorsRendered() override;
 
 private:
+	static constexpr const char *kPuzzleName = "Turtle Hurdle";
+	/** Turtle Hurdle board background loaded into the first page layer. */
+	static constexpr const char *kBackgroundPath = "#bmp/crazy_turtle/background";
 	/** Five randomized praise lines played when all Zoombinis leave Turtle Hurdle successfully. */
 	static constexpr const char *kGoSpeechFormat = "sounds/wld11.%d.wav";
 	/** Retreat line played before a saved-game departure with Zoombinis still waiting. */
