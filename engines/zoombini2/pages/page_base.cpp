@@ -191,7 +191,7 @@ bool PageLayer::activateRunnersAt(const Common::Point32 &point) {
 			runner = _animationRunners[index];
 		if (!runner->isActive() && runner->getMode() != AnimationRunnerMode::kDisabled04) {
 			runner->start(_vm->getFrameTickCount());
-			runner->captureBackground(_vm->getCurrentScreen(), _scrollX, _backgroundSize.width);
+			runner->captureBackground(_vm->_gfx->getScreen(), _scrollX, _backgroundSize.width);
 		}
 	}
 	return hit;
@@ -364,7 +364,7 @@ void PageBase::startPageMusic(const Common::Path &path) {
 	_pageMusicId = sound->load(true, path, true);
 	if (0 <= _pageMusicId) {
 		sound->playLoop(_pageMusicId);
-		sound->setVolume(_pageMusicId, sound->_volumeMusic);
+		sound->setVolume(_pageMusicId, sound->getMusicVolume());
 	}
 }
 

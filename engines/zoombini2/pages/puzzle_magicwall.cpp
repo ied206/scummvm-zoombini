@@ -266,6 +266,8 @@ bool MagicWallMaze::debugSolution(Common::Array<int> &sequence) const {
 	return false;
 }
 
+constexpr const char *PuzzleMagicWall::kPuzzleName;
+constexpr const char *PuzzleMagicWall::kBackgroundPath;
 constexpr const char *PuzzleMagicWall::kLayoutPath;
 constexpr const char *PuzzleMagicWall::kMusicPath;
 constexpr const char *PuzzleMagicWall::kDotFormat;
@@ -293,10 +295,13 @@ constexpr Common::Point32 PuzzleMagicWall::kGatePositions[4];
 constexpr Common::Point32 PuzzleMagicWall::kRosterPositions[8];
 constexpr Common::Point32 PuzzleMagicWall::kLightPositions[10];
 
-PuzzleMagicWall::PuzzleMagicWall(Zoombini2Engine *vm) : PuzzleBase(vm, kPageMagicWall) {}
+PuzzleMagicWall::PuzzleMagicWall(Zoombini2Engine *vm) : PuzzleBase(vm, kPageMagicWall) {
+	_puzzleName = kPuzzleName;
+	_initialBackgroundPath = kBackgroundPath;
+}
 
 PuzzleMagicWall::~PuzzleMagicWall() {
-	_vm->setHoverCursorActive(false);
+	_vm->setCursor(Zoombini2Engine::CursorType::kDefault);
 	for (Beetle &beetle : _beetles)
 		delete beetle.path;
 	for (int i = 0; i < 4; i++)
@@ -370,9 +375,9 @@ void PuzzleMagicWall::init() {
 		runner->setDefaultAnimation(_zoombiniAnimation);
 		runner->resetAnimation();
 		runner->setPosition(kRosterPositions[MIN<uint>(i, 7)]);
-		runner->_inputEnabled = false;
-		runner->_hidden = false;
-		runner->_puzzleStatus = 0;
+		runner->setInputEnabled(false);
+		runner->setHidden(false);
+		runner->setCanAdvanceFromPage(false);
 	}
 	Common::SeekableReadStream *stream = _vm->openResourceFile(kLayoutPath);
 	const bool loaded = stream && _maze.load(*stream);
@@ -421,7 +426,7 @@ bool PuzzleMagicWall::beetlesMoving() const {
 
 bool PuzzleMagicWall::runnersMoving() const {
 	for (const ZoombiniRunner *runner : _puzzleZoombinis) {
-		if (runner->_movementPath)
+		if (runner->hasMovementPath())
 			return true;
 	}
 	return false;
@@ -482,7 +487,7 @@ void PuzzleMagicWall::startRunnerPath(int index, int gate, bool exit) {
 	runner->startMovement(movement, _vm->getGameTickCount());
 	runner->startDirectionTrackedAnimation(_vm->getGameTickCount());
 	if (exit)
-		runner->_puzzleStatus = 1;
+		runner->setCanAdvanceFromPage(true);
 }
 
 void PuzzleMagicWall::submit() {
@@ -537,12 +542,12 @@ void PuzzleMagicWall::onUpdate() {
 	}
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
 		ZoombiniRunner *runner = _puzzleZoombinis[i];
-		if (runner->_movementPath) {
-			if (runner->_movementPath->finished) {
+		if (runner->hasMovementPath()) {
+			if (runner->isMovementFinished()) {
 				runner->clearMovement();
 				runner->resetAnimation();
-				if (runner->_screenPos.y < 330) {
-					runner->_hidden = true;
+				if (runner->getScreenPosition().y < 330) {
+					runner->setHidden(true);
 					if (i < 8)
 						_exited[i] = true;
 				}
@@ -553,7 +558,7 @@ void PuzzleMagicWall::onUpdate() {
 		runner->updateAnimation(now);
 	}
 	if (gatesActive() || runnersMoving()) {
-		_vm->setHoverCursorActive(false);
+		_vm->setCursor(Zoombini2Engine::CursorType::kDefault);
 		return;
 	}
 	if (_nextPuzzlePending) {
@@ -573,7 +578,9 @@ void PuzzleMagicWall::onUpdate() {
 	if (wasMoving && !beetlesMoving())
 		_movingRule = -1;
 	_hoveredTablet = tabletAt(_pointer);
-	_vm->setHoverCursorActive(_phase != Phase::kFinished && !_nextPuzzlePending && !beetlesMoving() && (0 <= _hoveredTablet || inside(_pointer, 279, 341, 40, 70)));
+	const bool hover = _phase != Phase::kFinished && !_nextPuzzlePending && !beetlesMoving() &&
+		(0 <= _hoveredTablet || inside(_pointer, 279, 341, 40, 70));
+	_vm->setCursor(hover ? Zoombini2Engine::CursorType::kInteractive : Zoombini2Engine::CursorType::kDefault);
 	if (0 <= _hoveredTablet || beetlesMoving()) {
 		_ripplePhase += 7;
 		if (255 < _ripplePhase)
@@ -817,7 +824,7 @@ bool PuzzleMagicWall::blocksSidebarInteraction() const {
 }
 
 bool PuzzleMagicWall::canUseGoButton() const {
-	return _canDepart && !blocksSidebarInteraction();
+	return (_canDepart || _vm->_zoombiniWalkingFlag) && !blocksSidebarInteraction();
 }
 
 bool PuzzleMagicWall::onGoButtonPressed() {
@@ -827,7 +834,7 @@ bool PuzzleMagicWall::onGoButtonPressed() {
 		return true;
 	int remaining = 0;
 	for (const ZoombiniRunner *runner : _puzzleZoombinis) {
-		if (runner->_puzzleStatus == 0)
+		if (!runner->canAdvanceFromPage())
 			remaining += 1;
 	}
 	Common::String path;

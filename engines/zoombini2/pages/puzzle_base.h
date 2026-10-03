@@ -76,7 +76,7 @@ struct PuzzleChanceInfo {
  */
 class PuzzleBase : public InteractiveBase {
 public:
-	/** Bind shared puzzle state to @p vm, capture its selected difficulty, and record @p pageId. */
+	/** Bind shared puzzle state and its page ID. */
 	PuzzleBase(Zoombini2Engine *vm, PageId pageId);
 	/** Release shared puzzle resources. */
 	~PuzzleBase() override = default;
@@ -100,36 +100,16 @@ public:
 	}
 	/** Additional resources not represented by the primary chance count. */
 	virtual Common::String debugGetChanceDetails() const { return Common::String(); }
-	/** Return the display name belonging to @p pageId. */
-	static const char *getPuzzleName(PageId pageId);
-	/** Return the resource-directory name belonging to @p pageId. */
-	static const char *getPuzzleDir(PageId pageId);
 
 private:
-	/** BitBlock key format for each puzzle's primary backdrop under the bitmap resource tree. */
-	static constexpr const char *kPuzzleBackgroundFormat = "#bmp/%s";
 	/** Shared small-Zoombini sprite animation drawn for the party roster on every puzzle page. */
 	static constexpr const char *kZoombiniAnimationPath = "bmp/zombis/littleZomb.anm";
-	/** Primary board backdrop selected for the Crazy Turtle puzzle. */
-	static constexpr const char *kCrazyTurtleBackgroundPath = "crazy_turtle/background";
-	/** Primary board backdrop selected for the Water Slide puzzle. */
-	static constexpr const char *kWaterslideBackgroundPath = "waterslide/waterslides";
-	/** Primary board backdrop selected for the AquaCube puzzle. */
-	static constexpr const char *kAquacubeBackgroundPath = "aquacube/background";
-	/** Primary board backdrop selected for the Mystic Marsh puzzle. */
-	static constexpr const char *kMysticMarshBackgroundPath = "mystic_marsh/background1";
-	/** Primary board backdrop selected for the Magic Wall puzzle. */
-	static constexpr const char *kMagicWallBackgroundPath = "magic_wall/magic wall";
-	/** Primary board backdrop selected for the Wall of Fleens puzzle. */
-	static constexpr const char *kWallOfFleensBackgroundPath = "wall_of_fleens/background";
-	/** Primary board backdrop selected for the Chez Norf puzzle. */
-	static constexpr const char *kChezNorfBackgroundPath = "chez_norf/baquegund";
-	/** Primary board backdrop selected for the Snowboard puzzle. */
-	static constexpr const char *kSnowboardBackgroundPath = "snowboard/snowboard-EASY";
-	/** Primary board backdrop selected for the Boolies puzzle. */
-	static constexpr const char *kBooliesBackgroundPath = "Boolies/background";
 
 protected:
+	/** Display name set by the concrete puzzle page. */
+	const char *_puzzleName = nullptr;
+	/** Background path set by the concrete puzzle page for shared initialization. */
+	const char *_initialBackgroundPath = nullptr;
 	/** Banner shared by all puzzle answer reports. */
 	Common::String debugAnswerHeader() const;
 	/** Print a roster entry using stable one-based indices and named traits. */

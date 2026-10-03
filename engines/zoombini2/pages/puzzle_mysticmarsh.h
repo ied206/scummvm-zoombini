@@ -496,8 +496,6 @@ public:
 	bool onGoButtonPressed() override;
 	/** Return whether enough grid outcomes allow departure. */
 	bool canUseGoButton() const override;
-	/** Mark all remaining party members free for console completion. */
-	void applyDebugPuzzleCompletion() override;
 	/** Describe retained generation intent and a bounded current-state forecast. */
 	Common::String debugGetAnswer() const override;
 	PuzzleChanceInfo debugGetChances() const override { return PuzzleChanceInfo(PuzzleChanceInfo::Type::kAmorphous); }
@@ -514,6 +512,9 @@ protected:
 	void onRenderForeground(ManagedSurface32 *screen) override;
 
 private:
+	static constexpr const char *kPuzzleName = "Bubble Bumpers";
+	/** Initial Bubble Bumpers background, replaced after the generated layout selects its board. */
+	static constexpr const char *kBackgroundPath = "#bmp/mystic_marsh/background1";
 	/** Looping Bubble Bumpers soundtrack. */
 	static constexpr const char *kMusicPath = "#sounds/music/04-BS01.wav";
 	/** Path format for the board backdrop selected by the generated layout. */

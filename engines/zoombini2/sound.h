@@ -23,6 +23,7 @@
 #define ZOOMBINI2_SOUND_H
 
 #include "common/array.h"
+#include "common/noncopyable.h"
 #include "common/path.h"
 #include "common/scummsys.h"
 #include "common/str.h"
@@ -54,6 +55,9 @@ enum class SoundCategory {
 
 /** Retains the path, playback policy, volume, and mixer handles for one sound. */
 struct SoundBuffer {
+private:
+	friend class SoundManager;
+
 	/** Number of simultaneous sample handles retained by one logical sound. */
 	static constexpr int kSampleSlotCount = 5;
 
@@ -97,7 +101,7 @@ struct SoundBuffer {
  * resolver. Numbered installed-music paths may resolve to the extracted CD
  * sound-effects directory when that compatibility resource exists.
  */
-class SoundManager {
+class SoundManager : public Common::NonCopyable {
 public:
 	/** Bind sound playback to the borrowed @p vm and @p mixer. */
 	SoundManager(Zoombini2Engine *vm, Audio::Mixer *mixer);
@@ -154,9 +158,16 @@ public:
 
 	/** Synchronize the game-facing percentages with ScummVM's mixer settings. */
 	void setVolumeSettings(int music, int sfx, int speech);
+	/** Return the global sound-effect volume in the inclusive range 0 through 100. */
+	int getSfxVolume() const { return _volumeSFX; }
+	/** Return the global music volume in the inclusive range 0 through 100. */
+	int getMusicVolume() const { return _volumeMusic; }
+	/** Return the global speech volume in the inclusive range 0 through 100. */
+	int getSpeechVolume() const { return _volumeSpeech; }
 	/** Select stereo input streams or downmix them to mono before playback. */
 	void setStereoOutputEnabled(bool enabled) { _stereoOutputEnabled = enabled; }
 
+private:
 	/** Global sound-effect volume in the inclusive range 0 through 100. */
 	int _volumeSFX = 100;
 	/** Global music volume in the inclusive range 0 through 100. */
@@ -164,8 +175,14 @@ public:
 	/** Global speech volume in the inclusive range 0 through 100. */
 	int _volumeSpeech = 100;
 
-private:
 	class MonoAudioStream;
+	static constexpr const char *kInstalledMusicPrefix = "#sounds/music/";
+	static constexpr const char *kMusicPrefix = "sounds/music/";
+	static constexpr const char *kFxPrefix = "sounds/fx/";
+	static constexpr const char *kFxPathFormat = "sounds/fx/%s";
+	static constexpr const char *kBlipPath = "sounds/blip.wav";
+	static constexpr const char *kSoundsPrefix = "sounds/";
+	static constexpr const char *kDataPrefix = "Data/";
 
 	/** Borrowed vm that resolves original logical resource names. */
 	Zoombini2Engine *_vm;

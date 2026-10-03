@@ -40,8 +40,6 @@ constexpr const char *ShelterBooliewood::kPascontentMarkerPath;
 constexpr const char *ShelterBooliewood::kWalkingAnimationPath;
 constexpr const char *ShelterBooliewood::kWaitingAnimationPath;
 constexpr const char *ShelterBooliewood::kCrowdRouteFormat;
-constexpr const char *ShelterBooliewood::kScrollRightCursorPath;
-constexpr const char *ShelterBooliewood::kScrollLeftCursorPath;
 constexpr const char *ShelterBooliewood::kMusicPath;
 constexpr const char *ShelterBooliewood::kIntroSpeechPath;
 constexpr const char *ShelterBooliewood::kAmbientSpeechFormat;
@@ -56,7 +54,7 @@ ShelterBooliewood::ShelterBooliewood(Zoombini2Engine *vm)
 }
 
 ShelterBooliewood::~ShelterBooliewood() {
-	_vm->setPageCursorSprite(nullptr);
+	_vm->setCursor(Zoombini2Engine::CursorType::kRestoreBase);
 	SoundManager *sound = _vm->getSoundManager();
 	if (sound) {
 		if (0 <= _introSpeechId)
@@ -121,7 +119,7 @@ void ShelterBooliewood::init() {
 		if (firstVisit) {
 			_introSpeechId = sound->load(false, Common::Path(kIntroSpeechPath), false);
 			if (0 <= _introSpeechId) {
-				sound->playWithVolume(_introSpeechId, sound->_volumeSpeech);
+				sound->playWithVolume(_introSpeechId, sound->getSpeechVolume());
 			}
 		}
 		for (int i = 0; i < kAmbientSpeechCount; i++) {
@@ -222,7 +220,7 @@ void ShelterBooliewood::buildSeatedCommunity(uint32 now) {
 		if (assignSeat(pos))
 			zoombini->setPosition(pos);
 		zoombini->setDefaultAnimation(_zoombiniAnimation, kSeatedZoombiniCell);
-		zoombini->_inputEnabled = false;
+		zoombini->setInputEnabled(false);
 	}
 
 	int historicalCount = state->_completedZoombiniCount - incomingCount;
@@ -239,7 +237,7 @@ void ShelterBooliewood::buildSeatedCommunity(uint32 now) {
 		ZoombiniRunner *zoombini = createHistoricalZoombini(state->_completedTraitHashes[i]);
 		zoombini->setPosition(pos);
 		zoombini->setDefaultAnimation(_zoombiniAnimation, kSeatedZoombiniCell);
-		zoombini->_inputEnabled = false;
+		zoombini->setInputEnabled(false);
 		_vm->_state->_activeZoombinis.push_back(zoombini);
 		if (walkingQuota != 0 && _vm->_rnd->getRandomNumber(1) != 0) {
 			zoombini->startAnimation(_walkingZoombiniAnimation, kSeatedZoombiniCell, now);
@@ -417,12 +415,12 @@ void ShelterBooliewood::updateScroll(uint32 now) {
 	const uint32 elapsed = now - _lastScrollTime;
 	_lastScrollTime = now;
 	const Common::Point32 mousePos = _vm->getMousePos();
-	const RleBlock *cursor = nullptr;
+	Zoombini2Engine::CursorType cursor = Zoombini2Engine::CursorType::kRestoreBase;
 	if (760 < mousePos.x)
-		cursor = _vm->_gfx->loadPageRleBlock(kScrollRightCursorPath);
+		cursor = Zoombini2Engine::CursorType::kScrollRight;
 	else if (mousePos.x < 30 && mousePos.y < 475)
-		cursor = _vm->_gfx->loadPageRleBlock(kScrollLeftCursorPath);
-	_vm->setPageCursorSprite(cursor);
+		cursor = Zoombini2Engine::CursorType::kScrollLeft;
+	_vm->setCursor(cursor);
 	int delta = _pendingScrollDelta;
 	_pendingScrollDelta = 0;
 	if (delta != 0) {
@@ -465,7 +463,7 @@ void ShelterBooliewood::playAmbientSpeech() {
 		return;
 	const int index = _vm->_rnd->getRandomNumber(kAmbientSpeechCount - 1);
 	if (0 <= _ambientSpeechIds[index])
-		sound->playWithVolume(_ambientSpeechIds[index], sound->_volumeSpeech);
+		sound->playWithVolume(_ambientSpeechIds[index], sound->getSpeechVolume());
 }
 
 void ShelterBooliewood::drawBackground(ManagedSurface32 *screen) const {
@@ -542,8 +540,8 @@ void ShelterBooliewood::drawSeatedCommunity(ManagedSurface32 *screen) const {
 	for (uint i = 0; i < order.size(); i++) {
 		const uint visibleIndex = order[i];
 		const ZoombiniRunner &zoombini = *_vm->_state->_activeZoombinis[visibleIndex];
-		const int animationFrame = zoombini._animationActive ? zoombini._animationFrame : 0;
-		drawZoombiniInPanorama(zoombini, zoombini._activeAnimation, zoombini._animationCell, animationFrame, zoombini._screenPos, screen);
+		const int animationFrame = zoombini.isAnimationActive() ? zoombini.getAnimationFrame() : 0;
+		drawZoombiniInPanorama(zoombini, zoombini.getActiveAnimation(), zoombini.getAnimationCell(), animationFrame, zoombini.getScreenPosition(), screen);
 	}
 }
 
@@ -558,7 +556,7 @@ void ShelterBooliewood::drawCrowdActors(ManagedSurface32 *screen) const {
 void ShelterBooliewood::drawZoombiniInPanorama(const ZoombiniRunner &zoombini, const ZoombiniAnimation *animation, int cell, int animationFrame, const Common::Point32 &pos, ManagedSurface32 *screen) const {
 	if (!animation)
 		return;
-	_vm->_gfx->drawZoombini(screen, animation, zoombini._traits, Common::Point32(getActorScreenX(pos.x), pos.y), cell, animationFrame);
+	_vm->_gfx->drawZoombini(screen, animation, zoombini.getTraits(), Common::Point32(getActorScreenX(pos.x), pos.y), cell, animationFrame);
 }
 
 } // End of namespace Zoombini2
