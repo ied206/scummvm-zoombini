@@ -423,15 +423,19 @@ private:
  * first continuation segment after the last segment completes, skipping the
  * FIRST segment that moves an object onto the repeating route.
  */
-struct PathObject {
+struct PathObject : public Common::NonCopyable {
 	/** Ordered segments released with this path. */
 	Common::Array<CurveSegment *> segments;
 	/** Index of the segment currently being evaluated. */
 	int currentSegment = 0;
 	/** Whether the path restarts after the last segment. */
 	bool looping = false;
+
+private:
 	/** Whether a non-looping path has reached its final endpoint. */
-	bool finished = false;
+	bool _finished = false;
+
+public:
 	/** Final endpoint in screen pixels. */
 	Common::Point32 endPos = Common::Point32();
 	/** Gameplay tick at which the path started. */
@@ -441,6 +445,8 @@ struct PathObject {
 	explicit PathObject(Zoombini2Engine *vm);
 	/** Release every retained segment. */
 	~PathObject();
+	/** Return whether a non-looping path has reached its final endpoint. */
+	bool isFinished() const { return _finished; }
 
 	/** Parse and return a newly allocated path, or nullptr on failure. */
 	static PathObject *loadFromPAT(Zoombini2Engine *vm, const Common::Path &path);
@@ -503,7 +509,7 @@ enum class ZmbDropResult {
  * implement the common movement, dragging, animation, and page-placement
  * lifecycle shared by active Zoombinis.
  */
-class ZoombiniRunner {
+class ZoombiniRunner : public Common::NonCopyable {
 public:
 	/** Completion branches selected by the active sprite-grid role. */
 	enum class AnimationCompletionPolicy {
@@ -527,14 +533,96 @@ public:
 
 	/** Assign the four visible traits, refresh their hash, and leave the stored unused slot unchanged. */
 	void setTraits(const ZmbTrait &traits);
+	/** Return the stored one-based trait record. */
+	const ZmbTrait &getTraits() const { return _traits; }
+	/** Return the packed cache derived from the four visible traits. */
+	uint16 getTraitHash() const { return _traitHash; }
+	/** Return the NUL-terminated Zoombini name. */
+	const char *getName() const { return _name; }
+	/** Replace the name while retaining the fixed-size storage buffer. */
+	void setName(const char *name) { Common::strlcpy(_name, name, sizeof(_name)); }
+	/** Copy complete fixed-size name bytes without assuming a NUL terminator. */
+	void setNameBytes(const char (&name)[StorageRecord::kNameSize]) { memcpy(_name, name, sizeof(_name)); }
+	/** Return whether this Zoombini can advance from the active page. */
+	bool canAdvanceFromPage() const { return _canAdvanceFromPage == 1; }
+	/** Store whether this Zoombini can advance from the active page. */
+	void setCanAdvanceFromPage(bool canAdvance) { _canAdvanceFromPage = canAdvance ? 1 : 0; }
+	/** Return whether page input may target this Zoombini. */
+	bool isInputEnabled() const { return _inputEnabled; }
+	/** Select whether page input may target this Zoombini. */
+	void setInputEnabled(bool enabled) { _inputEnabled = enabled; }
+	/** Return whether the page currently suppresses drawing this Zoombini. */
+	bool isHidden() const { return _hidden; }
+	/** Select whether the page suppresses drawing this Zoombini. */
+	void setHidden(bool hidden) { _hidden = hidden; }
+	/** Return whether the common pointer lifecycle currently holds this Zoombini. */
+	bool isDragging() const { return _dragging; }
+	/** Set the held state used by page-managed storage interactions. */
+	void setDragging(bool dragging) { _dragging = dragging; }
+	/** Return the shelter or puzzle placement index assigned to this Zoombini. */
+	int32 getPlacementIndex() const { return _placementIndex; }
+	/** Assign the shelter or puzzle placement index. */
+	void setPlacementIndex(int32 placementIndex) { _placementIndex = placementIndex; }
+	/** Return the Boolies rescued by this Zoombini during Boolie Boggle. */
+	int32 getRescuedBooliesPerZoombini() const { return _rescuedBooliesPerZoombini; }
+	/** Record the Boolies rescued by this Zoombini during Boolie Boggle. */
+	void setRescuedBooliesPerZoombini(int32 rescuedBoolies) { _rescuedBooliesPerZoombini = rescuedBoolies; }
+	/** Return whether this Zoombini has completed its page exit sequence. */
+	bool isExitComplete() const { return _exitComplete; }
+	/** Record whether this Zoombini has completed its page exit sequence. */
+	void setExitComplete(bool exitComplete) { _exitComplete = exitComplete; }
+	/** Return the available drop target currently under the dragged Zoombini, or -1. */
+	int32 getHoveredDropTargetIndex() const { return _hoveredDropTargetIndex; }
 	/** Select the default borrowed sprite grid and its resting cell. */
 	void setDefaultAnimation(const ZoombiniAnimation *animation, int cellIndex = 33);
 	/** Replace only the active borrowed sprite grid while retaining the grid restored at reset. */
 	void setActiveAnimation(const ZoombiniAnimation *animation);
+	/** Return the borrowed sprite grid currently selected for drawing. */
+	const ZoombiniAnimation *getActiveAnimation() const { return _activeAnimation; }
+	/** Select the borrowed sprite grid restored when the current animation ends. */
+	void setSavedAnimation(const ZoombiniAnimation *animation) { _savedAnimation = animation; }
+	/** Return whether the common renderer may start an ambient idle animation. */
+	bool isIdleAnimationEnabled() const { return _idleAnimationEnabled; }
+	/** Select whether the common renderer may start an ambient idle animation. */
+	void setIdleAnimationEnabled(bool enabled) { _idleAnimationEnabled = enabled; }
+	/** Return whether the current animation selects a nonzero frame. */
+	bool isAnimationActive() const { return _animationActive; }
+	/** Return the cell selected from the active Zoombini animation grid. */
+	int32 getAnimationCell() const { return _animationCell; }
+	/** Select the cell used by drawing and reset behavior. */
+	void setAnimationCell(int32 cell) { _animationCell = cell; }
+	/** Return the current frame in the selected animation cell. */
+	int32 getAnimationFrame() const { return _animationFrame; }
+	/** Select whether movement periodically recalculates the directional cell. */
+	void setTracksMovementDirection(bool enabled) { _tracksMovementDirection = enabled; }
+	/** Return the screen position immediately before the most recent movement update. */
+	Common::Point32 getPreviousScreenPosition() const { return _previousScreenPos; }
+	/** Return the selected base sprite size used by redraw bounds. */
+	const Size16 &getSpriteSize() const { return _spriteSize; }
 	/** Update the screen position and, when enabled, periodically refresh the directional animation cell. */
 	void setPosition(const Common::Point32 &pos);
+	/** Return the current screen position in game pixels. */
+	Common::Point32 getScreenPosition() const { return _screenPos; }
+	/** Store a page-selected position without changing the previous position or directional cell. */
+	void setScreenPositionWithoutTracking(const Common::Point32 &position) { _screenPos = position; }
+	/** Store the drag origin used when the current pointer hold ends. */
+	void setDragOrigin(const Common::Point32 &position) { _dragOrigin = position; }
+	/** Return the screen position saved when the current drag began. */
+	Common::Point32 getDragOrigin() const { return _dragOrigin; }
+	/** Store the pointer-to-sprite offset preserved during the active drag. */
+	void setDragOffset(const Common::Point32 &offset) { _dragOffset = offset; }
+	/** Return the pointer-to-sprite offset preserved during the active drag. */
+	Common::Point32 getDragOffset() const { return _dragOffset; }
 	/** Replace the retained path and begin evaluating it at @p tickCount. */
 	void startMovement(PathObject *path, uint32 tickCount);
+	/** Retain a page-configured path without restarting it. */
+	void setMovementPath(PathObject *path) { _movementPath = path; }
+	/** Return whether this Zoombini currently has a retained movement path. */
+	bool hasMovementPath() const { return _movementPath != nullptr; }
+	/** Return whether the retained movement path has completed. */
+	bool isMovementFinished() const { return _movementPath && _movementPath->isFinished(); }
+	/** Advance the retained path and return its position without updating the Zoombini position. */
+	bool advanceMovementPath(uint32 tickCount, Common::Point32 &position) { return _movementPath && _movementPath->advance(tickCount, position); }
 	/** Advance the retained path and apply @p spriteOffset without releasing a completed path. */
 	bool advanceMovement(uint32 tickCount, const Common::Point32 &spriteOffset = Common::Point32());
 	/** Release the retained path without changing the current position. */
@@ -587,12 +675,7 @@ public:
 	/** Return the sprite rectangle derived from the selected grid's base layer. */
 	Common::Rect32 getSpriteRect(int scrollX = 0, int backgroundWidth = AnimationRunner::kDefaultBackgroundWidth) const;
 
-	/** Stored one-based trait record, including its serialized unused slot zero. */
-	ZmbTrait _traits = ZmbTrait();
-	/** Runtime-only packed cache derived from the four visible traits. */
-	uint16 _traitHash = 0xFFFF;
-	/** NUL-terminated Zoombini name retained by storage records and saved game data. */
-	char _name[kZoombiniNameSize] = {};
+private:
 	/** Countdown between direction-cell recalculations while movement tracking is enabled. */
 	int32 _directionUpdateCooldown = 0;
 	/** Current signed 32-bit screen position. */
@@ -603,18 +686,12 @@ public:
 	Size16 _spriteSize = Size16();
 	/** Current movement path held by this Zoombini until movement ends. */
 	PathObject *_movementPath = nullptr;
-	/** Whether the current page allows this Zoombini to receive input. */
-	bool _inputEnabled = false;
-	/** Whether the common input lifecycle currently holds this Zoombini. */
-	bool _dragging = false;
 	/** Screen position saved when the current drag began. */
 	Common::Point32 _dragOrigin = Common::Point32();
 	/** Borrowed sprite grid currently used to draw this Zoombini. */
 	const ZoombiniAnimation *_activeAnimation = nullptr;
 	/** Borrowed sprite grid restored when the current animation ends. */
 	const ZoombiniAnimation *_savedAnimation = nullptr;
-	/** Slot, route, table, or maze placement index assigned by the active page. */
-	int32 _placementIndex = -1;
 	/** Whether the common renderer may start an ambient idle animation. */
 	bool _idleAnimationEnabled = true;
 	/** Banked idle-roll quota; the original one-in-250 roll runs once per 1000 banked units. */
@@ -623,26 +700,46 @@ public:
 	int64 _celebrateRollQuota = 0;
 	/** Gameplay tick at which the next animation frame becomes due. */
 	uint32 _nextAnimationFrameTime = 0;
-	/** Progress value assigned by the active page; zero and one meanings depend on the active puzzle. */
-	byte _puzzleStatus = 0;
-	/** Number of rescued Boolies credited when this Zoombini completes Boolie Boggle. */
-	int32 _rescuedBooliesPerZoombini = 0;
-	/** Whether this Zoombini has completed the active puzzle's exit sequence. */
-	bool _exitComplete = false;
-	/** Whether the dragged Zoombini currently overlaps an available drop target. */
-	bool _overDropTarget = false;
-	/** Index of the available drop target under the dragged Zoombini, or `-1`. */
-	int32 _hoveredDropTargetIndex = -1;
+
 	/** Whether drawing selects the animated frame instead of frame zero. */
 	bool _animationActive = false;
 	/** Cell selected from the active Zoombini animation grid. */
 	int32 _animationCell = 0;
 	/** Current frame in the selected animation cell. */
 	int32 _animationFrame = 0;
-	/** Whether drawing is suppressed while page logic retains this Zoombini. */
-	bool _hidden = false;
+
 	/** Pointer-to-sprite offset preserved during the active drag. */
 	Common::Point32 _dragOffset = Common::Point32();
+
+private:
+	friend class GameState;
+	friend struct StorageRecord;
+
+	/** Stored one-based trait record, including its serialized unused slot zero. */
+	ZmbTrait _traits = ZmbTrait();
+	/** Runtime-only packed cache derived from the four visible traits. */
+	uint16 _traitHash = 0xFFFF;
+	/** NUL-terminated Zoombini name retained by storage records and saved game data. */
+	char _name[StorageRecord::kNameSize] = {};
+	/** Byte-sized eligibility to advance from the active page. */
+	byte _canAdvanceFromPage = 0;
+	/** Whether the current page allows this Zoombini to receive input. */
+	bool _inputEnabled = false;
+	/** Whether the common input lifecycle currently holds this Zoombini. */
+	bool _dragging = false;
+	/** Slot, route, table, or maze placement index assigned by the active page. */
+	int32 _placementIndex = -1;
+	/** Number of rescued Boolies credited to this Zoombini. */
+	int32 _rescuedBooliesPerZoombini = 0;
+	/** Whether this Zoombini completed the active puzzle's exit sequence. */
+	bool _exitComplete = false;
+	/** Whether the dragged Zoombini currently overlaps an available drop target. */
+	bool _overDropTarget = false;
+	/** Index of the available drop target under the dragged Zoombini, or `-1`. */
+	int32 _hoveredDropTargetIndex = -1;
+	/** Whether drawing is suppressed while page logic retains this Zoombini. */
+	bool _hidden = false;
+
 	/** Optional one-shot callback retained independently from animation starts and resets. */
 	AnimationCompleteCallback _animationCompleteCallback = nullptr;
 	/** Borrowed context passed to @ref _animationCompleteCallback. */

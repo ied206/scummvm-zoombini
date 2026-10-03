@@ -119,7 +119,7 @@ void DialogMsgBox::resolveUiFont() {
 
 void DialogMsgBox::close() {
 	if (_state == DialogMsgBoxState::kOpen02) {
-		if (_savedBackground && _vm->getCurrentScreen()) {
+		if (_savedBackground && _vm->_gfx) {
 			_vm->_gfx->copyRegionToScreen(*_savedBackground, Common::Point(_position.x, _position.y));
 		}
 		_vm->setDialogPaused(false);

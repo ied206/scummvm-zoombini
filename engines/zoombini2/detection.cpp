@@ -65,15 +65,14 @@ public:
 
 DetectedGame Zoombini2MetaEngineDetection::toDetectedGame(const ADDetectedGame &adGame, ADDetectedGameExtraInfo *extraInfo) const {
 	DetectedGame game = AdvancedMetaEngineDetection::toDetectedGame(adGame, extraInfo);
-	const Zoombini2::Zoombini2GameDescription *zoombini2Desc = reinterpret_cast<const Zoombini2::Zoombini2GameDescription *>(adGame.desc);
 
-	if ((zoombini2Desc->features & (Zoombini2::GF_Z2_V10 | Zoombini2::GF_Z2_V11)) && zoombini2Desc->desc.extra && *zoombini2Desc->desc.extra) {
+	if (game.gameId == "zoombini2" && adGame.desc->extra && *adGame.desc->extra) {
 		// Keep each release target stable when multiple versions share the same platform and language.
-		static const Common::String kDemoSuffix = " Demo";
-		const bool isDemo = (zoombini2Desc->desc.flags & ADGF_DEMO) != 0;
-		Common::String versionExtra = zoombini2Desc->desc.extra;
+		static constexpr char kDemoSuffix[] = " Demo";
+		const bool isDemo = (adGame.desc->flags & ADGF_DEMO) != 0;
+		Common::String versionExtra = adGame.desc->extra;
 		if (isDemo && versionExtra.hasSuffix(kDemoSuffix))
-			versionExtra.erase(versionExtra.size() - kDemoSuffix.size());
+			versionExtra.erase(versionExtra.size() - (sizeof(kDemoSuffix) - 1));
 
 		Common::String versionTag;
 		for (const char *character = versionExtra.c_str(); *character; character++) {

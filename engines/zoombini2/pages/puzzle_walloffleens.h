@@ -63,6 +63,9 @@ public:
 	Common::String debugGetChanceDetails() const override;
 
 private:
+	static constexpr const char *kPuzzleName = "Magic Mirrors";
+	/** Magic Mirrors board background loaded into the first page layer. */
+	static constexpr const char *kBackgroundPath = "#bmp/wall_of_fleens/background";
 	/** Loading and projectile movement run independently of mirror reactions. */
 	enum class ShotPhase {
 		/** Load the next cannonball or Zoombini projectile. */

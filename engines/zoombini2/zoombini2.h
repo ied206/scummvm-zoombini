@@ -23,12 +23,15 @@
 #define ZOOMBINI2_ZOOMBINI2_H
 
 #include "common/array.h"
+#include "common/callback.h"
 #include "common/error.h"
 #include "common/events.h"
 #include "common/hashmap.h"
+#include "common/path.h"
 #include "common/rect.h"
 #include "common/scummsys.h"
 #include "common/str.h"
+#include "common/ustr.h"
 
 #include "engines/engine.h"
 
@@ -46,8 +49,8 @@ class SeekableReadStream;
 namespace Zoombini2 {
 
 class BitBlock;
-class DialogDebug;
-class DialogMsgBox;
+class DialogBase;
+struct DialogDebugCommand;
 enum class DialogMsgBoxButton;
 class PageBase;
 class RleBlock;
@@ -55,22 +58,6 @@ class SoundManager;
 class Sidebar;
 class ZoombiniAnimation;
 class ZoombiniRunner;
-
-/** Rescue Site I branch selected for the next map transition. */
-enum class RouteBranch : int {
-	kNone00 = 0, ///< No branch selected.
-	kLeft01 = 1, ///< Left branch.
-	kRight02 = 2 ///< Right branch.
-};
-
-/** Maximum number of Zoombinis in the starting party. */
-const uint kMaxPackSize = 16;
-
-/** Maximum party size after a rescue-site transition. */
-const uint kPostRescuePackSize = 8;
-
-/** Number of distinct four-feature combinations. */
-const int kMaxCombinations = 625;
 
 /**
  * Owns global resources, input, page dispatch, and the active game session.
@@ -81,6 +68,42 @@ const int kMaxCombinations = 625;
  */
 class Zoombini2Engine : public Engine {
 public:
+	/** Rescue Site I branch selected for the next map transition. */
+	enum class RouteBranch : int {
+		kNone00 = 0, ///< No branch selected.
+		kLeft01 = 1, ///< Left branch.
+		kRight02 = 2 ///< Right branch.
+	};
+
+	/** Cursor artwork or a request to remove the current page cursor. */
+	enum class CursorType : byte {
+		kDefault,     ///< Pointing hand
+		kInteractive, ///< Spread hand
+		kScrollLeft,  ///< Finger pointing left
+		kScrollRight, ///< Finger pointing right
+		/** Chez Norf main dishes. */
+		kMainDishSandwich,
+		kMainDishFish,
+		kMainDishSalad,
+		/** Chez Norf drinks. */
+		kDrinkTea,
+		kDrinkOrangeJuice,
+		kDrinkMilk,
+		/** Chez Norf desserts. */
+		kDessertFruitPie,
+		kDessertWatermelon,
+		kDessertIceCream,
+		kMealTray,   ///< Held Chez Norf meal tray.
+		kRestoreBase ///< Clear to the current default or interactive cursor.
+	};
+
+	/** Original developer actions that can also be invoked from the ScummVM debugger. */
+	enum class BuiltinDebugAction {
+		kExportZoombiniSet,
+		kImportZoombiniSet,
+		kCompletePuzzle
+	};
+
 	/** Construct an engine for one detected release. */
 	Zoombini2Engine(OSystem *syst, const Zoombini2GameDescription *desc);
 	/** Release the active page and all resources retained for this game instance. */
@@ -104,10 +127,8 @@ public:
 	void reseedRandomForV10();
 	/** Return the most recently processed game-space mouse position. */
 	Common::Point32 getMousePos() const { return _mousePos; }
-	/** Present the interactive hover cursor instead of the default cursor. */
-	void setHoverCursorActive(bool active);
-	/** Select a page's carried-item cursor, or restore normal hover selection with nullptr. */
-	void setPageCursorSprite(const RleBlock *sprite);
+	/** Select a cursor by its logical kind, or remove a page cursor with @ref CursorType::kRestoreBase. */
+	void setCursor(CursorType type);
 
 	/** Return the detected release language. */
 	Common::Language getLanguage() const { return _gameDescription->desc.language; }
@@ -122,18 +143,22 @@ public:
 	/** Return whether the detected release is the playable demo. */
 	bool isDemo() const { return (_gameDescription->desc.flags & ADGF_DEMO) != 0; }
 
-	/** Return the drawing surface for this game instance. */
-	ManagedSurface32 *getScreen() { return _screen; }
-	/** Return the drawing surface used by the active page. */
-	ManagedSurface32 *getCurrentScreen() { return _screen; }
 	/** Return the single immutable alpha-blending lookup table shared by this game instance. */
 	const AlphaBlendLUT &getAlphaLUT() const { return _alphaBlendLUT; }
 	/** Return the sound manager for this game instance. */
 	SoundManager *getSoundManager() { return _soundManager; }
-	/** Return the engine-owned shared message-box dialog. */
-	DialogMsgBox *getMsgBoxDialog() { return _msgBoxDialog; }
-	/** Return the engine-owned debug area-mask dialog. */
-	DialogDebug *getDebugDialog() { return _debugDialog; }
+	/** Queue a game-resource confirmation and retain its completion callback. */
+	bool requestMsgBox(const Common::Path &textPath, Common::BaseCallback<DialogMsgBoxButton> *callback,
+					   const Common::Point32 &pos = Common::Point32(-1, -1));
+	/** Queue a UI-text confirmation and retain its completion callback. */
+	bool requestUiTextMsgBox(const Common::U32String &text, Common::BaseCallback<DialogMsgBoxButton> *callback,
+							 const Common::Point32 &pos = Common::Point32(-1, -1));
+	/** Open the help overlay for the current page and difficulty. */
+	bool openHelpDialog(PageId pageId, int level);
+	/** Open a console debug view. */
+	bool openDebugDialog(const DialogDebugCommand &cmd);
+	/** Return the currently active engine dialog, if any. */
+	DialogBase *getActiveDialog() const;
 	/** Return the game-facing music volume percentage. */
 	int getMusicVolume() const;
 	/** Return the game-facing sound-effect volume percentage. */
@@ -162,6 +187,12 @@ public:
 	int getLogicPacingHz() const { return _logicPacingHz; }
 	/** Return whether the Chez Norf diagnostic overlay key is currently held. */
 	bool showChezNorfDebugOverlay() const { return _debugHotkeysEnabled && _debugOverlayKeyDown; }
+	/** Report the active target's developer-hotkey gate. */
+	bool areBuiltinDebugHotkeysEnabled() const { return _debugHotkeysEnabled; }
+	/** Return the target-prefixed roster-trait filename used in the configured save location. */
+	Common::String getDebugZoombiniSetFileName() const;
+	/** Invoke one original developer action without requiring an in-game key event. */
+	bool runBuiltinDebugAction(BuiltinDebugAction action);
 
 	/** Load or return a shared Zoombini sprite grid and select its page-configured frame delay. */
 	const ZoombiniAnimation *loadZoombiniAnimation(const Common::Path &path, uint32 frameDelay);
@@ -282,9 +313,28 @@ private:
 	class ResourceFileResolver;
 	/** Decimal factor separating a direct-practice page ID from its difficulty. */
 	static constexpr int kPracticeBootParamPageFactor = 100;
-	static constexpr const char *kCursorSpritePath = "bmp/cursor/cursor01.rb";
-	static constexpr const char *kInteractiveCursorSpritePath = "bmp/cursor/cursor02.rb";
+	static constexpr uint kCursorCount = static_cast<uint>(CursorType::kRestoreBase);
+	static constexpr const char *kCursorPaths[kCursorCount] = {
+		"bmp/cursor/cursor01.rb",
+		"bmp/cursor/cursor02.rb",
+		"bmp/cursor/cursor03.rb",
+		"bmp/cursor/cursor04.rb",
+		"bmp/chez_norf/miam_sandwitch",
+		"bmp/chez_norf/miam_poisson",
+		"bmp/chez_norf/miam_salade",
+		"bmp/chez_norf/glouglou_cafe",
+		"bmp/chez_norf/glouglou_orange",
+		"bmp/chez_norf/glouglou_lait",
+		"bmp/chez_norf/slurp_tarte",
+		"bmp/chez_norf/slurp_pasteque",
+		"bmp/chez_norf/slurp_glace",
+		"bmp/chez_norf/plato_mini"};
 	static constexpr const char *kQuitConfirmationPath = "bmp/menu/Quit_panel_text_quit";
+	static constexpr const char *kDebugZoombiniSetFileNameFormat = "%s-zoombini.set";
+	/** Maximum editable roster-document size in bytes. */
+	static constexpr uint32 kDebugZoombiniSetMaxSize = 4096;
+	/** Maximum roster size accepted by the developer interchange format. */
+	static constexpr int kDebugZoombiniSetMaxMembers = 16;
 
 	/** Savefile selected by a load, create, or confirmed overwrite. */
 	Common::String _activeSavefileName;
@@ -298,26 +348,39 @@ private:
 
 	typedef Common::HashMap<Common::Path, ZoombiniAnimation *, Common::Path::IgnoreCase_Hash, Common::Path::IgnoreCase_EqualTo> ZoombiniAnimationCache;
 
+	/** Cursor pixels derived once from a cached RLE sprite. */
+	struct CursorImage {
+		Size32 size;
+		byte *pixels;
+
+		explicit CursorImage(const Size32 &cursorSize);
+		~CursorImage();
+	};
+
 	/** Return the unique child directory whose name matches @p name without case. */
 	static Common::FSNode findChildDirectoryIgnoreCase(const Common::FSNode &directory, const char *name);
 	/** Decode and validate a direct-practice boot parameter before the initial page is selected. */
 	bool configurePracticeBootParamLaunch();
+	/** Release closed engine dialogs after their event handlers and callbacks return. */
+	void cleanupClosedDialogs();
 
 	/** Original logical resource-name resolver for the CD and installed roots. */
 	ResourceFileResolver *_resourceFileResolver = nullptr;
-	/** Fixed-size drawing surface for this game instance. */
-	ManagedSurface32 *_screen = nullptr;
 	/** Immutable animation sets shared by page lifetimes. */
 	ZoombiniAnimationCache _zoombiniAnimationCache;
 
-	/** Cursor sprite borrowed from the graphics shared cache. */
-	RleBlock *_cursorSprite = nullptr;
-	/** Interactive hover cursor sprite borrowed from the graphics shared cache. */
-	RleBlock *_interactiveCursorSprite = nullptr;
-	/** Whether the interactive hover cursor is currently presented. */
-	bool _hoverCursorActive = false;
-	/** Borrowed carried-item sprite, cleared by the page before its resources are released. */
-	const RleBlock *_pageCursorSprite = nullptr;
+	/** Default or interactive cursor requested by the active page. */
+	CursorType _baseCursorType = CursorType::kDefault;
+	/** Page cursor displayed above the base cursor until restored. */
+	CursorType _pageCursorType = CursorType::kRestoreBase;
+	/** Cursor last registered with CursorMan. */
+	CursorType _activeCursorType = CursorType::kDefault;
+	/** Whether a cursor has been registered for this game instance. */
+	bool _cursorRegistered = false;
+	/** BGRA cursor pixels indexed by @ref CursorType, with page entries cleared on transition. */
+	CursorImage *_cursorImages[kCursorCount] = {};
+	/** Missing or invalid cursor art already reported for this cache lifetime. */
+	bool _cursorUnavailable[kCursorCount] = {};
 	/** Signed 16-bit hotspot offset used by the active cursor image. */
 	Common::Point _cursorHotspot = Common::Point();
 	/** Whether CursorMan should present the game cursor. */
@@ -328,10 +391,8 @@ private:
 
 	/** Shared Help, Map, and Go controls for this game instance. */
 	Sidebar *_sidebar = nullptr;
-	/** Shared two-button message-box dialog for pages and controls. */
-	DialogMsgBox *_msgBoxDialog = nullptr;
-	/** Debug area-mask dialog opened from the console. */
-	DialogDebug *_debugDialog = nullptr;
+	/** Engine dialogs opened on demand; closed dialogs are retired after event dispatch. */
+	Common::Array<DialogBase *> _dialogStack;
 
 	/** Most recently processed game-space mouse position. */
 	Common::Point32 _mousePos = Common::Point32();
@@ -415,20 +476,22 @@ private:
 	void pauseEngineIntern(bool pause) override;
 	/** Load the target-scoped compatibility and gameplay-improvement switches from ScummVM configuration. */
 	void refreshEngineSettings();
-	/** Export the active party's trait tuples to working-directory zoombini.set. */
+	/** Export the active party's trait tuples as uncompressed text through @ref Common::SaveFileManager. */
 	void exportZoombiniSet() const;
-	/** Import bounded trait tuples from working-directory zoombini.set. */
+	/** Validate the complete save-location trait file before applying any member changes. */
 	void importZoombiniSet();
-	/** Apply the held global puzzle-completion shortcut to the active roster and page. */
-	void applyDebugPuzzleCompletion();
+	/** Read one complete whitespace-delimited decimal token within a bounded text snapshot. */
+	static bool readDebugSetInteger(const char *&cursor, const char *end, int32 &value);
+	/** Apply the global puzzle-completion shortcut to the active roster and page. */
+	bool applyDebugPuzzleCompletion();
 	/** Release every Zoombini sprite grid cached by this game instance. */
 	void clearZoombiniAnimationCache();
 	/** Load and register the game cursor. */
 	void initCursor();
-	/** Register the loaded cursor sprite with CursorMan. */
-	void registerCursorWithCursorMan();
-	/** Register @p sprite with CursorMan using the shared conversion. */
-	void registerCursorSpriteWithCursorMan(const RleBlock *sprite);
+	/** Convert @p sprite to BGRA cursor pixels. */
+	CursorImage *createCursorImage(const RleBlock *sprite) const;
+	/** Release derived cursor pixels beginning at @p firstIndex. */
+	void clearCursorImages(uint firstIndex);
 	/** Return the first held global Zoombini, or nullptr when none is held. */
 	const ZoombiniRunner *getDraggedGlobalZoombini() const;
 	/** Hide the cursor while held, then draw the page overlay and held name plate. */

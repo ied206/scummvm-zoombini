@@ -104,8 +104,8 @@ void ShelterRescueSiteBase::refillDepartureRoster(StorageRecord **storage) {
 	_departureRoster.clear();
 	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
 		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
-		zoombini->_puzzleStatus = 0;
-		zoombini->_inputEnabled = 1;
+		zoombini->setCanAdvanceFromPage(false);
+		zoombini->setInputEnabled(true);
 		if (i < 8)
 			_departureRoster.push_back(zoombini);
 	}
@@ -120,7 +120,7 @@ void ShelterRescueSiteBase::saveRescueRoster(StorageRecord **storage) {
 		bool departing = false;
 		if (_vm->isStartingMapTransition())
 			departing = isDepartingMember(zoombini);
-		zoombini->_puzzleStatus = 1;
+		zoombini->setCanAdvanceFromPage(true);
 		if (departing) {
 			i += 1;
 		} else {
@@ -129,7 +129,7 @@ void ShelterRescueSiteBase::saveRescueRoster(StorageRecord **storage) {
 			roster.remove_at(i);
 		}
 	}
-	_vm->writeGameSave(state->_playerName);
+	_vm->writeGameSave(state->getPlayerName());
 }
 
 bool ShelterRescueSiteBase::isDepartingMember(const ZoombiniRunner *zoombini) const {
@@ -177,7 +177,7 @@ void ShelterRescueSiteBase::clearSpeechQueue() {
 
 uint ShelterRescueSiteBase::countStorageMembers(StorageRecord *const *storage) {
 	uint count = 0;
-	for (int i = 0; i < kStorageRows * kStorageCols; i++) {
+	for (int i = 0; i < GameState::kStorageRows * GameState::kStorageCols; i++) {
 		if (storage[i])
 			count += 1;
 	}
@@ -220,7 +220,7 @@ void ShelterRescueSiteBase::onRenderContent(ManagedSurface32 *screen) {
 		const int colSlotBase = (col + _scrollOffset) * kGridRows;
 		for (int row = 0; row < kGridRows; row++) {
 			const int slotIdx = colSlotBase + row;
-			if (slotIdx < 0 || kStorageRows * kStorageCols <= slotIdx)
+			if (slotIdx < 0 || GameState::kStorageRows * GameState::kStorageCols <= slotIdx)
 				continue;
 
 			const StorageRecord *record = storage[slotIdx];
@@ -250,7 +250,7 @@ EventHandleResult ShelterRescueSiteBase::onLButtonDown(const Common::Point &pos)
 	}
 
 	if (_scrollDownRect.contains(pos)) {
-		if (_scrollOffset < kStorageRows - kGridCols)
+		if (_scrollOffset < GameState::kStorageRows - kGridCols)
 			_scrollOffset += 1;
 		debug(2, "RescueSite: Scroll down/right, offset=%d", _scrollOffset);
 		return EventHandleResult::kConsumed;
@@ -267,7 +267,7 @@ EventHandleResult ShelterRescueSiteBase::onLButtonDown(const Common::Point &pos)
 			if (slotHit.contains(pos)) {
 				const int slotIdx = (col + _scrollOffset) * kGridRows + row;
 				StorageRecord *const *storage = getRescueStorage();
-				if (0 <= slotIdx && slotIdx < kStorageRows * kStorageCols && storage[slotIdx]) {
+				if (0 <= slotIdx && slotIdx < GameState::kStorageRows * GameState::kStorageCols && storage[slotIdx]) {
 					_selectedZoombini = slotIdx;
 					debug(2, "RescueSite: Selected zoombini %d at slot %d", slotIdx, slotIdx);
 				} else {

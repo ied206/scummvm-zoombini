@@ -24,6 +24,7 @@
 
 #include "common/array.h"
 #include "common/language.h"
+#include "common/noncopyable.h"
 #include "common/scummsys.h"
 #include "common/str-array.h"
 #include "common/str.h"
@@ -72,27 +73,6 @@ enum PageId : int {
 	kPageMenuAlt = 40,          ///< Alternate sign-in route
 	kPageLogoArisuMedia = 1972, ///< (v1.1KR only) Splash video of ArisuMedia
 };
-
-/** Save-file version accepted by @ref GameState. */
-const int kSaveFileMagic = 262;
-
-/** Number of serialized rows in each sparse storage area. */
-const int kStorageRows = 125;
-
-/** Number of serialized columns in each sparse storage area. */
-const int kStorageCols = 5;
-
-/** Storage allocation size, including one unused sentinel row. */
-const int kStorageSize = 630;
-
-/** Number of distinct Zoombinis represented by the four visible traits. */
-const int kZoombiniCombinationCount = 625;
-
-/** Bytes reserved for a NUL-terminated Zoombini name in saved games. */
-const int kZoombiniNameSize = 15;
-
-/** Number of completed-Zoombini trait hashes retained in one saved game. */
-const int kCompletedTraitHashCount = 210;
 
 /** Stored Zoombini traits with an unused slot zero followed by the four visible values. */
 struct ZmbTrait {
@@ -231,6 +211,18 @@ struct VolumeSettings {
 	void setSfx(int value) { _sfx = CLIP(value, 0, kMaxVolumePercent); }
 	/** Clamp and assign the current speech level. */
 	void setSpeech(int value) { _speech = CLIP(value, 0, kMaxVolumePercent); }
+	/** Return the current music level percentage. */
+	int getMusic() const { return _music; }
+	/** Return the current sound-effect level percentage. */
+	int getSfx() const { return _sfx; }
+	/** Return the current speech level percentage. */
+	int getSpeech() const { return _speech; }
+	/** Return the music level captured when this edit began. */
+	int getInitialMusic() const { return _initialMusic; }
+	/** Return the sound-effect level captured when this edit began. */
+	int getInitialSfx() const { return _initialSfx; }
+	/** Return the speech level captured when this edit began. */
+	int getInitialSpeech() const { return _initialSpeech; }
 	/** Clamp and assign the current levels, then capture them as the cancellation baseline. */
 	void setInitialVolumes(int music, int sfx, int speech) {
 		setMusic(music);
@@ -241,6 +233,7 @@ struct VolumeSettings {
 		_initialSpeech = _speech;
 	}
 
+private:
 	/** Current music level percentage. */
 	int _music = kMaxVolumePercent;
 	/** Current sound-effect level percentage. */
@@ -257,33 +250,33 @@ struct VolumeSettings {
 
 /** Twenty-byte representation of one Zoombini stored in a sparse storage cell. */
 struct StorageRecord {
-	/** NUL-terminated character name copied from the active Zoombini. */
-	char _name[kZoombiniNameSize] = {};
-	/** Unused slot zero followed by Feet, Nose, Hair, and Eyes. */
-	ZmbTrait _traits;
+	/** Bytes reserved for a fixed-size Zoombini name in storage and saved games. */
+	static constexpr int kNameSize = 15;
 
 	/** Initialize the record to an empty name and unset stored traits. */
 	StorageRecord() = default;
 	/** Copy the persistent fields from @p zoombini into this record. */
 	void store(const ZoombiniRunner &zoombini);
+	/** Return the complete fixed-size name bytes retained in this record. */
+	const char (&getNameBytes() const)[kNameSize] { return _name; }
 	/** Return the complete trait tuple stored in this record. */
 	ZmbTrait getTraits() const;
 	/** Restore a newly allocated active Zoombini from this record. */
 	ZoombiniRunner *restore() const;
+
+private:
+	friend class GameState;
+
+	/** Fixed-size character name copied from the active Zoombini. */
+	char _name[kNameSize] = {};
+	/** Unused slot zero followed by Feet, Nose, Hair, and Eyes. */
+	ZmbTrait _traits;
 };
 
 /** Per-combination use-count table retained by the game state. */
 struct TraitComboTable {
-	/** Total accepted registrations, including repeated combinations. */
-	int32 _totalCount;
-	/** Number of distinct trait combinations registered at least once. */
-	int32 _uniqueCombinationCount;
-	/** Number of trait combinations registered exactly twice. */
-	int32 _twiceRegisteredCombinationCount;
-	/** Registration count for each of the 625 visible trait combinations. */
-	byte _combinationUseCounts[kZoombiniCombinationCount];
-	/** Unused trailing bytes preserved by the original 640-byte save block. */
-	byte _unusedTail[3];
+	/** Number of distinct Zoombinis represented by the four visible traits. */
+	static constexpr int kZoombiniCombinationCount = 625;
 
 	/** Return the table index for a validated trait combination, or -1. */
 	static int getComboIndex(const ZmbTrait &traits);
@@ -295,6 +288,20 @@ struct TraitComboTable {
 	bool registerCombo(const ZmbTrait &traits);
 	/** Remove one prior registration of @p traits from this table. */
 	bool unregisterCombo(const ZmbTrait &traits);
+
+private:
+	friend class GameState;
+
+	/** Total accepted registrations, including repeated combinations. */
+	int32 _totalCount;
+	/** Number of distinct trait combinations registered at least once. */
+	int32 _uniqueCombinationCount;
+	/** Number of trait combinations registered exactly twice. */
+	int32 _twiceRegisteredCombinationCount;
+	/** Registration count for each of the 625 visible trait combinations. */
+	byte _combinationUseCounts[kZoombiniCombinationCount];
+	/** Unused trailing bytes preserved by the original 640-byte save block. */
+	byte _unusedTail[3];
 };
 
 /**
@@ -305,8 +312,19 @@ struct TraitComboTable {
  * @ref GameState::_rescue1Storage, @ref GameState::_rescue2Storage, and
  * @ref GameState::_savedRoster.
  */
-class GameState {
+class GameState : public Common::NonCopyable {
 public:
+	/** Save-file version accepted by @ref GameState. */
+	static constexpr int kSaveFileMagic = 262;
+	/** Number of serialized rows in each sparse storage area. */
+	static constexpr int kStorageRows = 125;
+	/** Number of serialized columns in each sparse storage area. */
+	static constexpr int kStorageCols = 5;
+	/** Storage allocation size, including one unused sentinel row. */
+	static constexpr int kStorageSize = 630;
+	/** Number of completed-Zoombini trait hashes retained in one saved game. */
+	static constexpr int kCompletedTraitHashCount = 210;
+
 	/** Generate a short name for a newly created Zoombini. */
 	static Common::String generateZoombiniName(Random &random);
 	/** Construct a fresh game state. */
@@ -339,12 +357,16 @@ public:
 	static int findStorageScrollRow(StorageRecord *const *storage);
 	/** Return the four shelter-stage counts and serialized active-party count. */
 	Zoombini2PopulationSummary getPopulationSummary() const;
+	/** Return the savefile name associated with this game state. */
+	const Common::String &getPlayerName() const { return _playerName; }
+	/** Associate this state with @p playerName. */
+	void setPlayerName(const Common::String &playerName) { _playerName = playerName; }
 	/** Append one Booliewood completion snapshot while history capacity remains. */
 	bool recordCompletedZoombini(const ZoombiniRunner &zoombini);
 	/** Apply one completed Booliewood trip to this game state and its active party. */
 	void recordBooliesCompletion();
 	/** Return whether this game state has accepted its 625th Zoombini registration. */
-	bool hasReachedZoombiniRegistrationLimit() const { return _traitComboTable._totalCount == kZoombiniCombinationCount; }
+	bool hasReachedZoombiniRegistrationLimit() const { return _traitComboTable._totalCount == TraitComboTable::kZoombiniCombinationCount; }
 	/** Return whether accumulated progress has unlocked relaxed party trait limits. */
 	bool hasRelaxedPackTraitLimits() const { return 600 <= _traitComboTable._twiceRegisteredCombinationCount; }
 
@@ -395,8 +417,11 @@ public:
 		return 1;
 	}
 
+private:
 	/** Player name serialized in the savefile. */
 	Common::String _playerName;
+
+public:
 	/** Runtime level selected for the active gameplay page. */
 	int _level;
 	/** Most recently initialized gameplay page. */
@@ -429,10 +454,14 @@ public:
 	int32 _completedZoombiniCount;
 	/** Packed trait snapshots for Zoombinis that reached Booliewood. */
 	int32 _completedTraitHashes[kCompletedTraitHashCount];
+
+private:
 	/** First-rescue movie completion flag. */
 	byte _rescue1MoviePlayed;
 	/** Second-rescue movie completion flag. */
 	byte _rescue2MoviePlayed;
+
+public:
 	/** Trait-combination use-count table and aggregate totals. */
 	TraitComboTable _traitComboTable;
 	/** Zoombini roster retained by this game state. */

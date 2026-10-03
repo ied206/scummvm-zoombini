@@ -51,8 +51,6 @@ public:
 	bool onGoButtonPressed() override;
 	/** Keep sidebar controls unavailable while a meal selection or service sequence is active. */
 	bool blocksSidebarInteraction() const override;
-	/** Mark every waiting Zoombini released for the puzzle-console completion command. */
-	void applyDebugPuzzleCompletion() override;
 	/** Describe the active Norfs' meal requirements for the puzzle console. */
 	Common::String debugGetAnswer() const override;
 	/** Report the remaining tray opportunities as the puzzle's chances. */
@@ -65,38 +63,39 @@ public:
 	Common::String debugGetChanceDetails() const override;
 
 private:
+	static constexpr const char *kPuzzleName = "Chez Norf";
+	/** Chez Norf dining-room background loaded into the first page layer. */
+	static constexpr const char *kBackgroundPath = "#bmp/chez_norf/baquegund";
 	/** Path format for the food, note-symbol, and difficulty-specific order-panel RLE sprites. */
 	static constexpr const char *kFoodFormat = "bmp/chez_norf/%s";
 	/** Food resource names ordered as three mains, three drinks, then three desserts. */
 	static constexpr const char *kFoodNames[9] = {
-		"miam_sandwitch",
-		"miam_poisson",
-		"miam_salade",
-		"glouglou_cafe",
-		"glouglou_orange",
-		"glouglou_lait",
-		"slurp_tarte",
-		"slurp_pasteque",
-		"slurp_glace",
+		"miam_sandwitch", ///< MainDish - Sandwitch
+		"miam_poisson", ///< MainDish - Fish
+		"miam_salade", ///< MainDish - Salad
+		"glouglou_cafe", ///< Drink - Coffee
+		"glouglou_orange", ///< Drink - OrangeJuice
+		"glouglou_lait", ///< Drink - Milk
+		"slurp_tarte", ///< Desert - FruitPie
+		"slurp_pasteque", ///< Desert - Watermelon
+		"slurp_glace", ///< Desert - IceCream
 	};
 	/** Player note sprites for confirmed, rejected, and uncertain food deductions. */
-	static constexpr const char *kSymbolNames[3] = {
-		"symb_OK",
-		"symb_NO",
-		"symb_MAYBE",
+	static constexpr const char *kMemoSymbolNames[3] = {
+		"symb_OK", ///< 'V'
+		"symb_NO", ///< 'X'
+		"symb_MAYBE", ///< '?'
 	};
 	/** Order-panel RLE sprites indexed by Level 1, 2, and 3. */
 	static constexpr const char *kPanelNames[3] = {
-		"comande3",
-		"COMANDE1",
-		"comande2",
+		"comande3", ///< Level 1.
+		"COMANDE1", ///< Level 2.
+		"comande2", ///< Level 3.
 	};
 	/** Full-size RLE tray drawn for meal assembly and service on Levels 2 and 3. */
-	static constexpr const char *kPlatePath = "bmp/chez_norf/plato";
+	static constexpr const char *kMealTrayPath = "bmp/chez_norf/plato";
 	/** Compact RLE tray drawn for meal assembly and service on Level 1. */
-	static constexpr const char *kSmallPlatePath = "bmp/chez_norf/plato2";
-	/** Miniature RLE tray used as the pointer sprite while choosing a recipient table. */
-	static constexpr const char *kMiniPlatePath = "bmp/chez_norf/plato_mini";
+	static constexpr const char *kSmallMealTrayPath = "bmp/chez_norf/plato2";
 	/** RLE hover or selection highlight for food, trays, and Norfs. */
 	static constexpr const char *kHighlightPath = "bmp/chez_norf/highlight";
 	/** Static RLE Norf body art shown beneath its table-specific motion animation. */

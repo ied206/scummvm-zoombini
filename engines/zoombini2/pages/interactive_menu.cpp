@@ -413,7 +413,7 @@ void InteractiveMenu::loadSelectedSave(const Common::String &savefileName) {
 void InteractiveMenu::startNewSave(const Common::String &playerName, const Common::String &savefileName) {
 	GameState *gameState = _vm->_state;
 	gameState->init();
-	gameState->_playerName = playerName;
+	gameState->setPlayerName(playerName);
 
 	bool success = false;
 	if (playerName == savefileName)
@@ -440,7 +440,7 @@ void InteractiveMenu::requestDeleteConfirmation() {
 	_pendingDeleteSavefileName = _fileList->getSelectedName();
 	if (_pendingDeleteSavefileName.empty())
 		return;
-	_vm->getMsgBoxDialog()->request(Common::Path(kDeleteConfirmationPath), new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleDeleteConfirmation));
+	_vm->requestMsgBox(Common::Path(kDeleteConfirmationPath), new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleDeleteConfirmation));
 }
 
 void InteractiveMenu::requestCaseCollisionConfirmation(const Common::String &playerName, const Common::String &savefileName) {
@@ -448,7 +448,7 @@ void InteractiveMenu::requestCaseCollisionConfirmation(const Common::String &pla
 	_pendingCaseCollisionSavefileName = savefileName;
 	Common::BaseCallback<DialogMsgBoxButton> *callback =
 		new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleCaseCollisionConfirmation);
-	if (!_vm->getMsgBoxDialog()->requestUiText(getCaseCollisionConfirmationText(), callback)) {
+	if (!_vm->requestUiTextMsgBox(getCaseCollisionConfirmationText(), callback)) {
 		_pendingCaseCollisionPlayerName.clear();
 		_pendingCaseCollisionSavefileName.clear();
 	}
@@ -458,12 +458,12 @@ void InteractiveMenu::requestReadOnlyLoadConfirmation(const Common::String &save
 	_pendingReadOnlySavefileName = savefileName;
 	Common::BaseCallback<DialogMsgBoxButton> *callback =
 		new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleReadOnlyLoadConfirmation);
-	if (!_vm->getMsgBoxDialog()->requestUiText(getReadOnlyLoadConfirmationText(), callback))
+	if (!_vm->requestUiTextMsgBox(getReadOnlyLoadConfirmationText(), callback))
 		_pendingReadOnlySavefileName.clear();
 }
 
 void InteractiveMenu::requestQuitConfirmation() {
-	_vm->getMsgBoxDialog()->request(Common::Path(kQuitConfirmationPath), new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleQuitConfirmation));
+	_vm->requestMsgBox(Common::Path(kQuitConfirmationPath), new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleQuitConfirmation));
 }
 
 void InteractiveMenu::handleDeleteConfirmation(DialogMsgBoxButton button) {
@@ -546,7 +546,7 @@ void InteractiveMenu::deleteSelectedSave() {
 void InteractiveMenu::playSound(int soundId) {
 	SoundManager *sound = _vm->getSoundManager();
 	if (sound && 0 <= soundId)
-		sound->playWithVolume(soundId, sound->_volumeSFX);
+		sound->playWithVolume(soundId, sound->getSfxVolume());
 }
 
 InteractiveMenu::SaveFileList::SaveFileList(Zoombini2Engine *vm, const Common::Point32 &pos)

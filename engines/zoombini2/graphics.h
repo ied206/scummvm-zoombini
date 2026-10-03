@@ -37,8 +37,6 @@
 
 namespace Zoombini2 {
 
-enum class RouteBranch : int;
-
 class AlphaBlendLUT;
 
 /** One RGB color with eight bits per channel and no alpha component. */
@@ -132,9 +130,9 @@ struct SizeBase {
 /**
  * Old GCC does not support constructor inheritance.
  */
-#define BEGIN_SIZE_TYPE(T, Size) \
+#define BEGIN_Z2_SIZE_TYPE(T, Size) \
 	struct Size : public SizeBase<T, Size> {
-#define END_SIZE_TYPE(T, Size)                                                                          \
+#define END_Z2_SIZE_TYPE(T, Size)                                                                          \
 	constexpr Size() : SizeBase() {}                                                                    \
 	constexpr Size(T widthValue, T heightValue) : SizeBase(widthValue, heightValue) {}                  \
 	}                                                                                                   \
@@ -146,11 +144,11 @@ struct SizeBase {
 		return Size(static_cast<T>(size.width * multiplier), static_cast<T>(size.height * multiplier)); \
 	}
 
-BEGIN_SIZE_TYPE(int16, Size16)
-END_SIZE_TYPE(int16, Size16)
-BEGIN_SIZE_TYPE(int32, Size32)
+BEGIN_Z2_SIZE_TYPE(int16, Size16)
+END_Z2_SIZE_TYPE(int16, Size16)
+BEGIN_Z2_SIZE_TYPE(int32, Size32)
 constexpr Size32(const Size16 &size) : SizeBase(static_cast<int32>(size.width), static_cast<int32>(size.height)) {}
-END_SIZE_TYPE(int32, Size32)
+END_Z2_SIZE_TYPE(int32, Size32)
 
 class Zoombini2Engine;
 class SoundManager;
@@ -165,14 +163,16 @@ class RleBlock;
 class ZoombiniRunner;
 class ZoombiniAnimation;
 
-/** Provides page-facing operations for composed game graphics. */
-class Gfx {
+/** Initializes the game screen and provides page-facing graphics operations. */
+class Gfx : public Common::NonCopyable {
 public:
 	/** Construct the graphics interface for one game instance. */
 	explicit Gfx(Zoombini2Engine *vm);
 	/** Release the graphics interface for one game instance. */
 	~Gfx();
 
+	/** Return the fixed drawing surface for this game instance. */
+	ManagedSurface32 *getScreen() const { return _screen; }
 	/** Create a managed surface in the current game screen format. */
 	ManagedSurface32 *createSurface(const Size32 &size) const;
 	/** Load an RLE sprite once for the current page and return a borrowed pointer. */
@@ -333,7 +333,7 @@ public:
 	void drawLine(ManagedSurface32 *destSurface, const Common::Point32 &start, const Common::Point32 &end, uint32 color) const;
 
 	/** Create the route-map background with all state-dependent overlays applied. */
-	ManagedSurface32 *createMapTransitionBackground(PageId srcPageId, int mapRegion, RouteBranch routeBranch);
+	ManagedSurface32 *createMapTransitionBackground(PageId srcPageId, int mapRegion);
 
 private:
 	struct MaskedBitBlockEntry {
@@ -368,7 +368,7 @@ private:
 	/** Draw one map-overlay RLE sprite retained for the current page. */
 	void drawOverlaySprite(ManagedSurface32 *destSurface, const Common::String &name, const Common::Point32 &pos);
 	/** Compose the route-map overlays appropriate to the current progress. */
-	void drawMapOverlays(ManagedSurface32 *destSurface, PageId srcPageId, int mapRegion, RouteBranch routeBranch);
+	void drawMapOverlays(ManagedSurface32 *destSurface, PageId srcPageId, int mapRegion);
 	/** Return the tint for one text color. */
 	static RGBColor textColor(TextColor color);
 	/** Name-plate sprite drawn under the held Zoombini name. */
@@ -384,6 +384,8 @@ private:
 	/** Decoded bitmaps borrowed by UI and cursors that survive page changes. */
 	RleBlockCache _sharedRleBlocks;
 	BitBlockCache _sharedBitBlocks;
+	/** Fixed drawing surface presented by the engine. */
+	ManagedSurface32 *_screen = nullptr;
 	/** Page layer collection released with the graphics interface. */
 	PageLayerStack *_pageLayerStack = nullptr;
 
@@ -501,7 +503,7 @@ private:
  * A separate alpha bitmap must decode to an indexed surface with matching
  * dimensions, and each stored palette index is used directly as pixel coverage.
  */
-class BitBlock {
+class BitBlock : public Common::NonCopyable {
 public:
 	/** Construct an empty bitmap bound to @p vm. */
 	explicit BitBlock(Zoombini2Engine *vm);
@@ -632,7 +634,7 @@ private:
  * Drawing clips malformed or off-screen spans instead of writing outside the
  * destSurface surface.
  */
-class RleBlock {
+class RleBlock : public Common::NonCopyable {
 public:
 	/** Construct an empty RLE frame bound to @p vm. */
 	explicit RleBlock(Zoombini2Engine *vm);
@@ -761,7 +763,7 @@ private:
  * The file contains only frame order and image data; playback timing, events,
  * sounds, and looping policy are supplied by the caller.
  */
-class Animation {
+class Animation : public Common::NonCopyable {
 public:
 	/** Construct an animation without frames, bound to @p vm. */
 	explicit Animation(Zoombini2Engine *vm);
@@ -851,7 +853,7 @@ private:
  * The file does not store playback timing; @ref setFrameDelay supplies one
  * page-configured delay for the loaded grid.
  */
-class ZoombiniAnimation {
+class ZoombiniAnimation : public Common::NonCopyable {
 public:
 	/** Number of movement and animation cells. */
 	static constexpr int kDim0 = 100;
@@ -1109,7 +1111,7 @@ enum VolumePanelResult {
  * whether an apply result commits the values or a cancel result restores the
  * initial values captured by @ref VolumePanel::setInitialVolumes.
  */
-class VolumePanel {
+class VolumePanel : public Common::NonCopyable {
 public:
 	/** Leftmost selectable gauge coordinate. */
 	static constexpr int kSliderMinX = 350;
@@ -1152,17 +1154,17 @@ public:
 	void draw(ManagedSurface32 *destSurface, const Common::Point32 &mousePos, const AlphaBlendLUT &alphaLUT);
 
 	/** Return the current music volume percentage. */
-	int getMusicVolume() const { return _settings._music; }
+	int getMusicVolume() const { return _settings.getMusic(); }
 	/** Return the current sound-effect volume percentage. */
-	int getSfxVolume() const { return _settings._sfx; }
+	int getSfxVolume() const { return _settings.getSfx(); }
 	/** Return the current speech volume percentage. */
-	int getSpeechVolume() const { return _settings._speech; }
+	int getSpeechVolume() const { return _settings.getSpeech(); }
 	/** Return the initial music volume percentage. */
-	int getInitialMusicVolume() const { return _settings._initialMusic; }
+	int getInitialMusicVolume() const { return _settings.getInitialMusic(); }
 	/** Return the initial sound-effect volume percentage. */
-	int getInitialSfxVolume() const { return _settings._initialSfx; }
+	int getInitialSfxVolume() const { return _settings.getInitialSfx(); }
 	/** Return the initial speech volume percentage. */
-	int getInitialSpeechVolume() const { return _settings._initialSpeech; }
+	int getInitialSpeechVolume() const { return _settings.getInitialSpeech(); }
 
 	/** Clamp and assign the current music volume. */
 	void setMusicVolume(int volume);

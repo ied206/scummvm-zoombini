@@ -39,6 +39,8 @@ public:
 	void onUpdate() override {}
 	/** Return whether this dialog currently owns drawing and input. */
 	virtual bool isActive() const = 0;
+	/** Return whether shared sidebar controls are painted over this dialog. */
+	virtual bool drawsSidebarOnTop() const { return false; }
 	/** Close the dialog and restore any retained page state. */
 	virtual void close() = 0;
 	/** Draw the dialog over @p screen. */

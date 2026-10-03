@@ -24,7 +24,10 @@
 #include "common/ptr.h"
 #include "common/textconsole.h"
 
+#include "engines/util.h"
+
 #include "graphics/blit.h"
+#include "graphics/pixelformat.h"
 #include "image/bmp.h"
 
 #include "zoombini2/graphics.h"
@@ -1000,7 +1003,11 @@ constexpr const char *Gfx::kDropTargetGlowPath;
 constexpr const char *Gfx::kMapTransitionOverlayPathFormat;
 constexpr const char *Gfx::kMapTransitionBackgroundPathFormat;
 
-Gfx::Gfx(Zoombini2Engine *vm) : _vm(vm), _pageLayerStack(new PageLayerStack(vm)) {
+Gfx::Gfx(Zoombini2Engine *vm) : _vm(vm) {
+	static constexpr Graphics::PixelFormat bgra32 = Graphics::PixelFormat::createFormatBGRA32();
+	initGraphics(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height, &bgra32);
+	_screen = new ManagedSurface32(ManagedSurface32::kScreenSize, bgra32);
+	_pageLayerStack = new PageLayerStack(vm);
 	_dropTargetGlowSprite = loadSharedRleBlock(kDropTargetGlowPath);
 	if (!_dropTargetGlowSprite)
 		warning("Gfx: Failed to load shared drop-target glow");
@@ -1012,6 +1019,7 @@ Gfx::~Gfx() {
 	clearRleBlockCache(_sharedRleBlocks);
 	clearBitBlockCache(_sharedBitBlocks);
 	delete _textFont;
+	delete _screen;
 }
 
 void Gfx::clearPageLayers() {
@@ -1090,25 +1098,25 @@ void Gfx::clearPageBitmapCache() {
 }
 
 ManagedSurface32 *Gfx::createSurface(const Size32 &size) const {
-	return new ManagedSurface32(size, _vm->getScreen()->format);
+	return new ManagedSurface32(size, _screen->format);
 }
 
 void Gfx::captureScreen(ManagedSurface32 *destSurface) const {
 	assert(destSurface != nullptr);
-	destSurface->copyFrom(*_vm->getScreen());
+	destSurface->copyFrom(*_screen);
 }
 
 void Gfx::copyToScreen(const ManagedSurface32 &srcSurface) const {
-	_vm->getScreen()->copyFrom(srcSurface);
+	_screen->copyFrom(srcSurface);
 }
 
 void Gfx::captureScreenRegion(ManagedSurface32 *destSurface, const Common::Rect &srcRect) const {
 	assert(destSurface != nullptr);
-	destSurface->copyRectToSurface(*_vm->getScreen(), 0, 0, srcRect);
+	destSurface->copyRectToSurface(*_screen, 0, 0, srcRect);
 }
 
 void Gfx::copyRegionToScreen(const ManagedSurface32 &srcSurface, const Common::Point &destSurface) const {
-	_vm->getScreen()->copyRectToSurface(srcSurface, destSurface.x, destSurface.y, Common::Rect(srcSurface.w, srcSurface.h));
+	_screen->copyRectToSurface(srcSurface, destSurface.x, destSurface.y, Common::Rect(srcSurface.w, srcSurface.h));
 }
 
 void Gfx::drawBitBlock(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos) const {
@@ -1327,17 +1335,17 @@ void Gfx::drawZoombiniRunnerWithTraits(ManagedSurface32 *screen, const ZoombiniR
 void Gfx::drawZoombiniRunner(ManagedSurface32 *screen, const ZoombiniRunner *runner, const AlphaBlendLUT &alphaLUT,
 							 const Common::Rect32 *clip, int scrollX, int backgroundWidth, const RleBlock *dropTargetIndicator,
 							 const ZmbTrait *presentationTraits) {
-	if (!screen || !runner || !runner->_activeAnimation || runner->_hidden)
+	if (!screen || !runner || !runner->getActiveAnimation() || runner->isHidden())
 		return;
 	const Common::Rect32 spriteRect = runner->getSpriteRect(scrollX, backgroundWidth);
 	if (spriteRect.right <= 0 || spriteRect.bottom <= 0 || screen->w <= spriteRect.left || screen->h <= spriteRect.top)
 		return;
 	const Common::Point32 drawPos = runner->getDrawPosition(scrollX, backgroundWidth);
-	if (runner->_dragging && runner->_hoveredDropTargetIndex != -1 && dropTargetIndicator)
+	if (runner->isDragging() && runner->getHoveredDropTargetIndex() != -1 && dropTargetIndicator)
 		dropTargetIndicator->drawToScreen(screen, drawPos, alphaLUT);
-	const int frame = runner->_animationActive ? runner->_animationFrame : 0;
-	const ZmbTrait &traitsToDraw = presentationTraits ? *presentationTraits : runner->_traits;
-	drawZoombini(screen, runner->_activeAnimation, traitsToDraw, drawPos, runner->_animationCell, frame, alphaLUT, clip);
+	const int frame = runner->isAnimationActive() ? runner->getAnimationFrame() : 0;
+	const ZmbTrait &traitsToDraw = presentationTraits ? *presentationTraits : runner->getTraits();
+	drawZoombini(screen, runner->getActiveAnimation(), traitsToDraw, drawPos, runner->getAnimationCell(), frame, alphaLUT, clip);
 }
 
 RGBColor Gfx::textColor(TextColor color) {
@@ -1451,7 +1459,7 @@ void Gfx::drawLine(ManagedSurface32 *destSurface, const Common::Point32 &start, 
 		destSurface->drawLine(start.x, start.y, end.x, end.y, color);
 }
 
-ManagedSurface32 *Gfx::createMapTransitionBackground(PageId srcPageId, int mapRegion, RouteBranch routeBranch) {
+ManagedSurface32 *Gfx::createMapTransitionBackground(PageId srcPageId, int mapRegion) {
 	ManagedSurface32 *background = createSurface(ManagedSurface32::kScreenSize);
 
 	const Common::String backgroundPath = Common::String::format(kMapTransitionBackgroundPathFormat, mapRegion);
@@ -1463,7 +1471,7 @@ ManagedSurface32 *Gfx::createMapTransitionBackground(PageId srcPageId, int mapRe
 		fillRect(background, Common::Rect32(0, 0, ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), 0);
 	}
 
-	drawMapOverlays(background, srcPageId, mapRegion, routeBranch);
+	drawMapOverlays(background, srcPageId, mapRegion);
 	return background;
 }
 
@@ -1490,7 +1498,7 @@ void Gfx::drawOverlaySprite(ManagedSurface32 *dst, const Common::String &name, c
  * Route direction at the Rescue Site I fork is tracked through @ref GameState::hasPageVisit.
  * Magic Wall visit kind 1 selects the upper path and Mystic Marsh selects the lower path.
  */
-void Gfx::drawMapOverlays(ManagedSurface32 *dst, PageId srcPageId, int mapRegion, RouteBranch routeBranch) {
+void Gfx::drawMapOverlays(ManagedSurface32 *dst, PageId srcPageId, int mapRegion) {
 	GameState *gs = _vm->_state;
 
 	// Helper lambda: standard overlay visibility check.
@@ -1533,8 +1541,8 @@ void Gfx::drawMapOverlays(ManagedSurface32 *dst, PageId srcPageId, int mapRegion
 
 	case 2: {
 		// Map region two covers both routes between the rescue sites.
-		const bool northRoute = gs->hasPageVisit(kPageMagicWall, 1) || routeBranch == RouteBranch::kLeft01;
-		const bool southRoute = gs->hasPageVisit(kPageMysticMarsh, 1) || routeBranch == RouteBranch::kRight02;
+		const bool northRoute = gs->hasPageVisit(kPageMagicWall, 1) || _vm->_routeDirection == Zoombini2Engine::RouteBranch::kLeft01;
+		const bool southRoute = gs->hasPageVisit(kPageMysticMarsh, 1) || _vm->_routeDirection == Zoombini2Engine::RouteBranch::kRight02;
 
 		// Unconditional: start of route from Rescue1
 		drawOverlaySprite(dst, "bigmap_segment_03", Common::Point32(-18, 198));
@@ -2526,9 +2534,9 @@ bool VolumePanel::init(SoundManager *soundManager) {
 	if (!_sliderLabels[2].loadImagesWithMask(Common::Path(kSpeechNormalPath), speechMask, Common::Path(kSpeechHighlightPath), speechMask))
 		loaded = false;
 
-	_musicSliderX = volumeToPixel(_settings._music);
-	_sfxSliderX = volumeToPixel(_settings._sfx);
-	_speechSliderX = volumeToPixel(_settings._speech);
+	_musicSliderX = volumeToPixel(_settings.getMusic());
+	_sfxSliderX = volumeToPixel(_settings.getSfx());
+	_speechSliderX = volumeToPixel(_settings.getSpeech());
 	_sliderLabels[0].setOverlay(_gaugeImage, Common::Point32(kSliderMinX - kLabelX, kMusicGaugeY - kMusicLabelY), &_musicSliderX);
 	_sliderLabels[1].setOverlay(_gaugeImage, Common::Point32(kSliderMinX - kLabelX, kSfxGaugeY - kSfxLabelY), &_sfxSliderX);
 	_sliderLabels[2].setOverlay(_gaugeImage, Common::Point32(kSliderMinX - kLabelX, kSpeechGaugeY - kSpeechLabelY), &_speechSliderX);
@@ -2556,24 +2564,24 @@ int VolumePanel::volumeToPixel(int volume) {
 
 void VolumePanel::setMusicVolume(int vol) {
 	_settings.setMusic(vol);
-	_musicSliderX = volumeToPixel(_settings._music);
+	_musicSliderX = volumeToPixel(_settings.getMusic());
 }
 
 void VolumePanel::setSfxVolume(int vol) {
 	_settings.setSfx(vol);
-	_sfxSliderX = volumeToPixel(_settings._sfx);
+	_sfxSliderX = volumeToPixel(_settings.getSfx());
 }
 
 void VolumePanel::setSpeechVolume(int vol) {
 	_settings.setSpeech(vol);
-	_speechSliderX = volumeToPixel(_settings._speech);
+	_speechSliderX = volumeToPixel(_settings.getSpeech());
 }
 
 void VolumePanel::setInitialVolumes(int music, int sfx, int speech) {
 	_settings.setInitialVolumes(music, sfx, speech);
-	_musicSliderX = volumeToPixel(_settings._music);
-	_sfxSliderX = volumeToPixel(_settings._sfx);
-	_speechSliderX = volumeToPixel(_settings._speech);
+	_musicSliderX = volumeToPixel(_settings.getMusic());
+	_sfxSliderX = volumeToPixel(_settings.getSfx());
+	_speechSliderX = volumeToPixel(_settings.getSpeech());
 }
 
 VolumePanelResult VolumePanel::handleMouseInput(const Common::Point32 &mousePos, bool mouseDown, bool mouseReleased) {
@@ -2650,10 +2658,10 @@ void VolumePanel::playPreviewSound() {
 		return;
 
 	if (adjustedSlider == 1 && 0 <= _sfxPreviewSoundId) {
-		_soundManager->playWithVolume(_sfxPreviewSoundId, _settings._sfx);
+		_soundManager->playWithVolume(_sfxPreviewSoundId, _settings.getSfx());
 	} else if (adjustedSlider == 2 && 0 <= _speechPreviewSoundId) {
 		_soundManager->stop(_speechPreviewSoundId);
-		_soundManager->playWithVolume(_speechPreviewSoundId, _settings._speech);
+		_soundManager->playWithVolume(_speechPreviewSoundId, _settings.getSpeech());
 	}
 }
 

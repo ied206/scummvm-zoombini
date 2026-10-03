@@ -80,10 +80,6 @@ private:
 	static constexpr const char *kWaitingAnimationPath = "bmp/boolies/attend.an";
 	/** PAT route format for the decorative crowd actors; the argument is the route number. */
 	static constexpr const char *kCrowdRouteFormat = "bmp/booliewood/path%d.pat";
-	/** Cursor shown at the right edge when the panorama can scroll toward later scenery. */
-	static constexpr const char *kScrollRightCursorPath = "bmp/cursor/cursor03.rb";
-	/** Cursor shown at the left edge when the panorama can scroll toward earlier scenery. */
-	static constexpr const char *kScrollLeftCursorPath = "bmp/cursor/cursor04.rb";
 	/** Background music for the Booliewood community panorama. */
 	static constexpr const char *kMusicPath = "#sounds/music/Booliewood_Level1.wav";
 	/** First-visit greeting played when the player enters Booliewood. */

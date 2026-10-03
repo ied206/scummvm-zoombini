@@ -25,7 +25,6 @@
 #include "common/array.h"
 #include "common/str.h"
 
-#include "zoombini2/graphics.h"
 #include "zoombini2/pages/transition_base.h"
 #include "zoombini2/zoombini2.h"
 
@@ -53,9 +52,11 @@ public:
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
 	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
 	/** Resolve the next route page from the source page, Rescue Site I branch, and rescue progress. */
-	static PageId getDestPage(PageId src, RouteBranch routeBranch, int rescuedBoolies);
+	static PageId getDestPage(PageId src, Zoombini2Engine::RouteBranch routeBranch, int rescuedBoolies);
 
 private:
+	/** Minimum party size before the first rescue-site movie is selected. */
+	static constexpr int kRescue1MovieMinimumZoombinis = 8;
 	/** Audio path format that appends a speech clip name and .wav extension. */
 	static constexpr const char *kSpeechFormat = "sounds/%s.wav";
 	/** PAT route format for the source page's mountain-map travel path. */

@@ -43,7 +43,7 @@ class Zoombini2Engine;
  */
 class DialogHelp : public DialogBase {
 public:
-	/** Bind the reusable help overlay to @p vm. */
+	/** Bind a help overlay to @p vm. */
 	DialogHelp(Zoombini2Engine *vm);
 	/** Close the active help sheet and release the saved screen. */
 	~DialogHelp() override;
@@ -57,6 +57,8 @@ public:
 	void close() override;
 	/** Return whether this overlay currently owns drawing and input. */
 	bool isActive() const override { return _isActive; }
+	/** Keep shared controls visible over the help frame. */
+	bool drawsSidebarOnTop() const override { return true; }
 	/** Draw the frame, current help sheet, and navigation controls. */
 	void onRenderContent(ManagedSurface32 *screen) override;
 	/** Handle navigation or close-button input while the modal is active. */
