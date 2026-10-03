@@ -62,6 +62,9 @@ public:
 	Common::String debugGetChanceDetails() const override;
 
 private:
+	static constexpr const char *kPuzzleName = "Pipes of Paloo";
+	/** Pipes of Paloo background loaded into the first page layer. */
+	static constexpr const char *kBackgroundPath = "#bmp/waterslide/waterslides";
 	/** Background music played while Pipes of Paloo is active. */
 	static constexpr const char *kMusicPath = "#sounds/music/02-BS01.wav";
 	/** Trait icon format for the numbered Zoombini traits shown beside pipe endpoints. */

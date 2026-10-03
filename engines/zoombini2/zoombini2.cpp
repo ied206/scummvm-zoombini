@@ -25,11 +25,11 @@
 #include "common/error.h"
 #include "common/events.h"
 #include "common/fs.h"
+#include "common/savefile.h"
 #include "common/stream.h"
 #include "common/system.h"
-#include "common/tokenizer.h"
-
-#include "engines/util.h"
+#include "common/textconsole.h"
+#include "common/util.h"
 
 #include "graphics/cursorman.h"
 #include "graphics/pixelformat.h"
@@ -71,12 +71,12 @@
 
 namespace Zoombini2 {
 
-constexpr const char *Zoombini2Engine::kCursorSpritePath;
-constexpr const char *Zoombini2Engine::kInteractiveCursorSpritePath;
+constexpr const char *Zoombini2Engine::kCursorPaths[Zoombini2Engine::kCursorCount];
 constexpr const char *Zoombini2Engine::kQuitConfirmationPath;
+constexpr const char *Zoombini2Engine::kDebugZoombiniSetFileNameFormat;
 
 /** Resolve original logical resource names against their distinct physical roots. */
-class Zoombini2Engine::ResourceFileResolver {
+class Zoombini2Engine::ResourceFileResolver : public Common::NonCopyable {
 public:
 	ResourceFileResolver(const Common::FSNode &cdDataDirectory, const Common::FSNode &installedDirectory)
 		: _cdDataDirectory(cdDataDirectory.isDirectory() ? new Common::FSDirectory(cdDataDirectory, 8) : nullptr),
@@ -181,17 +181,15 @@ Zoombini2Engine::Zoombini2Engine(OSystem *syst, const Zoombini2GameDescription *
 Zoombini2Engine::~Zoombini2Engine() {
 	_nextPageId = kPageNone;
 	destroyCurrentPage();
+	clearCursorImages(0);
 	if (_state)
-		writeGameSave(_state->_playerName);
+		writeGameSave(_state->getPlayerName());
 	delete _state;
 	clearZoombiniAnimationCache();
 
 	delete _sidebar;
-	delete _msgBoxDialog;
-	delete _debugDialog;
 	delete _soundManager;
 	delete _gfx;
-	delete _screen;
 	delete _rnd;
 	delete _resourceFileResolver;
 }
@@ -357,15 +355,15 @@ void Zoombini2Engine::setPracticeLevel(int level) {
 }
 
 int Zoombini2Engine::getMusicVolume() const {
-	return _soundManager ? _soundManager->_volumeMusic : mixerVolumeToPercent(ConfMan.getInt("music_volume"));
+	return _soundManager ? _soundManager->getMusicVolume() : mixerVolumeToPercent(ConfMan.getInt("music_volume"));
 }
 
 int Zoombini2Engine::getSFXVolume() const {
-	return _soundManager ? _soundManager->_volumeSFX : mixerVolumeToPercent(ConfMan.getInt("sfx_volume"));
+	return _soundManager ? _soundManager->getSfxVolume() : mixerVolumeToPercent(ConfMan.getInt("sfx_volume"));
 }
 
 int Zoombini2Engine::getSpeechVolume() const {
-	return _soundManager ? _soundManager->_volumeSpeech : mixerVolumeToPercent(ConfMan.getInt("speech_volume"));
+	return _soundManager ? _soundManager->getSpeechVolume() : mixerVolumeToPercent(ConfMan.getInt("speech_volume"));
 }
 
 void Zoombini2Engine::previewSoundVolumes(int music, int sfx, int speech) {
@@ -401,8 +399,7 @@ void Zoombini2Engine::handleQuitRequest() {
 	g_system->getEventManager()->resetQuit();
 	_pendingPageEvents.clear();
 
-	if ((_sidebar && _sidebar->hasActiveDialog()) || (_msgBoxDialog && _msgBoxDialog->isActive()) ||
-		(_debugDialog && _debugDialog->isActive()))
+	if (getActiveDialog())
 		return;
 
 	requestQuitConfirmation();
@@ -410,8 +407,8 @@ void Zoombini2Engine::handleQuitRequest() {
 
 void Zoombini2Engine::requestQuitConfirmation() {
 	const Common::Point32 position = isDemo() ? Common::Point32(212, 270) : Common::Point32(-1, -1);
-	_msgBoxDialog->request(Common::Path(kQuitConfirmationPath),
-						   new Common::Callback<Zoombini2Engine, DialogMsgBoxButton>(this, &Zoombini2Engine::handleQuitConfirmation), position);
+	requestMsgBox(Common::Path(kQuitConfirmationPath),
+				  new Common::Callback<Zoombini2Engine, DialogMsgBoxButton>(this, &Zoombini2Engine::handleQuitConfirmation), position);
 }
 
 void Zoombini2Engine::handleQuitConfirmation(DialogMsgBoxButton button) {
@@ -423,6 +420,78 @@ void Zoombini2Engine::handleQuitConfirmation(DialogMsgBoxButton button) {
 	}
 }
 
+DialogBase *Zoombini2Engine::getActiveDialog() const {
+	for (uint i = _dialogStack.size(); 0 < i; i--) {
+		if (_dialogStack[i - 1]->isActive())
+			return _dialogStack[i - 1];
+	}
+	return nullptr;
+}
+
+void Zoombini2Engine::cleanupClosedDialogs() {
+	for (uint i = 0; i < _dialogStack.size();) {
+		if (_dialogStack[i]->isActive()) {
+			i += 1;
+			continue;
+		}
+		delete _dialogStack[i];
+		_dialogStack.remove_at(i);
+	}
+}
+
+bool Zoombini2Engine::requestMsgBox(const Common::Path &textPath, Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &pos) {
+	if (getActiveDialog()) {
+		delete callback;
+		return false;
+	}
+	DialogMsgBox *dialog = new DialogMsgBox(this);
+	if (!dialog->request(textPath, callback, pos)) {
+		delete dialog;
+		return false;
+	}
+	_dialogStack.push_back(dialog);
+	return true;
+}
+
+bool Zoombini2Engine::requestUiTextMsgBox(const Common::U32String &message, Common::BaseCallback<DialogMsgBoxButton> *callback,
+										  const Common::Point32 &pos) {
+	if (getActiveDialog()) {
+		delete callback;
+		return false;
+	}
+	DialogMsgBox *dialog = new DialogMsgBox(this);
+	if (!dialog->requestUiText(message, callback, pos)) {
+		delete dialog;
+		return false;
+	}
+	_dialogStack.push_back(dialog);
+	return true;
+}
+
+bool Zoombini2Engine::openHelpDialog(PageId pageId, int level) {
+	if (getActiveDialog())
+		return false;
+	DialogHelp *dialog = new DialogHelp(this);
+	if (!dialog->open(pageId, level)) {
+		delete dialog;
+		return false;
+	}
+	_dialogStack.push_back(dialog);
+	return true;
+}
+
+bool Zoombini2Engine::openDebugDialog(const DialogDebugCommand &cmd) {
+	if (getActiveDialog())
+		return false;
+	DialogDebug *dialog = new DialogDebug(this);
+	if (!dialog->open(cmd)) {
+		delete dialog;
+		return false;
+	}
+	_dialogStack.push_back(dialog);
+	return true;
+}
+
 bool Zoombini2Engine::hasFeature(EngineFeature f) const {
 	return f == kSupportsReturnToLauncher || f == kSupportsChangingOptionsDuringRuntime || f == kSupportsQuitDialogOverride;
 }
@@ -430,7 +499,8 @@ bool Zoombini2Engine::hasFeature(EngineFeature f) const {
 void Zoombini2Engine::syncSoundSettings() {
 	Engine::syncSoundSettings();
 	if (_soundManager) {
-		_soundManager->setVolumeSettings(mixerVolumeToPercent(ConfMan.getInt("music_volume")), mixerVolumeToPercent(ConfMan.getInt("sfx_volume")),
+		_soundManager->setVolumeSettings(mixerVolumeToPercent(ConfMan.getInt("music_volume")),
+										 mixerVolumeToPercent(ConfMan.getInt("sfx_volume")),
 										 mixerVolumeToPercent(ConfMan.getInt("speech_volume")));
 	}
 }
@@ -442,31 +512,14 @@ void Zoombini2Engine::applyGameSettings() {
 }
 
 Common::Error Zoombini2Engine::run() {
-	// Initialize 800x600 32-bit graphics
-	// Use RGBA8888 format (same as internal surfaces)
-	Graphics::PixelFormat format32(4, 8, 8, 8, 8, 16, 8, 0, 24);
-	::initGraphics(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height, &format32);
-
-	_screen = new ManagedSurface32(ManagedSurface32::kScreenSize, format32);
+	// Init subsystems
 	_gfx = new Gfx(this);
-
-	// Initialize cursor system
 	initCursor();
-
-	// Initialize sound manager
 	_soundManager = new SoundManager(this, _mixer);
 	_soundManager->setStereoOutputEnabled(_stereoOutputEnabled);
 	syncSoundSettings();
-
-	// Initialize game state
 	_state = new GameState();
-
-	// Initialize the shared Help, Map, and Go controls.
-	_sidebar = new Sidebar(this);
-	_msgBoxDialog = new DialogMsgBox(this);
-	_debugDialog = new DialogDebug(this);
-
-	// Attach the debug console before the main loop starts.
+	_sidebar = new Sidebar(this); // Shared Help, Map, Go buttons
 	setDebugger(new Zoombini2Console(this));
 
 	_startTime = g_system->getMillis();
@@ -482,85 +535,91 @@ Common::Error Zoombini2Engine::run() {
 	return Common::kNoError;
 }
 
+Zoombini2Engine::CursorImage::CursorImage(const Size32 &cursorSize)
+	: size(cursorSize), pixels(new byte[static_cast<size_t>(cursorSize.width) * cursorSize.height * 4]()) {
+}
+
+Zoombini2Engine::CursorImage::~CursorImage() {
+	delete[] pixels;
+}
+
 /**
- * Load the four game cursor sprites and register the default cursor.
+ * Load and register the default cursor. The hover cursor is loaded on first use.
  *
  * CursorMan keeps the cursor visible over both the game viewport and any surrounding border.
  */
 void Zoombini2Engine::initCursor() {
-	// Load cursor sprite from cursor01.rb (default cursor)
-	_cursorSprite = _gfx->loadSharedRleBlock(kCursorSpritePath);
-	if (!_cursorSprite) {
-		warning("Zoombini2Engine: Failed to load cursor sprite");
-		return;
-	}
-
 	// The cursor click point is three pixels right and ten pixels below its draw origin.
 	_cursorHotspot = Common::Point(3, 10);
 	_cursorVisible = true;
 
-	// Register cursor with CursorMan so it's visible in the black border area.
-	// Render the RLE cursor data into an RGBA surface.
-	registerCursorWithCursorMan();
+	setCursor(CursorType::kDefault);
 }
 
-/**
- * Convert the RLE cursor sprite to a pixel buffer and register with CursorMan.
- * This allows the cursor to be visible even in the black border area around
- * the game screen when the window is larger than 800x600.
- */
-void Zoombini2Engine::registerCursorWithCursorMan() {
-	registerCursorSpriteWithCursorMan(_cursorSprite);
-}
+void Zoombini2Engine::setCursor(CursorType type) {
+	if (type == CursorType::kDefault || type == CursorType::kInteractive) {
+		_baseCursorType = type;
+	} else if (type == CursorType::kRestoreBase) {
+		_pageCursorType = type;
+	} else if (static_cast<uint>(type) < kCursorCount) {
+		_pageCursorType = type;
+	} else {
+		warning("Zoombini2Engine: Invalid cursor type %u", static_cast<uint>(type));
+		return;
+	}
 
-void Zoombini2Engine::setHoverCursorActive(bool active) {
-	if (active && !_interactiveCursorSprite) {
-		_interactiveCursorSprite = _gfx->loadSharedRleBlock(kInteractiveCursorSpritePath);
-		if (!_interactiveCursorSprite) {
-			warning("Zoombini2Engine: Failed to load interactive cursor sprite");
-			return;
+	const CursorType activeType = _pageCursorType == CursorType::kRestoreBase ? _baseCursorType : _pageCursorType;
+	if (_cursorRegistered && activeType == _activeCursorType)
+		return;
+
+	const uint index = static_cast<uint>(activeType);
+	if (!_cursorImages[index] && !_cursorUnavailable[index]) {
+		RleBlock *sprite = nullptr;
+		if (index < static_cast<uint>(CursorType::kMainDishSandwich))
+			sprite = _gfx->loadSharedRleBlock(kCursorPaths[index]);
+		else
+			sprite = _gfx->loadPageRleBlock(kCursorPaths[index]);
+		if (!sprite || !sprite->isValid() || sprite->getSize().width <= 0 || sprite->getSize().height <= 0) {
+			warning("Zoombini2Engine: Failed to load cursor %s", kCursorPaths[index]);
+			_cursorUnavailable[index] = true;
+		} else {
+			_cursorImages[index] = createCursorImage(sprite);
 		}
 	}
-	if (!_interactiveCursorSprite || active == _hoverCursorActive)
+	if (!_cursorImages[index]) {
+		if (_pageCursorType != CursorType::kRestoreBase) {
+			_pageCursorType = CursorType::kRestoreBase;
+			setCursor(CursorType::kRestoreBase);
+		} else if (_baseCursorType == CursorType::kInteractive) {
+			_baseCursorType = CursorType::kDefault;
+			setCursor(CursorType::kDefault);
+		}
 		return;
-	_hoverCursorActive = active;
-	if (!_pageCursorSprite)
-		registerCursorSpriteWithCursorMan(active ? _interactiveCursorSprite : _cursorSprite);
+	}
+
+	const CursorImage *image = _cursorImages[index];
+	static constexpr Graphics::PixelFormat cursorFormat = Graphics::PixelFormat::createFormatBGRA32();
+	CursorMan.replaceCursor(image->pixels, image->size.width, image->size.height, _cursorHotspot.x, _cursorHotspot.y, 0, &cursorFormat);
+	CursorMan.showMouse(true);
+	_activeCursorType = activeType;
+	_cursorRegistered = true;
 }
 
-void Zoombini2Engine::setPageCursorSprite(const RleBlock *sprite) {
-	if (_pageCursorSprite == sprite)
-		return;
-	_pageCursorSprite = sprite;
-	const RleBlock *fallback = _hoverCursorActive ? _interactiveCursorSprite : _cursorSprite;
-	registerCursorSpriteWithCursorMan(sprite ? sprite : fallback);
-}
-
-void Zoombini2Engine::registerCursorSpriteWithCursorMan(const RleBlock *sprite) {
-	if (!sprite || !sprite->isValid())
-		return;
-
+Zoombini2Engine::CursorImage *Zoombini2Engine::createCursorImage(const RleBlock *sprite) const {
 	const Size32 size = sprite->getSize();
-	if (size.width <= 0 || size.height <= 0)
-		return;
-
-	// Create BGRA buffer initialized to fully transparent
-	// Using the same pixel format as the engine: BGRA8888
-	// (bytesPerPixel=4, rBits=8, gBits=8, bBits=8, aBits=8,
-	//  rShift=16, gShift=8, bShift=0, aShift=24)
-	const int bufSize = size.width * size.height * 4;
-	byte *buf = new byte[bufSize](); // zero-initialized = transparent black
+	CursorImage *image = new CursorImage(size);
+	byte *buf = image->pixels;
 
 	// Render the RLE cursor through its public drawing path,
 	// then extract the alpha channel by comparing the result over black and white backgrounds.
 
 	// Render onto black background
-	ManagedSurface32 blackSurf(size, Graphics::PixelFormat(4, 8, 8, 8, 8, 16, 8, 0, 24));
+	ManagedSurface32 blackSurf(size, Graphics::PixelFormat::createFormatBGRA32());
 	blackSurf.fillRect(Common::Rect(size.width, size.height), blackSurf.format.ARGBToColor(255, 0, 0, 0));
 	sprite->drawToScreen(&blackSurf, Common::Point32(0, 0), _alphaBlendLUT);
 
 	// Render onto white background
-	ManagedSurface32 whiteSurf(size, Graphics::PixelFormat(4, 8, 8, 8, 8, 16, 8, 0, 24));
+	ManagedSurface32 whiteSurf(size, Graphics::PixelFormat::createFormatBGRA32());
 	whiteSurf.fillRect(Common::Rect(size.width, size.height), whiteSurf.format.ARGBToColor(255, 255, 255, 255));
 	sprite->drawToScreen(&whiteSurf, Common::Point32(0, 0), _alphaBlendLUT);
 
@@ -571,8 +630,8 @@ void Zoombini2Engine::registerCursorSpriteWithCursorMan(const RleBlock *sprite) 
 	// So: invAlpha = result_white - result_black
 	//     alpha = 255 - invAlpha
 	//     color = src_premult * 255 / alpha (un-premultiply)
-	const byte *blackPixels = (const byte *)blackSurf.getPixels();
-	const byte *whitePixels = (const byte *)whiteSurf.getPixels();
+	const byte *blackPixels = static_cast<const byte *>(blackSurf.getPixels());
+	const byte *whitePixels = static_cast<const byte *>(whiteSurf.getPixels());
 
 	for (int i = 0; i < size.width * size.height; i++) {
 		int bBlack = blackPixels[i * 4 + 0];
@@ -598,17 +657,19 @@ void Zoombini2Engine::registerCursorSpriteWithCursorMan(const RleBlock *sprite) 
 			buf[i * 4 + 0] = MIN(bBlack * 255 / alpha, 255); // B
 			buf[i * 4 + 1] = MIN(gBlack * 255 / alpha, 255); // G
 			buf[i * 4 + 2] = MIN(rBlack * 255 / alpha, 255); // R
-			buf[i * 4 + 3] = (byte)alpha;                    // A
+			buf[i * 4 + 3] = static_cast<byte>(alpha);       // A
 		}
 	}
 
-	// Register with CursorMan
-	Graphics::PixelFormat cursorFormat(4, 8, 8, 8, 8, 16, 8, 0, 24);
-	CursorMan.replaceCursor(buf, size.width, size.height, _cursorHotspot.x, _cursorHotspot.y,
-							0, &cursorFormat);
-	CursorMan.showMouse(true);
+	return image;
+}
 
-	delete[] buf;
+void Zoombini2Engine::clearCursorImages(uint firstIndex) {
+	for (uint i = firstIndex; i < kCursorCount; i++) {
+		delete _cursorImages[i];
+		_cursorImages[i] = nullptr;
+		_cursorUnavailable[i] = false;
+	}
 }
 
 uint32 Zoombini2Engine::getGameTickCount() const {
@@ -699,68 +760,149 @@ void Zoombini2Engine::refreshEngineSettings() {
 	}
 }
 
+Common::String Zoombini2Engine::getDebugZoombiniSetFileName() const {
+	const char *target = _targetName.empty() ? "zoombini2" : _targetName.c_str();
+	return Common::String::format(kDebugZoombiniSetFileNameFormat, target);
+}
+
 void Zoombini2Engine::exportZoombiniSet() const {
 	if (_state->_activeZoombinis.empty())
 		return;
 
-	Common::FSNode outputNode(Common::Path("zoombini.set"));
-	Common::SeekableWriteStream *output = outputNode.createWriteStream(false);
-	if (!output)
+	const Common::String fileName = getDebugZoombiniSetFileName();
+	Common::OutSaveFile *output = g_system->getSavefileManager()->openForSaving(fileName, false);
+	if (!output) {
+		warning("Cannot open Zoombini trait file for saving: %s", fileName.c_str());
 		return;
+	}
 
 	output->writeString(Common::String::format("%u\n", _state->_activeZoombinis.size()));
 	for (uint i = 0; i < _state->_activeZoombinis.size(); i++) {
 		const ZoombiniRunner *zoombini = _state->_activeZoombinis[i];
 		if (!zoombini)
 			continue;
-		output->writeString(Common::String::format("%u %u %u %u\n", zoombini->_traits._feet, zoombini->_traits._nose, zoombini->_traits._hair,
-												   zoombini->_traits._eyes));
+		output->writeString(Common::String::format("%u %u %u %u\n", zoombini->getTraits()._feet, zoombini->getTraits()._nose, zoombini->getTraits()._hair,
+												   zoombini->getTraits()._eyes));
 	}
 	output->finalize();
+	if (output->err())
+		warning("Cannot save Zoombini trait file: %s", fileName.c_str());
 	delete output;
 }
 
+bool Zoombini2Engine::readDebugSetInteger(const char *&cursor, const char *end, int32 &value) {
+	while (cursor < end && Common::isSpace(static_cast<byte>(*cursor)))
+		cursor += 1;
+	if (cursor == end)
+		return false;
+
+	const bool negative = *cursor == '-';
+	if (*cursor == '+' || *cursor == '-')
+		cursor += 1;
+
+	const int64 limit = negative ? 2147483648LL : 2147483647LL;
+	int64 magnitude = 0;
+	bool hasDigit = false;
+	while (cursor < end && Common::isDigit(static_cast<byte>(*cursor))) {
+		hasDigit = true;
+		const int digit = *cursor - '0';
+		if ((limit - digit) / 10 < magnitude)
+			return false;
+		magnitude = magnitude * 10 + digit;
+		cursor += 1;
+	}
+	if (!hasDigit || (cursor < end && !Common::isSpace(static_cast<byte>(*cursor))))
+		return false;
+	value = static_cast<int32>(negative ? -magnitude : magnitude);
+	return true;
+}
+
 void Zoombini2Engine::importZoombiniSet() {
-	Common::FSNode inputNode(Common::Path("zoombini.set"));
-	Common::SeekableReadStream *input = inputNode.createReadStream();
+	const Common::String fileName = getDebugZoombiniSetFileName();
+	// The interchange document is plain text, so imports must not invoke automatic decompression.
+	Common::InSaveFile *input = g_system->getSavefileManager()->openRawFile(fileName);
 	if (!input)
 		return;
 
-	const uint fileCount = static_cast<uint>(input->readLine().asUint64());
-	const uint importCount = MIN<uint>(fileCount, _state->_activeZoombinis.size());
-	for (uint i = 0; i < importCount && !input->eos(); i++) {
-		Common::StringTokenizer tokens(input->readLine());
-		byte values[ZmbTrait::kTraitKindCount];
-		bool completeTuple = true;
-		for (int traitIndex = 0; traitIndex < ZmbTrait::kTraitKindCount; traitIndex++) {
-			if (tokens.empty()) {
-				completeTuple = false;
-				break;
-			}
-			values[traitIndex] = static_cast<byte>(tokens.nextToken().asUint64());
-		}
-		if (!completeTuple)
-			break;
-		if (_state->_activeZoombinis[i])
-			_state->_activeZoombinis[i]->setTraits(ZmbTrait(values[0], values[1], values[2], values[3]));
+	const int64 fileSize = input->size();
+	if (fileSize <= 0 || kDebugZoombiniSetMaxSize < fileSize) {
+		delete input;
+		warning("Rejected Zoombini trait file '%s': expected 1-%u bytes", fileName.c_str(), kDebugZoombiniSetMaxSize);
+		return;
 	}
+	char data[kDebugZoombiniSetMaxSize];
+	const uint32 dataSize = static_cast<uint32>(fileSize);
+	const uint32 bytesRead = input->read(data, dataSize);
+	const bool readOk = bytesRead == dataSize && !input->err() && input->size() == fileSize;
 	delete input;
+	if (!readOk) {
+		warning("Rejected Zoombini trait file '%s': incomplete or failed read", fileName.c_str());
+		return;
+	}
+
+	const char *cursor = data;
+	const char *end = data + dataSize;
+	int32 fileCount = 0;
+	if (!readDebugSetInteger(cursor, end, fileCount) || fileCount < 1 || kDebugZoombiniSetMaxMembers < fileCount) {
+		warning("Rejected Zoombini trait file '%s': expected 1-%d members", fileName.c_str(), kDebugZoombiniSetMaxMembers);
+		return;
+	}
+	ZmbTrait traits[kDebugZoombiniSetMaxMembers];
+	for (int i = 0; i < fileCount; i++) {
+		int32 values[ZmbTrait::kTraitKindCount];
+		for (int traitIndex = 0; traitIndex < ZmbTrait::kTraitKindCount; traitIndex++) {
+			if (!readDebugSetInteger(cursor, end, values[traitIndex]) || values[traitIndex] < 1 || ZmbTrait::kTraitValueCount < values[traitIndex]) {
+				warning("Rejected Zoombini trait file '%s': invalid trait %d of member %d", fileName.c_str(), traitIndex + 1, i + 1);
+				return;
+			}
+		}
+		traits[i] = ZmbTrait(static_cast<byte>(values[0]), static_cast<byte>(values[1]), static_cast<byte>(values[2]), static_cast<byte>(values[3]));
+	}
+	while (cursor < end && Common::isSpace(static_cast<byte>(*cursor)))
+		cursor += 1;
+	if (cursor != end) {
+		warning("Rejected Zoombini trait file '%s': unexpected trailing data", fileName.c_str());
+		return;
+	}
+
+	const uint importCount = MIN<uint>(static_cast<uint>(fileCount), _state->_activeZoombinis.size());
+	for (uint i = 0; i < importCount; i++) {
+		if (!_state->_activeZoombinis[i]) {
+			warning("Rejected Zoombini trait file '%s': active member %u is unavailable", fileName.c_str(), i + 1);
+			return;
+		}
+	}
+	for (uint i = 0; i < importCount; i++)
+		_state->_activeZoombinis[i]->setTraits(traits[i]);
 }
 
-void Zoombini2Engine::applyDebugPuzzleCompletion() {
-	if (!_debugHotkeysEnabled || !_debugCompletionKeyDown)
-		return;
+bool Zoombini2Engine::runBuiltinDebugAction(BuiltinDebugAction action) {
+	switch (action) {
+	case BuiltinDebugAction::kExportZoombiniSet:
+		exportZoombiniSet();
+		return true;
+	case BuiltinDebugAction::kImportZoombiniSet:
+		importZoombiniSet();
+		return true;
+	case BuiltinDebugAction::kCompletePuzzle:
+		return applyDebugPuzzleCompletion();
+	}
+	return false;
+}
+
+bool Zoombini2Engine::applyDebugPuzzleCompletion() {
 	if (_currentPageId == kPageZombiniville || _currentPageId == kPageRescue1 || _currentPageId == kPageRescue2 || _currentPageId == kPageBooliewood ||
 		_currentPageId == kPageFinal)
-		return;
+		return false;
 
 	for (uint i = 0; i < _state->_activeZoombinis.size(); i++) {
 		if (_state->_activeZoombinis[i])
-			_state->_activeZoombinis[i]->_puzzleStatus = 1;
+			_state->_activeZoombinis[i]->setCanAdvanceFromPage(true);
 	}
 	_zoombiniWalkingFlag = true;
 	if (_currentPage)
 		_currentPage->applyDebugPuzzleCompletion();
+	return true;
 }
 
 void Zoombini2Engine::processEvents() {
@@ -773,6 +915,10 @@ void Zoombini2Engine::processEvents() {
 			break;
 		case Common::EVENT_RETURN_TO_LAUNCHER:
 			return;
+		case Common::EVENT_FOCUS_LOST:
+			_debugCompletionKeyDown = false;
+			_debugOverlayKeyDown = false;
+			break;
 		case Common::EVENT_LBUTTONDOWN:
 		case Common::EVENT_RBUTTONDOWN:
 			_pendingPageEvents.push_back(event);
@@ -802,12 +948,17 @@ void Zoombini2Engine::processEvents() {
 					toggleGameSaveWriteLock(_activeSavefileName);
 				break;
 			}
+			if (event.kbd.keycode == Common::KEYCODE_F2 || event.kbd.keycode == Common::KEYCODE_F3) {
+				if (_debugHotkeysEnabled) {
+					if (event.kbd.keycode == Common::KEYCODE_F2)
+						runBuiltinDebugAction(BuiltinDebugAction::kExportZoombiniSet);
+					else
+						runBuiltinDebugAction(BuiltinDebugAction::kImportZoombiniSet);
+				}
+				break;
+			}
 			if (_debugHotkeysEnabled) {
-				if (event.kbd.keycode == Common::KEYCODE_F2)
-					exportZoombiniSet();
-				else if (event.kbd.keycode == Common::KEYCODE_F3)
-					importZoombiniSet();
-				else if (event.kbd.keycode == Common::KEYCODE_p)
+				if (event.kbd.keycode == Common::KEYCODE_p)
 					_debugCompletionKeyDown = true;
 				else if (event.kbd.keycode == Common::KEYCODE_c)
 					_debugOverlayKeyDown = true;
@@ -839,33 +990,27 @@ void Zoombini2Engine::applyPendingPageChange() {
 }
 
 bool Zoombini2Engine::dispatchPageEvents() {
-	const bool msgBoxWasActive = _msgBoxDialog && _msgBoxDialog->isActive();
-	const bool debugDialogWasActive = _debugDialog && _debugDialog->isActive();
-	const bool sidebarDialogWasActive = _sidebar && _sidebar->hasActiveDialog();
-	const bool sharedDialogWasActive = msgBoxWasActive || debugDialogWasActive || sidebarDialogWasActive;
-	bool modalInputBlocked = sharedDialogWasActive;
+	const bool dialogWasActive = getActiveDialog() != nullptr;
+	bool modalInputBlocked = dialogWasActive;
 
 	// Event dispatch temporarily replays each event's mouse position. The sidebar then polls the final position for this frame.
 	const Common::Point32 polledMousePos = _mousePos;
 	for (const Common::Event &event : _pendingPageEvents) {
 		if (_nextPageId != kPageNone)
 			break;
-		const bool msgBoxEventWasActive = _msgBoxDialog && _msgBoxDialog->isActive();
-		const bool debugDialogEventWasActive = _debugDialog && _debugDialog->isActive();
-		const bool sidebarDialogEventWasActive = _sidebar && _sidebar->hasActiveDialog();
+		DialogBase *dialog = getActiveDialog();
+		const bool dialogEventWasActive = dialog != nullptr;
 		const bool pageDialogWasActive = _currentPage->hasActiveDialog();
-		modalInputBlocked = modalInputBlocked || msgBoxEventWasActive || debugDialogEventWasActive || sidebarDialogEventWasActive;
+		modalInputBlocked = modalInputBlocked || dialogEventWasActive;
 		if (event.type == Common::EVENT_LBUTTONDOWN)
-			_modalOwnedPress = msgBoxEventWasActive || debugDialogEventWasActive || sidebarDialogEventWasActive;
+			_modalOwnedPress = dialogEventWasActive;
 
 		if (event.type == Common::EVENT_LBUTTONDOWN || event.type == Common::EVENT_RBUTTONDOWN || event.type == Common::EVENT_LBUTTONUP || event.type == Common::EVENT_MOUSEMOVE)
 			_mousePos = event.mouse;
 
 		EventHandleResult result = EventHandleResult::kPassthrough;
-		if (msgBoxEventWasActive)
-			result = _msgBoxDialog->handleEvent(event);
-		else if (debugDialogEventWasActive)
-			result = _debugDialog->handleEvent(event);
+		if (dialogEventWasActive)
+			result = dialog->handleEvent(event);
 		else if (_sidebar)
 			result = _sidebar->handleEvent(event);
 		// A press that began inside a shared modal owns its release. The press may
@@ -876,49 +1021,50 @@ bool Zoombini2Engine::dispatchPageEvents() {
 		if (event.type == Common::EVENT_LBUTTONUP)
 			_modalOwnedPress = false;
 
-		const bool msgBoxEventIsActive = _msgBoxDialog && _msgBoxDialog->isActive();
-		const bool debugDialogEventIsActive = _debugDialog && _debugDialog->isActive();
-		const bool sidebarDialogEventIsActive = _sidebar && _sidebar->hasActiveDialog();
-		modalInputBlocked = modalInputBlocked || msgBoxEventIsActive || debugDialogEventIsActive || sidebarDialogEventIsActive;
-		if ((msgBoxEventWasActive && !msgBoxEventIsActive) || (debugDialogEventWasActive && !debugDialogEventIsActive) || (sidebarDialogEventWasActive && !sidebarDialogEventIsActive) ||
-			(pageDialogWasActive && !_currentPage->hasActiveDialog()))
+		DialogBase *activeDialog = getActiveDialog();
+		modalInputBlocked = modalInputBlocked || activeDialog != nullptr;
+		if ((dialogEventWasActive && dialog != activeDialog) || (pageDialogWasActive && !_currentPage->hasActiveDialog()))
 			break;
 	}
 	_mousePos = polledMousePos;
+	cleanupClosedDialogs();
 
-	return sharedDialogWasActive;
+	return dialogWasActive;
 }
 
 void Zoombini2Engine::drawFrame() {
+	ManagedSurface32 *screen = _gfx->getScreen();
 	if (!_currentPage) {
-		_screen->fillRect(Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), 0);
+		screen->fillRect(Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), 0);
 		return;
 	}
 
-	applyDebugPuzzleCompletion();
-	const bool sharedDialogWasActive = dispatchPageEvents();
-	const bool msgBoxActive = _msgBoxDialog && _msgBoxDialog->isActive();
-	const bool debugDialogActive = _debugDialog && _debugDialog->isActive();
-	const bool sidebarDialogActive = _sidebar && _sidebar->hasActiveDialog();
-	const bool pageRendered = !sharedDialogWasActive && !msgBoxActive && !debugDialogActive && !sidebarDialogActive;
+	if (_debugHotkeysEnabled && _debugCompletionKeyDown)
+		runBuiltinDebugAction(BuiltinDebugAction::kCompletePuzzle);
+	const bool dialogWasActive = dispatchPageEvents();
+	DialogBase *dialog = getActiveDialog();
+	const bool pageRendered = !dialogWasActive && !dialog;
 	const bool advanceState = _nextPageId == kPageNone;
 	if (pageRendered)
-		_currentPage->onFrame(_screen, advanceState);
+		_currentPage->onFrame(screen, advanceState);
 
 	// The shared sidebar polls the final frame mouse state before drawing its controls.
-	if (_sidebar && !msgBoxActive && !debugDialogActive)
-		_sidebar->drawAndHandleInput(_screen, _nextPageId == kPageNone);
-	if (msgBoxActive)
-		_msgBoxDialog->render(_screen);
-	if (debugDialogActive)
-		_debugDialog->render(_screen);
+	DialogBase *dialogBeforeSidebar = dialog;
+	if (_sidebar && (!dialog || dialog->drawsSidebarOnTop()))
+		_sidebar->drawAndHandleInput(screen, _nextPageId == kPageNone);
+	dialog = getActiveDialog();
+	if (dialog && (dialog == dialogBeforeSidebar || dialog->drawsSidebarOnTop())) {
+		dialog->render(screen);
+		if (dialog->drawsSidebarOnTop() && _sidebar)
+			_sidebar->drawOverDialog(screen);
+	}
 	updateDragOverlay(pageRendered && advanceState);
 }
 
 const ZoombiniRunner *Zoombini2Engine::getDraggedGlobalZoombini() const {
 	for (uint i = 0; i < _state->_activeZoombinis.size(); i++) {
 		const ZoombiniRunner *zoombini = _state->_activeZoombinis[i];
-		if (zoombini && zoombini->_dragging)
+		if (zoombini && zoombini->isDragging())
 			return zoombini;
 	}
 	return nullptr;
@@ -931,16 +1077,13 @@ void Zoombini2Engine::updateDragOverlay(bool advanceState) {
 		_cursorVisible = !dragging;
 		CursorMan.showMouse(_cursorVisible);
 	}
-	if (!dragging || !_screen)
+	if (!dragging || !_gfx)
 		return;
-	if (_msgBoxDialog && _msgBoxDialog->isActive())
+	if (getActiveDialog())
 		return;
-	if (_debugDialog && _debugDialog->isActive())
-		return;
-	if (!_gfx)
-		return;
-	_currentPage->renderDragOverlay(_screen, advanceState);
-	_gfx->drawDragNameTooltip(_screen, Common::String(dragged->_name));
+	ManagedSurface32 *screen = _gfx->getScreen();
+	_currentPage->renderDragOverlay(screen, advanceState);
+	_gfx->drawDragNameTooltip(screen, Common::String(dragged->getName()));
 }
 
 void Zoombini2Engine::presentFrame() {
@@ -948,7 +1091,8 @@ void Zoombini2Engine::presentFrame() {
 	if (!_unlockFrameRate && now == _lastPresentTimeMs)
 		return;
 	_lastPresentTimeMs = now;
-	g_system->copyRectToScreen(_screen->getPixels(), _screen->pitch, 0, 0, ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height);
+	ManagedSurface32 *screen = _gfx->getScreen();
+	g_system->copyRectToScreen(screen->getPixels(), screen->pitch, 0, 0, ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height);
 	g_system->updateScreen();
 }
 
@@ -1028,25 +1172,25 @@ bool Zoombini2Engine::configurePracticeBootParamLaunch() {
 }
 
 void Zoombini2Engine::destroyCurrentPage() {
-	if (_sidebar && _sidebar->getHelpScreen())
-		_sidebar->getHelpScreen()->close();
-	if (_msgBoxDialog)
-		_msgBoxDialog->close();
-	if (_debugDialog)
-		_debugDialog->close();
+	for (uint i = 0; i < _dialogStack.size(); i++) {
+		_dialogStack[i]->close();
+		delete _dialogStack[i];
+	}
+	_dialogStack.clear();
 	if (_currentPage) {
 		delete _currentPage;
 		_currentPage = nullptr;
 	}
 	// Reset the shared page-layer collection so the replacement page starts empty.
 	if (_gfx) {
+		setCursor(CursorType::kDefault);
+		setCursor(CursorType::kRestoreBase);
+		clearCursorImages(static_cast<uint>(CursorType::kMainDishSandwich));
 		_gfx->clearPageLayers();
 		_gfx->clearPageBitmapCache();
+		// Clear the screen so a replacement page using double buffering cannot present stale content.
+		_gfx->getScreen()->fillRect(Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), 0);
 	}
-	// Clear screen on page destroy to prevent stale content showing
-	// when transitioning to a new page that uses double buffering.
-	if (_screen)
-		_screen->fillRect(Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), 0);
 }
 
 /**

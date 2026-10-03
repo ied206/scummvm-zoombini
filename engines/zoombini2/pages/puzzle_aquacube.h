@@ -69,6 +69,9 @@ public:
 	Common::String debugGetChanceDetails() const override;
 
 private:
+	static constexpr const char *kPuzzleName = "Aqua Cube";
+	/** Aqua Cube board background loaded into the first page layer. */
+	static constexpr const char *kBackgroundPath = "#bmp/aquacube/background";
 	/** Looping page soundtrack. */
 	static constexpr const char *kMusicPath = "#sounds/music/03-BB01.wav";
 	/** Glow drawn behind the moving light. */

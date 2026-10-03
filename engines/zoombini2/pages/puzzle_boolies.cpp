@@ -32,6 +32,8 @@
 
 namespace Zoombini2 {
 
+constexpr const char *PuzzleBoolies::kPuzzleName;
+constexpr const char *PuzzleBoolies::kBackgroundPath;
 constexpr const char *PuzzleBoolies::kMusicPath;
 constexpr const char *PuzzleBoolies::kFixePath;
 constexpr const char *PuzzleBoolies::kFixe2Path;
@@ -63,6 +65,8 @@ constexpr int PuzzleBoolies::kReadyHoldX[kMaxChallengeBalls];
 constexpr int PuzzleBoolies::kReadyHoldY[kMaxChallengeBalls];
 
 PuzzleBoolies::PuzzleBoolies(Zoombini2Engine *vm) : PuzzleBase(vm, kPageBoolies) {
+	_puzzleName = kPuzzleName;
+	_initialBackgroundPath = kBackgroundPath;
 }
 
 PuzzleBoolies::~PuzzleBoolies() {
@@ -372,7 +376,7 @@ void PuzzleBoolies::playEffect(int soundId) const {
 		return;
 	SoundManager *soundManager = _vm->getSoundManager();
 	if (soundManager)
-		soundManager->playWithVolume(soundId, soundManager->_volumeSFX);
+		soundManager->playWithVolume(soundId, soundManager->getSfxVolume());
 }
 
 void PuzzleBoolies::playBoardVoice() {
@@ -396,10 +400,10 @@ void PuzzleBoolies::init() {
 		if (!zoombini)
 			continue;
 		zoombini->setDefaultAnimation(_zoombiniAnimation);
-		zoombini->_rescuedBooliesPerZoombini = getRescuedBooliesPerZoombini(_puzzleLevel);
-		zoombini->_puzzleStatus = 0;
-		zoombini->_inputEnabled = false;
-		zoombini->_hidden = index != 0;
+		zoombini->setRescuedBooliesPerZoombini(getRescuedBooliesPerZoombini(_puzzleLevel));
+		zoombini->setCanAdvanceFromPage(false);
+		zoombini->setInputEnabled(false);
+		zoombini->setHidden(index != 0);
 		Common::Point32 position(120, 484);
 		if (index == 0)
 			position = Common::Point32(115, 495);
@@ -685,7 +689,7 @@ bool PuzzleBoolies::isRowEmpty(int row) const {
 void PuzzleBoolies::startBoat(uint32 now) {
 	startRefill(_boardingRow, _replacementValues[0], now);
 	if (_activeRunnerIndex < static_cast<int>(_puzzleZoombinis.size()) && _puzzleZoombinis[_activeRunnerIndex])
-		_puzzleZoombinis[_activeRunnerIndex]->_puzzleStatus = 1;
+		_puzzleZoombinis[_activeRunnerIndex]->setCanAdvanceFromPage(true);
 	_boatState = BoatState::kLeaving01;
 	_boatTime = now;
 	_returnBoatActive = false;
@@ -720,7 +724,7 @@ void PuzzleBoolies::advanceBoat(uint32 now) {
 		if (!lastRunner && !_returnBoatActive && 549 <= _boatX) {
 			_returnBoatX = -251;
 			_returnBoatActive = true;
-			_puzzleZoombinis[_activeRunnerIndex + 1]->_hidden = false;
+			_puzzleZoombinis[_activeRunnerIndex + 1]->setHidden(false);
 			_puzzleZoombinis[_activeRunnerIndex + 1]->setPosition(Common::Point32(_returnBoatX + 35, 495));
 			_vm->_zoombiniWalkingFlag = true;
 		}
@@ -736,7 +740,7 @@ void PuzzleBoolies::advanceBoat(uint32 now) {
 			return;
 		}
 		if (810 < _boatX) {
-			_puzzleZoombinis[_activeRunnerIndex]->_hidden = true;
+			_puzzleZoombinis[_activeRunnerIndex]->setHidden(true);
 			_boatState = BoatState::kReturning02;
 		}
 	}
@@ -746,7 +750,7 @@ void PuzzleBoolies::advanceBoat(uint32 now) {
 	_puzzleZoombinis[_activeRunnerIndex + 1]->setPosition(Common::Point32(_returnBoatX + 35, 495));
 	if (_returnBoatX < 80)
 		return;
-	_puzzleZoombinis[_activeRunnerIndex]->_hidden = true;
+	_puzzleZoombinis[_activeRunnerIndex]->setHidden(true);
 	_activeRunnerIndex += 1;
 	_returnBoatActive = false;
 	_passengers.clear();
@@ -1051,7 +1055,7 @@ bool PuzzleBoolies::onGoButtonPressed() {
 		return false;
 	int remaining = 0;
 	for (const ZoombiniRunner *runner : _puzzleZoombinis) {
-		if (runner->_puzzleStatus == 0)
+		if (!runner->canAdvanceFromPage())
 			remaining += 1;
 	}
 	if (remaining < 4)

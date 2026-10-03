@@ -21,6 +21,9 @@
 
 #include "zoombini2/console.h"
 
+#include "common/textconsole.h"
+#include "common/util.h"
+
 #include "zoombini2/pages/dialog_debug.h"
 #include "zoombini2/pages/interactive_map.h"
 #include "zoombini2/pages/puzzle_base.h"
@@ -28,28 +31,156 @@
 #include "zoombini2/scripts.h"
 #include "zoombini2/zoombini2.h"
 
+#include <errno.h>
+#include <limits.h>
+#include <stdint.h>
+#include <stdlib.h>
+
 namespace Zoombini2 {
 
+namespace {
+
+/** Parse bounded decimal or 0x-prefixed integer arguments for debugger commands. */
+class ConsoleArgumentParser {
+public:
+	static bool parseSignedInt(GUI::Debugger &debugger, const char *str, int32 &result);
+	static bool parseUnsignedInt(GUI::Debugger &debugger, const char *str, uint32 &result);
+
+private:
+	static bool reportFailure(GUI::Debugger &debugger, const char *type, const char *str);
+};
+
+bool ConsoleArgumentParser::reportFailure(GUI::Debugger &debugger, const char *type, const char *str) {
+	debugger.debugPrintf("Cannot parse %s(%s) (hex supported with 0x prefix)\n", type, str ? str : "(null)");
+	return false;
+}
+
+bool ConsoleArgumentParser::parseSignedInt(GUI::Debugger &debugger, const char *str, int32 &result) {
+	if (!str || str[0] == '\0') {
+		warning("parseSignedInt: Empty string\n");
+		return reportFailure(debugger, "int32", str);
+	}
+
+	const char *digits = str;
+	while (Common::isSpace(digits[0]))
+		digits += 1;
+
+	// Check if it's a hexadecimal number (starts with "0x" or "0X")
+	int base = 10;
+	if (digits[0] == '0' && (digits[1] == 'x' || digits[1] == 'X'))
+		base = 16;
+
+	char *endPtr = nullptr;
+	errno = 0;
+	const long parsed = strtol(str, &endPtr, base);
+
+	// Check for conversion errors
+	if (errno == ERANGE) {
+		warning("parseSignedInt: int32 overflow or underflow in '%s'\n", str);
+		return reportFailure(debugger, "int32", str);
+	}
+	if (errno != 0) {
+		warning("parseSignedInt: int32 conversion failed in '%s'\n", str);
+		return reportFailure(debugger, "int32", str);
+	}
+
+	// Check if any characters were converted
+	if (endPtr == str) {
+		warning("parseSignedInt: '%s' is not a valid int32\n", str);
+		return reportFailure(debugger, "int32", str);
+	}
+
+	// Check if there are trailing characters
+	if (*endPtr != '\0') {
+		warning("parseSignedInt: '%s' contains invalid characters\n", str);
+		return reportFailure(debugger, "int32", str);
+	}
+	if (parsed < INT32_MIN || INT32_MAX < parsed) {
+		warning("parseSignedInt: int32 overflow or underflow in '%s'\n", str);
+		return reportFailure(debugger, "int32", str);
+	}
+
+	result = static_cast<int32>(parsed);
+	return true;
+}
+
+bool ConsoleArgumentParser::parseUnsignedInt(GUI::Debugger &debugger, const char *str, uint32 &result) {
+	if (!str || str[0] == '\0') {
+		warning("parseUnsignedInt: Empty string\n");
+		return reportFailure(debugger, "uint32", str);
+	}
+
+	const char *digits = str;
+	while (Common::isSpace(digits[0]))
+		digits += 1;
+	if (digits[0] == '-') {
+		warning("parseUnsignedInt: '%s' is not a valid uint32\n", str);
+		return reportFailure(debugger, "uint32", str);
+	}
+
+	// Check if it's a hexadecimal number (starts with "0x" or "0X")
+	int base = 10;
+	if (digits[0] == '0' && (digits[1] == 'x' || digits[1] == 'X'))
+		base = 16;
+
+	char *endPtr = nullptr;
+	errno = 0;
+	const unsigned long parsed = strtoul(str, &endPtr, base);
+
+	// Check for conversion errors
+	if (errno == ERANGE) {
+		warning("parseUnsignedInt: uint32 overflow in '%s'\n", str);
+		return reportFailure(debugger, "uint32", str);
+	}
+	if (errno != 0) {
+		warning("parseUnsignedInt: uint32 conversion failed in '%s'\n", str);
+		return reportFailure(debugger, "uint32", str);
+	}
+
+	// Check if any characters were converted
+	if (endPtr == str) {
+		warning("parseUnsignedInt: '%s' is not a valid uint32\n", str);
+		return reportFailure(debugger, "uint32", str);
+	}
+
+	// Check if there are trailing characters
+	if (*endPtr != '\0') {
+		warning("parseUnsignedInt: '%s' contains invalid characters\n", str);
+		return reportFailure(debugger, "uint32", str);
+	}
+	if (UINT32_MAX < parsed) {
+		warning("parseUnsignedInt: uint32 overflow in '%s'\n", str);
+		return reportFailure(debugger, "uint32", str);
+	}
+
+	result = static_cast<uint32>(parsed);
+	return true;
+}
+
+} // End of anonymous namespace
+
 const Zoombini2Console::GoDestination Zoombini2Console::kGoDestinations[] = {
-	{"crazyturtle", kPageCrazyTurtle, kPageZombiniville, RouteBranch::kNone00},
-	{"waterslide", kPageWaterslide, kPageCrazyTurtle, RouteBranch::kNone00},
-	{"aquacube", kPageAquacube, kPageWaterslide, RouteBranch::kNone00},
-	{"rescue1", kPageRescue1, kPageAquacube, RouteBranch::kNone00},
-	{"mysticmarsh", kPageMysticMarsh, kPageRescue1, RouteBranch::kRight02},
-	{"magicwall", kPageMagicWall, kPageRescue1, RouteBranch::kLeft01},
-	{"walloffleens", kPageWallOfFleens, kPageMysticMarsh, RouteBranch::kNone00},
-	{"cheznorf", kPageChezNorf, kPageMagicWall, RouteBranch::kNone00},
-	{"rescue2", kPageRescue2, kPageWallOfFleens, RouteBranch::kNone00},
-	{"rescue2norf", kPageRescue2, kPageChezNorf, RouteBranch::kNone00},
-	{"snowboard", kPageSnowboard, kPageRescue2, RouteBranch::kNone00},
-	{"boolies", kPageBoolies, kPageSnowboard, RouteBranch::kNone00},
-	{"booliewood", kPageBooliewood, kPageBoolies, RouteBranch::kNone00},
-	{"final", kPageFinal, kPageBoolies, RouteBranch::kNone00},
+	{"crazyturtle", kPageCrazyTurtle, kPageZombiniville, Zoombini2Engine::RouteBranch::kNone00},
+	{"waterslide", kPageWaterslide, kPageCrazyTurtle, Zoombini2Engine::RouteBranch::kNone00},
+	{"aquacube", kPageAquacube, kPageWaterslide, Zoombini2Engine::RouteBranch::kNone00},
+	{"rescue1", kPageRescue1, kPageAquacube, Zoombini2Engine::RouteBranch::kNone00},
+	{"mysticmarsh", kPageMysticMarsh, kPageRescue1, Zoombini2Engine::RouteBranch::kRight02},
+	{"magicwall", kPageMagicWall, kPageRescue1, Zoombini2Engine::RouteBranch::kLeft01},
+	{"walloffleens", kPageWallOfFleens, kPageMysticMarsh, Zoombini2Engine::RouteBranch::kNone00},
+	{"cheznorf", kPageChezNorf, kPageMagicWall, Zoombini2Engine::RouteBranch::kNone00},
+	{"rescue2", kPageRescue2, kPageWallOfFleens, Zoombini2Engine::RouteBranch::kNone00},
+	{"rescue2norf", kPageRescue2, kPageChezNorf, Zoombini2Engine::RouteBranch::kNone00},
+	{"snowboard", kPageSnowboard, kPageRescue2, Zoombini2Engine::RouteBranch::kNone00},
+	{"boolies", kPageBoolies, kPageSnowboard, Zoombini2Engine::RouteBranch::kNone00},
+	{"booliewood", kPageBooliewood, kPageBoolies, Zoombini2Engine::RouteBranch::kNone00},
+	{"final", kPageFinal, kPageBoolies, Zoombini2Engine::RouteBranch::kNone00},
 };
 
 Zoombini2Console::Zoombini2Console(Zoombini2Engine *vm) : GUI::Debugger(), _vm(vm) {
 	registerCmd(kCmdGo, WRAP_METHOD(Zoombini2Console, Cmd_Go));
 	registerCmd(kCmdDraw, WRAP_METHOD(Zoombini2Console, Cmd_Draw));
+	registerCmd(kCmdBuiltinDebug, WRAP_METHOD(Zoombini2Console, Cmd_BuiltinDebug));
+	registerCmd(kCmdManBuiltinDebug, WRAP_METHOD(Zoombini2Console, Cmd_ManBuiltinDebug));
 	registerCmd("puzzle", WRAP_METHOD(Zoombini2Console, Cmd_Puzzle));
 	registerCmd("page", WRAP_METHOD(Zoombini2Console, Cmd_Puzzle));
 }
@@ -75,29 +206,85 @@ void Zoombini2Console::printHelpOption() {
 	debugPrintf("\n");
 }
 
-bool Zoombini2Console::parseNonNegativeInt(const char *str, int &result) {
-	if (!str || *str == '\0')
-		return false;
-
-	uint value = 0;
-	for (const char *p = str; *p != '\0'; p++) {
-		if (*p < '0' || '9' < *p)
-			return false;
-		const uint digit = static_cast<uint>(*p - '0');
-		if ((0xFFFFFFFFu - digit) / 10u < value)
-			return false;
-		value = value * 10u + digit;
+bool Zoombini2Console::Cmd_BuiltinDebug(int argc, const char **argv) {
+	const Common::String fileName = _vm->getDebugZoombiniSetFileName();
+	if (argc < 2 || hasHelpOption(argc, argv)) {
+		debugPrintf("Run an original Zoombinis Mountain Rescue developer action.\n");
+		debugPrintf("Usage: %s <export|import|complete>\n\n", kCmdBuiltinDebug);
+		debugPrintf("  export    Run F2: write the current party's traits to %s in the save location.\n", fileName.c_str());
+		debugPrintf("  import    Run F3: read that file and apply traits to existing party members.\n");
+		debugPrintf("  complete  Run P: mark the party free through the active page's completion path.\n\n");
+		debugPrintf("Debugger actions run independently of the in-game hotkey setting.\n");
+		debugPrintf("Use %s for the in-game keys and page limits.\n\n", kCmdManBuiltinDebug);
+		debugPrintf("Options:\n");
+		printHelpOption();
+		return true;
 	}
-	if (0x7FFFFFFFu < value)
-		return false;
-
-	result = static_cast<int>(value);
+	if (argc != 2) {
+		debugPrintf("Usage: %s <export|import|complete>\n\n", kCmdBuiltinDebug);
+		return true;
+	}
+	if (scumm_stricmp(argv[1], "export") == 0) {
+		_vm->runBuiltinDebugAction(Zoombini2Engine::BuiltinDebugAction::kExportZoombiniSet);
+		debugPrintf("F2 export to %s in the save location attempted. Empty parties produce no file.\n\n", fileName.c_str());
+	} else if (scumm_stricmp(argv[1], "import") == 0) {
+		_vm->runBuiltinDebugAction(Zoombini2Engine::BuiltinDebugAction::kImportZoombiniSet);
+		debugPrintf("F3 import from %s attempted. Missing or invalid input leaves the party unchanged.\n\n", fileName.c_str());
+	} else if (scumm_stricmp(argv[1], "complete") == 0) {
+		if (_vm->runBuiltinDebugAction(Zoombini2Engine::BuiltinDebugAction::kCompletePuzzle))
+			debugPrintf("P completion state applied. The active page handles departure.\n\n");
+		else
+			debugPrintf("P is unavailable on the active shelter or finale page.\n\n");
+	} else {
+		debugPrintf("Unknown developer action '%s'. Use %s --help.\n\n", argv[1], kCmdBuiltinDebug);
+	}
 	return true;
 }
 
-const Zoombini2Console::GoDestination *Zoombini2Console::findGoDestination(const char *name, bool puzzleOnly) {
+bool Zoombini2Console::Cmd_ManBuiltinDebug(int argc, const char **argv) {
+	const Common::String fileName = _vm->getDebugZoombiniSetFileName();
+	if (hasHelpOption(argc, argv)) {
+		debugPrintf("Print the original Zoombinis Mountain Rescue developer-key manual.\n");
+		debugPrintf("Usage: %s\n\n", kCmdManBuiltinDebug);
+		debugPrintf("Options:\n");
+		printHelpOption();
+		return true;
+	}
+	if (argc != 1) {
+		debugPrintf("Usage: %s\n\n", kCmdManBuiltinDebug);
+		return true;
+	}
+	debugPrintf("Zoombinis Mountain Rescue developer keys\n");
+	debugPrintf("  In-game hotkeys: %s (enable in the engine options).\n", _vm->areBuiltinDebugHotkeysEnabled() ? "enabled" : "disabled");
+	debugPrintf("  Close the ScummVM debugger before using a game key.\n\n");
+	debugPrintf("[Global keys]\n");
+	debugPrintf("  F2  Export the active party to %s in ScummVM's configured save location.\n", fileName.c_str());
+	debugPrintf("      Count, then one Feet Nose Hair Eyes decimal tuple per member.\n");
+	debugPrintf("      The file is uncompressed text and can be edited before F3 imports it.\n");
+	debugPrintf("      An empty party writes nothing.\n");
+	debugPrintf("  F3  Read whitespace-delimited tuples from the same target-prefixed file.\n");
+	debugPrintf("      Update at most the current party size; do not create or remove members.\n");
+	debugPrintf("      Validate the entire file first: at most 4096 bytes, 1-16 members, trait values 1-5.\n");
+	debugPrintf("      Incomplete, invalid, or extra data rejects the file without changing the party.\n");
+	debugPrintf("  P   While held, mark the active party free for normal puzzle departure.\n");
+	debugPrintf("      The changed puzzle state remains after the key is released.\n");
+	debugPrintf("      Unavailable in Zombiniville, both rescue sites, Booliewood, and the finale.\n");
+	debugPrintf("      Wall of Fleens also receives perfect-clear eligibility.\n\n");
+	debugPrintf("[Chez Norf only]\n");
+	debugPrintf("  C   While held, show the generated food values, table labels, and clue counts.\n");
+	debugPrintf("      The overlay changes no puzzle state.\n\n");
+	debugPrintf("The direct F2, F3, and P actions are available through %s.\n\n", kCmdBuiltinDebug);
+	return true;
+}
+
+const Zoombini2Console::GoDestination *Zoombini2Console::findGoDestPage(const char *name, bool puzzleOnly) {
 	int pageNumber = -1;
-	const bool numeric = parseNonNegativeInt(name, pageNumber);
+	const char *digits = name;
+	while (Common::isSpace(digits[0]))
+		digits += 1;
+	bool numeric = false;
+	if (Common::isDigit(digits[0]) || digits[0] == '+' || digits[0] == '-')
+		numeric = ConsoleArgumentParser::parseSignedInt(*this, name, pageNumber);
 	for (uint i = 0; i < ARRAYSIZE(kGoDestinations); i++) {
 		const GoDestination &destination = kGoDestinations[i];
 		if (puzzleOnly && InteractiveMap::getPracticePartySize(destination.target) == 0)
@@ -149,13 +336,13 @@ bool Zoombini2Console::CmdSub_GoPractice(int argc, const char **argv) {
 		debugPrintf("No active Zoombini2 game page.\n\n");
 		return true;
 	}
-	const GoDestination *destination = findGoDestination(argv[2], true);
+	const GoDestination *destination = findGoDestPage(argv[2], true);
 	if (!destination) {
 		debugPrintf("Unknown puzzle '%s'. Use go practice without arguments for the list.\n\n", argv[2]);
 		return true;
 	}
-	int level = 0;
-	if (!parseNonNegativeInt(argv[3], level) || level < 1 || 4 < level) {
+	uint level = 0;
+	if (!ConsoleArgumentParser::parseUnsignedInt(*this, argv[3], level) || level < 1 || 4 < level) {
 		debugPrintf("Invalid level '%s'. Must be 1-4.\n\n", argv[3]);
 		return true;
 	}
@@ -164,13 +351,13 @@ bool Zoombini2Console::CmdSub_GoPractice(int argc, const char **argv) {
 		return true;
 	}
 	const uint maxPartySize = InteractiveMap::getPracticePartySize(destination->target);
-	int count = static_cast<int>(maxPartySize);
-	if (argc == 5 && (!parseNonNegativeInt(argv[4], count) || count < 1 || static_cast<int>(maxPartySize) < count)) {
+	uint count = maxPartySize;
+	if (argc == 5 && (!ConsoleArgumentParser::parseUnsignedInt(*this, argv[4], count) || count < 1 || maxPartySize < count)) {
 		debugPrintf("Invalid count '%s'. Must be 1-%u for this route.\n\n", argv[4], maxPartySize);
 		return true;
 	}
-	_vm->queueDebugPracticeLaunch(destination->target, level, static_cast<uint>(count));
-	debugPrintf("Starting practice page %d at level %d with %d Zoombinis.\n\n", static_cast<int>(destination->target), level, count);
+	_vm->queueDebugPracticeLaunch(destination->target, static_cast<int>(level), count);
+	debugPrintf("Starting practice page %d at level %u with %u Zoombinis.\n\n", static_cast<int>(destination->target), level, count);
 	return false;
 }
 
@@ -188,13 +375,13 @@ bool Zoombini2Console::CmdSub_GoXfer(int argc, const char **argv) {
 		debugPrintf("No active Zoombini2 game page.\n\n");
 		return true;
 	}
-	const GoDestination *destination = findGoDestination(argv[2], false);
+	const GoDestination *destination = findGoDestPage(argv[2], false);
 	if (!destination) {
 		debugPrintf("Unknown destination '%s'. Use go xfer without arguments for the list.\n\n", argv[2]);
 		return true;
 	}
-	int level = 0;
-	if (argc == 4 && (!parseNonNegativeInt(argv[3], level) || level < 1 || 4 < level)) {
+	uint level = 0;
+	if (argc == 4 && (!ConsoleArgumentParser::parseUnsignedInt(*this, argv[3], level) || level < 1 || 4 < level)) {
 		debugPrintf("Invalid level '%s'. Must be 1-4.\n\n", argv[3]);
 		return true;
 	}
@@ -219,13 +406,13 @@ bool Zoombini2Console::CmdSub_GoXfer(int argc, const char **argv) {
 	}
 	if (level != 0) {
 		_vm->_isSavedGame = false;
-		_vm->_debugXferPracticeLevel = level;
+		_vm->_debugXferPracticeLevel = static_cast<int>(level);
 		_vm->_debugXferPracticeTarget = destination->target;
 		_vm->_debugXferResetState = true;
 	} else if (_vm->_isSavedGame && dynamic_cast<PuzzleBase *>(_vm->getCurrentPage())) {
 		for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
 			if (_vm->_state->_activeZoombinis[i])
-				_vm->_state->_activeZoombinis[i]->_puzzleStatus = 1;
+				_vm->_state->_activeZoombinis[i]->setCanAdvanceFromPage(true);
 		}
 	} else if (!_vm->_isSavedGame) {
 		_vm->_debugXferPracticeLevel = _vm->_state->getLevel();
@@ -299,7 +486,7 @@ bool Zoombini2Console::CmdSub_DrawAreaMask(int argc, const char **argv) {
 
 	DialogDebugCommand cmd;
 	cmd.setDrawAreaMask();
-	if (!_vm->getDebugDialog()->open(cmd))
+	if (!_vm->openDebugDialog(cmd))
 		return true;
 	return false;
 }
@@ -324,17 +511,17 @@ bool Zoombini2Console::CmdSub_DrawAnimation(int argc, const char **argv) {
 		return true;
 	}
 
-	int startFrame = 0;
-	if (argc == 4 && !parseNonNegativeInt(argv[3], startFrame)) {
+	uint startFrame = 0;
+	if (argc == 4 && (!ConsoleArgumentParser::parseUnsignedInt(*this, argv[3], startFrame) || INT_MAX < startFrame)) {
 		debugPrintf("Cannot parse argument %s\n", argv[3]);
 		debugPrintf("\n");
 		return true;
 	}
 
 	DialogDebugCommand cmd;
-	cmd.setDrawAnimation(Common::Path(argv[2]), startFrame);
-	if (!_vm->getDebugDialog()->open(cmd)) {
-		debugPrintf("Cannot open animation '%s' at frame %d\n", argv[2], startFrame);
+	cmd.setDrawAnimation(Common::Path(argv[2]), static_cast<int>(startFrame));
+	if (!_vm->openDebugDialog(cmd)) {
+		debugPrintf("Cannot open animation '%s' at frame %u\n", argv[2], startFrame);
 		debugPrintf("\n");
 		return true;
 	}
@@ -442,7 +629,7 @@ bool Zoombini2Console::CmdSub_PuzzleChance(int argc, const char **argv) {
 	if (hasHelpOption(argc, argv) || (!query && !set)) {
 		debugPrintf("Usage: page|puzzle chance|chances [get|set <remaining>]\n");
 		debugPrintf("Without an argument, show the chance model and remaining count.\n");
-		debugPrintf("Set accepts a decimal integer from zero through the opportunity limit.\n");
+		debugPrintf("Set accepts a decimal or 0x-prefixed integer from zero through the opportunity limit.\n");
 		const char *chanceSupport = "unsupported";
 		if (puzzle && puzzle->debugCanSetChances())
 			chanceSupport = "supported";
@@ -455,8 +642,8 @@ bool Zoombini2Console::CmdSub_PuzzleChance(int argc, const char **argv) {
 			debugPrintf("Usage: page|puzzle chance|chances set <remaining>\n\n");
 			return true;
 		}
-		int remaining;
-		if (!parseNonNegativeInt(argv[3], remaining)) {
+		uint remaining;
+		if (!ConsoleArgumentParser::parseUnsignedInt(*this, argv[3], remaining) || INT_MAX < remaining) {
 			debugPrintf("Invalid remaining chances '%s'. Must be a non-negative integer.\n\n", argv[3]);
 			return true;
 		}
@@ -464,11 +651,11 @@ bool Zoombini2Console::CmdSub_PuzzleChance(int argc, const char **argv) {
 			debugPrintf("The active page state does not support adjusting chances.\n\n");
 			return true;
 		}
-		if (info.opportunities < remaining) {
+		if (info.opportunities < 0 || static_cast<uint>(info.opportunities) < remaining) {
 			debugPrintf("Remaining chances must be between 0 and %d.\n\n", info.opportunities);
 			return true;
 		}
-		if (!puzzle->debugSetChances(remaining)) {
+		if (!puzzle->debugSetChances(static_cast<int>(remaining))) {
 			debugPrintf("The active puzzle cannot adjust chances in its current state.\n\n");
 			return true;
 		}

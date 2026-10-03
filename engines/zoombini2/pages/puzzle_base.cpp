@@ -29,54 +29,7 @@
 
 namespace Zoombini2 {
 
-constexpr const char *PuzzleBase::kPuzzleBackgroundFormat;
 constexpr const char *PuzzleBase::kZoombiniAnimationPath;
-constexpr const char *PuzzleBase::kCrazyTurtleBackgroundPath;
-constexpr const char *PuzzleBase::kWaterslideBackgroundPath;
-constexpr const char *PuzzleBase::kAquacubeBackgroundPath;
-constexpr const char *PuzzleBase::kMysticMarshBackgroundPath;
-constexpr const char *PuzzleBase::kMagicWallBackgroundPath;
-constexpr const char *PuzzleBase::kWallOfFleensBackgroundPath;
-constexpr const char *PuzzleBase::kChezNorfBackgroundPath;
-constexpr const char *PuzzleBase::kSnowboardBackgroundPath;
-constexpr const char *PuzzleBase::kBooliesBackgroundPath;
-
-// Public activity names paired with their internal resource directories.
-static constexpr struct {
-	PageId pageId;
-	const char *name;
-	const char *dir;
-	const char *bgName; // Background BMP name (without bmp/ prefix or .bmp extension)
-} kPuzzleInfo[] = {
-	{kPageCrazyTurtle, "Turtle Hurdle", "crazy_turtle", "crazy_turtle/background"},
-	{kPageWaterslide, "Pipes of Paloo", "waterslide", "waterslide/waterslides"},
-	{kPageAquacube, "Aqua Cube", "aquacube", "aquacube/background"},
-	{kPageMysticMarsh, "Bubble Bumpers", "mystic_marsh", "mystic_marsh/background1"},
-	{kPageMagicWall, "Beetle Bug Alley", "magic_wall", "magic_wall/magic wall"},
-	{kPageWallOfFleens, "Magic Mirrors", "wall_of_fleens", "wall_of_fleens/background"},
-	{kPageChezNorf, "Chez Norf", "chez_norf", "chez_norf/baquegund"},
-	{kPageSnowboard, "Snowboard Gulch", "snowboard", "snowboard/snowboard-EASY"},
-	{kPageBoolies, "Boolie Boggle", "boolies", "Boolies/background"},
-	{kPageNone, nullptr, nullptr, nullptr},
-};
-
-/* static */
-const char *PuzzleBase::getPuzzleName(PageId pageId) {
-	for (int i = 0; kPuzzleInfo[i].name; i++) {
-		if (kPuzzleInfo[i].pageId == pageId)
-			return kPuzzleInfo[i].name;
-	}
-	return "Unknown";
-}
-
-/* static */
-const char *PuzzleBase::getPuzzleDir(PageId pageId) {
-	for (int i = 0; kPuzzleInfo[i].dir; i++) {
-		if (kPuzzleInfo[i].pageId == pageId)
-			return kPuzzleInfo[i].dir;
-	}
-	return nullptr;
-}
 
 PuzzleBase::PuzzleBase(Zoombini2Engine *vm, PageId pageId)
 	: InteractiveBase(vm, PageCategory::kPuzzle), _puzzleLevel(vm->_state->_level) {
@@ -88,25 +41,15 @@ void PuzzleBase::finishPuzzleRoster(StorageRecord **storage, bool perfectClearEl
 }
 
 void PuzzleBase::init() {
-	const char *name = getPuzzleName(_pageId);
-	debug(1, "Puzzle::init - %s (page %d)", name, static_cast<int>(_pageId));
-
-	// Load the background from the activity resource table.
-	const char *bgName = nullptr;
-	for (int i = 0; kPuzzleInfo[i].name; i++) {
-		if (kPuzzleInfo[i].pageId == _pageId) {
-			bgName = kPuzzleInfo[i].bgName;
-			break;
-		}
-	}
+	debug(1, "Puzzle::init - %s (page %d)", _puzzleName, static_cast<int>(_pageId));
 
 	_vm->_gfx->getPageLayerStack()->clear();
 	_backgroundPath.clear();
 	_vm->_gfx->getPageLayerStack()->addLayer(1);
-	if (bgName) {
-		const Common::Path bgPath(Common::String::format(kPuzzleBackgroundFormat, bgName));
+	if (_initialBackgroundPath) {
+		const Common::Path bgPath(_initialBackgroundPath);
 		if (!loadPrimaryLayerBackground(bgPath)) {
-			debug(1, "Puzzle: Failed to load background for %s", name);
+			debug(1, "Puzzle: Failed to load background for %s", _puzzleName);
 		}
 	}
 	_vm->_gfx->getPageLayerStack()->addLayer(1);
@@ -141,7 +84,7 @@ void PuzzleBase::renderZoombinis(ManagedSurface32 *screen) const {
 		const ZoombiniRunner *zoombini = _puzzleZoombinis[index];
 		if (!zoombini)
 			continue;
-		if (zoombini->_dragging) {
+		if (zoombini->isDragging()) {
 			draggedZoombini = zoombini;
 			continue;
 		}
@@ -171,14 +114,15 @@ const char *PuzzleChanceInfo::typeName(Type type) {
 }
 
 Common::String PuzzleBase::debugAnswerHeader() const {
-	return Common::String::format("%s (level %d, party %u)\n", getPuzzleName(_pageId), _puzzleLevel, _puzzleZoombinis.size());
+	return Common::String::format("%s (level %d, party %u)\n", _puzzleName, _puzzleLevel, _puzzleZoombinis.size());
 }
 
 Common::String PuzzleBase::debugActorDescription(int index) const {
 	if (index < 0 || static_cast<int>(_puzzleZoombinis.size()) <= index)
 		return "(none)";
 	const ZoombiniRunner *actor = _puzzleZoombinis[index];
-	return Common::String::format("Zoombini near (%d, %d): %s", actor->_screenPos.x, actor->_screenPos.y, actor->_traits.toStr().c_str());
+	const Common::Point32 position = actor->getScreenPosition();
+	return Common::String::format("Zoombini near (%d, %d): %s", position.x, position.y, actor->getTraits().toStr().c_str());
 }
 
 void PuzzleBase::debugForceFinish() {
@@ -188,10 +132,10 @@ void PuzzleBase::debugForceFinish() {
 	for (ZoombiniRunner *actor : _puzzleZoombinis) {
 		actor->clearMovement();
 		actor->setAnimationCompleteCallback(nullptr);
-		actor->_dragging = false;
-		actor->_inputEnabled = false;
-		actor->_puzzleStatus = 1;
-		actor->_exitComplete = true;
+		actor->setDragging(false);
+		actor->setInputEnabled(false);
+		actor->setCanAdvanceFromPage(true);
+		actor->setExitComplete(true);
 	}
 	applyDebugPuzzleCompletion();
 	_vm->_zoombiniWalkingFlag = true;

@@ -21,7 +21,6 @@
 
 #include "zoombini2/pages/interactive_base.h"
 #include "zoombini2/graphics.h"
-#include "zoombini2/pages/dialog_help.h"
 #include "zoombini2/pages/dialog_msgbox.h"
 #include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
@@ -74,24 +73,12 @@ Sidebar::Sidebar(Zoombini2Engine *vm)
 	_helpClickSoundId = _vm->getSoundManager()->load(false, Common::Path(kHelpClickSoundPath), false);
 	_mapClickSoundId = _vm->getSoundManager()->load(false, Common::Path(kMapClickSoundPath), false);
 
-	// Create help screen modal system
-	_helpScreen = new DialogHelp(_vm);
-
 	// Create saved background buffer (34x102 for all 3 buttons).
 	_savedBackground = _vm->_gfx->createSurface(Size32(34, 102));
 }
 
 Sidebar::~Sidebar() {
-	delete _helpScreen;
 	delete _savedBackground;
-}
-
-DialogBase *Sidebar::getActiveDialog() const {
-	return _helpScreen && _helpScreen->isActive() ? _helpScreen : nullptr;
-}
-
-bool Sidebar::hasActiveDialog() const {
-	return getActiveDialog() != nullptr;
 }
 
 bool Sidebar::shouldShow() const {
@@ -141,7 +128,7 @@ bool Sidebar::isInButtonRegion(const Common::Point &pos) const {
 bool Sidebar::isInteractionBlocked() const {
 	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
 		const ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
-		if (zoombini && zoombini->_dragging)
+		if (zoombini && zoombini->isDragging())
 			return true;
 	}
 	const PageBase *page = _vm->getCurrentPage();
@@ -177,12 +164,6 @@ void Sidebar::consumePendingRelease() {
 }
 
 EventHandleResult Sidebar::onLButtonUp(const Common::Point &pos) {
-	if (DialogBase *dialog = getActiveDialog()) {
-		_primaryButtonArmed = false;
-		_pendingMouseRelease = false;
-		dialog->onLButtonUp(pos);
-		return EventHandleResult::kConsumed;
-	}
 	if (isInteractionBlocked()) {
 		_primaryButtonArmed = false;
 		_pendingMouseRelease = false;
@@ -198,28 +179,10 @@ EventHandleResult Sidebar::onLButtonUp(const Common::Point &pos) {
 	return EventHandleResult::kPassthrough;
 }
 
-EventHandleResult Sidebar::onKeyDown(const Common::KeyState &key, bool repeat) {
-	if (DialogBase *dialog = getActiveDialog()) {
-		dialog->onKeyDown(key, repeat);
-		return EventHandleResult::kConsumed;
-	}
-	return EventHandleResult::kPassthrough;
-}
-
-EventHandleResult Sidebar::onKeyUp(const Common::KeyState &key) {
-	if (DialogBase *dialog = getActiveDialog())
-		dialog->onKeyUp(key);
-	return hasActiveDialog() ? EventHandleResult::kConsumed : EventHandleResult::kPassthrough;
-}
 void Sidebar::drawAndHandleInput(ManagedSurface32 *screen, bool inputAllowed) {
-	if (DialogBase *dialog = getActiveDialog()) {
-		// The original frame routine keeps painting the Help, Map, and Go
-		// controls while the help overlay owns input. Rollover and release
-		// handling stay gated off, so every control keeps its normal sprite.
+	if (_vm->getActiveDialog()) {
 		_pendingMouseRelease = false;
 		updateHoverState(Common::Point(), false);
-		dialog->render(screen);
-		drawControls(screen);
 		return;
 	}
 
@@ -244,12 +207,17 @@ void Sidebar::drawAndHandleInput(ManagedSurface32 *screen, bool inputAllowed) {
 	else
 		_pendingMouseRelease = false;
 
-	if (DialogBase *dialog = getActiveDialog()) {
-		dialog->render(screen);
-		drawControls(screen);
+	if (_vm->getActiveDialog()) {
+		updateHoverState(Common::Point(), false);
 		return;
 	}
 
+	drawControls(screen);
+}
+
+void Sidebar::drawOverDialog(ManagedSurface32 *screen) {
+	_pendingMouseRelease = false;
+	updateHoverState(Common::Point(), false);
 	drawControls(screen);
 }
 
@@ -280,20 +248,7 @@ void Sidebar::drawControls(ManagedSurface32 *screen) {
 	_vm->_gfx->drawSharedRleBlock(screen, goPath, Common::Point32(_goButtonRect.left, _goButtonRect.top));
 }
 
-EventHandleResult Sidebar::onMouseMove(const Common::Point &pos) {
-	if (DialogBase *dialog = getActiveDialog()) {
-		dialog->onMouseMove(pos);
-		return EventHandleResult::kConsumed;
-	}
-	return EventHandleResult::kPassthrough;
-}
-
 EventHandleResult Sidebar::onLButtonDown(const Common::Point &pos) {
-	if (DialogBase *dialog = getActiveDialog()) {
-		_primaryButtonArmed = false;
-		_pendingMouseRelease = false;
-		return dialog->onLButtonDown(pos);
-	}
 	if (isInteractionBlocked()) {
 		_primaryButtonArmed = false;
 		_pendingMouseRelease = false;
@@ -308,15 +263,12 @@ EventHandleResult Sidebar::onLButtonDown(const Common::Point &pos) {
 }
 
 void Sidebar::onHelpClick() {
-	if (!_helpScreen) {
-		return;
-	}
 	_vm->getSoundManager()->play(_helpClickSoundId);
 
 	const PageId currentPage = _vm->getCurrentPageId();
 	int level = _vm->_state->getLevel();
 
-	_helpScreen->open(currentPage, level);
+	_vm->openHelpDialog(currentPage, level);
 }
 
 void Sidebar::onMapClick() {
@@ -328,12 +280,12 @@ void Sidebar::onMapClick() {
 		returnToMap();
 		return;
 	}
-	if (!_vm->writeGameSave(_vm->_state->_playerName))
+	if (!_vm->writeGameSave(_vm->_state->getPlayerName()))
 		return;
 	bool hasActive = false;
 	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
 		const ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
-		hasActive = hasActive || zoombini->_puzzleStatus == 1 || zoombini->_inputEnabled == 1;
+		hasActive = hasActive || zoombini->canAdvanceFromPage() || zoombini->isInputEnabled();
 	}
 	if ((page && page->isShelter()) ||
 		(!hasActive && (!_vm->getCurrentPage() || _vm->isStartingMapTransition())))
@@ -366,7 +318,7 @@ void Sidebar::returnToMap() {
 }
 
 void Sidebar::requestAbandonConfirmation() {
-	_vm->getMsgBoxDialog()->request(Common::Path(kAbandonConfirmationPath),
+	_vm->requestMsgBox(Common::Path(kAbandonConfirmationPath),
 									new Common::Callback<Sidebar, DialogMsgBoxButton>(this, &Sidebar::handleAbandonConfirmation));
 }
 

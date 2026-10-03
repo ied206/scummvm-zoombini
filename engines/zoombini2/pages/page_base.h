@@ -264,10 +264,10 @@ public:
 /**
  * Coordinates one screen-facing update, drawing, and input lifecycle.
  * The engine dispatches one regular page at a time. Modal dialogs derive from
- * this base but remain separately retained by the sidebar while preserving the
+ * this base but remain separately retained by the engine while preserving the
  * underlying dispatched page.
  */
-class PageBase : public PageEventHandler {
+class PageBase : public PageEventHandler, public Common::NonCopyable {
 public:
 	/** Bind this page to @p vm and record its @p pageCategory. */
 	PageBase(Zoombini2Engine *vm, PageCategory pageCategory);

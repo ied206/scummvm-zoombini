@@ -36,6 +36,13 @@
 namespace Zoombini2 {
 
 constexpr int SoundBuffer::kSampleSlotCount;
+constexpr const char *SoundManager::kInstalledMusicPrefix;
+constexpr const char *SoundManager::kMusicPrefix;
+constexpr const char *SoundManager::kFxPrefix;
+constexpr const char *SoundManager::kFxPathFormat;
+constexpr const char *SoundManager::kBlipPath;
+constexpr const char *SoundManager::kSoundsPrefix;
+constexpr const char *SoundManager::kDataPrefix;
 
 /** Convert stereo samples to one mono sample per source frame. */
 class SoundManager::MonoAudioStream : public Audio::AudioStream {
@@ -480,12 +487,12 @@ Common::Path SoundManager::resolveCompatibilityPath(const Common::Path &filename
 
 	// Some extracted-data layouts retain the numbered background tracks in the CD sound-effects directory.
 	const Common::String str = filename.toString('/');
-	const Common::String installedMusicPrefix("#sounds/music/");
+	const Common::String installedMusicPrefix(kInstalledMusicPrefix);
 	if (str.hasPrefix(installedMusicPrefix)) {
 		const Common::String basename = str.substr(installedMusicPrefix.size());
 		// Check if this is a numeric-prefix BB file (e.g. "01-BB01.wav")
 		if (basename.size() > 6 && basename[2] == '-' && basename[3] == 'B' && basename[4] == 'B') {
-			const Common::Path fxPath(Common::String::format("sounds/fx/%s", basename.c_str()));
+			const Common::Path fxPath(Common::String::format(kFxPathFormat, basename.c_str()));
 			if (_vm->hasResource(fxPath.toString('/')))
 				return fxPath;
 		}
@@ -498,14 +505,14 @@ SoundCategory SoundManager::classifySound(const Common::Path &filename) {
 	Common::String path = filename.toString('/');
 	if (!path.empty() && path[0] == '#')
 		path = path.substr(1);
-	else if (path.hasPrefixIgnoreCase("Data/"))
+	else if (path.hasPrefixIgnoreCase(kDataPrefix))
 		path = path.substr(5);
 	path.toLowercase();
-	if (path.hasPrefix("sounds/music/"))
+	if (path.hasPrefix(kMusicPrefix))
 		return SoundCategory::kMusic00;
-	if (path.hasPrefix("sounds/fx/") || path == "sounds/blip.wav")
+	if (path.hasPrefix(kFxPrefix) || path == kBlipPath)
 		return SoundCategory::kSFX01;
-	if (path.hasPrefix("sounds/"))
+	if (path.hasPrefix(kSoundsPrefix))
 		return SoundCategory::kSpeech02;
 	return SoundCategory::kSFX01;
 }

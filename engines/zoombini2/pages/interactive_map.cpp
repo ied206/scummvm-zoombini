@@ -140,7 +140,7 @@ void InteractiveMap::init() {
 	SoundManager *sm = _vm->getSoundManager();
 	GameState *gs = _vm->_state;
 	if (!isPracticeMode() && _vm->_isSavedGame)
-		_vm->writeGameSave(gs->_playerName);
+		_vm->writeGameSave(gs->getPlayerName());
 	_vm->_state->clearActiveZoombinis();
 	_vm->_isSavedGame = !isPracticeMode();
 	if (isPracticeMode()) {
@@ -318,12 +318,12 @@ bool InteractiveMap::practiceCandidateFitsPack(const Zoombini2Engine *vm, const 
 		const ZoombiniRunner *zoombini = vm->_state->_activeZoombinis[i];
 		for (int traitOrdinal = 0; traitOrdinal < ZmbTrait::kTraitKindCount; traitOrdinal++) {
 			const ZmbTrait::TraitKind traitIndex = static_cast<ZmbTrait::TraitKind>(traitOrdinal);
-			const byte value = zoombini->_traits.getValue(traitIndex);
+			const byte value = zoombini->getTraits().getValue(traitIndex);
 			if (value < 1 || ZmbTrait::kTraitValueCount < value)
 				return false;
 			counts[traitOrdinal][value] += 1;
 		}
-		if (zoombini->_traitHash == candidateHash)
+		if (zoombini->getTraitHash() == candidateHash)
 			matchingCombinations += 1;
 	}
 
@@ -355,15 +355,15 @@ void InteractiveMap::createPracticeParty(Zoombini2Engine *vm, PageId pageId, uin
 
 		ZoombiniRunner *zoombini = new ZoombiniRunner();
 		zoombini->setTraits(traits);
-		zoombini->_inputEnabled = 1;
-		zoombini->_puzzleStatus = 0;
-		zoombini->_animationCell = 33;
+		zoombini->setInputEnabled(true);
+		zoombini->setCanAdvanceFromPage(false);
+		zoombini->setAnimationCell(33);
 		vm->_state->_activeZoombinis.push_back(zoombini);
 	}
 
 	for (uint i = 0; i < vm->_state->_activeZoombinis.size(); i++) {
 		const Common::String name = GameState::generateZoombiniName(*vm->_rnd);
-		Common::strlcpy(vm->_state->_activeZoombinis[i]->_name, name.c_str(), sizeof(vm->_state->_activeZoombinis[i]->_name));
+		vm->_state->_activeZoombinis[i]->setName(name.c_str());
 	}
 }
 
@@ -437,7 +437,7 @@ void InteractiveMap::loadButtons() {
 		// Button 2 is always enabled for a saved game.
 		// Practice can switch back to the active game only after one exists.
 		if (i == 2 && isPracticeMode()) {
-			btn.enabled = gs && !gs->_playerName.empty();
+			btn.enabled = gs && !gs->getPlayerName().empty();
 		} else {
 			btn.enabled = true;
 		}
@@ -479,7 +479,7 @@ void InteractiveMap::computeStats() {
 	int rescue1StorageCount = 0;
 	int rescue2StorageCount = 0;
 
-	for (int i = 0; i < kStorageSize - kStorageCols; i++) {
+	for (int i = 0; i < GameState::kStorageSize - GameState::kStorageCols; i++) {
 		if (gs->_rescue1Storage[i] != nullptr)
 			rescue1StorageCount += 1;
 		if (gs->_rescue2Storage[i] != nullptr)
@@ -489,7 +489,7 @@ void InteractiveMap::computeStats() {
 	_stats[3] = gs->_completedZoombiniCount;
 	_stats[2] = rescue2StorageCount;
 	_stats[1] = rescue1StorageCount;
-	_stats[0] = kMaxCombinations - _stats[3] - _stats[2] - _stats[1];
+	_stats[0] = TraitComboTable::kZoombiniCombinationCount - _stats[3] - _stats[2] - _stats[1];
 }
 
 // ============================================================================
@@ -559,7 +559,7 @@ void InteractiveMap::onRenderContent(ManagedSurface32 *screen) {
 
 		if (_vm->_gfx->hasTextFont(Gfx::TextColor::kWhite03)) {
 			// Player name centered at Y=10, min X=240
-			const Common::String &name = gs->_playerName;
+			const Common::String &name = gs->getPlayerName();
 			int nameWidth = _vm->_gfx->getTextWidth(name, Gfx::TextColor::kWhite03);
 			int nameX = 400 - nameWidth / 2;
 			if (nameX < 240)
@@ -997,7 +997,7 @@ void InteractiveMap::applyVolumePanelVolumes(bool usePanelValues, bool persistCh
 }
 
 void InteractiveMap::requestQuitConfirmation() {
-	_vm->getMsgBoxDialog()->request(Common::Path(kQuitConfirmationPath),
+	_vm->requestMsgBox(Common::Path(kQuitConfirmationPath),
 									new Common::Callback<InteractiveMap, DialogMsgBoxButton>(this, &InteractiveMap::handleQuitConfirmation));
 }
 

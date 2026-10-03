@@ -30,13 +30,14 @@
 
 namespace Zoombini2 {
 
+constexpr const char *PuzzleChezNorf::kPuzzleName;
+constexpr const char *PuzzleChezNorf::kBackgroundPath;
 constexpr const char *PuzzleChezNorf::kFoodFormat;
 constexpr const char *PuzzleChezNorf::kFoodNames[9];
-constexpr const char *PuzzleChezNorf::kSymbolNames[3];
+constexpr const char *PuzzleChezNorf::kMemoSymbolNames[3];
 constexpr const char *PuzzleChezNorf::kPanelNames[3];
-constexpr const char *PuzzleChezNorf::kPlatePath;
-constexpr const char *PuzzleChezNorf::kSmallPlatePath;
-constexpr const char *PuzzleChezNorf::kMiniPlatePath;
+constexpr const char *PuzzleChezNorf::kMealTrayPath;
+constexpr const char *PuzzleChezNorf::kSmallMealTrayPath;
 constexpr const char *PuzzleChezNorf::kHighlightPath;
 constexpr const char *PuzzleChezNorf::kNorfPath;
 constexpr const char *PuzzleChezNorf::kCapPath;
@@ -56,11 +57,14 @@ constexpr Common::Point32 PuzzleChezNorf::kFoodOffsets[9];
 
 constexpr PuzzleChezNorf::Layout PuzzleChezNorf::kLayouts[12];
 
-PuzzleChezNorf::PuzzleChezNorf(Zoombini2Engine *vm) : PuzzleBase(vm, kPageChezNorf) {}
+PuzzleChezNorf::PuzzleChezNorf(Zoombini2Engine *vm) : PuzzleBase(vm, kPageChezNorf) {
+	_puzzleName = kPuzzleName;
+	_initialBackgroundPath = kBackgroundPath;
+}
 
 PuzzleChezNorf::~PuzzleChezNorf() {
 	clearSelection();
-	_vm->setHoverCursorActive(false);
+	_vm->setCursor(Zoombini2Engine::CursorType::kDefault);
 	delete _trayPath;
 	for (int motion = 0; motion < 7; motion++) {
 		delete _bodyAnimations[motion];
@@ -98,9 +102,9 @@ void PuzzleChezNorf::init() {
 		runner->setDefaultAnimation(_zoombiniAnimation);
 		runner->resetAnimation();
 		runner->setPosition(Common::Point32(100 + 50 * i, i == 0 ? 530 : 610));
-		runner->_inputEnabled = false;
-		runner->_hidden = i != 0;
-		runner->_puzzleStatus = 0;
+		runner->setInputEnabled(false);
+		runner->setHidden(i != 0);
+		runner->setCanAdvanceFromPage(false);
 	}
 	debug(1, "ChezNorf: level=%d layout=%d tables=%d", _level, _layout, _tableCount);
 	for (int i = 0; i < _tableCount; i++) {
@@ -140,10 +144,9 @@ void PuzzleChezNorf::loadResources() {
 	for (int i = 0; i < 9; i++)
 		gfx->loadPageRleBlock(Common::String::format(kFoodFormat, kFoodNames[i]));
 	for (int i = 0; i < 3; i++)
-		gfx->loadPageRleBlock(Common::String::format(kFoodFormat, kSymbolNames[i]));
+		gfx->loadPageRleBlock(Common::String::format(kFoodFormat, kMemoSymbolNames[i]));
 	gfx->loadPageRleBlock(Common::String::format(kFoodFormat, kPanelNames[_level - 1]));
-	gfx->loadPageRleBlock(_level == 1 ? kSmallPlatePath : kPlatePath);
-	gfx->loadPageRleBlock(kMiniPlatePath);
+	gfx->loadPageRleBlock(_level == 1 ? kSmallMealTrayPath : kMealTrayPath);
 	gfx->loadPageRleBlock(kHighlightPath);
 	gfx->loadPageRleBlock(kNorfPath);
 	static constexpr int kMotionResources[7] = {
@@ -221,7 +224,7 @@ int PuzzleChezNorf::foodAt(const Common::Point32 &pos) const {
 }
 
 int PuzzleChezNorf::trayAt(const Common::Point32 &pos) const {
-	const Size32 size = _vm->_gfx->getPageRleBlockSize(_level == 1 ? kSmallPlatePath : kPlatePath);
+	const Size32 size = _vm->_gfx->getPageRleBlockSize(_level == 1 ? kSmallMealTrayPath : kMealTrayPath);
 	if (!size.width || !size.height)
 		return -1;
 	for (int i = 0; i < _tableCount; i++) {
@@ -271,7 +274,7 @@ void PuzzleChezNorf::playClue(const Common::Path &path) {
 	if (SoundManager *sound = _vm->getSoundManager()) {
 		sound->unload(_clueSpeechSound);
 		_clueSpeechSound = sound->load(true, path, false);
-		sound->playWithVolume(_clueSpeechSound, sound->_volumeSpeech);
+		sound->playWithVolume(_clueSpeechSound, sound->getSpeechVolume());
 	}
 }
 
@@ -306,19 +309,31 @@ void PuzzleChezNorf::sayClue(int index) {
 void PuzzleChezNorf::clearSelection() {
 	_selectedFood = -1;
 	_selectedTray = -1;
-	_vm->setPageCursorSprite(nullptr);
+	_vm->setCursor(Zoombini2Engine::CursorType::kRestoreBase);
 }
 
 void PuzzleChezNorf::updateCursor() {
+	static constexpr Zoombini2Engine::CursorType kFoodCursorTypes[9] = {
+		Zoombini2Engine::CursorType::kMainDishSandwich,
+		Zoombini2Engine::CursorType::kMainDishFish,
+		Zoombini2Engine::CursorType::kMainDishSalad,
+		Zoombini2Engine::CursorType::kDrinkTea,
+		Zoombini2Engine::CursorType::kDrinkOrangeJuice,
+		Zoombini2Engine::CursorType::kDrinkMilk,
+		Zoombini2Engine::CursorType::kDessertFruitPie,
+		Zoombini2Engine::CursorType::kDessertWatermelon,
+		Zoombini2Engine::CursorType::kDessertIceCream
+	};
 	const bool available = _phase == kReady00 && !_departAfterSpeech;
 	const int tray = trayAt(_pointer);
-	_vm->setHoverCursorActive(available && (0 <= foodAt(_pointer) || 0 <= norfAt(_pointer) || (0 <= tray && mealComplete(_trays[tray]))));
+	const bool hover = available && (0 <= foodAt(_pointer) || 0 <= norfAt(_pointer) || (0 <= tray && mealComplete(_trays[tray])));
+	_vm->setCursor(hover ? Zoombini2Engine::CursorType::kInteractive : Zoombini2Engine::CursorType::kDefault);
 	if (0 <= _selectedFood)
-		_vm->setPageCursorSprite(_vm->_gfx->loadPageRleBlock(Common::String::format(kFoodFormat, kFoodNames[_selectedFood])));
+		_vm->setCursor(kFoodCursorTypes[_selectedFood]);
 	else if (0 <= _selectedTray && _phase == kReady00)
-		_vm->setPageCursorSprite(_vm->_gfx->loadPageRleBlock(kMiniPlatePath));
+		_vm->setCursor(Zoombini2Engine::CursorType::kMealTray);
 	else
-		_vm->setPageCursorSprite(nullptr);
+		_vm->setCursor(Zoombini2Engine::CursorType::kRestoreBase);
 }
 
 EventHandleResult PuzzleChezNorf::onMouseMove(const Common::Point &pos) {
@@ -338,7 +353,7 @@ EventHandleResult PuzzleChezNorf::onLButtonUp(const Common::Point &pos) {
 		_click = _pointer;
 		_clickPending = true;
 		if (canSubmitTo(norfAt(_pointer)))
-			_vm->setPageCursorSprite(nullptr);
+			_vm->setCursor(Zoombini2Engine::CursorType::kRestoreBase);
 	}
 	_buttonArmed = false;
 	return EventHandleResult::kPassthrough;
@@ -494,7 +509,7 @@ void PuzzleChezNorf::submit(int table) {
 		_trayAvailable[_selectedTray] = false;
 	playSound(0);
 	_phase = kThrow01;
-	_vm->setPageCursorSprite(nullptr);
+	_vm->setCursor(Zoombini2Engine::CursorType::kRestoreBase);
 	debug(1, "ChezNorf: submit=%d source=%d norf=%d meal=%d,%d,%d", _submissions, _selectedTray, table,
 		  _flyingMeal.food[0], _flyingMeal.food[1], _flyingMeal.food[2]);
 }
@@ -537,8 +552,8 @@ void PuzzleChezNorf::releaseCohort() {
 		if (!movement)
 			error("ChezNorf: required exit path is unavailable: %s", path.toString().c_str());
 		ZoombiniRunner *runner = _puzzleZoombinis[index];
-		runner->_hidden = false;
-		runner->_puzzleStatus = 1;
+		runner->setHidden(false);
+		runner->setCanAdvanceFromPage(true);
 		runner->startMovement(movement, now);
 		runner->startDirectionTrackedAnimation(now);
 		_remaining -= 1;
@@ -558,7 +573,7 @@ void PuzzleChezNorf::dismissWaiter() {
 	if (_puzzleZoombinis.empty())
 		return;
 	ZoombiniRunner *runner = _puzzleZoombinis[0];
-	const Common::Point32 start = runner->_screenPos;
+	const Common::Point32 start = runner->getScreenPosition();
 	const int dy = (630 - start.y) / 3;
 	PathObject *path = new PathObject(_vm);
 	path->appendSegment(start, Common::Point32(start.x, start.y + dy), Common::Point32(start.x, 630 - dy), Common::Point32(start.x, 630), 2, 0);
@@ -596,12 +611,12 @@ void PuzzleChezNorf::onActorsRendered() {
 	if (_phase == kRelease05 || _phase == kDismiss06) {
 		bool moving = false;
 		for (ZoombiniRunner *runner : _puzzleZoombinis) {
-			if (!runner->_movementPath)
+			if (!runner->hasMovementPath())
 				continue;
-			if (runner->_movementPath->finished) {
+			if (runner->isMovementFinished()) {
 				runner->clearMovement();
 				runner->resetAnimation();
-				runner->_hidden = true;
+				runner->setHidden(true);
 			} else {
 				runner->advanceMovement(now, Common::Point32(0, _phase == kRelease05 ? -15 : 0));
 				moving = true;
@@ -634,7 +649,7 @@ void PuzzleChezNorf::onActorsRendered() {
 				_phase = kReady00;
 		}
 		if (_trayPath) {
-			if (_trayPath->finished) {
+			if (_trayPath->isFinished()) {
 				delete _trayPath;
 				_trayPath = nullptr;
 				if (_phase == kThrow01) {
@@ -656,7 +671,7 @@ void PuzzleChezNorf::onActorsRendered() {
 }
 
 void PuzzleChezNorf::drawTray(ManagedSurface32 *screen, const Common::Point32 &pos, const Meal &meal) {
-	_vm->_gfx->drawPageRleBlock(screen, _level == 1 ? kSmallPlatePath : kPlatePath, pos);
+	_vm->_gfx->drawPageRleBlock(screen, _level == 1 ? kSmallMealTrayPath : kMealTrayPath, pos);
 	static constexpr int kDrawOrder[3] = {
 		1,
 		0,
@@ -684,7 +699,7 @@ void PuzzleChezNorf::onRenderContent(ManagedSurface32 *screen) {
 			for (int column = 0; column < _tableCount; column++) {
 				const int mark = _notes[section][row][column];
 				if (0 < mark)
-					_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kFoodFormat, kSymbolNames[mark - 1]),
+					_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kFoodFormat, kMemoSymbolNames[mark - 1]),
 												Common::Point32(51 + 14 * column, kNoteTop[section] + 15 * row));
 			}
 		}
@@ -774,13 +789,18 @@ bool PuzzleChezNorf::blocksSidebarInteraction() const {
 }
 
 bool PuzzleChezNorf::canUseGoButton() const {
-	return _canDepart && !blocksSidebarInteraction();
+	return (_canDepart || _vm->_zoombiniWalkingFlag) && !blocksSidebarInteraction();
 }
 
 bool PuzzleChezNorf::onGoButtonPressed() {
 	if (_departAfterSpeech)
 		return false;
-	if (_vm->_isSavedGame && 4 <= _remaining) {
+	int waiting = 0;
+	for (const ZoombiniRunner *runner : _puzzleZoombinis) {
+		if (!runner->canAdvanceFromPage())
+			waiting += 1;
+	}
+	if (_vm->_isSavedGame && 4 <= waiting) {
 		queueSpeech(Common::Path(kRetreatSpeechPath));
 		_departAfterSpeech = true;
 		return false;
@@ -849,21 +869,6 @@ Common::String PuzzleChezNorf::debugGetChanceDetails() const {
 			trays += 1;
 	return Common::String::format("Tray positions: %d; spare trays: %d; waiting Zoombinis: %d. Setting chances also synchronizes tray availability.\n",
 								  trays, MAX(0, _traySupply - 1), _remaining);
-}
-
-void PuzzleChezNorf::applyDebugPuzzleCompletion() {
-	_remaining = 0;
-	_phase = kFinished07;
-	_canDepart = true;
-	clearSelection();
-	delete _trayPath;
-	_trayPath = nullptr;
-	for (AnimationRunner *runner : _bodyRunners)
-		runner->stop();
-	for (int i = 0; i < _tableCount; i++) {
-		for (AnimationRunner *runner : _capRunners[i])
-			runner->stop();
-	}
 }
 
 } // End of namespace Zoombini2

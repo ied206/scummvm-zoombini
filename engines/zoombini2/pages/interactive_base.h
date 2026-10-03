@@ -26,8 +26,6 @@
 
 namespace Zoombini2 {
 
-class DialogBase;
-class DialogHelp;
 enum class DialogMsgBoxButton;
 
 /** Interactive screens, including menus, maps, shelters, and puzzles. */
@@ -48,34 +46,26 @@ protected:
  *
  * The group uses the current pointer position for normal hover and the
  * position paired with a pending release for that frame's hit test.
- * It also retains the help overlay, per-frame hover results, and saved screen
- * region needed to draw those controls. Map-return confirmation uses the
+ * It retains per-frame hover results and the saved screen region needed to
+ * draw those controls. Help and Map confirmation use the
  * shared engine confirmation dialog.
  */
-class Sidebar : public PageEventHandler {
+class Sidebar : public PageEventHandler, public Common::NonCopyable {
 public:
 	/** Bind sidebar policy and resources to @p vm. */
 	explicit Sidebar(Zoombini2Engine *vm);
-	/** Release help state and the saved background; button sprites remain in the graphics shared cache. */
+	/** Release the saved background; button sprites remain in the graphics shared cache. */
 	~Sidebar();
 	/** Poll input, consume one release, and paint visible controls or their active dialog. */
 	void drawAndHandleInput(ManagedSurface32 *screen, bool inputAllowed);
-	/** Arm a sidebar control release or route a press to the active Help overlay. */
+	/** Arm a sidebar control release. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
-	/** Queue a sidebar control release or route it to the active Help overlay. */
+	/** Queue a sidebar control release. */
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
-	/** Preserve normal event routing while the per-frame draw pass updates sidebar hover state. */
-	EventHandleResult onMouseMove(const Common::Point &pos) override;
-	/** Route key presses to the active Help overlay. */
-	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
-	/** Route key releases to the active Help overlay when one is present. */
-	EventHandleResult onKeyUp(const Common::KeyState &key) override;
 	/** Return whether the active page exposes the sidebar. */
 	bool shouldShow() const;
-	/** Return whether the help overlay currently handles input exclusively. */
-	bool hasActiveDialog() const;
-	/** Return the help overlay managed by the sidebar. */
-	DialogHelp *getHelpScreen() { return _helpScreen; }
+	/** Paint controls above the active Help dialog without accepting input. */
+	void drawOverDialog(ManagedSurface32 *screen);
 	/** Restart the Go-button attention blink with the original toggle count and deadline. */
 	void restartGoBlink();
 
@@ -101,9 +91,7 @@ private:
 	/** Bit-block message shown when returning to the map requires confirmation to abandon gameplay. */
 	static constexpr const char *kAbandonConfirmationPath = "bmp/menu/Quit_panel_text_abandon";
 
-	/** Return the active modal overlay, or nullptr. */
-	DialogBase *getActiveDialog() const;
-	/** Open or close the help overlay. */
+	/** Open the help overlay. */
 	void onHelpClick();
 	/** Request a safe return to the map. */
 	void onMapClick();
@@ -132,8 +120,6 @@ private:
 
 	/** Borrowed engine interface used by these controls. */
 	Zoombini2Engine *_vm;
-	/** Help overlay managed by the sidebar. */
-	DialogHelp *_helpScreen = nullptr;
 
 	/** Shared Help click sound registered with the sound manager. */
 	int _helpClickSoundId = -1;

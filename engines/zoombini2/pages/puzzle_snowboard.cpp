@@ -32,6 +32,8 @@
 
 namespace Zoombini2 {
 
+constexpr const char *PuzzleSnowboard::kPuzzleName;
+constexpr const char *PuzzleSnowboard::kBackgroundPath;
 constexpr const char *PuzzleSnowboard::kMusicPath;
 constexpr const char *PuzzleSnowboard::kTraitFormat;
 constexpr const char *PuzzleSnowboard::kPatFormat;
@@ -68,6 +70,8 @@ constexpr Common::Point32 PuzzleSnowboard::kEasyHints[3];
 constexpr Common::Point32 PuzzleSnowboard::kHardHints[4];
 
 PuzzleSnowboard::PuzzleSnowboard(Zoombini2Engine *vm) : PuzzleBase(vm, kPageSnowboard) {
+	_puzzleName = kPuzzleName;
+	_initialBackgroundPath = kBackgroundPath;
 }
 
 PuzzleSnowboard::~PuzzleSnowboard() {
@@ -129,7 +133,7 @@ byte PuzzleSnowboard::pickPresentValue(ZmbTrait::TraitKind traitIndex) {
 	for (;;) {
 		const byte value = static_cast<byte>(_vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
 		for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
-			if (_puzzleZoombinis[index] && _puzzleZoombinis[index]->_traits.getValue(traitIndex) == value)
+			if (_puzzleZoombinis[index] && _puzzleZoombinis[index]->getTraits().getValue(traitIndex) == value)
 				return value;
 		}
 	}
@@ -139,7 +143,7 @@ int PuzzleSnowboard::classifyZoombini(const ZoombiniRunner *zoombini) const {
 	int nodeIndex = 0;
 	while (nodeIndex < kRuleCount) {
 		const TreeNode &node = _tree[nodeIndex];
-		const byte value = zoombini->_traits.getValue(node.traitIndex);
+		const byte value = zoombini->getTraits().getValue(node.traitIndex);
 		const bool matches = value == node.primaryValue || (_puzzleLevel == 3 && value == node.alternateValue);
 		nodeIndex = 2 * nodeIndex + (matches ? 1 : 2);
 	}
@@ -151,7 +155,7 @@ void PuzzleSnowboard::countLanes(byte (&counts)[kLaneCount]) const {
 		counts[lane] = 0;
 	for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
 		const ZoombiniRunner *zoombini = _puzzleZoombinis[index];
-		if (zoombini && zoombini->_inputEnabled)
+		if (zoombini && zoombini->isInputEnabled())
 			counts[classifyZoombini(zoombini)] += 1;
 	}
 }
@@ -219,9 +223,9 @@ void PuzzleSnowboard::init() {
 			continue;
 		zoombini->setDefaultAnimation(_zoombiniAnimation);
 		zoombini->setPosition(kStartPositions[index % 8]);
-		zoombini->_inputEnabled = true;
-		zoombini->_hidden = false;
-		zoombini->_puzzleStatus = 0;
+		zoombini->setInputEnabled(true);
+		zoombini->setHidden(false);
+		zoombini->setCanAdvanceFromPage(false);
 	}
 	generateTree();
 	ZmbDropTarget boardTarget;
@@ -241,7 +245,7 @@ void PuzzleSnowboard::captureZoombini(int zoombiniIndex) {
 	if (_finished || _activeRunnerIndex != -1 || zoombiniIndex < 0 || _puzzleZoombinis.size() <= static_cast<uint>(zoombiniIndex))
 		return;
 	ZoombiniRunner *zoombini = _puzzleZoombinis[zoombiniIndex];
-	if (!zoombini || !zoombini->_inputEnabled)
+	if (!zoombini || !zoombini->isInputEnabled())
 		return;
 	_targetRouteCode = classifyZoombini(zoombini) + kRuleCount;
 	const Common::Path path(Common::String::format(kPatFormat, _targetRouteCode));
@@ -258,12 +262,12 @@ void PuzzleSnowboard::captureZoombini(int zoombiniIndex) {
 	_boardFacingDelay = 100;
 	for (int lane = 0; lane < kLaneCount; lane++)
 		_obstacleHit[lane] = false;
-	zoombini->_inputEnabled = false;
+	zoombini->setInputEnabled(false);
 	zoombini->startMovement(ridePath, now);
 	zoombini->resetAnimation();
 	bool hasSelectableRider = false;
 	for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
-		if (_puzzleZoombinis[index] && _puzzleZoombinis[index]->_inputEnabled) {
+		if (_puzzleZoombinis[index] && _puzzleZoombinis[index]->isInputEnabled()) {
 			hasSelectableRider = true;
 			break;
 		}
@@ -273,7 +277,7 @@ void PuzzleSnowboard::captureZoombini(int zoombiniIndex) {
 		_boardCoverActive = true;
 	}
 	if (SoundManager *sound = _vm->getSoundManager())
-		sound->playWithVolume(_rideSound, sound->_volumeSFX);
+		sound->playWithVolume(_rideSound, sound->getSfxVolume());
 }
 
 void PuzzleSnowboard::chooseOpenLane() {
@@ -300,12 +304,12 @@ void PuzzleSnowboard::chooseOpenLane() {
 			_obstacleHiding[lane] = false;
 			_obstacleRevealStart[lane] = now;
 			if (SoundManager *sound = _vm->getSoundManager())
-				sound->playWithVolume(_obstacleRevealSound, sound->_volumeSFX);
+				sound->playWithVolume(_obstacleRevealSound, sound->getSfxVolume());
 		} else {
 			_obstacleHiding[lane] = true;
 			_obstacleHideStart[lane] = now;
 			if (SoundManager *sound = _vm->getSoundManager())
-				sound->playWithVolume(_obstacleHideSound, sound->_volumeSFX);
+				sound->playWithVolume(_obstacleHideSound, sound->getSfxVolume());
 		}
 	}
 	_obstacleChangePending = false;
@@ -318,13 +322,13 @@ void PuzzleSnowboard::checkObstacleCollision(ZoombiniRunner *zoombini) {
 		if (!_obstacleVisible[lane] || _obstacleHit[lane])
 			continue;
 		const Common::Point32 &position = kObstaclePositions[lane];
-		if (position.x < zoombini->_screenPos.x && zoombini->_screenPos.x < position.x + 50 &&
-			position.y < zoombini->_screenPos.y && zoombini->_screenPos.y < position.y + 50) {
+		if (position.x < zoombini->getScreenPosition().x && zoombini->getScreenPosition().x < position.x + 50 &&
+			position.y < zoombini->getScreenPosition().y && zoombini->getScreenPosition().y < position.y + 50) {
 			_obstacleHit[lane] = true;
 			_obstacleHitAnimating[lane] = true;
 			_obstacleHitStart[lane] = _vm->getGameTickCount();
 			if (SoundManager *sound = _vm->getSoundManager())
-				sound->playWithVolume(_obstacleHitSound, sound->_volumeSFX);
+				sound->playWithVolume(_obstacleHitSound, sound->getSfxVolume());
 			const int variant = _vm->_rnd->getRandomNumber(2) + 1;
 			Common::String speechPath;
 			if (_collisionCount == _collisionQuota)
@@ -370,7 +374,7 @@ void PuzzleSnowboard::startExitPath(ZoombiniRunner *zoombini) {
 	const uint32 now = _vm->getGameTickCount();
 	if (SoundManager *sound = _vm->getSoundManager()) {
 		sound->stop(_rideSound);
-		sound->playWithVolume(_boardReadySound, sound->_volumeSFX);
+		sound->playWithVolume(_boardReadySound, sound->getSfxVolume());
 	}
 	_generatorAnimationStart = now;
 	_generatorActive = true;
@@ -378,7 +382,7 @@ void PuzzleSnowboard::startExitPath(ZoombiniRunner *zoombini) {
 		if (_usedExitPoint[index] || kExitPoints[index].routeCode != _targetRouteCode)
 			continue;
 		_usedExitPoint[index] = true;
-		const Common::Point32 start = zoombini->_screenPos;
+		const Common::Point32 start = zoombini->getScreenPosition();
 		const Common::Point32 end(kExitPoints[index].x, kExitPoints[index].y);
 		const int dx = end.x - start.x;
 		const int dy = end.y - start.y;
@@ -398,8 +402,8 @@ void PuzzleSnowboard::finishRide(ZoombiniRunner *zoombini) {
 	zoombini->clearMovement();
 	zoombini->resetAnimation();
 	_vm->_zoombiniWalkingFlag = true;
-	zoombini->_puzzleStatus = 1;
-	zoombini->_inputEnabled = false;
+	zoombini->setCanAdvanceFromPage(true);
+	zoombini->setInputEnabled(false);
 	_activeRunnerIndex = -1;
 	_onExitPath = false;
 	_ridesCompleted += 1;
@@ -408,9 +412,9 @@ void PuzzleSnowboard::finishRide(ZoombiniRunner *zoombini) {
 	for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
 		if (!_puzzleZoombinis[index])
 			continue;
-		if (_puzzleZoombinis[index]->_puzzleStatus == 0)
+		if (!_puzzleZoombinis[index]->canAdvanceFromPage())
 			remaining += 1;
-		else if (_puzzleZoombinis[index]->_puzzleStatus == 1)
+		else if (_puzzleZoombinis[index]->canAdvanceFromPage())
 			successful += 1;
 	}
 	if (remaining == 0 || _collisionQuota < _collisionCount) {
@@ -460,7 +464,7 @@ void PuzzleSnowboard::onUpdate() {
 		return;
 	}
 	ZoombiniRunner *zoombini = _puzzleZoombinis[_activeRunnerIndex];
-	if (!zoombini || !zoombini->_movementPath)
+	if (!zoombini || !zoombini->hasMovementPath())
 		return;
 	const bool moving = zoombini->advanceMovement(now, _onExitPath ? Common::Point32() : Common::Point32(20, 30));
 	if (!_onExitPath) {
@@ -496,13 +500,14 @@ void PuzzleSnowboard::updateBoardFacing(ZoombiniRunner *zoombini) {
 		_boardFacingDelay += 1;
 		return;
 	}
-	const int deltaX = zoombini->_previousScreenPos.x - zoombini->_screenPos.x;
-	const int deltaY = zoombini->_previousScreenPos.y - zoombini->_screenPos.y;
+	const Common::Point32 previousScreenPosition = zoombini->getPreviousScreenPosition();
+	const int deltaX = previousScreenPosition.x - zoombini->getScreenPosition().x;
+	const int deltaY = previousScreenPosition.y - zoombini->getScreenPosition().y;
 	const double distance = sqrt(static_cast<double>(deltaX) * deltaX + static_cast<double>(deltaY) * deltaY);
 	if (distance == 0.0)
 		return;
 	int direction = static_cast<int>(acos(CLIP(static_cast<double>(deltaX) / distance, -1.0, 1.0)) * 180.0 * 0.31831926) / 20;
-	if (zoombini->_screenPos.y < zoombini->_previousScreenPos.y)
+	if (zoombini->getScreenPosition().y < previousScreenPosition.y)
 		direction = -direction;
 	if (_boardFacingSector < direction)
 		_boardFacingSector += 1;
@@ -520,7 +525,7 @@ void PuzzleSnowboard::updateBoardFacing(ZoombiniRunner *zoombini) {
 		36,
 		66,
 	};
-	zoombini->_animationCell = kFacingCells[_boardFacingSector];
+	zoombini->setAnimationCell(kFacingCells[_boardFacingSector]);
 	_boardFacingDelay = 0;
 }
 
@@ -611,7 +616,7 @@ void PuzzleSnowboard::onRenderActors(ManagedSurface32 *screen) {
 		const ZoombiniRunner *zoombini = _puzzleZoombinis[_activeRunnerIndex];
 		if (zoombini) {
 			_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kSurfFormat, kSurfIds[8 - _boardFacingSector]),
-										Common::Point32(zoombini->_screenPos.x - 5, zoombini->_screenPos.y + 10));
+										Common::Point32(zoombini->getScreenPosition().x - 5, zoombini->getScreenPosition().y + 10));
 		}
 	}
 	renderZoombinis(screen);
@@ -628,7 +633,7 @@ bool PuzzleSnowboard::onGoButtonPressed() {
 		return false;
 	int freeCount = 0;
 	for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
-		if (_puzzleZoombinis[index] && _puzzleZoombinis[index]->_puzzleStatus == 0)
+		if (_puzzleZoombinis[index] && !_puzzleZoombinis[index]->canAdvanceFromPage())
 			freeCount += 1;
 	}
 	if (freeCount == 0) {
@@ -674,7 +679,7 @@ Common::String PuzzleSnowboard::debugGetAnswer() const {
 		bool found = false;
 		for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
 			const ZoombiniRunner *actor = _puzzleZoombinis[i];
-			if (!actor->_inputEnabled)
+			if (!actor->isInputEnabled())
 				continue;
 			const int lane = classifyZoombini(actor);
 			if (_obstacleVisible[lane] != static_cast<bool>(blocked))

@@ -1610,6 +1610,8 @@ bool MysticMarshGrid::findAnswer(Common::Array<AnswerLaunch> &answer, bool &from
 
 constexpr byte MysticMarshGrid::kLayouts[9][kRows][kColumns];
 
+constexpr const char *PuzzleMysticMarsh::kPuzzleName;
+constexpr const char *PuzzleMysticMarsh::kBackgroundPath;
 constexpr const char *PuzzleMysticMarsh::kMusicPath;
 constexpr const char *PuzzleMysticMarsh::kBackgroundFormat;
 constexpr const char *PuzzleMysticMarsh::kAreaFormat;
@@ -1628,6 +1630,8 @@ constexpr const char *PuzzleMysticMarsh::kCaveSpeech;
 constexpr const char *PuzzleMysticMarsh::kCompleteSpeech;
 
 PuzzleMysticMarsh::PuzzleMysticMarsh(Zoombini2Engine *vm) : PuzzleBase(vm, kPageMysticMarsh) {
+	_puzzleName = kPuzzleName;
+	_initialBackgroundPath = kBackgroundPath;
 }
 
 PuzzleMysticMarsh::~PuzzleMysticMarsh() {
@@ -1656,7 +1660,7 @@ void PuzzleMysticMarsh::init() {
 	_level4Background = nullptr;
 	Common::Array<ZmbTrait> party;
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++)
-		party.push_back(_puzzleZoombinis[i]->_traits);
+		party.push_back(_puzzleZoombinis[i]->getTraits());
 	_grid.init(party, CLIP(_puzzleLevel, 1, 4), *_vm->_rnd);
 	for (int i = 0; i < MysticMarshGrid::kCellCount; i++)
 		_drawCells[i] = _grid.cell(i);
@@ -1676,10 +1680,10 @@ void PuzzleMysticMarsh::init() {
 		zoombini->clearMovement();
 		zoombini->setDefaultAnimation(_zoombiniAnimation);
 		zoombini->setPosition(kStartingPositions[_backgroundIndex - 1][i % 8]);
-		zoombini->_inputEnabled = true;
-		zoombini->_puzzleStatus = 0;
-		zoombini->_hidden = false;
-		zoombini->_dragging = false;
+		zoombini->setInputEnabled(true);
+		zoombini->setCanAdvanceFromPage(false);
+		zoombini->setHidden(false);
+		zoombini->setDragging(false);
 	}
 	for (int i = 0; i < MysticMarshGrid::kCellCount; i++) {
 		const int type = _grid.cell(i).type;
@@ -1751,7 +1755,7 @@ void PuzzleMysticMarsh::placeZoombini(int slotIndex, int zoombiniIndex) {
 	_placingSlot = slotIndex;
 	_placementStart = now;
 	ZoombiniRunner *zoombini = _puzzleZoombinis[zoombiniIndex];
-	zoombini->_inputEnabled = false;
+	zoombini->setInputEnabled(false);
 	const Common::Point32 &position = _slots[slotIndex].position;
 	zoombini->setPosition(Common::Point32(position.x + 10, position.y + 30));
 	playSfx(3);
@@ -1760,7 +1764,7 @@ void PuzzleMysticMarsh::placeZoombini(int slotIndex, int zoombiniIndex) {
 void PuzzleMysticMarsh::playSfx(int index) {
 	SoundManager *sound = _vm->getSoundManager();
 	if (sound && 0 <= _sounds[index])
-		sound->playWithVolume(_sounds[index], sound->_volumeSFX);
+		sound->playWithVolume(_sounds[index], sound->getSfxVolume());
 }
 
 void PuzzleMysticMarsh::freeZoombini(int index, uint32 now) {
@@ -1771,11 +1775,11 @@ void PuzzleMysticMarsh::freeZoombini(int index, uint32 now) {
 	bubble.path = nullptr;
 	bubble.active = false;
 	ZoombiniRunner *zoombini = _puzzleZoombinis[index];
-	zoombini->_inputEnabled = false;
-	zoombini->_puzzleStatus = 1;
+	zoombini->setInputEnabled(false);
+	zoombini->setCanAdvanceFromPage(true);
 	_vm->_zoombiniWalkingFlag = true;
 	zoombini->setActiveAnimation(_zoombiniAnimation);
-	zoombini->startMovement(createPath(zoombini->_screenPos, kExitPositions[_backgroundIndex - 1][_freed % 8], 7), now);
+	zoombini->startMovement(createPath(zoombini->getScreenPosition(), kExitPositions[_backgroundIndex - 1][_freed % 8], 7), now);
 	zoombini->startDirectionTrackedAnimation(now);
 	_freed += 1;
 	playSfx(4);
@@ -1795,8 +1799,8 @@ void PuzzleMysticMarsh::loseZoombini(int index, bool whirlpool, uint32 now) {
 	delete bubble.path;
 	bubble.path = nullptr;
 	bubble.active = false;
-	_puzzleZoombinis[index]->_hidden = true;
-	_puzzleZoombinis[index]->_inputEnabled = false;
+	_puzzleZoombinis[index]->setHidden(true);
+	_puzzleZoombinis[index]->setInputEnabled(false);
 	if (whirlpool)
 		playSfx(8);
 }
@@ -1852,12 +1856,17 @@ void PuzzleMysticMarsh::onUpdate() {
 	}
 	bool available = false;
 	int resolved = 0;
+	int successful = 0;
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
 		ZoombiniRunner *zoombini = _puzzleZoombinis[i];
-		available = available || zoombini->_inputEnabled;
-		if (zoombini->_puzzleStatus == 1 || zoombini->_hidden)
+		available = available || zoombini->isInputEnabled();
+		if (zoombini->canAdvanceFromPage()) {
 			resolved += 1;
-		if (zoombini->_movementPath && !zoombini->advanceMovement(now)) {
+			successful += 1;
+		}
+		if (zoombini->isHidden())
+			resolved += 1;
+		if (zoombini->hasMovementPath() && !zoombini->advanceMovement(now)) {
 			zoombini->clearMovement();
 			zoombini->resetAnimation();
 		}
@@ -1866,10 +1875,10 @@ void PuzzleMysticMarsh::onUpdate() {
 	if (!_finished && resolved == static_cast<int>(_puzzleZoombinis.size())) {
 		_finished = true;
 		_vm->restartGoBlink();
-		if (0 < _freed)
+		if (0 < successful)
 			enqueueSpeech(kCompleteSpeech);
 	}
-	if (!available && _vm->_zoombiniWalkingFlag && 0 < _freed) {
+	if (!available && _vm->_zoombiniWalkingFlag) {
 		for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
 			ZoombiniRunner *zoombini = _puzzleZoombinis[i];
 			zoombini->tryStartCelebrationAnimation(_celebrateAnimation, *_vm->_rnd, now, _vm->getFrameDeltaMs(), _vm->getLogicPacingHz());
@@ -1884,7 +1893,9 @@ void PuzzleMysticMarsh::onUpdate() {
 			_puzzleZoombinis[_placingZoombini]->startAnimation(_floatAnimation, 33, now);
 			_placingZoombini = -1;
 		} else {
-			_puzzleZoombinis[_placingZoombini]->_screenPos.y -= (now - _lastTick) / 30;
+			ZoombiniRunner *zoombini = _puzzleZoombinis[_placingZoombini];
+			const Common::Point32 position = zoombini->getScreenPosition();
+			zoombini->setScreenPositionWithoutTracking(Common::Point32(position.x, position.y - (now - _lastTick) / 30));
 		}
 	}
 	bool moving = false;
@@ -1898,7 +1909,7 @@ void PuzzleMysticMarsh::onUpdate() {
 			delete bubble.path;
 			bubble.path = nullptr;
 		}
-		_puzzleZoombinis[i]->_screenPos = Common::Point32(bubble.position.x + 9, bubble.position.y + 10);
+		_puzzleZoombinis[i]->setScreenPositionWithoutTracking(Common::Point32(bubble.position.x + 9, bubble.position.y + 10));
 	}
 	if (!moving && _placingZoombini == -1 && !_finished)
 		advanceGrid(now);
@@ -2335,7 +2346,7 @@ bool PuzzleMysticMarsh::onGoButtonPressed() {
 		return true;
 	int unresolved = 0;
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
-		if (_puzzleZoombinis[i]->_puzzleStatus == 0)
+		if (!_puzzleZoombinis[i]->canAdvanceFromPage())
 			unresolved += 1;
 	}
 	if (4 <= unresolved)
@@ -2352,25 +2363,6 @@ bool PuzzleMysticMarsh::onGoButtonPressed() {
 
 bool PuzzleMysticMarsh::canUseGoButton() const {
 	return _vm->_zoombiniWalkingFlag;
-}
-
-void PuzzleMysticMarsh::applyDebugPuzzleCompletion() {
-	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
-		ZoombiniRunner *zoombini = _puzzleZoombinis[i];
-		zoombini->clearMovement();
-		zoombini->_puzzleStatus = 1;
-		zoombini->_hidden = false;
-		zoombini->_inputEnabled = false;
-		zoombini->setDefaultAnimation(_zoombiniAnimation);
-		zoombini->setPosition(kExitPositions[_backgroundIndex - 1][i % 8]);
-		delete _bubbles[i].path;
-		_bubbles[i].path = nullptr;
-		_bubbles[i].active = false;
-	}
-	_placingZoombini = -1;
-	_finished = true;
-	_freed = _puzzleZoombinis.size();
-	_vm->_zoombiniWalkingFlag = !_puzzleZoombinis.empty();
 }
 
 Common::String PuzzleMysticMarsh::debugGetAnswer() const {
@@ -2403,7 +2395,7 @@ Common::String PuzzleMysticMarsh::debugGetChanceDetails() const {
 	int available = 0;
 	int active = 0;
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
-		if (_puzzleZoombinis[i]->_inputEnabled)
+		if (_puzzleZoombinis[i]->isInputEnabled())
 			available += 1;
 		if (_bubbles[i].active)
 			active += 1;

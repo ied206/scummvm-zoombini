@@ -26,6 +26,8 @@
 
 namespace Zoombini2 {
 
+constexpr const char *PuzzleWaterslide::kPuzzleName;
+constexpr const char *PuzzleWaterslide::kBackgroundPath;
 constexpr const char *PuzzleWaterslide::kMusicPath;
 constexpr const char *PuzzleWaterslide::kTraitFormat;
 constexpr const char *PuzzleWaterslide::kHorizontalFormat;
@@ -57,7 +59,10 @@ constexpr Common::Point32 PuzzleWaterslide::kWaitingPositions[16];
 constexpr int PuzzleWaterslide::kNeighbors[16][5];
 constexpr PuzzleWaterslide::GraphPlacement PuzzleWaterslide::kGraphPlacements[26];
 
-PuzzleWaterslide::PuzzleWaterslide(Zoombini2Engine *vm) : PuzzleBase(vm, kPageWaterslide) {}
+PuzzleWaterslide::PuzzleWaterslide(Zoombini2Engine *vm) : PuzzleBase(vm, kPageWaterslide) {
+	_puzzleName = kPuzzleName;
+	_initialBackgroundPath = kBackgroundPath;
+}
 
 PuzzleWaterslide::~PuzzleWaterslide() {
 	delete _valveRunner;
@@ -111,9 +116,9 @@ void PuzzleWaterslide::init() {
 		actor->setDefaultAnimation(_zoombiniAnimation);
 		actor->resetAnimation();
 		actor->setPosition(kWaitingPositions[i]);
-		actor->_inputEnabled = true;
-		actor->_puzzleStatus = 0;
-		actor->_hidden = false;
+		actor->setInputEnabled(true);
+		actor->setCanAdvanceFromPage(false);
+		actor->setHidden(false);
 	}
 	startPageMusic(Common::Path(kMusicPath));
 	if (_vm->_isSavedGame)
@@ -133,12 +138,12 @@ void PuzzleWaterslide::createDemoParty() {
 		const byte feet = static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1);
 		ZoombiniRunner *actor = new ZoombiniRunner();
 		actor->setTraits(ZmbTrait(feet, nose, hair, eyes));
-		actor->_animationCell = 33;
+		actor->setAnimationCell(33);
 		_vm->_state->_activeZoombinis.push_back(actor);
 	}
 	for (ZoombiniRunner *actor : _vm->_state->_activeZoombinis) {
 		const Common::String name = GameState::generateZoombiniName(*_vm->_rnd);
-		Common::strlcpy(actor->_name, name.c_str(), sizeof(actor->_name));
+		actor->setName(name.c_str());
 	}
 }
 
@@ -231,7 +236,7 @@ void PuzzleWaterslide::loadResources() {
 }
 
 int PuzzleWaterslide::trait(int generatedIndex, int axis) const {
-	return _puzzleZoombinis[_generationOrder[generatedIndex]]->_traits.getValue(static_cast<ZmbTrait::TraitKind>(axis));
+	return _puzzleZoombinis[_generationOrder[generatedIndex]]->getTraits().getValue(static_cast<ZmbTrait::TraitKind>(axis));
 }
 
 int PuzzleWaterslide::sharedAxis(int first, int second, bool rejectLast) {
@@ -645,7 +650,7 @@ bool PuzzleWaterslide::matches(const Edge &edge) const {
 	if (edge.axis < 0)
 		return true;
 	const ZmbTrait::TraitKind axis = static_cast<ZmbTrait::TraitKind>(edge.axis);
-	return _puzzleZoombinis[a.zoombiniIndex]->_traits.getValue(axis) == _puzzleZoombinis[b.zoombiniIndex]->_traits.getValue(axis);
+	return _puzzleZoombinis[a.zoombiniIndex]->getTraits().getValue(axis) == _puzzleZoombinis[b.zoombiniIndex]->getTraits().getValue(axis);
 }
 
 void PuzzleWaterslide::evaluateConnections() {
@@ -722,7 +727,7 @@ void PuzzleWaterslide::onSlotChanged(void *context, int slot, int zoombini) {
 
 void PuzzleWaterslide::playSound(int handle) {
 	if (0 <= handle && _vm->getSoundManager())
-		_vm->getSoundManager()->playWithVolume(handle, _vm->getSoundManager()->_volumeSFX);
+		_vm->getSoundManager()->playWithVolume(handle, _vm->getSoundManager()->getSfxVolume());
 }
 
 void PuzzleWaterslide::activateValve() {
@@ -734,9 +739,9 @@ void PuzzleWaterslide::activateValve() {
 	if (!any)
 		return;
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
-		_puzzleZoombinis[i]->_inputEnabled = false;
+		_puzzleZoombinis[i]->setInputEnabled(false);
 		if (_eligible[i])
-			_puzzleZoombinis[i]->_puzzleStatus = 1;
+			_puzzleZoombinis[i]->setCanAdvanceFromPage(true);
 	}
 	_phase = kValve01;
 	_valveRunner->setHitTestEnabled(false);
@@ -783,7 +788,7 @@ void PuzzleWaterslide::dischargeNext() {
 		_vm->_zoombiniWalkingFlag = true;
 		_eligible[_heldZoombini] = false;
 		ZoombiniRunner *actor = _puzzleZoombinis[_heldZoombini];
-		actor->setPosition(actor->_screenPos - Common::Point32(1, 1));
+		actor->setPosition(actor->getScreenPosition() - Common::Point32(1, 1));
 		_dischargeStart = _vm->getGameTickCount();
 		actor->startAnimation(_aspiration, 33, _dischargeStart);
 		actor->setAnimationCompleteCallback(&onAspirationComplete, this);
@@ -798,14 +803,14 @@ void PuzzleWaterslide::dischargeNext() {
 
 void PuzzleWaterslide::onAspirationComplete(void *context, ZoombiniRunner *zoombini) {
 	(void)context;
-	zoombini->_hidden = true;
+	zoombini->setHidden(true);
 }
 
 void PuzzleWaterslide::onCascadeComplete(void *context, AnimationRunner *runner) {
 	(void)runner;
 	PuzzleWaterslide *page = static_cast<PuzzleWaterslide *>(context);
 	if (0 <= page->_heldZoombini)
-		page->_puzzleZoombinis[page->_heldZoombini]->_hidden = true;
+		page->_puzzleZoombinis[page->_heldZoombini]->setHidden(true);
 	page->_heldZoombini = -1;
 }
 
@@ -830,7 +835,7 @@ void PuzzleWaterslide::onUpdate() {
 			dischargeNext();
 	}
 	for (ZoombiniRunner *actor : _puzzleZoombinis) {
-		if (actor->_puzzleStatus == 1 && !actor->_animationActive && _vm->_rnd->getRandomNumber(19) == 1)
+		if (actor->canAdvanceFromPage() && !actor->isAnimationActive() && _vm->_rnd->getRandomNumber(19) == 1)
 			actor->startAnimation(_idle, 33, tick);
 	}
 	for (ZoombiniRunner *actor : _puzzleZoombinis)
@@ -1014,7 +1019,7 @@ EventHandleResult PuzzleWaterslide::onMouseMove(const Common::Point &pos) {
 int PuzzleWaterslide::countFreeZoombinis() const {
 	int count = 0;
 	for (const ZoombiniRunner *actor : _puzzleZoombinis)
-		if (actor->_puzzleStatus == 0)
+		if (!actor->canAdvanceFromPage())
 			count += 1;
 	return count;
 }
@@ -1054,7 +1059,7 @@ bool PuzzleWaterslide::debugPlacementMatches(int slot, int actor, const Common::
 		if (other < 0)
 			continue;
 		const ZmbTrait::TraitKind axis = static_cast<ZmbTrait::TraitKind>(edge.axis);
-		if (_puzzleZoombinis[actor]->_traits.getValue(axis) != _puzzleZoombinis[other]->_traits.getValue(axis))
+		if (_puzzleZoombinis[actor]->getTraits().getValue(axis) != _puzzleZoombinis[other]->getTraits().getValue(axis))
 			return false;
 	}
 	return true;
