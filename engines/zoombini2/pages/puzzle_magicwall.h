@@ -148,6 +148,9 @@ public:
 	Common::String debugGetChanceDetails() const override;
 
 private:
+	static constexpr const char *kPuzzleName = "Beetle Bug Alley";
+	/** Beetle Bug Alley board background loaded into the first page layer. */
+	static constexpr const char *kBackgroundPath = "#bmp/magic_wall/magic wall";
 	/** ZTL board data containing weighted layouts, tablet points, and rule variants. */
 	static constexpr const char *kLayoutPath = "bmp/magic_wall/default.ztl";
 	/** Looping Beetle Bug Alley soundtrack. */

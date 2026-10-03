@@ -197,8 +197,8 @@ ZoombiniRunner *StorageRecord::restore() const {
 	ZoombiniRunner *zoombini = new ZoombiniRunner();
 	memcpy(zoombini->_name, _name, sizeof(zoombini->_name));
 	zoombini->setTraits(getTraits());
-	zoombini->_inputEnabled = 1;
-	zoombini->_animationCell = 33;
+	zoombini->setInputEnabled(true);
+	zoombini->setAnimationCell(33);
 	return zoombini;
 }
 
@@ -224,7 +224,7 @@ bool GameState::storeInStorage(StorageRecord **storage, ZoombiniRunner &zoombini
 				if (!cell) {
 					cell = new StorageRecord();
 					cell->store(zoombini);
-					zoombini._puzzleStatus = 0;
+					zoombini.setCanAdvanceFromPage(false);
 					return true;
 				}
 			}
@@ -333,7 +333,7 @@ void GameState::recordBooliesCompletion() {
 	if (_activeZoombinis.empty() || !_activeZoombinis[0])
 		return;
 
-	const int rescuedBooliesPerZoombini = _activeZoombinis[0]->_rescuedBooliesPerZoombini;
+	const int rescuedBooliesPerZoombini = _activeZoombinis[0]->getRescuedBooliesPerZoombini();
 	_rescuedBoolieCount += static_cast<int32>(_activeZoombinis.size()) * rescuedBooliesPerZoombini;
 	for (uint i = 0; i < _activeZoombinis.size(); i++) {
 		if (_activeZoombinis[i])
@@ -461,7 +461,7 @@ void GameState::finishPuzzleRoster(PageId pageId, StorageRecord **storage, bool 
 	if (perfectClearEligible && 0 <= pageIndex && pageIndex < 100 && _activeZoombinis.size() == expectedPartySize) {
 		bool allSucceeded = true;
 		for (uint i = 0; i < _activeZoombinis.size(); i++) {
-			if (!_activeZoombinis[i] || _activeZoombinis[i]->_puzzleStatus == 0) {
+			if (!_activeZoombinis[i] || !_activeZoombinis[i]->canAdvanceFromPage()) {
 				allSucceeded = false;
 				break;
 			}
@@ -478,7 +478,7 @@ void GameState::finishPuzzleRoster(PageId pageId, StorageRecord **storage, bool 
 
 	for (uint i = 0; i < _activeZoombinis.size();) {
 		ZoombiniRunner *zoombini = _activeZoombinis[i];
-		if (!advancing || zoombini->_puzzleStatus == 0) {
+		if (!advancing || !zoombini->canAdvanceFromPage()) {
 			if (storage)
 				storeInStorage(storage, *zoombini);
 			else
@@ -641,7 +641,7 @@ Zoombini2PopulationSummary GameState::getPopulationSummary() const {
 	summary._rescue1Count = countStorageEntries(_rescue1Storage);
 	summary._rescue2Count = countStorageEntries(_rescue2Storage);
 	summary._booliewoodCount = _completedZoombiniCount;
-	summary._zombinivilleCount = kZoombiniCombinationCount - summary._rescue1Count - summary._rescue2Count - summary._booliewoodCount;
+	summary._zombinivilleCount = TraitComboTable::kZoombiniCombinationCount - summary._rescue1Count - summary._rescue2Count - summary._booliewoodCount;
 	summary._activePartyCount = static_cast<int>(_savedRoster.size());
 	return summary;
 }
@@ -949,7 +949,7 @@ bool Zoombini2SavegameManager::importSavefile(const Common::String &savefileName
 	}
 
 	// Z2 identifies an independent .mk file by its filename stem and embedded player name.
-	importedState._playerName = savefileName;
+	importedState.setPlayerName(savefileName);
 	return writeSavefile(savefileName, importedState);
 }
 
@@ -998,7 +998,7 @@ bool Zoombini2SavegameManager::renameSavefile(const Common::String &oldSavefileN
 	GameState renamedState;
 	if (!loadSavefile(oldSavefileName, renamedState))
 		return false;
-	renamedState._playerName = newSavefileName;
+	renamedState.setPlayerName(newSavefileName);
 	if (!writeSavefile(newSavefileName, renamedState))
 		return false;
 	if (deleteSavefile(oldSavefileName))
@@ -1018,7 +1018,7 @@ bool Zoombini2SavegameManager::duplicateSavefile(const Common::String &srcSavefi
 	if (!loadSavefile(srcSavefileName, duplicatedState))
 		return false;
 
-	duplicatedState._playerName = newSavefileName;
+	duplicatedState.setPlayerName(newSavefileName);
 	return writeSavefile(newSavefileName, duplicatedState);
 }
 

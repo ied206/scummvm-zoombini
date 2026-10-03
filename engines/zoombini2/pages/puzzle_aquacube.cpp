@@ -30,6 +30,8 @@
 
 namespace Zoombini2 {
 
+constexpr const char *PuzzleAquacube::kPuzzleName;
+constexpr const char *PuzzleAquacube::kBackgroundPath;
 constexpr const char *PuzzleAquacube::kMusicPath;
 constexpr const char *PuzzleAquacube::kLightPath;
 constexpr const char *PuzzleAquacube::kBallPaths[2];
@@ -58,7 +60,10 @@ constexpr Common::Point32 PuzzleAquacube::kLeverPositions[4];
 constexpr Common::Point32 PuzzleAquacube::kIndicatorPositions[4];
 constexpr int PuzzleAquacube::kShotX[11];
 
-PuzzleAquacube::PuzzleAquacube(Zoombini2Engine *vm) : PuzzleBase(vm, kPageAquacube) {}
+PuzzleAquacube::PuzzleAquacube(Zoombini2Engine *vm) : PuzzleBase(vm, kPageAquacube) {
+	_puzzleName = kPuzzleName;
+	_initialBackgroundPath = kBackgroundPath;
+}
 
 PuzzleAquacube::~PuzzleAquacube() {
 	delete _ballPath;
@@ -224,13 +229,13 @@ void PuzzleAquacube::setupBoard() {
 		node.occupants[node.occupantCount] = i;
 		ZoombiniRunner *actor = _puzzleZoombinis[i];
 		actor->clearMovement();
-		actor->_savedAnimation = _zoombiniAnimation;
+		actor->setSavedAnimation(_zoombiniAnimation);
 		actor->resetAnimation();
-		actor->_activeAnimation = _smallest;
-		actor->_hidden = false;
-		actor->_inputEnabled = false;
-		actor->_puzzleStatus = 0;
-		actor->_exitComplete = false;
+		actor->setActiveAnimation(_smallest);
+		actor->setHidden(false);
+		actor->setInputEnabled(false);
+		actor->setCanAdvanceFromPage(false);
+		actor->setExitComplete(false);
 		actor->setPosition(node.pos + offset + Common::Point32(6 * (3 - node.occupantCount), 0));
 		node.occupantCount += 1;
 		slot = (slot + 1) % _numNodes;
@@ -248,7 +253,7 @@ PathObject *PuzzleAquacube::makePath(const Common::Point32 &start, const Common:
 void PuzzleAquacube::playSound(int index) {
 	if (SoundManager *sound = _vm->getSoundManager())
 		if (0 <= _sounds[index])
-			sound->playWithVolume(_sounds[index], sound->_volumeSFX);
+			sound->playWithVolume(_sounds[index], sound->getSfxVolume());
 }
 
 void PuzzleAquacube::moveBall(int axis) {
@@ -312,12 +317,12 @@ void PuzzleAquacube::resolveArrival() {
 			ZoombiniRunner *actor = _puzzleZoombinis[index];
 			actor->setPosition(kRescuePositions[_freedCount]);
 			_freedCount += 1;
-			actor->_puzzleStatus = 1;
-			actor->_hidden = true;
-			actor->_exitComplete = true;
+			actor->setCanAdvanceFromPage(true);
+			actor->setHidden(true);
+			actor->setExitComplete(true);
 			_vm->_zoombiniWalkingFlag = true;
 			_rescued.push_back(index);
-			_flare[0]->startAt(actor->_screenPos - Common::Point32(90, 90), _vm->getGameTickCount());
+			_flare[0]->startAt(actor->getScreenPosition() - Common::Point32(90, 90), _vm->getGameTickCount());
 			playSound(1);
 		}
 		node.occupantCount = 0;
@@ -334,7 +339,7 @@ void PuzzleAquacube::resolveArrival() {
 void PuzzleAquacube::onFlareComplete(void *context, AnimationRunner *runner) {
 	PuzzleAquacube *page = static_cast<PuzzleAquacube *>(context);
 	for (int index : page->_rescued)
-		page->_puzzleZoombinis[index]->_hidden = false;
+		page->_puzzleZoombinis[index]->setHidden(false);
 	page->_flare[1]->startAt(runner->getPosition(), page->_vm->getGameTickCount());
 }
 
@@ -350,12 +355,13 @@ void PuzzleAquacube::onAngryComplete(void *context, AnimationRunner *runner) {
 
 void PuzzleAquacube::beginChase() {
 	for (ZoombiniRunner *actor : _puzzleZoombinis) {
-		if (actor->_screenPos.y < 100) {
+		const Common::Point32 screenPosition = actor->getScreenPosition();
+		if (screenPosition.y < 100) {
 			actor->clearMovement();
-			actor->_movementPath = makePath(actor->_screenPos, actor->_screenPos + Common::Point32(150, 0), 3);
+			actor->setMovementPath(makePath(screenPosition, screenPosition + Common::Point32(150, 0), 3));
 			actor->startAnimation(_smallest, 33, _vm->getGameTickCount());
-			actor->_tracksMovementDirection = false;
-			actor->_puzzleStatus = 0;
+			actor->setTracksMovementDirection(false);
+			actor->setCanAdvanceFromPage(false);
 			_actorsEscaping = true;
 		}
 	}
@@ -416,7 +422,7 @@ void PuzzleAquacube::onUpdate() {
 		resolveArrival();
 	}
 	if (_chasePath) {
-		if (_chasePath->finished) {
+		if (_chasePath->isFinished()) {
 			delete _chasePath;
 			_chasePath = nullptr;
 			_freedCount = 0;
@@ -432,13 +438,13 @@ void PuzzleAquacube::onUpdate() {
 	}
 	_actorsEscaping = false;
 	for (ZoombiniRunner *actor : _puzzleZoombinis) {
-		if (actor->_movementPath) {
-			if (actor->_movementPath->finished) {
+		if (actor->hasMovementPath()) {
+			if (actor->isMovementFinished()) {
 				actor->clearMovement();
-				actor->_hidden = true;
+				actor->setHidden(true);
 			} else {
 				Common::Point32 pos;
-				actor->_movementPath->advance(tick, pos);
+				actor->advanceMovementPath(tick, pos);
 				actor->setPosition(pos);
 				_actorsEscaping = true;
 			}
@@ -446,7 +452,7 @@ void PuzzleAquacube::onUpdate() {
 		actor->updateAnimation(tick);
 	}
 	if (_ballPath) {
-		if (_ballPath->finished) {
+		if (_ballPath->isFinished()) {
 			delete _ballPath;
 			_ballPath = nullptr;
 			if (sound && 0 <= _sounds[3])
@@ -472,7 +478,7 @@ void PuzzleAquacube::onUpdate() {
 	}
 	bool allProcessed = true;
 	for (const ZoombiniRunner *actor : _puzzleZoombinis)
-		if (!actor->_exitComplete)
+		if (!actor->isExitComplete())
 			allProcessed = false;
 	if (allProcessed)
 		finishPuzzle();
@@ -577,7 +583,7 @@ EventHandleResult PuzzleAquacube::onLButtonUp(const Common::Point &pos) {
 int PuzzleAquacube::countFreeZoombinis() const {
 	int count = 0;
 	for (const ZoombiniRunner *actor : _puzzleZoombinis)
-		if (actor->_puzzleStatus == 0)
+		if (!actor->canAdvanceFromPage())
 			count += 1;
 	return count;
 }

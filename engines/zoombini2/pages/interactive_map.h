@@ -75,6 +75,10 @@ public:
 	bool hasActiveDialog() const override { return _volumePanel != nullptr; }
 
 private:
+	/** Maximum number of Zoombinis in a starting practice party. */
+	static constexpr uint kMaxPackSize = 16;
+	/** Maximum practice-party size after Rescue Site I. */
+	static constexpr uint kPostRescuePackSize = 8;
 	/** Bit-block mountain-map backdrop drawn beneath icons and route overlays. */
 	static constexpr const char *kBackgroundPath = "#bmp/Map/background";
 	/** RLE practice-mode panel that labels the map's practice controls. */

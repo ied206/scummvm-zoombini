@@ -774,7 +774,7 @@ PathObject *PathObject::loadFromPAT(Zoombini2Engine *vm, const Common::Path &pat
 void PathObject::start(uint32 tickCount) {
 	synchronizeNumericMode();
 	currentSegment = 0;
-	finished = false;
+	_finished = false;
 	startTime = tickCount;
 
 	for (uint i = 0; i < segments.size(); i++)
@@ -796,13 +796,13 @@ void PathObject::setStepValueForAllSegments(int stepValue) {
  */
 bool PathObject::advance(uint32 tickCount, Common::Point32 &outPos) {
 	synchronizeNumericMode();
-	if (finished) {
+	if (_finished) {
 		outPos = endPos;
 		return false;
 	}
 
 	if (currentSegment >= static_cast<int>(segments.size())) {
-		finished = true;
+		_finished = true;
 		outPos = endPos;
 		return false;
 	}
@@ -822,7 +822,7 @@ bool PathObject::advance(uint32 tickCount, Common::Point32 &outPos) {
 			next->evaluate(tickCount, outPos);
 			return true;
 		} else {
-			finished = true;
+			_finished = true;
 			outPos = endPos;
 			return false;
 		}
@@ -976,7 +976,7 @@ void ZoombiniRunner::startDirectionTrackedAnimation(uint32 tickCount) {
 }
 
 bool ZoombiniRunner::tryStartCelebrationAnimation(const ZoombiniAnimation *animation, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz) {
-	if (!animation || _puzzleStatus != 1 || _animationActive)
+	if (!animation || !canAdvanceFromPage() || _animationActive)
 		return false;
 	// Bank quota so the original one-in-20 roll runs pacingHz times per second.
 	// The remainder spreads multi-roll frames evenly when pacing exceeds the render rate.

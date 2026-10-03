@@ -77,6 +77,9 @@ public:
 	static int getRescuedBooliesPerZoombini(int level);
 
 private:
+	static constexpr const char *kPuzzleName = "Boolie Boggle";
+	/** Boolie Boggle board background loaded into the first page layer. */
+	static constexpr const char *kBackgroundPath = "#bmp/Boolies/background";
 	/** Number of Boolie ledges. */
 	static constexpr int kRowCount = 3;
 	/** Maximum number of Boolies on one ledge. */

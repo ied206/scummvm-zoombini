@@ -77,7 +77,7 @@ struct DialogDebugCommand {
  */
 class DialogDebug : public DialogBase {
 public:
-	/** Bind the reusable debug overlay to @p vm. */
+	/** Bind one debug overlay to @p vm. */
 	explicit DialogDebug(Zoombini2Engine *vm);
 	/** Release the saved screen and loaded view resources. */
 	~DialogDebug() override;

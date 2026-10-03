@@ -24,11 +24,11 @@
 
 #include "gui/debugger.h"
 
+#include "zoombini2/zoombini2.h"
+
 namespace Zoombini2 {
 
-class Zoombini2Engine;
 enum PageId : int;
-enum class RouteBranch : int;
 
 /**
  * Debug console for the Mountain Rescue engine.
@@ -50,7 +50,7 @@ private:
 		const char *name;
 		PageId target;
 		PageId source;
-		RouteBranch branch;
+		Zoombini2Engine::RouteBranch branch;
 	};
 	static const GoDestination kGoDestinations[];
 	static constexpr const char *kCmdGo = "go";
@@ -59,7 +59,7 @@ private:
 	bool Cmd_Go(int argc, const char **argv);
 	bool CmdSub_GoXfer(int argc, const char **argv);
 	bool CmdSub_GoPractice(int argc, const char **argv);
-	static const GoDestination *findGoDestination(const char *name, bool puzzleOnly);
+	const GoDestination *findGoDestPage(const char *name, bool puzzleOnly);
 	void printGoDestinations(bool puzzleOnly);
 	bool Cmd_Puzzle(int argc, const char **argv);
 	bool CmdSub_PuzzleFinish(int argc, const char **argv);
@@ -67,6 +67,12 @@ private:
 	/** Wrap puzzle answers to the debugger width while retaining section indentation. */
 	static Common::String formatPuzzleAnswer(const Common::String &answer);
 	bool CmdSub_PuzzleChance(int argc, const char **argv);
+	/** Invoke the original global developer actions through the debugger. */
+	static constexpr const char *kCmdBuiltinDebug = "builtin_debug";
+	/** Explain the original developer keys and their activation gate. */
+	static constexpr const char *kCmdManBuiltinDebug = "man_builtin_debug";
+	bool Cmd_BuiltinDebug(int argc, const char **argv);
+	bool Cmd_ManBuiltinDebug(int argc, const char **argv);
 	/** Top-level debugger command for drawing debug views. */
 	static constexpr const char *kCmdDraw = "draw";
 	/** Draw the active page through its drop-acceptance mask. */
@@ -84,8 +90,6 @@ private:
 	static bool isHelpOption(const char *arg);
 	/** Return whether any command argument requests help. */
 	static bool hasHelpOption(int argc, const char **argv);
-	/** Parse a non-negative decimal debugger argument. */
-	static bool parseNonNegativeInt(const char *str, int &result);
 	/** Print the standard help-option usage line. */
 	void printHelpOption();
 

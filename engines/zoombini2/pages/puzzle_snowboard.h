@@ -74,6 +74,9 @@ public:
 	bool debugSetChances(int remaining) override;
 
 private:
+	static constexpr const char *kPuzzleName = "Snowboard Gulch";
+	/** Snowboard Gulch slope background loaded into the first page layer. */
+	static constexpr const char *kBackgroundPath = "#bmp/snowboard/snowboard-EASY";
 	/** Looping Snowboard Gulch soundtrack. */
 	static constexpr const char *kMusicPath = "#sounds/music/01-BS06.wav";
 	/** Path format for the RLE icon of a feature and one of its values. */

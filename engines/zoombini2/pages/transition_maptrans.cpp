@@ -37,8 +37,6 @@ constexpr const char *TransitionMapTrans::kRouteFormat;
 constexpr const char *TransitionMapTrans::kZoombiniAnimationPath;
 constexpr const char *TransitionMapTrans::kMusicPath;
 
-static constexpr int kRescue1MovieMinimumZoombinis = 8;
-
 // ============================================================================
 // TransitionMapTrans - route-map transition.
 // ============================================================================
@@ -98,7 +96,7 @@ void TransitionMapTrans::queueTravelSpeech(PageId srcPage) {
 		queueSpeech(kSpeechAqu31);
 		break;
 	case kPageRescue1:
-		if (_vm->_routeDirection == RouteBranch::kLeft01) {
+		if (_vm->_routeDirection == Zoombini2Engine::RouteBranch::kLeft01) {
 			if (state->hasPageVisit(kPageMagicWall, 1))
 				queueSpeech(Common::String::format(kSpeechMgw21Format, getRandomBinarySpeechVariant()));
 			else
@@ -185,7 +183,7 @@ void TransitionMapTrans::updateSpeechQueue() {
 		if (_speechIds[speechIndex] < 0)
 			continue;
 		_activeSpeechIndex = static_cast<int>(speechIndex);
-		sound->playWithVolume(_speechIds[speechIndex], sound->_volumeSpeech);
+		sound->playWithVolume(_speechIds[speechIndex], sound->getSpeechVolume());
 		return;
 	}
 }
@@ -216,7 +214,7 @@ void TransitionMapTrans::cleanupPaths() {
 			continue;
 		zoombini->clearMovement();
 		zoombini->resetAnimation();
-		zoombini->_hidden = false;
+		zoombini->setHidden(false);
 	}
 }
 
@@ -225,7 +223,7 @@ void TransitionMapTrans::init() {
 		  static_cast<int>(_vm->_mapTransitionSourcePageId), static_cast<int>(_vm->_routeDirection));
 
 	const PageId src = _vm->_mapTransitionSourcePageId;
-	const RouteBranch routeBranch = _vm->_routeDirection;
+	const Zoombini2Engine::RouteBranch routeBranch = _vm->_routeDirection;
 	_vm->_skipMode = false;
 	_transitionFinished = false;
 	cleanupSpeech();
@@ -255,9 +253,9 @@ void TransitionMapTrans::init() {
 		patName = "tr4 - map1.pat";
 		break;
 	case kPageRescue1:
-		if (routeBranch == RouteBranch::kLeft01)
+		if (routeBranch == Zoombini2Engine::RouteBranch::kLeft01)
 			patName = "tr5 - map2.pat";
-		else if (routeBranch == RouteBranch::kRight02)
+		else if (routeBranch == Zoombini2Engine::RouteBranch::kRight02)
 			patName = "tr8 - map2.pat";
 		break;
 	case kPageMysticMarsh:
@@ -297,7 +295,7 @@ void TransitionMapTrans::init() {
 
 	// Request the graphics interface to compose the background and overlays.
 	delete _compositedBg;
-	_compositedBg = _vm->_gfx->createMapTransitionBackground(src, mapRegion, routeBranch);
+	_compositedBg = _vm->_gfx->createMapTransitionBackground(src, mapRegion);
 
 	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path(kZoombiniAnimationPath), 50);
 	if (!_zoombiniAnimation)
@@ -309,8 +307,8 @@ void TransitionMapTrans::init() {
 	for (uint i = 0; i < numZoombinis; i++) {
 		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
 		zoombini->clearMovement();
-		zoombini->_hidden = true;
-		zoombini->_inputEnabled = false;
+		zoombini->setHidden(true);
+		zoombini->setInputEnabled(false);
 		zoombini->startDirectionTrackedAnimation(now);
 		zoombini->setActiveAnimation(_zoombiniAnimation);
 	}
@@ -339,7 +337,7 @@ void TransitionMapTrans::walkZoombinis() {
 		PathObject *path = PathObject::loadFromPAT(_vm, _patPath);
 		if (path) {
 			ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[_nextWalkIndex];
-			zoombini->_hidden = false;
+			zoombini->setHidden(false);
 			path->setStepValueForAllSegments(2);
 			zoombini->startMovement(path, now);
 		} else {
@@ -352,10 +350,10 @@ void TransitionMapTrans::walkZoombinis() {
 	// Update all walking zoombinis
 	for (uint i = 0; i < numZoombinis; i++) {
 		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
-		if (!zoombini->_movementPath)
+		if (!zoombini->hasMovementPath())
 			continue;
-		if (zoombini->_movementPath->finished) {
-			zoombini->_hidden = true;
+		if (zoombini->isMovementFinished()) {
+			zoombini->setHidden(true);
 			zoombini->clearMovement();
 			_completedCount += 1;
 			continue;
@@ -426,7 +424,7 @@ void TransitionMapTrans::onRenderActors(ManagedSurface32 *screen) {
 	Common::Array<uint> drawOrder;
 	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
 		const ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
-		if (zoombini->_movementPath && !zoombini->_hidden)
+		if (zoombini->hasMovementPath() && !zoombini->isHidden())
 			drawOrder.push_back(i);
 	}
 	ZoombiniRunner::sortDrawOrderByY(_vm->_state->_activeZoombinis, drawOrder);
@@ -439,7 +437,7 @@ void TransitionMapTrans::onRenderActors(ManagedSurface32 *screen) {
 void TransitionMapTrans::onActorsRendered() {
 	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
 		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
-		if (zoombini->_movementPath && !zoombini->_hidden)
+		if (zoombini->hasMovementPath() && !zoombini->isHidden())
 			zoombini->advanceAnimationAfterDraw();
 	}
 }
@@ -457,7 +455,7 @@ EventHandleResult TransitionMapTrans::onLButtonUp(const Common::Point &pos) {
 	return EventHandleResult::kConsumed;
 }
 
-PageId TransitionMapTrans::getDestPage(PageId src, RouteBranch routeBranch, int rescuedBoolies) {
+PageId TransitionMapTrans::getDestPage(PageId src, Zoombini2Engine::RouteBranch routeBranch, int rescuedBoolies) {
 	switch (src) {
 	case kPageZombiniville:
 		return kPageCrazyTurtle;
@@ -468,9 +466,9 @@ PageId TransitionMapTrans::getDestPage(PageId src, RouteBranch routeBranch, int 
 	case kPageAquacube:
 		return kPageRescue1;
 	case kPageRescue1: {
-		if (routeBranch == RouteBranch::kLeft01)
+		if (routeBranch == Zoombini2Engine::RouteBranch::kLeft01)
 			return kPageMagicWall;
-		else if (routeBranch == RouteBranch::kRight02)
+		else if (routeBranch == Zoombini2Engine::RouteBranch::kRight02)
 			return kPageMysticMarsh;
 		return kPageNone;
 	}
