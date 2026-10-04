@@ -305,6 +305,8 @@ public:
 	virtual bool canUseGoButton() const { return hasGoButton(); }
 	/** Apply page-local state that must be settled before Map saves or leaves the page. */
 	virtual void onMapButtonPressed() {}
+	/** Prepare page-local state before a debugger-requested route transition. */
+	virtual void debugPrepareRouteDeparture() {}
 	/** Handle page-local Go speech; return true to continue the shared transition. */
 	virtual bool onGoButtonPressed() { return true; }
 	/** Return whether page-local state prevents the sidebar from accepting pointer input. */

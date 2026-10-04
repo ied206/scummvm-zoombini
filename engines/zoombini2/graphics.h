@@ -32,12 +32,11 @@
 #include "common/stream.h"
 
 #include "graphics/managed_surface.h"
+#include "graphics/pixelformat.h"
 
 #include "zoombini2/state.h"
 
 namespace Zoombini2 {
-
-class AlphaBlendLUT;
 
 /** One RGB color with eight bits per channel and no alpha component. */
 struct RGBColor {
@@ -46,29 +45,21 @@ struct RGBColor {
 	byte b;
 
 	constexpr RGBColor(byte red = 0, byte green = 0, byte blue = 0) : r(red), g(green), b(blue) {}
-	/** Read one BGR pixel from @p pixel. */
-	static RGBColor fromBGR(const byte *pixel) { return RGBColor(pixel[2], pixel[1], pixel[0]); }
-	/** Write this color to one BGR pixel at @p pixel. */
-	void writeBGR(byte *pixel) const {
-		pixel[0] = b;
-		pixel[1] = g;
-		pixel[2] = r;
+	/** Decode a packed pixel with @p pixelFormat. */
+	static RGBColor fromPixel(uint32 pixel, const Graphics::PixelFormat &pixelFormat) {
+		RGBColor color;
+		pixelFormat.colorToRGB(pixel, color.r, color.g, color.b);
+		return color;
 	}
-	/** Blend this source color with @p destColor using Zoombini2's lookup-table rule. */
-	RGBColor blendWithAlphaLUT(const RGBColor &destColor, byte sourceFactor, byte destFactor, const AlphaBlendLUT &alphaLUT) const;
-	/** Convert premultiplied channels to straight RGB for @p alpha. */
-	RGBColor unpremultiply(byte alpha) const {
-		if (alpha == 0)
-			return RGBColor();
-		return RGBColor(static_cast<byte>(MIN(255, static_cast<int>(r) * 255 / alpha)),
-						static_cast<byte>(MIN(255, static_cast<int>(g) * 255 / alpha)),
-						static_cast<byte>(MIN(255, static_cast<int>(b) * 255 / alpha)));
-	}
+	/** Encode this color with @p pixelFormat. */
+	uint32 toPixel(const Graphics::PixelFormat &pixelFormat) const { return pixelFormat.RGBToColor(r, g, b); }
 	/** Return the greatest RGB channel value. */
 	byte getMaxChannel() const { return MAX(r, MAX(g, b)); }
 	/** Return the least RGB channel value. */
 	byte getMinChannel() const { return MIN(r, MIN(g, b)); }
 };
+
+class AlphaBlendLUT;
 
 /** Optional color presentation for small displays and red-green color vision deficiency. */
 enum class ColorAssistMode : byte {
@@ -132,7 +123,7 @@ struct SizeBase {
  */
 #define BEGIN_Z2_SIZE_TYPE(T, Size) \
 	struct Size : public SizeBase<T, Size> {
-#define END_Z2_SIZE_TYPE(T, Size)                                                                          \
+#define END_Z2_SIZE_TYPE(T, Size)                                                                       \
 	constexpr Size() : SizeBase() {}                                                                    \
 	constexpr Size(T widthValue, T heightValue) : SizeBase(widthValue, heightValue) {}                  \
 	}                                                                                                   \
@@ -290,7 +281,7 @@ public:
 	/** Select the display color for a nose trait without changing its logical value. */
 	static bool noseColorRGB(ColorAssistMode mode, byte value, RGBColor &color);
 	/** Shift a nose pixel toward the display hue while retaining its value and saturation variation. */
-	static RGBColor recolorNoseGradientRGB(const RGBColor &sourceColor, const RGBColor &targetColor);
+	static RGBColor recolorNoseGradientRGB(const RGBColor &srcColor, const RGBColor &targetColor);
 	/** Draw one visible runner and its available drop-target glow at the scrolled or dragged anchor without advancing animation. */
 	void drawZoombiniRunner(ManagedSurface32 *destSurface, const ZoombiniRunner *runner, const Common::Rect32 *clip = nullptr, int scrollX = 0, int backgroundWidth = 800) const;
 	/** Draw one runner with temporary presentation traits without changing its gameplay traits. */
@@ -468,6 +459,8 @@ public:
 	 * @param value Source or destSurface color-channel value.
 	 */
 	byte scale(byte factor, byte value) const { return _values[factor][value]; }
+	/** Scale source and destination channels separately, then add with saturation at 255. */
+	RGBColor blend(const RGBColor &srcColor, const RGBColor &destColor, byte sourceFactor, byte destFactor) const;
 
 private:
 	/** Cached results indexed as `[factor][channelValue]`. */
@@ -577,6 +570,8 @@ private:
 	void drawToSurfaceInternal(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &srcRect, bool useColorKey) const;
 	/** Decode a 24-bit BMP from @p stream through the shared image decoder. */
 	bool loadColorBMP(Common::SeekableReadStream *stream);
+	/** Decode the bounded BB pixel prefix and retain only rows containing recovered pixels. */
+	bool loadBBStream(Common::SeekableReadStream &stream, const Common::Path &path);
 	/** Decode an indexed alpha-mask BMP from @p stream through the shared image decoder. */
 	bool loadAlphaBMP(Common::SeekableReadStream *stream);
 	/** Exchange bitmap buffer state with @p other. */
@@ -686,6 +681,8 @@ public:
 	bool isValid() const { return _loaded; }
 
 private:
+	/** Source pixel layout of decoded RLE frame data. */
+	static constexpr Graphics::PixelFormat kSourceFormat = Graphics::PixelFormat::createFormatBGRA32(false);
 	/** Serialized pixel layout and composition rule selected by one span's mode byte. */
 	enum class SpanMode : byte {
 		/** Mode 0: three-byte opaque BGR pixels which replace the destination. */

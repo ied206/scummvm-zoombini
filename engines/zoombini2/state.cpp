@@ -479,16 +479,21 @@ void GameState::finishPuzzleRoster(PageId pageId, StorageRecord **storage, bool 
 	for (uint i = 0; i < _activeZoombinis.size();) {
 		ZoombiniRunner *zoombini = _activeZoombinis[i];
 		if (!advancing || !zoombini->canAdvanceFromPage()) {
-			if (storage)
-				storeInStorage(storage, *zoombini);
-			else
-				_savedRoster.push_back(cloneRosterMember(*zoombini));
+			retainRosterMember(storage, *zoombini);
 			delete zoombini;
 			_activeZoombinis.remove_at(i);
 		} else {
 			i += 1;
 		}
 	}
+}
+
+void GameState::retainRosterMember(StorageRecord **storage, ZoombiniRunner &zoombini) {
+	if (storage && storeInStorage(storage, zoombini))
+		return;
+	if (storage)
+		warning("GameState: rescue storage is full; retaining Zoombini in the saved roster");
+	_savedRoster.push_back(cloneRosterMember(zoombini));
 }
 
 ZoombiniRunner *GameState::cloneRosterMember(const ZoombiniRunner &src) {

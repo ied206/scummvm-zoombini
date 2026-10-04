@@ -721,8 +721,10 @@ PathObject *PathObject::loadFromPAT(Zoombini2Engine *vm, const Common::Path &pat
 		warning("PathObject: cannot open PAT '%s'", path.toString().c_str());
 		return nullptr;
 	}
-	Common::SeekableReadStream &f = *stream;
+	return loadPATStream(vm, *stream);
+}
 
+PathObject *PathObject::loadPATStream(Zoombini2Engine *vm, Common::SeekableReadStream &f) {
 	PathObject *obj = new PathObject(vm);
 
 	// Read FIRST line
@@ -735,6 +737,12 @@ PathObject *PathObject::loadFromPAT(Zoombini2Engine *vm, const Common::Path &pat
 				   &stepVal, &waitVal) >= 10) {
 			obj->appendSegment(Common::Point32(x0, y0), Common::Point32(cx0, cy0), Common::Point32(cx1, cy1), Common::Point32(x1, y1), stepVal, waitVal);
 		}
+	}
+
+	if (obj->segments.empty()) {
+		warning("PathObject: PAT has no valid FIRST segment");
+		delete obj;
+		return nullptr;
 	}
 
 	// Read NEXT lines (start with 'N')
@@ -847,6 +855,13 @@ ZoombiniRunner::ZoombiniRunner() {
 
 ZoombiniRunner::~ZoombiniRunner() {
 	clearMovement();
+}
+
+Common::String ZoombiniRunner::getName() const {
+	uint length = 0;
+	while (length < sizeof(_name) && _name[length])
+		length += 1;
+	return Common::String(_name, length);
 }
 
 void ZoombiniRunner::setTraits(const ZmbTrait &other) {
