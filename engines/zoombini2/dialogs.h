@@ -137,6 +137,8 @@ private:
 	void updateSavefileTableLayout();
 	/** Enable or disable actions for the current selection. */
 	void updateButtons();
+	/** Return whether this target's running engine will automatically write @p savefileName. */
+	bool isActiveSavefile(const Common::String &savefileName) const;
 	/** Prompt for and commit a new name for the selected savefile. */
 	void renameSelectedSavefile();
 	/** Prompt for and create a distinct copy of the selected savefile. */

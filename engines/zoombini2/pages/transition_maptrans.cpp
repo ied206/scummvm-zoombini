@@ -22,6 +22,7 @@
 #include "common/debug.h"
 #include "common/file.h"
 #include "common/tokenizer.h"
+#include "common/util.h"
 
 #include "zoombini2/graphics.h"
 #include "zoombini2/pages/transition_maptrans.h"
@@ -36,6 +37,23 @@ constexpr const char *TransitionMapTrans::kSpeechFormat;
 constexpr const char *TransitionMapTrans::kRouteFormat;
 constexpr const char *TransitionMapTrans::kZoombiniAnimationPath;
 constexpr const char *TransitionMapTrans::kMusicPath;
+constexpr int TransitionMapTrans::kFinalPageRescueThreshold;
+
+const TransitionMapTrans::RouteDest TransitionMapTrans::kRouteDestinations[] = {
+	{"crazyturtle", kPageCrazyTurtle, kPageZombiniville, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
+	{"waterslide", kPageWaterslide, kPageCrazyTurtle, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
+	{"aquacube", kPageAquacube, kPageWaterslide, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
+	{"rescue1", kPageRescue1, kPageAquacube, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
+	{"mysticmarsh", kPageMysticMarsh, kPageRescue1, Zoombini2Engine::RouteBranch::kRight02, RouteRescueCondition::kAnyCount},
+	{"magicwall", kPageMagicWall, kPageRescue1, Zoombini2Engine::RouteBranch::kLeft01, RouteRescueCondition::kAnyCount},
+	{"walloffleens", kPageWallOfFleens, kPageMysticMarsh, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
+	{"cheznorf", kPageChezNorf, kPageMagicWall, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
+	{"rescue2", kPageRescue2, kPageWallOfFleens, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
+	{"rescue2norf", kPageRescue2, kPageChezNorf, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
+	{"snowboard", kPageSnowboard, kPageRescue2, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
+	{"boolies", kPageBoolies, kPageSnowboard, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
+	{"booliewood", kPageBooliewood, kPageBoolies, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kBelowFinalThreshold},
+	{"final", kPageFinal, kPageBoolies, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAtOrAboveFinalThreshold}};
 
 // ============================================================================
 // TransitionMapTrans - route-map transition.
@@ -455,39 +473,32 @@ EventHandleResult TransitionMapTrans::onLButtonUp(const Common::Point &pos) {
 	return EventHandleResult::kConsumed;
 }
 
+const TransitionMapTrans::RouteDest *TransitionMapTrans::getRouteDestinations(uint &count) {
+	count = ARRAYSIZE(kRouteDestinations);
+	return kRouteDestinations;
+}
+
 PageId TransitionMapTrans::getDestPage(PageId src, Zoombini2Engine::RouteBranch routeBranch, int rescuedBoolies) {
-	switch (src) {
-	case kPageZombiniville:
-		return kPageCrazyTurtle;
-	case kPageCrazyTurtle:
-		return kPageWaterslide;
-	case kPageWaterslide:
-		return kPageAquacube;
-	case kPageAquacube:
-		return kPageRescue1;
-	case kPageRescue1: {
-		if (routeBranch == Zoombini2Engine::RouteBranch::kLeft01)
-			return kPageMagicWall;
-		else if (routeBranch == Zoombini2Engine::RouteBranch::kRight02)
-			return kPageMysticMarsh;
-		return kPageNone;
+	uint destinationCount = 0;
+	const RouteDest *destinations = getRouteDestinations(destinationCount);
+	for (uint i = 0; i < destinationCount; i++) {
+		const RouteDest &routeDest = destinations[i];
+		if (routeDest.source != src)
+			continue;
+
+		if (src == kPageRescue1 && routeDest.branch != routeBranch)
+			continue;
+
+		if (routeDest.rescueCondition == RouteRescueCondition::kBelowFinalThreshold &&
+			kFinalPageRescueThreshold <= rescuedBoolies)
+			continue;
+		if (routeDest.rescueCondition == RouteRescueCondition::kAtOrAboveFinalThreshold && rescuedBoolies < kFinalPageRescueThreshold)
+			continue;
+
+		return routeDest.target;
 	}
-	case kPageMysticMarsh:
-		return kPageWallOfFleens;
-	case kPageMagicWall:
-		return kPageChezNorf;
-	case kPageWallOfFleens:
-	case kPageChezNorf:
-		return kPageRescue2;
-	case kPageRescue2:
-		return kPageSnowboard;
-	case kPageSnowboard:
-		return kPageBoolies;
-	case kPageBoolies:
-		return rescuedBoolies < 400 ? kPageBooliewood : kPageFinal;
-	default:
-		return kPageNone;
-	}
+
+	return kPageNone;
 }
 
 } // End of namespace Zoombini2
