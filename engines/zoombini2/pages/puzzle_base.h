@@ -87,6 +87,8 @@ public:
 	void init() override;
 	/** Accept the whole current party and use the regular practice or adventure departure. */
 	void debugForceFinish();
+	/** Allow the active party to leave this puzzle through a debugger-requested route transition. */
+	void debugPrepareRouteDeparture() override;
 	/** Describe generated rules without changing puzzle state or consuming random numbers. */
 	virtual Common::String debugGetAnswer() const = 0;
 	/** Describe the page's actual opportunity model. */

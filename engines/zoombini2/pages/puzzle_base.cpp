@@ -147,4 +147,14 @@ void PuzzleBase::debugForceFinish() {
 	}
 }
 
+void PuzzleBase::debugPrepareRouteDeparture() {
+	if (!_vm->_state)
+		return;
+
+	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i += 1) {
+		if (_vm->_state->_activeZoombinis[i])
+			_vm->_state->_activeZoombinis[i]->setCanAdvanceFromPage(true);
+	}
+}
+
 } // End of namespace Zoombini2

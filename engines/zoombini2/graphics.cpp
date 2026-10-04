@@ -20,6 +20,7 @@
  */
 
 #include "common/debug.h"
+#include "common/endian.h"
 #include "common/memstream.h"
 #include "common/ptr.h"
 #include "common/textconsole.h"
@@ -40,6 +41,7 @@
 namespace Zoombini2 {
 
 constexpr Size32 ManagedSurface32::kScreenSize;
+constexpr Graphics::PixelFormat RleBlock::kSourceFormat;
 constexpr Size32 VolumePanel::kLabelSize;
 constexpr const char *VolumePanel::kGaugeImagePath;
 constexpr const char *VolumePanel::kOkNormalPath;
@@ -146,11 +148,11 @@ AlphaBlendLUT::AlphaBlendLUT() {
 	}
 }
 
-RGBColor RGBColor::blendWithAlphaLUT(const RGBColor &destColor, byte sourceFactor, byte destFactor, const AlphaBlendLUT &alphaLUT) const {
+RGBColor AlphaBlendLUT::blend(const RGBColor &srcColor, const RGBColor &destColor, byte sourceFactor, byte destFactor) const {
 	return RGBColor(
-		static_cast<byte>(MIN<int>(alphaLUT.scale(sourceFactor, r) + alphaLUT.scale(destFactor, destColor.r), 255)),
-		static_cast<byte>(MIN<int>(alphaLUT.scale(sourceFactor, g) + alphaLUT.scale(destFactor, destColor.g), 255)),
-		static_cast<byte>(MIN<int>(alphaLUT.scale(sourceFactor, b) + alphaLUT.scale(destFactor, destColor.b), 255)));
+		static_cast<byte>(MIN<int>(scale(sourceFactor, srcColor.r) + scale(destFactor, destColor.r), 255)),
+		static_cast<byte>(MIN<int>(scale(sourceFactor, srcColor.g) + scale(destFactor, destColor.g), 255)),
+		static_cast<byte>(MIN<int>(scale(sourceFactor, srcColor.b) + scale(destFactor, destColor.b), 255)));
 }
 
 BitBlock::BitBlock(Zoombini2Engine *vm) : _vm(vm) {
@@ -214,14 +216,16 @@ bool BitBlock::loadFromBB(const Common::Path &bbPath) {
 		debug(3, "BitBlock: cannot open BB '%s'", bbPath.toString().c_str());
 		return false;
 	}
-	Common::SeekableReadStream &f = *stream;
+	return loadBBStream(*stream, bbPath);
+}
 
+bool BitBlock::loadBBStream(Common::SeekableReadStream &f, const Common::Path &bbPath) {
 	/* int32 alphaMapPlaceholder = */ f.readSint32LE();
 	/* int32 pixelsPlaceholder = */ f.readSint32LE();
 	const uint32 bufferSize = f.readUint32LE();
 	const int32 width = f.readSint32LE();
 	const int32 height = f.readSint32LE();
-	const Size32 size(width, height);
+	Size32 size(width, height);
 	const uint32 dataSize = f.readUint32LE();
 
 	if (f.err() || f.eos() || size.width <= 0 || size.height <= 0) {
@@ -231,7 +235,8 @@ bool BitBlock::loadFromBB(const Common::Path &bbPath) {
 
 	const uint64 pixelCount64 = static_cast<uint64>(size.width) * static_cast<uint64>(size.height);
 	const uint64 expectedSize64 = pixelCount64 * 3;
-	if (0x7FFFFFFFU < pixelCount64 || 0xFFFFFFFFU < expectedSize64) {
+	// Drawing clips through signed 16-bit rectangles, and the decoded buffer uses four bytes per pixel.
+	if (INT16_MAX < size.width || INT16_MAX < size.height || static_cast<uint64>(INT32_MAX) / 4 < pixelCount64 || UINT32_MAX < expectedSize64) {
 		warning("BitBlock: BB dimensions overflow in '%s'", bbPath.toString().c_str());
 		return false;
 	}
@@ -244,6 +249,10 @@ bool BitBlock::loadFromBB(const Common::Path &bbPath) {
 	const uint32 readableSize = static_cast<uint32>(MIN<uint64>(expectedSize, static_cast<uint64>(availableSize64)));
 	const uint32 recoveredPixelCount = readableSize / 3;
 	const uint32 recoveredSize = recoveredPixelCount * 3;
+	if (!recoveredPixelCount) {
+		warning("BitBlock: no complete BB pixels in '%s'", bbPath.toString().c_str());
+		return false;
+	}
 
 	byte *bgrBuffer = recoveredSize ? new byte[recoveredSize] : nullptr;
 	if (recoveredSize && f.read(bgrBuffer, recoveredSize) != recoveredSize) {
@@ -259,9 +268,12 @@ bool BitBlock::loadFromBB(const Common::Path &bbPath) {
 	if (expectedSize64 < static_cast<uint64>(availableSize64))
 		warning("BitBlock: ignoring %u trailing bytes in BB '%s'", static_cast<uint32>(availableSize64 - expectedSize64), bbPath.toString().c_str());
 
-	const int pixelCount = static_cast<int>(pixelCount64);
-	byte *pixels = new byte[pixelCount * 4];
-	for (int i = 0; i < pixelCount; i++) {
+	// Missing rows do not justify allocating their declared pixel storage.
+	size.height = static_cast<int32>((static_cast<uint64>(recoveredPixelCount) + size.width - 1) / size.width);
+	const uint32 pixelCount = static_cast<uint32>(size.width) * static_cast<uint32>(size.height);
+	const uint32 decodedSize = pixelCount * 4;
+	byte *pixels = new byte[decodedSize];
+	for (uint32 i = 0; i < pixelCount; i++) {
 		pixels[i * 4] = 0;
 		pixels[i * 4 + 1] = 0;
 		pixels[i * 4 + 2] = 0;
@@ -429,7 +441,7 @@ void BitBlock::drawToSurfaceInternal(ManagedSurface32 *destSurface, const Common
 	bool converted = false;
 	if (useColorKey) {
 		static constexpr Graphics::PixelFormat kSourceFormat = Graphics::PixelFormat::createFormatRGBA32();
-		const uint32 colorKey = kSourceFormat.RGBToColor(_pixels[0], _pixels[1], _pixels[2]);
+		const uint32 colorKey = RGBColor(_pixels[0], _pixels[1], _pixels[2]).toPixel(kSourceFormat);
 		converted = Graphics::crossKeyBlit(destPixels, srcPixels, destSurface->pitch, srcPitch, dest.width(), dest.height(), destSurface->format,
 										   kSourceFormat, colorKey);
 	} else {
@@ -457,6 +469,8 @@ void BitBlock::drawToSurfaceInternal(ManagedSurface32 *destSurface, const Common
 void BitBlock::drawAlphaBlend(ManagedSurface32 *dst, const Common::Point32 &pos) const {
 	if (!_pixels || !_alphaMap)
 		return;
+	assert(dst->format.bytesPerPixel == 4);
+	static constexpr Graphics::PixelFormat kSourceFormat = Graphics::PixelFormat::createFormatRGBA32();
 
 	for (int row = 0; row < _size.height; row++) {
 		int dy = pos.y + row;
@@ -475,10 +489,11 @@ void BitBlock::drawAlphaBlend(ManagedSurface32 *dst, const Common::Point32 &pos)
 			const byte *src = _pixels + (row * _size.width + col) * 4;
 			byte *dstPixel = static_cast<byte *>(dst->getBasePtr(dx, dy));
 
-			dstPixel[0] = blendChannel(src[2], dstPixel[0], alpha);
-			dstPixel[1] = blendChannel(src[1], dstPixel[1], alpha);
-			dstPixel[2] = blendChannel(src[0], dstPixel[2], alpha);
-			dstPixel[3] = 255;
+			const RGBColor srcColor = RGBColor::fromPixel(READ_UINT32(src), kSourceFormat);
+			const RGBColor destColor = RGBColor::fromPixel(READ_UINT32(dstPixel), dst->format);
+			const RGBColor blendedColor(blendChannel(srcColor.r, destColor.r, alpha), blendChannel(srcColor.g, destColor.g, alpha),
+										blendChannel(srcColor.b, destColor.b, alpha));
+			WRITE_UINT32(dstPixel, blendedColor.toPixel(dst->format));
 		}
 	}
 }
@@ -496,6 +511,8 @@ void BitBlock::drawAlphaBlend(ManagedSurface32 *dst, const Common::Point32 &pos)
 void BitBlock::drawRleMaskBlend(ManagedSurface32 *dst, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const {
 	if (!_pixels || !_alphaMap)
 		return;
+	assert(dst->format.bytesPerPixel == 4);
+	static constexpr Graphics::PixelFormat kSourceFormat = Graphics::PixelFormat::createFormatRGBA32();
 
 	for (int row = 0; row < _size.height; row++) {
 		const int destY = pos.y + row;
@@ -511,16 +528,16 @@ void BitBlock::drawRleMaskBlend(ManagedSurface32 *dst, const Common::Point32 &po
 				continue;
 			const byte *src = _pixels + (row * _size.width + column) * 4;
 			byte *destPtr = static_cast<byte *>(dst->getBasePtr(destX, destY));
-			RGBColor srcColor = RGBColor::fromBGR(src);
+			const RGBColor srcColor = RGBColor::fromPixel(READ_UINT32(src), kSourceFormat);
 			if (mask == 255) {
-				srcColor.writeBGR(destPtr);
+				WRITE_UINT32(destPtr, srcColor.toPixel(dst->format));
 			} else {
 				// Round the source and destination contributions separately through the LUT.
 				const byte invAlpha = 255 - mask;
-				const RGBColor destColor = RGBColor::fromBGR(destPtr);
-				srcColor.blendWithAlphaLUT(destColor, mask, invAlpha, alphaLUT).writeBGR(destPtr);
+				const RGBColor destColor = RGBColor::fromPixel(READ_UINT32(destPtr), dst->format);
+				const RGBColor blendedColor = alphaLUT.blend(srcColor, destColor, mask, invAlpha);
+				WRITE_UINT32(destPtr, blendedColor.toPixel(dst->format));
 			}
-			destPtr[3] = 255;
 		}
 	}
 }
@@ -783,8 +800,9 @@ bool RleBlock::recolorPixel(const byte *source, bool premultiplied, const RGBCol
 	const int alpha = premultiplied ? 255 - source[3] : 255;
 	if (alpha < 8)
 		return false;
-	const RGBColor pixelColor = RGBColor::fromBGR(source);
-	const RGBColor sourceColor = pixelColor.unpremultiply(static_cast<byte>(alpha));
+	const RGBColor pixelColor = RGBColor::fromPixel(READ_UINT32(source), kSourceFormat);
+	const RGBColor sourceColor(static_cast<byte>(MIN(255, pixelColor.r * 255 / alpha)), static_cast<byte>(MIN(255, pixelColor.g * 255 / alpha)),
+							   static_cast<byte>(MIN(255, pixelColor.b * 255 / alpha)));
 	const int brightest = sourceColor.getMaxChannel();
 	const int darkest = sourceColor.getMinChannel();
 	if (brightest - darkest < 24)
@@ -834,7 +852,6 @@ void RleBlock::drawToScreenMirrored(ManagedSurface32 *destSurface, const Common:
 	if (!_loaded || !destSurface)
 		return;
 	assert(destSurface->format.bytesPerPixel == 4);
-	static constexpr Graphics::PixelFormat kOpaqueRleFormat = Graphics::PixelFormat::createFormatBGRA32(false);
 	for (uint spanIndex = 0; spanIndex < _spans.size(); spanIndex++) {
 		const Span &span = _spans[spanIndex];
 		assert(span.pixelOffset <= _pixelCount);
@@ -855,17 +872,19 @@ void RleBlock::drawToScreenMirrored(ManagedSurface32 *destSurface, const Common:
 		for (int32 x = left; x < right; x++) {
 			const byte *srcPixel = sourcePixels + (sourceCol - (x - left)) * 4;
 			if (span.mode == SpanMode::kOpaqueBgr00) {
-				if (!Graphics::crossBlit(dstPixel, srcPixel, destSurface->pitch, 4, 1, 1, destSurface->format, kOpaqueRleFormat)) {
+				if (!Graphics::crossBlit(dstPixel, srcPixel, destSurface->pitch, 4, 1, 1, destSurface->format, kSourceFormat)) {
 					warning("RleBlock: unsupported mirrored opaque pixel conversion");
 					return;
 				}
 			} else {
 				assert(span.mode == SpanMode::kInverseAlphaBgr01);
 				const byte invAlpha = srcPixel[3];
-				dstPixel[0] = blendChannel(srcPixel[0], dstPixel[0], invAlpha, alphaLUT);
-				dstPixel[1] = blendChannel(srcPixel[1], dstPixel[1], invAlpha, alphaLUT);
-				dstPixel[2] = blendChannel(srcPixel[2], dstPixel[2], invAlpha, alphaLUT);
-				dstPixel[3] = 255;
+				const RGBColor sourceColor = RGBColor::fromPixel(READ_UINT32(srcPixel), kSourceFormat);
+				const RGBColor destColor = RGBColor::fromPixel(READ_UINT32(dstPixel), destSurface->format);
+				const RGBColor blendedColor(blendChannel(sourceColor.r, destColor.r, invAlpha, alphaLUT),
+											blendChannel(sourceColor.g, destColor.g, invAlpha, alphaLUT),
+											blendChannel(sourceColor.b, destColor.b, invAlpha, alphaLUT));
+				WRITE_UINT32(dstPixel, blendedColor.toPixel(destSurface->format));
 			}
 			dstPixel += 4;
 		}
@@ -877,6 +896,7 @@ void RleBlock::drawToScreenSolidColor(ManagedSurface32 *destSurface, const Commo
 	if (!_loaded || !destSurface)
 		return;
 	assert(destSurface->format.bytesPerPixel == 4);
+	const uint32 solidPixel = color.toPixel(destSurface->format);
 	for (uint spanIndex = 0; spanIndex < _spans.size(); spanIndex++) {
 		const Span &span = _spans[spanIndex];
 		const int32 screenX = pos.x + span.xOffset;
@@ -892,15 +912,14 @@ void RleBlock::drawToScreenSolidColor(ManagedSurface32 *destSurface, const Commo
 		byte *dstPixel = static_cast<byte *>(destSurface->getBasePtr(left, screenY));
 		for (int x = left; x < right; x++) {
 			if (span.mode == SpanMode::kOpaqueBgr00) {
-				color.writeBGR(dstPixel);
+				WRITE_UINT32(dstPixel, solidPixel);
 			} else {
 				const byte inverseAlpha = srcPixel[3];
 				const byte forwardAlpha = 255 - inverseAlpha;
-				const RGBColor destColor = RGBColor::fromBGR(dstPixel);
-				const RGBColor blendedColor = color.blendWithAlphaLUT(destColor, forwardAlpha, inverseAlpha, alphaLUT);
-				blendedColor.writeBGR(dstPixel);
+				const RGBColor destColor = RGBColor::fromPixel(READ_UINT32(dstPixel), destSurface->format);
+				const RGBColor blendedColor = alphaLUT.blend(color, destColor, forwardAlpha, inverseAlpha);
+				WRITE_UINT32(dstPixel, blendedColor.toPixel(destSurface->format));
 			}
-			dstPixel[3] = 255;
 			srcPixel += 4;
 			dstPixel += 4;
 		}
@@ -917,8 +936,7 @@ void RleBlock::drawToScreenInternal(ManagedSurface32 *destSurface, const Common:
 	if (destClip.isEmpty())
 		return;
 	assert(destSurface->format.bytesPerPixel == 4);
-	static constexpr Graphics::PixelFormat kOpaqueRleFormat = Graphics::PixelFormat::createFormatBGRA32(false);
-	const uint32 colorKeyPixel = colorKey ? kOpaqueRleFormat.RGBToColor(colorKey->r, colorKey->g, colorKey->b) : 0;
+	const uint32 colorKeyPixel = colorKey ? colorKey->toPixel(kSourceFormat) : 0;
 
 	for (uint spanIndex = 0; spanIndex < _spans.size(); spanIndex++) {
 		const Span &span = _spans[spanIndex];
@@ -944,21 +962,18 @@ void RleBlock::drawToScreenInternal(ManagedSurface32 *destSurface, const Common:
 				if (recolor) {
 					for (int i = 0; i < count; i++) {
 						RGBColor adjustedColor;
-						if (recolorPixel(srcPixel, false, recolor->targetColor, recolor->sourceBrightness, recolor->preserveGradient, adjustedColor)) {
-							adjustedColor.writeBGR(dstPixel);
-						} else {
-							RGBColor::fromBGR(srcPixel).writeBGR(dstPixel);
-						}
-						dstPixel[3] = 255;
+						if (!recolorPixel(srcPixel, false, recolor->targetColor, recolor->sourceBrightness, recolor->preserveGradient, adjustedColor))
+							adjustedColor = RGBColor::fromPixel(READ_UINT32(srcPixel), kSourceFormat);
+						WRITE_UINT32(dstPixel, adjustedColor.toPixel(destSurface->format));
 						srcPixel += 4;
 						dstPixel += 4;
 					}
 				} else {
 					bool converted = false;
 					if (colorKey)
-						converted = Graphics::crossKeyBlit(dstPixel, srcPixel, destSurface->pitch, count * 4, count, 1, destSurface->format, kOpaqueRleFormat, colorKeyPixel);
+						converted = Graphics::crossKeyBlit(dstPixel, srcPixel, destSurface->pitch, count * 4, count, 1, destSurface->format, kSourceFormat, colorKeyPixel);
 					else
-						converted = Graphics::crossBlit(dstPixel, srcPixel, destSurface->pitch, count * 4, count, 1, destSurface->format, kOpaqueRleFormat);
+						converted = Graphics::crossBlit(dstPixel, srcPixel, destSurface->pitch, count * 4, count, 1, destSurface->format, kSourceFormat);
 					if (!converted) {
 						warning("RleBlock: unsupported opaque pixel conversion");
 						continue;
@@ -970,7 +985,7 @@ void RleBlock::drawToScreenInternal(ManagedSurface32 *destSurface, const Common:
 				// Mode 1 stores premultiplied BGR followed by inverse alpha.
 				for (int i = 0; i < count; i++) {
 					const byte invAlpha = srcPixel[3];
-					RGBColor sourceColor = RGBColor::fromBGR(srcPixel);
+					RGBColor sourceColor = RGBColor::fromPixel(READ_UINT32(srcPixel), kSourceFormat);
 					if (recolor) {
 						RGBColor adjustedColor;
 						if (recolorPixel(srcPixel, true, recolor->targetColor, recolor->sourceBrightness, recolor->preserveGradient, adjustedColor)) {
@@ -981,13 +996,12 @@ void RleBlock::drawToScreenInternal(ManagedSurface32 *destSurface, const Common:
 								alphaLUT.scale(alpha, adjustedColor.b));
 						}
 					}
-					const RGBColor destColor = RGBColor::fromBGR(dstPixel);
+					const RGBColor destColor = RGBColor::fromPixel(READ_UINT32(dstPixel), destSurface->format);
 					const RGBColor blendedColor(
 						blendChannel(sourceColor.r, destColor.r, invAlpha, alphaLUT),
 						blendChannel(sourceColor.g, destColor.g, invAlpha, alphaLUT),
 						blendChannel(sourceColor.b, destColor.b, invAlpha, alphaLUT));
-					blendedColor.writeBGR(dstPixel);
-					dstPixel[3] = 255;
+					WRITE_UINT32(dstPixel, blendedColor.toPixel(destSurface->format));
 					srcPixel += 4;
 					dstPixel += 4;
 				}
@@ -1302,9 +1316,9 @@ bool Gfx::noseColorRGB(ColorAssistMode mode, byte value, RGBColor &color) {
 	return true;
 }
 
-RGBColor Gfx::recolorNoseGradientRGB(const RGBColor &sourceColor, const RGBColor &targetColor) {
-	const int sourceMaximum = sourceColor.getMaxChannel();
-	const int sourceMinimum = sourceColor.getMinChannel();
+RGBColor Gfx::recolorNoseGradientRGB(const RGBColor &srcColor, const RGBColor &targetColor) {
+	const int sourceMaximum = srcColor.getMaxChannel();
+	const int sourceMinimum = srcColor.getMinChannel();
 	const int targetMaximum = targetColor.getMaxChannel();
 	const int targetMinimum = targetColor.getMinChannel();
 	if (sourceMaximum == 0 || targetMaximum == 0)
@@ -2385,6 +2399,8 @@ void BitmapFont::drawGlyph(ManagedSurface32 *dst, const Glyph &glyph, const Comm
 						   const RGBColor &color, const AlphaBlendLUT &alphaLUT) const {
 	if (!glyph.mask)
 		return;
+	assert(dst->format.bytesPerPixel == 4);
+	const uint32 solidPixel = color.toPixel(dst->format);
 
 	for (int row = 0; row < glyph.height; row++) {
 		const int destY = pos.y + row;
@@ -2400,16 +2416,15 @@ void BitmapFont::drawGlyph(ManagedSurface32 *dst, const Glyph &glyph, const Comm
 				continue;
 			byte *destPtr = static_cast<byte *>(dst->getBasePtr(destX, destY));
 			if (mask == 255) {
-				color.writeBGR(destPtr);
+				WRITE_UINT32(destPtr, solidPixel);
 			} else {
 				// The tint is uniform across the glyph, so scale it by the
 				// coverage and scale the destination by the coverage's inverse.
 				const byte invAlpha = 255 - mask;
-				const RGBColor destColor = RGBColor::fromBGR(destPtr);
-				const RGBColor blendedColor = color.blendWithAlphaLUT(destColor, mask, invAlpha, alphaLUT);
-				blendedColor.writeBGR(destPtr);
+				const RGBColor destColor = RGBColor::fromPixel(READ_UINT32(destPtr), dst->format);
+				const RGBColor blendedColor = alphaLUT.blend(color, destColor, mask, invAlpha);
+				WRITE_UINT32(destPtr, blendedColor.toPixel(dst->format));
 			}
-			destPtr[3] = 255;
 		}
 	}
 }

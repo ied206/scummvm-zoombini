@@ -22,6 +22,7 @@
 #include <string.h>
 
 #include "common/debug.h"
+#include "common/endian.h"
 #include "zoombini2/graphics.h"
 #include "zoombini2/pages/shelter_zombiniville.h"
 #include "zoombini2/scripts.h"
@@ -574,7 +575,7 @@ void ShelterZombiniville::sendZoombiniOff(ZoombiniRunner *zoombini, bool restore
 	const uint32 tick = _vm->getGameTickCount();
 	zoombini->startDirectionTrackedAnimation(tick);
 	zoombini->startMovement(createReturnPath(zoombini->getScreenPosition()), tick);
-	debug(2, "ShelterZombiniville: Returning '%s' from slot %d", zoombini->getName(), slotIndex);
+	debug(2, "ShelterZombiniville: Returning '%s' from slot %d", zoombini->getName().c_str(), slotIndex);
 }
 
 void ShelterZombiniville::sendAllZoombinisOff() {
@@ -610,7 +611,7 @@ void ShelterZombiniville::finishSendingZoombiniOff(ZoombiniRunner *zoombini) {
 	}
 	if (!_vm->_state->_traitComboTable.unregisterCombo(zoombini->getTraits()))
 		warning("ShelterZombiniville: Failed to unregister returned Zoombini traits %s", zoombini->getTraits().toStr().c_str());
-	debug(2, "ShelterZombiniville: Returned '%s'", zoombini->getName());
+	debug(2, "ShelterZombiniville: Returned '%s'", zoombini->getName().c_str());
 	delete zoombini;
 	refreshFeatureCounts();
 }
@@ -796,18 +797,20 @@ void ShelterZombiniville::recolorPickerNose(ManagedSurface32 *screen, byte noseV
 			if (x < 0 || screen->w <= x || 144 < dx * dx + dy * dy)
 				continue;
 			byte *pixel = static_cast<byte *>(screen->getBasePtr(x, y));
-			const RGBColor sourceColor = RGBColor::fromBGR(pixel);
+			byte alpha;
+			RGBColor srcColor;
+			screen->format.colorToARGB(READ_UINT32(pixel), alpha, srcColor.r, srcColor.g, srcColor.b);
 			bool matchingColor = false;
 			if (noseVal == 3)
-				matchingColor = sourceColor.r + 12 < sourceColor.g && sourceColor.b + 12 < sourceColor.g;
+				matchingColor = srcColor.r + 12 < srcColor.g && srcColor.b + 12 < srcColor.g;
 			else if (noseVal == 4)
-				matchingColor = sourceColor.r + 20 < sourceColor.b && sourceColor.g + 20 < sourceColor.b;
+				matchingColor = srcColor.r + 20 < srcColor.b && srcColor.g + 20 < srcColor.b;
 			else if (noseVal == 5)
-				matchingColor = sourceColor.g + 15 < sourceColor.r && sourceColor.g + 15 < sourceColor.b;
+				matchingColor = srcColor.g + 15 < srcColor.r && srcColor.g + 15 < srcColor.b;
 			if (!matchingColor)
 				continue;
-			const RGBColor adjustedColor = Gfx::recolorNoseGradientRGB(sourceColor, targetColor);
-			adjustedColor.writeBGR(pixel);
+			const RGBColor adjustedColor = Gfx::recolorNoseGradientRGB(srcColor, targetColor);
+			WRITE_UINT32(pixel, screen->format.ARGBToColor(alpha, adjustedColor.r, adjustedColor.g, adjustedColor.b));
 		}
 	}
 	screen->addDirtyRect(Common::Rect(centerX - 12, centerY - 12, centerX + 13, centerY + 13));

@@ -399,7 +399,7 @@ void PuzzleWallOfFleens::finishShot() {
 	} else {
 		ZoombiniRunner *lost = _puzzleZoombinis[_loadedRunner];
 		if (_vm->_isSavedGame)
-			GameState::storeInStorage(_vm->_state->_rescue1Storage, *lost);
+			_vm->_state->retainRosterMember(_vm->_state->_rescue1Storage, *lost);
 		for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
 			if (_vm->_state->_activeZoombinis[i] == lost) {
 				_vm->_state->_activeZoombinis.remove_at(i);

@@ -218,10 +218,20 @@ void Zoombini2Engine::clearZoombiniAnimationCache() {
 }
 
 bool Zoombini2Engine::writeGameSave(const Common::String &savefileName) {
-	const Common::String &activeSavefileName = _activeSavefileName.empty() ? savefileName : _activeSavefileName;
+	if (!_isSavedGame || !_state || _state->getPlayerName().empty() || savefileName.empty() || _activeSavefileName.empty())
+		return true;
+	const Common::String &activeSavefileName = _activeSavefileName;
 	if (isGameSaveWriteLocked(activeSavefileName) || _activeSavefileReadOnly)
 		return true;
 	return writeGameSavefile(activeSavefileName);
+}
+
+void Zoombini2Engine::resetGameState() {
+	_activeSavefileName.clear();
+	_activeSavefileReadOnly = false;
+	_isSavedGame = false;
+	if (_state)
+		_state->init();
 }
 
 bool Zoombini2Engine::isSavefileReadOnlyToggleEnabled() const {
@@ -330,6 +340,43 @@ void Zoombini2Engine::queueDebugPracticeLaunch(PageId pageId, int level, uint pa
 	_debugPracticeResetState = true;
 	_isSavedGame = false;
 	requestPageChange(kPageMenuPractice);
+}
+
+Zoombini2Engine::DebugRouteRequestResult Zoombini2Engine::requestDebugMapTransition(PageId targetPageId, PageId sourcePageId, RouteBranch routeBranch, uint level) {
+	if (!_state || !_currentPage)
+		return DebugRouteRequestResult::kNoActivePage;
+	if (4 < level)
+		return DebugRouteRequestResult::kInvalidLevel;
+	if (level == 4 && !supportsInternalPracticeLevel4(targetPageId))
+		return DebugRouteRequestResult::kUnsupportedLevel4;
+
+	const uint targetPartySize = InteractiveMap::getPracticePartySize(targetPageId);
+	if (targetPartySize == 0 && (level != 0 || !_isSavedGame))
+		return DebugRouteRequestResult::kPracticeRequiresPuzzle;
+	if (level == 0 && !_isSavedGame && _state->getLevel() == 4 && !supportsInternalPracticeLevel4(targetPageId) && targetPartySize != 0)
+		return DebugRouteRequestResult::kUnavailableCurrentLevel4;
+
+	const int rescuedBoolies = level == 0 ? _state->_rescuedBoolieCount : 0;
+	if (TransitionMapTrans::getDestPage(sourcePageId, routeBranch, rescuedBoolies) != targetPageId)
+		return DebugRouteRequestResult::kUnreachableDestination;
+
+	if (level != 0) {
+		_isSavedGame = false;
+		_debugXferPracticeLevel = static_cast<int>(level);
+		_debugXferPracticeTarget = targetPageId;
+		_debugXferResetState = true;
+	} else if (_isSavedGame) {
+		_currentPage->debugPrepareRouteDeparture();
+	} else {
+		_debugXferPracticeLevel = _state->getLevel();
+		_debugXferPracticeTarget = targetPageId;
+	}
+
+	_mapTransitionSourcePageId = sourcePageId;
+	_routeDirection = routeBranch;
+	_debugXferDestination = targetPartySize != 0 ? targetPageId : sourcePageId;
+	requestPageChange(kPageMapTrans);
+	return DebugRouteRequestResult::kQueued;
 }
 
 bool Zoombini2Engine::supportsInternalPracticeLevel4(PageId pageId) {
@@ -1083,7 +1130,7 @@ void Zoombini2Engine::updateDragOverlay(bool advanceState) {
 		return;
 	ManagedSurface32 *screen = _gfx->getScreen();
 	_currentPage->renderDragOverlay(screen, advanceState);
-	_gfx->drawDragNameTooltip(screen, Common::String(dragged->getName()));
+	_gfx->drawDragNameTooltip(screen, dragged->getName());
 }
 
 void Zoombini2Engine::presentFrame() {
@@ -1203,16 +1250,12 @@ void Zoombini2Engine::switchPage(PageId pageId) {
 	destroyCurrentPage();
 	_zoombiniWalkingFlag = false;
 	if (pageId == kPageMenuPractice && _debugPracticeResetState) {
-		_state->init();
-		_activeSavefileName.clear();
-		_activeSavefileReadOnly = false;
+		resetGameState();
 		_debugPracticeResetState = false;
 	}
 	if (pageId == kPageMapTrans && _debugXferDestination != kPageNone) {
 		if (_debugXferResetState) {
-			_state->init();
-			_activeSavefileName.clear();
-			_activeSavefileReadOnly = false;
+			resetGameState();
 			_state->_level = _debugXferPracticeLevel;
 			_debugXferResetState = false;
 		}

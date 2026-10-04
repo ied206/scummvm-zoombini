@@ -166,7 +166,7 @@ Zoombini2SaveManagementDialog::Zoombini2SaveManagementDialog(const Common::Strin
 	static constexpr int kActionButtonWidth = (kTableWidth - (kActionButtonCount - 1) * kActionButtonGap) / kActionButtonCount;
 	int actionX = kDialogMargin;
 	_editButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kActionButtonWidth, kButtonHeight, true, Common::U32String(U"Rename"),
-										Common::U32String(), kEditSavefileCommand);
+										Common::U32String(U"Return to the launcher before renaming the active saved game."), kEditSavefileCommand);
 	actionX += kActionButtonWidth + kActionButtonGap;
 	_duplicateButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kActionButtonWidth, kButtonHeight, true, Common::U32String(U"Clone"),
 											 Common::U32String(), kDuplicateSavefileCommand);
@@ -178,7 +178,8 @@ Zoombini2SaveManagementDialog::Zoombini2SaveManagementDialog(const Common::Strin
 										  Common::U32String(), kExportSavefileCommand);
 	actionX += kActionButtonWidth + kActionButtonGap;
 	_deleteButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kTableWidth - actionX + kDialogMargin, kButtonHeight, true,
-										  Common::U32String(U"Delete"), Common::U32String(), kDeleteSavefileCommand);
+										  Common::U32String(U"Delete"), Common::U32String(U"Return to the launcher before deleting the active saved game."),
+										  kDeleteSavefileCommand);
 
 	GUI::ContainerWidget *savefileHeader = new GUI::ContainerWidget(this, kDialogMargin, kHeaderTop, kTableWidth, kTableRowHeight, true);
 	savefileHeader->setBackgroundType(GUI::ThemeEngine::kWidgetBackgroundNo);
@@ -314,11 +315,19 @@ void Zoombini2SaveManagementDialog::updateSavefileTableLayout() {
 void Zoombini2SaveManagementDialog::updateButtons() {
 	const bool hasSelection = 0 <= _selectedSavefileIndex && _selectedSavefileIndex < _savefileRowCount;
 	const bool stateValid = hasSelection && _savefileStateValid[_selectedSavefileIndex];
-	_editButton->setEnabled(stateValid);
+	const bool activeSavefile = hasSelection && isActiveSavefile(_savefileNames[_selectedSavefileIndex]);
+	_editButton->setEnabled(stateValid && !activeSavefile);
 	_duplicateButton->setEnabled(stateValid && _savefileRowCount < kMaximumSavefileRows);
 	_importButton->setEnabled(true);
 	_exportButton->setEnabled(stateValid);
-	_deleteButton->setEnabled(hasSelection);
+	_deleteButton->setEnabled(hasSelection && !activeSavefile);
+}
+
+bool Zoombini2SaveManagementDialog::isActiveSavefile(const Common::String &savefileName) const {
+	if (!g_engine || ConfMan.getActiveDomainName() != _domain || Common::String(g_engine->getMetaEngine()->getName()) != "zoombini2")
+		return false;
+	const Zoombini2Engine *vm = static_cast<const Zoombini2Engine *>(g_engine);
+	return vm->isActiveGameSave(savefileName);
 }
 
 void Zoombini2SaveManagementDialog::renameSelectedSavefile() {
@@ -326,6 +335,8 @@ void Zoombini2SaveManagementDialog::renameSelectedSavefile() {
 		return;
 
 	const Common::String oldSavefileName = _savefileNames[_selectedSavefileIndex];
+	if (isActiveSavefile(oldSavefileName))
+		return;
 	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language);
 	Zoombini2SavefileNameDialog nameDialog(Common::U32String(U"Rename saved game"), savegameManager.decodeSavefileName(oldSavefileName), _language);
 	if (nameDialog.runModal() != GUI::kOKCmd)
@@ -399,6 +410,11 @@ void Zoombini2SaveManagementDialog::importSavefile() {
 		}
 	}
 
+	if (isActiveSavefile(savefileName)) {
+		GUI::MessageDialog errorDialog(Common::U32String(U"Return to the launcher before replacing the active saved game."));
+		errorDialog.runModal();
+		return;
+	}
 	if (savegameManager.savefileExists(savefileName)) {
 		GUI::MessageDialog confirmation(Common::U32String(U"A saved game with this name already exists. Replace it?"),
 										Common::U32String(U"Replace"), Common::U32String(U"Cancel"));
@@ -468,13 +484,15 @@ void Zoombini2SaveManagementDialog::exportSelectedSavefile() {
 void Zoombini2SaveManagementDialog::deleteSelectedSavefile() {
 	if (_selectedSavefileIndex < 0 || static_cast<int>(_savefileNames.size()) <= _selectedSavefileIndex)
 		return;
+	const Common::String savefileName = _savefileNames[_selectedSavefileIndex];
+	if (isActiveSavefile(savefileName))
+		return;
 
 	GUI::MessageDialog confirmation(Common::U32String(U"Do you really want to delete this saved game?"), Common::U32String(U"Delete"),
 									Common::U32String(U"Cancel"));
 	if (confirmation.runModal() != GUI::kMessageOK)
 		return;
 
-	const Common::String savefileName = _savefileNames[_selectedSavefileIndex];
 	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language);
 	if (!savegameManager.deleteSavefile(savefileName)) {
 		GUI::MessageDialog errorDialog(Common::U32String(U"Error deleting saved game"));
@@ -546,8 +564,8 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	manageSavefilesButton->setTarget(this);
 	_savefileReadOnlyToggleCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.SavefileReadOnlyToggle",
 															  Common::U32String(U"Enable savefile readonly toggle (Ctrl-K)"),
-																		  Common::U32String(U"Ctrl+K or right-click toggles automatic save writes for one savefile during this game session. "
-																							U"A file without write permission remains read-only."));
+															  Common::U32String(U"Ctrl+K or right-click toggles automatic save writes for one savefile during this game session. "
+																				U"A file without write permission remains read-only."));
 
 	new SeparatorWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayEnhancementsSeparator");
 	header = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayEnhancements",
@@ -607,8 +625,8 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	pacingLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
 	_pacingPopUp = new GUI::PopUpWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.Pacing",
 										Common::U32String(U"Select 60Hz LCD or 75Hz CRT logic pacing. "
-													U"Affects Booliewood panorama scrolling speed and idle animation trigger rates. "
-													U"Rendering frame rate is unaffected."));
+														  U"Affects Booliewood panorama scrolling speed and idle animation trigger rates. "
+														  U"Rendering frame rate is unaffected."));
 	_pacingPopUp->appendEntry(Common::U32String(U"60Hz LCD"), 60);
 	_pacingPopUp->appendEntry(Common::U32String(U"75Hz CRT"), 75);
 	_unlockFrameRateCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.UnlockFrameRate",

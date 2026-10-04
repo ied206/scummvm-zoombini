@@ -100,7 +100,7 @@ void TransitionVideo::init() {
 
 	Common::SeekableReadStream *stream = _vm->openResourceFile(_videoPath.toString('/'));
 	if (!stream || !_decoder->loadStream(stream)) {
-		delete stream;
+		// The decoder releases its stream, including when loading fails.
 		warning("TransitionVideo: Failed to load %s", _videoPath.toString('/').c_str());
 		// Skip to next page if video is missing
 		_vm->requestPageChange(_nextPageId);
