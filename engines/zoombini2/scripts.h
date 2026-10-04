@@ -465,6 +465,8 @@ private:
 	Zoombini2Engine *_vm;
 	/** Apply the live engine option to every already loaded segment. */
 	void synchronizeNumericMode();
+	/** Parse a PAT stream only after establishing its first segment. */
+	static PathObject *loadPATStream(Zoombini2Engine *vm, Common::SeekableReadStream &stream);
 };
 
 /** One page-managed target accepted by the common Zoombini input lifecycle. */
@@ -537,8 +539,8 @@ public:
 	const ZmbTrait &getTraits() const { return _traits; }
 	/** Return the packed cache derived from the four visible traits. */
 	uint16 getTraitHash() const { return _traitHash; }
-	/** Return the NUL-terminated Zoombini name. */
-	const char *getName() const { return _name; }
+	/** Return the displayed name without reading beyond its fixed-size saved bytes. */
+	Common::String getName() const;
 	/** Replace the name while retaining the fixed-size storage buffer. */
 	void setName(const char *name) { Common::strlcpy(_name, name, sizeof(_name)); }
 	/** Copy complete fixed-size name bytes without assuming a NUL terminator. */
@@ -719,7 +721,7 @@ private:
 	ZmbTrait _traits = ZmbTrait();
 	/** Runtime-only packed cache derived from the four visible traits. */
 	uint16 _traitHash = 0xFFFF;
-	/** NUL-terminated Zoombini name retained by storage records and saved game data. */
+	/** Fixed-size name bytes retained by storage records and saved game data. */
 	char _name[StorageRecord::kNameSize] = {};
 	/** Byte-sized eligibility to advance from the active page. */
 	byte _canAdvanceFromPage = 0;

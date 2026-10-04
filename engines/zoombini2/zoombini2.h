@@ -104,6 +104,17 @@ public:
 		kCompletePuzzle
 	};
 
+	/** Result of validating and queueing a debugger-requested map route. */
+	enum class DebugRouteRequestResult {
+		kQueued,
+		kNoActivePage,
+		kInvalidLevel,
+		kUnsupportedLevel4,
+		kPracticeRequiresPuzzle,
+		kUnavailableCurrentLevel4,
+		kUnreachableDestination
+	};
+
 	/** Construct an engine for one detected release. */
 	Zoombini2Engine(OSystem *syst, const Zoombini2GameDescription *desc);
 	/** Release the active page and all resources retained for this game instance. */
@@ -204,6 +215,8 @@ public:
 	bool takePracticePuzzleLaunch(PageId &pageId, int &level, uint &partySize);
 	/** Queue a console-only practice launch without exposing an unsupported map tier. */
 	void queueDebugPracticeLaunch(PageId pageId, int level, uint partySize);
+	/** Validate and queue a debugger-requested route through the map transition. */
+	DebugRouteRequestResult requestDebugMapTransition(PageId targetPageId, PageId sourcePageId, RouteBranch routeBranch, uint level);
 	/** Return whether this page supports the debug-only level 4 practice tier. */
 	static bool supportsInternalPracticeLevel4(PageId pageId);
 	/** Return the practice-map level retained for this engine session. */
@@ -214,8 +227,12 @@ public:
 	/** Pause or resume the gameplay clock for a game dialog. */
 	void setDialogPaused(bool paused);
 
-	/** Write the current game state to its active savefile, or succeed without writing while that file is locked. */
+	/** Write saved-game state to its active savefile, or succeed without writing during practice, sign-in, or a write lock. */
 	bool writeGameSave(const Common::String &savefileName);
+	/** Reset the game state and detach its previous automatic-save target. */
+	void resetGameState();
+	/** Return whether @p savefileName is the current automatic-save target. */
+	bool isActiveGameSave(const Common::String &savefileName) const { return !_activeSavefileName.empty() && _activeSavefileName.equalsIgnoreCase(savefileName); }
 	/** Return whether the per-savefile write-lock controls are enabled for this target. */
 	bool isSavefileReadOnlyToggleEnabled() const;
 	/** Return whether automatic writes are locked for @p savefileName during this game session. */
@@ -249,6 +266,8 @@ public:
 	PageId getCurrentPageId() const { return _currentPageId; }
 	/** Return the borrowed active page. */
 	PageBase *getCurrentPage() { return _currentPage; }
+	/** Return whether game state and a page are both active. */
+	bool hasActiveGamePage() const { return _state && _currentPage; }
 
 	/** Return gameplay milliseconds from the current clock read. */
 	uint32 getGameTickCount() const;

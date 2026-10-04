@@ -347,6 +347,8 @@ public:
 	void stashActiveZoombinis();
 	/** Retain puzzle leavers in the saved roster or @p storage, keep successful route members active, and record an eligible perfect clear. */
 	void finishPuzzleRoster(PageId pageId, StorageRecord **storage, bool advancing, bool savedGame, bool perfectClearEligible);
+	/** Retain a member in @p storage, or in the serialized roster when no storage cell is available. */
+	void retainRosterMember(StorageRecord **storage, ZoombiniRunner &zoombini);
 	/** Delete every record in @p storage and clear its cells. */
 	static void clearStorage(StorageRecord **storage);
 	/** Store @p zoombini in the first available cell of @p storage. */

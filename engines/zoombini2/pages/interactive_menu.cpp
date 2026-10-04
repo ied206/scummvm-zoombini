@@ -94,7 +94,7 @@ InteractiveMenu::~InteractiveMenu() {
 }
 
 void InteractiveMenu::init() {
-	_vm->_state->init();
+	_vm->resetGameState();
 	loadResources();
 	loadButtons();
 
@@ -411,8 +411,8 @@ void InteractiveMenu::loadSelectedSave(const Common::String &savefileName) {
 }
 
 void InteractiveMenu::startNewSave(const Common::String &playerName, const Common::String &savefileName) {
+	_vm->resetGameState();
 	GameState *gameState = _vm->_state;
-	gameState->init();
 	gameState->setPlayerName(playerName);
 
 	bool success = false;

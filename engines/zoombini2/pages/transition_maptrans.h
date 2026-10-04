@@ -35,6 +35,22 @@ class ZoombiniAnimation;
 /** Transition page that walks the current party along a route on the mountain map. */
 class TransitionMapTrans : public TransitionBase {
 public:
+	/** Rescue-count condition for a named route leaving Boolies. */
+	enum class RouteRescueCondition {
+		kAnyCount, ///< The route is available for any rescue count.
+		kBelowFinalThreshold, ///< The route is available below the final-page threshold.
+		kAtOrAboveFinalThreshold ///< The route is available at or above the final-page threshold.
+	};
+
+	/** Route edge with the developer-navigation label used to select it. */
+	struct RouteDest {
+		const char *name; ///< Debugger command name for this route.
+		PageId target; ///< Page reached by this route edge.
+		PageId source; ///< Page that starts this route edge.
+		Zoombini2Engine::RouteBranch branch; ///< Branch selected when leaving Rescue Site I.
+		RouteRescueCondition rescueCondition; ///< Rescue-count condition for this route.
+	};
+
 	/** Construct the map transition for @p vm. */
 	TransitionMapTrans(Zoombini2Engine *vm);
 	/** Release the composited map and per-Zoombini paths. */
@@ -51,10 +67,16 @@ public:
 	/** Skip the remaining walking animation and enter the resolved destination on button release. */
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
 	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
+	/** Return all named route edges and their count. */
+	static const RouteDest *getRouteDestinations(uint &count);
 	/** Resolve the next route page from the source page, Rescue Site I branch, and rescue progress. */
 	static PageId getDestPage(PageId src, Zoombini2Engine::RouteBranch routeBranch, int rescuedBoolies);
 
 private:
+	/** Rescue threshold that selects the finale instead of Booliewood. */
+	static constexpr int kFinalPageRescueThreshold = 400;
+	/** Map edges shared by route resolution and developer navigation. */
+	static const RouteDest kRouteDestinations[];
 	/** Minimum party size before the first rescue-site movie is selected. */
 	static constexpr int kRescue1MovieMinimumZoombinis = 8;
 	/** Audio path format that appends a speech clip name and .wav extension. */

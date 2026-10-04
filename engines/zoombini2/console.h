@@ -24,11 +24,30 @@
 
 #include "gui/debugger.h"
 
+#include "zoombini2/pages/transition_maptrans.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
 enum PageId : int;
+
+/** Parse bounded decimal or 0x-prefixed integer text without reporting diagnostics. */
+class StringParser {
+public:
+	enum class Result {
+		kSuccess,
+		kEmptyInput,
+		kInvalidInput,
+		kTrailingCharacters,
+		kConversionFailure,
+		kOutOfRange
+	};
+
+	/** Leave @p result unchanged when parsing fails. */
+	static Result parseSignedInt(const char *text, int32 &result);
+	/** Leave @p result unchanged when parsing fails. */
+	static Result parseUnsignedInt(const char *text, uint32 &result);
+};
 
 /**
  * Debug console for the Mountain Rescue engine.
@@ -46,20 +65,15 @@ public:
 	~Zoombini2Console() override;
 
 private:
-	struct GoDestination {
-		const char *name;
-		PageId target;
-		PageId source;
-		Zoombini2Engine::RouteBranch branch;
-	};
-	static const GoDestination kGoDestinations[];
 	static constexpr const char *kCmdGo = "go";
+	static constexpr const char *kCmdPuzzle = "puzzle";
+	static constexpr const char *kCmdPage = "page";
 	static constexpr const char *kSubCmdGoXfer = "xfer";
 	static constexpr const char *kSubCmdGoPractice = "practice";
 	bool Cmd_Go(int argc, const char **argv);
 	bool CmdSub_GoXfer(int argc, const char **argv);
 	bool CmdSub_GoPractice(int argc, const char **argv);
-	const GoDestination *findGoDestPage(const char *name, bool puzzleOnly);
+	const TransitionMapTrans::RouteDest *findGoDestination(const char *name, bool puzzleOnly);
 	void printGoDestinations(bool puzzleOnly);
 	bool Cmd_Puzzle(int argc, const char **argv);
 	bool CmdSub_PuzzleFinish(int argc, const char **argv);
@@ -86,6 +100,9 @@ private:
 	bool CmdSub_DrawAreaMask(int argc, const char **argv);
 	/** Open the debug dialog showing animation or sprite frames. */
 	bool CmdSub_DrawAnimation(int argc, const char **argv);
+	bool parseSignedInt(const char *text, int32 &result);
+	bool parseUnsignedInt(const char *text, uint32 &result);
+	void reportIntegerParseFailure(StringParser::Result result, bool unsignedValue, const char *text);
 	/** Return whether @p arg requests command help. */
 	static bool isHelpOption(const char *arg);
 	/** Return whether any command argument requests help. */

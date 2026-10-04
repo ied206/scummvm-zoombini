@@ -124,7 +124,7 @@ void ShelterRescueSiteBase::saveRescueRoster(StorageRecord **storage) {
 		if (departing) {
 			i += 1;
 		} else {
-			GameState::storeInStorage(storage, *zoombini);
+			state->retainRosterMember(storage, *zoombini);
 			delete zoombini;
 			roster.remove_at(i);
 		}
