@@ -26,7 +26,6 @@
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
-#include <cmath>
 
 namespace Zoombini2 {
 
@@ -376,7 +375,7 @@ void PuzzleAquacube::updateBubbles(uint32 elapsed) {
 				bubble.active = false;
 			} else {
 				bubble.y -= elapsed * (bubble.type == 0 ? 0.05 : 0.025);
-				bubble.x = std::sin(bubble.phase) * 5.0 + bubble.originX;
+				bubble.x = sinf(bubble.phase) * 5.0 + bubble.originX;
 				bubble.phase += elapsed * 0.0025;
 				if (6.283 < bubble.phase)
 					bubble.phase = 0;
