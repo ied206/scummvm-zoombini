@@ -78,6 +78,37 @@ public:
 private:
 	/** Number of fixed slots in the Zombiniville boarding area. */
 	static constexpr int kBoardingSlotCount = 16;
+	/** Draw positions for feature controls indexed by trait kind and value. */
+	static constexpr Common::Point32 kFeatureDrawPositions[ZmbTrait::kTraitKindCount][ZmbTrait::kTraitValueCount] = {
+		{
+			Common::Point32(237, 345),
+			Common::Point32(292, 351),
+			Common::Point32(398, 355),
+			Common::Point32(346, 349),
+			Common::Point32(438, 369),
+		},
+		{
+			Common::Point32(534, 126),
+			Common::Point32(529, 167),
+			Common::Point32(526, 214),
+			Common::Point32(522, 255),
+			Common::Point32(518, 296),
+		},
+		{
+			Common::Point32(229, 41),
+			Common::Point32(286, 45),
+			Common::Point32(404, 46),
+			Common::Point32(345, 44),
+			Common::Point32(453, 45),
+		},
+		{
+			Common::Point32(162, 155),
+			Common::Point32(165, 109),
+			Common::Point32(163, 195),
+			Common::Point32(157, 233),
+			Common::Point32(157, 275),
+		},
+	};
 	/** Full-screen background bitmap for the Zoombiniville party picker. */
 	static constexpr const char *kBackgroundPath = "#bmp/zombiniville/zoombiniville";
 	/** Area map defining the interactive regions used for drag-and-drop input. */
