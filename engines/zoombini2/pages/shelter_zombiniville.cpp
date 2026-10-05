@@ -33,6 +33,7 @@
 namespace Zoombini2 {
 
 constexpr int ShelterZombiniville::kBoardingSlotCount;
+constexpr Common::Point32 ShelterZombiniville::kFeatureDrawPositions[ZmbTrait::kTraitKindCount][ZmbTrait::kTraitValueCount];
 constexpr const char *ShelterZombiniville::kBackgroundPath;
 constexpr const char *ShelterZombiniville::kAreaMaskPath;
 constexpr const char *ShelterZombiniville::kFeatureAnimationFormat;
@@ -89,36 +90,6 @@ ShelterZombiniville::~ShelterZombiniville() {
 }
 
 const Common::Point32 &ShelterZombiniville::getFeatureDrawPosition(ZmbTrait::TraitKind traitKind, int traitVal) {
-	static constexpr Common::Point32 kFeatureDrawPositions[ZmbTrait::kTraitKindCount][ZmbTrait::kTraitValueCount] = {
-		{
-			Common::Point32(237, 345),
-			Common::Point32(292, 351),
-			Common::Point32(398, 355),
-			Common::Point32(346, 349),
-			Common::Point32(438, 369),
-		},
-		{
-			Common::Point32(534, 126),
-			Common::Point32(529, 167),
-			Common::Point32(526, 214),
-			Common::Point32(522, 255),
-			Common::Point32(518, 296),
-		},
-		{
-			Common::Point32(229, 41),
-			Common::Point32(286, 45),
-			Common::Point32(404, 46),
-			Common::Point32(345, 44),
-			Common::Point32(453, 45),
-		},
-		{
-			Common::Point32(162, 155),
-			Common::Point32(165, 109),
-			Common::Point32(163, 195),
-			Common::Point32(157, 233),
-			Common::Point32(157, 275),
-		},
-	};
 	return kFeatureDrawPositions[static_cast<int>(traitKind)][traitVal];
 }
 
