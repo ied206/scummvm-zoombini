@@ -231,7 +231,9 @@ private:
 	GUI::CheckboxWidget *_enhancedKbdShortcutsCheckbox = nullptr;
 	/** Toggle keying the solid color from affected help-sheet bitmaps. */
 	GUI::CheckboxWidget *_transparentHelpPagesCheckbox = nullptr;
-	/** Select the color-only presentation used for noses and colored puzzle pieces. */
+	/** Label used to align the color-assistance selector. */
+	GUI::StaticTextWidget *_colorAssistLabel = nullptr;
+	/** Color-assistance choices. */
 	GUI::PopUpWidget *_colorAssistPopUp = nullptr;
 	/** Toggle for the F2, F3, P, and Chez Norf C developer keys. */
 	GUI::CheckboxWidget *_debugHotkeysCheckbox = nullptr;
@@ -241,10 +243,16 @@ private:
 	GUI::CheckboxWidget *_aquacubeSafeFirstMoveCheckbox = nullptr;
 	/** Toggle access to recoverable level 4 puzzles from the practice map. */
 	GUI::CheckboxWidget *_allowCutLevel4PracticePuzzlesCheckbox = nullptr;
-	/** Toggle selecting the original Windows random-number generator. */
-	GUI::CheckboxWidget *_originalPrngCheckbox = nullptr;
+	/** Label used to align the PRNG algorithm selector. */
+	GUI::StaticTextWidget *_prngAlgorithmLabel = nullptr;
+	/** Select the original or ScummVM standard PRNG algorithm. */
+	GUI::PopUpWidget *_prngAlgorithmPopUp = nullptr;
+	/** Label used to align the logic pacing selector. */
+	GUI::StaticTextWidget *_pacingLabel = nullptr;
 	/** Logic pacing selector showing the 60Hz LCD and 75Hz CRT choices. */
 	GUI::PopUpWidget *_pacingPopUp = nullptr;
+	/** Label used to align the frame-rate control. */
+	GUI::StaticTextWidget *_frameRateLabel = nullptr;
 	/** Frame-rate limit in frames per second. */
 	FrameRateNumberBox *_frameRateNumberBox = nullptr;
 	/** Disable the engine-side frame-rate limit. */

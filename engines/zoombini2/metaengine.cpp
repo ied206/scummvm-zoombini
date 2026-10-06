@@ -48,9 +48,9 @@ void Zoombini2MetaEngine::registerDefaultSettings(const Common::String &target) 
 	ConfMan.registerDefault(kConfigGreedyWaterslidePairing, false);
 	ConfMan.registerDefault(kConfigAquacubeSafeFirstMove, false);
 	ConfMan.registerDefault(kConfigAllowCutLevel4PracticePuzzles, false);
-	ConfMan.registerDefault(kConfigOriginalPRNG, true);
+	ConfMan.registerDefault(kConfigPrngAlgorithm, static_cast<int>(PrngAlgorithm::kOriginalPrng));
 	ConfMan.registerDefault(kConfigColorAssistMode, 0);
-	ConfMan.registerDefault(kConfigLogicPacingHz, 75);
+	ConfMan.registerDefault(kConfigLogicPacingMode, static_cast<int>(LogicPacingMode::k75Hz));
 	ConfMan.registerDefault(kConfigFrameRate, kDefaultFrameRate);
 	ConfMan.registerDefault(kConfigUnlockFrameRate, false);
 }

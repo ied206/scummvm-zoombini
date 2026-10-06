@@ -31,6 +31,7 @@
 #include "common/str.h"
 #include "common/stream.h"
 
+#include "graphics/font.h"
 #include "graphics/managed_surface.h"
 #include "graphics/pixelformat.h"
 
@@ -147,7 +148,7 @@ class Animation;
 class AnimationRunner;
 class AreaMask;
 class BitBlock;
-class BitmapFont;
+class BmtFont;
 class ManagedSurface32;
 class PageLayerStack;
 class RleBlock;
@@ -306,7 +307,7 @@ public:
 	bool hasTextFont(TextColor color) const;
 	/** Draw bitmap text tinted with @p color and return its horizontal advance. */
 	int drawText(ManagedSurface32 *destSurface, TextColor color, const Common::Point32 &pos, const Common::String &text) const;
-	/** Measure text with the same glyph advances used by @ref Gfx::drawText. */
+	/** Measure text by BmtFont with the active release's game rules. */
 	int getTextWidth(const Common::String &text, TextColor color) const;
 	/** Draw the held Zoombini name plate centered at the bottom of @p destSurface. */
 	void drawDragNameTooltip(ManagedSurface32 *destSurface, const Common::String &name);
@@ -354,7 +355,7 @@ private:
 	/** Path format for the map transition background. */
 	static constexpr const char *kMapTransitionBackgroundPathFormat = "#bmp/maptrans/bigmap_background_%d";
 	/** Single coverage-mask glyph set tinted per draw, retained until graphics shutdown. */
-	BitmapFont *_textFont = nullptr;
+	BmtFont *_textFont = nullptr;
 
 	/** Draw one map-overlay RLE sprite retained for the current page. */
 	void drawOverlaySprite(ManagedSurface32 *destSurface, const Common::String &name, const Common::Point32 &pos);
@@ -1019,30 +1020,44 @@ enum MenuButtonId {
 };
 
 /**
- * Renders text with the glyphs extracted from one bitmap-font strip.
+ * Renders text with the glyphs from one font strip bitmap.
  *
- * A font uses two files whose `.bmt` extension still contains standard BMP data:
+ * A font uses two files whose `.bmt` extension contains standard BMP data:
  * @code
  * <base>.bmt    24-bit BGR color strip
  * <base>-A.bmt  indexed coverage strip with matching dimensions
  * @endcode
  *
- * Column zero is reserved and skipped.
- * All-zero columns in the coverage strip separate glyphs, while each contiguous
- * run of nonzero columns forms the next glyph in the fixed character sequence.
- * The retained glyph width includes two trailing pixels beyond that nonzero run.
+ * Pixel column zero (x = 0) is reserved and skipped.
+ * Blank pixel columns (x != 0), whose coverage values are all zero, separate glyphs.
+ * A nonblank pixel column contains at least one nonzero coverage value.
+ * Each contiguous run of nonblank pixel columns forms the next glyph in the fixed character sequence.
+ * The retained glyph width includes two trailing pixel columns beyond that run.
+ *
+ * Example coverage strip: '.' means zero coverage and '#' means nonzero coverage.
+ * @code
+ * x:  0 1 2 3 4 5 6 7 8 9
+ *     . . # . . . # # . .
+ *     . # . # . . # . # .
+ *     . # # # . . # # . .
+ *     . # . # . . # . # .
+ *       [ A ]     [ B ]
+ * @endcode
+ * Glyph A occupies pixel columns 1-3, and blank columns 4-5 separate it from glyph B in columns 6-8.
  *
  * The usual strip has 81 glyphs.
  * The v1.1SE strip has 84.
  * The v1.0HE strip has 80 and puts Hebrew
  * shapes in both Latin letter ranges, while Hebrew bytes select matching
- * slots directly. Spaces advance by @ref BitmapFont::kSpaceWidth.
+ * slots directly. Spaces advance by @ref BmtFont::kSpaceWidth.
  *
  * The strip is loaded once and only its per-pixel coverage masks are retained.
  * The glyph color is a uniform tint applied at draw time, so this single glyph
  * set serves every text color.
+ * Game strings retain the Hebrew and Swedish draw/measure rules through
+ * @ref BmtFont::drawString and @ref BmtFont::getStringWidth.
  */
-class BitmapFont {
+class BmtFont : public Graphics::Font {
 public:
 	/** Maximum number of glyphs in the font-strip mapping. */
 	static constexpr int kNumGlyphs = 84;
@@ -1050,16 +1065,25 @@ public:
 	static constexpr int kSpaceWidth = 10;
 
 	/** Construct an unloaded font bound to @p vm. */
-	explicit BitmapFont(Zoombini2Engine *vm);
+	explicit BmtFont(Zoombini2Engine *vm);
 
 	/** Load the BMT color-and-alpha pair and extract the coverage masks. */
 	bool load(const Common::Path &basePath);
-	/** Draw @p text tinted with @p color at @p pos and return its horizontal pixel advance. */
-	int drawString(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::String &text, const RGBColor &color, const AlphaBlendLUT &alphaLUT) const;
-	/** Return the horizontal pixel advance for @p text without drawing it. */
+	int getFontHeight() const override;
+	int getMaxCharWidth() const override;
+	int getCharWidth(uint32 character) const override;
+	using Graphics::Font::getBoundingBox;
+	Common::Rect getBoundingBox(uint32 character) const override;
+	using Graphics::Font::drawChar;
+	void drawChar(Graphics::Surface *destSurface, uint32 character, int x, int y, uint32 color) const override;
+	using Graphics::Font::drawString;
+	/** Draw game bytes, including Hebrew traversal, and return the horizontal advance. */
+	int drawString(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::String &text, const RGBColor &color) const;
+	using Graphics::Font::getStringWidth;
+	/** Measure game bytes with the Hebrew and Swedish release-specific rules. */
 	int getStringWidth(const Common::String &text) const;
 	/** Return the glyph index for @p character, or -1 when it is unsupported. */
-	int charToGlyphIndex(char character) const;
+	int charToGlyphIndex(uint32 ch) const;
 	/** Return whether glyph extraction completed. */
 	bool isLoaded() const { return _loaded; }
 
@@ -1068,6 +1092,8 @@ private:
 	Zoombini2Engine *_vm;
 	/** Whether the font strip has been processed. */
 	bool _loaded = false;
+	/** Largest glyph advance, including the fixed space advance. */
+	int _maxCharWidth = 0;
 	/** One extracted glyph: its coverage mask and dimensions. */
 	struct Glyph {
 		/** Per-pixel coverage, 0 (transparent) through 255 (opaque). */
@@ -1089,8 +1115,7 @@ private:
 	 * tint scaled by the coverage and the destination scaled by its inverse,
 	 * matching the RLE premultiplied blend rule.
 	 */
-	void drawGlyph(ManagedSurface32 *destSurface, const Glyph &glyph, const Common::Point32 &pos, const RGBColor &color,
-				   const AlphaBlendLUT &alphaLUT) const;
+	void drawGlyph(Graphics::Surface *destSurface, const Glyph &glyph, const Common::Point32 &pos, const RGBColor &color, const AlphaBlendLUT &alphaLUT) const;
 };
 
 /** Result of one @ref VolumePanel input-and-draw pass. */

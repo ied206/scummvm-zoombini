@@ -35,7 +35,8 @@
 namespace Zoombini2 {
 
 Random::Random(const Common::String &name) : _scummRnd(name) {
-	_useOriginal = ConfMan.getBool(::Zoombini2MetaEngine::kConfigOriginalPRNG);
+	const int prngAlgorithmVal = ConfMan.getInt(Zoombini2MetaEngine::kConfigPrngAlgorithm);
+	_prngAlgorithm = static_cast<Zoombini2MetaEngine::PrngAlgorithm>(prngAlgorithmVal);
 
 #ifdef ENABLE_EVENTRECORDER
 	setSeed(g_eventRec.getRandomSeed(name));
@@ -44,9 +45,27 @@ Random::Random(const Common::String &name) : _scummRnd(name) {
 #endif
 }
 
+void Random::setAlgorithm(Zoombini2MetaEngine::PrngAlgorithm prngAlgorithm) {
+	if (_prngAlgorithm == prngAlgorithm)
+		return;
+
+	_prngAlgorithm = prngAlgorithm;
+	setSeed(generateNewSeed());
+}
+
 void Random::setSeed(uint32 seed) {
 	_randState = seed;
 	_scummRnd.setSeed(seed);
+}
+
+uint32 Random::getSeed() const {
+	switch (_prngAlgorithm) {
+	case Zoombini2MetaEngine::PrngAlgorithm::kOriginalPrng:
+		return _randState;
+	case Zoombini2MetaEngine::PrngAlgorithm::kStandardPrng:
+	default:
+		return _scummRnd.getSeed();
+	}
 }
 
 uint32 Random::generateNewSeed() {
@@ -68,10 +87,13 @@ int32 Random::getOriginalRandomNumber(int32 max) {
 int32 Random::getRandomNumber(int32 max) {
 	assert(0 <= max);
 
-	if (!_useOriginal)
+	switch (_prngAlgorithm) {
+	case Zoombini2MetaEngine::PrngAlgorithm::kStandardPrng:
 		return static_cast<int32>(_scummRnd.getRandomNumber(static_cast<uint32>(max)));
-
-	return getOriginalRandomNumber(max);
+	case Zoombini2MetaEngine::PrngAlgorithm::kOriginalPrng:
+	default:
+		return getOriginalRandomNumber(max);
+	}
 }
 
 int32 Random::getRandomNumberRng(int32 min, int32 max) {
@@ -80,8 +102,14 @@ int32 Random::getRandomNumberRng(int32 min, int32 max) {
 		SWAP<int32>(min, max);
 	}
 
-	const uint32 span = static_cast<uint32>(max - min);
-	assert(span <= static_cast<uint32>(INT_MAX));
+	// Cast each endpoint before subtraction to avoid signed overflow.
+	// Unsigned subtraction wraps modulo 2^32 and yields the exact span for sorted endpoints, even when the range crosses zero.
+	// For example, min = -10 and max = 10 give a span of 20.
+	const uint32 span = static_cast<uint32>(max) - static_cast<uint32>(min);
+	if (static_cast<uint32>(INT_MAX) < span)
+		error("Random::getRandomNumberRng: range exceeds INT_MAX");
+
+	// With an offset in [0, span], this signed sum stays in [min, max].
 	return min + getRandomNumber(static_cast<int32>(span));
 }
 
