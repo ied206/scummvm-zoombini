@@ -235,7 +235,7 @@ void Zoombini2Engine::resetGameState() {
 }
 
 bool Zoombini2Engine::isSavefileReadOnlyToggleEnabled() const {
-	return ConfMan.getBool(::Zoombini2MetaEngine::kConfigEnableSavefileReadOnlyToggle, ConfMan.getActiveDomainName());
+	return ConfMan.getBool(Zoombini2MetaEngine::kConfigEnableSavefileReadOnlyToggle, ConfMan.getActiveDomainName());
 }
 
 bool Zoombini2Engine::isGameSaveWriteLocked(const Common::String &savefileName) const {
@@ -554,6 +554,11 @@ void Zoombini2Engine::syncSoundSettings() {
 
 void Zoombini2Engine::applyGameSettings() {
 	refreshEngineSettings();
+	if (_rnd) {
+		const int prngAlgorithmVal = ConfMan.getInt(Zoombini2MetaEngine::kConfigPrngAlgorithm);
+		const Zoombini2MetaEngine::PrngAlgorithm prngAlgorithm = static_cast<Zoombini2MetaEngine::PrngAlgorithm>(prngAlgorithmVal);
+		_rnd->setAlgorithm(prngAlgorithm);
+	}
 	if (_soundManager)
 		_soundManager->setStereoOutputEnabled(_stereoOutputEnabled);
 }
@@ -771,6 +776,16 @@ uint32 Zoombini2Engine::calculateGameTickCount() const {
 	return elapsed;
 }
 
+int Zoombini2Engine::getLogicPacingHz() const {
+	switch (_logicPacingMode) {
+	case Zoombini2MetaEngine::LogicPacingMode::k75Hz:
+		return 75;
+	case Zoombini2MetaEngine::LogicPacingMode::k60Hz:
+	default:
+		return 60;
+	}
+}
+
 int Zoombini2Engine::mixerVolumeToPercent(int volume) {
 	return CLIP((CLIP<int>(volume, 0, Audio::Mixer::kMaxMixerVolume) * kMaxVolumePercent + 128) / 256, 0, kMaxVolumePercent);
 }
@@ -780,9 +795,9 @@ int Zoombini2Engine::percentToMixerVolume(int volume) {
 }
 
 void Zoombini2Engine::refreshEngineSettings() {
-	const int frameRate = CLIP<int>(ConfMan.getInt(::Zoombini2MetaEngine::kConfigFrameRate),
-									::Zoombini2MetaEngine::kMinFrameRate, ::Zoombini2MetaEngine::kMaxFrameRate);
-	const bool unlockFrameRate = ConfMan.getBool(::Zoombini2MetaEngine::kConfigUnlockFrameRate);
+	const int frameRate = CLIP<int>(ConfMan.getInt(Zoombini2MetaEngine::kConfigFrameRate),
+									Zoombini2MetaEngine::kMinFrameRate, Zoombini2MetaEngine::kMaxFrameRate);
+	const bool unlockFrameRate = ConfMan.getBool(Zoombini2MetaEngine::kConfigUnlockFrameRate);
 	if (_frameRate != frameRate || _unlockFrameRate != unlockFrameRate) {
 		_frameRate = frameRate;
 		_unlockFrameRate = unlockFrameRate;
@@ -790,17 +805,18 @@ void Zoombini2Engine::refreshEngineSettings() {
 		_lastFrameElapsedMs = 0;
 		_hasFrameIndex = false;
 	}
-	_debugHotkeysEnabled = ConfMan.getBool(::Zoombini2MetaEngine::kConfigDebugHotkeys);
-	_stereoOutputEnabled = ConfMan.getBool(::Zoombini2MetaEngine::kConfigStereoOutput);
-	const int colorAssistValue = ConfMan.getInt(::Zoombini2MetaEngine::kConfigColorAssistMode);
+	_debugHotkeysEnabled = ConfMan.getBool(Zoombini2MetaEngine::kConfigDebugHotkeys);
+	_stereoOutputEnabled = ConfMan.getBool(Zoombini2MetaEngine::kConfigStereoOutput);
+	const int colorAssistValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigColorAssistMode);
 	_colorAssistMode = 0 <= colorAssistValue && colorAssistValue <= 2 ? static_cast<ColorAssistMode>(colorAssistValue) : ColorAssistMode::kOriginal00;
-	_useGreedyWaterslidePairing = ConfMan.getBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing);
-	_useAquacubeSafeFirstMove = ConfMan.getBool(::Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove);
-	_useFloatingPointPaths = ConfMan.getBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths);
-	_fixFleenDepartStreak = ConfMan.getBool(::Zoombini2MetaEngine::kConfigFixFleenDepartureStreak);
-	_enhancedKbdShortcuts = ConfMan.getBool(::Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts);
-	_allowCutLevel4PracticePuzzles = ConfMan.getBool(::Zoombini2MetaEngine::kConfigAllowCutLevel4PracticePuzzles);
-	_logicPacingHz = ConfMan.getInt(::Zoombini2MetaEngine::kConfigLogicPacingHz) == 75 ? 75 : 60;
+	_useGreedyWaterslidePairing = ConfMan.getBool(Zoombini2MetaEngine::kConfigGreedyWaterslidePairing);
+	_useAquacubeSafeFirstMove = ConfMan.getBool(Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove);
+	_useFloatingPointPaths = ConfMan.getBool(Zoombini2MetaEngine::kConfigUseFloatingPointPaths);
+	_fixFleenDepartStreak = ConfMan.getBool(Zoombini2MetaEngine::kConfigFixFleenDepartureStreak);
+	_enhancedKbdShortcuts = ConfMan.getBool(Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts);
+	_allowCutLevel4PracticePuzzles = ConfMan.getBool(Zoombini2MetaEngine::kConfigAllowCutLevel4PracticePuzzles);
+	const int logicPacingValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigLogicPacingMode);
+	_logicPacingMode = static_cast<Zoombini2MetaEngine::LogicPacingMode>(logicPacingValue);
 	if (!_debugHotkeysEnabled) {
 		_debugCompletionKeyDown = false;
 		_debugOverlayKeyDown = false;

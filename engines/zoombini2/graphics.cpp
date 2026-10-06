@@ -1381,7 +1381,7 @@ bool Gfx::loadTextFont(TextColor color) {
 	if (hasTextFont(color))
 		return true;
 	if (!_textFont)
-		_textFont = new BitmapFont(_vm);
+		_textFont = new BmtFont(_vm);
 	return _textFont->load(Common::Path(kTextFontPath));
 }
 
@@ -1394,7 +1394,7 @@ int Gfx::drawText(ManagedSurface32 *destSurface, TextColor color, const Common::
 	if (!destSurface || !hasTextFont(color))
 		return 0;
 	const RGBColor tint = textColor(color);
-	return _textFont->drawString(destSurface, pos, text, tint, _vm->getAlphaLUT());
+	return _textFont->drawString(destSurface, pos, text, tint);
 }
 
 int Gfx::getTextWidth(const Common::String &text, TextColor color) const {
@@ -1420,7 +1420,7 @@ void Gfx::drawDragNameTooltip(ManagedSurface32 *destSurface, const Common::Strin
 	drawRleBlock(destSurface, _nameBoxSprite, Common::Point32(kPlateX, kPlateY));
 	const int width = _textFont->getStringWidth(name);
 	const RGBColor tint = textColor(TextColor::kDark00);
-	_textFont->drawString(destSurface, Common::Point32(kTextCenterX - width / 2, kTextY), name, tint, _vm->getAlphaLUT());
+	_textFont->drawString(destSurface, Common::Point32(kTextCenterX - width / 2, kTextY), name, tint);
 }
 
 void Gfx::maskRejectedArea(ManagedSurface32 *destSurface, const AreaMask *areaMask) {
@@ -2183,10 +2183,10 @@ int UIButton::drawAndHitTest(ManagedSurface32 *dst, const Common::Point32 &mouse
 // BitmapFont - bitmap-based font for UI text rendering.
 // ============================================================================
 
-BitmapFont::BitmapFont(Zoombini2Engine *vm) : _vm(vm) {
+BmtFont::BmtFont(Zoombini2Engine *vm) : _vm(vm) {
 }
 
-bool BitmapFont::load(const Common::Path &basePath) {
+bool BmtFont::load(const Common::Path &basePath) {
 	for (int i = 0; i < kNumGlyphs; i++) {
 		delete[] _glyphs[i].mask;
 		_glyphs[i].mask = nullptr;
@@ -2194,6 +2194,7 @@ bool BitmapFont::load(const Common::Path &basePath) {
 		_glyphs[i].height = 0;
 	}
 	_loaded = false;
+	_maxCharWidth = kSpaceWidth;
 
 	Common::Path colorPath(basePath);
 	if (!basePath.toString().hasSuffixIgnoreCase(".bmt"))
@@ -2255,6 +2256,8 @@ bool BitmapFont::load(const Common::Path &basePath) {
 		Glyph &glyph = _glyphs[glyphIndex];
 		glyph.width = glyphWidth;
 		glyph.height = size.height;
+		if (_maxCharWidth < glyphWidth + 2)
+			_maxCharWidth = glyphWidth + 2;
 		glyph.mask = new byte[glyphWidth * size.height]();
 		const int copyWidth = MIN(glyphWidth, size.width - startCol);
 		for (int row = 0; row < size.height; row++) {
@@ -2280,7 +2283,9 @@ bool BitmapFont::load(const Common::Path &basePath) {
 	return true;
 }
 
-int BitmapFont::charToGlyphIndex(char c) const {
+int BmtFont::charToGlyphIndex(uint32 c) const {
+	if (255 < c)
+		return -1;
 	const byte value = static_cast<byte>(c);
 	const bool hebrew = _vm->isHebrew();
 	if (hebrew && 0xE0 <= value && value <= 0xFA) {
@@ -2395,8 +2400,45 @@ int BitmapFont::charToGlyphIndex(char c) const {
 	}
 }
 
-void BitmapFont::drawGlyph(ManagedSurface32 *dst, const Glyph &glyph, const Common::Point32 &pos,
-						   const RGBColor &color, const AlphaBlendLUT &alphaLUT) const {
+int BmtFont::getFontHeight() const {
+	return _loaded ? _glyphs[0].height : 0;
+}
+
+int BmtFont::getMaxCharWidth() const {
+	return _loaded ? _maxCharWidth : 0;
+}
+
+int BmtFont::getCharWidth(uint32 character) const {
+	if (!_loaded)
+		return 0;
+	if (character == ' ')
+		return kSpaceWidth;
+	const int glyphIndex = charToGlyphIndex(character);
+	if (glyphIndex < 0 || kNumGlyphs <= glyphIndex || !_glyphs[glyphIndex].mask)
+		return 0;
+	return _glyphs[glyphIndex].width + 2;
+}
+
+Common::Rect BmtFont::getBoundingBox(uint32 character) const {
+	if (!_loaded)
+		return Common::Rect();
+	const int glyphIndex = charToGlyphIndex(character);
+	if (glyphIndex < 0 || kNumGlyphs <= glyphIndex || !_glyphs[glyphIndex].mask)
+		return Common::Rect();
+	return Common::Rect(_glyphs[glyphIndex].width, _glyphs[glyphIndex].height);
+}
+
+void BmtFont::drawChar(Graphics::Surface *dst, uint32 character, int x, int y, uint32 color) const {
+	if (!dst || !_loaded)
+		return;
+	const int glyphIndex = charToGlyphIndex(character);
+	if (glyphIndex < 0 || kNumGlyphs <= glyphIndex || !_glyphs[glyphIndex].mask)
+		return;
+	const RGBColor tint = RGBColor::fromPixel(color, dst->format);
+	drawGlyph(dst, _glyphs[glyphIndex], Common::Point32(x, y), tint, _vm->getAlphaLUT());
+}
+
+void BmtFont::drawGlyph(Graphics::Surface *dst, const Glyph &glyph, const Common::Point32 &pos, const RGBColor &color, const AlphaBlendLUT &alphaLUT) const {
 	if (!glyph.mask)
 		return;
 	assert(dst->format.bytesPerPixel == 4);
@@ -2429,32 +2471,22 @@ void BitmapFont::drawGlyph(ManagedSurface32 *dst, const Glyph &glyph, const Comm
 	}
 }
 
-int BitmapFont::drawString(ManagedSurface32 *dst, const Common::Point32 &pos,
-						   const Common::String &text, const RGBColor &color,
-						   const AlphaBlendLUT &alphaLUT) const {
-	if (!_loaded) {
+int BmtFont::drawString(ManagedSurface32 *dst, const Common::Point32 &pos, const Common::String &text, const RGBColor &color) const {
+	if (!dst || !_loaded)
 		return 0;
+	const uint32 pixelColor = color.toPixel(dst->format);
+	if (!_vm->isHebrew()) {
+		Graphics::Font::drawString(dst, text, pos.x, pos.y, dst->w, pixelColor, Graphics::kTextAlignLeft, 0, false, true);
+		return Graphics::Font::getStringWidth(text);
 	}
 
 	int curX = pos.x;
-	const bool hebrew = _vm->isHebrew();
-
+	// Hebrew visits game bytes backwards; only digits move the pen left.
 	for (uint i = 0; i < text.size(); i++) {
-		const char c = hebrew ? text[text.size() - i - 1] : text[i];
-
-		if (c == ' ') {
-			curX += kSpaceWidth;
-			continue;
-		}
-
-		const int glyphIdx = charToGlyphIndex(c);
-		if (glyphIdx < 0 || glyphIdx >= kNumGlyphs || !_glyphs[glyphIdx].mask) {
-			continue;
-		}
-
-		drawGlyph(dst, _glyphs[glyphIdx], Common::Point32(curX, pos.y), color, alphaLUT);
-		const int advance = _glyphs[glyphIdx].width + 2;
-		if (hebrew && '0' <= c && c <= '9')
+		const byte c = static_cast<byte>(text[text.size() - i - 1]);
+		drawChar(dst, c, curX, pos.y, pixelColor);
+		const int advance = getCharWidth(c);
+		if ('0' <= c && c <= '9')
 			curX -= advance;
 		else
 			curX += advance;
@@ -2463,33 +2495,25 @@ int BitmapFont::drawString(ManagedSurface32 *dst, const Common::Point32 &pos,
 	return curX - pos.x;
 }
 
-int BitmapFont::getStringWidth(const Common::String &text) const {
-	if (!_loaded) {
+int BmtFont::getStringWidth(const Common::String &text) const {
+	if (!_loaded)
 		return 0;
-	}
+	const bool hebrew = _vm->isHebrew();
+	const bool swedish = _vm->isSwedish();
+	if (!hebrew && !swedish)
+		return Graphics::Font::getStringWidth(text);
 
 	int width = 0;
-	const bool hebrew = _vm->isHebrew();
-
+	// Game measurement deliberately differs from drawing in these two releases.
 	for (uint i = 0; i < text.size(); i++) {
-		char c = text[i];
-
-		if (c == ' ') {
-			width += kSpaceWidth;
+		const byte c = static_cast<byte>(text[i]);
+		if (swedish && 0x80 <= c)
 			continue;
-		}
-
-		if (_vm->isSwedish() && 0x80 <= static_cast<byte>(c))
-			continue;
-		const int glyphIdx = charToGlyphIndex(c);
-		if (glyphIdx < 0 || glyphIdx >= kNumGlyphs || !_glyphs[glyphIdx].mask) {
-			continue;
-		}
-
+		const int advance = getCharWidth(c);
 		if (hebrew && (('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z')))
-			width -= _glyphs[glyphIdx].width + 2;
-		else if (!hebrew || (static_cast<byte>(c) < 0x80 && c != '_'))
-			width += _glyphs[glyphIdx].width + 2;
+			width -= advance;
+		else if (!hebrew || (c < 0x80 && c != '_'))
+			width += advance;
 	}
 
 	return width;

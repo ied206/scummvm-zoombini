@@ -39,6 +39,7 @@
 
 #include "zoombini2/detection.h"
 #include "zoombini2/graphics.h"
+#include "zoombini2/metaengine.h"
 #include "zoombini2/random.h"
 #include "zoombini2/state.h"
 
@@ -195,7 +196,7 @@ public:
 	/** Return the logic pacing rate in Hz selected for frame-derived speeds.
 	 * It gates only Booliewood panorama scrolling and the banked idle-roll quota;
 	 * millisecond-deadline animations are unaffected. */
-	int getLogicPacingHz() const { return _logicPacingHz; }
+	int getLogicPacingHz() const;
 	/** Return whether the Chez Norf diagnostic overlay key is currently held. */
 	bool showChezNorfDebugOverlay() const { return _debugHotkeysEnabled && _debugOverlayKeyDown; }
 	/** Report the active target's developer-hotkey gate. */
@@ -475,8 +476,8 @@ private:
 	bool _enhancedKbdShortcuts = false;
 	/** Whether the practice map exposes recoverable level 4 puzzles. */
 	bool _allowCutLevel4PracticePuzzles = false;
-	/** Logic pacing rate in Hz selected for frame-derived speeds. */
-	int _logicPacingHz = 75;
+	/** Selected preset for frame-derived gameplay pacing. */
+	Zoombini2MetaEngine::LogicPacingMode _logicPacingMode = Zoombini2MetaEngine::LogicPacingMode::k75Hz;
 	/** Held state of the global puzzle-completion key. */
 	bool _debugCompletionKeyDown = false;
 	/** Held state of the Chez Norf diagnostic-overlay key. */

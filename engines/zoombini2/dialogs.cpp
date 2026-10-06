@@ -25,6 +25,7 @@
 #include "common/language.h"
 #include "common/savefile.h"
 #include "common/system.h"
+#include "common/translation.h"
 #include "common/util.h"
 
 #include "gui/ThemeEval.h"
@@ -82,9 +83,9 @@ public:
 		for (uint i = 0; i < text.size(); i++) {
 			if (text[i] < '0' || '9' < text[i])
 				return _value;
-			value = MIN<int>(::Zoombini2MetaEngine::kMaxFrameRate, value * 10 + static_cast<int>(text[i] - '0'));
+			value = MIN<int>(Zoombini2MetaEngine::kMaxFrameRate, value * 10 + static_cast<int>(text[i] - '0'));
 		}
-		return CLIP<int>(value, ::Zoombini2MetaEngine::kMinFrameRate, ::Zoombini2MetaEngine::kMaxFrameRate);
+		return CLIP<int>(value, Zoombini2MetaEngine::kMinFrameRate, Zoombini2MetaEngine::kMaxFrameRate);
 	}
 
 protected:
@@ -120,12 +121,16 @@ void Zoombini2MenuDialog::handleCommand(GUI::CommandSender *sender, uint32 cmd, 
 Zoombini2SavefileNameDialog::Zoombini2SavefileNameDialog(const Common::U32String &title, const Common::U32String &initialName, Common::Language language)
 	: GUI::Dialog(0, 0, 360, 144) {
 	new GUI::StaticTextWidget(this, 12, 10, 336, 24, title, Graphics::kTextAlignStart);
-	const Common::U32String nameHint(language == Common::HE_ISR ? U"1-16 letters or spaces; , . ; also allowed" : U"Use 1 to 16 letters, digits, or spaces");
+	Common::U32String nameHint;
+	if (language == Common::HE_ISR)
+		nameHint = _("1-16 letters or spaces; , . ; also allowed");
+	else
+		nameHint = _("Use 1 to 16 letters, digits, or spaces");
 	new GUI::StaticTextWidget(this, 12, 38, 336, 20, false, nameHint, Graphics::kTextAlignStart,
 							  Common::U32String(), GUI::ThemeEngine::kFontStyleNormal, Common::UNK_LANG, false);
 	_edit = new GUI::EditTextWidget(this, 12, 62, 336, 28, false, initialName);
-	new GUI::ButtonWidget(this, 12, 104, 150, 28, false, Common::U32String(U"OK"), Common::U32String(), GUI::kOKCmd);
-	new GUI::ButtonWidget(this, 198, 104, 150, 28, false, Common::U32String(U"Cancel"), Common::U32String(), GUI::kCloseCmd);
+	new GUI::ButtonWidget(this, 12, 104, 150, 28, false, _("OK"), Common::U32String(), GUI::kOKCmd);
+	new GUI::ButtonWidget(this, 198, 104, 150, 28, false, _("Cancel"), Common::U32String(), GUI::kCloseCmd);
 }
 
 Common::U32String Zoombini2SavefileNameDialog::getSavefileName() const {
@@ -159,38 +164,40 @@ Zoombini2SaveManagementDialog::Zoombini2SaveManagementDialog(const Common::Strin
 		_language = vm->getLanguage();
 	}
 
-	new GUI::StaticTextWidget(this, kDialogMargin, 8, kTableWidth, 24, true, Common::U32String(U"Manage saved games"), Graphics::kTextAlignStart);
+	new GUI::StaticTextWidget(this, kDialogMargin, 8, kTableWidth, 24, true, _("Manage saved games"), Graphics::kTextAlignStart);
 
 	static constexpr int kActionButtonGap = 6;
 	static constexpr int kActionButtonCount = 5;
 	static constexpr int kActionButtonWidth = (kTableWidth - (kActionButtonCount - 1) * kActionButtonGap) / kActionButtonCount;
 	int actionX = kDialogMargin;
-	_editButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kActionButtonWidth, kButtonHeight, true, Common::U32String(U"Rename"),
-										Common::U32String(U"Return to the launcher before renaming the active saved game."), kEditSavefileCommand);
+	_editButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kActionButtonWidth, kButtonHeight, true, _("Rename"),
+										_("Return to the launcher before renaming the active saved game."), kEditSavefileCommand);
 	actionX += kActionButtonWidth + kActionButtonGap;
-	_duplicateButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kActionButtonWidth, kButtonHeight, true, Common::U32String(U"Clone"),
+	_duplicateButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kActionButtonWidth, kButtonHeight, true, _("Clone"),
 											 Common::U32String(), kDuplicateSavefileCommand);
 	actionX += kActionButtonWidth + kActionButtonGap;
-	_importButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kActionButtonWidth, kButtonHeight, true, Common::U32String(U"Import"),
+	_importButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kActionButtonWidth, kButtonHeight, true, _("Import"),
 										  Common::U32String(), kImportSavefileCommand);
 	actionX += kActionButtonWidth + kActionButtonGap;
-	_exportButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kActionButtonWidth, kButtonHeight, true, Common::U32String(U"Export"),
+	_exportButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kActionButtonWidth, kButtonHeight, true, _("Export"),
 										  Common::U32String(), kExportSavefileCommand);
 	actionX += kActionButtonWidth + kActionButtonGap;
 	_deleteButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kTableWidth - actionX + kDialogMargin, kButtonHeight, true,
-										  Common::U32String(U"Delete"), Common::U32String(U"Return to the launcher before deleting the active saved game."),
+										  _("Delete"), _("Return to the launcher before deleting the active saved game."),
 										  kDeleteSavefileCommand);
 
 	GUI::ContainerWidget *savefileHeader = new GUI::ContainerWidget(this, kDialogMargin, kHeaderTop, kTableWidth, kTableRowHeight, true);
 	savefileHeader->setBackgroundType(GUI::ThemeEngine::kWidgetBackgroundNo);
-	new GUI::StaticTextWidget(savefileHeader, kNameX, 0, kNameWidth, kTableRowHeight, true, Common::U32String(U"Name"), Graphics::kTextAlignCenter);
-	new GUI::StaticTextWidget(savefileHeader, kZombinivilleX, 0, kZombinivilleWidth, kTableRowHeight, true, Common::U32String(U"Zombiniville"),
+	new GUI::StaticTextWidget(savefileHeader, kNameX, 0, kNameWidth, kTableRowHeight, true, _("Name"), Graphics::kTextAlignCenter);
+	// I18N: Name of the Zoombini settlement.
+	new GUI::StaticTextWidget(savefileHeader, kZombinivilleX, 0, kZombinivilleWidth, kTableRowHeight, true, _("Zombiniville"),
 							  Graphics::kTextAlignCenter);
-	new GUI::StaticTextWidget(savefileHeader, kRescue1X, 0, kRescueWidth, kTableRowHeight, true, Common::U32String(U"Rescue I"), Graphics::kTextAlignCenter);
-	new GUI::StaticTextWidget(savefileHeader, kRescue2X, 0, kRescueWidth, kTableRowHeight, true, Common::U32String(U"Rescue II"), Graphics::kTextAlignCenter);
-	new GUI::StaticTextWidget(savefileHeader, kBooliewoodX, 0, kBooliewoodWidth, kTableRowHeight, true, Common::U32String(U"Booliewood"),
+	new GUI::StaticTextWidget(savefileHeader, kRescue1X, 0, kRescueWidth, kTableRowHeight, true, _("Rescue I"), Graphics::kTextAlignCenter);
+	new GUI::StaticTextWidget(savefileHeader, kRescue2X, 0, kRescueWidth, kTableRowHeight, true, _("Rescue II"), Graphics::kTextAlignCenter);
+	// I18N: Name of the Boolie shelter.
+	new GUI::StaticTextWidget(savefileHeader, kBooliewoodX, 0, kBooliewoodWidth, kTableRowHeight, true, _("Booliewood"),
 							  Graphics::kTextAlignCenter);
-	new GUI::StaticTextWidget(savefileHeader, kActivePartyX, 0, kActivePartyWidth, kTableRowHeight, true, Common::U32String(U"Active"),
+	new GUI::StaticTextWidget(savefileHeader, kActivePartyX, 0, kActivePartyWidth, kTableRowHeight, true, _("Active"),
 							  Graphics::kTextAlignCenter);
 
 	_savefileList = new GUI::ScrollContainerWidget(this, scaleDialogValue(kDialogMargin), scaleDialogValue(kListTop), scaleDialogValue(kTableWidth),
@@ -217,7 +224,7 @@ Zoombini2SaveManagementDialog::Zoombini2SaveManagementDialog(const Common::Strin
 														  Graphics::kTextAlignCenter, Common::U32String(), GUI::ThemeEngine::kFontStyleNormal);
 	}
 
-	new GUI::ButtonWidget(this, kDialogMargin + (kTableWidth - 120) / 2, kBottomButtonsTop, 120, kButtonHeight, true, Common::U32String(U"Close"),
+	new GUI::ButtonWidget(this, kDialogMargin + (kTableWidth - 120) / 2, kBottomButtonsTop, 120, kButtonHeight, true, _("Close"),
 						  Common::U32String(), GUI::kCloseCmd, Common::ASCII_ESCAPE);
 }
 
@@ -279,11 +286,12 @@ void Zoombini2SaveManagementDialog::refreshSavefiles(const Common::String &selec
 			_booliewoodLabels[i]->setLabel(Common::U32String::format("%d", summary._population._booliewoodCount));
 			_activePartyLabels[i]->setLabel(Common::U32String::format("%d", summary._population._activePartyCount));
 		} else {
-			_zombinivilleLabels[i]->setLabel(Common::U32String(U"?"));
-			_rescue1Labels[i]->setLabel(Common::U32String(U"?"));
-			_rescue2Labels[i]->setLabel(Common::U32String(U"?"));
-			_booliewoodLabels[i]->setLabel(Common::U32String(U"?"));
-			_activePartyLabels[i]->setLabel(Common::U32String(U"?"));
+			// I18N: Placeholder for a population count in an invalid saved game.
+			_zombinivilleLabels[i]->setLabel(_("?"));
+			_rescue1Labels[i]->setLabel(_("?"));
+			_rescue2Labels[i]->setLabel(_("?"));
+			_booliewoodLabels[i]->setLabel(_("?"));
+			_activePartyLabels[i]->setLabel(_("?"));
 		}
 
 		GUI::ThemeEngine::FontColor fontColor = GUI::ThemeEngine::kFontColorOverride;
@@ -338,14 +346,14 @@ void Zoombini2SaveManagementDialog::renameSelectedSavefile() {
 	if (isActiveSavefile(oldSavefileName))
 		return;
 	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language);
-	Zoombini2SavefileNameDialog nameDialog(Common::U32String(U"Rename saved game"), savegameManager.decodeSavefileName(oldSavefileName), _language);
+	Zoombini2SavefileNameDialog nameDialog(_("Rename saved game"), savegameManager.decodeSavefileName(oldSavefileName), _language);
 	if (nameDialog.runModal() != GUI::kOKCmd)
 		return;
 
 	Common::String newSavefileName;
 	if (!savegameManager.encodeSavefileName(nameDialog.getSavefileName(), newSavefileName) ||
 		!savegameManager.renameSavefile(oldSavefileName, newSavefileName)) {
-		GUI::MessageDialog errorDialog(Common::U32String(U"Invalid file name for saving"));
+		GUI::MessageDialog errorDialog(_("Invalid file name for saving"));
 		errorDialog.runModal();
 		return;
 	}
@@ -360,7 +368,7 @@ void Zoombini2SaveManagementDialog::duplicateSelectedSavefile() {
 		return;
 
 	const Common::String srcSavefileName = _savefileNames[_selectedSavefileIndex];
-	Zoombini2SavefileNameDialog nameDialog(Common::U32String(U"Clone saved game"), Common::U32String(), _language);
+	Zoombini2SavefileNameDialog nameDialog(_("Clone saved game"), Common::U32String(), _language);
 	if (nameDialog.runModal() != GUI::kOKCmd)
 		return;
 
@@ -368,7 +376,7 @@ void Zoombini2SaveManagementDialog::duplicateSelectedSavefile() {
 	Common::String newSavefileName;
 	if (!savegameManager.encodeSavefileName(nameDialog.getSavefileName(), newSavefileName) ||
 		!savegameManager.duplicateSavefile(srcSavefileName, newSavefileName)) {
-		GUI::MessageDialog errorDialog(Common::U32String(U"Enter a unique name using the allowed characters for this language"));
+		GUI::MessageDialog errorDialog(_("Enter a unique name using the allowed characters for this language"));
 		errorDialog.runModal();
 		return;
 	}
@@ -378,7 +386,7 @@ void Zoombini2SaveManagementDialog::duplicateSelectedSavefile() {
 }
 
 void Zoombini2SaveManagementDialog::importSavefile() {
-	GUI::BrowserDialog browser(Common::U32String(U"Select one Zoombini2 .mk saved game"), false);
+	GUI::BrowserDialog browser(_("Select one Zoombini2 .mk saved game"), false);
 	if (browser.runModal() <= 0)
 		return;
 
@@ -387,7 +395,7 @@ void Zoombini2SaveManagementDialog::importSavefile() {
 	const size_t extensionPosition = srcName.findLastOf('.');
 	if (!src.exists() || src.isDirectory() || extensionPosition == Common::String::npos ||
 		!srcName.substr(extensionPosition).equalsIgnoreCase(".mk")) {
-		GUI::MessageDialog errorDialog(Common::U32String(U"Select one Zoombini2 .mk saved game"));
+		GUI::MessageDialog errorDialog(_("Select one Zoombini2 .mk saved game"));
 		errorDialog.runModal();
 		return;
 	}
@@ -398,26 +406,26 @@ void Zoombini2SaveManagementDialog::importSavefile() {
 	bool validName = savegameManager.encodeSavefileName(displayName, savefileName) &&
 					 Zoombini2SavegameManager::isValidSavefileName(savefileName, _language);
 	while (!validName) {
-		Zoombini2SavefileNameDialog nameDialog(Common::U32String(U"Choose compatible save name"), displayName, _language);
+		Zoombini2SavefileNameDialog nameDialog(_("Choose compatible save name"), displayName, _language);
 		if (nameDialog.runModal() != GUI::kOKCmd)
 			return;
 		displayName = nameDialog.getSavefileName();
 		validName = savegameManager.encodeSavefileName(displayName, savefileName) &&
 					Zoombini2SavegameManager::isValidSavefileName(savefileName, _language);
 		if (!validName) {
-			GUI::MessageDialog errorDialog(Common::U32String(U"The name contains characters unavailable in this language"));
+			GUI::MessageDialog errorDialog(_("The name contains characters unavailable in this language"));
 			errorDialog.runModal();
 		}
 	}
 
 	if (isActiveSavefile(savefileName)) {
-		GUI::MessageDialog errorDialog(Common::U32String(U"Return to the launcher before replacing the active saved game."));
+		GUI::MessageDialog errorDialog(_("Return to the launcher before replacing the active saved game."));
 		errorDialog.runModal();
 		return;
 	}
 	if (savegameManager.savefileExists(savefileName)) {
-		GUI::MessageDialog confirmation(Common::U32String(U"A saved game with this name already exists. Replace it?"),
-										Common::U32String(U"Replace"), Common::U32String(U"Cancel"));
+		GUI::MessageDialog confirmation(_("A saved game with this name already exists. Replace it?"),
+										_("Replace"), _("Cancel"));
 		if (confirmation.runModal() != GUI::kMessageOK)
 			return;
 	}
@@ -426,7 +434,7 @@ void Zoombini2SaveManagementDialog::importSavefile() {
 	const bool imported = savegameManager.importSavefile(savefileName, stream, true);
 	delete stream;
 	if (!imported) {
-		GUI::MessageDialog errorDialog(Common::U32String(U"The selected file is not a valid Zoombini2 saved game"));
+		GUI::MessageDialog errorDialog(_("The selected file is not a valid Zoombini2 saved game"));
 		errorDialog.runModal();
 		return;
 	}
@@ -434,7 +442,7 @@ void Zoombini2SaveManagementDialog::importSavefile() {
 	refreshSavefiles(savefileName);
 	_savefileList->reflowLayout();
 	g_gui.scheduleTopDialogRedraw();
-	GUI::MessageDialog successDialog(Common::U32String(U"The saved game was imported"));
+	GUI::MessageDialog successDialog(_("The saved game was imported"));
 	successDialog.runModal();
 }
 
@@ -442,13 +450,13 @@ void Zoombini2SaveManagementDialog::exportSelectedSavefile() {
 	if (_selectedSavefileIndex < 0 || static_cast<int>(_savefileNames.size()) <= _selectedSavefileIndex || !_savefileStateValid[_selectedSavefileIndex])
 		return;
 
-	GUI::BrowserDialog browser(Common::U32String(U"Select the directory for the exported Zoombini2 .mk save"), true);
+	GUI::BrowserDialog browser(_("Select the directory for the exported Zoombini2 .mk save"), true);
 	if (browser.runModal() <= 0)
 		return;
 
 	const Common::FSNode directory = browser.getResult();
 	if (!directory.isDirectory()) {
-		GUI::MessageDialog errorDialog(Common::U32String(U"The selected destination is not a directory"));
+		GUI::MessageDialog errorDialog(_("The selected destination is not a directory"));
 		errorDialog.runModal();
 		return;
 	}
@@ -458,8 +466,8 @@ void Zoombini2SaveManagementDialog::exportSelectedSavefile() {
 	const Common::String exportName = savegameManager.decodeSavefileName(savefileName).encode(Common::kUtf8) + ".mk";
 	const Common::FSNode dest = findChild(directory, exportName);
 	if (dest.exists()) {
-		GUI::MessageDialog confirmation(Common::U32String(U"The .mk file already exists. Replace it?"),
-										Common::U32String(U"Replace"), Common::U32String(U"Cancel"));
+		GUI::MessageDialog confirmation(_("The .mk file already exists. Replace it?"),
+										_("Replace"), _("Cancel"));
 		if (confirmation.runModal() != GUI::kMessageOK)
 			return;
 	}
@@ -472,12 +480,12 @@ void Zoombini2SaveManagementDialog::exportSelectedSavefile() {
 	}
 	delete stream;
 	if (!exported) {
-		GUI::MessageDialog errorDialog(Common::U32String(U"Unable to export the selected saved game"));
+		GUI::MessageDialog errorDialog(_("Unable to export the selected saved game"));
 		errorDialog.runModal();
 		return;
 	}
 
-	GUI::MessageDialog successDialog(Common::U32String(U"The saved game was exported as a Zoombini2 .mk file"));
+	GUI::MessageDialog successDialog(_("The saved game was exported as a Zoombini2 .mk file"));
 	successDialog.runModal();
 }
 
@@ -488,14 +496,14 @@ void Zoombini2SaveManagementDialog::deleteSelectedSavefile() {
 	if (isActiveSavefile(savefileName))
 		return;
 
-	GUI::MessageDialog confirmation(Common::U32String(U"Do you really want to delete this saved game?"), Common::U32String(U"Delete"),
-									Common::U32String(U"Cancel"));
+	GUI::MessageDialog confirmation(_("Do you really want to delete this saved game?"), _("Delete"),
+									_("Cancel"));
 	if (confirmation.runModal() != GUI::kMessageOK)
 		return;
 
 	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language);
 	if (!savegameManager.deleteSavefile(savefileName)) {
-		GUI::MessageDialog errorDialog(Common::U32String(U"Error deleting saved game"));
+		GUI::MessageDialog errorDialog(_("Error deleting saved game"));
 		errorDialog.runModal();
 		return;
 	}
@@ -557,87 +565,99 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	: GUI::OptionsContainerWidget(boss, name, "Zoombini2EngineOptionsDialog", domain) {
 	new SeparatorWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.SaveFilesSeparator");
 	GUI::StaticTextWidget *header = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.SaveFilesHeader",
-															  Common::U32String(U"Save management"), Common::U32String(), GUI::ThemeEngine::kFontStyleBold);
+															  _("Save management"), Common::U32String(), GUI::ThemeEngine::kFontStyleBold);
 	header->setAlign(Graphics::TextAlign::kTextAlignStart);
 	GUI::ButtonWidget *manageSavefilesButton = new GUI::ButtonWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ManageSavefiles",
-																	 Common::U32String(U"Saved games"), Common::U32String(), kManageSavefilesCommand);
+																	 _("Saved games"), Common::U32String(), kManageSavefilesCommand);
 	manageSavefilesButton->setTarget(this);
 	_savefileReadOnlyToggleCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.SavefileReadOnlyToggle",
-															  Common::U32String(U"Enable savefile readonly toggle (Ctrl-K)"),
-															  Common::U32String(U"Ctrl+K or right-click toggles automatic save writes for one savefile during this game session. "
-																				U"A file without write permission remains read-only."));
+															  _("Enable savefile readonly toggle (Ctrl-K)"),
+															  _("Ctrl+K or right-click toggles automatic save writes for one savefile during this game session. "
+																"A file without write permission remains read-only."));
 
 	new SeparatorWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayEnhancementsSeparator");
 	header = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayEnhancements",
-									   Common::U32String(U"Gameplay Enhancements"), Common::U32String(), GUI::ThemeEngine::kFontStyleBold);
+									   _("Gameplay Enhancements"), Common::U32String(), GUI::ThemeEngine::kFontStyleBold);
 	header->setAlign(Graphics::TextAlign::kTextAlignStart);
-	_stereoOutputCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.StereoOutput", Common::U32String(U"Enable stereo game audio"),
-													Common::U32String(U"Keeps both channels of stereo WAV resources instead of downmixing them to mono."));
+	_stereoOutputCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.StereoOutput", _("Enable stereo game audio"),
+													_("Keeps both channels of stereo WAV resources instead of downmixing them to mono."));
 	_floatingPointPathsCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.FloatingPointPaths",
-														  Common::U32String(U"Use floating-point path calculations"),
-														  Common::U32String(U"Uses 32-bit floating point instead of the original signed Q10 fixed-point arithmetic for Bezier movement paths."));
+														  _("Use floating-point path calculations"),
+														  _("Uses 32-bit floating point instead of the original signed Q10 fixed-point arithmetic for Bezier movement paths."));
 	_fixFleenDepartureStreakCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.FixFleenDepartureStreak",
-															   Common::U32String(U"Remove stray streaks from fleeing Fleens"),
-															   Common::U32String(U"Hides stray brown streaks in some Fleen departure frames in Magic Mirrors."));
+															   _("Remove stray streaks from fleeing Fleens"),
+															   _("Hides stray brown streaks in some Fleen departure frames in Magic Mirrors."));
 	_enhancedKbdShortcutsCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.EnhancedKbdShortcuts",
-															Common::U32String(U"Enable enhanced keyboard shortcuts"),
-															Common::U32String(U"Enables some ScummVM-only keyboard shortcuts for quality of life improvements."));
+															_("Enable enhanced keyboard shortcuts"),
+															_("Enables some ScummVM-only keyboard shortcuts for quality of life improvements."));
 	if (Common::checkGameGUIOption(GAMEOPTION_HELP_PAGE_COLOR_KEYING, ConfMan.get("guioptions", domain))) {
 		_transparentHelpPagesCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.TransparentHelpPages",
-																Common::U32String(U"Remove solid color behind help text"),
-																Common::U32String(U"Uses the help sheet's corner color as a transparency key for affected releases."));
+																_("Remove solid color behind help text"),
+																_("Uses the help sheet's corner color as a transparency key for affected releases."));
 	}
-	GUI::StaticTextWidget *colorAssistLabel = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ColorAssistLabel",
-																		Common::U32String(U"Color assistance:"));
-	colorAssistLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
+	_colorAssistLabel = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ColorAssistLabel",
+												  _("Color assistance:"));
+	_colorAssistLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
 	_colorAssistPopUp = new GUI::PopUpWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ColorAssist",
-											 Common::U32String(U"Adjusts Zoombini noses and puzzle colors."));
-	_colorAssistPopUp->appendEntry(Common::U32String(U"Original colors"), 0);
-	_colorAssistPopUp->appendEntry(Common::U32String(U"Small screen"), 1);
-	_colorAssistPopUp->appendEntry(Common::U32String(U"Red-green color assist"), 2);
+											 _("Adjusts Zoombini noses and puzzle colors."));
+	_colorAssistPopUp->appendEntry(_("Original colors"), 0);
+	_colorAssistPopUp->appendEntry(_("Small screen"), 1);
+	_colorAssistPopUp->appendEntry(_("Red-green color assist"), 2);
 
 	new SeparatorWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayAdjustmentSeparator");
 	header = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayAdjustment",
-									   Common::U32String(U"Gameplay Adjustment"), Common::U32String(), GUI::ThemeEngine::kFontStyleBold);
+									   _("Gameplay Adjustment"), Common::U32String(), GUI::ThemeEngine::kFontStyleBold);
 	header->setAlign(Graphics::TextAlign::kTextAlignStart);
-	_debugHotkeysCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.DebugHotkeys", Common::U32String(U"Enable developer hotkeys"),
-													Common::U32String(U"Enables F2/F3 party exchange, P puzzle completion, and the Chez Norf C overlay."));
+	_debugHotkeysCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.DebugHotkeys", _("Enable developer hotkeys"),
+													_("Enables F2/F3 party exchange, P puzzle completion, and the Chez Norf C overlay."));
 	_greedyWaterslideCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GreedyWaterslide",
-														Common::U32String(U"Use alternate Pipes of Paloo pairing"),
-														Common::U32String(U"Selects the alternate pairing branch for level one."));
+														_("Use alternate Pipes of Paloo pairing"),
+														_("Selects the alternate pairing branch for level one."));
 	_aquacubeSafeFirstMoveCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.AquacubeSafeFirstMove",
-															 Common::U32String(U"Protect Aqua Cube's first lever move"),
-															 Common::U32String(U"On level three, swaps the hidden axes of two levers if the first direct lever press would enter a Fleen cell."));
+															 _("Protect Aqua Cube's first lever move"),
+															 _("On level three, swaps the hidden axes of two levers if the first direct lever press would enter a Fleen cell."));
 	_allowCutLevel4PracticePuzzlesCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.AllowCutLevel4PracticePuzzles",
-																	 Common::U32String(U"Allow cut level 4 puzzles in practice mode"),
-																	 Common::U32String(U"Adds a level 4 practice-map tab. Puzzles without a recovered level 4 remain at level three."));
-	_originalPrngCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.OriginalPRNG",
-													Common::U32String(U"Use original random number generator (requires restart)"),
-													Common::U32String(U"Uses the original Windows engine's Visual C++ 6.0 CRT generator instead of ScummVM's default."));
-	GUI::StaticTextWidget *frameRateLabel = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.FrameRateLabel",
-																	  Common::U32String(U"Frame rate (FPS):"));
-	frameRateLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
+																	 _("Allow cut level 4 puzzles in practice mode"),
+																	 _("Adds a level 4 practice-map tab. Puzzles without a recovered level 4 remain at level three."));
+	const Common::U32String prngAlgorithmTooltip = _("Selects the pseudo random number generator algorithm.");
+	_prngAlgorithmLabel = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.PrngAlgorithmLabel", _("PRNG Algorithm:"), prngAlgorithmTooltip);
+	_prngAlgorithmLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
+	_prngAlgorithmPopUp = new GUI::PopUpWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.PrngAlgorithm", prngAlgorithmTooltip);
+	_prngAlgorithmPopUp->appendEntry(_("Original PRNG"), static_cast<uint32>(Zoombini2MetaEngine::PrngAlgorithm::kOriginalPrng));
+	_prngAlgorithmPopUp->appendEntry(_("ScummVM Standard PRNG"), static_cast<uint32>(Zoombini2MetaEngine::PrngAlgorithm::kStandardPrng));
+	_frameRateLabel = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.FrameRateLabel", _("Frame rate (FPS):"));
+	_frameRateLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
 	_frameRateNumberBox = new FrameRateNumberBox(widgetsBoss(), "Zoombini2EngineOptionsDialog.FrameRate",
-												 ::Zoombini2MetaEngine::kDefaultFrameRate,
-												 Common::U32String(U"Enter a whole number from 30 to 240 FPS."));
-	GUI::StaticTextWidget *pacingLabel = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.PacingLabel",
-																   Common::U32String(U"Logic pacing:"));
-	pacingLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
+												 Zoombini2MetaEngine::kDefaultFrameRate,
+												 _("Enter a whole number from 30 to 240 FPS."));
+	_pacingLabel = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.PacingLabel", _("Logic pacing:"));
+	_pacingLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
 	_pacingPopUp = new GUI::PopUpWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.Pacing",
-										Common::U32String(U"Select 60Hz LCD or 75Hz CRT logic pacing. "
-														  U"Affects Booliewood panorama scrolling speed and idle animation trigger rates. "
-														  U"Rendering frame rate is unaffected."));
-	_pacingPopUp->appendEntry(Common::U32String(U"60Hz LCD"), 60);
-	_pacingPopUp->appendEntry(Common::U32String(U"75Hz CRT"), 75);
+										_("Select 60Hz LCD or 75Hz CRT logic pacing. "
+										  "Affects Booliewood panorama scrolling speed and idle animation trigger rates. "
+										  "Rendering frame rate is unaffected."));
+	_pacingPopUp->appendEntry(_("60Hz (LCD preset)"), static_cast<uint32>(Zoombini2MetaEngine::LogicPacingMode::k60Hz));
+	_pacingPopUp->appendEntry(_("75Hz (CRT preset)"), static_cast<uint32>(Zoombini2MetaEngine::LogicPacingMode::k75Hz));
 	_unlockFrameRateCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.UnlockFrameRate",
-													   Common::U32String(U"Unlock frame rate"),
-													   Common::U32String(U"Removes the engine frame-rate limit. Display VSync may still limit presentation."),
+													   _("Unlock frame rate"),
+													   _("Removes the engine frame-rate limit. Display VSync may still limit presentation."),
 													   kUnlockFrameRateCommand);
 	_unlockFrameRateCheckbox->setTarget(this);
 }
 
 void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const {
 	const int lineHeight = layouts.getVar("Globals.Line.Height");
+	static constexpr int kOptionLabelPadding = 4;
+	const GUI::StaticTextWidget *const optionLabels[] = {
+		_colorAssistLabel,
+		_prngAlgorithmLabel,
+		_pacingLabel,
+		_frameRateLabel,
+	};
+	int optionLabelWidth = 0;
+	for (uint labelIdx = 0; labelIdx < ARRAYSIZE(optionLabels); labelIdx++)
+		optionLabelWidth = MAX(optionLabelWidth, g_gui.getStringWidth(optionLabels[labelIdx]->getLabel()));
+	optionLabelWidth += kOptionLabelPadding;
 	layouts.addDialog(layoutName, overlayedLayout)
 		.addLayout(GUI::ThemeLayout::kLayoutVertical)
 		.addPadding(0, 0, 0, 0)
@@ -655,7 +675,8 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 		.addWidget("EnhancedKbdShortcuts", "Checkbox")
 		.addWidget("TransparentHelpPages", "Checkbox")
 		.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
-		.addWidget("ColorAssistLabel", "OptionsLabel")
+		.addPadding(0, 0, 0, 0)
+		.addWidget("ColorAssistLabel", "", optionLabelWidth, lineHeight)
 		.addWidget("ColorAssist", "", 210, lineHeight)
 		.closeLayout()
 		.addSpace(10)
@@ -665,13 +686,19 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 		.addWidget("GreedyWaterslide", "Checkbox")
 		.addWidget("AquacubeSafeFirstMove", "Checkbox")
 		.addWidget("AllowCutLevel4PracticePuzzles", "Checkbox")
-		.addWidget("OriginalPRNG", "Checkbox")
 		.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
-		.addWidget("PacingLabel", "OptionsLabel")
+		.addPadding(0, 0, 0, 0)
+		.addWidget("PrngAlgorithmLabel", "", optionLabelWidth, lineHeight)
+		.addWidget("PrngAlgorithm", "PopUp")
+		.closeLayout()
+		.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
+		.addPadding(0, 0, 0, 0)
+		.addWidget("PacingLabel", "", optionLabelWidth, lineHeight)
 		.addWidget("Pacing", "", 120, lineHeight)
 		.closeLayout()
 		.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
-		.addWidget("FrameRateLabel", "OptionsLabel")
+		.addPadding(0, 0, 0, 0)
+		.addWidget("FrameRateLabel", "", optionLabelWidth, lineHeight)
 		.addWidget("FrameRate", "", 64, lineHeight)
 		.closeLayout()
 		.addWidget("UnlockFrameRate", "Checkbox")
@@ -680,25 +707,24 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 }
 
 void Zoombini2OptionsWidget::load() {
-	_savefileReadOnlyToggleCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigEnableSavefileReadOnlyToggle, _domain));
-	_stereoOutputCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigStereoOutput, _domain));
-	_floatingPointPathsCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths, _domain));
-	_fixFleenDepartureStreakCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigFixFleenDepartureStreak, _domain));
-	_enhancedKbdShortcutsCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _domain));
+	_savefileReadOnlyToggleCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigEnableSavefileReadOnlyToggle, _domain));
+	_stereoOutputCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigStereoOutput, _domain));
+	_floatingPointPathsCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigUseFloatingPointPaths, _domain));
+	_fixFleenDepartureStreakCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigFixFleenDepartureStreak, _domain));
+	_enhancedKbdShortcutsCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _domain));
 	if (_transparentHelpPagesCheckbox)
-		_transparentHelpPagesCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigTransparentHelpPages, _domain));
-	const int colorAssistValue = ConfMan.getInt(::Zoombini2MetaEngine::kConfigColorAssistMode, _domain);
+		_transparentHelpPagesCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigTransparentHelpPages, _domain));
+	const int colorAssistValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigColorAssistMode, _domain);
 	_colorAssistPopUp->setSelectedTag(0 <= colorAssistValue && colorAssistValue <= 2 ? colorAssistValue : 0);
-	_debugHotkeysCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigDebugHotkeys, _domain));
-	_greedyWaterslideCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _domain));
-	_aquacubeSafeFirstMoveCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove, _domain));
-	_allowCutLevel4PracticePuzzlesCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigAllowCutLevel4PracticePuzzles, _domain));
-	_originalPrngCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _domain));
-	_pacingPopUp->setSelectedTag(ConfMan.getInt(::Zoombini2MetaEngine::kConfigLogicPacingHz, _domain) == 75 ? 75 : 60);
-	const int frameRate = CLIP<int>(ConfMan.getInt(::Zoombini2MetaEngine::kConfigFrameRate, _domain),
-									::Zoombini2MetaEngine::kMinFrameRate, ::Zoombini2MetaEngine::kMaxFrameRate);
+	_debugHotkeysCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigDebugHotkeys, _domain));
+	_greedyWaterslideCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _domain));
+	_aquacubeSafeFirstMoveCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove, _domain));
+	_allowCutLevel4PracticePuzzlesCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigAllowCutLevel4PracticePuzzles, _domain));
+	_prngAlgorithmPopUp->setSelectedTag(ConfMan.getInt(Zoombini2MetaEngine::kConfigPrngAlgorithm, _domain));
+	_pacingPopUp->setSelectedTag(ConfMan.getInt(Zoombini2MetaEngine::kConfigLogicPacingMode, _domain));
+	const int frameRate = CLIP<int>(ConfMan.getInt(Zoombini2MetaEngine::kConfigFrameRate, _domain), Zoombini2MetaEngine::kMinFrameRate, Zoombini2MetaEngine::kMaxFrameRate);
 	_frameRateNumberBox->setValue(frameRate);
-	_unlockFrameRateCheckbox->setState(ConfMan.getBool(::Zoombini2MetaEngine::kConfigUnlockFrameRate, _domain));
+	_unlockFrameRateCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigUnlockFrameRate, _domain));
 	updateFrameRateControls();
 }
 
@@ -706,28 +732,25 @@ bool Zoombini2OptionsWidget::save() {
 	const int frameRate = _frameRateNumberBox->getValue();
 	_frameRateNumberBox->setValue(frameRate);
 
-	const bool originalPrngChanged = ConfMan.getBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _domain) != _originalPrngCheckbox->getState();
+	const Zoombini2MetaEngine::PrngAlgorithm prngAlgorithm = static_cast<Zoombini2MetaEngine::PrngAlgorithm>(_prngAlgorithmPopUp->getSelectedTag());
+	const Zoombini2MetaEngine::LogicPacingMode logicPacingMode = static_cast<Zoombini2MetaEngine::LogicPacingMode>(_pacingPopUp->getSelectedTag());
 
-	ConfMan.setBool(::Zoombini2MetaEngine::kConfigEnableSavefileReadOnlyToggle, _savefileReadOnlyToggleCheckbox->getState(), _domain);
-	ConfMan.setBool(::Zoombini2MetaEngine::kConfigStereoOutput, _stereoOutputCheckbox->getState(), _domain);
-	ConfMan.setBool(::Zoombini2MetaEngine::kConfigUseFloatingPointPaths, _floatingPointPathsCheckbox->getState(), _domain);
-	ConfMan.setBool(::Zoombini2MetaEngine::kConfigFixFleenDepartureStreak, _fixFleenDepartureStreakCheckbox->getState(), _domain);
-	ConfMan.setBool(::Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _enhancedKbdShortcutsCheckbox->getState(), _domain);
+	ConfMan.setBool(Zoombini2MetaEngine::kConfigEnableSavefileReadOnlyToggle, _savefileReadOnlyToggleCheckbox->getState(), _domain);
+	ConfMan.setBool(Zoombini2MetaEngine::kConfigStereoOutput, _stereoOutputCheckbox->getState(), _domain);
+	ConfMan.setBool(Zoombini2MetaEngine::kConfigUseFloatingPointPaths, _floatingPointPathsCheckbox->getState(), _domain);
+	ConfMan.setBool(Zoombini2MetaEngine::kConfigFixFleenDepartureStreak, _fixFleenDepartureStreakCheckbox->getState(), _domain);
+	ConfMan.setBool(Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _enhancedKbdShortcutsCheckbox->getState(), _domain);
 	if (_transparentHelpPagesCheckbox)
-		ConfMan.setBool(::Zoombini2MetaEngine::kConfigTransparentHelpPages, _transparentHelpPagesCheckbox->getState(), _domain);
-	ConfMan.setInt(::Zoombini2MetaEngine::kConfigColorAssistMode, _colorAssistPopUp->getSelectedTag(), _domain);
-	ConfMan.setBool(::Zoombini2MetaEngine::kConfigDebugHotkeys, _debugHotkeysCheckbox->getState(), _domain);
-	ConfMan.setBool(::Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _greedyWaterslideCheckbox->getState(), _domain);
-	ConfMan.setBool(::Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove, _aquacubeSafeFirstMoveCheckbox->getState(), _domain);
-	ConfMan.setBool(::Zoombini2MetaEngine::kConfigAllowCutLevel4PracticePuzzles, _allowCutLevel4PracticePuzzlesCheckbox->getState(), _domain);
-	ConfMan.setBool(::Zoombini2MetaEngine::kConfigOriginalPRNG, _originalPrngCheckbox->getState(), _domain);
-	ConfMan.setInt(::Zoombini2MetaEngine::kConfigLogicPacingHz, _pacingPopUp->getSelectedTag() == 75 ? 75 : 60, _domain);
-	ConfMan.setInt(::Zoombini2MetaEngine::kConfigFrameRate, frameRate, _domain);
-	ConfMan.setBool(::Zoombini2MetaEngine::kConfigUnlockFrameRate, _unlockFrameRateCheckbox->getState(), _domain);
-	if (originalPrngChanged && g_engine) {
-		GUI::MessageDialog dialog(Common::U32String(U"The random number generator change will take effect after restarting the game."));
-		dialog.runModal();
-	}
+		ConfMan.setBool(Zoombini2MetaEngine::kConfigTransparentHelpPages, _transparentHelpPagesCheckbox->getState(), _domain);
+	ConfMan.setInt(Zoombini2MetaEngine::kConfigColorAssistMode, _colorAssistPopUp->getSelectedTag(), _domain);
+	ConfMan.setBool(Zoombini2MetaEngine::kConfigDebugHotkeys, _debugHotkeysCheckbox->getState(), _domain);
+	ConfMan.setBool(Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _greedyWaterslideCheckbox->getState(), _domain);
+	ConfMan.setBool(Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove, _aquacubeSafeFirstMoveCheckbox->getState(), _domain);
+	ConfMan.setBool(Zoombini2MetaEngine::kConfigAllowCutLevel4PracticePuzzles, _allowCutLevel4PracticePuzzlesCheckbox->getState(), _domain);
+	ConfMan.setInt(Zoombini2MetaEngine::kConfigPrngAlgorithm, static_cast<int>(prngAlgorithm), _domain);
+	ConfMan.setInt(Zoombini2MetaEngine::kConfigLogicPacingMode, static_cast<int>(logicPacingMode), _domain);
+	ConfMan.setInt(Zoombini2MetaEngine::kConfigFrameRate, frameRate, _domain);
+	ConfMan.setBool(Zoombini2MetaEngine::kConfigUnlockFrameRate, _unlockFrameRateCheckbox->getState(), _domain);
 	return true;
 }
 
