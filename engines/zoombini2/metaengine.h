@@ -23,6 +23,7 @@
 #define ZOOMBINI2_METAENGINE_H
 
 #include "common/error.h"
+#include "common/str.h"
 
 #include "engines/advancedDetector.h"
 
@@ -63,12 +64,30 @@ public:
 	static constexpr const char *kConfigAquacubeSafeFirstMove = "aquacube_safe_first_move";
 	/** Target configuration key exposing recoverable level 4 puzzles on the practice map. */
 	static constexpr const char *kConfigAllowCutLevel4PracticePuzzles = "allow_cut_level4_practice_puzzles";
-	/** Target configuration key selecting the original Windows random-number generator. */
-	static constexpr const char *kConfigOriginalPRNG = "original_prng";
+	/** Persisted and runtime pseudo-random generator selection. */
+	enum class PrngAlgorithm : uint32 {
+		/**
+		 * Original engine's LCG PRNG.
+		 */
+		kOriginalPrng = 0,
+		/**
+		 * ScummVM standard xorshift-based PRNG.
+		 */
+		kStandardPrng = 1,
+	};
+	/** Target configuration key selecting the pseudo-random generator. */
+	static constexpr const char *kConfigPrngAlgorithm = "prng_algorithm";
 	/** Target configuration key selecting the optional color-only presentation. */
 	static constexpr const char *kConfigColorAssistMode = "color_assist_mode";
-	/** Target configuration key selecting the logic pacing rate in Hz. */
-	static constexpr const char *kConfigLogicPacingHz = "logic_pacing_hz";
+	/** Persisted and runtime selection for frame-derived gameplay pacing. */
+	enum class LogicPacingMode : uint32 {
+		/** Scale frame-derived speeds to the 60Hz (LCD preset). */
+		k60Hz = 60,
+		/** Scale frame-derived speeds to the 75Hz (CRT preset). */
+		k75Hz = 75,
+	};
+	/** Target configuration key selecting the logic pacing rate mode. */
+	static constexpr const char *kConfigLogicPacingMode = "logic_pacing_mode";
 	/** Target frame rate for the engine's presentation loop. */
 	static constexpr const char *kConfigFrameRate = "frame_rate";
 	/** Disable the engine's frame-rate limiter. */
@@ -77,9 +96,7 @@ public:
 	static constexpr int kDefaultFrameRate = 60;
 	static constexpr int kMaxFrameRate = 240;
 
-	const char *getName() const override {
-		return "zoombini2";
-	}
+	const char *getName() const override { return "zoombini2"; }
 
 	Common::Error createInstance(OSystem *syst, Engine **engine, const Zoombini2::Zoombini2GameDescription *desc) const override;
 

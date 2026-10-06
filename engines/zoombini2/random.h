@@ -26,6 +26,8 @@
 #include "common/scummsys.h"
 #include "common/str.h"
 
+#include "zoombini2/metaengine.h"
+
 namespace Zoombini2 {
 
 /**
@@ -34,35 +36,45 @@ namespace Zoombini2 {
  * An engine variant for another original platform, such as Macintosh, must
  * identify that platform's runtime RNG before selecting this stream.
  *
- * The "original_prng" configuration option selects this compatibility stream
- * or ScummVM's default @ref Common::RandomSource stream at construction time.
+ * The "prng_algorithm" configuration option selects this compatibility stream
+ * or ScummVM's default @ref Common::RandomSource stream.
+ * Changing the algorithm starts a new sequence when engine settings are applied.
  */
 class Random {
 private:
-	/** Complete unsigned 32-bit MSVC 6.0 CRT linear-congruential state. */
+	/** State of the original PRNG (MSVC 6.0 CRT LCG) */
 	uint32 _randState = 0;
-	/** ScummVM random-number stream used when compatibility mode is disabled. */
+	/** ScummVM standard PRNG. */
 	Common::RandomSource _scummRnd;
-	/** Whether calls use the original Windows compatibility algorithm. */
-	bool _useOriginal;
+	/** Currently selected PRNG algorithm. */
+	Zoombini2MetaEngine::PrngAlgorithm _prngAlgorithm;
 
-	/** Advance the compatibility state and return an inclusive value from zero through @p max, including when @p max is zero. */
+	/** 
+	 * Generate one inclusive bounded value with the compatibility algorithm.
+	 * Advance the compatibility state and return an iclusive value from zero through @p max.
+	 * The state is advanced even when @p max is zero.
+	 */
 	int32 getOriginalRandomNumber(int32 max);
 
 public:
-	/** Construct the shared game stream and select its algorithm from "original_prng". */
+	/** Construct the shared game stream and select its algorithm from the target configuration. */
 	explicit Random(const Common::String &name);
 
+	/** Switch algorithms and start a new random sequence only when the selection changes. */
+	void setAlgorithm(Zoombini2MetaEngine::PrngAlgorithm prngAlgorithm);
 	/** Seed both backing streams. The compatibility stream preserves zero exactly. */
 	void setSeed(uint32 seed);
 	/** Return the current state of the selected stream. */
-	uint32 getSeed() const { return _useOriginal ? _randState : _scummRnd.getSeed(); }
+	uint32 getSeed() const;
 	/** Generates new seed based on the current date/time */
 	static uint32 generateNewSeed();
 
 	/** Advance the stream and return an inclusive value in the range zero through @p max. */
 	int32 getRandomNumber(int32 max);
-	/** Advance the stream and return an inclusive signed value in the range @p min through @p max. */
+	/**
+	 * Advance the stream and return an inclusive signed value in the range @p min through @p max.
+	 * Swap reversed endpoints and report a fatal error if their span exceeds INT_MAX.
+	 */
 	int32 getRandomNumberRng(int32 min, int32 max);
 };
 
