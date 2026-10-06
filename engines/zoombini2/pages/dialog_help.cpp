@@ -108,7 +108,7 @@ bool DialogHelp::open(PageId pageId, int level) {
 	_currentPageId = pageId;
 	_currentLevel = level;
 	_currentSheet = 1;
-	_transparentHelpPages = (_vm->getFeatures() & GF_Z2_SOLID_HELP_PAGES) != 0 && ConfMan.getBool(::Zoombini2MetaEngine::kConfigTransparentHelpPages);
+	_transparentHelpPages = (_vm->getFeatures() & GF_Z2_SOLID_HELP_PAGES) != 0 && ConfMan.getBool(Zoombini2MetaEngine::kConfigTransparentHelpPages);
 	if (level == 4)
 		resolveUiFont();
 
