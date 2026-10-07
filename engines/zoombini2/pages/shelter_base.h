@@ -54,9 +54,9 @@ public:
 
 	/** Advance the departure phase. */
 	void onUpdate() override;
-	/** Draw the site-owned foreground followed by the common waiting roster. */
+	/** Draw @ref ShelterRescueSiteBase::onRenderSite, then the common scroll controls and waiting roster. */
 	void onRenderContent(ManagedSurface32 *screen) override;
-	/** Dispatch common scrolling and roster selection around site-owned controls. */
+	/** Handle scrolling, then @ref ShelterRescueSiteBase::onSiteLButtonDown, then waiting-roster selection if the click is still unhandled. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 	/** Return whether the departure roster contains exactly eight Zoombinis. */
 	bool hasFullDepartureParty() const { return _readyToDepart; }
@@ -68,7 +68,8 @@ public:
 	 */
 	virtual bool isDepartingMember(const ZoombiniRunner *zoombini) const;
 
-protected: /** Bind a concrete rescue site to @p vm. */
+protected:
+	/** Bind a concrete rescue site to @p vm. */
 	explicit ShelterRescueSiteBase(Zoombini2Engine *vm);
 
 	/** Configure the site-specific roster and scroll-control geometry. */
@@ -92,7 +93,7 @@ protected: /** Bind a concrete rescue site to @p vm. */
 	void refillDepartureRoster(StorageRecord **storage);
 	/** Persist every non-departing member in @p storage and write the active save. */
 	void saveRescueRoster(StorageRecord **storage);
-	/** Load the shared little-Zoombini sprite grid from @ref kRosterAnimationPath through the engine cache. */
+	/** Load the shared Zoombini sprite grid for drawing the waiting roster from @ref ShelterRescueSiteBase::kRosterAnimationPath through the engine cache. */
 	void loadRosterAnimation();
 	/**
 	 * Queue an arrival speech for sequential playback.
@@ -135,7 +136,7 @@ private:
 	static constexpr int kGridRows = 5;
 	/** Dimensions of one visible roster slot. */
 	static constexpr Size32 kSlotSize = Size32(40, 57);
-	/** Shared little-Zoombini sprite grid used to draw Zoombinis in the waiting roster. */
+	/** Shared sprite grid of Zoombinis at their normal gameplay size, used to draw the waiting roster. */
 	static constexpr const char *kRosterAnimationPath = "bmp/zombis/littleZomb.anm";
 
 	/** Selection marker path for the current rescue site. */
@@ -165,7 +166,8 @@ private:
 	/** Arrival speech currently playing, or -1 when the queue is idle. */
 	int _speechSoundId = -1;
 	/** Arrival speech paths awaiting sequential playback. */
-	Common::Array<Common::String> _speechQueue; /** Borrowed immutable sprite grid owned by the engine cache. */
+	Common::Array<Common::String> _speechQueue;
+	/** Immutable sprite grid borrowed from the engine cache and retained across page transitions. */
 	const ZoombiniAnimation *_zoombiniAnimation = nullptr;
 	/** Runtime party chosen to leave this rescue site. */
 	Common::Array<ZoombiniRunner *> _departureRoster;

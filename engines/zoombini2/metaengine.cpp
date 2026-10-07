@@ -39,7 +39,7 @@ bool Zoombini2MetaEngine::hasFeature(MetaEngineFeature f) const {
 void Zoombini2MetaEngine::registerDefaultSettings(const Common::String &target) const {
 	(void)target;
 	ConfMan.registerDefault(kConfigEnableSavefileReadOnlyToggle, false);
-	ConfMan.registerDefault(kConfigStereoOutput, false);
+	ConfMan.registerDefault(kConfigAudioOutputMode, static_cast<int>(AudioOutputMode::kMonoDownmix));
 	ConfMan.registerDefault(kConfigUseFloatingPointPaths, false);
 	ConfMan.registerDefault(kConfigFixFleenDepartureStreak, true);
 	ConfMan.registerDefault(kConfigEnhancedKbdShortcuts, true);
@@ -49,7 +49,7 @@ void Zoombini2MetaEngine::registerDefaultSettings(const Common::String &target) 
 	ConfMan.registerDefault(kConfigAquacubeSafeFirstMove, false);
 	ConfMan.registerDefault(kConfigAllowCutLevel4PracticePuzzles, false);
 	ConfMan.registerDefault(kConfigPrngAlgorithm, static_cast<int>(PrngAlgorithm::kOriginalPrng));
-	ConfMan.registerDefault(kConfigColorAssistMode, 0);
+	ConfMan.registerDefault(kConfigColorAssistMode, static_cast<int>(ColorAssistMode::kOriginal));
 	ConfMan.registerDefault(kConfigLogicPacingMode, static_cast<int>(LogicPacingMode::k75Hz));
 	ConfMan.registerDefault(kConfigFrameRate, kDefaultFrameRate);
 	ConfMan.registerDefault(kConfigUnlockFrameRate, false);

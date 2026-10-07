@@ -52,10 +52,9 @@ enum class DialogMsgBoxState {
 /**
  * Two-button confirmation dialog requested by pages and controls.
  *
- * A request supplies either a game text resource or UI text, position, text
- * offset, and completion callback. The dialog borrows its panel resources from
- * the graphics page cache and retains the saved screen rectangle, pause
- * lifecycle, hover state, and exclusive input routing.
+ * Requests enter a pending state; the first render loads panel resources from the page cache, snapshots the covered rectangle, and pauses gameplay.
+ * Activating a button closes the dialog before invoking its callback, allowing the callback to request another dialog.
+ * Closing without a button result, including a resource-load failure, deletes the callback without invoking it.
  */
 class DialogMsgBox : public DialogBase {
 public:
@@ -65,24 +64,26 @@ public:
 	~DialogMsgBox() override;
 
 	/**
-	 * Queue one confirmation request and take ownership of @p callback.
+	 * Queue one confirmation request with a bitmap message.
 	 *
-	 * A request made while another confirmation is active is rejected and its
-	 * callback is deleted.
+	 * @p callback is deleted after invocation or closure; a rejected request deletes it immediately.
+	 * The caller must not retain or delete that pointer after this call, even when the request is rejected.
 	 *
 	 * @param textPath Bit-block resource path for the confirmation message.
+	 * @return True when queued, not when resources have loaded; false if another request is already pending or open.
 	 */
 	bool request(const Common::Path &textPath, Common::BaseCallback<DialogMsgBoxButton> *callback,
 				 const Common::Point32 &position = Common::Point32(-1, -1), const Common::Point32 &textOffset = Common::Point32(17, 17));
 
 	/**
-	 * Queue a confirmation whose text is drawn with the release language font.
+	 * Queue Unicode UI text drawn with the release language font.
+	 * Callback lifetime and the queued-success result follow @ref DialogMsgBox::request.
 	 */
 	bool requestUiText(const Common::U32String &text, Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &position = Common::Point32(-1, -1));
 
 	/** Return whether a request is pending or its dialog is open. */
 	bool isActive() const override { return _state != DialogMsgBoxState::kClosed00; }
-	/** Restore retained state, release request resources, and resume gameplay. */
+	/** Restore saved pixels, resume gameplay if opened, and delete the pending callback without invoking it. */
 	void close() override;
 
 	/** Open a pending request and draw its current panel. */
@@ -141,7 +142,7 @@ private:
 	Common::U32String _uiText;
 	/** UI font borrowed from the theme for the current request, or nullptr. */
 	const Graphics::Font *_uiFont = nullptr;
-	/** Callback owned for the lifetime of the request. */
+	/** Callback deleted after button activation or closure; detached before invocation so it can queue a new request. */
 	Common::BaseCallback<DialogMsgBoxButton> *_callback = nullptr;
 	/** Button currently under the pointer. */
 	DialogMsgBoxButton _hoveredButton = DialogMsgBoxButton::kNone00;
@@ -149,7 +150,6 @@ private:
 	bool _redrawNeeded = false;
 	/** Saved pixels covered by the panel. */
 	ManagedSurface32 *_savedBackground = nullptr;
-	/** System tick captured when the open dialog paused gameplay. */
 };
 
 } // End of namespace Zoombini2

@@ -26,18 +26,21 @@
 
 namespace Zoombini2 {
 
-/** Modal page that retains the dispatched page and consumes its input. */
+/**
+ * Modal overlay displayed while the underlying dispatched page remains alive.
+ * Openers configure dialogs directly; the engine's modal route handles shared-dialog input and rendering.
+ * @ref DialogBase::close marks a dialog inactive and restores any saved page state before it is retired.
+ */
 class DialogBase : public PageBase {
 public:
-	/** Bind this modal page to its owning @p vm. */
+	/** Bind this modal overlay to @p vm. */
 	explicit DialogBase(Zoombini2Engine *vm) : PageBase(vm, PageCategory::kDialog) {}
-	/** Release resources owned by the concrete dialog. */
 	~DialogBase() override {}
 	/** Dialog setup is driven by the opener rather than the page dispatcher. */
 	void init() override {}
 	/** Dialogs have no dispatcher update step; their owner or the engine-level modal route drives them. */
 	void onUpdate() override {}
-	/** Return whether this dialog currently owns drawing and input. */
+	/** Return whether this dialog is open and should receive modal input and rendering. */
 	virtual bool isActive() const = 0;
 	/** Return whether shared sidebar controls are painted over this dialog. */
 	virtual bool drawsSidebarOnTop() const { return false; }
@@ -60,7 +63,7 @@ protected:
 
 	/**
 	 * Classify Return, keypad Enter, and Escape without choosing a button.
-	 * Concrete dialogs retain ownership of action mapping and dialog state.
+	 * Concrete dialogs map the resulting action to their buttons and state transitions.
 	 */
 	static DialogKeyAction classifyDialogKey(const Common::KeyState &kbd);
 };

@@ -35,11 +35,11 @@ namespace Zoombini2 {
 class Zoombini2Engine;
 
 /**
- * Owns the context-sensitive help overlay for one puzzle and level.
+ * Displays context-sensitive help for one puzzle and difficulty level.
  *
- * Help pages resolve below `bmp/help` from the puzzle, level, and sheet
- * number. The dialog pauses gameplay, retains the underlying screen, and
- * restores both the screen and gameplay clock when it closes.
+ * @ref DialogHelp::kHelpPageFormat selects a sheet by page ID, difficulty suffix, and one-based sheet number.
+ * The dialog pauses gameplay and retains a screen snapshot until it closes, when it restores the screen and resumes the clock.
+ * A missing sheet leaves the help frame open; level 4 displays a ScummVM-added notice.
  */
 class DialogHelp : public DialogBase {
 public:
@@ -48,14 +48,17 @@ public:
 	/** Close the active help sheet and release the saved screen. */
 	~DialogHelp() override;
 
-	/** Return whether a help sheet exists for the supplied page coordinates. */
+	/** Check whether the requested help-sheet path exists without loading or validating the bitmap. */
 	bool isPageValid(PageId pageId, int level, int sheet);
 
-	/** Save the current screen and open the first help sheet. */
+	/**
+	 * Save the current screen and open the frame at the first help sheet, even when that sheet is missing.
+	 * @return False if this dialog is already open; otherwise true after pausing gameplay and opening the frame.
+	 */
 	bool open(PageId pageId, int level);
 	/** Close the overlay, restore the saved screen, and resume gameplay timing. */
 	void close() override;
-	/** Return whether this overlay currently owns drawing and input. */
+	/** Return whether this overlay is open and should receive modal input and rendering. */
 	bool isActive() const override { return _isActive; }
 	/** Keep shared controls visible over the help frame. */
 	bool drawsSidebarOnTop() const override { return true; }
@@ -69,7 +72,6 @@ public:
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
 
 private:
-	/** Resource paths and formats used by the help overlay. */
 	/** RLE frame drawn behind the active help sheet and navigation controls. */
 	static constexpr const char *kHelpFramePath = "Bmp/MENU/help_screen_main.rb";
 	/** RLE placeholder shown when a supported difficulty has no loaded help sheet. */

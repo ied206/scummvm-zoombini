@@ -35,6 +35,7 @@
 #include "graphics/managed_surface.h"
 #include "graphics/pixelformat.h"
 
+#include "zoombini2/metaengine.h"
 #include "zoombini2/state.h"
 
 namespace Zoombini2 {
@@ -61,13 +62,6 @@ struct RGBColor {
 };
 
 class AlphaBlendLUT;
-
-/** Optional color presentation for small displays and red-green color vision deficiency. */
-enum class ColorAssistMode : byte {
-	kOriginal00 = 0,
-	kSmallScreen01 = 1,
-	kRedGreen02 = 2
-};
 
 /**
  * Signed width and height without positional semantics.
@@ -155,7 +149,12 @@ class RleBlock;
 class ZoombiniRunner;
 class ZoombiniAnimation;
 
-/** Initializes the game screen and provides page-facing graphics operations. */
+/**
+ * Provides the fixed game surface, cached artwork, and text rendering used by pages.
+ * Page bitmap pointers remain valid until @ref Gfx::clearPageBitmapCache; dialogs and pages must release their references before that call.
+ * Shared bitmaps and the text font remain available until this graphics interface is destroyed.
+ * Surfaces returned by @ref Gfx::createSurface are separate allocations that the caller must delete.
+ */
 class Gfx : public Common::NonCopyable {
 public:
 	/** Construct the graphics interface for one game instance. */
@@ -183,11 +182,11 @@ public:
 	void clearPageBitmapCache();
 	/** Copy the current game screen into @p destSurface. */
 	void captureScreen(ManagedSurface32 *destSurface) const;
-	/** Copy @p source onto the current game screen. */
+	/** Copy @p srcSurface onto the current game screen. */
 	void copyToScreen(const ManagedSurface32 &srcSurface) const;
-	/** Capture a rectangle from the current game screen at the destSurface origin. */
+	/** Copy @p srcRect from the current game screen to the origin of @p destSurface. */
 	void captureScreenRegion(ManagedSurface32 *destSurface, const Common::Rect &srcRect) const;
-	/** Restore @p source onto the current game screen at @p destSurface. */
+	/** Copy @p srcSurface onto the current game screen at the destination position @p destSurface. */
 	void copyRegionToScreen(const ManagedSurface32 &srcSurface, const Common::Point &destSurface) const;
 
 	/** Draw an uncompressed bitmap through the shared Z2 rendering boundary. */
@@ -280,7 +279,7 @@ public:
 	/** Compose the same picker preview with an explicit blend table. */
 	static void drawZoombiniPreview(ManagedSurface32 *destSurface, const ZoombiniAnimation *animation, const byte (&selectedValues)[ZmbTrait::kTraitKindCount], const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT);
 	/** Select the display color for a nose trait without changing its logical value. */
-	static bool noseColorRGB(ColorAssistMode mode, byte value, RGBColor &color);
+	static bool noseColorRGB(Zoombini2MetaEngine::ColorAssistMode mode, byte value, RGBColor &color);
 	/** Shift a nose pixel toward the display hue while retaining its value and saturation variation. */
 	static RGBColor recolorNoseGradientRGB(const RGBColor &srcColor, const RGBColor &targetColor);
 	/** Draw one visible runner and its available drop-target glow at the scrolled or dragged anchor without advancing animation. */
@@ -305,9 +304,16 @@ public:
 	bool loadTextFont(TextColor color);
 	/** Return whether the shared text strip is ready. */
 	bool hasTextFont(TextColor color) const;
-	/** Draw bitmap text tinted with @p color and return its horizontal advance. */
+	/**
+	 * Draw tinted game text and return the signed pen displacement from @ref BmtFont::drawString.
+	 * For Hebrew and Swedish, this can differ from @ref Gfx::getTextWidth and does not describe the visible text bounds.
+	 */
 	int drawText(ManagedSurface32 *destSurface, TextColor color, const Common::Point32 &pos, const Common::String &text) const;
-	/** Measure text by BmtFont with the active release's game rules. */
+	/**
+	 * Measure game text through @ref BmtFont::getStringLayoutWidth for page alignment and name-input limits.
+	 * This preserves the game's Hebrew and Swedish measurement rules; the result can be negative or omit drawn glyphs.
+	 * Replacing it with the return value of @ref Gfx::drawText would change those layout and input decisions.
+	 */
 	int getTextWidth(const Common::String &text, TextColor color) const;
 	/** Draw the held Zoombini name plate centered at the bottom of @p destSurface. */
 	void drawDragNameTooltip(ManagedSurface32 *destSurface, const Common::String &name);
@@ -450,7 +456,7 @@ public:
 	/** Number of values in each byte-sized lookup dimension, from 0 through 255. */
 	static constexpr int kValueCount = 256;
 
-	/** Populate every factor-and-value combination used by @ref scale. */
+	/** Populate every factor-and-value combination used by @ref AlphaBlendLUT::scale. */
 	AlphaBlendLUT();
 
 	/**
@@ -848,8 +854,7 @@ private:
  * The outer size precedes the embedded @ref RleBlock header and must match the
  * payload size stored in that header.
  * This differs from `.an`, where the duplicate size follows the RLE header.
- * The file does not store playback timing; @ref setFrameDelay supplies one
- * page-configured delay for the loaded grid.
+ * The file does not store playback timing; @ref ZoombiniAnimation::setFrameDelay supplies one page-configured delay for the loaded grid.
  */
 class ZoombiniAnimation : public Common::NonCopyable {
 public:
@@ -878,7 +883,7 @@ public:
 	/** Return the number of frames in @p cellIndex, or zero for an invalid cell. */
 	int getFrameCount(int cellIndex) const;
 	/** Return the current presentation setting for this animation's game instance. */
-	ColorAssistMode getColorAssistMode() const;
+	Zoombini2MetaEngine::ColorAssistMode getColorAssistMode() const;
 	/** Return the base layer's dimensions for one Zoombini cell and frame. */
 	Size32 getSpriteSize(int cell, int frame) const;
 	/** Forward legacy drawing calls to @ref Gfx::drawZoombini with the supplied blend table and clip. */
@@ -1047,15 +1052,26 @@ enum MenuButtonId {
  *
  * The usual strip has 81 glyphs.
  * The v1.1SE strip has 84.
- * The v1.0HE strip has 80 and puts Hebrew
- * shapes in both Latin letter ranges, while Hebrew bytes select matching
- * slots directly. Spaces advance by @ref BmtFont::kSpaceWidth.
+ * The v1.0HE strip has 80 and puts Hebrew shapes in both Latin letter ranges, while Hebrew bytes select matching slots directly.
+ * Spaces advance by @ref BmtFont::kSpaceWidth.
  *
- * The strip is loaded once and only its per-pixel coverage masks are retained.
+ * After loading, only the strip's per-pixel coverage masks are retained.
  * The glyph color is a uniform tint applied at draw time, so this single glyph
  * set serves every text color.
- * Game strings retain the Hebrew and Swedish draw/measure rules through
- * @ref BmtFont::drawString and @ref BmtFont::getStringWidth.
+ * Character values are bytes in the detected release's encoding, not Unicode code points.
+ *
+ * The per-character @ref Graphics::Font interface exposes ordinary glyph advances and bounds.
+ * Its inherited string drawing, measurement, alignment, and wrapping use those advances and forward byte order.
+ * Glyph bounds exclude advance spacing; they are distinct from the logical width even in that common interface.
+ *
+ * The game-facing @ref BmtFont::drawString overload and @ref BmtFont::getStringLayoutWidth preserve the game's separate
+ * drawing and layout policies. For Hebrew and Swedish, the game's layout width can differ from both the
+ * drawing pen displacement and the common Font logical width. This distinction affects name alignment and input limits.
+ *
+ * @note The @ref Graphics::Font::getStringWidth overloads are nonvirtual and remain inherited without hiding them.
+ * Calling getStringWidth through either a BmtFont or Graphics::Font pointer or reference therefore gives the same
+ * common logical width. Both Common::String and Common::U32String overloads use this font's byte mapping.
+ * Common string bounds describe the common forward drawing, not the Hebrew traversal in the game drawString overload.
  */
 class BmtFont : public Graphics::Font {
 public:
@@ -1067,28 +1083,76 @@ public:
 	/** Construct an unloaded font bound to @p vm. */
 	explicit BmtFont(Zoombini2Engine *vm);
 
-	/** Load the BMT color-and-alpha pair and extract the coverage masks. */
+	/**
+	 * Replace the current glyphs with the BMT color-and-alpha pair at @p basePath.
+	 * The path may include the `.bmt` extension; the coverage file uses the same stem followed by `-A.bmt`.
+	 * A failed load leaves the font unavailable, so metrics return zero and drawing has no effect until a successful retry.
+	 * @return True when the release's expected glyph count was extracted.
+	 */
 	bool load(const Common::Path &basePath);
 	int getFontHeight() const override;
 	int getMaxCharWidth() const override;
+	/** Return the glyph advance, including spacing, or zero for an unsupported byte or an unloaded font. */
 	int getCharWidth(uint32 character) const override;
 	using Graphics::Font::getBoundingBox;
+	/** Return retained glyph bounds without advance spacing, or an empty rectangle for a space, unsupported byte, or unloaded font. */
 	Common::Rect getBoundingBox(uint32 character) const override;
 	using Graphics::Font::drawChar;
+	/**
+	 * Tint one glyph at (@p x, @p y), clipping to @p destSurface.
+	 * The destination must use a 32-bit pixel format, and @p color must be packed in that format.
+	 * Unsupported character bytes and an unloaded font draw nothing.
+	 */
 	void drawChar(Graphics::Surface *destSurface, uint32 character, int x, int y, uint32 color) const override;
 	using Graphics::Font::drawString;
-	/** Draw game bytes, including Hebrew traversal, and return the horizontal advance. */
+	/**
+	 * Draw release-encoded game bytes from @p pos with a uniform tint.
+	 *
+	 * Hebrew visits bytes in reverse order, draws each glyph at the current pen, then moves left for digits
+	 * and right for other supported characters and spaces. Its return value is the final x minus the starting x;
+	 * opposing advances can cancel, so this value does not bound the pixels drawn by a mixed string.
+	 * Other releases draw forward and return the sum of glyph advances, including supported Swedish Nordic bytes.
+	 * Clipping affects the pixels drawn, not this return value.
+	 *
+	 * This overload differs from the inherited common Font drawing in its Hebrew traversal.
+	 * Its return value is not the game's layout measurement: Hebrew letter bytes can draw and advance while
+	 * contributing zero or a negative value to @ref BmtFont::getStringLayoutWidth; Swedish Nordic bytes draw and advance
+	 * while contributing zero. Use @ref BmtFont::getStringLayoutWidth for the game's alignment and name-input decisions.
+	 *
+	 * @return Signed horizontal pen displacement, or zero for an unloaded font or null destination.
+	 */
 	int drawString(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::String &text, const RGBColor &color) const;
-	using Graphics::Font::getStringWidth;
-	/** Measure game bytes with the Hebrew and Swedish release-specific rules. */
-	int getStringWidth(const Common::String &text) const;
-	/** Return the glyph index for @p character, or -1 when it is unsupported. */
+	/**
+	 * Return the width used to lay out release-encoded game text and check name-input limits.
+	 *
+	 * Hebrew subtracts ASCII letter advances, adds supported ASCII digit, punctuation, and space advances,
+	 * and ignores Hebrew high bytes and underscores. Drawing instead advances right for letters and Hebrew bytes
+	 * and left for digits. A string of supported Hebrew high bytes can therefore measure zero while drawing glyphs.
+	 * Swedish ignores bytes at or above 0x80, even when they select supported Nordic glyphs. For example, the
+	 * CP1252 bytes 0xC5, 's', 'a' draw all three glyphs, but this method measures only 's' and 'a'.
+	 * Conversely, supported ASCII punctuation contributes its ASCII-slot advance even though Swedish drawing
+	 * ignores it. Those measurement slots can contain Nordic glyphs; underscores contribute zero.
+	 * Other releases use the common Font sum of glyph advances.
+	 *
+	 * These release-specific values preserve the game's layout decisions rather than describe a visible extent.
+	 * They are intentionally different from the pen displacement returned by the game @ref BmtFont::drawString overload.
+	 * The inherited common Font string bounds, alignment, and wrapping use the common forward glyph metrics;
+	 * they do not use this method or describe the game's Hebrew traversal. Substituting the inherited
+	 * @ref Graphics::Font::getStringWidth for this method changes the game's layout and input decisions.
+	 *
+	 * @return The game layout width, which can be negative for Hebrew, or zero while the font is unloaded.
+	 */
+	int getStringLayoutWidth(const Common::String &text) const;
+	/** Map the release-encoded byte @p ch to a glyph index, or return -1 for an unsupported byte or a value above 255. */
 	int charToGlyphIndex(uint32 ch) const;
 	/** Return whether glyph extraction completed. */
 	bool isLoaded() const { return _loaded; }
 
 private:
-	/** Borrowed vm used to load the font strip and construct glyphs. */
+	/** Map supported ASCII punctuation to its strip slot independently of the release's drawing map; underscores are excluded. */
+	static int asciiPunctuationToGlyphIndex(uint32 character);
+
+	/** Engine retained by the caller for loading resources, selecting the language mapping, and blending glyph coverage. */
 	Zoombini2Engine *_vm;
 	/** Whether the font strip has been processed. */
 	bool _loaded = false;
