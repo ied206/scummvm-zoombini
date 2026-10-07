@@ -49,14 +49,7 @@ public:
 	static Result parseUnsignedInt(const char *text, uint32 &result);
 };
 
-/**
- * Debug console for the Mountain Rescue engine.
- *
- * The @ref draw command mirrors the Zoombini 1 console layout so later
- * resource subcommands slot into the same dispatcher. The first
- * subcommand visualizes the drop-acceptance area mask, which plays the
- * role of the original walkability terrain bitmap.
- */
+/** Debug console for the Mountain Rescue engine. */
 class Zoombini2Console : public GUI::Debugger {
 public:
 	/** Bind the console to @p vm without taking ownership. */
@@ -65,8 +58,11 @@ public:
 	~Zoombini2Console() override;
 
 private:
+	/** Select a route transition or practice puzzle through @ref Zoombini2Console::Cmd_Go. */
 	static constexpr const char *kCmdGo = "go";
+	/** Inspect puzzle answers, manage remaining chances, or complete the active puzzle through @ref Zoombini2Console::Cmd_Puzzle. */
 	static constexpr const char *kCmdPuzzle = "puzzle";
+	/** Alias of @ref Zoombini2Console::kCmdPuzzle, handled by @ref Zoombini2Console::Cmd_Puzzle. */
 	static constexpr const char *kCmdPage = "page";
 	static constexpr const char *kSubCmdGoXfer = "xfer";
 	static constexpr const char *kSubCmdGoPractice = "practice";
@@ -87,7 +83,10 @@ private:
 	static constexpr const char *kCmdManBuiltinDebug = "man_builtin_debug";
 	bool Cmd_BuiltinDebug(int argc, const char **argv);
 	bool Cmd_ManBuiltinDebug(int argc, const char **argv);
-	/** Top-level debugger command for drawing debug views. */
+	/**
+	 * Preview resources or the page's drop-acceptance area mask through @ref Zoombini2Console::Cmd_Draw.
+	 * Debug views open in dialogs so the active page remains available when the preview closes.
+	 */
 	static constexpr const char *kCmdDraw = "draw";
 	/** Draw the active page through its drop-acceptance mask. */
 	static constexpr const char *kSubCmdDrawAreaMask = "areamask";
