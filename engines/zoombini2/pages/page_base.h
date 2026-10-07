@@ -131,8 +131,8 @@ private:
 	int16 _scrollX = 0;
 	/** Background dimensions retained locally or copied from the first stack layer. */
 	Size32 _backgroundSize = Size32();
-	/** Multiplier applied by @ref scrollBy. */
-	byte _scrollDirection;
+	/** Multiplier applied by @ref PageLayer::scrollBy. */
+	int16 _scrollByMultiplier;
 	/** Animation runners released with this layer. */
 	Common::Array<AnimationRunner *> _animationRunners;
 	/** Whether this layer was created without a background bitmap. */
@@ -196,7 +196,7 @@ private:
 	Common::Array<PageLayer *> _layers;
 	/** Whether a pressed pointer has already been dispatched. */
 	bool _pointerPressLatched = false;
-	/** Whether @ref scrollBy is currently suppressed. */
+	/** Whether @ref PageLayerStack::scrollBy is currently suppressed. */
 	bool _scrollLocked = false;
 };
 
@@ -263,9 +263,10 @@ public:
 
 /**
  * Coordinates one screen-facing update, drawing, and input lifecycle.
- * The engine dispatches one regular page at a time. Modal dialogs derive from
- * this base but remain separately retained by the engine while preserving the
- * underlying dispatched page.
+ * The engine dispatches one regular page at a time, keeping shared modal dialogs separately while that page remains alive.
+ * @ref PageBase::onFrame optionally updates state, then draws background, content, actors, and foreground in that order.
+ * When state may advance, @ref PageBase::onActorsRendered runs between actors and foreground, and @ref PageBase::onPostRender runs last.
+ * @ref PageBase::render follows the same drawing order while skipping those state-advance hooks and @ref PageBase::onUpdate.
  */
 class PageBase : public PageEventHandler, public Common::NonCopyable {
 public:
@@ -274,11 +275,14 @@ public:
 	/** Release resources retained by the concrete page. */
 	virtual ~PageBase();
 
-	/** Dispatch one backend event through the concrete page and its page-layer stack. */
+	/**
+	 * Dispatch the concrete event handler, then update the page-layer pointer latch for left-button events even if the handler consumed them.
+	 * Dialogs skip layer dispatch because those layers belong to the page underneath the modal.
+	 */
 	EventHandleResult handleEvent(const Common::Event &event);
 	/** Advance page state when permitted, then execute the complete render pass. */
 	void onFrame(ManagedSurface32 *screen, bool advanceState);
-	/** Recompose the selected visuals without advancing simulation or completion callbacks. */
+	/** Recompose visuals while skipping @ref PageBase::onUpdate, @ref PageBase::onActorsRendered, and @ref PageBase::onPostRender. */
 	void render(ManagedSurface32 *screen);
 	/** Draw a page-specific held actor above shared controls, then optionally advance it. */
 	virtual void renderDragOverlay(ManagedSurface32 *screen, bool advanceState) {

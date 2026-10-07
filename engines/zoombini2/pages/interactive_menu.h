@@ -77,7 +77,7 @@ private:
 	 * Sorted save-name list used by the menu screen.
 	 *
 	 * Text colors are shared through @ref Gfx::loadTextFont.
-	 * The selection bar is supplied by the menu and retained until the page is destroyed.
+	 * The selection bar is loaded through @ref Gfx::drawPageRleBlock and remains in the page bitmap cache.
 	 * Savefile names are filename stems for in-game `.mk` saves.
 	 * Names are limited to 16 characters.
 	 * The viewport contains four rows.
@@ -106,7 +106,7 @@ private:
 		/** Number of rows visible in the list viewport. */
 		static constexpr int kVisibleRows = 4;
 
-		/** Construct a list for @p vm at @p pos using the borrowed @p selectionBar. */
+		/** Construct an empty savefile list at @p pos; @p vm supplies the shared text renderer. */
 		SaveFileList(Zoombini2Engine *vm, const Common::Point32 &pos);
 
 		/** Prepare the normal, prefix-match, edit, and read-only colors through @ref Gfx::loadTextFont. */
@@ -116,7 +116,7 @@ private:
 		/** Insert @p name and its @p readOnly status in case-sensitive order unless it is invalid or duplicated. */
 		bool addItemSorted(const Common::String &name, bool readOnly);
 
-		/** Draw the visible rows and the borrowed selection bar. */
+		/** Draw the visible rows and highlight the selected row through the page bitmap cache. */
 		void draw(ManagedSurface32 *screen) const;
 		/** Select the row at @p pos and report whether the list consumed the click. */
 		bool handleClick(const Common::Point &pos);

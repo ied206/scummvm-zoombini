@@ -46,8 +46,15 @@ class Zoombini2MetaEngine : public AdvancedMetaEngine<Zoombini2::Zoombini2GameDe
 public:
 	/** Target configuration key enabling per-savefile write-lock controls. */
 	static constexpr const char *kConfigEnableSavefileReadOnlyToggle = "enable_savefile_readonly_toggle";
-	/** Target configuration key selecting stereo game-audio streams. */
-	static constexpr const char *kConfigStereoOutput = "stereo_output";
+	/** Persisted selection for mono downmixing or stereo game-audio playback. */
+	enum class AudioOutputMode : uint32 {
+		/** Downmix stereo game-audio resources to mono. */
+		kMonoDownmix = 0,
+		/** Preserve both channels of stereo game-audio resources. */
+		kStereoPlayback = 1
+	};
+	/** Target configuration key selecting game-audio channel handling. */
+	static constexpr const char *kConfigAudioOutputMode = "audio_output_mode";
 	/** Target configuration key selecting floating-point Bezier path calculations. */
 	static constexpr const char *kConfigUseFloatingPointPaths = "use_floating_point_paths";
 	/** Target configuration key hiding the stray Fleen departure streaks. */
@@ -66,31 +73,36 @@ public:
 	static constexpr const char *kConfigAllowCutLevel4PracticePuzzles = "allow_cut_level4_practice_puzzles";
 	/** Persisted and runtime pseudo-random generator selection. */
 	enum class PrngAlgorithm : uint32 {
-		/**
-		 * Original engine's LCG PRNG.
-		 */
+		/** Use the MSVC-compatible linear congruential stream. */
 		kOriginalPrng = 0,
-		/**
-		 * ScummVM standard xorshift-based PRNG.
-		 */
+		/** Use @ref Common::RandomSource. */
 		kStandardPrng = 1,
 	};
 	/** Target configuration key selecting the pseudo-random generator. */
 	static constexpr const char *kConfigPrngAlgorithm = "prng_algorithm";
+	/** Persisted and runtime selection for color-only presentation assistance. */
+	enum class ColorAssistMode : uint32 {
+		/** Preserve the original artwork colors. */
+		kOriginal = 0,
+		/** Make selected similar colors easier to distinguish. */
+		kEnhancedDistinction = 1,
+		/** Use colors chosen for red-green color vision deficiency. */
+		kRedGreenBlindAssist = 2
+	};
 	/** Target configuration key selecting the optional color-only presentation. */
 	static constexpr const char *kConfigColorAssistMode = "color_assist_mode";
-	/** Persisted and runtime selection for frame-derived gameplay pacing. */
+	/** Reference rate for frame-derived motion and random-event quotas, independent of presentation FPS and timed animations. */
 	enum class LogicPacingMode : uint32 {
-		/** Scale frame-derived speeds to the 60Hz (LCD preset). */
+		/** Normalize frame-derived motion and random-event quotas to 60 updates per second (LCD preset). */
 		k60Hz = 60,
-		/** Scale frame-derived speeds to the 75Hz (CRT preset). */
+		/** Normalize frame-derived motion and random-event quotas to 75 updates per second (CRT preset). */
 		k75Hz = 75,
 	};
 	/** Target configuration key selecting the logic pacing rate mode. */
 	static constexpr const char *kConfigLogicPacingMode = "logic_pacing_mode";
-	/** Target frame rate for the engine's presentation loop. */
+	/** Target configuration key for the presentation rate; it does not select the logic pacing reference. */
 	static constexpr const char *kConfigFrameRate = "frame_rate";
-	/** Disable the engine's frame-rate limiter. */
+	/** Target configuration key bypassing the presentation limiter while retaining elapsed-time logic updates. */
 	static constexpr const char *kConfigUnlockFrameRate = "unlock_frame_rate";
 	static constexpr int kMinFrameRate = 30;
 	static constexpr int kDefaultFrameRate = 60;

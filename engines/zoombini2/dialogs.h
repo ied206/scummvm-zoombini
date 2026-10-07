@@ -221,8 +221,10 @@ private:
 	static constexpr uint32 kUnlockFrameRateCommand = 'z2ul';
 	/** Enable per-savefile write-lock controls for repeatable tests. */
 	GUI::CheckboxWidget *_savefileReadOnlyToggleCheckbox = nullptr;
-	/** Toggle selecting stereo rather than mono game-audio streams. */
-	GUI::CheckboxWidget *_stereoOutputCheckbox = nullptr;
+	/** Label used to align the game-audio output selector. */
+	GUI::StaticTextWidget *_audioOutputLabel = nullptr;
+	/** Select mono downmixing or stereo game-audio playback. */
+	GUI::PopUpWidget *_audioOutputPopUp = nullptr;
 	/** Toggle selecting floating-point rather than original Q10 Bezier calculations. */
 	GUI::CheckboxWidget *_floatingPointPathsCheckbox = nullptr;
 	/** Toggle hiding the stray streaks in the Fleen departure animation. */

@@ -29,7 +29,7 @@
 namespace Zoombini2 {
 
 PageLayer::PageLayer(Zoombini2Engine *vm, byte scrollDirection, const Common::Path &backgroundPath)
-	: _vm(vm), _scrollDirection(scrollDirection) {
+	: _vm(vm), _scrollByMultiplier(scrollDirection) {
 	if (!backgroundPath.empty())
 		loadBackground(backgroundPath);
 }
@@ -158,7 +158,7 @@ void PageLayer::setScrollX(int16 scrollX) {
 }
 
 void PageLayer::scrollBy(int16 delta) {
-	_scrollX = static_cast<int16>(_scrollX + delta * _scrollDirection);
+	_scrollX = static_cast<int16>(_scrollX + delta * _scrollByMultiplier);
 	wrapScrollX();
 }
 

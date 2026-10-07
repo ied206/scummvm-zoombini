@@ -58,10 +58,11 @@ public:
 
 	/** Load map resources and derive availability from the selected mode. */
 	void init() override;
-	/** Update icon, legend, button, and volume-panel hover state. */
+	/** Update map-control hover state while the volume panel is closed. */
 	void onUpdate() override;
-	/** Draw the map, route progress, statistics, and owned volume panel. */
+	/** Draw the map, route progress, controls, and statistics beneath any open volume panel. */
 	void onRenderContent(ManagedSurface32 *screen) override;
+	/** Draw the open volume panel above the map. */
 	void onRenderForeground(ManagedSurface32 *screen) override;
 	/** Dispatch a click to a map icon, control, legend tab, or volume panel. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;

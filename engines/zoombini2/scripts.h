@@ -133,7 +133,7 @@ public:
 	/** Remove the completed-cycle redirect. */
 	void clearNextTimedEntry() { _nextTimedEntryIndex = -1; }
 
-	/** Install the callback invoked only by @ref invokeInteractionCallback. */
+	/** Install the callback invoked only by @ref AnimationRunner::invokeInteractionCallback. */
 	void setInteractionCallback(Callback callback, void *context = nullptr);
 	/** Install the callback invoked at an unredirected cycle boundary. */
 	void setCompletionCallback(Callback callback, void *context = nullptr);
@@ -480,7 +480,7 @@ struct ZmbDropTarget {
 	bool occupied = false;
 	/** Optional page callback for target membership changes. */
 	Callback callback = nullptr;
-	/** Borrowed page context passed to @ref callback. */
+	/** Borrowed page context passed to @ref ZmbDropTarget::callback. */
 	void *callbackContext = nullptr;
 	/** Index assigned on the latest occupied transition; ignored while free. */
 	int zoombiniIndex = -1;
@@ -744,7 +744,7 @@ private:
 
 	/** Optional one-shot callback retained independently from animation starts and resets. */
 	AnimationCompleteCallback _animationCompleteCallback = nullptr;
-	/** Borrowed context passed to @ref _animationCompleteCallback. */
+	/** Borrowed context passed to @ref ZoombiniRunner::_animationCompleteCallback. */
 	void *_animationCompleteCallbackContext = nullptr;
 	/** Whether movement periodically selects a new directional cell. */
 	bool _tracksMovementDirection = false;

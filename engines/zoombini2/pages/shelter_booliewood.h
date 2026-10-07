@@ -269,8 +269,11 @@ private:
 
 	/** Current horizontal origin within the cyclic panorama. */
 	int _scrollX = 10;
+	/** One click's signed 300-pixel jump, consumed by the next scroll update. */
 	int _pendingScrollDelta = 0;
+	/** Gameplay tick of the previous scroll update, used to calculate elapsed motion. */
 	uint32 _lastScrollTime = 0;
+	/** Signed thousandths of a pixel carried between edge-hover updates; cleared by a click jump or leaving the edge. */
 	int _scrollRemainder = 0;
 	/** Development stage selected from the rescued total. */
 	int _developmentStage = 1;
@@ -281,9 +284,9 @@ private:
 	/** Decorative walking actor state. */
 	CrowdActorState _crowdActors[kCrowdActorCount] = {};
 
-	/** Borrowed immutable seated sprite grid owned by the engine cache. */
+	/** Immutable seated sprite grid borrowed from the engine cache and retained across page transitions. */
 	const ZoombiniAnimation *_zoombiniAnimation = nullptr;
-	/** Borrowed immutable walking sprite grid owned by the engine cache. */
+	/** Immutable walking sprite grid borrowed from the engine cache and retained across page transitions. */
 	const ZoombiniAnimation *_walkingZoombiniAnimation = nullptr;
 	/** Shared walking animation used by the 17 decorative actors. */
 	Animation *_walkingAnimation = nullptr;

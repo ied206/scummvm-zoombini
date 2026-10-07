@@ -806,9 +806,21 @@ void Zoombini2Engine::refreshEngineSettings() {
 		_hasFrameIndex = false;
 	}
 	_debugHotkeysEnabled = ConfMan.getBool(Zoombini2MetaEngine::kConfigDebugHotkeys);
-	_stereoOutputEnabled = ConfMan.getBool(Zoombini2MetaEngine::kConfigStereoOutput);
+	const int audioOutputValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigAudioOutputMode);
+	const Zoombini2MetaEngine::AudioOutputMode audioOutputMode = static_cast<Zoombini2MetaEngine::AudioOutputMode>(audioOutputValue);
+	_stereoOutputEnabled = audioOutputMode == Zoombini2MetaEngine::AudioOutputMode::kStereoPlayback;
 	const int colorAssistValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigColorAssistMode);
-	_colorAssistMode = 0 <= colorAssistValue && colorAssistValue <= 2 ? static_cast<ColorAssistMode>(colorAssistValue) : ColorAssistMode::kOriginal00;
+	const Zoombini2MetaEngine::ColorAssistMode colorAssistMode = static_cast<Zoombini2MetaEngine::ColorAssistMode>(colorAssistValue);
+	switch (colorAssistMode) {
+	case Zoombini2MetaEngine::ColorAssistMode::kEnhancedDistinction:
+	case Zoombini2MetaEngine::ColorAssistMode::kRedGreenBlindAssist:
+		_colorAssistMode = colorAssistMode;
+		break;
+	case Zoombini2MetaEngine::ColorAssistMode::kOriginal:
+	default:
+		_colorAssistMode = Zoombini2MetaEngine::ColorAssistMode::kOriginal;
+		break;
+	}
 	_useGreedyWaterslidePairing = ConfMan.getBool(Zoombini2MetaEngine::kConfigGreedyWaterslidePairing);
 	_useAquacubeSafeFirstMove = ConfMan.getBool(Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove);
 	_useFloatingPointPaths = ConfMan.getBool(Zoombini2MetaEngine::kConfigUseFloatingPointPaths);

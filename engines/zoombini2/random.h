@@ -31,27 +31,24 @@
 namespace Zoombini2 {
 
 /**
- * Reimplement RNG of MSVC 6.0 CRT used by the original Windows releases.
+ * Provides the selectable random stream shared by game logic.
  *
- * An engine variant for another original platform, such as Macintosh, must
- * identify that platform's runtime RNG before selecting this stream.
- *
- * The "prng_algorithm" configuration option selects this compatibility stream
- * or ScummVM's default @ref Common::RandomSource stream.
+ * The "prng_algorithm" option selects the MSVC-compatible 32-bit LCG or @ref Common::RandomSource.
+ * The compatibility stream advances once per request and bounds its 15-bit output with a remainder operation.
+ * Consequently, large requested ranges do not expand its output beyond 32767.
  * Changing the algorithm starts a new sequence when engine settings are applied.
  */
 class Random {
 private:
-	/** State of the original PRNG (MSVC 6.0 CRT LCG) */
+	/** Current 32-bit state of the MSVC-compatible LCG. */
 	uint32 _randState = 0;
 	/** ScummVM standard PRNG. */
 	Common::RandomSource _scummRnd;
 	/** Currently selected PRNG algorithm. */
 	Zoombini2MetaEngine::PrngAlgorithm _prngAlgorithm;
 
-	/** 
-	 * Generate one inclusive bounded value with the compatibility algorithm.
-	 * Advance the compatibility state and return an iclusive value from zero through @p max.
+	/**
+	 * Advance the compatibility state and return an inclusive value from zero through @p max.
 	 * The state is advanced even when @p max is zero.
 	 */
 	int32 getOriginalRandomNumber(int32 max);
@@ -62,14 +59,20 @@ public:
 
 	/** Switch algorithms and start a new random sequence only when the selection changes. */
 	void setAlgorithm(Zoombini2MetaEngine::PrngAlgorithm prngAlgorithm);
-	/** Seed both backing streams. The compatibility stream preserves zero exactly. */
+	/**
+	 * Seed both backing streams.
+	 * The compatibility stream preserves zero exactly; @ref Common::RandomSource substitutes a nonzero seed.
+	 */
 	void setSeed(uint32 seed);
 	/** Return the current state of the selected stream. */
 	uint32 getSeed() const;
-	/** Generates new seed based on the current date/time */
+	/** Obtain a seed from @ref Common::RandomSource::generateNewSeed, honoring ScummVM's configured random seed. */
 	static uint32 generateNewSeed();
 
-	/** Advance the stream and return an inclusive value in the range zero through @p max. */
+	/**
+	 * Advance the selected stream once and return an inclusive value from zero through @p max.
+	 * @param max Nonnegative upper bound; zero still consumes a draw.
+	 */
 	int32 getRandomNumber(int32 max);
 	/**
 	 * Advance the stream and return an inclusive signed value in the range @p min through @p max.
