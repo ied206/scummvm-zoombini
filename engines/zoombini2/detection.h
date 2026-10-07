@@ -37,6 +37,8 @@ enum GameFeatures {
 	 * - v1.0US
 	 * - v1.0NL
 	 * - v1.0HE
+	 *
+	 * Selects gameplay-tick reseeding when a puzzle calls @ref Zoombini2Engine::reseedRandomForV10.
 	 */
 	GF_Z2_V10 = (1 << 0),
 	/**
@@ -46,8 +48,14 @@ enum GameFeatures {
 	 * - v1.1SE
 	 * - v1.1PL
 	 *
-	 * Gameplay is identical to the base v1.0 family, except RNG reseeding on every puzzle loading.
-	 * No new puzzle rule or level change has been established.
+	 * Puzzle generation continues the existing random sequence without reseeding.
+	 * @ref Zoombini2Engine::reseedRandomForV10 therefore leaves the random state unchanged.
+	 * Except of reseed difference, v1.1 has identical gameplay logics.
+	 *
+	 * v1.1 enables DirectDraw flip chain mode on some NT5 or later Windows.
+	 * The exact version check has a quirk: (5 <= os.major && 0 < os.minor). Windows XP qualifies, though.
+	 * Successful flip-chain creation engages vsync; otherwise presentation falls back to blitting-wo-waiting.
+	 * ScummVM presentation remains backend-controlled, this flag does not affect any frame presentation.
 	 */
 	GF_Z2_V11 = (1 << 1),
 	/** Help-sheet bitmaps use a solid background color instead of the frame gradient. */

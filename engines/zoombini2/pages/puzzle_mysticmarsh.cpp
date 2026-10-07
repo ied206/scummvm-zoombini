@@ -2287,7 +2287,7 @@ void PuzzleMysticMarsh::drawColorSymbol(ManagedSurface32 *screen, int symbolInde
 		group = symbolIndex - 27;
 	else if (49 <= symbolIndex && symbolIndex <= 55)
 		group = symbolIndex - 49;
-	if (group < 0 || _vm->getColorAssistMode() != ColorAssistMode::kRedGreen02) {
+	if (group < 0 || _vm->getColorAssistMode() != Zoombini2MetaEngine::ColorAssistMode::kRedGreenBlindAssist) {
 		_vm->_gfx->drawPageRleBlock(screen, key, pos);
 		return;
 	}

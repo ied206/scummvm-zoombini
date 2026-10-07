@@ -24,6 +24,7 @@
 
 #include "common/array.h"
 #include "common/rect.h"
+#include "zoombini2/metaengine.h"
 #include "zoombini2/pages/puzzle_base.h"
 
 namespace Common {
@@ -32,7 +33,6 @@ class SeekableReadStream;
 
 namespace Zoombini2 {
 
-enum class ColorAssistMode : byte;
 class Animation;
 class AnimationRunner;
 struct PathObject;
@@ -208,7 +208,7 @@ private:
 	/** Peak channels at the centers of the ten source beetle sprites. */
 	static constexpr byte kBugSourceBrightness[10] = {228, 180, 130, 208, 157, 201, 197, 200, 213, 208};
 	/** Select a display color for one beetle and its matching endpoint. */
-	static bool colorAssistRGB(ColorAssistMode mode, uint color, RGBColor &displayColor);
+	static bool colorAssistRGB(Zoombini2MetaEngine::ColorAssistMode mode, uint color, RGBColor &displayColor);
 	/** Draw one identity-colored RLE resource with the current display palette. */
 	void drawColorSprite(ManagedSurface32 *screen, const char *format, uint color, const Common::Point32 &pos, byte sourceBrightness) const;
 	/** Screen locations for tablets, gates, roster runners, and gate lights. */

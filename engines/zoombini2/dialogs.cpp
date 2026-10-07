@@ -579,8 +579,13 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	header = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayEnhancements",
 									   _("Gameplay Enhancements"), Common::U32String(), GUI::ThemeEngine::kFontStyleBold);
 	header->setAlign(Graphics::TextAlign::kTextAlignStart);
-	_stereoOutputCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.StereoOutput", _("Enable stereo game audio"),
-													_("Keeps both channels of stereo WAV resources instead of downmixing them to mono."));
+	const Common::U32String audioOutputTooltip = _("Selects mono downmixing or stereo playback for game audio resources. "
+												   "Changes apply to newly started sounds.");
+	_audioOutputLabel = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.AudioOutputLabel", _("Game audio:"), audioOutputTooltip);
+	_audioOutputLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
+	_audioOutputPopUp = new GUI::PopUpWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.AudioOutput", audioOutputTooltip);
+	_audioOutputPopUp->appendEntry(_("Mono Downmix (Original)"), static_cast<uint32>(Zoombini2MetaEngine::AudioOutputMode::kMonoDownmix));
+	_audioOutputPopUp->appendEntry(_("Stereo Playback"), static_cast<uint32>(Zoombini2MetaEngine::AudioOutputMode::kStereoPlayback));
 	_floatingPointPathsCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.FloatingPointPaths",
 														  _("Use floating-point path calculations"),
 														  _("Uses 32-bit floating point instead of the original signed Q10 fixed-point arithmetic for Bezier movement paths."));
@@ -600,9 +605,9 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	_colorAssistLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
 	_colorAssistPopUp = new GUI::PopUpWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ColorAssist",
 											 _("Adjusts Zoombini noses and puzzle colors."));
-	_colorAssistPopUp->appendEntry(_("Original colors"), 0);
-	_colorAssistPopUp->appendEntry(_("Small screen"), 1);
-	_colorAssistPopUp->appendEntry(_("Red-green color assist"), 2);
+	_colorAssistPopUp->appendEntry(_("Original colors"), static_cast<uint32>(Zoombini2MetaEngine::ColorAssistMode::kOriginal));
+	_colorAssistPopUp->appendEntry(_("Enhanced color distinction"), static_cast<uint32>(Zoombini2MetaEngine::ColorAssistMode::kEnhancedDistinction));
+	_colorAssistPopUp->appendEntry(_("Red-green color blind assist"), static_cast<uint32>(Zoombini2MetaEngine::ColorAssistMode::kRedGreenBlindAssist));
 
 	new SeparatorWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayAdjustmentSeparator");
 	header = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayAdjustment",
@@ -633,9 +638,9 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	_pacingLabel = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.PacingLabel", _("Logic pacing:"));
 	_pacingLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
 	_pacingPopUp = new GUI::PopUpWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.Pacing",
-										_("Select 60Hz LCD or 75Hz CRT logic pacing. "
-										  "Affects Booliewood panorama scrolling speed and idle animation trigger rates. "
-										  "Rendering frame rate is unaffected."));
+										_("Selects the reference frame rate used to normalize logic pacing. "
+										  "Affects panorama scrolling speed in Booliewood and how often idle animations are triggered. "
+										  "Does not affect the rendering frame rate."));
 	_pacingPopUp->appendEntry(_("60Hz (LCD preset)"), static_cast<uint32>(Zoombini2MetaEngine::LogicPacingMode::k60Hz));
 	_pacingPopUp->appendEntry(_("75Hz (CRT preset)"), static_cast<uint32>(Zoombini2MetaEngine::LogicPacingMode::k75Hz));
 	_unlockFrameRateCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.UnlockFrameRate",
@@ -649,6 +654,7 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 	const int lineHeight = layouts.getVar("Globals.Line.Height");
 	static constexpr int kOptionLabelPadding = 4;
 	const GUI::StaticTextWidget *const optionLabels[] = {
+		_audioOutputLabel,
 		_colorAssistLabel,
 		_prngAlgorithmLabel,
 		_pacingLabel,
@@ -669,7 +675,11 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 		.addSpace(10)
 		.addWidget("GameplayEnhancementsSeparator", "", -1, 2)
 		.addWidget("GameplayEnhancements", "", -1, lineHeight)
-		.addWidget("StereoOutput", "Checkbox")
+		.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
+		.addPadding(0, 0, 0, 0)
+		.addWidget("AudioOutputLabel", "", optionLabelWidth, lineHeight)
+		.addWidget("AudioOutput", "PopUp")
+		.closeLayout()
 		.addWidget("FloatingPointPaths", "Checkbox")
 		.addWidget("FixFleenDepartureStreak", "Checkbox")
 		.addWidget("EnhancedKbdShortcuts", "Checkbox")
@@ -708,14 +718,34 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 
 void Zoombini2OptionsWidget::load() {
 	_savefileReadOnlyToggleCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigEnableSavefileReadOnlyToggle, _domain));
-	_stereoOutputCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigStereoOutput, _domain));
+	const int audioOutputValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigAudioOutputMode, _domain);
+	const Zoombini2MetaEngine::AudioOutputMode audioOutputMode = static_cast<Zoombini2MetaEngine::AudioOutputMode>(audioOutputValue);
+	switch (audioOutputMode) {
+	case Zoombini2MetaEngine::AudioOutputMode::kMonoDownmix:
+	case Zoombini2MetaEngine::AudioOutputMode::kStereoPlayback:
+		_audioOutputPopUp->setSelectedTag(static_cast<uint32>(audioOutputMode));
+		break;
+	default:
+		_audioOutputPopUp->setSelectedTag(static_cast<uint32>(Zoombini2MetaEngine::AudioOutputMode::kMonoDownmix));
+		break;
+	}
 	_floatingPointPathsCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigUseFloatingPointPaths, _domain));
 	_fixFleenDepartureStreakCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigFixFleenDepartureStreak, _domain));
 	_enhancedKbdShortcutsCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _domain));
 	if (_transparentHelpPagesCheckbox)
 		_transparentHelpPagesCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigTransparentHelpPages, _domain));
 	const int colorAssistValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigColorAssistMode, _domain);
-	_colorAssistPopUp->setSelectedTag(0 <= colorAssistValue && colorAssistValue <= 2 ? colorAssistValue : 0);
+	const Zoombini2MetaEngine::ColorAssistMode colorAssistMode = static_cast<Zoombini2MetaEngine::ColorAssistMode>(colorAssistValue);
+	switch (colorAssistMode) {
+	case Zoombini2MetaEngine::ColorAssistMode::kOriginal:
+	case Zoombini2MetaEngine::ColorAssistMode::kEnhancedDistinction:
+	case Zoombini2MetaEngine::ColorAssistMode::kRedGreenBlindAssist:
+		_colorAssistPopUp->setSelectedTag(static_cast<uint32>(colorAssistMode));
+		break;
+	default:
+		_colorAssistPopUp->setSelectedTag(static_cast<uint32>(Zoombini2MetaEngine::ColorAssistMode::kOriginal));
+		break;
+	}
 	_debugHotkeysCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigDebugHotkeys, _domain));
 	_greedyWaterslideCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _domain));
 	_aquacubeSafeFirstMoveCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove, _domain));
@@ -732,17 +762,19 @@ bool Zoombini2OptionsWidget::save() {
 	const int frameRate = _frameRateNumberBox->getValue();
 	_frameRateNumberBox->setValue(frameRate);
 
+	const Zoombini2MetaEngine::AudioOutputMode audioOutputMode = static_cast<Zoombini2MetaEngine::AudioOutputMode>(_audioOutputPopUp->getSelectedTag());
+	const Zoombini2MetaEngine::ColorAssistMode colorAssistMode = static_cast<Zoombini2MetaEngine::ColorAssistMode>(_colorAssistPopUp->getSelectedTag());
 	const Zoombini2MetaEngine::PrngAlgorithm prngAlgorithm = static_cast<Zoombini2MetaEngine::PrngAlgorithm>(_prngAlgorithmPopUp->getSelectedTag());
 	const Zoombini2MetaEngine::LogicPacingMode logicPacingMode = static_cast<Zoombini2MetaEngine::LogicPacingMode>(_pacingPopUp->getSelectedTag());
 
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigEnableSavefileReadOnlyToggle, _savefileReadOnlyToggleCheckbox->getState(), _domain);
-	ConfMan.setBool(Zoombini2MetaEngine::kConfigStereoOutput, _stereoOutputCheckbox->getState(), _domain);
+	ConfMan.setInt(Zoombini2MetaEngine::kConfigAudioOutputMode, static_cast<int>(audioOutputMode), _domain);
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigUseFloatingPointPaths, _floatingPointPathsCheckbox->getState(), _domain);
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigFixFleenDepartureStreak, _fixFleenDepartureStreakCheckbox->getState(), _domain);
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _enhancedKbdShortcutsCheckbox->getState(), _domain);
 	if (_transparentHelpPagesCheckbox)
 		ConfMan.setBool(Zoombini2MetaEngine::kConfigTransparentHelpPages, _transparentHelpPagesCheckbox->getState(), _domain);
-	ConfMan.setInt(Zoombini2MetaEngine::kConfigColorAssistMode, _colorAssistPopUp->getSelectedTag(), _domain);
+	ConfMan.setInt(Zoombini2MetaEngine::kConfigColorAssistMode, static_cast<int>(colorAssistMode), _domain);
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigDebugHotkeys, _debugHotkeysCheckbox->getState(), _domain);
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _greedyWaterslideCheckbox->getState(), _domain);
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove, _aquacubeSafeFirstMoveCheckbox->getState(), _domain);

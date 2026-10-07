@@ -579,7 +579,7 @@ void PuzzleMagicWall::onUpdate() {
 		_movingRule = -1;
 	_hoveredTablet = tabletAt(_pointer);
 	const bool hover = _phase != Phase::kFinished && !_nextPuzzlePending && !beetlesMoving() &&
-		(0 <= _hoveredTablet || inside(_pointer, 279, 341, 40, 70));
+					   (0 <= _hoveredTablet || inside(_pointer, 279, 341, 40, 70));
 	_vm->setCursor(hover ? Zoombini2Engine::CursorType::kInteractive : Zoombini2Engine::CursorType::kDefault);
 	if (0 <= _hoveredTablet || beetlesMoving()) {
 		_ripplePhase += 7;
@@ -691,10 +691,10 @@ void PuzzleMagicWall::drawBeetles(ManagedSurface32 *screen) {
 	}
 }
 
-bool PuzzleMagicWall::colorAssistRGB(ColorAssistMode mode, uint color, RGBColor &displayColor) {
-	if (10 <= color || mode == ColorAssistMode::kOriginal00)
+bool PuzzleMagicWall::colorAssistRGB(Zoombini2MetaEngine::ColorAssistMode mode, uint color, RGBColor &displayColor) {
+	if (10 <= color || mode == Zoombini2MetaEngine::ColorAssistMode::kOriginal)
 		return false;
-	if (mode == ColorAssistMode::kSmallScreen01) {
+	if (mode == Zoombini2MetaEngine::ColorAssistMode::kEnhancedDistinction) {
 		if (color == 6) {
 			displayColor = RGBColor(240, 32, 205);
 			return true;

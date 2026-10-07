@@ -1230,7 +1230,7 @@ void Gfx::drawZoombini(ManagedSurface32 *screen, const ZoombiniAnimation *animat
 	if (!screen || !animation || cell < 0 || ZoombiniAnimation::kDim0 <= cell || frame < 0)
 		return;
 	const int baseIndex = cell * ZoombiniAnimation::kDim1 * ZoombiniAnimation::kDim2;
-	const ColorAssistMode colorAssistMode = animation->getColorAssistMode();
+	const Zoombini2MetaEngine::ColorAssistMode colorAssistMode = animation->getColorAssistMode();
 	for (int layer = 0; layer < ZoombiniAnimation::kDim1; layer++) {
 		int variant = 0;
 		if (0 < layer)
@@ -1294,16 +1294,16 @@ void Gfx::drawZoombiniPreview(ManagedSurface32 *screen, const ZoombiniAnimation 
 	}
 }
 
-bool Gfx::noseColorRGB(ColorAssistMode mode, byte value, RGBColor &color) {
+bool Gfx::noseColorRGB(Zoombini2MetaEngine::ColorAssistMode mode, byte value, RGBColor &color) {
 	if (value < 1 || ZmbTrait::kTraitValueCount < value)
 		return false;
-	if (mode == ColorAssistMode::kSmallScreen01) {
+	if (mode == Zoombini2MetaEngine::ColorAssistMode::kEnhancedDistinction) {
 		if (value != 5)
 			return false;
 		color = RGBColor(167, 108, 212);
 		return true;
 	}
-	if (mode != ColorAssistMode::kRedGreen02)
+	if (mode != Zoombini2MetaEngine::ColorAssistMode::kRedGreenBlindAssist)
 		return false;
 	static constexpr RGBColor kNoseColors[ZmbTrait::kTraitValueCount] = {
 		RGBColor(230, 159, 0),
@@ -1400,7 +1400,7 @@ int Gfx::drawText(ManagedSurface32 *destSurface, TextColor color, const Common::
 int Gfx::getTextWidth(const Common::String &text, TextColor color) const {
 	if (!hasTextFont(color))
 		return 0;
-	return _textFont->getStringWidth(text);
+	return _textFont->getStringLayoutWidth(text);
 }
 
 void Gfx::drawDragNameTooltip(ManagedSurface32 *destSurface, const Common::String &name) {
@@ -1418,7 +1418,7 @@ void Gfx::drawDragNameTooltip(ManagedSurface32 *destSurface, const Common::Strin
 	static constexpr int kTextCenterX = 400;
 	static constexpr int kTextY = 570;
 	drawRleBlock(destSurface, _nameBoxSprite, Common::Point32(kPlateX, kPlateY));
-	const int width = _textFont->getStringWidth(name);
+	const int width = _textFont->getStringLayoutWidth(name);
 	const RGBColor tint = textColor(TextColor::kDark00);
 	_textFont->drawString(destSurface, Common::Point32(kTextCenterX - width / 2, kTextY), name, tint);
 }
@@ -1974,7 +1974,7 @@ int ZoombiniAnimation::getFrameCount(int cellIndex) const {
 	return _cells[cellIndex].frames.size();
 }
 
-ColorAssistMode ZoombiniAnimation::getColorAssistMode() const {
+Zoombini2MetaEngine::ColorAssistMode ZoombiniAnimation::getColorAssistMode() const {
 	return _vm->getColorAssistMode();
 }
 
@@ -2357,8 +2357,13 @@ int BmtFont::charToGlyphIndex(uint32 c) const {
 	}
 	if (_vm->isSwedish())
 		return -1;
+	if (c == '_')
+		return 80;
+	return asciiPunctuationToGlyphIndex(c);
+}
 
-	switch (c) {
+int BmtFont::asciiPunctuationToGlyphIndex(uint32 character) {
+	switch (character) {
 	case '.':
 		return 62;
 	case ',':
@@ -2393,8 +2398,6 @@ int BmtFont::charToGlyphIndex(uint32 c) const {
 		return 77;
 	case '*':
 		return 78;
-	case '_':
-		return 80;
 	default:
 		return -1;
 	}
@@ -2495,7 +2498,7 @@ int BmtFont::drawString(ManagedSurface32 *dst, const Common::Point32 &pos, const
 	return curX - pos.x;
 }
 
-int BmtFont::getStringWidth(const Common::String &text) const {
+int BmtFont::getStringLayoutWidth(const Common::String &text) const {
 	if (!_loaded)
 		return 0;
 	const bool hebrew = _vm->isHebrew();
@@ -2509,7 +2512,13 @@ int BmtFont::getStringWidth(const Common::String &text) const {
 		const byte c = static_cast<byte>(text[i]);
 		if (swedish && 0x80 <= c)
 			continue;
-		const int advance = getCharWidth(c);
+		int advance = getCharWidth(c);
+		if (swedish) {
+			// Punctuation contributes its ASCII-slot advance even though the Swedish drawing map rejects it.
+			const int glyphIndex = asciiPunctuationToGlyphIndex(c);
+			if (0 <= glyphIndex && glyphIndex < kNumGlyphs && _glyphs[glyphIndex].mask)
+				advance = _glyphs[glyphIndex].width + 2;
+		}
 		if (hebrew && (('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z')))
 			width -= advance;
 		else if (!hebrew || (c < 0x80 && c != '_'))

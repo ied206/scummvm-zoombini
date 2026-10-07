@@ -52,9 +52,9 @@ struct DialogDebugCommand {
 
 	/** Selected debug view. */
 	Type _type = Type::kNone;
-	/** Animation (.an) or sprite (.rb) resource path for @ref kDrawAnimation. */
+	/** Animation (.an) or sprite (.rb) resource path for @ref DialogDebugCommand::Type::kDrawAnimation. */
 	Common::Path _animPath;
-	/** Zero-based starting frame for @ref kDrawAnimation. */
+	/** Zero-based starting frame for @ref DialogDebugCommand::Type::kDrawAnimation. */
 	int _startFrame = 0;
 
 	/** Select a command that shows the active page through its area mask. */
@@ -70,9 +70,9 @@ struct DialogDebugCommand {
 /**
  * Modal debug view dispatched from the console draw command.
  *
- * The dialog mirrors the Zoombini 1 terrain dialog: the area-mask view
- * snapshots the screen on open and masks rejected drop areas with black,
- * while the animation view renders resource frames over a blank sheet.
+ * The area-mask view snapshots the screen on open and masks rejected drop areas with black.
+ * The animation view renders resource frames over a blank sheet and permits manual frame stepping.
+ * Gameplay timing is paused until the view closes.
  * Every view closes on any click or ESC key.
  */
 class DialogDebug : public DialogBase {
@@ -87,7 +87,7 @@ public:
 	/** Close the overlay and resume gameplay timing. */
 	void close() override;
 
-	/** Return whether this overlay currently owns drawing and input. */
+	/** Return whether this overlay is open and should receive modal input and rendering. */
 	bool isActive() const override { return _isActive; }
 
 	/** Draw the active debug view. */

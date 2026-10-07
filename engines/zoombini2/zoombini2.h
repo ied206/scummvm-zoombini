@@ -61,11 +61,12 @@ class ZoombiniAnimation;
 class ZoombiniRunner;
 
 /**
- * Owns global resources, input, page dispatch, and the active game session.
+ * Coordinates input, page transitions, and rendering for one game session.
  *
- * The engine presents a fixed 800x600 surface. It owns the shared game state,
- * global party, sidebar controls, sound manager, cursor resources, and exactly one
- * dispatched @ref Page at a time.
+ * The engine presents a fixed 800x600 surface and dispatches one @ref PageBase at a time.
+ * @ref GameState retains the party and saved progress across page transitions.
+ * Pages borrow the graphics, audio, and animation services retained for this engine instance.
+ * @ref Zoombini2Engine::destroyCurrentPage closes dialogs and deletes the page before clearing its layers and bitmap cache.
  */
 class Zoombini2Engine : public Engine {
 public:
@@ -139,7 +140,7 @@ public:
 	void reseedRandomForV10();
 	/** Return the most recently processed game-space mouse position. */
 	Common::Point32 getMousePos() const { return _mousePos; }
-	/** Select a cursor by its logical kind, or remove a page cursor with @ref CursorType::kRestoreBase. */
+	/** Select a cursor by its logical kind, or remove a page cursor with @ref Zoombini2Engine::CursorType::kRestoreBase. */
 	void setCursor(CursorType type);
 
 	/** Return the detected release language. */
@@ -193,9 +194,11 @@ public:
 	bool useEnhancedKbdShortcuts() const { return _enhancedKbdShortcuts; }
 	/** Return whether the practice map exposes recoverable level 4 puzzles. */
 	bool allowCutLevel4PracticePuzzles() const { return _allowCutLevel4PracticePuzzles; }
-	/** Return the logic pacing rate in Hz selected for frame-derived speeds.
-	 * It gates only Booliewood panorama scrolling and the banked idle-roll quota;
-	 * millisecond-deadline animations are unaffected. */
+	/**
+	 * Return the reference rate used to convert frame-derived motion and random-event quotas to elapsed-time updates.
+	 * This covers Booliewood scrolling, Aqua Cube bubble spawning, and banked idle or celebration rolls.
+	 * Presentation FPS and millisecond-deadline animations are independent of this rate.
+	 */
 	int getLogicPacingHz() const;
 	/** Return whether the Chez Norf diagnostic overlay key is currently held. */
 	bool showChezNorfDebugOverlay() const { return _debugHotkeysEnabled && _debugOverlayKeyDown; }
@@ -273,7 +276,7 @@ public:
 	/** Return gameplay milliseconds from the current clock read. */
 	uint32 getGameTickCount() const;
 	/** Return the active color-only presentation setting. */
-	ColorAssistMode getColorAssistMode() const { return _colorAssistMode; }
+	Zoombini2MetaEngine::ColorAssistMode getColorAssistMode() const { return _colorAssistMode; }
 	/** Return the gameplay millisecond snapshot captured before the current page pass. */
 	uint32 getFrameTickCount() const { return _cachedGameTickCount; }
 	/** Return gameplay milliseconds elapsed between the last two page passes. */
@@ -397,7 +400,7 @@ private:
 	CursorType _activeCursorType = CursorType::kDefault;
 	/** Whether a cursor has been registered for this game instance. */
 	bool _cursorRegistered = false;
-	/** BGRA cursor pixels indexed by @ref CursorType, with page entries cleared on transition. */
+	/** BGRA cursor pixels indexed by @ref Zoombini2Engine::CursorType, with page entries cleared on transition. */
 	CursorImage *_cursorImages[kCursorCount] = {};
 	/** Missing or invalid cursor art already reported for this cache lifetime. */
 	bool _cursorUnavailable[kCursorCount] = {};
@@ -462,8 +465,8 @@ private:
 	bool _debugHotkeysEnabled = false;
 	/** Whether newly started stereo game-audio streams retain both channels. */
 	bool _stereoOutputEnabled = false;
-	/** Color assist mode, mainly for colorblinds. */
-	ColorAssistMode _colorAssistMode = ColorAssistMode::kOriginal00;
+	/** Color-only presentation assistance for similar colors and red-green color vision deficiency. */
+	Zoombini2MetaEngine::ColorAssistMode _colorAssistMode = Zoombini2MetaEngine::ColorAssistMode::kOriginal;
 	/** Whether Waterslide level one uses the alternate greedy pairing. */
 	bool _useGreedyWaterslidePairing = false;
 	/** Whether Aqua Cube level three protects its first direct lever move from a Fleen. */
@@ -527,7 +530,9 @@ private:
 	/** Apply a queued page replacement before the active frame is dispatched. */
 	void applyPendingPageChange();
 	/**
-	 * Dispatch queued input while preserving shared and page-owned modal boundaries.
+	 * Dispatch queued input through the active shared dialog, sidebar, and page, in that order.
+	 * A shared modal blocks page input for the rest of the pass, including the release of a press that dismissed it.
+	 * Stop the pass when a modal closes or a page transition is requested, then retire closed shared dialogs.
 	 * @return True if a shared modal was active when dispatch began.
 	 */
 	bool dispatchPageEvents();
@@ -543,7 +548,7 @@ private:
 	void mainGameLoop();
 	/** Destroy the active page and construct @p pageId. */
 	void switchPage(PageId pageId);
-	/** Release the active page and clear its pointer. */
+	/** Close shared dialogs and delete the active page before releasing page layers, bitmaps, and cursor art. */
 	void destroyCurrentPage();
 };
 

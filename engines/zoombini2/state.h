@@ -307,10 +307,10 @@ private:
 /**
  * Tracks one game's progress, local roster, sparse storage, and trait-combo table.
  *
- * Loads are transactional: a complete temporary state is validated before it
- * replaces the active instance. The class also owns every pointer stored in
- * @ref GameState::_rescue1Storage, @ref GameState::_rescue2Storage, and
- * @ref GameState::_savedRoster.
+ * @ref GameState::_savedRoster holds persistent identities; @ref GameState::_activeZoombinis holds live page runners.
+ * Moving between these rosters clones persistent fields and deletes the source runners, so callers must discard their old runner pointers.
+ * Storage records and both rosters are released on reset or destruction.
+ * Loads validate a temporary state before replacing the active instance; a failed load leaves the current state intact.
  */
 class GameState : public Common::NonCopyable {
 public:
@@ -335,15 +335,18 @@ public:
 	/** Reset all serialized and runtime game fields to their initial values. */
 	void init();
 
-	/** Load and validate a complete game state from @p stream. */
+	/**
+	 * Load and validate a complete game state from @p stream without closing the stream.
+	 * @return True after replacing the state and releasing its previous storage records and runners; false leaves the state unchanged.
+	 */
 	bool load(Common::SeekableReadStream *stream);
 	/** Serialize this game state and the eligible active party to @p stream. */
 	bool save(Common::WriteStream *stream) const;
 	/** Delete and clear the live party retained by this game state. */
 	void clearActiveZoombinis();
-	/** Restore the saved party as live runners. */
+	/** Clone saved identities into live runners and delete the saved entries through @ref GameState::transferRoster. */
 	void restoreSavedZoombinis();
-	/** Retain the live party as saved roster entries on return to the map. */
+	/** Clone live identities into the saved roster and delete the live runners on return to the map. */
 	void stashActiveZoombinis();
 	/** Retain puzzle leavers in the saved roster or @p storage, keep successful route members active, and record an eligible perfect clear. */
 	void finishPuzzleRoster(PageId pageId, StorageRecord **storage, bool advancing, bool savedGame, bool perfectClearEligible);
@@ -483,7 +486,7 @@ private:
 	static void transferRoster(Common::Array<ZoombiniRunner *> &src, Common::Array<ZoombiniRunner *> &dest);
 	/** Copy the persistent identity of one live runner into a new roster entry. */
 	static ZoombiniRunner *cloneRosterMember(const ZoombiniRunner &src);
-	/** Exchange all owned and scalar state with @p other. */
+	/** Exchange storage pointers, both rosters, and all scalar state with @p other. */
 	void swapState(GameState &other);
 	/** Parse the complete state body from @p stream. */
 	bool readState(Common::SeekableReadStream *stream);
@@ -506,8 +509,10 @@ private:
 /**
  * Target-scoped storage for independent `.mk` savefiles.
  *
- * The manager validates single-byte savefile names, serializes @ref GameState,
- * and verifies newly written bytes before reporting success.
+ * Public names use the detected language's single-byte game encoding.
+ * @ref Zoombini2SavegameManager::makeSaveFileName converts Hebrew and Swedish names to UTF-8 at the filesystem boundary.
+ * New names must pass the game's typing rules; existing names need only pass the length and path-safety checks.
+ * Writes serialize @ref GameState and verify the stored bytes before reporting success.
  */
 class Zoombini2SavegameManager {
 public:
@@ -550,14 +555,14 @@ public:
 private:
 	/** Check length and path safety for a previously stored name without imposing the typing whitelist. */
 	static bool isSafeStoredSavefileName(const Common::String &savefileName);
-	/** Build the target-scoped filename for @p savefileName. */
+	/** Convert the game-encoded @p savefileName to a target-prefixed filesystem name ending in `.mk`. */
 	Common::String makeSaveFileName(const Common::String &savefileName) const;
 	/** Insert @p savefileName into @p savefiles unless it is already present. */
 	static void addSavefileSorted(Common::StringArray &savefiles, const Common::String &savefileName);
 	/** Verify that a completed save contains exactly @p size bytes from @p data. */
 	bool verifySaveData(const Common::String &saveFileName, const byte *data, uint32 size) const;
 
-	/** Backend that owns target save streams. */
+	/** Borrowed backend for opening and managing savefiles; each operation releases the streams it opens. */
 	Common::SaveFileManager *_saveFileManager;
 	/** ScummVM target identifier used as the save-file namespace. */
 	Common::String _target;
