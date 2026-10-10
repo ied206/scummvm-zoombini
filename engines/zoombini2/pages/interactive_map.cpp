@@ -24,6 +24,7 @@
 #include "common/path.h"
 #include "common/str.h"
 
+#include "graphics/font.h"
 #include "zoombini2/graphics.h"
 #include "zoombini2/pages/dialog_msgbox.h"
 #include "zoombini2/pages/interactive_map.h"
@@ -77,28 +78,23 @@ const Common::Rect InteractiveMap::kIconHitRects[kNumIcons] = {
 	Common::Rect(642, 190, 685, 235), // 11 Boolies
 	Common::Rect(709, 48, 798, 124)   // 12 Booliewood
 };
-
 /**
  * Title sprite draw positions {x, y}.
  * Each entry supplies the title origin for one page icon.
  */
 constexpr Common::Point32 InteractiveMap::kTitlePos[kNumTitles];
-
 /** Stat label Y positions. */
 constexpr int InteractiveMap::kStatLabelY[4];
-
 /**
  * Title sprite filenames per page (0-12).
  */
 constexpr const char *InteractiveMap::kTitleFiles[];
-
 /**
  * Segment draw positions {x, y}.
  * Slots 12 and 13 intentionally share a position.
  * Slot 13 duplicates slot 12 (both 661, 101).
  */
 constexpr Common::Point32 InteractiveMap::kSegmentPos[kNumSegments];
-
 /**
  * Segment-to-page mapping for saved-game page-level drawing.
  * The saved-game route uses each mapped page's stored level.
@@ -106,13 +102,13 @@ constexpr Common::Point32 InteractiveMap::kSegmentPos[kNumSegments];
  * Slot 12 is unused in saved-game mode.
  */
 constexpr PageId InteractiveMap::kSegmentPageIds[kNumSegments];
-
 constexpr const char *InteractiveMap::kSegmentDirs[];
-
 // Branch resources use b-before-a slot order rather than alphabetical suffix order.
 constexpr const char *InteractiveMap::kSegmentFiles[];
-
 constexpr const char *InteractiveMap::kLegendFiles[];
+constexpr const char32_t *InteractiveMap::kLevel4TabLabelEn;
+constexpr const char32_t *InteractiveMap::kLevel4TabLabelKo;
+constexpr RGBColor InteractiveMap::kLevel4Color;
 
 // ============================================================================
 // Construction / Destruction
@@ -587,8 +583,9 @@ void InteractiveMap::onRenderContent(ManagedSurface32 *screen) {
 			if (!_legends[tabToShow].empty())
 				_vm->_gfx->drawPageBitBlock(screen, _legends[tabToShow], Common::Point32(590, 427));
 		}
-		if (_vm->allowCutLevel4PracticePuzzles())
-			drawLevel4LegendTab(screen);
+		if (_vm->allowCutLevel4PracticePuzzles()) {
+			drawLevel4Legend(screen);
+		}
 	}
 
 	// 5. Page icons
@@ -646,7 +643,7 @@ void InteractiveMap::drawPracticeSegments(ManagedSurface32 *screen) {
 		if (level == 4) {
 			RleBlock *segment = _vm->_gfx->loadPageRleBlock(_segments[tier][slot]);
 			if (segment)
-				segment->drawToScreenSolidColor(screen, kSegmentPos[slot], RGBColor(24, 25, 30), _vm->getAlphaLUT());
+				segment->drawToScreenSolidColor(screen, kSegmentPos[slot], kLevel4Color, _vm->getAlphaLUT());
 		} else {
 			_vm->_gfx->drawPageRleBlock(screen, _segments[tier][slot], kSegmentPos[slot]);
 		}
@@ -669,28 +666,81 @@ bool InteractiveMap::selectPracticeLevel(int level) {
 	return true;
 }
 
-void InteractiveMap::drawLevel4LegendTab(ManagedSurface32 *screen) const {
-	const uint32 fill = screen->format.ARGBToColor(255, 17, 18, 22);
-	const uint32 border = screen->format.ARGBToColor(255, 95, 98, 103);
-	const uint32 activeBorder = screen->format.ARGBToColor(255, 235, 196, 80);
-	const uint32 hoverBorder = screen->format.ARGBToColor(255, 240, 240, 240);
-	uint32 outline = border;
-	if (_hoveredLegendTab == 4)
-		outline = hoverBorder;
-	else if (_currentLevel == 4)
-		outline = activeBorder;
+void InteractiveMap::drawLevel4Legend(ManagedSurface32 *screen) const {
+	if (!screen)
+		return;
 
+	const uint32 fillColor = kLevel4Color.toPixel(screen->format);
+	const uint32 outlineColor = screen->format.ARGBToColor(255, 255, 242, 0); // #FFF200
+
+	// Draw a slanted rect to be clicked on.
 	for (int y = kLevel4TabTop; y < kLevel4TabBottom; y++) {
+		// Graphics::Surface does not support filling of a slanted rect.
+		// Draw line by line to mitigate this limitation, think as a HDMA trick on 2D game consoles.
 		const int slant = (y - kLevel4TabTop) * kLevel4TabSlant / (kLevel4TabBottom - kLevel4TabTop);
-		screen->fillRect(Common::Rect32(kLevel4TabLeft - slant, y, kLevel4TabRight - slant, y + 1), fill);
+		screen->fillRect(Common::Rect32(kLevel4TabLeft - slant, y, kLevel4TabRight - slant, y + 1), fillColor);
 	}
-	_vm->_gfx->drawLine(screen, Common::Point32(kLevel4TabLeft, kLevel4TabTop), Common::Point32(kLevel4TabRight, kLevel4TabTop), outline);
-	_vm->_gfx->drawLine(screen, Common::Point32(kLevel4TabLeft - kLevel4TabSlant, kLevel4TabBottom),
-						Common::Point32(kLevel4TabRight - kLevel4TabSlant, kLevel4TabBottom), outline);
-	_vm->_gfx->drawLine(screen, Common::Point32(kLevel4TabLeft, kLevel4TabTop),
-						Common::Point32(kLevel4TabLeft - kLevel4TabSlant, kLevel4TabBottom), outline);
-	_vm->_gfx->drawLine(screen, Common::Point32(kLevel4TabRight, kLevel4TabTop),
-						Common::Point32(kLevel4TabRight - kLevel4TabSlant, kLevel4TabBottom), outline);
+
+	// Frame a slanted rect on hover.
+	if (_hoveredLegendTab == 4) {
+		_vm->_gfx->drawLine(screen, Common::Point32(kLevel4TabLeft, kLevel4TabTop), Common::Point32(kLevel4TabRight, kLevel4TabTop), outlineColor, kLevel4TabBorderThickness);
+		_vm->_gfx->drawLine(screen, Common::Point32(kLevel4TabLeft - kLevel4TabSlant, kLevel4TabBottom), Common::Point32(kLevel4TabRight - kLevel4TabSlant, kLevel4TabBottom), outlineColor, kLevel4TabBorderThickness);
+		_vm->_gfx->drawLine(screen, Common::Point32(kLevel4TabLeft, kLevel4TabTop), Common::Point32(kLevel4TabLeft - kLevel4TabSlant, kLevel4TabBottom), outlineColor, kLevel4TabBorderThickness);
+		_vm->_gfx->drawLine(screen, Common::Point32(kLevel4TabRight, kLevel4TabTop), Common::Point32(kLevel4TabRight - kLevel4TabSlant, kLevel4TabBottom), outlineColor, kLevel4TabBorderThickness);
+	}
+
+	// Draw a label explaining restoration of cut level - Level4.
+	const Graphics::Font *labelFont = _vm->_gfx->getSvmGuiFont();
+	if (!labelFont)
+		return;
+
+	Common::U32String label;
+	switch (_vm->getLanguage()) {
+	case Common::KO_KOR:
+		label = kLevel4TabLabelKo;
+		break;
+	default:
+		label = kLevel4TabLabelEn;
+		break;
+	}
+
+	const int fontHeight = labelFont->getFontHeight();
+	if (fontHeight <= 0)
+		return;
+
+	const int textX = kLevel4TabRight + kLevel4TabTextMargin;
+	int textY = kLevel4TabTop + (kLevel4TabBottom - kLevel4TabTop - fontHeight) / 2;
+	// In some releases, L1-L3 label can take up to two lines.
+	// Our L4 label should be moved to bottom a bit in that case.
+	switch (_vm->getLanguage()) {
+	case Common::KO_KOR:
+		textY += 12;
+		break;
+	case Common::PL_POL:
+		textY += 8;
+		break;
+	default:
+		break;
+	}
+
+	const int maxWidth = kLevel4TabTextRightEdge - textX - kLevel4TabTextMargin;
+	if (maxWidth <= 0)
+		return;
+
+	Gfx::TextConf conf;
+	conf.font = labelFont;
+	conf.fillColor = fillColor;
+	conf.outlineEffect = true;
+	conf.outlineColor = outlineColor;
+	switch (_vm->getLanguage()) {
+	case Common::KO_KOR:
+		conf.hAlign = Graphics::kTextAlignCenter;
+		break;
+	default:
+		conf.hAlign = Graphics::kTextAlignLeft;
+		break;
+	}
+	_vm->_gfx->drawString(screen, label, Common::Point32(textX, textY), maxWidth, conf);
 }
 
 // ============================================================================
@@ -998,7 +1048,7 @@ void InteractiveMap::applyVolumePanelVolumes(bool usePanelValues, bool persistCh
 
 void InteractiveMap::requestQuitConfirmation() {
 	_vm->requestMsgBox(Common::Path(kQuitConfirmationPath),
-									new Common::Callback<InteractiveMap, DialogMsgBoxButton>(this, &InteractiveMap::handleQuitConfirmation));
+					   new Common::Callback<InteractiveMap, DialogMsgBoxButton>(this, &InteractiveMap::handleQuitConfirmation));
 }
 
 void InteractiveMap::handleQuitConfirmation(DialogMsgBoxButton button) {

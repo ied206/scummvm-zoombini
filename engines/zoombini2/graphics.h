@@ -315,23 +315,44 @@ public:
 	 * Replacing it with the return value of @ref Gfx::drawText would change those layout and input decisions.
 	 */
 	int getTextWidth(const Common::String &text, TextColor color) const;
+	/**
+	 * Return the shared ScummVM UI font for the release language, borrowed from the theme or font manager.
+	 * The theme extra pointer is queried fresh on every call because each successful extra-font load replaces it.
+	 * The font manager fallback is also queried fresh because the localized font selection can change.
+	 * The cached flags keep only the load decision so the font file loads once while callers query per frame.
+	 */
+	const Graphics::Font *getSvmGuiFont();
 	/** Draw the held Zoombini name plate centered at the bottom of @p destSurface. */
 	void drawDragNameTooltip(ManagedSurface32 *destSurface, const Common::String &name);
 	/** Black out @p destSurface where @p areaMask rejects drops, or everywhere when @p areaMask is nullptr. */
 	void maskRejectedArea(ManagedSurface32 *destSurface, const AreaMask *areaMask);
-	/** Fill a clipped rectangle through the shared Z2 rendering boundary. */
+	/** Fill a clipped rectangle. */
 	void fillRect(ManagedSurface32 *destSurface, const Common::Rect32 &rect, uint32 color) const;
-	/** Fill a 16-bit API-boundary rectangle through the shared Z2 rendering boundary. */
+	/** Fill a clipped rectangle. */
 	void fillRect(ManagedSurface32 *destSurface, const Common::Rect &rect, uint32 color) const;
-	/** Draw a clipped rectangular outline through the shared Z2 rendering boundary. */
-	void frameRect(ManagedSurface32 *destSurface, const Common::Rect32 &rect, uint32 color) const;
-	/** Draw a 16-bit API-boundary rectangular outline through the shared Z2 rendering boundary. */
-	void frameRect(ManagedSurface32 *destSurface, const Common::Rect &rect, uint32 color) const;
-	/** Draw a line through the shared Z2 rendering boundary. */
-	void drawLine(ManagedSurface32 *destSurface, const Common::Point32 &start, const Common::Point32 &end, uint32 color) const;
-
-	/** Create the route-map background with all state-dependent overlays applied. */
-	ManagedSurface32 *createMapTransitionBackground(PageId srcPageId, int mapRegion);
+	/** Draw a line with a square pen of @p thickness pixels. */
+	void drawLine(ManagedSurface32 *destSurface, const Common::Point32 &start, const Common::Point32 &end, uint32 color, int thickness = 1) const;
+	/**
+	 * Bundles the settings for one @ref Gfx::drawString call.
+	 * Mirrors the Z1 TextConf pattern: the font, fill color, and optional outline are configured together.
+	 */
+	struct TextConf {
+		/** Font used to draw the glyphs. */
+		const Graphics::Font *font = nullptr;
+		/** Color of the text glyphs. */
+		uint32 fillColor = 0;
+		/** Whether a one-pixel outline is drawn around the glyphs. */
+		bool outlineEffect = false;
+		/** Color of the outline when @ref outlineEffect is true. */
+		uint32 outlineColor = 0;
+		/** Horizontal alignment of the text. */
+		Graphics::TextAlign hAlign = Graphics::kTextAlignLeft;
+	};
+	/**
+	 * Draw @p text using @p conf, outlining the glyphs before the fill when @ref TextConf::outlineEffect is set.
+	 * The four one-pixel outline passes are drawn first so the main text does not move.
+	 */
+	void drawString(ManagedSurface32 *destSurface, const Common::U32String &text, const Common::Point32 &pos, int maxWidth, const TextConf &conf) const;
 
 private:
 	struct MaskedBitBlockEntry {
@@ -356,17 +377,19 @@ private:
 	static constexpr const char *kNameBoxSpritePath = "bmp/menu/name_box.rb";
 	/** Yellow mask drawn beneath a held Zoombini over an available drop target. */
 	static constexpr const char *kDropTargetGlowPath = "bmp/cursor/glow";
-	/** Path format for one map transition overlay. */
-	static constexpr const char *kMapTransitionOverlayPathFormat = "bmp/maptrans/%s.bmp";
-	/** Path format for the map transition background. */
-	static constexpr const char *kMapTransitionBackgroundPathFormat = "#bmp/maptrans/bigmap_background_%d";
 	/** Single coverage-mask glyph set tinted per draw, retained until graphics shutdown. */
 	BmtFont *_textFont = nullptr;
+	/**
+	 * Whether the shared UI font load has been attempted once for this game instance.
+	 * This flag cache only the load decision so the font file loads once while callers query per frame.
+	 */
+	bool _uiFontResolved = false;
+	/**
+	 * Whether the theme supplies a language extra font for this game instance.
+	 * This flag cache only the load decision so the font file loads once while callers query per frame.
+	 */
+	bool _uiFontHasExtra = false;
 
-	/** Draw one map-overlay RLE sprite retained for the current page. */
-	void drawOverlaySprite(ManagedSurface32 *destSurface, const Common::String &name, const Common::Point32 &pos);
-	/** Compose the route-map overlays appropriate to the current progress. */
-	void drawMapOverlays(ManagedSurface32 *destSurface, PageId srcPageId, int mapRegion);
 	/** Return the tint for one text color. */
 	static RGBColor textColor(TextColor color);
 	/** Name-plate sprite drawn under the held Zoombini name. */

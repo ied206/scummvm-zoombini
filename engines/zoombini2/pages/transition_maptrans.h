@@ -37,17 +37,17 @@ class TransitionMapTrans : public TransitionBase {
 public:
 	/** Rescue-count condition for a named route leaving Boolies. */
 	enum class RouteRescueCondition {
-		kAnyCount, ///< The route is available for any rescue count.
-		kBelowFinalThreshold, ///< The route is available below the final-page threshold.
+		kAnyCount,               ///< The route is available for any rescue count.
+		kBelowFinalThreshold,    ///< The route is available below the final-page threshold.
 		kAtOrAboveFinalThreshold ///< The route is available at or above the final-page threshold.
 	};
 
 	/** Route edge with the developer-navigation label used to select it. */
 	struct RouteDest {
-		const char *name; ///< Debugger command name for this route.
-		PageId target; ///< Page reached by this route edge.
-		PageId source; ///< Page that starts this route edge.
-		Zoombini2Engine::RouteBranch branch; ///< Branch selected when leaving Rescue Site I.
+		const char *name;                     ///< Debugger command name for this route.
+		PageId target;                        ///< Page reached by this route edge.
+		PageId source;                        ///< Page that starts this route edge.
+		Zoombini2Engine::RouteBranch branch;  ///< Branch selected when leaving Rescue Site I.
 		RouteRescueCondition rescueCondition; ///< Rescue-count condition for this route.
 	};
 
@@ -87,6 +87,38 @@ private:
 	static constexpr const char *kZoombiniAnimationPath = "bmp/transition1/PitiZomb3.anm";
 	/** Background music played during map travel and queued travel speech. */
 	static constexpr const char *kMusicPath = "#sounds/music/ZMR-Transition.wav";
+	/** Path format for one map transition overlay. */
+	static constexpr const char *kMapTransitionOverlayPathFormat = "bmp/maptrans/%s.bmp";
+	/** Path format for the map transition background. */
+	static constexpr const char *kMapTransitionBackgroundPathFormat = "#bmp/maptrans/bigmap_background_%d";
+	/** Route segment sprite base names drawn over the map transition background. */
+	static constexpr const char *kOverlaySegment01 = "bigmap_segment_01";
+	static constexpr const char *kOverlaySegment02 = "bigmap_segment_02";
+	static constexpr const char *kOverlaySegment03 = "bigmap_segment_03";
+	static constexpr const char *kOverlaySegment04 = "bigmap_segment_04";
+	static constexpr const char *kOverlaySegment05a = "bigmap_segment_05a";
+	static constexpr const char *kOverlaySegment05b = "bigmap_segment_05b";
+	static constexpr const char *kOverlaySegment06a = "bigmap_segment_06a";
+	static constexpr const char *kOverlaySegment06b = "bigmap_segment_06b";
+	static constexpr const char *kOverlaySegment07a = "bigmap_segment_07a";
+	static constexpr const char *kOverlaySegment07b = "bigmap_segment_07b";
+	static constexpr const char *kOverlaySegment08 = "bigmap_segment_08";
+	static constexpr const char *kOverlaySegment09 = "bigmap_segment_09";
+	static constexpr const char *kOverlaySegment10 = "bigmap_segment_10";
+	/** Route icon sprite base names drawn over the map transition background. */
+	static constexpr const char *kOverlayIcon01 = "bigmap_icon_01";
+	static constexpr const char *kOverlayIcon02 = "bigmap_icon_02";
+	static constexpr const char *kOverlayIcon03 = "bigmap_icon_03";
+	static constexpr const char *kOverlayIcon04 = "bigmap_icon_04";
+	static constexpr const char *kOverlayIcon05 = "bigmap_icon_05";
+	static constexpr const char *kOverlayIcon06a = "bigmap_icon_06a";
+	static constexpr const char *kOverlayIcon06b = "bigmap_icon_06b";
+	static constexpr const char *kOverlayIcon07a = "bigmap_icon_07a";
+	static constexpr const char *kOverlayIcon07b = "bigmap_icon_07b";
+	static constexpr const char *kOverlayIcon08 = "bigmap_icon_08";
+	static constexpr const char *kOverlayIcon09 = "bigmap_icon_09";
+	static constexpr const char *kOverlayIcon10 = "bigmap_icon_10";
+	static constexpr const char *kOverlayIcon11 = "bigmap_icon_11";
 	/** First-visit speech queued when leaving Zoombiniville for Crazy Turtle. */
 	static constexpr const char *kSpeechTur11 = "tur11";
 	/** Revisit greeting queued when leaving Zoombiniville before Booliewood was visited. */
@@ -170,6 +202,12 @@ private:
 	PageId getPostTransitionPage() const;
 	/** Commit the destination page after the last walker finishes. */
 	void finishTransition();
+	/** Compose the map transition background with the route-specific overlays. */
+	ManagedSurface32 *createMapTransitionBackground(PageId srcPageId, int mapRegion);
+	/** Compose the route-map overlays appropriate to the current progress. */
+	void drawMapOverlays(ManagedSurface32 *dst, PageId srcPageId, int mapRegion);
+	/** Draw one map-overlay RLE sprite retained for the current page. */
+	void drawOverlaySprite(ManagedSurface32 *dst, const Common::String &name, const Common::Point32 &pos);
 
 	/** Background with route-specific overlays already applied. */
 	ManagedSurface32 *_compositedBg = nullptr;
