@@ -23,9 +23,6 @@
 #include "common/debug.h"
 #include "common/system.h"
 #include "graphics/font.h"
-#include "graphics/fontman.h"
-#include "gui/ThemeEngine.h"
-#include "gui/gui-manager.h"
 #include "zoombini2/graphics.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/zoombini2.h"
@@ -92,8 +89,6 @@ bool DialogMsgBox::openDialog() {
 		return false;
 	}
 
-	resolveUiFont();
-
 	const Size32 panelSize = _vm->_gfx->getPageRleBlockSize(kPanelPaths[1]);
 	if (_position.x == -1)
 		_position.x = ManagedSurface32::kScreenSize.width / 2 - panelSize.width / 2;
@@ -107,14 +102,6 @@ bool DialogMsgBox::openDialog() {
 	_vm->setDialogPaused(true);
 	_state = DialogMsgBoxState::kOpen02;
 	return true;
-}
-
-void DialogMsgBox::resolveUiFont() {
-	_uiFont = nullptr;
-	if (g_gui.theme()->loadExtraFont(GUI::ThemeEngine::kFontStyleNormal, _vm->getLanguage()))
-		_uiFont = g_gui.theme()->getFont(GUI::ThemeEngine::kFontStyleLangExtra);
-	if (!_uiFont)
-		_uiFont = FontMan.getFontByUsage(Graphics::FontManager::kLocalizedFont);
 }
 
 void DialogMsgBox::close() {
@@ -133,7 +120,6 @@ void DialogMsgBox::close() {
 	releaseResources();
 	_textPath.clear();
 	_uiText.clear();
-	_uiFont = nullptr;
 }
 
 void DialogMsgBox::releaseResources() {
@@ -142,21 +128,25 @@ void DialogMsgBox::releaseResources() {
 }
 
 void DialogMsgBox::drawUiText(ManagedSurface32 *screen) const {
-	if (_uiText.empty() || !_uiFont)
+	if (_uiText.empty())
 		return;
 
-	const int lineHeight = _uiFont->getFontHeight();
+	const Graphics::Font *guiFont = _vm->_gfx->getSvmGuiFont();
+	if (!guiFont)
+		return;
+
+	const int lineHeight = guiFont->getFontHeight();
 	if (lineHeight <= 0)
 		return;
 
 	Common::Array<Common::U32String> lines;
-	_uiFont->wordWrapText(_uiText, kUiTextWidth, lines);
+	guiFont->wordWrapText(_uiText, kUiTextWidth, lines);
 	const int maxLines = kUiTextHeight / lineHeight;
 	const uint32 textColor = screen->format.RGBToColor(0, 0, 0);
 	for (uint i = 0; i < lines.size() && static_cast<int>(i) < maxLines; i++) {
 		const int x = _position.x + kUiTextMarginX;
 		const int y = _position.y + kUiTextOffsetY + static_cast<int>(i) * lineHeight;
-		_uiFont->drawString(screen, lines[i], x, y, kUiTextWidth, textColor, Graphics::kTextAlignCenter);
+		guiFont->drawString(screen, lines[i], x, y, kUiTextWidth, textColor, Graphics::kTextAlignCenter);
 	}
 }
 

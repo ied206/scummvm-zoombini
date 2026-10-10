@@ -29,10 +29,6 @@
 
 #include "zoombini2/pages/dialog_base.h"
 
-namespace Graphics {
-class Font;
-}
-
 namespace Zoombini2 {
 
 /** Numeric result supplied to a shared confirmation callback. */
@@ -119,8 +115,6 @@ private:
 	bool beginRequest(Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &position);
 	/** Load request-specific resources and retain the covered screen rectangle. */
 	bool openDialog();
-	/** Select the UI font for the current request from the release language. */
-	void resolveUiFont();
 	/** Release the saved screen pixels for the current request. */
 	void releaseResources();
 	/** Draw the current UI-font text request over the panel. */
@@ -140,8 +134,6 @@ private:
 	Common::String _textPath;
 	/** Request-specific text drawn with the release language font. */
 	Common::U32String _uiText;
-	/** UI font borrowed from the theme for the current request, or nullptr. */
-	const Graphics::Font *_uiFont = nullptr;
 	/** Callback deleted after button activation or closure; detached before invocation so it can queue a new request. */
 	Common::BaseCallback<DialogMsgBoxButton> *_callback = nullptr;
 	/** Button currently under the pointer. */

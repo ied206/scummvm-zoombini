@@ -30,9 +30,6 @@
 #include "common/system.h"
 #include "common/ustr.h"
 #include "graphics/font.h"
-#include "graphics/fontman.h"
-#include "gui/ThemeEngine.h"
-#include "gui/gui-manager.h"
 
 namespace Zoombini2 {
 
@@ -109,8 +106,6 @@ bool DialogHelp::open(PageId pageId, int level) {
 	_currentLevel = level;
 	_currentSheet = 1;
 	_transparentHelpPages = (_vm->getFeatures() & GF_Z2_SOLID_HELP_PAGES) != 0 && ConfMan.getBool(Zoombini2MetaEngine::kConfigTransparentHelpPages);
-	if (level == 4)
-		resolveUiFont();
 
 	_vm->setDialogPaused(true);
 
@@ -146,7 +141,6 @@ void DialogHelp::close() {
 	_currentLevel = -1;
 	_currentSheet = 1;
 	_transparentHelpPages = false;
-	_uiFont = nullptr;
 }
 
 bool DialogHelp::loadPage(PageId pageId, int level, int sheet) {
@@ -171,23 +165,16 @@ void DialogHelp::freePage() {
 	_helpPagePath.clear();
 }
 
-void DialogHelp::resolveUiFont() {
-	_uiFont = nullptr;
-	if (g_gui.theme()->loadExtraFont(GUI::ThemeEngine::kFontStyleNormal, _vm->getLanguage()))
-		_uiFont = g_gui.theme()->getFont(GUI::ThemeEngine::kFontStyleLangExtra);
-	if (!_uiFont)
-		_uiFont = FontMan.getFontByUsage(Graphics::FontManager::kLocalizedFont);
-}
-
 void DialogHelp::drawMissingHelpText(ManagedSurface32 *screen) const {
-	if (!_uiFont)
+	const Graphics::Font *guiFont = _vm->_gfx->getSvmGuiFont();
+	if (!guiFont)
 		return;
 
 	const char *text = _vm->isKorean() ? kMissingHelpTextKorean : kMissingHelpTextEnglish;
 	const Common::U32String message(text, Common::kUtf8);
-	const int y = kMissingHelpTextCenterY - _uiFont->getFontHeight() / 2;
+	const int y = kMissingHelpTextCenterY - guiFont->getFontHeight() / 2;
 	const uint32 textColor = screen->format.RGBToColor(0, 0, 0);
-	_uiFont->drawString(screen, message, kMissingHelpTextX, y, kMissingHelpTextWidth, textColor, Graphics::kTextAlignCenter);
+	guiFont->drawString(screen, message, kMissingHelpTextX, y, kMissingHelpTextWidth, textColor, Graphics::kTextAlignCenter);
 }
 
 void DialogHelp::onRenderContent(ManagedSurface32 *screen) {
