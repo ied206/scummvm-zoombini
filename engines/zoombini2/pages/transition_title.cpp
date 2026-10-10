@@ -39,7 +39,7 @@ TransitionTitle::TransitionTitle(Zoombini2Engine *vm)
 
 void TransitionTitle::init() {
 	debug(1, "TitleScreen::init");
-	_deadline = _vm->getGameTickCount() + 10000;
+	_deadline = _vm->getTotalPlayTime() + 10000;
 
 	// Load the static title background.
 	if (!_vm->_gfx->loadPageBitBlock(kBackgroundPath)) {
@@ -54,7 +54,7 @@ void TransitionTitle::onUpdate() {
 	if (_clicked)
 		return;
 
-	if (_deadline < _vm->getGameTickCount())
+	if (_deadline < _vm->getTotalPlayTime())
 		dismiss();
 }
 

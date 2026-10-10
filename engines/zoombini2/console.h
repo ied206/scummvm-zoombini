@@ -99,6 +99,26 @@ private:
 	bool CmdSub_DrawAreaMask(int argc, const char **argv);
 	/** Open the debug dialog showing animation or sprite frames. */
 	bool CmdSub_DrawAnimation(int argc, const char **argv);
+	/** Plot a point, line, or rectangle on a white debug canvas through @ref Zoombini2Console::Cmd_Plot. */
+	static constexpr const char *kCmdPlot = "plot";
+	/** Plot one pixel. */
+	static constexpr const char *kSubCmdPlotPoint = "point";
+	/** Plot a line between two inclusive endpoints. */
+	static constexpr const char *kSubCmdPlotLine = "line";
+	/** Plot a rectangle outline with exclusive right and bottom coordinates. */
+	static constexpr const char *kSubCmdPlotRect = "rect";
+	/** Dispatch the plot command to its selected subcommand. */
+	bool Cmd_Plot(int argc, const char **argv);
+	/** Open the debug dialog showing one diagnostic pixel. */
+	bool CmdSub_PlotPoint(int argc, const char **argv);
+	/** Open the debug dialog showing one diagnostic line. */
+	bool CmdSub_PlotLine(int argc, const char **argv);
+	/** Open the debug dialog showing one diagnostic rectangle outline. */
+	bool CmdSub_PlotRect(int argc, const char **argv);
+	/** Parse a signed coordinate pair without allowing values to wrap when passed to surface drawing. */
+	bool parsePlotPoint(const char *xText, const char *yText, Common::Point32 &point);
+	/** Parse a 24-bit RGB color, accepting 0xRRGGBB or #RRGGBB independently of the destination pixel format. */
+	bool parsePlotColor(const char *text, uint32 &color);
 	bool parseSignedInt(const char *text, int32 &result);
 	bool parseUnsignedInt(const char *text, uint32 &result);
 	void reportIntegerParseFailure(StringParser::Result result, bool unsignedValue, const char *text);

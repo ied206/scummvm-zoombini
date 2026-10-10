@@ -393,7 +393,7 @@ void PuzzleBoolies::init() {
 		return;
 	}
 	loadResources();
-	_blockerStart = _vm->getGameTickCount();
+	_blockerStart = _vm->getTotalPlayTime();
 	const int rosterCount = static_cast<int>(_puzzleZoombinis.size());
 	for (int index = 0; index < rosterCount; index++) {
 		ZoombiniRunner *zoombini = _puzzleZoombinis[index];
@@ -414,7 +414,7 @@ void PuzzleBoolies::init() {
 	byte entryValues[kSlotCount];
 	for (int slot = 0; slot < kSlotCount; slot++)
 		entryValues[slot] = _boolies[kRowCount - 1][slot].value;
-	startRefill(kRowCount - 1, entryValues, _vm->getGameTickCount());
+	startRefill(kRowCount - 1, entryValues, _vm->getTotalPlayTime());
 	switch (_puzzleLevel) {
 	case 1:
 		_requiredTurns = (rosterCount + 3) / 4 + 2 * rosterCount + 1;
@@ -435,7 +435,7 @@ void PuzzleBoolies::init() {
 		_vm->restartGoBlink();
 		return;
 	}
-	beginRound(_vm->getGameTickCount());
+	beginRound(_vm->getTotalPlayTime());
 }
 
 void PuzzleBoolies::startLaneBall(Ball &ball, uint32 now) {
@@ -788,7 +788,7 @@ void PuzzleBoolies::advanceBoardingCheck(uint32 now) {
 }
 
 void PuzzleBoolies::onUpdate() {
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	if (_goPending) {
 		SoundManager *sound = _vm->getSoundManager();
 		if (!sound || !sound->hasPendingSpeech()) {
@@ -870,7 +870,7 @@ void PuzzleBoolies::drawSpotHighlights(ManagedSurface32 *screen) const {
 }
 
 void PuzzleBoolies::onRenderContent(ManagedSurface32 *screen) {
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	for (int row = 0; row < kRowCount; row++) {
 		for (int slot = 0; slot < kSlotCount; slot++) {
 			const Boolie &boolie = _boolies[row][slot];
@@ -988,7 +988,7 @@ EventHandleResult PuzzleBoolies::onLButtonDown(const Common::Point &pos) {
 		return EventHandleResult::kPassthrough;
 	_selectedRow = row;
 	_pinRoute = row;
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	_nextLaneBallIndex = 0;
 	_nextLaneLaunchAt = now + (row == 2 ? 0 : kFirstBallLaunchDelay);
 	_phase = Phase::kRolling01;

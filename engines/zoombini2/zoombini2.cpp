@@ -574,10 +574,10 @@ Common::Error Zoombini2Engine::run() {
 	_sidebar = new Sidebar(this); // Shared Help, Map, Go buttons
 	setDebugger(new Zoombini2Console(this));
 
-	_startTime = g_system->getMillis();
-	_cachedGameTickCount = 0;
-	_prevFrameTickCount = 0;
-	_frameTimeOriginMs = _startTime;
+	// Seed both snapshots from the same clock so the first frame delta stays small.
+	_cachedGameTickCount = getTotalPlayTime();
+	_prevFrameTickCount = _cachedGameTickCount;
+	_frameTimeOriginMs = g_system->getMillis();
 	_lastFrameElapsedMs = 0;
 	_hasFrameIndex = false;
 
@@ -724,36 +724,23 @@ void Zoombini2Engine::clearCursorImages(uint firstIndex) {
 	}
 }
 
-uint32 Zoombini2Engine::getGameTickCount() const {
-	return calculateGameTickCount();
-}
-
-void Zoombini2Engine::setPauseState(bool &reason, bool paused) {
-	if (reason == paused)
-		return;
-	const bool wasPaused = _dialogPaused || _backendPaused;
-	reason = paused;
-	const bool isPaused = _dialogPaused || _backendPaused;
-	const uint32 now = g_system->getMillis();
-	if (!wasPaused && isPaused) {
-		_pauseTimeStart = now;
-		if (_soundManager)
-			_soundManager->pauseAll();
-		_mixer->pauseAll(true);
-	} else if (wasPaused && !isPaused) {
-		_pauseTimeAccum += now - _pauseTimeStart;
-		if (_soundManager)
-			_soundManager->resumeAll();
-		_mixer->pauseAll(false);
-	}
-}
-
 void Zoombini2Engine::setDialogPaused(bool paused) {
-	setPauseState(_dialogPaused, paused);
+	if (_dialogPauseToken.isActive() == paused)
+		return;
+	if (paused)
+		_dialogPauseToken = pauseEngine();
+	else
+		_dialogPauseToken.clear();
 }
 
 void Zoombini2Engine::pauseEngineIntern(bool pause) {
-	setPauseState(_backendPaused, pause);
+	Engine::pauseEngineIntern(pause);
+	if (!_soundManager)
+		return;
+	if (pause)
+		_soundManager->pauseAll();
+	else
+		_soundManager->resumeAll();
 }
 
 void Zoombini2Engine::restartGoBlink() {
@@ -763,17 +750,7 @@ void Zoombini2Engine::restartGoBlink() {
 
 void Zoombini2Engine::reseedRandomForV10() {
 	if ((_gameDescription->features & GF_Z2_V10) != 0)
-		_rnd->setSeed(getGameTickCount());
-}
-
-uint32 Zoombini2Engine::calculateGameTickCount() const {
-	const uint32 now = g_system->getMillis();
-	uint32 elapsed = now - _startTime;
-	if (_dialogPaused || _backendPaused)
-		elapsed -= _pauseTimeAccum + (now - _pauseTimeStart);
-	else
-		elapsed -= _pauseTimeAccum;
-	return elapsed;
+		_rnd->setSeed(getTotalPlayTime());
 }
 
 int Zoombini2Engine::getLogicPacingHz() const {
@@ -1204,7 +1181,7 @@ void Zoombini2Engine::runFrame() {
 		return;
 	// Keep one gameplay-time snapshot for every active pass.
 	_prevFrameTickCount = _cachedGameTickCount;
-	_cachedGameTickCount = calculateGameTickCount();
+	_cachedGameTickCount = getTotalPlayTime();
 	if (_soundManager)
 		_soundManager->updateSpeechQueue();
 	applyPendingPageChange();

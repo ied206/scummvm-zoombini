@@ -106,7 +106,7 @@ void ShelterBooliewood::init() {
 	_vm->_gfx->loadPageRleBlock(kContentMarkerPath);
 	_vm->_gfx->loadPageRleBlock(kPascontentMarkerPath);
 
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	_lastScrollTime = now;
 	resetSeats();
 	buildSeatedCommunity(now);
@@ -134,7 +134,7 @@ void ShelterBooliewood::init() {
 }
 
 void ShelterBooliewood::onUpdate() {
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	updateScroll(now);
 	updateAttractions(now);
 	updateSeatedAnimations(now);

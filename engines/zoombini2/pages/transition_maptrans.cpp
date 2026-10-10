@@ -320,7 +320,7 @@ void TransitionMapTrans::init() {
 		warning("MapTransition: Failed to load PitiZomb3.anm");
 
 	// Preserve the previous page grid for cleanup, then install the map-only grid.
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	const uint numZoombinis = _vm->_state->_activeZoombinis.size();
 	for (uint i = 0; i < numZoombinis; i++) {
 		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
@@ -345,7 +345,7 @@ void TransitionMapTrans::init() {
 
 /** Start and advance one independent path per Zoombini with an 800-millisecond stagger. */
 void TransitionMapTrans::walkZoombinis() {
-	uint32 now = _vm->getGameTickCount();
+	uint32 now = _vm->getTotalPlayTime();
 	const uint numZoombinis = _vm->_state->_activeZoombinis.size();
 
 	// Start the next Zoombini walking if its strict 800-millisecond gate has passed.

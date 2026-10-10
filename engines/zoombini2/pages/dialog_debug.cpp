@@ -51,7 +51,8 @@ bool DialogDebug::open(const DialogDebugCommand &cmd) {
 	_viewType = DialogDebugCommand::Type::kNone;
 	_titleText.clear();
 
-	if (cmd._type == DialogDebugCommand::Type::kDrawAreaMask) {
+	switch (cmd._type) {
+	case DialogDebugCommand::Type::kDrawAreaMask: {
 		PageBase *page = _vm->getCurrentPage();
 		if (!page)
 			return false;
@@ -63,7 +64,9 @@ bool DialogDebug::open(const DialogDebugCommand &cmd) {
 			_titleText = Common::String::format("[AreaMask] page(%d)", static_cast<int>(page->getPageId()));
 		else
 			_titleText = Common::String::format("[AreaMask] page(%d) no area mask", static_cast<int>(page->getPageId()));
-	} else if (cmd._type == DialogDebugCommand::Type::kDrawAnimation) {
+		break;
+	}
+	case DialogDebugCommand::Type::kDrawAnimation: {
 		if (cmd._animPath.toString().hasSuffixIgnoreCase(".rb")) {
 			if (!_vm->_gfx->loadPageRleBlock(cmd._animPath.toString('/'))) {
 				freeAnimation();
@@ -85,7 +88,14 @@ bool DialogDebug::open(const DialogDebugCommand &cmd) {
 		_frameIndex = cmd._startFrame;
 		_animPath = cmd._animPath;
 		updateAnimationTitle();
-	} else {
+		break;
+	}
+	case DialogDebugCommand::Type::kPlotPoint:
+	case DialogDebugCommand::Type::kPlotLine:
+	case DialogDebugCommand::Type::kPlotRect:
+		preparePlot(cmd);
+		break;
+	default:
 		return false;
 	}
 
@@ -126,6 +136,59 @@ void DialogDebug::updateAnimationTitle() {
 	_titleText = Common::String::format("[Animation] %s frame(%d/%d)", _animPath.toString().c_str(), _frameIndex, getFrameCount());
 }
 
+void DialogDebug::preparePlot(const DialogDebugCommand &cmd) {
+	const uint32 white = _savedScreen->format.RGBToColor(255, 255, 255);
+	_vm->_gfx->fillRect(_savedScreen, Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), white);
+	const RGBColor rgb(static_cast<byte>(cmd._plotColor >> 16), static_cast<byte>(cmd._plotColor >> 8), static_cast<byte>(cmd._plotColor));
+	const uint32 color = rgb.toPixel(_savedScreen->format);
+	const Common::Point32 &start = cmd._plotStart;
+	const Common::Point32 &end = cmd._plotEnd;
+
+	switch (cmd._type) {
+	case DialogDebugCommand::Type::kPlotPoint:
+		_vm->_gfx->fillRect(_savedScreen, Common::Rect32(start.x, start.y, start.x + 1, start.y + 1), color);
+		_titleText = Common::String::format("[Plot Point] at (%d, %d) color(0x%06X)", start.x, start.y, cmd._plotColor);
+		break;
+	case DialogDebugCommand::Type::kPlotLine:
+		_vm->_gfx->drawLine(_savedScreen, start, end, color);
+		_titleText = Common::String::format("[Plot Line] from (%d, %d) to (%d, %d) color(0x%06X)", start.x, start.y, end.x, end.y, cmd._plotColor);
+		break;
+	case DialogDebugCommand::Type::kPlotRect:
+	default:
+		_vm->_gfx->drawLine(_savedScreen, start, Common::Point32(end.x - 1, start.y), color);
+		_vm->_gfx->drawLine(_savedScreen, Common::Point32(start.x, end.y - 1), Common::Point32(end.x - 1, end.y - 1), color);
+		_vm->_gfx->drawLine(_savedScreen, start, Common::Point32(start.x, end.y - 1), color);
+		_vm->_gfx->drawLine(_savedScreen, Common::Point32(end.x - 1, start.y), Common::Point32(end.x - 1, end.y - 1), color);
+		_titleText = Common::String::format("[Plot Rect] from (%d, %d) to (%d, %d) color(0x%06X)", start.x, start.y, end.x, end.y, cmd._plotColor);
+		break;
+	}
+}
+
+void DialogDebug::drawTitleText(ManagedSurface32 *screen) const {
+	if (_titleText.empty() || !_vm->_gfx->hasTextFont(Gfx::TextColor::kWhite03))
+		return;
+	_vm->_gfx->fillRect(screen, Common::Rect32(0, 0, ManagedSurface32::kScreenSize.width, kTitleHeight), 0);
+	_vm->_gfx->drawText(screen, Gfx::TextColor::kWhite03, Common::Point32(kTitleX, kTitleY), _titleText);
+}
+
+void DialogDebug::drawEscText(ManagedSurface32 *screen, const Common::String &keyLegend) const {
+	static constexpr const char *kEscText = "[ESC] close";
+	if (!_vm->_gfx->hasTextFont(Gfx::TextColor::kWhite03))
+		return;
+	Common::String text;
+	if (keyLegend.empty()) {
+		text = kEscText;
+	} else {
+		text = keyLegend;
+		if (keyLegend.lastChar() != ' ')
+			text += ' ';
+		text += kEscText;
+	}
+	const int escWidth = _vm->_gfx->getTextWidth(text, Gfx::TextColor::kWhite03);
+	_vm->_gfx->drawText(screen, Gfx::TextColor::kWhite03,
+						Common::Point32(ManagedSurface32::kScreenSize.width - escWidth - kTitleX, kTitleY), text);
+}
+
 void DialogDebug::onRenderContent(ManagedSurface32 *screen) {
 	if (!_isActive)
 		return;
@@ -141,11 +204,11 @@ void DialogDebug::onRenderContent(ManagedSurface32 *screen) {
 		screen->copyFrom(*_savedScreen);
 	}
 
-	if (_vm->_gfx->hasTextFont(Gfx::TextColor::kWhite03) && !_titleText.empty()) {
-		static constexpr int kTitleHeight = 22;
-		_vm->_gfx->fillRect(screen, Common::Rect32(0, 0, ManagedSurface32::kScreenSize.width, kTitleHeight), 0);
-		_vm->_gfx->drawText(screen, Gfx::TextColor::kWhite03, Common::Point32(8, 3), _titleText);
-	}
+	drawTitleText(screen);
+	if (_viewType == DialogDebugCommand::Type::kDrawAnimation)
+		drawEscText(screen, "[<-/->] frame");
+	else
+		drawEscText(screen);
 }
 
 EventHandleResult DialogDebug::onLButtonDown(const Common::Point &pos) {
