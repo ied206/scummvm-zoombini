@@ -225,18 +225,20 @@ private:
 	GUI::StaticTextWidget *_audioOutputLabel = nullptr;
 	/** Select mono downmixing or stereo game-audio playback. */
 	GUI::PopUpWidget *_audioOutputPopUp = nullptr;
-	/** Toggle selecting floating-point rather than original Q10 Bezier calculations. */
-	GUI::CheckboxWidget *_floatingPointPathsCheckbox = nullptr;
+	/** Label for selecting datatype of original Q10 Bezier calculations. */
+	GUI::StaticTextWidget *_bezierCurveDataTypeLabel = nullptr;
+	/** Select datatype of original Q10 Bezier calculations. */
+	GUI::PopUpWidget *_bezierCurveDataTypePopUp = nullptr;
+	/** Label used to align the color-assistance selector. */
+	GUI::StaticTextWidget *_colorAssistLabel = nullptr;
+	/** Color-assistance choices. */
+	GUI::PopUpWidget *_colorAssistPopUp = nullptr;
 	/** Toggle hiding the stray streaks in the Fleen departure animation. */
 	GUI::CheckboxWidget *_fixFleenDepartureStreakCheckbox = nullptr;
 	/** Toggle enabling the enhanced keyboard shortcut set. */
 	GUI::CheckboxWidget *_enhancedKbdShortcutsCheckbox = nullptr;
 	/** Toggle keying the solid color from affected help-sheet bitmaps. */
 	GUI::CheckboxWidget *_transparentHelpPagesCheckbox = nullptr;
-	/** Label used to align the color-assistance selector. */
-	GUI::StaticTextWidget *_colorAssistLabel = nullptr;
-	/** Color-assistance choices. */
-	GUI::PopUpWidget *_colorAssistPopUp = nullptr;
 	/** Toggle for the F2, F3, P, and Chez Norf C developer keys. */
 	GUI::CheckboxWidget *_debugHotkeysCheckbox = nullptr;
 	/** Toggle selecting the alternate level-one Waterslide pairing. */
@@ -244,7 +246,7 @@ private:
 	/** Toggle protecting Aqua Cube's first direct lever move from a Fleen. */
 	GUI::CheckboxWidget *_aquacubeSafeFirstMoveCheckbox = nullptr;
 	/** Toggle access to recoverable level 4 puzzles from the practice map. */
-	GUI::CheckboxWidget *_allowCutLevel4PracticePuzzlesCheckbox = nullptr;
+	GUI::CheckboxWidget *_allowRestoreL4PracticePuzzlesCheckbox = nullptr;
 	/** Label used to align the PRNG algorithm selector. */
 	GUI::StaticTextWidget *_prngAlgorithmLabel = nullptr;
 	/** Select the original or ScummVM standard PRNG algorithm. */
