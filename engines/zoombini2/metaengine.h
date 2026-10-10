@@ -55,8 +55,14 @@ public:
 	};
 	/** Target configuration key selecting game-audio channel handling. */
 	static constexpr const char *kConfigAudioOutputMode = "audio_output_mode";
-	/** Target configuration key selecting floating-point Bezier path calculations. */
-	static constexpr const char *kConfigUseFloatingPointPaths = "use_floating_point_paths";
+	enum class BezierCurveDataType : uint32 {
+		/** Q10 fixed-point arithmetic, same with the original. */
+		kQ10FixedPoint = 0,
+		/** F32 floating-point arithmetic, making use of 'modern' FPU. */
+		kF32FloatingPoint = 1,
+	};
+	/** Target configuration key selecting datatype for Bezier curve calculations. */
+	static constexpr const char *kConfigBezierCurveDataType = "bezier_curve_datatype";
 	/** Target configuration key hiding the stray Fleen departure streaks. */
 	static constexpr const char *kConfigFixFleenDepartureStreak = "fix_fleen_depart_streak";
 	/** Target configuration key enabling the enhanced keyboard shortcut set. */
@@ -70,7 +76,7 @@ public:
 	/** Target configuration key protecting Aqua Cube's first direct lever move from a Fleen. */
 	static constexpr const char *kConfigAquacubeSafeFirstMove = "aquacube_safe_first_move";
 	/** Target configuration key exposing recoverable level 4 puzzles on the practice map. */
-	static constexpr const char *kConfigAllowCutLevel4PracticePuzzles = "allow_cut_level4_practice_puzzles";
+	static constexpr const char *kConfigRestoreL4PracticePuzzles = "restore_l4_practice_puzzles";
 	/** Persisted and runtime pseudo-random generator selection. */
 	enum class PrngAlgorithm : uint32 {
 		/** Use the MSVC-compatible linear congruential stream. */

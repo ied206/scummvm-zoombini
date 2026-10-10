@@ -187,7 +187,7 @@ public:
 	/** Return whether Aqua Cube protects its first direct lever move from a Fleen. */
 	bool useAquacubeSafeFirstMove() const { return _useAquacubeSafeFirstMove; }
 	/** Return whether Bezier paths use floating-point rather than original Q10 calculations. */
-	bool useFloatingPointPaths() const { return _useFloatingPointPaths; }
+	Zoombini2MetaEngine::BezierCurveDataType getBezierCurveDataType() const { return _bezierCurveDataType; }
 	/** Return whether the Wall of Fleens departure artwork correction is enabled. */
 	bool fixFleenDepartStreak() const { return _fixFleenDepartStreak; }
 	/** Return whether the enhanced keyboard shortcut set is enabled. */
@@ -463,7 +463,7 @@ private:
 	/** Whether Aqua Cube level three protects its first direct lever move from a Fleen. */
 	bool _useAquacubeSafeFirstMove = false;
 	/** Whether Bezier paths use the optional floating-point evaluator. */
-	bool _useFloatingPointPaths = false;
+	Zoombini2MetaEngine::BezierCurveDataType _bezierCurveDataType = Zoombini2MetaEngine::BezierCurveDataType::kQ10FixedPoint;
 	/** Whether the departing Fleen omits the malformed white-nose frames. */
 	bool _fixFleenDepartStreak = true;
 	/** Whether the enhanced keyboard shortcut set is enabled. */

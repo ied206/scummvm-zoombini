@@ -699,7 +699,7 @@ PathObject::~PathObject() {
 
 void PathObject::appendSegment(const Common::Point32 &start, const Common::Point32 &control0, const Common::Point32 &control1, const Common::Point32 &end,
 							   int stepValue, int waitInitial) {
-	CurveSegment *segment = new CurveSegment(_vm->useFloatingPointPaths());
+	CurveSegment *segment = new CurveSegment(_vm->getBezierCurveDataType() == Zoombini2MetaEngine::BezierCurveDataType::kF32FloatingPoint);
 	segment->init(start, control0, control1, end, stepValue, waitInitial);
 	segments.push_back(segment);
 	endPos = end;
@@ -845,7 +845,7 @@ bool PathObject::advance(uint32 tickCount, Common::Point32 &outPos) {
 }
 
 void PathObject::synchronizeNumericMode() {
-	const bool useFloatingPoint = _vm->useFloatingPointPaths();
+	const bool useFloatingPoint = _vm->getBezierCurveDataType() == Zoombini2MetaEngine::BezierCurveDataType::kF32FloatingPoint;
 	for (uint i = 0; i < segments.size(); i++)
 		segments[i]->setFloatingPointMode(useFloatingPoint);
 }

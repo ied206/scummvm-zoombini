@@ -497,7 +497,7 @@ bool Zoombini2Console::CmdSub_DrawAnimation(int argc, const char **argv) {
 
 bool Zoombini2Console::Cmd_Plot(int argc, const char **argv) {
 	if (argc < 2 || (argc == 2 && isHelpOption(argv[1]))) {
-		debugPrintf("Open a debug dialog that plots primitive geometry on a white canvas.\n");
+		debugPrintf("Plot a primitive geometry.\n");
 		debugPrintf("Usage: %s <subcommand> [arguments]\n\n", kCmdPlot);
 		debugPrintf("Subcommands:\n");
 		debugPrintf("  %s <x> <y> [color]\n", kSubCmdPlotPoint);
@@ -559,7 +559,7 @@ bool Zoombini2Console::parsePlotColor(const char *text, uint32 &color) {
 
 bool Zoombini2Console::CmdSub_PlotPoint(int argc, const char **argv) {
 	if (hasHelpOption(argc, argv) || argc < 4 || 5 < argc) {
-		debugPrintf("Plot one pixel on a white debug canvas.\n");
+		debugPrintf("Plot one pixel over the current screen.\n");
 		debugPrintf("Usage: %s %s <x> <y> [color]\n\n", kCmdPlot, kSubCmdPlotPoint);
 		debugPrintf("Coordinates must be within the 800x600 game screen.\n");
 		debugPrintf("Color is 24-bit RGB (0xRRGGBB or #RRGGBB), default: black.\n\n");
@@ -590,7 +590,7 @@ bool Zoombini2Console::CmdSub_PlotPoint(int argc, const char **argv) {
 
 bool Zoombini2Console::CmdSub_PlotLine(int argc, const char **argv) {
 	if (hasHelpOption(argc, argv) || argc < 6 || 7 < argc) {
-		debugPrintf("Plot a line on a white debug canvas.\n");
+		debugPrintf("Plot a line over the current screen.\n");
 		debugPrintf("Usage: %s %s <x0> <y0> <x1> <y1> [color]\n\n", kCmdPlot, kSubCmdPlotLine);
 		debugPrintf("Endpoints are inclusive signed 16-bit coordinates; the line is clipped to the screen.\n");
 		debugPrintf("Color is 24-bit RGB (0xRRGGBB or #RRGGBB), default: black.\n\n");
@@ -618,7 +618,7 @@ bool Zoombini2Console::CmdSub_PlotLine(int argc, const char **argv) {
 
 bool Zoombini2Console::CmdSub_PlotRect(int argc, const char **argv) {
 	if (hasHelpOption(argc, argv) || argc < 6 || 7 < argc) {
-		debugPrintf("Plot a rectangle outline on a white debug canvas.\n");
+		debugPrintf("Plot a rectangle outline over the current screen.\n");
 		debugPrintf("Usage: %s %s <x1> <y1> <x2> <y2> [color]\n\n", kCmdPlot, kSubCmdPlotRect);
 		debugPrintf("Coordinates are signed 16-bit values; x1 < x2 and y1 < y2 are required.\n");
 		debugPrintf("Right and bottom coordinates are exclusive; edges are clipped to the screen.\n");
