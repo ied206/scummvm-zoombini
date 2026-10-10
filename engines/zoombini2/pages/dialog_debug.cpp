@@ -193,15 +193,19 @@ void DialogDebug::onRenderContent(ManagedSurface32 *screen) {
 	if (!_isActive)
 		return;
 
-	if (_viewType == DialogDebugCommand::Type::kDrawAnimation) {
+	switch (_viewType) {
+	case DialogDebugCommand::Type::kDrawAnimation: {
 		const uint32 white = screen->format.ARGBToColor(255, 255, 255, 255);
 		_vm->_gfx->fillRect(screen, Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), white);
 		if (_singleFrameSprite)
 			_vm->_gfx->drawPageRleBlock(screen, _animPath.toString('/'), Common::Point32(0, 0));
 		else if (_animation && 0 <= _frameIndex && _frameIndex < _animation->getFrameCount())
 			_vm->_gfx->drawRleBlock(screen, _animation->getFrame(_frameIndex), Common::Point32(0, 0));
-	} else {
+		break;
+	}
+	default:
 		screen->copyFrom(*_savedScreen);
+		break;
 	}
 
 	drawTitleText(screen);
