@@ -273,8 +273,6 @@ public:
 	/** Return whether game state and a page are both active. */
 	bool hasActiveGamePage() const { return _state && _currentPage; }
 
-	/** Return gameplay milliseconds from the current clock read. */
-	uint32 getGameTickCount() const;
 	/** Return the active color-only presentation setting. */
 	Zoombini2MetaEngine::ColorAssistMode getColorAssistMode() const { return _colorAssistMode; }
 	/** Return the gameplay millisecond snapshot captured before the current page pass. */
@@ -305,13 +303,6 @@ public:
 	PageId _debugXferPracticeTarget = kPageNone;
 	/** Whether the debug transition starts a fresh practice session. */
 	bool _debugXferResetState = false;
-	/** Total paused time excluded from @ref Zoombini2Engine::getGameTickCount. */
-	uint32 _pauseTimeAccum = 0;
-	/** System tick captured when the current pause began. */
-	uint32 _pauseTimeStart = 0;
-	/** Independent dialog and ScummVM modal reasons for freezing gameplay time. */
-	bool _dialogPaused = false;
-	bool _backendPaused = false;
 	/** Whether at least one route-transition Zoombini is still walking. */
 	bool _zoombiniWalkingFlag = false;
 	/** Whether the current transition may skip its remaining presentation. */
@@ -444,8 +435,8 @@ private:
 	/** Practice-map level retained while puzzle pages replace the map. */
 	int _practiceLevel = 1;
 
-	/** System tick used as the gameplay-clock origin. */
-	uint32 _startTime = 0;
+	/** Shared pause token held while a game dialog suspends the gameplay clock. */
+	PauseToken _dialogPauseToken;
 	/** Gameplay tick snapshot refreshed once per main-loop pass. */
 	uint32 _cachedGameTickCount = 0;
 	/** Gameplay tick snapshot from the previous main-loop pass. */
@@ -491,11 +482,7 @@ private:
 	static int mixerVolumeToPercent(int volume);
 	/** Convert a game-facing zero-to-one-hundred percentage to a ScummVM mixer value. */
 	static int percentToMixerVolume(int volume);
-	/** Compute gameplay time directly from the backend clock. */
-	uint32 calculateGameTickCount() const;
-	/** Update one pause reason and account only the combined paused interval. */
-	void setPauseState(bool &reason, bool paused);
-	/** Track the ScummVM modal pause alongside game dialogs. */
+	/** Pause audio for ScummVM modal and game-dialog pauses. */
 	void pauseEngineIntern(bool pause) override;
 	/** Load the target-scoped compatibility and gameplay-improvement switches from ScummVM configuration. */
 	void refreshEngineSettings();

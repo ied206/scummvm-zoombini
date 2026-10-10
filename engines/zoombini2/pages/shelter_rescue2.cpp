@@ -276,7 +276,7 @@ bool ShelterRescueSite2::materializeFromStorage(int gridCol, int gridRow, const 
 	const int storageIndex = (_scrollRow + gridCol) * GameState::kStorageCols + gridRow;
 	if (storageIndex < 0 || GameState::kStorageRows * GameState::kStorageCols <= storageIndex || !storage[storageIndex])
 		return false;
-	const uint32 tick = _vm->getGameTickCount();
+	const uint32 tick = _vm->getTotalPlayTime();
 	ZoombiniRunner *zoombini = new ZoombiniRunner();
 	zoombini->setInputEnabled(true);
 	zoombini->setTraits(storage[storageIndex]->getTraits());
@@ -355,7 +355,7 @@ void ShelterRescueSite2::onUpdate() {
 	updateHoverCursor();
 	releasePendingZoombini();
 	refreshGridOccupancy();
-	const uint32 tick = _vm->getGameTickCount();
+	const uint32 tick = _vm->getTotalPlayTime();
 	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++)
 		_vm->_state->_activeZoombinis[i]->updateAnimation(tick);
 	if (_scrollPhase != kScrollIdle)
@@ -391,7 +391,7 @@ void ShelterRescueSite2::drawBoardingActives(ManagedSurface32 *screen) const {
 		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[order[i]];
 		if (zoombini->isHidden())
 			continue;
-		zoombini->tryStartIdleAnimation(_idleZombAnimation, *_vm->_rnd, _vm->getGameTickCount(), _vm->getFrameDeltaMs(), _vm->getLogicPacingHz());
+		zoombini->tryStartIdleAnimation(_idleZombAnimation, *_vm->_rnd, _vm->getTotalPlayTime(), _vm->getFrameDeltaMs(), _vm->getLogicPacingHz());
 		_vm->_gfx->drawZoombiniRunner(screen, zoombini);
 		zoombini->advanceAnimationAfterDraw();
 	}
@@ -468,7 +468,7 @@ EventHandleResult ShelterRescueSite2::onLButtonDown(const Common::Point &) {
 
 EventHandleResult ShelterRescueSite2::onLButtonUp(const Common::Point &pos) {
 	refreshGridOccupancy();
-	const uint32 tick = _vm->getGameTickCount();
+	const uint32 tick = _vm->getTotalPlayTime();
 	const ZmbDropResult inputResult = ZoombiniRunner::handlePointerInput(_vm->_state->_activeZoombinis, Common::Point32(pos.x, pos.y), true,
 																		 _pickupZombAnimation, tick, &_dropTargets, getAreaMask());
 	if (inputResult != ZmbDropResult::kIgnored00)
@@ -504,7 +504,7 @@ EventHandleResult ShelterRescueSite2::onLButtonUp(const Common::Point &pos) {
 
 EventHandleResult ShelterRescueSite2::onMouseMove(const Common::Point &pos) {
 	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_vm->_state->_activeZoombinis, Common::Point32(pos.x, pos.y), false,
-																	_pickupZombAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
+																	_pickupZombAnimation, _vm->getTotalPlayTime(), &_dropTargets, getAreaMask());
 	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 

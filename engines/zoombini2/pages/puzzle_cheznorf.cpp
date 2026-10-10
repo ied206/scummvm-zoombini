@@ -491,7 +491,7 @@ void PuzzleChezNorf::startTrayPath(const Common::Point32 &from, const Common::Po
 	_trayPath = new PathObject(_vm);
 	const int dy = (to.y - from.y) / 3;
 	_trayPath->appendSegment(from, Common::Point32(from.x, from.y + dy), Common::Point32(to.x, to.y - dy), to, 6, 0);
-	_trayPath->start(_vm->getGameTickCount());
+	_trayPath->start(_vm->getTotalPlayTime());
 	_flyingPosition = from;
 }
 
@@ -544,7 +544,7 @@ void PuzzleChezNorf::checkMeal() {
 
 void PuzzleChezNorf::releaseCohort() {
 	const int count = _level == 3 && 2 <= _successCount ? 1 : 2;
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	for (int i = 0; i < count && 0 < _remaining; i++) {
 		const int index = _remaining - 1;
 		const Common::Path path(index == 0 ? Common::String(kWaiterExitPath) : Common::String::format(kExitFormat, i + 1));
@@ -577,15 +577,15 @@ void PuzzleChezNorf::dismissWaiter() {
 	const int dy = (630 - start.y) / 3;
 	PathObject *path = new PathObject(_vm);
 	path->appendSegment(start, Common::Point32(start.x, start.y + dy), Common::Point32(start.x, 630 - dy), Common::Point32(start.x, 630), 2, 0);
-	runner->startMovement(path, _vm->getGameTickCount());
-	runner->startAnimation(_zoombiniAnimation, 22, _vm->getGameTickCount());
+	runner->startMovement(path, _vm->getTotalPlayTime());
+	runner->startAnimation(_zoombiniAnimation, 22, _vm->getTotalPlayTime());
 	_canDepart = 0 < _successCount;
 	if (_canDepart)
 		_vm->restartGoBlink();
 }
 
 void PuzzleChezNorf::onUpdate() {
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	SoundManager *sound = _vm->getSoundManager();
 	if (_departAfterSpeech && (!sound || !sound->hasPendingSpeech())) {
 		_vm->_returningFromPuzzle = true;
@@ -597,7 +597,7 @@ void PuzzleChezNorf::onUpdate() {
 }
 
 void PuzzleChezNorf::onActorsRendered() {
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	for (ZoombiniRunner *runner : _puzzleZoombinis)
 		runner->advanceAnimationAfterDraw();
 	if (_releasePending) {

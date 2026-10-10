@@ -58,8 +58,8 @@ void TransitionCredits::init() {
 	_redrawNeeded = true;
 	_initialWait = true;
 
-	_endTime = _vm->getGameTickCount() + kInitialHoldMilliseconds;
-	_lastUpdateTime = _vm->getGameTickCount();
+	_endTime = _vm->getTotalPlayTime() + kInitialHoldMilliseconds;
+	_lastUpdateTime = _vm->getTotalPlayTime();
 
 	startPageMusic(Common::Path(_vm->isDemo() ? kDemoMusicPath : kMusicPath));
 
@@ -72,7 +72,7 @@ void TransitionCredits::onUpdate() {
 	static constexpr float kScrollPixelsPerMillisecond = 0.03f;
 	static constexpr uint32 kEndHoldMilliseconds = 10000;
 
-	uint32 now = _vm->getGameTickCount();
+	uint32 now = _vm->getTotalPlayTime();
 
 	if (_scrollActive) {
 		if (_initialWait) {

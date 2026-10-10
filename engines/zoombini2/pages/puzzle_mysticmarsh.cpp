@@ -1700,7 +1700,7 @@ void PuzzleMysticMarsh::init() {
 		target.callbackContext = this;
 		_dropTargets.push_back(target);
 	}
-	_lastTick = _vm->getGameTickCount();
+	_lastTick = _vm->getTotalPlayTime();
 	debug(1, "Mystic Marsh: difficulty=%d layout=%d background=%d party=%u craters=%u", _puzzleLevel, _grid.layout(), _backgroundIndex,
 		  _puzzleZoombinis.size(), _slots.size());
 }
@@ -1743,7 +1743,7 @@ void PuzzleMysticMarsh::slotDropCallback(void *context, int slotIndex, int zoomb
 }
 
 void PuzzleMysticMarsh::placeZoombini(int slotIndex, int zoombiniIndex) {
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	_unlockTime = now + 4000;
 	for (uint i = 0; i < _dropTargets.size(); i++) {
 		_dropTargets[i].occupied = true;
@@ -1839,7 +1839,7 @@ void PuzzleMysticMarsh::advanceGrid(uint32 now) {
 }
 
 void PuzzleMysticMarsh::onUpdate() {
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	// Cell changes become visible after the frame which advances the grid.
 	for (int i = 0; i < MysticMarshGrid::kCellCount; i++)
 		_drawCells[i] = _grid.cell(i);
@@ -2266,7 +2266,7 @@ void PuzzleMysticMarsh::onRenderContent(ManagedSurface32 *screen) {
 		const Slot &slot = _slots[i];
 		_vm->_gfx->drawPageRleBlock(screen, kCraterPath, Common::Point32(slot.position.x, slot.position.y + 10));
 	}
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	if (0 <= _placingSlot && now - _placementStart < 1100 && _craterAnimation && 0 < _craterAnimation->getFrameCount()) {
 		const int frame = MIN<int>((now - _placementStart) / 100, _craterAnimation->getFrameCount() - 1);
 		_vm->_gfx->drawAnimationFrame(screen, _craterAnimation, frame, _slots[_placingSlot].position);
@@ -2323,13 +2323,13 @@ void PuzzleMysticMarsh::onRenderForeground(ManagedSurface32 *screen) {
 
 EventHandleResult PuzzleMysticMarsh::onLButtonUp(const Common::Point &pos) {
 	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), true,
-																	_pickupAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
+																	_pickupAnimation, _vm->getTotalPlayTime(), &_dropTargets, getAreaMask());
 	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 
 EventHandleResult PuzzleMysticMarsh::onMouseMove(const Common::Point &pos) {
 	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), false,
-																	_pickupAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
+																	_pickupAnimation, _vm->getTotalPlayTime(), &_dropTargets, getAreaMask());
 	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 

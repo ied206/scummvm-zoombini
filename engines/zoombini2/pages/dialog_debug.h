@@ -40,14 +40,20 @@ class ManagedSurface32;
  * that view needs. Additional views slot in as new command types.
  */
 struct DialogDebugCommand {
-	/** Debug views selectable through the console draw command. */
+	/** Debug views selectable through the console draw and plot commands. */
 	enum class Type {
 		/** No view selected. */
 		kNone,
 		/** Show the active page through its area mask. */
 		kDrawAreaMask,
 		/** Show frames of an animation or sprite resource. */
-		kDrawAnimation
+		kDrawAnimation,
+		/** Plot one pixel on a white canvas. */
+		kPlotPoint,
+		/** Plot a line on a white canvas. */
+		kPlotLine,
+		/** Plot a rectangle outline on a white canvas. */
+		kPlotRect
 	};
 
 	/** Selected debug view. */
@@ -56,6 +62,12 @@ struct DialogDebugCommand {
 	Common::Path _animPath;
 	/** Zero-based starting frame for @ref DialogDebugCommand::Type::kDrawAnimation. */
 	int _startFrame = 0;
+	/** Pixel position, first line endpoint, or rectangle's top-left corner for a plot command. */
+	Common::Point32 _plotStart;
+	/** Last inclusive line endpoint or exclusive bottom-right rectangle corner for a plot command. */
+	Common::Point32 _plotEnd;
+	/** Diagnostic RGB value in 0xRRGGBB form, independent of the screen format. */
+	uint32 _plotColor = 0;
 
 	/** Select a command that shows the active page through its area mask. */
 	void setDrawAreaMask() { _type = Type::kDrawAreaMask; }
@@ -65,13 +77,34 @@ struct DialogDebugCommand {
 		_animPath = path;
 		_startFrame = startFrame;
 	}
+	/** Plot @p point using a 24-bit RGB @p color. */
+	void setPlotPoint(const Common::Point32 &point, uint32 color) {
+		_type = Type::kPlotPoint;
+		_plotStart = point;
+		_plotColor = color;
+	}
+	/** Plot from @p start through @p end, including both endpoints, using a 24-bit RGB @p color. */
+	void setPlotLine(const Common::Point32 &start, const Common::Point32 &end, uint32 color) {
+		_type = Type::kPlotLine;
+		_plotStart = start;
+		_plotEnd = end;
+		_plotColor = color;
+	}
+	/** Plot an outline from @p topLeft to the exclusive @p bottomRight corner using a 24-bit RGB @p color. */
+	void setPlotRect(const Common::Point32 &topLeft, const Common::Point32 &bottomRight, uint32 color) {
+		_type = Type::kPlotRect;
+		_plotStart = topLeft;
+		_plotEnd = bottomRight;
+		_plotColor = color;
+	}
 };
 
 /**
- * Modal debug view dispatched from the console draw command.
+ * Modal debug view dispatched from the console draw and plot commands.
  *
  * The area-mask view snapshots the screen on open and masks rejected drop areas with black.
  * The animation view renders resource frames over a blank sheet and permits manual frame stepping.
+ * Plot views retain a white canvas with one primitive drawn through the shared graphics interface.
  * Gameplay timing is paused until the view closes.
  * Every view closes on any click or ESC key.
  */
@@ -107,12 +140,18 @@ private:
 	int getFrameCount() const;
 	/** Refresh the animation title from the current frame index. */
 	void updateAnimationTitle();
+	/** Prepare the plot canvas and title, drawing rectangle edges before clipping so offscreen edges stay offscreen. */
+	void preparePlot(const DialogDebugCommand &cmd);
+	/** Draw the stored title line over a title bar at the top of @p screen. */
+	void drawTitleText(ManagedSurface32 *screen) const;
+	/** Draw the close legend right-aligned in the title bar, appended to @p keyLegend when given. */
+	void drawEscText(ManagedSurface32 *screen, const Common::String &keyLegend = Common::String()) const;
 
 	/** Whether the debug overlay is active. */
 	bool _isActive = false;
 	/** Active debug view. */
 	DialogDebugCommand::Type _viewType = DialogDebugCommand::Type::kNone;
-	/** Masked screen snapshot shown by the area-mask view. */
+	/** Masked page snapshot or prepared plot canvas copied into each debug frame. */
 	ManagedSurface32 *_savedScreen = nullptr;
 	/** Title line describing the active view. */
 	Common::String _titleText;
@@ -124,6 +163,11 @@ private:
 	Common::Path _animPath;
 	/** Zero-based index of the displayed animation frame. */
 	int _frameIndex = 0;
+	/** Height of the debug title bar in pixels. */
+	static constexpr int kTitleHeight = 22;
+	/** Title text origin inside the debug title bar. */
+	static constexpr int kTitleX = 8;
+	static constexpr int kTitleY = 3;
 	/** System tick captured when the overlay paused gameplay. */
 };
 
