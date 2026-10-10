@@ -800,10 +800,11 @@ void Zoombini2Engine::refreshEngineSettings() {
 	}
 	_useGreedyWaterslidePairing = ConfMan.getBool(Zoombini2MetaEngine::kConfigGreedyWaterslidePairing);
 	_useAquacubeSafeFirstMove = ConfMan.getBool(Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove);
-	_useFloatingPointPaths = ConfMan.getBool(Zoombini2MetaEngine::kConfigUseFloatingPointPaths);
+	const int bezierCurveDataTypeValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigBezierCurveDataType);
+	_bezierCurveDataType = static_cast<Zoombini2MetaEngine::BezierCurveDataType>(bezierCurveDataTypeValue);
 	_fixFleenDepartStreak = ConfMan.getBool(Zoombini2MetaEngine::kConfigFixFleenDepartureStreak);
 	_enhancedKbdShortcuts = ConfMan.getBool(Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts);
-	_allowCutLevel4PracticePuzzles = ConfMan.getBool(Zoombini2MetaEngine::kConfigAllowCutLevel4PracticePuzzles);
+	_allowCutLevel4PracticePuzzles = ConfMan.getBool(Zoombini2MetaEngine::kConfigRestoreL4PracticePuzzles);
 	const int logicPacingValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigLogicPacingMode);
 	_logicPacingMode = static_cast<Zoombini2MetaEngine::LogicPacingMode>(logicPacingValue);
 	if (!_debugHotkeysEnabled) {

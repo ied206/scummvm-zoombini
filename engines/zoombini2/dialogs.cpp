@@ -586,9 +586,20 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	_audioOutputPopUp = new GUI::PopUpWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.AudioOutput", audioOutputTooltip);
 	_audioOutputPopUp->appendEntry(_("Mono Downmix (Original)"), static_cast<uint32>(Zoombini2MetaEngine::AudioOutputMode::kMonoDownmix));
 	_audioOutputPopUp->appendEntry(_("Stereo Playback"), static_cast<uint32>(Zoombini2MetaEngine::AudioOutputMode::kStereoPlayback));
-	_floatingPointPathsCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.FloatingPointPaths",
-														  _("Use floating-point path calculations"),
-														  _("Uses 32-bit floating point instead of the original signed Q10 fixed-point arithmetic for Bezier movement paths."));
+	const Common::U32String bezierCurveDataTypeTooltip = _("Select datatype for Bezier curve computation.");
+	_bezierCurveDataTypeLabel = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.BezierCurveDataTypeLabel", _("Bezier curve datatype:"), bezierCurveDataTypeTooltip);
+	_bezierCurveDataTypeLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
+	_bezierCurveDataTypePopUp = new GUI::PopUpWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.BezierCurveDataType", bezierCurveDataTypeTooltip);
+	_bezierCurveDataTypePopUp->appendEntry(_("Q10 fixed-point (Original)"), static_cast<uint32>(Zoombini2MetaEngine::BezierCurveDataType::kQ10FixedPoint));
+	_bezierCurveDataTypePopUp->appendEntry(_("F32 floating-point"), static_cast<uint32>(Zoombini2MetaEngine::BezierCurveDataType::kF32FloatingPoint));
+	_colorAssistLabel = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ColorAssistLabel",
+												  _("Color assistance:"));
+	_colorAssistLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
+	_colorAssistPopUp = new GUI::PopUpWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ColorAssist",
+											 _("Adjusts Zoombini noses and puzzle colors."));
+	_colorAssistPopUp->appendEntry(_("Original colors"), static_cast<uint32>(Zoombini2MetaEngine::ColorAssistMode::kOriginal));
+	_colorAssistPopUp->appendEntry(_("Enhanced color distinction"), static_cast<uint32>(Zoombini2MetaEngine::ColorAssistMode::kEnhancedDistinction));
+	_colorAssistPopUp->appendEntry(_("Red-green color blind assist"), static_cast<uint32>(Zoombini2MetaEngine::ColorAssistMode::kRedGreenBlindAssist));
 	_fixFleenDepartureStreakCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.FixFleenDepartureStreak",
 															   _("Remove stray streaks from fleeing Fleens"),
 															   _("Hides stray brown streaks in some Fleen departure frames in Magic Mirrors."));
@@ -600,14 +611,6 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 																_("Remove solid color behind help text"),
 																_("Uses the help sheet's corner color as a transparency key for affected releases."));
 	}
-	_colorAssistLabel = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ColorAssistLabel",
-												  _("Color assistance:"));
-	_colorAssistLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
-	_colorAssistPopUp = new GUI::PopUpWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ColorAssist",
-											 _("Adjusts Zoombini noses and puzzle colors."));
-	_colorAssistPopUp->appendEntry(_("Original colors"), static_cast<uint32>(Zoombini2MetaEngine::ColorAssistMode::kOriginal));
-	_colorAssistPopUp->appendEntry(_("Enhanced color distinction"), static_cast<uint32>(Zoombini2MetaEngine::ColorAssistMode::kEnhancedDistinction));
-	_colorAssistPopUp->appendEntry(_("Red-green color blind assist"), static_cast<uint32>(Zoombini2MetaEngine::ColorAssistMode::kRedGreenBlindAssist));
 
 	new SeparatorWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayAdjustmentSeparator");
 	header = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayAdjustment",
@@ -621,9 +624,9 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	_aquacubeSafeFirstMoveCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.AquacubeSafeFirstMove",
 															 _("Protect Aqua Cube's first lever move"),
 															 _("On level three, swaps the hidden axes of two levers if the first direct lever press would enter a Fleen cell."));
-	_allowCutLevel4PracticePuzzlesCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.AllowCutLevel4PracticePuzzles",
-																	 _("Allow cut level 4 puzzles in practice mode"),
-																	 _("Adds a level 4 practice-map tab. Puzzles without a recovered level 4 remain at level three."));
+	_allowRestoreL4PracticePuzzlesCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.RestoreL4PracticePuzzles",
+																	 _("Restore Level 4 puzzles in practice mode"),
+																	 _("Adds a Level 4 practice-map tab, giving access to a restored level 4. Puzzles without a recovered level remain at Level 3."));
 	const Common::U32String prngAlgorithmTooltip = _("Selects the pseudo random number generator algorithm.");
 	_prngAlgorithmLabel = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.PrngAlgorithmLabel", _("PRNG Algorithm:"), prngAlgorithmTooltip);
 	_prngAlgorithmLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
@@ -655,6 +658,7 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 	static constexpr int kOptionLabelPadding = 4;
 	const GUI::StaticTextWidget *const optionLabels[] = {
 		_audioOutputLabel,
+		_bezierCurveDataTypeLabel,
 		_colorAssistLabel,
 		_prngAlgorithmLabel,
 		_pacingLabel,
@@ -680,22 +684,26 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 		.addWidget("AudioOutputLabel", "", optionLabelWidth, lineHeight)
 		.addWidget("AudioOutput", "PopUp")
 		.closeLayout()
-		.addWidget("FloatingPointPaths", "Checkbox")
-		.addWidget("FixFleenDepartureStreak", "Checkbox")
-		.addWidget("EnhancedKbdShortcuts", "Checkbox")
-		.addWidget("TransparentHelpPages", "Checkbox")
+		.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
+		.addPadding(0, 0, 0, 0)
+		.addWidget("BezierCurveDataTypeLabel", "", optionLabelWidth, lineHeight)
+		.addWidget("BezierCurveDataType", "PopUp")
+		.closeLayout()
 		.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
 		.addPadding(0, 0, 0, 0)
 		.addWidget("ColorAssistLabel", "", optionLabelWidth, lineHeight)
-		.addWidget("ColorAssist", "", 210, lineHeight)
+		.addWidget("ColorAssist", "", 210)
 		.closeLayout()
+		.addWidget("FixFleenDepartureStreak", "Checkbox")
+		.addWidget("EnhancedKbdShortcuts", "Checkbox")
+		.addWidget("TransparentHelpPages", "Checkbox")
 		.addSpace(10)
 		.addWidget("GameplayAdjustmentSeparator", "", -1, 2)
-		.addWidget("GameplayAdjustment", "", -1, lineHeight)
+		.addWidget("GameplayAdjustment", "", -1)
 		.addWidget("DebugHotkeys", "Checkbox")
 		.addWidget("GreedyWaterslide", "Checkbox")
 		.addWidget("AquacubeSafeFirstMove", "Checkbox")
-		.addWidget("AllowCutLevel4PracticePuzzles", "Checkbox")
+		.addWidget("RestoreL4PracticePuzzles", "Checkbox")
 		.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
 		.addPadding(0, 0, 0, 0)
 		.addWidget("PrngAlgorithmLabel", "", optionLabelWidth, lineHeight)
@@ -704,12 +712,12 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 		.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
 		.addPadding(0, 0, 0, 0)
 		.addWidget("PacingLabel", "", optionLabelWidth, lineHeight)
-		.addWidget("Pacing", "", 120, lineHeight)
+		.addWidget("Pacing", "")
 		.closeLayout()
 		.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
 		.addPadding(0, 0, 0, 0)
 		.addWidget("FrameRateLabel", "", optionLabelWidth, lineHeight)
-		.addWidget("FrameRate", "", 64, lineHeight)
+		.addWidget("FrameRate", "", 64)
 		.closeLayout()
 		.addWidget("UnlockFrameRate", "Checkbox")
 		.closeLayout()
@@ -726,14 +734,22 @@ void Zoombini2OptionsWidget::load() {
 		_audioOutputPopUp->setSelectedTag(static_cast<uint32>(audioOutputMode));
 		break;
 	default:
+		warning("Zoombini2OptionsWidget::load(): Invalid %s(%d)", Zoombini2MetaEngine::kConfigAudioOutputMode, audioOutputValue);
 		_audioOutputPopUp->setSelectedTag(static_cast<uint32>(Zoombini2MetaEngine::AudioOutputMode::kMonoDownmix));
 		break;
 	}
-	_floatingPointPathsCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigUseFloatingPointPaths, _domain));
-	_fixFleenDepartureStreakCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigFixFleenDepartureStreak, _domain));
-	_enhancedKbdShortcutsCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _domain));
-	if (_transparentHelpPagesCheckbox)
-		_transparentHelpPagesCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigTransparentHelpPages, _domain));
+	const int bezierCurveDataTypeValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigBezierCurveDataType, _domain);
+	const Zoombini2MetaEngine::BezierCurveDataType bezierCurveDataType = static_cast<Zoombini2MetaEngine::BezierCurveDataType>(bezierCurveDataTypeValue);
+	switch (bezierCurveDataType) {
+	case Zoombini2MetaEngine::BezierCurveDataType::kQ10FixedPoint:
+	case Zoombini2MetaEngine::BezierCurveDataType::kF32FloatingPoint:
+		_bezierCurveDataTypePopUp->setSelectedTag(static_cast<uint32>(bezierCurveDataType));
+		break;
+	default:
+		warning("Zoombini2OptionsWidget::load(): Invalid %s(%d)", Zoombini2MetaEngine::kConfigBezierCurveDataType, bezierCurveDataTypeValue);
+		_bezierCurveDataTypePopUp->setSelectedTag(static_cast<uint32>(Zoombini2MetaEngine::BezierCurveDataType::kQ10FixedPoint));
+		break;
+	}
 	const int colorAssistValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigColorAssistMode, _domain);
 	const Zoombini2MetaEngine::ColorAssistMode colorAssistMode = static_cast<Zoombini2MetaEngine::ColorAssistMode>(colorAssistValue);
 	switch (colorAssistMode) {
@@ -743,13 +759,18 @@ void Zoombini2OptionsWidget::load() {
 		_colorAssistPopUp->setSelectedTag(static_cast<uint32>(colorAssistMode));
 		break;
 	default:
+		warning("Zoombini2OptionsWidget::load(): Invalid %s(%d)", Zoombini2MetaEngine::kConfigColorAssistMode, colorAssistValue);
 		_colorAssistPopUp->setSelectedTag(static_cast<uint32>(Zoombini2MetaEngine::ColorAssistMode::kOriginal));
 		break;
 	}
+	_fixFleenDepartureStreakCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigFixFleenDepartureStreak, _domain));
+	_enhancedKbdShortcutsCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _domain));
+	if (_transparentHelpPagesCheckbox)
+		_transparentHelpPagesCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigTransparentHelpPages, _domain));
 	_debugHotkeysCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigDebugHotkeys, _domain));
 	_greedyWaterslideCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _domain));
 	_aquacubeSafeFirstMoveCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove, _domain));
-	_allowCutLevel4PracticePuzzlesCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigAllowCutLevel4PracticePuzzles, _domain));
+	_allowRestoreL4PracticePuzzlesCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigRestoreL4PracticePuzzles, _domain));
 	_prngAlgorithmPopUp->setSelectedTag(ConfMan.getInt(Zoombini2MetaEngine::kConfigPrngAlgorithm, _domain));
 	_pacingPopUp->setSelectedTag(ConfMan.getInt(Zoombini2MetaEngine::kConfigLogicPacingMode, _domain));
 	const int frameRate = CLIP<int>(ConfMan.getInt(Zoombini2MetaEngine::kConfigFrameRate, _domain), Zoombini2MetaEngine::kMinFrameRate, Zoombini2MetaEngine::kMaxFrameRate);
@@ -763,22 +784,23 @@ bool Zoombini2OptionsWidget::save() {
 	_frameRateNumberBox->setValue(frameRate);
 
 	const Zoombini2MetaEngine::AudioOutputMode audioOutputMode = static_cast<Zoombini2MetaEngine::AudioOutputMode>(_audioOutputPopUp->getSelectedTag());
+	const Zoombini2MetaEngine::BezierCurveDataType bezierCurveDataType = static_cast<Zoombini2MetaEngine::BezierCurveDataType>(_bezierCurveDataTypePopUp->getSelectedTag());
 	const Zoombini2MetaEngine::ColorAssistMode colorAssistMode = static_cast<Zoombini2MetaEngine::ColorAssistMode>(_colorAssistPopUp->getSelectedTag());
 	const Zoombini2MetaEngine::PrngAlgorithm prngAlgorithm = static_cast<Zoombini2MetaEngine::PrngAlgorithm>(_prngAlgorithmPopUp->getSelectedTag());
 	const Zoombini2MetaEngine::LogicPacingMode logicPacingMode = static_cast<Zoombini2MetaEngine::LogicPacingMode>(_pacingPopUp->getSelectedTag());
 
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigEnableSavefileReadOnlyToggle, _savefileReadOnlyToggleCheckbox->getState(), _domain);
 	ConfMan.setInt(Zoombini2MetaEngine::kConfigAudioOutputMode, static_cast<int>(audioOutputMode), _domain);
-	ConfMan.setBool(Zoombini2MetaEngine::kConfigUseFloatingPointPaths, _floatingPointPathsCheckbox->getState(), _domain);
+	ConfMan.setInt(Zoombini2MetaEngine::kConfigBezierCurveDataType, static_cast<int>(bezierCurveDataType), _domain);
+	ConfMan.setInt(Zoombini2MetaEngine::kConfigColorAssistMode, static_cast<int>(colorAssistMode), _domain);
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigFixFleenDepartureStreak, _fixFleenDepartureStreakCheckbox->getState(), _domain);
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _enhancedKbdShortcutsCheckbox->getState(), _domain);
 	if (_transparentHelpPagesCheckbox)
 		ConfMan.setBool(Zoombini2MetaEngine::kConfigTransparentHelpPages, _transparentHelpPagesCheckbox->getState(), _domain);
-	ConfMan.setInt(Zoombini2MetaEngine::kConfigColorAssistMode, static_cast<int>(colorAssistMode), _domain);
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigDebugHotkeys, _debugHotkeysCheckbox->getState(), _domain);
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _greedyWaterslideCheckbox->getState(), _domain);
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove, _aquacubeSafeFirstMoveCheckbox->getState(), _domain);
-	ConfMan.setBool(Zoombini2MetaEngine::kConfigAllowCutLevel4PracticePuzzles, _allowCutLevel4PracticePuzzlesCheckbox->getState(), _domain);
+	ConfMan.setBool(Zoombini2MetaEngine::kConfigRestoreL4PracticePuzzles, _allowRestoreL4PracticePuzzlesCheckbox->getState(), _domain);
 	ConfMan.setInt(Zoombini2MetaEngine::kConfigPrngAlgorithm, static_cast<int>(prngAlgorithm), _domain);
 	ConfMan.setInt(Zoombini2MetaEngine::kConfigLogicPacingMode, static_cast<int>(logicPacingMode), _domain);
 	ConfMan.setInt(Zoombini2MetaEngine::kConfigFrameRate, frameRate, _domain);

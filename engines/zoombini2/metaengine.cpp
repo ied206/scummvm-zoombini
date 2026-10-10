@@ -40,14 +40,14 @@ void Zoombini2MetaEngine::registerDefaultSettings(const Common::String &target) 
 	(void)target;
 	ConfMan.registerDefault(kConfigEnableSavefileReadOnlyToggle, false);
 	ConfMan.registerDefault(kConfigAudioOutputMode, static_cast<int>(AudioOutputMode::kMonoDownmix));
-	ConfMan.registerDefault(kConfigUseFloatingPointPaths, false);
+	ConfMan.registerDefault(kConfigBezierCurveDataType, static_cast<int>(BezierCurveDataType::kQ10FixedPoint));
 	ConfMan.registerDefault(kConfigFixFleenDepartureStreak, true);
 	ConfMan.registerDefault(kConfigEnhancedKbdShortcuts, true);
 	ConfMan.registerDefault(kConfigTransparentHelpPages, true);
 	ConfMan.registerDefault(kConfigDebugHotkeys, false);
 	ConfMan.registerDefault(kConfigGreedyWaterslidePairing, false);
 	ConfMan.registerDefault(kConfigAquacubeSafeFirstMove, false);
-	ConfMan.registerDefault(kConfigAllowCutLevel4PracticePuzzles, false);
+	ConfMan.registerDefault(kConfigRestoreL4PracticePuzzles, false);
 	ConfMan.registerDefault(kConfigPrngAlgorithm, static_cast<int>(PrngAlgorithm::kOriginalPrng));
 	ConfMan.registerDefault(kConfigColorAssistMode, static_cast<int>(ColorAssistMode::kOriginal));
 	ConfMan.registerDefault(kConfigLogicPacingMode, static_cast<int>(LogicPacingMode::k75Hz));
