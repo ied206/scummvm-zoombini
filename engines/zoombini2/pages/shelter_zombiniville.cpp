@@ -543,7 +543,7 @@ void ShelterZombiniville::sendZoombiniOff(ZoombiniRunner *zoombini, bool restore
 	zoombini->setInputEnabled(false);
 	_boardingSlots[slotIndex].occupied = false;
 	_departingZoombinis.push_back(zoombini);
-	const uint32 tick = _vm->getGameTickCount();
+	const uint32 tick = _vm->getTotalPlayTime();
 	zoombini->startDirectionTrackedAnimation(tick);
 	zoombini->startMovement(createReturnPath(zoombini->getScreenPosition()), tick);
 	debug(2, "ShelterZombiniville: Returning '%s' from slot %d", zoombini->getName().c_str(), slotIndex);
@@ -623,7 +623,7 @@ bool ShelterZombiniville::createZoombini(bool allowConcurrentEntrances) {
 	zoombini->setInputEnabled(false);
 	zoombini->setPlacementIndex(slotIndex);
 	zoombini->setTracksMovementDirection(true);
-	const uint32 tick = _vm->getGameTickCount();
+	const uint32 tick = _vm->getTotalPlayTime();
 	zoombini->startAnimation(nullptr, 66, tick);
 	zoombini->startMovement(createEntrancePath(dest), tick);
 	_vm->_state->_activeZoombinis.push_back(zoombini);
@@ -639,7 +639,7 @@ bool ShelterZombiniville::createZoombini(bool allowConcurrentEntrances) {
 }
 
 void ShelterZombiniville::onUpdate() {
-	const uint32 tick = _vm->getGameTickCount();
+	const uint32 tick = _vm->getTotalPlayTime();
 	for (int i = static_cast<int>(_departingZoombinis.size()) - 1; 0 <= i; i--) {
 		ZoombiniRunner *zoombini = _departingZoombinis[i];
 		zoombini->updateAnimation(tick);
@@ -704,7 +704,7 @@ void ShelterZombiniville::onRenderActors(ManagedSurface32 *screen) {
 }
 
 void ShelterZombiniville::onActorsRendered() {
-	const uint32 tick = _vm->getGameTickCount();
+	const uint32 tick = _vm->getTotalPlayTime();
 	Common::Array<uint> order;
 	buildBoardingZoombiniDrawOrder(order);
 	for (uint i = 0; i < order.size(); i++) {
@@ -734,7 +734,7 @@ void ShelterZombiniville::renderDragOverlay(ManagedSurface32 *screen, bool advan
 }
 
 void ShelterZombiniville::drawHoverRunners(ManagedSurface32 *screen) {
-	const uint32 tick = _vm->getGameTickCount();
+	const uint32 tick = _vm->getTotalPlayTime();
 	for (byte traitIdx = 0; traitIdx < ZmbTrait::kTraitKindCount; traitIdx++) {
 		const ZmbTrait::TraitKind traitKind = static_cast<ZmbTrait::TraitKind>(traitIdx);
 		for (byte traitVal = 1; traitVal <= ZmbTrait::kTraitValueCount; traitVal++) {
@@ -800,7 +800,7 @@ void ShelterZombiniville::updateHoverRunners() {
 		return;
 
 	const Common::Point32 mousePos = _vm->getMousePos();
-	const uint32 tick = _vm->getGameTickCount();
+	const uint32 tick = _vm->getTotalPlayTime();
 	for (int traitIdx = 0; traitIdx < ZmbTrait::kTraitKindCount; traitIdx++) {
 		for (int traitVal = 0; traitVal < ZmbTrait::kTraitValueCount; traitVal++) {
 			AnimationRunner *runner = _featureButtonRunners[traitIdx][traitVal];
@@ -840,7 +840,7 @@ EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
 	if (_createButtonRunner->containsHitPoint(Common::Point32(pos))) {
 		// The bumper overlays are not layer-registered, so start them here: the
 		// original starts them on every press through ActivateRunnersAt.
-		_createButtonRunner->start(_vm->getGameTickCount());
+		_createButtonRunner->start(_vm->getTotalPlayTime());
 		if (!canCreateSelectedZoombini() || !createZoombini(false)) {
 			if (0 <= _sndWrongZoombini)
 				_vm->getSoundManager()->playWithVolume(_sndWrongZoombini, _vm->getSoundManager()->getSfxVolume());
@@ -856,7 +856,7 @@ EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
 	}
 
 	if (_oneRandomButtonRunner->containsHitPoint(Common::Point32(pos))) {
-		_oneRandomButtonRunner->start(_vm->getGameTickCount());
+		_oneRandomButtonRunner->start(_vm->getTotalPlayTime());
 		if (_boardingZoombinis.size() < kBoardingSlotCount && !hasActiveEntrance() && !hasActiveReturns()) {
 			if (0 <= _sndOneRandom)
 				_vm->getSoundManager()->playWithVolume(_sndOneRandom, _vm->getSoundManager()->getSfxVolume());
@@ -874,7 +874,7 @@ EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
 	}
 
 	if (_allRandomButtonRunner->containsHitPoint(Common::Point32(pos))) {
-		_allRandomButtonRunner->start(_vm->getGameTickCount());
+		_allRandomButtonRunner->start(_vm->getTotalPlayTime());
 		if (_boardingZoombinis.size() < kBoardingSlotCount && !hasActiveEntrance() && !hasActiveReturns()) {
 			if (0 <= _sndAllRandom)
 				_vm->getSoundManager()->playWithVolume(_sndAllRandom, _vm->getSoundManager()->getSfxVolume());
@@ -904,13 +904,13 @@ EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
 
 EventHandleResult ShelterZombiniville::onLButtonUp(const Common::Point &pos) {
 	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_boardingZoombinis, Common::Point32(pos.x, pos.y), true,
-																	_pickupZombAnimation, _vm->getGameTickCount(), nullptr, getAreaMask());
+																	_pickupZombAnimation, _vm->getTotalPlayTime(), nullptr, getAreaMask());
 	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 
 EventHandleResult ShelterZombiniville::onMouseMove(const Common::Point &pos) {
 	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_boardingZoombinis, Common::Point32(pos.x, pos.y), false,
-																	_pickupZombAnimation, _vm->getGameTickCount(), nullptr, getAreaMask());
+																	_pickupZombAnimation, _vm->getTotalPlayTime(), nullptr, getAreaMask());
 	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 

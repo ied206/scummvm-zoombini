@@ -101,7 +101,7 @@ void Sidebar::updateGoBlink(bool goEnabled, PageId pageId) {
 		_goBlinkDeadline = 0;
 	}
 
-	const uint32 tick = _vm->getGameTickCount();
+	const uint32 tick = _vm->getTotalPlayTime();
 	if (0 < _goBlinkTogglesRemaining && _goBlinkDeadline < tick) {
 		_goBlinkHighlighted = !_goBlinkHighlighted;
 		_goBlinkTogglesRemaining -= 1;
@@ -113,7 +113,7 @@ void Sidebar::restartGoBlink() {
 	_goPageId = _vm->getCurrentPageId();
 	_goBlinkHighlighted = false;
 	_goBlinkTogglesRemaining = 30;
-	_goBlinkDeadline = _vm->getGameTickCount() + 150;
+	_goBlinkDeadline = _vm->getTotalPlayTime() + 150;
 }
 
 bool Sidebar::isPointStrictlyInside(const Common::Rect &rect, const Common::Point &pos) {

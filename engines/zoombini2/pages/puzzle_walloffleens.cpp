@@ -156,7 +156,7 @@ void PuzzleWallOfFleens::init() {
 		_railPositions[i] = Common::Point32(690 + 23 * (_ballsLeft - 1 - i), 424);
 	buildGrid();
 	loadNextProjectile();
-	_nextAmbientTick = _vm->getGameTickCount() + 1000 * (_vm->_rnd->getRandomNumber(15) + 15);
+	_nextAmbientTick = _vm->getTotalPlayTime() + 1000 * (_vm->_rnd->getRandomNumber(15) + 15);
 }
 
 void PuzzleWallOfFleens::permute(int *values, int count) {
@@ -262,7 +262,7 @@ PathObject *PuzzleWallOfFleens::makeLine(const Common::Point32 &start, const Com
 void PuzzleWallOfFleens::loadNextProjectile() {
 	if (_finished || _retreating)
 		return;
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	if (_ballsLeft == 0) {
 		if (_selected != -1 && (_level != 1 || _panel == 5)) {
 			const int score = _cells[_selected].score;
@@ -335,7 +335,7 @@ PuzzleWallOfFleens::CannonAimAngle PuzzleWallOfFleens::stepCannonAimAngle(Cannon
 void PuzzleWallOfFleens::startFlight(const Common::Point32 &start, const Common::Point32 &end, int step) {
 	delete _projectilePath;
 	_projectilePath = makeLine(start, end, step);
-	_projectilePath->start(_vm->getGameTickCount());
+	_projectilePath->start(_vm->getTotalPlayTime());
 	_projectilePos = start;
 	static constexpr int kCells[5] = {
 		6,
@@ -420,11 +420,11 @@ void PuzzleWallOfFleens::onFleenAnimationDone(void *context, ZoombiniRunner *run
 	if (page->_mirrorPhase == MirrorPhase::kShouting03 && page->_shoutCount == 0) {
 		page->_shoutCount = 1;
 		page->playEffect(7);
-		runner->startAnimation(page->_vocif1, 55, page->_vm->getGameTickCount());
+		runner->startAnimation(page->_vocif1, 55, page->_vm->getTotalPlayTime());
 		runner->setAnimationCompleteCallback(onFleenAnimationDone, page);
 	} else if (page->_mirrorPhase == MirrorPhase::kShouting03) {
 		page->_mirrorPhase = MirrorPhase::kLeaving04;
-		runner->startAnimation(page->_vocif2, kFleenDepartureCell, page->_vm->getGameTickCount());
+		runner->startAnimation(page->_vocif2, kFleenDepartureCell, page->_vm->getTotalPlayTime());
 		runner->setAnimationCompleteCallback(onFleenAnimationDone, page);
 	} else {
 		page->finishCatch();
@@ -465,9 +465,9 @@ void PuzzleWallOfFleens::startRetreat() {
 	_shotPhase = ShotPhase::kStopped05;
 	ZoombiniRunner *z = _puzzleZoombinis[0];
 	const Common::Point32 end(-10 - z->getSpriteSize().width, z->getScreenPosition().y);
-	z->startMovement(makeLine(z->getScreenPosition(), end, 2), _vm->getGameTickCount());
+	z->startMovement(makeLine(z->getScreenPosition(), end, 2), _vm->getTotalPlayTime());
 	z->setActiveAnimation(_zoombiniAnimation);
-	z->startDirectionTrackedAnimation(_vm->getGameTickCount());
+	z->startDirectionTrackedAnimation(_vm->getTotalPlayTime());
 	z->setCanAdvanceFromPage(false);
 	_vm->restartGoBlink();
 	if (_vm->_isSavedGame) {
@@ -489,7 +489,7 @@ void PuzzleWallOfFleens::queueSpeech(const Common::String &path) {
 }
 
 void PuzzleWallOfFleens::onUpdate() {
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	SoundManager *sound = _vm->getSoundManager();
 	if (_goTransitionPending && (!sound || !sound->hasPendingSpeech())) {
 		_goTransitionPending = false;
@@ -645,7 +645,7 @@ void PuzzleWallOfFleens::drawCell(ManagedSurface32 *screen, const Cell &cell, bo
 			_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[4], cell.pos);
 		}
 		if (_mirrorPhase == MirrorPhase::kExploding02 && _explode) {
-			const int frame = MIN<int>((_vm->getGameTickCount() - _mirrorTick) / 100, 5);
+			const int frame = MIN<int>((_vm->getTotalPlayTime() - _mirrorTick) / 100, 5);
 			_vm->_gfx->drawAnimationFrame(screen, _explode, frame, cell.pos);
 		}
 		return;
@@ -679,7 +679,7 @@ void PuzzleWallOfFleens::drawCell(ManagedSurface32 *screen, const Cell &cell, bo
 			1,
 			0,
 		};
-		const uint32 elapsed = _vm->getGameTickCount() - _mirrorTick;
+		const uint32 elapsed = _vm->getTotalPlayTime() - _mirrorTick;
 		int index = elapsed < 440 ? elapsed / 40 : 11 + (elapsed - 440) / 70;
 		index = MIN(index, 20);
 		_vm->_gfx->drawAnimationFrame(screen, _rotate, kFrames[index], cell.pos);

@@ -64,7 +64,7 @@ void PuzzleBase::init() {
 		_puzzleZoombinis.push_back(_vm->_state->_activeZoombinis[i]);
 	}
 
-	_stateTimer = _vm->getGameTickCount();
+	_stateTimer = _vm->getTotalPlayTime();
 }
 
 bool PuzzleBase::loadPrimaryLayerBackground(const Common::Path &path) {

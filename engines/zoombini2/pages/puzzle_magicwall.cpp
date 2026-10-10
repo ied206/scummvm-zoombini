@@ -456,7 +456,7 @@ void PuzzleMagicWall::startRule(int index) {
 		return;
 	const Common::Array<int> before = _maze.positions();
 	_maze.apply(index);
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	for (uint i = 0; i < before.size(); i++) {
 		if (before[i] == _maze.positions()[i])
 			continue;
@@ -484,8 +484,8 @@ void PuzzleMagicWall::startRunnerPath(int index, int gate, bool exit) {
 	movement->setStepValueForAllSegments(4);
 	ZoombiniRunner *runner = _puzzleZoombinis[index];
 	runner->resetAnimation();
-	runner->startMovement(movement, _vm->getGameTickCount());
-	runner->startDirectionTrackedAnimation(_vm->getGameTickCount());
+	runner->startMovement(movement, _vm->getTotalPlayTime());
+	runner->startDirectionTrackedAnimation(_vm->getTotalPlayTime());
 	if (exit)
 		runner->setCanAdvanceFromPage(true);
 }
@@ -531,7 +531,7 @@ void PuzzleMagicWall::gateDone(void *context, AnimationRunner *runner) {
 }
 
 void PuzzleMagicWall::onUpdate() {
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	if (_speechPending) {
 		SoundManager *sound = _vm->getSoundManager();
 		if (!sound || !sound->hasPendingSpeech()) {

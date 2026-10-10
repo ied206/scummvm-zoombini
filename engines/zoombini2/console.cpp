@@ -24,6 +24,7 @@
 #include "common/textconsole.h"
 #include "common/util.h"
 
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/dialog_debug.h"
 #include "zoombini2/pages/interactive_map.h"
 #include "zoombini2/pages/puzzle_base.h"
@@ -107,6 +108,7 @@ StringParser::Result StringParser::parseUnsignedInt(const char *text, uint32 &re
 Zoombini2Console::Zoombini2Console(Zoombini2Engine *vm) : GUI::Debugger(), _vm(vm) {
 	registerCmd(kCmdGo, WRAP_METHOD(Zoombini2Console, Cmd_Go));
 	registerCmd(kCmdDraw, WRAP_METHOD(Zoombini2Console, Cmd_Draw));
+	registerCmd(kCmdPlot, WRAP_METHOD(Zoombini2Console, Cmd_Plot));
 	registerCmd(kCmdBuiltinDebug, WRAP_METHOD(Zoombini2Console, Cmd_BuiltinDebug));
 	registerCmd(kCmdManBuiltinDebug, WRAP_METHOD(Zoombini2Console, Cmd_ManBuiltinDebug));
 	registerCmd(kCmdPuzzle, WRAP_METHOD(Zoombini2Console, Cmd_Puzzle));
@@ -488,6 +490,160 @@ bool Zoombini2Console::CmdSub_DrawAnimation(int argc, const char **argv) {
 	if (!_vm->openDebugDialog(cmd)) {
 		debugPrintf("Cannot open animation '%s' at frame %u\n", argv[2], startFrame);
 		debugPrintf("\n");
+		return true;
+	}
+	return false;
+}
+
+bool Zoombini2Console::Cmd_Plot(int argc, const char **argv) {
+	if (argc < 2 || (argc == 2 && isHelpOption(argv[1]))) {
+		debugPrintf("Open a debug dialog that plots primitive geometry on a white canvas.\n");
+		debugPrintf("Usage: %s <subcommand> [arguments]\n\n", kCmdPlot);
+		debugPrintf("Subcommands:\n");
+		debugPrintf("  %s <x> <y> [color]\n", kSubCmdPlotPoint);
+		debugPrintf("      Plot one pixel within the game screen.\n");
+		debugPrintf("  %s <x0> <y0> <x1> <y1> [color]\n", kSubCmdPlotLine);
+		debugPrintf("      Plot a line between two inclusive endpoints.\n");
+		debugPrintf("  %s <x1> <y1> <x2> <y2> [color]\n", kSubCmdPlotRect);
+		debugPrintf("      Plot a rectangle outline; right and bottom coordinates are exclusive.\n\n");
+		debugPrintf("Coordinates are 0-based signed 16-bit values; lines and rectangles are clipped to the screen.\n");
+		debugPrintf("Integer arguments accept a 0x prefix. Color is 24-bit RGB (0xRRGGBB or #RRGGBB), default: black.\n");
+		debugPrintf("Click or press ESC to close the dialog.\n\n");
+		debugPrintf("Options:\n");
+		printHelpOption();
+		return true;
+	}
+
+	if (scumm_stricmp(argv[1], kSubCmdPlotPoint) == 0)
+		return CmdSub_PlotPoint(argc, argv);
+	if (scumm_stricmp(argv[1], kSubCmdPlotLine) == 0)
+		return CmdSub_PlotLine(argc, argv);
+	if (scumm_stricmp(argv[1], kSubCmdPlotRect) == 0)
+		return CmdSub_PlotRect(argc, argv);
+
+	debugPrintf("Unknown %s subcommand '%s'. Use %s, %s, or %s.\n\n", kCmdPlot, argv[1], kSubCmdPlotPoint, kSubCmdPlotLine, kSubCmdPlotRect);
+	return true;
+}
+
+bool Zoombini2Console::parsePlotPoint(const char *xText, const char *yText, Common::Point32 &point) {
+	int32 x = 0;
+	int32 y = 0;
+	if (!parseSignedInt(xText, x) || !parseSignedInt(yText, y))
+		return false;
+	if (x < INT16_MIN || INT16_MAX < x || y < INT16_MIN || INT16_MAX < y) {
+		debugPrintf("Coordinates must be in the signed 16-bit range.\n");
+		return false;
+	}
+	point = Common::Point32(x, y);
+	return true;
+}
+
+bool Zoombini2Console::parsePlotColor(const char *text, uint32 &color) {
+	if (text && text[0] == '#') {
+		if (strlen(text) != 7) {
+			debugPrintf("A #RRGGBB color must contain exactly six hexadecimal digits.\n");
+			return false;
+		}
+		const Common::String hexadecimal = Common::String::format("0x%s", text + 1);
+		if (!parseUnsignedInt(hexadecimal.c_str(), color))
+			return false;
+	} else if (!parseUnsignedInt(text, color)) {
+		return false;
+	}
+	if (0xFFFFFF < color) {
+		debugPrintf("Color must be a 24-bit RGB value (0xRRGGBB or #RRGGBB).\n");
+		return false;
+	}
+	return true;
+}
+
+bool Zoombini2Console::CmdSub_PlotPoint(int argc, const char **argv) {
+	if (hasHelpOption(argc, argv) || argc < 4 || 5 < argc) {
+		debugPrintf("Plot one pixel on a white debug canvas.\n");
+		debugPrintf("Usage: %s %s <x> <y> [color]\n\n", kCmdPlot, kSubCmdPlotPoint);
+		debugPrintf("Coordinates must be within the 800x600 game screen.\n");
+		debugPrintf("Color is 24-bit RGB (0xRRGGBB or #RRGGBB), default: black.\n\n");
+		debugPrintf("Options:\n");
+		printHelpOption();
+		return true;
+	}
+
+	Common::Point32 point;
+	uint32 color = 0;
+	if (!parsePlotPoint(argv[2], argv[3], point) || (argc == 5 && !parsePlotColor(argv[4], color))) {
+		debugPrintf("\n");
+		return true;
+	}
+	if (point.x < 0 || ManagedSurface32::kScreenSize.width <= point.x || point.y < 0 || ManagedSurface32::kScreenSize.height <= point.y) {
+		debugPrintf("Coordinates out of bounds (screen size: %d x %d).\n\n", ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height);
+		return true;
+	}
+
+	DialogDebugCommand cmd;
+	cmd.setPlotPoint(point, color);
+	if (!_vm->openDebugDialog(cmd)) {
+		debugPrintf("Cannot open the plot debug dialog.\n\n");
+		return true;
+	}
+	return false;
+}
+
+bool Zoombini2Console::CmdSub_PlotLine(int argc, const char **argv) {
+	if (hasHelpOption(argc, argv) || argc < 6 || 7 < argc) {
+		debugPrintf("Plot a line on a white debug canvas.\n");
+		debugPrintf("Usage: %s %s <x0> <y0> <x1> <y1> [color]\n\n", kCmdPlot, kSubCmdPlotLine);
+		debugPrintf("Endpoints are inclusive signed 16-bit coordinates; the line is clipped to the screen.\n");
+		debugPrintf("Color is 24-bit RGB (0xRRGGBB or #RRGGBB), default: black.\n\n");
+		debugPrintf("Options:\n");
+		printHelpOption();
+		return true;
+	}
+
+	Common::Point32 start;
+	Common::Point32 end;
+	uint32 color = 0;
+	if (!parsePlotPoint(argv[2], argv[3], start) || !parsePlotPoint(argv[4], argv[5], end) || (argc == 7 && !parsePlotColor(argv[6], color))) {
+		debugPrintf("\n");
+		return true;
+	}
+
+	DialogDebugCommand cmd;
+	cmd.setPlotLine(start, end, color);
+	if (!_vm->openDebugDialog(cmd)) {
+		debugPrintf("Cannot open the plot debug dialog.\n\n");
+		return true;
+	}
+	return false;
+}
+
+bool Zoombini2Console::CmdSub_PlotRect(int argc, const char **argv) {
+	if (hasHelpOption(argc, argv) || argc < 6 || 7 < argc) {
+		debugPrintf("Plot a rectangle outline on a white debug canvas.\n");
+		debugPrintf("Usage: %s %s <x1> <y1> <x2> <y2> [color]\n\n", kCmdPlot, kSubCmdPlotRect);
+		debugPrintf("Coordinates are signed 16-bit values; x1 < x2 and y1 < y2 are required.\n");
+		debugPrintf("Right and bottom coordinates are exclusive; edges are clipped to the screen.\n");
+		debugPrintf("Color is 24-bit RGB (0xRRGGBB or #RRGGBB), default: black.\n\n");
+		debugPrintf("Options:\n");
+		printHelpOption();
+		return true;
+	}
+
+	Common::Point32 topLeft;
+	Common::Point32 bottomRight;
+	uint32 color = 0;
+	if (!parsePlotPoint(argv[2], argv[3], topLeft) || !parsePlotPoint(argv[4], argv[5], bottomRight) || (argc == 7 && !parsePlotColor(argv[6], color))) {
+		debugPrintf("\n");
+		return true;
+	}
+	if (bottomRight.x <= topLeft.x || bottomRight.y <= topLeft.y) {
+		debugPrintf("Invalid rectangle coordinates: x1 < x2 and y1 < y2 are required.\n\n");
+		return true;
+	}
+
+	DialogDebugCommand cmd;
+	cmd.setPlotRect(topLeft, bottomRight, color);
+	if (!_vm->openDebugDialog(cmd)) {
+		debugPrintf("Cannot open the plot debug dialog.\n\n");
 		return true;
 	}
 	return false;
