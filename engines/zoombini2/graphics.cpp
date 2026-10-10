@@ -28,7 +28,10 @@
 #include "engines/util.h"
 
 #include "graphics/blit.h"
+#include "graphics/fontman.h"
 #include "graphics/pixelformat.h"
+#include "gui/ThemeEngine.h"
+#include "gui/gui-manager.h"
 #include "image/bmp.h"
 
 #include "zoombini2/graphics.h"
@@ -1014,8 +1017,6 @@ void RleBlock::drawToScreenInternal(ManagedSurface32 *destSurface, const Common:
 constexpr const char *Gfx::kTextFontPath;
 constexpr const char *Gfx::kNameBoxSpritePath;
 constexpr const char *Gfx::kDropTargetGlowPath;
-constexpr const char *Gfx::kMapTransitionOverlayPathFormat;
-constexpr const char *Gfx::kMapTransitionBackgroundPathFormat;
 
 Gfx::Gfx(Zoombini2Engine *vm) : _vm(vm) {
 	static constexpr Graphics::PixelFormat bgra32 = Graphics::PixelFormat::createFormatBGRA32();
@@ -1403,6 +1404,21 @@ int Gfx::getTextWidth(const Common::String &text, TextColor color) const {
 	return _textFont->getStringLayoutWidth(text);
 }
 
+const Graphics::Font *Gfx::getSvmGuiFont() {
+	// Cache the load decision here so the font file loads once.
+	if (!_uiFontResolved) {
+		_uiFontResolved = true;
+		if (g_gui.theme()->loadExtraFont(GUI::ThemeEngine::kFontStyleNormal, _vm->getLanguage()))
+			_uiFontHasExtra = true;
+	}
+
+	// Query both pointers fresh on every call because either owner can replace them.
+	if (_uiFontHasExtra)
+		return g_gui.theme()->getFont(GUI::ThemeEngine::kFontStyleLangExtra);
+	else
+		return FontMan.getFontByUsage(Graphics::FontManager::kLocalizedFont);
+}
+
 void Gfx::drawDragNameTooltip(ManagedSurface32 *destSurface, const Common::String &name) {
 	if (!destSurface)
 		return;
@@ -1458,218 +1474,41 @@ void Gfx::fillRect(ManagedSurface32 *destSurface, const Common::Rect &rect, uint
 		destSurface->fillRect(rect, color);
 }
 
-void Gfx::frameRect(ManagedSurface32 *destSurface, const Common::Rect32 &rect, uint32 color) const {
-	if (destSurface)
-		destSurface->frameRect(rect, color);
-}
+void Gfx::drawLine(ManagedSurface32 *destSurface, const Common::Point32 &start, const Common::Point32 &end, uint32 color, int thickness) const {
+	if (!destSurface || thickness <= 0)
+		return;
 
-void Gfx::frameRect(ManagedSurface32 *destSurface, const Common::Rect &rect, uint32 color) const {
-	if (destSurface)
-		destSurface->frameRect(rect, color);
-}
-
-void Gfx::drawLine(ManagedSurface32 *destSurface, const Common::Point32 &start, const Common::Point32 &end, uint32 color) const {
-	if (destSurface)
+	if (thickness <= 1)
 		destSurface->drawLine(start.x, start.y, end.x, end.y, color);
+	else
+		destSurface->drawThickLine(start.x, start.y, end.x, end.y, thickness, thickness, color);
 }
 
-ManagedSurface32 *Gfx::createMapTransitionBackground(PageId srcPageId, int mapRegion) {
-	ManagedSurface32 *background = createSurface(ManagedSurface32::kScreenSize);
+void Gfx::drawString(ManagedSurface32 *destSurface, const Common::U32String &text, const Common::Point32 &pos, int maxWidth, const TextConf &conf) const {
+	if (!destSurface)
+		return;
 
-	const Common::String backgroundPath = Common::String::format(kMapTransitionBackgroundPathFormat, mapRegion);
-	BitBlock *bitmap = loadPageBitBlock(backgroundPath);
-	if (bitmap) {
-		drawBitBlock(background, bitmap, Common::Point32(0, 0));
-	} else {
-		warning("MapTransition: Failed to load background %s", backgroundPath.c_str());
-		fillRect(background, Common::Rect32(0, 0, ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), 0);
-	}
+	// If the font instance was not set, retreive default font from GUI.
+	const Graphics::Font *font = conf.font;
+	if (!font)
+		font = _vm->_gfx->getSvmGuiFont();
 
-	drawMapOverlays(background, srcPageId, mapRegion);
-	return background;
-}
-
-/** Draw one map-overlay RLE sprite retained for the current page. */
-void Gfx::drawOverlaySprite(ManagedSurface32 *dst, const Common::String &name, const Common::Point32 &pos) {
-	const Common::String overlayPath = Common::String::format(kMapTransitionOverlayPathFormat, name.c_str());
-
-	RleBlock *overlay = loadPageRleBlock(overlayPath);
-	if (overlay) {
-		drawRleBlock(dst, overlay, pos);
-	} else {
-		debug(2, "MapTransition: overlay '%s' not found", name.c_str());
-	}
-}
-
-/**
- * Draw map overlay segments and icons based on visited-page state.
- *
- * Key pattern for each overlay:
- *   Draw if dstPageId was already visited during the current game,
- *   or if the current transition starts at srcPageId and that page is visited
- *   but dstPageId has not been reached at this level yet.
- *
- * Route direction at the Rescue Site I fork is tracked through @ref GameState::hasPageVisit.
- * Magic Wall visit kind 1 selects the upper path and Mystic Marsh selects the lower path.
- */
-void Gfx::drawMapOverlays(ManagedSurface32 *dst, PageId srcPageId, int mapRegion) {
-	GameState *gs = _vm->_state;
-
-	// Helper lambda: standard overlay visibility check.
-	// "Show this path piece if destSurface was previously visited,
-	// OR if we're currently transitioning and haven't arrived yet."
-	auto visible = [&](PageId segmentSrcPageId, PageId dstPageId) -> bool {
-		return gs->isPageVisited(dstPageId) || (srcPageId == segmentSrcPageId && gs->isPageVisited(segmentSrcPageId) && !gs->hasPageVisit(dstPageId, 1));
-	};
-
-	switch (mapRegion) {
-	case 1: {
-		// Map region one covers ShelterZombiniville through Rescue Site I.
-		const bool seg01vis = visible(kPageZombiniville, kPageCrazyTurtle);
-		const bool seg02vis = visible(kPageCrazyTurtle, kPageWaterslide);
-		const bool seg03vis = visible(kPageWaterslide, kPageAquacube);
-		const bool seg04vis = visible(kPageAquacube, kPageRescue1);
-
-		if (seg01vis)
-			drawOverlaySprite(dst, "bigmap_segment_01", Common::Point32(264, 206));
-		if (seg02vis)
-			drawOverlaySprite(dst, "bigmap_segment_02", Common::Point32(369, 94));
-		if (seg03vis)
-			drawOverlaySprite(dst, "bigmap_segment_03", Common::Point32(520, 74));
-		if (seg04vis)
-			drawOverlaySprite(dst, "bigmap_segment_03", Common::Point32(632, 156));
-
-		// Icons
-		if (seg01vis) {
-			drawOverlaySprite(dst, "bigmap_icon_01", Common::Point32(259, 302));
-			drawOverlaySprite(dst, "bigmap_icon_02", Common::Point32(281, 131));
+	// Draw the four one-pixel outline passes before the main text, if requested to.
+	if (conf.outlineEffect) {
+		static constexpr Common::Point32 kOutlineOffsets[4] = {
+			Common::Point32(-1, 0),
+			Common::Point32(1, 0),
+			Common::Point32(0, -1),
+			Common::Point32(0, 1),
+		};
+		for (int i = 0; i < ARRAYSIZE(kOutlineOffsets); i++) {
+			const Common::Point32 offset = kOutlineOffsets[i];
+			font->drawString(destSurface, text, pos.x + offset.x, pos.y + offset.y, maxWidth, conf.outlineColor, conf.hAlign);
 		}
-		if (seg02vis)
-			drawOverlaySprite(dst, "bigmap_icon_03", Common::Point32(421, 26));
-		if (seg03vis)
-			drawOverlaySprite(dst, "bigmap_icon_04", Common::Point32(564, 99));
-		if (seg04vis)
-			drawOverlaySprite(dst, "bigmap_icon_05", Common::Point32(653, 191));
-		break;
 	}
 
-	case 2: {
-		// Map region two covers both routes between the rescue sites.
-		const bool northRoute = gs->hasPageVisit(kPageMagicWall, 1) || _vm->_routeDirection == Zoombini2Engine::RouteBranch::kLeft01;
-		const bool southRoute = gs->hasPageVisit(kPageMysticMarsh, 1) || _vm->_routeDirection == Zoombini2Engine::RouteBranch::kRight02;
-
-		// Unconditional: start of route from Rescue1
-		drawOverlaySprite(dst, "bigmap_segment_03", Common::Point32(-18, 198));
-		drawOverlaySprite(dst, "bigmap_segment_04", Common::Point32(99, 280));
-
-		// Top path: fork, Magic Wall, Chez Norf, then Rescue Site II.
-		if (northRoute && visible(kPageRescue1, kPageMagicWall))
-			drawOverlaySprite(dst, "bigmap_segment_05a", Common::Point32(201, 260));
-
-		// Magic Wall to Chez Norf segment.
-		const bool czNorfSeg = gs->isPageVisited(kPageChezNorf) ||
-							   (srcPageId == kPageMagicWall && gs->isPageVisited(kPageMagicWall) && !gs->hasPageVisit(kPageChezNorf, 1));
-		if (czNorfSeg)
-			drawOverlaySprite(dst, "bigmap_segment_06a", Common::Point32(310, 230));
-
-		// Chez Norf to Rescue Site II segment.
-		if (gs->hasPageVisit(kPageChezNorf, 1)) {
-			if (gs->isPageVisited(kPageRescue2) || (srcPageId == kPageChezNorf && gs->isPageVisited(kPageChezNorf) && !gs->hasPageVisit(kPageRescue2, 1)))
-				drawOverlaySprite(dst, "bigmap_segment_07a", Common::Point32(480, 233));
-		}
-
-		// Bottom path: fork, Mystic Marsh, Wall of Fleens, then Rescue Site II.
-		if (southRoute && visible(kPageRescue1, kPageMysticMarsh))
-			drawOverlaySprite(dst, "bigmap_segment_05b", Common::Point32(164, 376));
-
-		// Mystic Marsh to Wall of Fleens segment.
-		const bool wofSeg = gs->isPageVisited(kPageWallOfFleens) ||
-							(srcPageId == kPageMysticMarsh && gs->isPageVisited(kPageMysticMarsh) && !gs->hasPageVisit(kPageWallOfFleens, 1));
-		if (wofSeg)
-			drawOverlaySprite(dst, "bigmap_segment_06b", Common::Point32(339, 476));
-
-		// Wall of Fleens to Rescue Site II segment.
-		if (gs->hasPageVisit(kPageWallOfFleens, 1)) {
-			if (gs->isPageVisited(kPageRescue2) || (srcPageId == kPageWallOfFleens && gs->isPageVisited(kPageWallOfFleens) && !gs->hasPageVisit(kPageRescue2, 1)))
-				drawOverlaySprite(dst, "bigmap_segment_07b", Common::Point32(512, 360));
-		}
-
-		// These route icons are always visible in region two.
-		drawOverlaySprite(dst, "bigmap_icon_04", Common::Point32(27, 223));
-		drawOverlaySprite(dst, "bigmap_icon_05", Common::Point32(116, 315));
-
-		// Top route icons
-		if (northRoute && visible(kPageRescue1, kPageMagicWall))
-			drawOverlaySprite(dst, "bigmap_icon_06a", Common::Point32(259, 210));
-		if (czNorfSeg)
-			drawOverlaySprite(dst, "bigmap_icon_07a", Common::Point32(440, 170));
-
-		// Rescue2 icon (reachable from either path)
-		if (gs->isPageVisited(kPageRescue2) ||
-			(srcPageId == kPageChezNorf && gs->isPageVisited(kPageChezNorf) && !gs->hasPageVisit(kPageRescue2, 1)) ||
-			(srcPageId == kPageWallOfFleens && gs->isPageVisited(kPageWallOfFleens) && !gs->hasPageVisit(kPageRescue2, 1)))
-			drawOverlaySprite(dst, "bigmap_icon_08", Common::Point32(476, 271));
-
-		// Bottom route icons
-		if (southRoute && visible(kPageRescue1, kPageMysticMarsh))
-			drawOverlaySprite(dst, "bigmap_icon_06b", Common::Point32(290, 418));
-		if (visible(kPageMysticMarsh, kPageWallOfFleens))
-			drawOverlaySprite(dst, "bigmap_icon_07b", Common::Point32(443, 430));
-		break;
-	}
-
-	case 3: {
-		// Map region three covers Rescue Site II through the finale.
-		const bool northRouteVisited = gs->hasPageVisit(kPageMagicWall, 1);
-		const bool czNorfFlag = gs->hasPageVisit(kPageChezNorf, 1);
-		const bool wofFlag = gs->hasPageVisit(kPageWallOfFleens, 1);
-
-		// Previous route segments (show which path was taken)
-		if (northRouteVisited) {
-			drawOverlaySprite(dst, "bigmap_segment_05a", Common::Point32(-27, 418));
-			drawOverlaySprite(dst, "bigmap_segment_06a", Common::Point32(87, 386));
-		}
-		if (czNorfFlag)
-			drawOverlaySprite(dst, "bigmap_segment_07a", Common::Point32(251, 383));
-		if (wofFlag)
-			drawOverlaySprite(dst, "bigmap_segment_07b", Common::Point32(293, 515));
-
-		// Rescue Site II to Snowboard Gulch is always visible.
-		drawOverlaySprite(dst, "bigmap_segment_08", Common::Point32(313, 407));
-
-		// Snowboard Gulch to Boolie Boggle.
-		if (visible(kPageSnowboard, kPageBoolies))
-			drawOverlaySprite(dst, "bigmap_segment_09", Common::Point32(434, 328));
-		// Boolie Boggle to the finale.
-		if (visible(kPageBoolies, kPageBooliewood))
-			drawOverlaySprite(dst, "bigmap_segment_10", Common::Point32(527, 111));
-
-		// Prior-route icons remain conditional on saved progress.
-		if (northRouteVisited)
-			drawOverlaySprite(dst, "bigmap_icon_06a", Common::Point32(33, 366));
-		if (czNorfFlag)
-			drawOverlaySprite(dst, "bigmap_icon_07a", Common::Point32(214, 326));
-
-		// Unconditional icons
-		drawOverlaySprite(dst, "bigmap_icon_08", Common::Point32(252, 426));
-		drawOverlaySprite(dst, "bigmap_icon_07b", Common::Point32(66, 574));
-		drawOverlaySprite(dst, "bigmap_icon_09", Common::Point32(367, 367));
-
-		// Conditional icons
-		if (visible(kPageSnowboard, kPageBoolies))
-			drawOverlaySprite(dst, "bigmap_icon_10", Common::Point32(469, 273));
-		if (visible(kPageBoolies, kPageBooliewood))
-			drawOverlaySprite(dst, "bigmap_icon_11", Common::Point32(608, -12));
-		break;
-	}
-
-	default:
-		// Use the first map region as a safe fallback.
-		drawOverlaySprite(dst, "bigmap_segment_01", Common::Point32(264, 206));
-		drawOverlaySprite(dst, "bigmap_icon_01", Common::Point32(259, 302));
-		drawOverlaySprite(dst, "bigmap_icon_02", Common::Point32(281, 131));
-		break;
-	}
+	// Draw the main text.
+	font->drawString(destSurface, text, pos.x, pos.y, maxWidth, conf.fillColor, conf.hAlign);
 }
 
 // ============================================================================

@@ -26,10 +26,6 @@
 #include "common/str.h"
 #include "zoombini2/pages/dialog_base.h"
 
-namespace Graphics {
-class Font;
-}
-
 namespace Zoombini2 {
 
 class Zoombini2Engine;
@@ -104,8 +100,6 @@ private:
 	void freePage();
 	/** Return the help-resource filename suffix for @p level, or null when none exists. */
 	static const char *getLevelHelpFileSuffix(int level);
-	/** Select a localized font for the ScummVM-added level 4 notice, which has no original-engine equivalent. */
-	void resolveUiFont();
 	/** Draw the ScummVM-added level 4 notice; the original engine leaves the frame without text when no sheet exists. */
 	void drawMissingHelpText(ManagedSurface32 *screen) const;
 
@@ -121,8 +115,6 @@ private:
 	ManagedSurface32 *_savedScreen = nullptr;
 	/** Path of the active help-sheet bitmap in the graphics page cache. */
 	Common::String _helpPagePath;
-	/** UI font borrowed from the theme while a level-four help dialog is open. */
-	const Graphics::Font *_uiFont = nullptr;
 	/** Whether the active release and target enable help-sheet color keying. */
 	bool _transparentHelpPages = false;
 	/** Close-button hit rectangle. */
