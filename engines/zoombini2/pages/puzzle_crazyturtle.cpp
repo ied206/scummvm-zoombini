@@ -324,7 +324,7 @@ void PuzzleCrazyTurtle::placeZoombinis() {
 }
 
 void PuzzleCrazyTurtle::onUpdate() {
-	const uint32 tick = _vm->getGameTickCount();
+	const uint32 tick = _vm->getTotalPlayTime();
 	SoundManager *sound = _vm->getSoundManager();
 	if (_goPending && (!sound || !sound->hasPendingSpeech())) {
 		_vm->_mapTransitionSourcePageId = kPageCrazyTurtle;
@@ -469,7 +469,7 @@ void PuzzleCrazyTurtle::startTransitionSequence() {
 	_vm->restartGoBlink();
 	playSound(_sndTransition);
 	if (_motherRunner && _motherAnimation)
-		_motherRunner->reset(_vm->getGameTickCount());
+		_motherRunner->reset(_vm->getTotalPlayTime());
 	_idlePhaseEnabled = true;
 }
 
@@ -531,7 +531,7 @@ bool PuzzleCrazyTurtle::evaluateTurtleMatch(const ZoombiniRunner *zoombini, int 
 }
 
 void PuzzleCrazyTurtle::handleTurtleClick(int turtleIndex, int zoombiniIndex) {
-	const uint32 tick = _vm->getGameTickCount();
+	const uint32 tick = _vm->getTotalPlayTime();
 	if (turtleIndex < 0 || kTurtleCount <= turtleIndex || zoombiniIndex < 0 || _puzzleZoombinis.size() <= static_cast<uint>(zoombiniIndex) || _mistakesMirror <= 0)
 		return;
 	_inputLocked = true;
@@ -612,7 +612,7 @@ void PuzzleCrazyTurtle::onTurtleFallComplete(void *context, ZoombiniRunner *zoom
 	PuzzleCrazyTurtle *page = static_cast<PuzzleCrazyTurtle *>(context);
 	if (page->_fallCounter < 2) {
 		page->_fallCounter += 1;
-		zoombini->startAnimation(page->_tombeAnimation, 33, page->_vm->getGameTickCount());
+		zoombini->startAnimation(page->_tombeAnimation, 33, page->_vm->getTotalPlayTime());
 		zoombini->setAnimationCompleteCallback(&onTurtleFallComplete, page);
 		return;
 	}
@@ -710,7 +710,7 @@ void PuzzleCrazyTurtle::drawTurtles(ManagedSurface32 *screen) const {
 }
 
 void PuzzleCrazyTurtle::drawTurtleRunners(ManagedSurface32 *screen) const {
-	const uint32 tick = _vm->getGameTickCount();
+	const uint32 tick = _vm->getTotalPlayTime();
 	for (int type = 0; type < kFeatureCount; type++) {
 		_vm->_gfx->drawAndUpdateAnimationRunner(screen, _turtleIdleRunners[type], tick, 0, ManagedSurface32::kScreenSize.width);
 		_vm->_gfx->drawAndUpdateAnimationRunner(screen, _turtleSpinRunners[type], tick, 0, ManagedSurface32::kScreenSize.width);
@@ -739,7 +739,7 @@ EventHandleResult PuzzleCrazyTurtle::onLButtonUp(const Common::Point &pos) {
 	const bool clickReleased = !_inputLocked;
 	const ZmbDropResult inputResult =
 		ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), clickReleased, _pickupZombAnimation,
-										   _vm->getGameTickCount(), &_turtleDropTargets, getAreaMask());
+										   _vm->getTotalPlayTime(), &_turtleDropTargets, getAreaMask());
 	if (inputResult == ZmbDropResult::kIgnored00)
 		return EventHandleResult::kPassthrough;
 	return EventHandleResult::kConsumed;
@@ -748,7 +748,7 @@ EventHandleResult PuzzleCrazyTurtle::onLButtonUp(const Common::Point &pos) {
 EventHandleResult PuzzleCrazyTurtle::onMouseMove(const Common::Point &pos) {
 	const ZmbDropResult inputResult =
 		ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), false, _pickupZombAnimation,
-										   _vm->getGameTickCount(), &_turtleDropTargets, getAreaMask());
+										   _vm->getTotalPlayTime(), &_turtleDropTargets, getAreaMask());
 	if (inputResult == ZmbDropResult::kIgnored00)
 		return EventHandleResult::kPassthrough;
 	return EventHandleResult::kConsumed;

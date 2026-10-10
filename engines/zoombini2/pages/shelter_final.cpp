@@ -116,7 +116,7 @@ void ShelterFinal::init() {
 		_revealFlare2 = nullptr;
 	}
 
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	for (int i = 0; i < kFireworkCount; i++) {
 		FireworkState &firework = _fireworks[i];
 		firework.animation = new Animation(_vm);
@@ -162,7 +162,7 @@ void ShelterFinal::init() {
 }
 
 void ShelterFinal::onUpdate() {
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	SoundManager *sound = _vm->getSoundManager();
 	if (!_openingSpeechFinished && (!sound || _openingSpeechId < 0 || !sound->isPlaying(_openingSpeechId))) {
 		_openingSpeechFinished = true;
@@ -186,7 +186,7 @@ void ShelterFinal::onRenderContent(ManagedSurface32 *screen) {
 	_vm->_gfx->drawPageBitBlock(screen, kBackgroundPath, Common::Point32(0, 0));
 	_vm->_gfx->drawPageBitBlock(screen, kFullBigBoolPath, Common::Point32(225, 34));
 
-	const uint32 elapsed = _vm->getGameTickCount() - _animationStartTime;
+	const uint32 elapsed = _vm->getTotalPlayTime() - _animationStartTime;
 	if (_boolDance && 0 < _boolDance->getFrameCount())
 		drawAnimation(_boolDance, static_cast<int>(elapsed / 200) % _boolDance->getFrameCount(), Common::Point32(151, 31), screen);
 	if (_dancingBoolie && 0 < _dancingBoolie->getFrameCount()) {
@@ -214,7 +214,7 @@ void ShelterFinal::onRenderActors(ManagedSurface32 *screen) {
 void ShelterFinal::onActorsRendered() {
 	for (uint i = 0; i < kDecorativeZoombiniCount && i < _vm->_state->_activeZoombinis.size(); i++)
 		_vm->_state->_activeZoombinis[i]->advanceAnimationAfterDraw();
-	updateDecorativeZoombiniRunnersAfterDraw(_vm->getGameTickCount());
+	updateDecorativeZoombiniRunnersAfterDraw(_vm->getTotalPlayTime());
 }
 
 EventHandleResult ShelterFinal::onLButtonDown(const Common::Point &pos) {

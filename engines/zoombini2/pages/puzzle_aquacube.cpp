@@ -95,7 +95,7 @@ void PuzzleAquacube::init() {
 	_warpQuota = MIN(_level - 1, 2);
 	loadResources();
 	setupBoard();
-	_lastTick = _vm->getGameTickCount();
+	_lastTick = _vm->getTotalPlayTime();
 	startPageMusic(Common::Path(kMusicPath));
 	debug(1, "AquaCube: level=%d nodes=%d party=%u start=%d warps=%d", _level, _numNodes, _puzzleZoombinis.size(), _ballNode, _warpQuota);
 }
@@ -245,7 +245,7 @@ PathObject *PuzzleAquacube::makePath(const Common::Point32 &start, const Common:
 	const Common::Point32 third((end.x - start.x) / 3, (end.y - start.y) / 3);
 	PathObject *path = new PathObject(_vm);
 	path->appendSegment(start, start + third, end - third, end, speed, 0);
-	path->start(_vm->getGameTickCount());
+	path->start(_vm->getTotalPlayTime());
 	return path;
 }
 
@@ -321,7 +321,7 @@ void PuzzleAquacube::resolveArrival() {
 			actor->setExitComplete(true);
 			_vm->_zoombiniWalkingFlag = true;
 			_rescued.push_back(index);
-			_flare[0]->startAt(actor->getScreenPosition() - Common::Point32(90, 90), _vm->getGameTickCount());
+			_flare[0]->startAt(actor->getScreenPosition() - Common::Point32(90, 90), _vm->getTotalPlayTime());
 			playSound(1);
 		}
 		node.occupantCount = 0;
@@ -329,7 +329,7 @@ void PuzzleAquacube::resolveArrival() {
 		_vm->_zoombiniWalkingFlag = false;
 		node.state = kEmpty01;
 		_fleenIndex = node.fleenType - 1;
-		_angry[_fleenIndex]->startAt(Common::Point32(573, 67), _vm->getGameTickCount());
+		_angry[_fleenIndex]->startAt(Common::Point32(573, 67), _vm->getTotalPlayTime());
 		playSound(1);
 	}
 	debug(1, "AquaCube arrival: node=%d steps=%d rescued=%d warps=%d finished=%d", _ballNode, _stepsUsed, _freedCount, _warpsUsed, _finished);
@@ -339,7 +339,7 @@ void PuzzleAquacube::onFlareComplete(void *context, AnimationRunner *runner) {
 	PuzzleAquacube *page = static_cast<PuzzleAquacube *>(context);
 	for (int index : page->_rescued)
 		page->_puzzleZoombinis[index]->setHidden(false);
-	page->_flare[1]->startAt(runner->getPosition(), page->_vm->getGameTickCount());
+	page->_flare[1]->startAt(runner->getPosition(), page->_vm->getTotalPlayTime());
 }
 
 void PuzzleAquacube::onTimerComplete(void *context, AnimationRunner *runner) {
@@ -358,7 +358,7 @@ void PuzzleAquacube::beginChase() {
 		if (screenPosition.y < 100) {
 			actor->clearMovement();
 			actor->setMovementPath(makePath(screenPosition, screenPosition + Common::Point32(150, 0), 3));
-			actor->startAnimation(_smallest, 33, _vm->getGameTickCount());
+			actor->startAnimation(_smallest, 33, _vm->getTotalPlayTime());
 			actor->setTracksMovementDirection(false);
 			actor->setCanAdvanceFromPage(false);
 			_actorsEscaping = true;
@@ -403,7 +403,7 @@ void PuzzleAquacube::updateBubbles(uint32 elapsed) {
 }
 
 void PuzzleAquacube::onUpdate() {
-	const uint32 tick = _vm->getGameTickCount();
+	const uint32 tick = _vm->getTotalPlayTime();
 	SoundManager *sound = _vm->getSoundManager();
 	if (_goPending && (!sound || !sound->hasPendingSpeech())) {
 		_vm->_mapTransitionSourcePageId = kPageAquacube;
@@ -517,7 +517,7 @@ void PuzzleAquacube::onRenderContent(ManagedSurface32 *screen) {
 			warpState = kWarpButtonOff00;
 		gfx->drawPageRleBlock(screen, kWarpPaths[warpState], Common::Point32(641, 541));
 		gfx->drawPageRleBlock(screen, kTimerEmptyPath, Common::Point32(666, 544));
-		gfx->drawAndUpdateAnimationRunner(screen, _timer, _vm->getGameTickCount(), 0, ManagedSurface32::kScreenSize.width);
+		gfx->drawAndUpdateAnimationRunner(screen, _timer, _vm->getTotalPlayTime(), 0, ManagedSurface32::kScreenSize.width);
 	}
 }
 
@@ -536,7 +536,7 @@ void PuzzleAquacube::onRenderForeground(ManagedSurface32 *screen) {
 		if (bubble.active)
 			gfx->drawPageRleBlock(screen, Common::String::format(kBubbleFormat, bubble.type + 1), Common::Point32(static_cast<int>(bubble.x), static_cast<int>(bubble.y)));
 	gfx->drawPageRleBlock(screen, kLightPath, _ballPos - Common::Point32(60, 50));
-	const uint32 tick = _vm->getGameTickCount();
+	const uint32 tick = _vm->getTotalPlayTime();
 	for (AnimationRunner *runner : _angry)
 		gfx->drawAndUpdateAnimationRunner(screen, runner, tick, 0, ManagedSurface32::kScreenSize.width);
 	for (AnimationRunner *runner : _chase)
@@ -558,7 +558,7 @@ EventHandleResult PuzzleAquacube::onLButtonUp(const Common::Point &pos) {
 			pending = false;
 		_warpPlanning = true;
 		_warpsUsed += 1;
-		_timer->startAt(Common::Point32(666, 544), _vm->getGameTickCount());
+		_timer->startAt(Common::Point32(666, 544), _vm->getTotalPlayTime());
 		playSound(2);
 		return EventHandleResult::kConsumed;
 	}

@@ -257,7 +257,7 @@ void PuzzleSnowboard::captureZoombini(int zoombiniIndex) {
 	_activeRunnerIndex = zoombiniIndex;
 	_boardReady = false;
 	_onExitPath = false;
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	_boardFacingSector = 8;
 	_boardFacingDelay = 100;
 	for (int lane = 0; lane < kLaneCount; lane++)
@@ -294,7 +294,7 @@ void PuzzleSnowboard::chooseOpenLane() {
 	do {
 		openLane = _vm->_rnd->getRandomNumber(kLaneCount - 1);
 	} while (laneCounts[openLane] == 0);
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	for (int lane = 0; lane < kLaneCount; lane++) {
 		const bool visible = lane != openLane;
 		if (visible == _obstacleVisible[lane])
@@ -326,7 +326,7 @@ void PuzzleSnowboard::checkObstacleCollision(ZoombiniRunner *zoombini) {
 			position.y < zoombini->getScreenPosition().y && zoombini->getScreenPosition().y < position.y + 50) {
 			_obstacleHit[lane] = true;
 			_obstacleHitAnimating[lane] = true;
-			_obstacleHitStart[lane] = _vm->getGameTickCount();
+			_obstacleHitStart[lane] = _vm->getTotalPlayTime();
 			if (SoundManager *sound = _vm->getSoundManager())
 				sound->playWithVolume(_obstacleHitSound, sound->getSfxVolume());
 			const int variant = _vm->_rnd->getRandomNumber(2) + 1;
@@ -371,7 +371,7 @@ bool PuzzleSnowboard::hasActiveHitAnimation(uint32 now) const {
 }
 
 void PuzzleSnowboard::startExitPath(ZoombiniRunner *zoombini) {
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	if (SoundManager *sound = _vm->getSoundManager()) {
 		sound->stop(_rideSound);
 		sound->playWithVolume(_boardReadySound, sound->getSfxVolume());
@@ -421,7 +421,7 @@ void PuzzleSnowboard::finishRide(ZoombiniRunner *zoombini) {
 		_finished = true;
 		_boardCoverActive = false;
 		_obstacleChangePending = false;
-		_finishAnimationStart = _vm->getGameTickCount();
+		_finishAnimationStart = _vm->getTotalPlayTime();
 		enqueueSpeech(successful == 8 ? kSuccessSpeechPath : kFailureSpeechPath, false);
 		_vm->restartGoBlink();
 	} else if (2 <= _ridesCompleted) {
@@ -430,7 +430,7 @@ void PuzzleSnowboard::finishRide(ZoombiniRunner *zoombini) {
 }
 
 void PuzzleSnowboard::onUpdate() {
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	SoundManager *sound = _vm->getSoundManager();
 	if (_collisionSpeechPending && (!sound || !sound->hasPendingSpeech()))
 		_collisionSpeechPending = false;
@@ -575,7 +575,7 @@ void PuzzleSnowboard::drawObstacle(ManagedSurface32 *screen, int lane, uint32 no
 }
 
 void PuzzleSnowboard::onRenderContent(ManagedSurface32 *screen) {
-	const uint32 now = _vm->getGameTickCount();
+	const uint32 now = _vm->getTotalPlayTime();
 	if (_generatorActive && _engineAnim && 0 < _engineAnim->getFrameCount()) {
 		const int frame = ((now - _generatorAnimationStart) / 100) % 5 % _engineAnim->getFrameCount();
 		_vm->_gfx->drawAnimationFrame(screen, _engineAnim, frame, Common::Point32(153, 0));
@@ -658,13 +658,13 @@ void PuzzleSnowboard::onActorsRendered() {
 EventHandleResult PuzzleSnowboard::onLButtonUp(const Common::Point &pos) {
 	const bool acceptRelease = !_finished && _activeRunnerIndex == -1;
 	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y),
-																	acceptRelease, _pickupAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
+																	acceptRelease, _pickupAnimation, _vm->getTotalPlayTime(), &_dropTargets, getAreaMask());
 	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 
 EventHandleResult PuzzleSnowboard::onMouseMove(const Common::Point &pos) {
 	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), false,
-																	_pickupAnimation, _vm->getGameTickCount(), &_dropTargets, getAreaMask());
+																	_pickupAnimation, _vm->getTotalPlayTime(), &_dropTargets, getAreaMask());
 	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 
@@ -709,7 +709,7 @@ bool PuzzleSnowboard::debugSetChances(int remaining) {
 		_finished = true;
 		_boardCoverActive = false;
 		_obstacleChangePending = false;
-		_finishAnimationStart = _vm->getGameTickCount();
+		_finishAnimationStart = _vm->getTotalPlayTime();
 		enqueueSpeech(kFailureSpeechPath, false);
 		_vm->restartGoBlink();
 	}

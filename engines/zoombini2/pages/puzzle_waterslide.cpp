@@ -789,7 +789,7 @@ void PuzzleWaterslide::dischargeNext() {
 		_eligible[_heldZoombini] = false;
 		ZoombiniRunner *actor = _puzzleZoombinis[_heldZoombini];
 		actor->setPosition(actor->getScreenPosition() - Common::Point32(1, 1));
-		_dischargeStart = _vm->getGameTickCount();
+		_dischargeStart = _vm->getTotalPlayTime();
 		actor->startAnimation(_aspiration, 33, _dischargeStart);
 		actor->setAnimationCompleteCallback(&onAspirationComplete, this);
 		_cascadeRunner->startAt(_cascadePos, _dischargeStart);
@@ -815,7 +815,7 @@ void PuzzleWaterslide::onCascadeComplete(void *context, AnimationRunner *runner)
 }
 
 void PuzzleWaterslide::onUpdate() {
-	const uint32 tick = _vm->getGameTickCount();
+	const uint32 tick = _vm->getTotalPlayTime();
 	SoundManager *sound = _vm->getSoundManager();
 	if (_goPending && (!sound || !sound->hasPendingSpeech())) {
 		_vm->_mapTransitionSourcePageId = kPageWaterslide;
@@ -960,7 +960,7 @@ void PuzzleWaterslide::drawBoard(ManagedSurface32 *screen) const {
 }
 
 void PuzzleWaterslide::drawDecorations(ManagedSurface32 *screen) {
-	const uint32 tick = _vm->getGameTickCount();
+	const uint32 tick = _vm->getTotalPlayTime();
 	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _treeRunner, tick, 0, ManagedSurface32::kScreenSize.width);
 	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _fountainRunner, tick, 0, ManagedSurface32::kScreenSize.width);
 	if (_cascadeRunner->isActive())
@@ -992,7 +992,7 @@ EventHandleResult PuzzleWaterslide::onLButtonDown(const Common::Point &pos) {
 		return EventHandleResult::kPassthrough;
 	if (!_valveRunner->isActive()) {
 		activateValve();
-		_valveRunner->start(_vm->getGameTickCount());
+		_valveRunner->start(_vm->getTotalPlayTime());
 	}
 	return EventHandleResult::kConsumed;
 }
@@ -1004,7 +1004,7 @@ EventHandleResult PuzzleWaterslide::onLButtonUp(const Common::Point &pos) {
 		return EventHandleResult::kConsumed;
 	}
 	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), true,
-																	_pickup, _vm->getGameTickCount(), &_targets, getAreaMask());
+																	_pickup, _vm->getTotalPlayTime(), &_targets, getAreaMask());
 	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 
@@ -1012,7 +1012,7 @@ EventHandleResult PuzzleWaterslide::onMouseMove(const Common::Point &pos) {
 	if (_phase != kInteractive00)
 		return EventHandleResult::kPassthrough;
 	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), false,
-																	_pickup, _vm->getGameTickCount(), &_targets, getAreaMask());
+																	_pickup, _vm->getTotalPlayTime(), &_targets, getAreaMask());
 	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
 }
 

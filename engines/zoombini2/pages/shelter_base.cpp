@@ -86,7 +86,7 @@ void ShelterRescueSiteBase::resetRescueState() {
 	}
 
 	_phase = 0;
-	_phaseTimer = _vm->getGameTickCount();
+	_phaseTimer = _vm->getTotalPlayTime();
 	_scrollOffset = 0;
 	_selectedZoombini = -1;
 	_readyToDepart = false;
@@ -186,14 +186,14 @@ uint ShelterRescueSiteBase::countStorageMembers(StorageRecord *const *storage) {
 
 void ShelterRescueSiteBase::beginDeparture() {
 	_phase = 1;
-	_phaseTimer = _vm->getGameTickCount();
+	_phaseTimer = _vm->getTotalPlayTime();
 }
 
 void ShelterRescueSiteBase::onUpdate() {
 	if (_phase == 0) {
 		// Wait for the player to choose a route direction.
 	} else if (_phase == 1) {
-		const uint32 elapsed = _vm->getGameTickCount() - _phaseTimer;
+		const uint32 elapsed = _vm->getTotalPlayTime() - _phaseTimer;
 		if (1500 < elapsed) {
 			_vm->_mapTransitionSourcePageId = _pageId;
 			_vm->requestPageChange(kPageMapTrans);
