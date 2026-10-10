@@ -142,7 +142,7 @@ void PuzzleWallOfFleens::init() {
 		z->setPosition(Common::Point32(50 + 30 * i, 490));
 		z->setHidden(false);
 		z->setInputEnabled(false);
-		z->setCanAdvanceFromPage(true);
+		z->setCanAdvanceFromPage(false);
 	}
 	_ballsLeft = 8;
 	if (_level == 1)
@@ -450,6 +450,8 @@ void PuzzleWallOfFleens::finishCatch() {
 	} else {
 		_finished = true;
 		_vm->_zoombiniWalkingFlag = !_puzzleZoombinis.empty();
+		for (uint i = 0; i < _puzzleZoombinis.size(); i++)
+			_puzzleZoombinis[i]->setCanAdvanceFromPage(true);
 		debug(2, "WallOfFleens: completed level=%d survivors=%u", _level, _puzzleZoombinis.size());
 		queueSpeech(static_cast<int>(_puzzleZoombinis.size()) == _initialPartyCount ? kSuccessSpeechPath : kLossSpeechPath);
 	}
