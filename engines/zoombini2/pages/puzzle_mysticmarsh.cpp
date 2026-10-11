@@ -1929,7 +1929,7 @@ void PuzzleMysticMarsh::onRenderBackground(ManagedSurface32 *screen) {
 	}
 	if (!_level4Background) {
 		_level4Background = new ManagedSurface32(ManagedSurface32::kScreenSize, screen->format);
-		_level4Background->fillRect(Common::Rect32(0, 0, screen->w, screen->h), screen->format.RGBToColor(0, 0, 0));
+		_level4Background->fillRect(Common::Rect32(0, 0, screen->w, screen->h), Gfx::PredefinedColor::kBlack.toPixel(screen->format));
 		drawPrimaryPageLayer(_level4Background);
 		MysticMarshL4Background::compose(_level4Background);
 	}
@@ -2217,7 +2217,7 @@ void MysticMarshL4Background::drawGridEdge(ManagedSurface32 *screen, const Commo
 }
 
 void MysticMarshL4Background::drawGrid(ManagedSurface32 *screen, const MysticMarshGrid::Cell *cells) {
-	const uint32 lineColor = screen->format.RGBToColor(255, 255, 255);
+	const uint32 lineColor = Gfx::PredefinedColor::kWhite03.toPixel(screen->format);
 	for (int column = 0; column < MysticMarshGrid::kColumns; column++) {
 		for (int row = 0; row < MysticMarshGrid::kRows; row++) {
 			const int cellIndex = column * MysticMarshGrid::kRows + row;

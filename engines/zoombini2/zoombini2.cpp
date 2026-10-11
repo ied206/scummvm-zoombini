@@ -67,6 +67,7 @@
 #include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
+#include "zoombini2/text.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
@@ -190,6 +191,7 @@ Zoombini2Engine::~Zoombini2Engine() {
 	delete _sidebar;
 	delete _soundManager;
 	delete _gfx;
+	delete _text;
 	delete _rnd;
 	delete _resourceFileResolver;
 }
@@ -571,6 +573,9 @@ void Zoombini2Engine::applyGameSettings() {
 
 Common::Error Zoombini2Engine::run() {
 	// Init subsystems
+	_text = new Text(this);
+	if (!_text->loadTextFont())
+		warning("Zoombini2Engine: Failed to load bitmap text strip");
 	_gfx = new Gfx(this);
 	initCursor();
 	_soundManager = new SoundManager(this, _mixer);

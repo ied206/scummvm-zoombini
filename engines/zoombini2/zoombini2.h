@@ -59,6 +59,7 @@ class SoundManager;
 class Sidebar;
 class ZoombiniAnimation;
 class ZoombiniRunner;
+class Text;
 
 /**
  * Coordinates input, page transitions, and rendering for one game session.
@@ -284,6 +285,8 @@ public:
 	Random *_rnd;
 	/** Shared graphics interface used by pages and engine rendering. */
 	Gfx *_gfx = nullptr;
+	/** Game text fonts and release-encoded conversion used by graphics and pages. */
+	Text *_text = nullptr;
 
 	/** Whether the next puzzle entry restores the saved party retained by the current game state. */
 	bool _returningFromPuzzle = false;
