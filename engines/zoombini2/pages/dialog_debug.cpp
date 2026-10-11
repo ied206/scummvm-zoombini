@@ -137,8 +137,9 @@ void DialogDebug::updateAnimationTitle() {
 }
 
 void DialogDebug::preparePlot(const DialogDebugCommand &cmd) {
-	const uint32 white = _savedScreen->format.RGBToColor(255, 255, 255);
-	_vm->_gfx->fillRect(_savedScreen, Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), white);
+	// Overlay the primitive on a snapshot of the current screen so the
+	// coordinate can be read against the live game scene.
+	_vm->_gfx->captureScreen(_savedScreen);
 	const RGBColor rgb(static_cast<byte>(cmd._plotColor >> 16), static_cast<byte>(cmd._plotColor >> 8), static_cast<byte>(cmd._plotColor));
 	const uint32 color = rgb.toPixel(_savedScreen->format);
 	const Common::Point32 &start = cmd._plotStart;
@@ -153,13 +154,18 @@ void DialogDebug::preparePlot(const DialogDebugCommand &cmd) {
 		_vm->_gfx->drawLine(_savedScreen, start, end, color);
 		_titleText = Common::String::format("[Plot Line] from (%d, %d) to (%d, %d) color(0x%06X)", start.x, start.y, end.x, end.y, cmd._plotColor);
 		break;
-	case DialogDebugCommand::Type::kPlotRect:
-	default:
-		_vm->_gfx->drawLine(_savedScreen, start, Common::Point32(end.x - 1, start.y), color);
-		_vm->_gfx->drawLine(_savedScreen, Common::Point32(start.x, end.y - 1), Common::Point32(end.x - 1, end.y - 1), color);
-		_vm->_gfx->drawLine(_savedScreen, start, Common::Point32(start.x, end.y - 1), color);
-		_vm->_gfx->drawLine(_savedScreen, Common::Point32(end.x - 1, start.y), Common::Point32(end.x - 1, end.y - 1), color);
+	case DialogDebugCommand::Type::kPlotRect: {
+		const Common::Point32 topRight(end.x - 1, start.y);
+		const Common::Point32 bottomLeft(start.x, end.y - 1);
+		const Common::Point32 bottomRight(end.x - 1, end.y - 1);
+		_vm->_gfx->drawLine(_savedScreen, start, topRight, color);
+		_vm->_gfx->drawLine(_savedScreen, bottomLeft, bottomRight, color);
+		_vm->_gfx->drawLine(_savedScreen, start, bottomLeft, color);
+		_vm->_gfx->drawLine(_savedScreen, topRight, bottomRight, color);
 		_titleText = Common::String::format("[Plot Rect] from (%d, %d) to (%d, %d) color(0x%06X)", start.x, start.y, end.x, end.y, cmd._plotColor);
+		break;
+	}
+	default:
 		break;
 	}
 }
