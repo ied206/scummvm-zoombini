@@ -131,22 +131,21 @@ void DialogMsgBox::drawUiText(ManagedSurface32 *screen) const {
 	if (_uiText.empty())
 		return;
 
-	const Graphics::Font *guiFont = _vm->_gfx->getSvmGuiFont();
-	if (!guiFont)
-		return;
-
-	const int lineHeight = guiFont->getFontHeight();
+	Gfx::TextConf conf;
+	conf.fontKind = Gfx::FontKind::kGuiFont;
+	conf.fillColor = Gfx::PredefinedColor::kBlack.toPixel(screen->format);
+	conf.hAlign = Graphics::kTextAlignCenter;
+	const int lineHeight = _vm->_gfx->getFontHeight(conf);
 	if (lineHeight <= 0)
 		return;
 
 	Common::Array<Common::U32String> lines;
-	guiFont->wordWrapText(_uiText, kUiTextWidth, lines);
+	_vm->_gfx->wordWrapText(_uiText, kUiTextWidth, lines, conf);
 	const int maxLines = kUiTextHeight / lineHeight;
-	const uint32 textColor = screen->format.RGBToColor(0, 0, 0);
 	for (uint i = 0; i < lines.size() && static_cast<int>(i) < maxLines; i++) {
 		const int x = _position.x + kUiTextMarginX;
 		const int y = _position.y + kUiTextOffsetY + static_cast<int>(i) * lineHeight;
-		guiFont->drawString(screen, lines[i], x, y, kUiTextWidth, textColor, Graphics::kTextAlignCenter);
+		_vm->_gfx->drawString(screen, lines[i], Common::Point32(x, y), kUiTextWidth, conf);
 	}
 }
 

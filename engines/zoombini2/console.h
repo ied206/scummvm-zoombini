@@ -24,6 +24,7 @@
 
 #include "gui/debugger.h"
 
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/transition_maptrans.h"
 #include "zoombini2/zoombini2.h"
 
@@ -108,7 +109,7 @@ private:
 	/** Plot a rectangle outline with exclusive right and bottom coordinates. */
 	static constexpr const char *kSubCmdPlotRect = "rect";
 	/** Default plot color matching the white Z1 reference. */
-	static constexpr uint32 kDefaultPlotColor = 0xFFFFFF;
+	static constexpr RGBColor kDefaultPlotColor = RGBColor(255, 255, 255);
 	/** Dispatch the plot command to its selected subcommand. */
 	bool Cmd_Plot(int argc, const char **argv);
 	/** Open the debug dialog showing one diagnostic pixel. */
@@ -120,7 +121,7 @@ private:
 	/** Parse a signed coordinate pair without allowing values to wrap when passed to surface drawing. */
 	bool parsePlotPoint(const char *xText, const char *yText, Common::Point32 &point);
 	/** Parse a 24-bit RGB color, accepting 0xRRGGBB or #RRGGBB independently of the destination pixel format. */
-	bool parsePlotColor(const char *text, uint32 &color);
+	bool parsePlotColor(const char *text, RGBColor &color);
 	bool parseSignedInt(const char *text, int32 &result);
 	bool parseUnsignedInt(const char *text, uint32 &result);
 	void reportIntegerParseFailure(StringParser::Result result, bool unsignedValue, const char *text);

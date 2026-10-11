@@ -756,8 +756,6 @@ void PuzzleChezNorf::onRenderForeground(ManagedSurface32 *screen) {
 
 void PuzzleChezNorf::drawDebugOverlay(ManagedSurface32 *screen) {
 	Gfx *gfx = _vm->_gfx;
-	if (!gfx->hasTextFont(Gfx::TextColor::kGreen02) && !gfx->loadTextFont(Gfx::TextColor::kGreen02))
-		return;
 	static constexpr const char *kLabels[10] = {
 		"Swich",
 		"Fish",
@@ -772,15 +770,18 @@ void PuzzleChezNorf::drawDebugOverlay(ManagedSurface32 *screen) {
 	};
 	const Common::String header = Common::String::format("%d - %d %d %d - %d %d %d - %d %d %d", _layout,
 														 _foodValues[0], _foodValues[1], _foodValues[2], _foodValues[3], _foodValues[4], _foodValues[5], _foodValues[6], _foodValues[7], _foodValues[8]);
-	gfx->drawText(screen, Gfx::TextColor::kGreen02, Common::Point32(100, 0), header);
+	Gfx::TextConf conf;
+	conf.fontKind = Gfx::FontKind::kBmtFont;
+	conf.fillColor = Gfx::PredefinedColor::kGreen02.toPixel(screen->format);
+	gfx->drawString(screen, header, Common::Point32(100, 0), Gfx::kNoMaxWidth, conf);
 	for (int table = 0; table < _tableCount; table++) {
 		int clues = 0;
 		for (int course = 0; course < 3; course++) {
-			gfx->drawText(screen, Gfx::TextColor::kGreen02, tablePosition(table, 50 + 30 * course), kLabels[_norfs[table].answer.food[course]]);
+			gfx->drawString(screen, kLabels[_norfs[table].answer.food[course]], tablePosition(table, 50 + 30 * course), Gfx::kNoMaxWidth, conf);
 			if (_norfs[table].clue[course] != 9)
 				clues += 1;
 		}
-		gfx->drawText(screen, Gfx::TextColor::kGreen02, tablePosition(table, 140), Common::String::format("%d", clues));
+		gfx->drawString(screen, Common::String::format("%d", clues), tablePosition(table, 140), Gfx::kNoMaxWidth, conf);
 	}
 }
 

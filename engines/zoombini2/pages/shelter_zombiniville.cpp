@@ -255,9 +255,6 @@ void ShelterZombiniville::init() {
 	for (uint i = 0; i < _boardingZoombinis.size(); i++)
 		_boardingZoombinis[i]->setDefaultAnimation(_littleZombAnimation, 33);
 
-	if (!_vm->_gfx->loadTextFont(Gfx::TextColor::kDark00))
-		warning("ShelterZombiniville: Failed to load name font");
-
 	setupHoverRunners();
 	_vm->_gfx->getPageLayerStack()->setScrollLocked(true);
 	resetSelectedFeatures();
@@ -693,9 +690,12 @@ void ShelterZombiniville::onRenderContent(ManagedSurface32 *screen) {
 	_vm->_gfx->drawBackground(screen, Common::Point32(0, 0));
 	drawHoverRunners(screen);
 
-	if (hasActiveEntrance() && _vm->_gfx->hasTextFont(Gfx::TextColor::kDark00)) {
-		const int width = _vm->_gfx->getTextWidth(_currentName, Gfx::TextColor::kDark00);
-		_vm->_gfx->drawText(screen, Gfx::TextColor::kDark00, Common::Point32(367 - width / 2, 280), _currentName);
+	if (hasActiveEntrance()) {
+		Gfx::TextConf conf;
+		conf.fontKind = Gfx::FontKind::kBmtFont;
+		conf.fillColor = Gfx::PredefinedColor::kDark00.toPixel(screen->format);
+		const int width = _vm->_gfx->getTextWidth(_currentName, conf);
+		_vm->_gfx->drawString(screen, _currentName, Common::Point32(367 - width / 2, 280), Gfx::kNoMaxWidth, conf);
 	}
 }
 

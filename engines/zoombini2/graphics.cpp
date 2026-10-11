@@ -28,10 +28,7 @@
 #include "engines/util.h"
 
 #include "graphics/blit.h"
-#include "graphics/fontman.h"
 #include "graphics/pixelformat.h"
-#include "gui/ThemeEngine.h"
-#include "gui/gui-manager.h"
 #include "image/bmp.h"
 
 #include "zoombini2/graphics.h"
@@ -39,10 +36,12 @@
 #include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
+#include "zoombini2/text.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
+constexpr int Gfx::kNoMaxWidth;
 constexpr Size32 ManagedSurface32::kScreenSize;
 constexpr Graphics::PixelFormat RleBlock::kSourceFormat;
 constexpr Size32 VolumePanel::kLabelSize;
@@ -1014,8 +1013,13 @@ void RleBlock::drawToScreenInternal(ManagedSurface32 *destSurface, const Common:
 	}
 }
 
-constexpr const char *Gfx::kTextFontPath;
 constexpr const char *Gfx::kNameBoxSpritePath;
+constexpr RGBColor Gfx::PredefinedColor::kBlack;
+constexpr RGBColor Gfx::PredefinedColor::kDark00;
+constexpr RGBColor Gfx::PredefinedColor::kBlue01;
+constexpr RGBColor Gfx::PredefinedColor::kGreen02;
+constexpr RGBColor Gfx::PredefinedColor::kWhite03;
+constexpr RGBColor Gfx::PredefinedColor::kRed04;
 constexpr const char *Gfx::kDropTargetGlowPath;
 
 Gfx::Gfx(Zoombini2Engine *vm) : _vm(vm) {
@@ -1033,7 +1037,6 @@ Gfx::~Gfx() {
 	clearPageBitmapCache();
 	clearRleBlockCache(_sharedRleBlocks);
 	clearBitBlockCache(_sharedBitBlocks);
-	delete _textFont;
 	delete _screen;
 }
 
@@ -1363,60 +1366,31 @@ void Gfx::drawZoombiniRunner(ManagedSurface32 *screen, const ZoombiniRunner *run
 	drawZoombini(screen, runner->getActiveAnimation(), traitsToDraw, drawPos, runner->getAnimationCell(), frame, alphaLUT, clip);
 }
 
-RGBColor Gfx::textColor(TextColor color) {
-	static constexpr RGBColor kColors[5] = {
-		RGBColor(16, 16, 16),
-		RGBColor(0, 0, 255),
-		RGBColor(0, 255, 0),
-		RGBColor(255, 255, 255),
-		RGBColor(255, 0, 0),
-	};
-	const int index = static_cast<int>(color);
-	return kColors[index];
-}
-
-bool Gfx::loadTextFont(TextColor color) {
-	const int index = static_cast<int>(color);
-	if (index < 0 || 5 <= index)
-		return false;
-	if (hasTextFont(color))
-		return true;
-	if (!_textFont)
-		_textFont = new BmtFont(_vm);
-	return _textFont->load(Common::Path(kTextFontPath));
-}
-
-bool Gfx::hasTextFont(TextColor color) const {
-	const int index = static_cast<int>(color);
-	return 0 <= index && index < 5 && _textFont && _textFont->isLoaded();
-}
-
-int Gfx::drawText(ManagedSurface32 *destSurface, TextColor color, const Common::Point32 &pos, const Common::String &text) const {
-	if (!destSurface || !hasTextFont(color))
+int Gfx::drawString(ManagedSurface32 *destSurface, const Common::String &text, const Common::Point32 &pos, int maxWidth, const TextConf &conf) const {
+	if (!destSurface)
 		return 0;
-	const RGBColor tint = textColor(color);
-	return _textFont->drawString(destSurface, pos, text, tint);
-}
-
-int Gfx::getTextWidth(const Common::String &text, TextColor color) const {
-	if (!hasTextFont(color))
-		return 0;
-	return _textFont->getStringLayoutWidth(text);
-}
-
-const Graphics::Font *Gfx::getSvmGuiFont() {
-	// Cache the load decision here so the font file loads once.
-	if (!_uiFontResolved) {
-		_uiFontResolved = true;
-		if (g_gui.theme()->loadExtraFont(GUI::ThemeEngine::kFontStyleNormal, _vm->getLanguage()))
-			_uiFontHasExtra = true;
+	if (conf.fontKind == FontKind::kBmtFont) {
+		BmtFont *bmtFont = _vm->_text->bmtFont();
+		if (!bmtFont)
+			return 0;
+		return bmtFont->drawString(destSurface, pos, text, maxWidth, conf.fillColor);
 	}
+	const Common::U32String decoded = Text::toU32String(text, _vm->getLanguage());
+	TextConf alignedConf = conf;
+	alignedConf.hAlign = Graphics::kTextAlignLeft;
+	drawString(destSurface, decoded, pos, maxWidth, alignedConf);
+	const Graphics::Font *font = _vm->_text->resolveFont(conf.fontKind);
+	return font ? font->getStringWidth(decoded) : 0;
+}
 
-	// Query both pointers fresh on every call because either owner can replace them.
-	if (_uiFontHasExtra)
-		return g_gui.theme()->getFont(GUI::ThemeEngine::kFontStyleLangExtra);
-	else
-		return FontMan.getFontByUsage(Graphics::FontManager::kLocalizedFont);
+int Gfx::getTextWidth(const Common::String &text, const TextConf &conf) const {
+	if (conf.fontKind == FontKind::kBmtFont) {
+		BmtFont *bmtFont = _vm->_text->bmtFont();
+		if (!bmtFont)
+			return 0;
+		return bmtFont->getStringLayoutWidth(text);
+	}
+	return getTextWidth(Text::toU32String(text, _vm->getLanguage()), conf);
 }
 
 void Gfx::drawDragNameTooltip(ManagedSurface32 *destSurface, const Common::String &name) {
@@ -1427,16 +1401,17 @@ void Gfx::drawDragNameTooltip(ManagedSurface32 *destSurface, const Common::Strin
 		if (!_nameBoxSprite)
 			return;
 	}
-	if (!loadTextFont(TextColor::kDark00))
+	BmtFont *bmtFont = _vm->_text->bmtFont();
+	if (!bmtFont)
 		return;
 	static constexpr int kPlateX = 310;
 	static constexpr int kPlateY = 565;
 	static constexpr int kTextCenterX = 400;
 	static constexpr int kTextY = 570;
 	drawRleBlock(destSurface, _nameBoxSprite, Common::Point32(kPlateX, kPlateY));
-	const int width = _textFont->getStringLayoutWidth(name);
-	const RGBColor tint = textColor(TextColor::kDark00);
-	_textFont->drawString(destSurface, Common::Point32(kTextCenterX - width / 2, kTextY), name, tint);
+	const int width = bmtFont->getStringLayoutWidth(name);
+	const uint32 tint = Gfx::PredefinedColor::kDark00.toPixel(destSurface->format);
+	bmtFont->drawString(destSurface, Common::Point32(kTextCenterX - width / 2, kTextY), name, Gfx::kNoMaxWidth, tint);
 }
 
 void Gfx::maskRejectedArea(ManagedSurface32 *destSurface, const AreaMask *areaMask) {
@@ -1487,11 +1462,16 @@ void Gfx::drawLine(ManagedSurface32 *destSurface, const Common::Point32 &start, 
 void Gfx::drawString(ManagedSurface32 *destSurface, const Common::U32String &text, const Common::Point32 &pos, int maxWidth, const TextConf &conf) const {
 	if (!destSurface)
 		return;
+	if (conf.fontKind == FontKind::kBmtFont) {
+		drawString(destSurface, Text::fromU32String(text, _vm->getLanguage()), pos, maxWidth, conf);
+		return;
+	}
+	const int effectiveMaxWidth = maxWidth == kNoMaxWidth ? destSurface->w : maxWidth;
 
-	// If the font instance was not set, retreive default font from GUI.
-	const Graphics::Font *font = conf.font;
+	// Resolve the shared UI font inside the graphics layer so callers never hold font objects.
+	const Graphics::Font *font = _vm->_text->resolveFont(conf.fontKind);
 	if (!font)
-		font = _vm->_gfx->getSvmGuiFont();
+		return;
 
 	// Draw the four one-pixel outline passes before the main text, if requested to.
 	if (conf.outlineEffect) {
@@ -1503,12 +1483,48 @@ void Gfx::drawString(ManagedSurface32 *destSurface, const Common::U32String &tex
 		};
 		for (int i = 0; i < ARRAYSIZE(kOutlineOffsets); i++) {
 			const Common::Point32 offset = kOutlineOffsets[i];
-			font->drawString(destSurface, text, pos.x + offset.x, pos.y + offset.y, maxWidth, conf.outlineColor, conf.hAlign);
+			font->drawString(destSurface, text, pos.x + offset.x, pos.y + offset.y, effectiveMaxWidth, conf.outlineColor, conf.hAlign);
 		}
 	}
 
 	// Draw the main text.
-	font->drawString(destSurface, text, pos.x, pos.y, maxWidth, conf.fillColor, conf.hAlign);
+	font->drawString(destSurface, text, pos.x, pos.y, effectiveMaxWidth, conf.fillColor, conf.hAlign);
+}
+
+int Gfx::getTextWidth(const Common::U32String &text, const TextConf &conf) const {
+	if (conf.fontKind == FontKind::kBmtFont)
+		return getTextWidth(Text::fromU32String(text, _vm->getLanguage()), conf);
+	const Graphics::Font *font = _vm->_text->resolveFont(conf.fontKind);
+	return font ? font->getStringWidth(text) : 0;
+}
+
+int Gfx::getFontHeight(const TextConf &conf) const {
+	if (conf.fontKind == FontKind::kBmtFont && !_vm->_text->loadTextFont())
+		return 0;
+	const Graphics::Font *font = _vm->_text->resolveFont(conf.fontKind);
+	return font ? font->getFontHeight() : 0;
+}
+
+void Gfx::wordWrapText(const Common::U32String &text, int maxWidth, Common::Array<Common::U32String> &lines, const TextConf &conf) const {
+	if (conf.fontKind == FontKind::kBmtFont) {
+		lines.clear();
+		if (!_vm->_text->loadTextFont())
+			return;
+		BmtFont *bmtFont = _vm->_text->bmtFont();
+		if (!bmtFont)
+			return;
+		Common::Array<Common::String> encodedLines;
+		bmtFont->wordWrapText(Text::fromU32String(text, _vm->getLanguage()), maxWidth, encodedLines);
+		for (uint i = 0; i < encodedLines.size(); i++)
+			lines.push_back(Text::toU32String(encodedLines[i], _vm->getLanguage()));
+		return;
+	}
+	const Graphics::Font *font = _vm->_text->resolveFont(conf.fontKind);
+	if (!font) {
+		lines.clear();
+		return;
+	}
+	font->wordWrapText(text, maxWidth, lines);
 }
 
 // ============================================================================
@@ -2313,20 +2329,24 @@ void BmtFont::drawGlyph(Graphics::Surface *dst, const Glyph &glyph, const Common
 	}
 }
 
-int BmtFont::drawString(ManagedSurface32 *dst, const Common::Point32 &pos, const Common::String &text, const RGBColor &color) const {
+int BmtFont::drawString(ManagedSurface32 *dst, const Common::Point32 &pos, const Common::String &text, int maxWidth, uint32 color) const {
 	if (!dst || !_loaded)
 		return 0;
-	const uint32 pixelColor = color.toPixel(dst->format);
+	const bool hasWidthLimit = maxWidth != Gfx::kNoMaxWidth;
+	const int effectiveMaxWidth = hasWidthLimit ? maxWidth : dst->w;
 	if (!_vm->isHebrew()) {
-		Graphics::Font::drawString(dst, text, pos.x, pos.y, dst->w, pixelColor, Graphics::kTextAlignLeft, 0, false, true);
+		Graphics::Font::drawString(dst, text, pos.x, pos.y, effectiveMaxWidth, color, Graphics::kTextAlignLeft, 0, false, !hasWidthLimit);
 		return Graphics::Font::getStringWidth(text);
 	}
 
+	const int rightX = pos.x + effectiveMaxWidth + 1;
 	int curX = pos.x;
 	// Hebrew visits game bytes backwards; only digits move the pen left.
 	for (uint i = 0; i < text.size(); i++) {
 		const byte c = static_cast<byte>(text[text.size() - i - 1]);
-		drawChar(dst, c, curX, pos.y, pixelColor);
+		if (hasWidthLimit && curX + getBoundingBox(c).right > rightX)
+			break;
+		drawChar(dst, c, curX, pos.y, color);
 		const int advance = getCharWidth(c);
 		if ('0' <= c && c <= '9')
 			curX -= advance;
