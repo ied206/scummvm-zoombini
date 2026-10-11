@@ -507,7 +507,7 @@ bool Zoombini2Console::Cmd_Plot(int argc, const char **argv) {
 		debugPrintf("  %s <x1> <y1> <x2> <y2> [color]\n", kSubCmdPlotRect);
 		debugPrintf("      Plot a rectangle outline; right and bottom coordinates are exclusive.\n\n");
 		debugPrintf("Coordinates are 0-based signed 16-bit values; lines and rectangles are clipped to the screen.\n");
-		debugPrintf("Integer arguments accept a 0x prefix. Color is 24-bit RGB (0xRRGGBB or #RRGGBB), default: black.\n");
+		debugPrintf("Integer arguments accept a 0x prefix. Color is 24-bit RGB (0xRRGGBB or #RRGGBB), default: white.\n");
 		debugPrintf("Click or press ESC to close the dialog.\n\n");
 		debugPrintf("Options:\n");
 		printHelpOption();
@@ -562,14 +562,14 @@ bool Zoombini2Console::CmdSub_PlotPoint(int argc, const char **argv) {
 		debugPrintf("Plot one pixel over the current screen.\n");
 		debugPrintf("Usage: %s %s <x> <y> [color]\n\n", kCmdPlot, kSubCmdPlotPoint);
 		debugPrintf("Coordinates must be within the 800x600 game screen.\n");
-		debugPrintf("Color is 24-bit RGB (0xRRGGBB or #RRGGBB), default: black.\n\n");
+		debugPrintf("Color is 24-bit RGB (0xRRGGBB or #RRGGBB), default: white.\n\n");
 		debugPrintf("Options:\n");
 		printHelpOption();
 		return true;
 	}
 
 	Common::Point32 point;
-	uint32 color = 0;
+	uint32 color = kDefaultPlotColor;
 	if (!parsePlotPoint(argv[2], argv[3], point) || (argc == 5 && !parsePlotColor(argv[4], color))) {
 		debugPrintf("\n");
 		return true;
@@ -593,7 +593,7 @@ bool Zoombini2Console::CmdSub_PlotLine(int argc, const char **argv) {
 		debugPrintf("Plot a line over the current screen.\n");
 		debugPrintf("Usage: %s %s <x0> <y0> <x1> <y1> [color]\n\n", kCmdPlot, kSubCmdPlotLine);
 		debugPrintf("Endpoints are inclusive signed 16-bit coordinates; the line is clipped to the screen.\n");
-		debugPrintf("Color is 24-bit RGB (0xRRGGBB or #RRGGBB), default: black.\n\n");
+		debugPrintf("Color is 24-bit RGB (0xRRGGBB or #RRGGBB), default: white.\n\n");
 		debugPrintf("Options:\n");
 		printHelpOption();
 		return true;
@@ -601,7 +601,7 @@ bool Zoombini2Console::CmdSub_PlotLine(int argc, const char **argv) {
 
 	Common::Point32 start;
 	Common::Point32 end;
-	uint32 color = 0;
+	uint32 color = kDefaultPlotColor;
 	if (!parsePlotPoint(argv[2], argv[3], start) || !parsePlotPoint(argv[4], argv[5], end) || (argc == 7 && !parsePlotColor(argv[6], color))) {
 		debugPrintf("\n");
 		return true;
@@ -622,7 +622,7 @@ bool Zoombini2Console::CmdSub_PlotRect(int argc, const char **argv) {
 		debugPrintf("Usage: %s %s <x1> <y1> <x2> <y2> [color]\n\n", kCmdPlot, kSubCmdPlotRect);
 		debugPrintf("Coordinates are signed 16-bit values; x1 < x2 and y1 < y2 are required.\n");
 		debugPrintf("Right and bottom coordinates are exclusive; edges are clipped to the screen.\n");
-		debugPrintf("Color is 24-bit RGB (0xRRGGBB or #RRGGBB), default: black.\n\n");
+		debugPrintf("Color is 24-bit RGB (0xRRGGBB or #RRGGBB), default: white.\n\n");
 		debugPrintf("Options:\n");
 		printHelpOption();
 		return true;
@@ -630,7 +630,7 @@ bool Zoombini2Console::CmdSub_PlotRect(int argc, const char **argv) {
 
 	Common::Point32 topLeft;
 	Common::Point32 bottomRight;
-	uint32 color = 0;
+	uint32 color = kDefaultPlotColor;
 	if (!parsePlotPoint(argv[2], argv[3], topLeft) || !parsePlotPoint(argv[4], argv[5], bottomRight) || (argc == 7 && !parsePlotColor(argv[6], color))) {
 		debugPrintf("\n");
 		return true;

@@ -528,8 +528,14 @@ bool Zoombini2Engine::openHelpDialog(PageId pageId, int level) {
 }
 
 bool Zoombini2Engine::openDebugDialog(const DialogDebugCommand &cmd) {
-	if (getActiveDialog())
+	// A new debug view closes its open predecessor before opening behind it.
+	// Unrelated modals still block the request while they own input and rendering.
+	DialogBase *activeDialog = getActiveDialog();
+	DialogDebug *activeDebugDialog = dynamic_cast<DialogDebug *>(activeDialog);
+	if (activeDialog && !activeDebugDialog)
 		return false;
+	if (activeDebugDialog)
+		activeDebugDialog->close();
 	DialogDebug *dialog = new DialogDebug(this);
 	if (!dialog->open(cmd)) {
 		delete dialog;
