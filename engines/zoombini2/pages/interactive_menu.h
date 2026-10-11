@@ -76,7 +76,7 @@ private:
 	/**
 	 * Sorted save-name list used by the menu screen.
 	 *
-	 * Text colors are shared through @ref Gfx::loadTextFont.
+	 * Text colors come from @ref Gfx::PredefinedColor.
 	 * The selection bar is loaded through @ref Gfx::drawPageRleBlock and remains in the page bitmap cache.
 	 * Savefile names are filename stems for in-game `.mk` saves.
 	 * Names are limited to 16 characters.
@@ -109,8 +109,6 @@ private:
 		/** Construct an empty savefile list at @p pos; @p vm supplies the shared text renderer. */
 		SaveFileList(Zoombini2Engine *vm, const Common::Point32 &pos);
 
-		/** Prepare the normal, prefix-match, edit, and read-only colors through @ref Gfx::loadTextFont. */
-		bool init();
 		/** Remove every item and reset selection and editing state. */
 		void clear();
 		/** Insert @p name and its @p readOnly status in case-sensitive order unless it is invalid or duplicated. */

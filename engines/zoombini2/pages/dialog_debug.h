@@ -25,6 +25,7 @@
 #include "common/path.h"
 #include "common/rect.h"
 #include "common/str.h"
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/dialog_base.h"
 
 namespace Zoombini2 {
@@ -66,8 +67,8 @@ struct DialogDebugCommand {
 	Common::Point32 _plotStart;
 	/** Last inclusive line endpoint or exclusive bottom-right rectangle corner for a plot command. */
 	Common::Point32 _plotEnd;
-	/** Diagnostic RGB value in 0xRRGGBB form, independent of the screen format. */
-	uint32 _plotColor = 0;
+	/** Diagnostic color, independent of the screen format. */
+	RGBColor _plotColor;
 
 	/** Select a command that shows the active page through its area mask. */
 	void setDrawAreaMask() { _type = Type::kDrawAreaMask; }
@@ -77,21 +78,21 @@ struct DialogDebugCommand {
 		_animPath = path;
 		_startFrame = startFrame;
 	}
-	/** Plot @p point using a 24-bit RGB @p color. */
-	void setPlotPoint(const Common::Point32 &point, uint32 color) {
+	/** Plot @p point using @p color. */
+	void setPlotPoint(const Common::Point32 &point, const RGBColor &color) {
 		_type = Type::kPlotPoint;
 		_plotStart = point;
 		_plotColor = color;
 	}
-	/** Plot from @p start through @p end, including both endpoints, using a 24-bit RGB @p color. */
-	void setPlotLine(const Common::Point32 &start, const Common::Point32 &end, uint32 color) {
+	/** Plot from @p start through @p end, including both endpoints, using @p color. */
+	void setPlotLine(const Common::Point32 &start, const Common::Point32 &end, const RGBColor &color) {
 		_type = Type::kPlotLine;
 		_plotStart = start;
 		_plotEnd = end;
 		_plotColor = color;
 	}
-	/** Plot an outline from @p topLeft to the exclusive @p bottomRight corner using a 24-bit RGB @p color. */
-	void setPlotRect(const Common::Point32 &topLeft, const Common::Point32 &bottomRight, uint32 color) {
+	/** Plot an outline from @p topLeft to the exclusive @p bottomRight corner using @p color. */
+	void setPlotRect(const Common::Point32 &topLeft, const Common::Point32 &bottomRight, const RGBColor &color) {
 		_type = Type::kPlotRect;
 		_plotStart = topLeft;
 		_plotEnd = bottomRight;
