@@ -48,11 +48,11 @@ struct DialogDebugCommand {
 		kDrawAreaMask,
 		/** Show frames of an animation or sprite resource. */
 		kDrawAnimation,
-		/** Plot one pixel on a white canvas. */
+		/** Plot one pixel. */
 		kPlotPoint,
-		/** Plot a line on a white canvas. */
+		/** Plot a line */
 		kPlotLine,
-		/** Plot a rectangle outline on a white canvas. */
+		/** Plot a rectangle outline. */
 		kPlotRect
 	};
 
@@ -104,7 +104,7 @@ struct DialogDebugCommand {
  *
  * The area-mask view snapshots the screen on open and masks rejected drop areas with black.
  * The animation view renders resource frames over a blank sheet and permits manual frame stepping.
- * Plot views retain a white canvas with one primitive drawn through the shared graphics interface.
+ * Plot views snapshot the current screen and draw one primitive over it through the shared graphics interface.
  * Gameplay timing is paused until the view closes.
  * Every view closes on any click or ESC key.
  */
