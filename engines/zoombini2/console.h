@@ -99,7 +99,7 @@ private:
 	bool CmdSub_DrawAreaMask(int argc, const char **argv);
 	/** Open the debug dialog showing animation or sprite frames. */
 	bool CmdSub_DrawAnimation(int argc, const char **argv);
-	/** Plot a point, line, or rectangle on a white debug canvas through @ref Zoombini2Console::Cmd_Plot. */
+	/** Plot a point, line, or rectangle over the current screen through @ref Zoombini2Console::Cmd_Plot. */
 	static constexpr const char *kCmdPlot = "plot";
 	/** Plot one pixel. */
 	static constexpr const char *kSubCmdPlotPoint = "point";
@@ -107,6 +107,8 @@ private:
 	static constexpr const char *kSubCmdPlotLine = "line";
 	/** Plot a rectangle outline with exclusive right and bottom coordinates. */
 	static constexpr const char *kSubCmdPlotRect = "rect";
+	/** Default plot color matching the white Z1 reference. */
+	static constexpr uint32 kDefaultPlotColor = 0xFFFFFF;
 	/** Dispatch the plot command to its selected subcommand. */
 	bool Cmd_Plot(int argc, const char **argv);
 	/** Open the debug dialog showing one diagnostic pixel. */
