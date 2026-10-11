@@ -47,6 +47,10 @@ struct RGBColor {
 	byte b;
 
 	constexpr RGBColor(byte red = 0, byte green = 0, byte blue = 0) : r(red), g(green), b(blue) {}
+	/** Return this color as a lowercase #rrggbb string. */
+	Common::String toString() const {
+		return Common::String::format("#%02x%02x%02x", static_cast<uint32>(r), static_cast<uint32>(g), static_cast<uint32>(b));
+	}
 	/** Decode a packed pixel with @p pixelFormat. */
 	static RGBColor fromPixel(uint32 pixel, const Graphics::PixelFormat &pixelFormat) {
 		RGBColor color;
@@ -157,6 +161,9 @@ class ZoombiniAnimation;
  */
 class Gfx : public Common::NonCopyable {
 public:
+	/** Sentinel for drawing text without a caller-specified width limit. */
+	static constexpr int kNoMaxWidth = -1;
+
 	/** Construct the graphics interface for one game instance. */
 	explicit Gfx(Zoombini2Engine *vm);
 	/** Release the graphics interface for one game instance. */
@@ -291,37 +298,6 @@ public:
 	static void drawZoombiniRunner(ManagedSurface32 *destSurface, const ZoombiniRunner *runner, const AlphaBlendLUT &alphaLUT,
 								   const Common::Rect32 *clip = nullptr, int scrollX = 0, int backgroundWidth = 800,
 								   const RleBlock *dropTargetIndicator = nullptr, const ZmbTrait *presentationTraits = nullptr);
-	/** Color variants of the shared bitmap text strip. */
-	enum class TextColor {
-		kDark00 = 0,
-		kBlue01 = 1,
-		kGreen02 = 2,
-		kWhite03 = 3,
-		kRed04 = 4
-	};
-
-	/** Load the shared text strip on demand; failed loads can be retried by the caller. */
-	bool loadTextFont(TextColor color);
-	/** Return whether the shared text strip is ready. */
-	bool hasTextFont(TextColor color) const;
-	/**
-	 * Draw tinted game text and return the signed pen displacement from @ref BmtFont::drawString.
-	 * For Hebrew and Swedish, this can differ from @ref Gfx::getTextWidth and does not describe the visible text bounds.
-	 */
-	int drawText(ManagedSurface32 *destSurface, TextColor color, const Common::Point32 &pos, const Common::String &text) const;
-	/**
-	 * Measure game text through @ref BmtFont::getStringLayoutWidth for page alignment and name-input limits.
-	 * This preserves the game's Hebrew and Swedish measurement rules; the result can be negative or omit drawn glyphs.
-	 * Replacing it with the return value of @ref Gfx::drawText would change those layout and input decisions.
-	 */
-	int getTextWidth(const Common::String &text, TextColor color) const;
-	/**
-	 * Return the shared ScummVM UI font for the release language, borrowed from the theme or font manager.
-	 * The theme extra pointer is queried fresh on every call because each successful extra-font load replaces it.
-	 * The font manager fallback is also queried fresh because the localized font selection can change.
-	 * The cached flags keep only the load decision so the font file loads once while callers query per frame.
-	 */
-	const Graphics::Font *getSvmGuiFont();
 	/** Draw the held Zoombini name plate centered at the bottom of @p destSurface. */
 	void drawDragNameTooltip(ManagedSurface32 *destSurface, const Common::String &name);
 	/** Black out @p destSurface where @p areaMask rejects drops, or everywhere when @p areaMask is nullptr. */
@@ -334,12 +310,31 @@ public:
 	void drawLine(ManagedSurface32 *destSurface, const Common::Point32 &start, const Common::Point32 &end, uint32 color, int thickness = 1) const;
 	/**
 	 * Bundles the settings for one @ref Gfx::drawString call.
-	 * Mirrors the Z1 TextConf pattern: the font, fill color, and optional outline are configured together.
+	 * Mirrors the Z1 TextConf pattern: the font family travels as an enum and @ref Gfx resolves the object.
 	 */
+	/** Common fixed UI and bitmap text colors as RGB values; pack with @ref RGBColor::toPixel for the destination surface. */
+	struct PredefinedColor {
+		static constexpr RGBColor kBlack = RGBColor(0, 0, 0);
+		static constexpr RGBColor kDark00 = RGBColor(16, 16, 16);
+		static constexpr RGBColor kBlue01 = RGBColor(0, 0, 255);
+		static constexpr RGBColor kGreen02 = RGBColor(0, 255, 0);
+		static constexpr RGBColor kWhite03 = RGBColor(255, 255, 255);
+		static constexpr RGBColor kRed04 = RGBColor(255, 0, 0);
+	};
+	enum class FontKind {
+		/** Original bitmap strip based font. */
+		kBmtFont,
+		/** ScummVM GUI font. */
+		kGuiFont,
+		/** ScummVM debug title font. */
+		kDebugTitleFont,
+		/** ScummVM debug body font. */
+		kDebugFont,
+	};
 	struct TextConf {
-		/** Font used to draw the glyphs. */
-		const Graphics::Font *font = nullptr;
-		/** Color of the text glyphs. */
+		/** Font family for the draw, resolved inside @ref ZoombiniText so callers never hold font objects. */
+		FontKind fontKind = FontKind::kGuiFont;
+		/** Color of the text glyphs, packed in the destination surface format. */
 		uint32 fillColor = 0;
 		/** Whether a one-pixel outline is drawn around the glyphs. */
 		bool outlineEffect = false;
@@ -351,8 +346,44 @@ public:
 	/**
 	 * Draw @p text using @p conf, outlining the glyphs before the fill when @ref TextConf::outlineEffect is set.
 	 * The four one-pixel outline passes are drawn first so the main text does not move.
+	 * @p maxWidth limits the drawing area, or @ref Gfx::kNoMaxWidth uses the destination surface width.
+	 * Bitmap text is encoded to release bytes and drawn with the strip quirk path at @p pos, ignoring outline and alignment.
+	 * It still respects a positive @p maxWidth.
+	 * GUI and debug text use the standard API with outline and alignment.
 	 */
 	void drawString(ManagedSurface32 *destSurface, const Common::U32String &text, const Common::Point32 &pos, int maxWidth, const TextConf &conf) const;
+	/**
+	 * Draw text at @p pos within @p maxWidth and return its text width.
+	 * Use @ref Gfx::kNoMaxWidth to draw without a caller-specified width limit.
+	 * Bitmap text draws release-encoded game bytes with the strip quirk path and returns the signed pen displacement from @ref BmtFont::drawString.
+	 * The tint comes from @ref TextConf::fillColor.
+	 * GUI and debug text decode @p text with the release encoding and use the standard API left-aligned at @p pos, returning the standard width.
+	 * Alignment is ignored; use the @ref Common::U32String overload for aligned text.
+	 */
+	int drawString(ManagedSurface32 *destSurface, const Common::String &text, const Common::Point32 &pos, int maxWidth, const TextConf &conf) const;
+	/**
+	 * Measure game text for page alignment and name-input limits.
+	 * Bitmap text uses the strip quirk layout width from @ref BmtFont::getStringLayoutWidth; the result can be negative or omit drawn glyphs.
+	 * GUI and debug text decode @p text with the release encoding and use the standard width.
+	 * Replacing the bitmap result with the pen displacement from the bitmap @ref Gfx::drawString overload would change those layout and input decisions.
+	 */
+	int getTextWidth(const Common::String &text, const TextConf &conf) const;
+	/**
+	 * Measure @p text and return its width, or zero when the font is unavailable.
+	 * Bitmap text is encoded to release bytes and measured with the strip quirk layout width.
+	 * GUI and debug text use the standard width.
+	 */
+	int getTextWidth(const Common::U32String &text, const TextConf &conf) const;
+	/**
+	 * Return the selected font height, or zero when the font is unavailable.
+	 */
+	int getFontHeight(const TextConf &conf) const;
+	/**
+	 * Wrap @p text to @p maxWidth, leaving @p lines empty when the font is unavailable.
+	 * Bitmap text wraps the encoded release bytes with the strip metrics and decodes the lines back.
+	 * GUI and debug text use the standard API.
+	 */
+	void wordWrapText(const Common::U32String &text, int maxWidth, Common::Array<Common::U32String> &lines, const TextConf &conf) const;
 
 private:
 	struct MaskedBitBlockEntry {
@@ -371,27 +402,10 @@ private:
 	static void clearRleBlockCache(RleBlockCache &cache);
 	static void clearBitBlockCache(BitBlockCache &cache);
 
-	/** Bitmap strip shared by all UI text colors. */
-	static constexpr const char *kTextFontPath = "bmp/typo";
 	/** Name plate sprite shown while dragging a Zoombini. */
 	static constexpr const char *kNameBoxSpritePath = "bmp/menu/name_box.rb";
 	/** Yellow mask drawn beneath a held Zoombini over an available drop target. */
 	static constexpr const char *kDropTargetGlowPath = "bmp/cursor/glow";
-	/** Single coverage-mask glyph set tinted per draw, retained until graphics shutdown. */
-	BmtFont *_textFont = nullptr;
-	/**
-	 * Whether the shared UI font load has been attempted once for this game instance.
-	 * This flag cache only the load decision so the font file loads once while callers query per frame.
-	 */
-	bool _uiFontResolved = false;
-	/**
-	 * Whether the theme supplies a language extra font for this game instance.
-	 * This flag cache only the load decision so the font file loads once while callers query per frame.
-	 */
-	bool _uiFontHasExtra = false;
-
-	/** Return the tint for one text color. */
-	static RGBColor textColor(TextColor color);
 	/** Name-plate sprite drawn under the held Zoombini name. */
 	RleBlock *_nameBoxSprite = nullptr;
 	/** Shared drop-target glow retained for the game instance. */
@@ -1129,13 +1143,15 @@ public:
 	void drawChar(Graphics::Surface *destSurface, uint32 character, int x, int y, uint32 color) const override;
 	using Graphics::Font::drawString;
 	/**
-	 * Draw release-encoded game bytes from @p pos with a uniform tint.
+	 * Draw release-encoded game bytes from @p pos with a uniform tint inside @p maxWidth.
+	 * Use @ref Gfx::kNoMaxWidth to draw without a caller-specified width limit.
+	 * @p color is packed in the destination surface format, matching @ref Graphics::Font::drawString.
 	 *
 	 * Hebrew visits bytes in reverse order, draws each glyph at the current pen, then moves left for digits
 	 * and right for other supported characters and spaces. Its return value is the final x minus the starting x;
 	 * opposing advances can cancel, so this value does not bound the pixels drawn by a mixed string.
 	 * Other releases draw forward and return the sum of glyph advances, including supported Swedish Nordic bytes.
-	 * Clipping affects the pixels drawn, not this return value.
+	 * A width limit affects the pixels drawn, not this return value.
 	 *
 	 * This overload differs from the inherited common Font drawing in its Hebrew traversal.
 	 * Its return value is not the game's layout measurement: Hebrew letter bytes can draw and advance while
@@ -1144,7 +1160,7 @@ public:
 	 *
 	 * @return Signed horizontal pen displacement, or zero for an unloaded font or null destination.
 	 */
-	int drawString(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::String &text, const RGBColor &color) const;
+	int drawString(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::String &text, int maxWidth, uint32 color) const;
 	/**
 	 * Return the width used to lay out release-encoded game text and check name-input limits.
 	 *

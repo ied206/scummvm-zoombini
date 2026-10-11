@@ -201,9 +201,6 @@ void InteractiveMap::init() {
 			_legends[i].clear();
 	}
 
-	// --- White bitmap font for stats ---
-	_vm->_gfx->loadTextFont(Gfx::TextColor::kWhite03);
-
 	// --- Set initial level ---
 	if (isPracticeMode()) {
 		_currentLevel = _vm->getPracticeLevel();
@@ -553,21 +550,22 @@ void InteractiveMap::onRenderContent(ManagedSurface32 *screen) {
 		if (!_statsSavedGamePath.empty())
 			_vm->_gfx->drawPageRleBlock(screen, _statsSavedGamePath, Common::Point32(10, 10));
 
-		if (_vm->_gfx->hasTextFont(Gfx::TextColor::kWhite03)) {
-			// Player name centered at Y=10, min X=240
-			const Common::String &name = gs->getPlayerName();
-			int nameWidth = _vm->_gfx->getTextWidth(name, Gfx::TextColor::kWhite03);
-			int nameX = 400 - nameWidth / 2;
-			if (nameX < 240)
-				nameX = 240;
-			_vm->_gfx->drawText(screen, Gfx::TextColor::kWhite03, Common::Point32(nameX, 10), name);
+		Gfx::TextConf conf;
+		conf.fontKind = Gfx::FontKind::kBmtFont;
+		conf.fillColor = Gfx::PredefinedColor::kWhite03.toPixel(screen->format);
+		// Player name centered at Y=10, min X=240
+		const Common::String &name = gs->getPlayerName();
+		int nameWidth = _vm->_gfx->getTextWidth(name, conf);
+		int nameX = 400 - nameWidth / 2;
+		if (nameX < 240)
+			nameX = 240;
+		_vm->_gfx->drawString(screen, name, Common::Point32(nameX, 10), Gfx::kNoMaxWidth, conf);
 
-			// Stat numbers (right-aligned at x=226, Y from kStatLabelY)
-			for (int i = 0; i < 4; i++) {
-				Common::String valStr = Common::String::format("%d", _stats[i]);
-				int valWidth = _vm->_gfx->getTextWidth(valStr, Gfx::TextColor::kWhite03);
-				_vm->_gfx->drawText(screen, Gfx::TextColor::kWhite03, Common::Point32(226 - valWidth, kStatLabelY[i]), valStr);
-			}
+		// Stat numbers (right-aligned at x=226, Y from kStatLabelY)
+		for (int i = 0; i < 4; i++) {
+			Common::String valStr = Common::String::format("%d", _stats[i]);
+			int valWidth = _vm->_gfx->getTextWidth(valStr, conf);
+			_vm->_gfx->drawString(screen, valStr, Common::Point32(226 - valWidth, kStatLabelY[i]), Gfx::kNoMaxWidth, conf);
 		}
 	}
 
@@ -690,8 +688,13 @@ void InteractiveMap::drawLevel4Legend(ManagedSurface32 *screen) const {
 	}
 
 	// Draw a label explaining restoration of cut level - Level4.
-	const Graphics::Font *labelFont = _vm->_gfx->getSvmGuiFont();
-	if (!labelFont)
+	Gfx::TextConf conf;
+	conf.fontKind = Gfx::FontKind::kGuiFont;
+	conf.fillColor = fillColor;
+	conf.outlineEffect = true;
+	conf.outlineColor = outlineColor;
+	const int fontHeight = _vm->_gfx->getFontHeight(conf);
+	if (fontHeight <= 0)
 		return;
 
 	Common::U32String label;
@@ -703,10 +706,6 @@ void InteractiveMap::drawLevel4Legend(ManagedSurface32 *screen) const {
 		label = kLevel4TabLabelEn;
 		break;
 	}
-
-	const int fontHeight = labelFont->getFontHeight();
-	if (fontHeight <= 0)
-		return;
 
 	const int textX = kLevel4TabRight + kLevel4TabTextMargin;
 	int textY = kLevel4TabTop + (kLevel4TabBottom - kLevel4TabTop - fontHeight) / 2;
@@ -727,11 +726,6 @@ void InteractiveMap::drawLevel4Legend(ManagedSurface32 *screen) const {
 	if (maxWidth <= 0)
 		return;
 
-	Gfx::TextConf conf;
-	conf.font = labelFont;
-	conf.fillColor = fillColor;
-	conf.outlineEffect = true;
-	conf.outlineColor = outlineColor;
 	switch (_vm->getLanguage()) {
 	case Common::KO_KOR:
 		conf.hAlign = Graphics::kTextAlignCenter;

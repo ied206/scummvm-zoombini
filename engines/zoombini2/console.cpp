@@ -39,6 +39,8 @@
 
 namespace Zoombini2 {
 
+constexpr RGBColor Zoombini2Console::kDefaultPlotColor;
+
 StringParser::Result StringParser::parseSignedInt(const char *text, int32 &result) {
 	if (!text || text[0] == '\0')
 		return Result::kEmptyInput;
@@ -538,22 +540,24 @@ bool Zoombini2Console::parsePlotPoint(const char *xText, const char *yText, Comm
 	return true;
 }
 
-bool Zoombini2Console::parsePlotColor(const char *text, uint32 &color) {
+bool Zoombini2Console::parsePlotColor(const char *text, RGBColor &color) {
+	uint32 parsed = 0;
 	if (text && text[0] == '#') {
 		if (strlen(text) != 7) {
 			debugPrintf("A #RRGGBB color must contain exactly six hexadecimal digits.\n");
 			return false;
 		}
 		const Common::String hexadecimal = Common::String::format("0x%s", text + 1);
-		if (!parseUnsignedInt(hexadecimal.c_str(), color))
+		if (!parseUnsignedInt(hexadecimal.c_str(), parsed))
 			return false;
-	} else if (!parseUnsignedInt(text, color)) {
+	} else if (!parseUnsignedInt(text, parsed)) {
 		return false;
 	}
-	if (0xFFFFFF < color) {
+	if (0xFFFFFF < parsed) {
 		debugPrintf("Color must be a 24-bit RGB value (0xRRGGBB or #RRGGBB).\n");
 		return false;
 	}
+	color = RGBColor(static_cast<byte>(parsed >> 16), static_cast<byte>(parsed >> 8), static_cast<byte>(parsed));
 	return true;
 }
 
@@ -569,7 +573,7 @@ bool Zoombini2Console::CmdSub_PlotPoint(int argc, const char **argv) {
 	}
 
 	Common::Point32 point;
-	uint32 color = kDefaultPlotColor;
+	RGBColor color = kDefaultPlotColor;
 	if (!parsePlotPoint(argv[2], argv[3], point) || (argc == 5 && !parsePlotColor(argv[4], color))) {
 		debugPrintf("\n");
 		return true;
@@ -601,7 +605,7 @@ bool Zoombini2Console::CmdSub_PlotLine(int argc, const char **argv) {
 
 	Common::Point32 start;
 	Common::Point32 end;
-	uint32 color = kDefaultPlotColor;
+	RGBColor color = kDefaultPlotColor;
 	if (!parsePlotPoint(argv[2], argv[3], start) || !parsePlotPoint(argv[4], argv[5], end) || (argc == 7 && !parsePlotColor(argv[6], color))) {
 		debugPrintf("\n");
 		return true;
@@ -630,7 +634,7 @@ bool Zoombini2Console::CmdSub_PlotRect(int argc, const char **argv) {
 
 	Common::Point32 topLeft;
 	Common::Point32 bottomRight;
-	uint32 color = kDefaultPlotColor;
+	RGBColor color = kDefaultPlotColor;
 	if (!parsePlotPoint(argv[2], argv[3], topLeft) || !parsePlotPoint(argv[4], argv[5], bottomRight) || (argc == 7 && !parsePlotColor(argv[6], color))) {
 		debugPrintf("\n");
 		return true;

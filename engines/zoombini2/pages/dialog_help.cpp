@@ -166,15 +166,18 @@ void DialogHelp::freePage() {
 }
 
 void DialogHelp::drawMissingHelpText(ManagedSurface32 *screen) const {
-	const Graphics::Font *guiFont = _vm->_gfx->getSvmGuiFont();
-	if (!guiFont)
+	Gfx::TextConf conf;
+	conf.fontKind = Gfx::FontKind::kGuiFont;
+	conf.fillColor = Gfx::PredefinedColor::kBlack.toPixel(screen->format);
+	conf.hAlign = Graphics::kTextAlignCenter;
+	const int fontHeight = _vm->_gfx->getFontHeight(conf);
+	if (fontHeight <= 0)
 		return;
 
 	const char *text = _vm->isKorean() ? kMissingHelpTextKorean : kMissingHelpTextEnglish;
 	const Common::U32String message(text, Common::kUtf8);
-	const int y = kMissingHelpTextCenterY - guiFont->getFontHeight() / 2;
-	const uint32 textColor = screen->format.RGBToColor(0, 0, 0);
-	guiFont->drawString(screen, message, kMissingHelpTextX, y, kMissingHelpTextWidth, textColor, Graphics::kTextAlignCenter);
+	const int y = kMissingHelpTextCenterY - fontHeight / 2;
+	_vm->_gfx->drawString(screen, message, Common::Point32(kMissingHelpTextX, y), kMissingHelpTextWidth, conf);
 }
 
 void DialogHelp::onRenderContent(ManagedSurface32 *screen) {

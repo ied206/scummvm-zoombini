@@ -32,9 +32,6 @@ namespace Zoombini2 {
 DialogDebug::DialogDebug(Zoombini2Engine *vm)
 	: DialogBase(vm) {
 	_savedScreen = _vm->_gfx->createSurface(ManagedSurface32::kScreenSize);
-
-	if (!_vm->_gfx->loadTextFont(Gfx::TextColor::kWhite03))
-		warning("DialogDebug: Failed to load title font");
 }
 
 DialogDebug::~DialogDebug() {
@@ -140,19 +137,19 @@ void DialogDebug::preparePlot(const DialogDebugCommand &cmd) {
 	// Overlay the primitive on a snapshot of the current screen so the
 	// coordinate can be read against the live game scene.
 	_vm->_gfx->captureScreen(_savedScreen);
-	const RGBColor rgb(static_cast<byte>(cmd._plotColor >> 16), static_cast<byte>(cmd._plotColor >> 8), static_cast<byte>(cmd._plotColor));
-	const uint32 color = rgb.toPixel(_savedScreen->format);
+	const uint32 color = cmd._plotColor.toPixel(_savedScreen->format);
+	const Common::String colorText = cmd._plotColor.toString();
 	const Common::Point32 &start = cmd._plotStart;
 	const Common::Point32 &end = cmd._plotEnd;
 
 	switch (cmd._type) {
 	case DialogDebugCommand::Type::kPlotPoint:
 		_vm->_gfx->fillRect(_savedScreen, Common::Rect32(start.x, start.y, start.x + 1, start.y + 1), color);
-		_titleText = Common::String::format("[Plot Point] at (%d, %d) color(0x%06X)", start.x, start.y, cmd._plotColor);
+		_titleText = Common::String::format("[Plot Point] at (%d, %d) color(%s)", start.x, start.y, colorText.c_str());
 		break;
 	case DialogDebugCommand::Type::kPlotLine:
 		_vm->_gfx->drawLine(_savedScreen, start, end, color);
-		_titleText = Common::String::format("[Plot Line] from (%d, %d) to (%d, %d) color(0x%06X)", start.x, start.y, end.x, end.y, cmd._plotColor);
+		_titleText = Common::String::format("[Plot Line] from (%d, %d) to (%d, %d) color(%s)", start.x, start.y, end.x, end.y, colorText.c_str());
 		break;
 	case DialogDebugCommand::Type::kPlotRect: {
 		const Common::Point32 topRight(end.x - 1, start.y);
@@ -162,7 +159,7 @@ void DialogDebug::preparePlot(const DialogDebugCommand &cmd) {
 		_vm->_gfx->drawLine(_savedScreen, bottomLeft, bottomRight, color);
 		_vm->_gfx->drawLine(_savedScreen, start, bottomLeft, color);
 		_vm->_gfx->drawLine(_savedScreen, topRight, bottomRight, color);
-		_titleText = Common::String::format("[Plot Rect] from (%d, %d) to (%d, %d) color(0x%06X)", start.x, start.y, end.x, end.y, cmd._plotColor);
+		_titleText = Common::String::format("[Plot Rect] from (%d, %d) to (%d, %d) color(%s)", start.x, start.y, end.x, end.y, colorText.c_str());
 		break;
 	}
 	default:
@@ -171,16 +168,17 @@ void DialogDebug::preparePlot(const DialogDebugCommand &cmd) {
 }
 
 void DialogDebug::drawTitleText(ManagedSurface32 *screen) const {
-	if (_titleText.empty() || !_vm->_gfx->hasTextFont(Gfx::TextColor::kWhite03))
+	if (_titleText.empty())
 		return;
 	_vm->_gfx->fillRect(screen, Common::Rect32(0, 0, ManagedSurface32::kScreenSize.width, kTitleHeight), 0);
-	_vm->_gfx->drawText(screen, Gfx::TextColor::kWhite03, Common::Point32(kTitleX, kTitleY), _titleText);
+	Gfx::TextConf conf;
+	conf.fontKind = Gfx::FontKind::kDebugTitleFont;
+	conf.fillColor = Gfx::PredefinedColor::kWhite03.toPixel(screen->format);
+	_vm->_gfx->drawString(screen, _titleText, Common::Point32(kTitleX, kTitleY), Gfx::kNoMaxWidth, conf);
 }
 
 void DialogDebug::drawEscText(ManagedSurface32 *screen, const Common::String &keyLegend) const {
 	static constexpr const char *kEscText = "[ESC] close";
-	if (!_vm->_gfx->hasTextFont(Gfx::TextColor::kWhite03))
-		return;
 	Common::String text;
 	if (keyLegend.empty()) {
 		text = kEscText;
@@ -190,9 +188,12 @@ void DialogDebug::drawEscText(ManagedSurface32 *screen, const Common::String &ke
 			text += ' ';
 		text += kEscText;
 	}
-	const int escWidth = _vm->_gfx->getTextWidth(text, Gfx::TextColor::kWhite03);
-	_vm->_gfx->drawText(screen, Gfx::TextColor::kWhite03,
-						Common::Point32(ManagedSurface32::kScreenSize.width - escWidth - kTitleX, kTitleY), text);
+	Gfx::TextConf conf;
+	conf.fontKind = Gfx::FontKind::kDebugFont;
+	conf.fillColor = Gfx::PredefinedColor::kWhite03.toPixel(screen->format);
+	const int escWidth = _vm->_gfx->getTextWidth(text, conf);
+	_vm->_gfx->drawString(screen, text,
+						Common::Point32(ManagedSurface32::kScreenSize.width - escWidth - kTitleX, kTitleY), Gfx::kNoMaxWidth, conf);
 }
 
 void DialogDebug::onRenderContent(ManagedSurface32 *screen) {

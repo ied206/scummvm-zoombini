@@ -99,8 +99,6 @@ void InteractiveMenu::init() {
 	loadButtons();
 
 	_fileList = new SaveFileList(_vm, kFileListPos);
-	if (!_fileList->init())
-		warning("MenuScreenPage: Failed to load save-list fonts");
 	scanSaveFiles();
 
 	startMapMusic();
@@ -553,13 +551,6 @@ InteractiveMenu::SaveFileList::SaveFileList(Zoombini2Engine *vm, const Common::P
 	: _vm(vm), _pos(pos) {
 }
 
-bool InteractiveMenu::SaveFileList::init() {
-	return _vm->_gfx->loadTextFont(Gfx::TextColor::kDark00) &&
-		   _vm->_gfx->loadTextFont(Gfx::TextColor::kBlue01) &&
-		   _vm->_gfx->loadTextFont(Gfx::TextColor::kGreen02) &&
-		   _vm->_gfx->loadTextFont(Gfx::TextColor::kRed04);
-}
-
 void InteractiveMenu::SaveFileList::clear() {
 	_items.clear();
 	_readOnly.clear();
@@ -593,14 +584,19 @@ void InteractiveMenu::SaveFileList::draw(ManagedSurface32 *screen) const {
 			_vm->_gfx->drawPageRleBlock(screen, kSelectionBarPath, Common::Point32(_pos.x + kSelectionOffsetX, _pos.y + kSelectionOffsetY + row * kRowStride));
 
 		const bool readOnly = _readOnly[itemIndex] || _vm->isGameSaveWriteLocked(_items[itemIndex]);
-		Gfx::TextColor color = readOnly ? Gfx::TextColor::kRed04 : Gfx::TextColor::kDark00;
+		uint32 color = Gfx::PredefinedColor::kDark00.toPixel(screen->format);
+		if (readOnly)
+			color = Gfx::PredefinedColor::kRed04.toPixel(screen->format);
 		if (selected && kEditProvisional02 <= _editState)
-			color = Gfx::TextColor::kGreen02;
+			color = Gfx::PredefinedColor::kGreen02.toPixel(screen->format);
 		else if (!readOnly && selected && _editState == kEditPrefixMatch01)
-			color = Gfx::TextColor::kBlue01;
+			color = Gfx::PredefinedColor::kBlue01.toPixel(screen->format);
 
 		const Common::Point32 textPos(_pos.x + kSelectionOffsetX + kTextOffsetX, _pos.y + kSelectionOffsetY + kTextOffsetY + row * kRowStride);
-		_vm->_gfx->drawText(screen, color, textPos, _items[itemIndex]);
+		Gfx::TextConf conf;
+		conf.fontKind = Gfx::FontKind::kBmtFont;
+		conf.fillColor = color;
+		_vm->_gfx->drawString(screen, _items[itemIndex], textPos, Gfx::kNoMaxWidth, conf);
 	}
 }
 
@@ -869,10 +865,12 @@ bool InteractiveMenu::SaveFileList::canAppendCharacter(char c) const {
 		return false;
 
 	const int barWidth = _vm->_gfx->getPageRleBlockSize(kSelectionBarPath).width;
-	if (!_vm->_gfx->hasTextFont(Gfx::TextColor::kDark00) || barWidth == 0)
+	if (barWidth == 0)
 		return true;
 	const int fontHeight = _vm->isHebrew() ? kHebrewFontHeight : 0;
-	return _vm->_gfx->getTextWidth(_editBuffer, Gfx::TextColor::kDark00) < barWidth - fontHeight - 5;
+	Gfx::TextConf conf;
+	conf.fontKind = Gfx::FontKind::kBmtFont;
+	return _vm->_gfx->getTextWidth(_editBuffer, conf) < barWidth - fontHeight - 5;
 }
 
 char InteractiveMenu::SaveFileList::normalizeCharacter(char c) const {
