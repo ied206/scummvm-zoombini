@@ -148,8 +148,8 @@ public:
 		Common::Array<int> lower;
 		Common::Array<int> group;
 		Common::Array<int> subset;
-		Common::Array<int> level4Order;
-		int level4Features[3][2] = {};
+		Common::Array<int> l4Order;
+		int l4Features[3][2] = {};
 		/** Actors used as generator references and primary filter examples. */
 		int referenceActors[2] = {
 			-1,
@@ -166,7 +166,7 @@ public:
 	const GenerationInfo &generationInfo() const { return _generation; }
 	const Cell &initialCell(int cellIndex) const { return _initialCells[cellIndex]; }
 	/** Generate rules using the party and the shared random stream. */
-	void init(const Common::Array<ZmbTrait> &party, int difficulty, Random &random);
+	void init(const Common::Array<ZmbTrait> &party, int level, Random &random);
 	/** Place one roster entry in a crater. */
 	bool place(int cellIndex, int zoombiniIndex);
 	/** Advance one complete grid step and replace the result queues. */
@@ -409,23 +409,23 @@ private:
 	void loadLayout(int layout);
 	void clearCell(int column, int row);
 	void setFeature(int column, int row, Feature feature);
-	/** Count party features and select predicates/actors for the difficulty generator. */
+	/** Count party features and select predicates/actors for the level generator. */
 	void tally(const Common::Array<int> &group, int counts[5][6]) const;
 	Feature singleton(const Common::Array<int> &group) const;
 	Feature popular(const Common::Array<int> &group, int limit) const;
 	Feature unusedFeature(const Common::Array<int> &group);
 	int pick(const Common::Array<int> &candidates, Common::Array<int> &used);
 	int select(Common::Array<int> &used, Feature a, bool matchA, Feature b = Feature(), bool matchB = true, Feature c = Feature(), bool matchC = true);
-	/** Generate each difficulty branch and select distinct party actors as needed. */
+	/** Generate each level branch and select distinct party actors as needed. */
 	int generateEasy(int layout);
 	void generateMedium();
 	void generateHard();
-	void generateLevel4();
+	void generateL4();
 	/** Correct the level 4 conditional arrow after generation, before retaining the initial board. */
-	void correctLevel4Arrow();
-	int pickLevel4Singleton(Feature &feature);
-	bool pickLevel4Constrained(int excludedActor, Feature &feature);
-	Feature pickLevel4Pair(Feature primary, Feature secondary, int excludedActor);
+	void correctL4Arrow();
+	int pickL4Singleton(Feature &feature);
+	bool pickL4Constrained(int excludedActor, Feature &feature);
+	Feature pickL4Pair(Feature primary, Feature secondary, int excludedActor);
 	int pickUnique(Common::Array<int> &used);
 	int pickDifferent(int first, Common::Array<int> &used, int minimum);
 	/** Resolve a move, remove a collision pair, and rotate triggered devices. */
@@ -520,8 +520,8 @@ private:
 	/** Path format for the board backdrop selected by the generated layout. */
 	static constexpr const char *kBackgroundFormat = "#bmp/mystic_marsh/background%d";
 	/** Existing backdrop used when the internal Level 4 layout selects missing background 6. */
-	static constexpr int kLevel4FallbackBackgroundIndex = 1;
-	static constexpr int kLevel4RejectVisualCellIndex = 8 * MysticMarshGrid::kRows;
+	static constexpr int kL4FallbackBackgroundIndex = 1;
+	static constexpr int kL4RejectVisualCellIndex = 8 * MysticMarshGrid::kRows;
 	static constexpr int kRejectCellType = 58;
 	/** Path format for the drop-area mask corresponding to the generated background index. */
 	static constexpr const char *kAreaFormat = "bmp/mystic_marsh/area%d.bmt";
@@ -674,7 +674,7 @@ private:
 	Common::Array<Effect> _effects;
 	/** Background variant, released count, active placement, tick/lock timing, and Go state. */
 	int _backgroundIndex = 1;
-	ManagedSurface32 *_level4Background = nullptr;
+	ManagedSurface32 *_l4Background = nullptr;
 	int _freed = 0;
 	int _placingZoombini = -1;
 	int _placingSlot = -1;

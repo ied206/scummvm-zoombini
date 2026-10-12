@@ -41,7 +41,7 @@ class PuzzleSnowboard : public PuzzleBase {
 public:
 	/** Construct Snowboard Gulch for @p vm. */
 	PuzzleSnowboard(Zoombini2Engine *vm);
-	/** Release the lane, trait, board, scenery, and active-path resources. */
+	/** Release the cached trail overlay, loaded sounds, and page-owned animations. */
 	~PuzzleSnowboard() override;
 
 	/** Generate the decision tree and place the puzzle roster at the start. */
@@ -83,7 +83,9 @@ private:
 	static constexpr const char *kTraitFormat = "bmp/snowboard/traits/%d-%d";
 	/** PAT route format for the hill ride selected by a decision-tree leaf code. */
 	static constexpr const char *kPatFormat = "bmp/snowboard/pat/easy/%d.pat";
-	/** RLE cover drawn over the finish area on Levels 2 and 3. */
+	/** PAT route format for level 4 hill paths selected by their route code. */
+	static constexpr const char *kL4PatFormat = "bmp/snowboard/pat/hard/%d.pat";
+	/** RLE cover drawn over the finish area from L2, L3 and L4. */
 	static constexpr const char *kBoardPath = "bmp/snowboard/BOARD01";
 	/** One-shot animation that covers the finish area during the ride sequence. */
 	static constexpr const char *kBoardAnimPath = "bmp/snowboard/BOARD";
@@ -137,23 +139,29 @@ private:
 	static constexpr const char *kPickupAnimationPath = "bmp/zombis/pris/pris.anm";
 	/** Shared celebration animation used for successful riders after the run. */
 	static constexpr const char *kCelebrationAnimationPath = "bmp/zombis/attente/attenteZomb.anm";
-	/** Counts for physical lanes, decision tests, exit slots, and animation-bank frame roles. */
+	/** L1-L3 physical lane count. */
 	static constexpr int kLaneCount = 4;
+	/** Number of lanes used by L4. */
+	static constexpr int kL4LaneCount = 8;
 	static constexpr int kRuleCount = 3;
 	static constexpr int kEndpointCount = 33;
+	static constexpr int kMaxRuleCount = 7;
+	static constexpr int kL4EndpointCount = 48;
 	static constexpr int kRevealAnimIndex = 0;
 	static constexpr int kHitAnimIndex = 1;
 	static constexpr int kFinishAnimIndex = 2;
 	static constexpr int kHideAnimIndex = 3;
 	static constexpr int kIdleAnimIndex = 4;
 
-	/** One trait test in the four-leaf decision tree. */
+	/** One trait test, or two different trait tests joined by OR. */
 	struct TreeNode {
 		/** Trait index tested by this node. */
 		ZmbTrait::TraitKind traitIndex;
+		/** Second trait tested at level 4. */
+		ZmbTrait::TraitKind alternateTraitIndex;
 		/** Primary value that selects the matching branch. */
 		byte primaryValue;
-		/** Second matching value used at difficulty 3. */
+		/** Second matching value used at difficulties 3 and 4. */
 		byte alternateValue;
 	};
 
@@ -184,6 +192,71 @@ private:
 		Common::Point32(295, 398),
 		Common::Point32(428, 402),
 		Common::Point32(551, 362),
+	};
+	/** Retained eight-route anchors ordered by ascending PAT leaf code. */
+	static constexpr Common::Point32 kL4ObstaclePositions[kL4LaneCount] = {
+		Common::Point32(92, 347),
+		Common::Point32(128, 443),
+		Common::Point32(241, 427),
+		Common::Point32(323, 432),
+		Common::Point32(405, 437),
+		Common::Point32(491, 415),
+		Common::Point32(580, 373),
+		Common::Point32(612, 283),
+	};
+	/**
+	 * Retained exit slots for L4, including its offscreen overflow positions.
+	 * This exit points were excavated from the v1.0US demo.
+	 */
+	static constexpr PathPoint kL4ExitPoints[kL4EndpointCount] = {
+		{21, 341, 7},
+		{26, 387, 7},
+		{51, 366, 7},
+		{-51, 366, 7},
+		{-51, 366, 7},
+		{-51, 366, 7},
+		{75, 491, 8},
+		{76, 448, 8},
+		{115, 483, 8},
+		{76, 650, 8},
+		{76, 650, 8},
+		{76, 650, 8},
+		{191, 514, 9},
+		{240, 533, 9},
+		{219, 506, 9},
+		{240, 650, 9},
+		{240, 650, 9},
+		{240, 650, 9},
+		{303, 529, 10},
+		{352, 516, 10},
+		{325, 503, 10},
+		{250, 650, 10},
+		{250, 650, 10},
+		{250, 650, 10},
+		{407, 517, 11},
+		{457, 503, 11},
+		{435, 525, 11},
+		{511, 650, 11},
+		{511, 650, 11},
+		{511, 650, 11},
+		{516, 526, 12},
+		{566, 512, 12},
+		{532, 490, 12},
+		{516, 650, 12},
+		{516, 650, 12},
+		{516, 650, 12},
+		{675, 498, 13},
+		{712, 469, 13},
+		{669, 459, 13},
+		{850, 450, 13},
+		{850, 450, 13},
+		{850, 450, 13},
+		{741, 350, 14},
+		{741, 308, 14},
+		{703, 327, 14},
+		{850, 310, 14},
+		{850, 310, 14},
+		{850, 310, 14},
 	};
 	/** Candidate endpoints for classified riders. */
 	static constexpr PathPoint kExitPoints[kEndpointCount] = {
@@ -227,26 +300,56 @@ private:
 		Common::Point32(619, 188),
 		Common::Point32(689, 188),
 	};
-	/** Trait-hint positions at difficulty 3. */
+	/** Trait-hint positions at level 3. */
 	static constexpr Common::Point32 kHardHints[4] = {
 		Common::Point32(648, 111),
 		Common::Point32(642, 141),
 		Common::Point32(617, 176),
 		Common::Point32(613, 206),
 	};
-
+	/** Primary depth hints followed by alternate depth hints at level 4. */
+	static constexpr Common::Point32 kL4Hints[6] = {
+		Common::Point32(648, 111),
+		Common::Point32(642, 141),
+		Common::Point32(617, 176),
+		Common::Point32(613, 206),
+		Common::Point32(163, 366),
+		Common::Point32(295, 398),
+	};
 	/** Capture the dropped rider after a release over the board target. */
 	static void onBoardDrop(void *context, int targetIndex, int zoombiniIndex);
 	/** Start the PAT ride for puzzle-roster entry @p zoombiniIndex. */
 	void captureZoombini(int zoombiniIndex);
 	/** Load trait icons, board visuals, scenery, and obstacle animations. */
 	void loadGraphics();
-	/** Generate the decision tree for the selected difficulty. */
+	/**
+	 * Draw the eight L4 trails over the available slope background.
+	 *
+	 * @remark The demo executable shows that L4 uses 8 lanes, while L1-L3 use four.
+	 * L1-L3 use @c snowboard-EASY.bb; the corresponding HARD background bitmap is missing.
+	 * Unlike MysticMarsh, reconstructing it is nearly impossible without any serious photo editing,
+	 * which ScummVM project does not aim to.
+	 * Instead, draw trails to provide a best-effort visual guide to the L4 routes.
+	 */
+	void drawL4Trail(ManagedSurface32 *screen);
+	/** Draw the six full-size depth hints at the retained demo positions. */
+	void drawL4Legend(ManagedSurface32 *screen) const;
+	/** Generate the decision tree for the selected level. */
 	void generateTree();
+	/** Generate and rank bounded candidates for the retained fourth-tier rules. */
+	void generateL4Tree();
+	/** Generate one original two-trait OR tree in the demo's RNG order. */
+	void generateL4Candidate();
+	/** Scale a random sample using the demo's range-selection formula. */
+	int drawL4Value(int count);
+	/** Preserve the demo's nested boolean comparisons in its retry gate. */
+	bool hasRepeatedL4Rule() const;
 	/** Pick a value for @p traitIndex that occurs in the active roster. */
 	byte pickPresentValue(ZmbTrait::TraitKind traitIndex);
 	/** Count currently selectable Zoombinis in each classified lane. */
-	void countLanes(byte (&counts)[kLaneCount]) const;
+	void countLanes(Common::Array<byte> &counts) const;
+	/** Return the authored obstacle position for the selected lane family. */
+	const Common::Point32 &obstaclePosition(int lane) const;
 	/** Classify @p zoombini and return its destination lane. */
 	int classifyZoombini(const ZoombiniRunner *zoombini) const;
 	/** Hide an obstacle in one lane that still has a selectable rider. */
@@ -269,7 +372,11 @@ private:
 	void drawTraitHint(ManagedSurface32 *screen, const TreeNode &node, bool alternate, const Common::Point32 &pos) const;
 
 	/** Generated root and child trait tests for the current party. */
-	TreeNode _tree[kRuleCount] = {};
+	TreeNode _tree[kMaxRuleCount] = {};
+	/** Cached surface of L4 trail drawings. */
+	ManagedSurface32 *_l4TrailOverlay = nullptr;
+	int _laneCount = kLaneCount;
+	int _ruleCount = kRuleCount;
 	/** Board drop region used when a dragged rider is released. */
 	Common::Array<ZmbDropTarget> _dropTargets;
 	/** Shared celebration grid for successful riders after completion. */
@@ -282,18 +389,18 @@ private:
 	Animation *_engineAnim = nullptr;
 	/** Loaded obstacle and scenery animations. */
 	Animation *_obstacleAnims[5] = {};
-	/** Whether each physical obstacle is visible. */
-	bool _obstacleVisible[kLaneCount] = {};
-	/** Whether the active rider has already contacted each obstacle. */
-	bool _obstacleHit[kLaneCount] = {};
-	/** Whether a lane is playing its disappear sequence. */
-	bool _obstacleHiding[kLaneCount] = {};
-	/** Whether a lane is playing its squash and recovery sequence. */
-	bool _obstacleHitAnimating[kLaneCount] = {};
+	/** Obstacle visibility by lane: 4 elements for L1-L3 and 8 for L4. */
+	Common::Array<bool> _obstacleVisible;
+	/** Rider hit state by lane: 4 elements for L1-L3 and 8 for L4. */
+	Common::Array<bool> _obstacleHit;
+	/** Hide-animation state by lane: 4 elements for L1-L3 and 8 for L4. */
+	Common::Array<bool> _obstacleHiding;
+	/** Hit-animation state by lane: 4 elements for L1-L3 and 8 for L4. */
+	Common::Array<bool> _obstacleHitAnimating;
 	/** A lane change waits for collision speech and squash animations. */
 	bool _obstacleChangePending = false;
 	/** Exit points already assigned to completed rides. */
-	bool _usedExitPoint[kEndpointCount] = {};
+	bool _usedExitPoint[kL4EndpointCount] = {};
 	/** Collision threshold after which no further riders are accepted. */
 	int _collisionQuota = 2;
 	/** Number of visible-obstacle contacts during this puzzle instance. */
@@ -323,11 +430,12 @@ private:
 	int _boardFacingSector = 8;
 	/** Number of movement updates since the last board-facing adjustment. */
 	int _boardFacingDelay = 100;
-	/** Tick at which each visible obstacle began its introduction. */
-	uint32 _obstacleRevealStart[kLaneCount] = {};
-	/** Tick at which each obstacle began hiding or reacting to a hit. */
-	uint32 _obstacleHideStart[kLaneCount] = {};
-	uint32 _obstacleHitStart[kLaneCount] = {};
+	/** Obstacle reveal-start ticks by lane: 4 elements for L1-L3 and 8 for L4. */
+	Common::Array<uint32> _obstacleRevealStart;
+	/** Obstacle hide-start ticks by lane: 4 elements for L1-L3 and 8 for L4. */
+	Common::Array<uint32> _obstacleHideStart;
+	/** Obstacle hit-start ticks by lane: 4 elements for L1-L3 and 8 for L4. */
+	Common::Array<uint32> _obstacleHitStart;
 	/** Tick at which the page began its completion animation. */
 	uint32 _finishAnimationStart = 0;
 	/** Whether the shared speech queue still gates another collision. */

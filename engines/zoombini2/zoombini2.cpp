@@ -349,14 +349,10 @@ Zoombini2Engine::DebugRouteRequestResult Zoombini2Engine::requestDebugMapTransit
 		return DebugRouteRequestResult::kNoActivePage;
 	if (4 < level)
 		return DebugRouteRequestResult::kInvalidLevel;
-	if (level == 4 && !supportsInternalPracticeLevel4(targetPageId))
-		return DebugRouteRequestResult::kUnsupportedLevel4;
 
 	const uint targetPartySize = InteractiveMap::getPracticePartySize(targetPageId);
 	if (targetPartySize == 0 && (level != 0 || !_isSavedGame))
 		return DebugRouteRequestResult::kPracticeRequiresPuzzle;
-	if (level == 0 && !_isSavedGame && _state->getLevel() == 4 && !supportsInternalPracticeLevel4(targetPageId) && targetPartySize != 0)
-		return DebugRouteRequestResult::kUnavailableCurrentLevel4;
 
 	const int rescuedBoolies = level == 0 ? _state->_rescuedBoolieCount : 0;
 	if (TransitionMapTrans::getDestPage(sourcePageId, routeBranch, rescuedBoolies) != targetPageId)
@@ -381,25 +377,8 @@ Zoombini2Engine::DebugRouteRequestResult Zoombini2Engine::requestDebugMapTransit
 	return DebugRouteRequestResult::kQueued;
 }
 
-bool Zoombini2Engine::supportsInternalPracticeLevel4(PageId pageId) {
-	switch (pageId) {
-	case kPageCrazyTurtle:
-	case kPageWaterslide:
-	case kPageAquacube:
-	case kPageMysticMarsh:
-	case kPageMagicWall:
-	case kPageWallOfFleens:
-	case kPageBoolies:
-		return true;
-	case kPageChezNorf:
-	case kPageSnowboard:
-	default:
-		return false;
-	}
-}
-
 void Zoombini2Engine::setPracticeLevel(int level) {
-	if ((1 <= level && level <= 3) || (level == 4 && _allowCutLevel4PracticePuzzles))
+	if ((1 <= level && level <= 3) || (level == 4 && _allowCutL4PracticePuzzles))
 		_practiceLevel = level;
 }
 
@@ -794,6 +773,7 @@ void Zoombini2Engine::refreshEngineSettings() {
 		_hasFrameIndex = false;
 	}
 	_debugHotkeysEnabled = ConfMan.getBool(Zoombini2MetaEngine::kConfigDebugHotkeys);
+	_chezNorfSubtitlesEnabled = ConfMan.getBool(Zoombini2MetaEngine::kConfigChezNorfClueSubtitles);
 	const int audioOutputValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigAudioOutputMode);
 	const Zoombini2MetaEngine::AudioOutputMode audioOutputMode = static_cast<Zoombini2MetaEngine::AudioOutputMode>(audioOutputValue);
 	_stereoOutputEnabled = audioOutputMode == Zoombini2MetaEngine::AudioOutputMode::kStereoPlayback;
@@ -813,9 +793,9 @@ void Zoombini2Engine::refreshEngineSettings() {
 	_useAquacubeSafeFirstMove = ConfMan.getBool(Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove);
 	const int bezierCurveDataTypeValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigBezierCurveDataType);
 	_bezierCurveDataType = static_cast<Zoombini2MetaEngine::BezierCurveDataType>(bezierCurveDataTypeValue);
-	_fixFleenDepartStreak = ConfMan.getBool(Zoombini2MetaEngine::kConfigFixFleenDepartureStreak);
+	_fixFleenDepartStreak = ConfMan.getBool(Zoombini2MetaEngine::kConfigFixFleenDepartStreak);
 	_enhancedKbdShortcuts = ConfMan.getBool(Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts);
-	_allowCutLevel4PracticePuzzles = ConfMan.getBool(Zoombini2MetaEngine::kConfigRestoreL4PracticePuzzles);
+	_allowCutL4PracticePuzzles = ConfMan.getBool(Zoombini2MetaEngine::kConfigRestoreL4PracticePuzzles);
 	const int logicPacingValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigLogicPacingMode);
 	_logicPacingMode = static_cast<Zoombini2MetaEngine::LogicPacingMode>(logicPacingValue);
 	if (!_debugHotkeysEnabled) {
@@ -1223,7 +1203,7 @@ bool Zoombini2Engine::configurePracticeBootParamLaunch() {
 
 	const PageId pageId = static_cast<PageId>(bootParam / kPracticeBootParamPageFactor);
 	const int level = bootParam % kPracticeBootParamPageFactor;
-	if (InteractiveMap::getPracticePartySize(pageId) == 0 || level < 1 || 4 < level || (level == 4 && !supportsInternalPracticeLevel4(pageId))) {
+	if (InteractiveMap::getPracticePartySize(pageId) == 0 || level < 1 || 4 < level) {
 		warning("Zoombini2: unsupported practice boot parameter %d", bootParam);
 		return false;
 	}
@@ -1388,8 +1368,8 @@ void Zoombini2Engine::switchPage(PageId pageId) {
 	}
 
 	if (_currentPage) {
-		// The original publishes one effective difficulty per page switch. Puzzle
-		// destinations carry their stored world difficulty, while shelter, movie,
+		// The original publishes one effective level per page switch. Puzzle
+		// destinations carry their stored world level, while shelter, movie,
 		// and transition destinations pass 0, which is coerced to level 1. Mirror
 		// that coercion so non-puzzle pages (e.g. Booliewood) always resolve the
 		// easy help sheet instead of a missing medium/hard one.
