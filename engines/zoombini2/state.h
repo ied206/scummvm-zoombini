@@ -447,7 +447,7 @@ public:
 	int32 _pageLevel[100];
 	/** Saturating visit counters indexed by `5 * pageId + visitKind`. */
 	byte _pageVisitCounts[500];
-	/** Per-page perfect-clear counts toward the next difficulty increase; each count resets after three. */
+	/** Per-page perfect-clear counts toward the next level increase; each count resets after three. */
 	int32 _perfectClearCount[100];
 	/** Total rescued Boolies used for Booliewood development and the 400-point finale. */
 	int32 _rescuedBoolieCount;

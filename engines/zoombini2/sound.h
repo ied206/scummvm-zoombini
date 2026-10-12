@@ -133,6 +133,8 @@ public:
 	void stop(int id, int sampleSlot = 0);
 	/** Stop every sample slot or preserve and pause the streamed handle belonging to @p id. */
 	void stopAll(int id);
+	/** Stop active handles in @p category without releasing their sound records. */
+	void stopAll(SoundCategory category);
 	/** Pause every active handle belonging to @p id. */
 	void pause(int id);
 	/** Resume every paused handle belonging to @p id. */

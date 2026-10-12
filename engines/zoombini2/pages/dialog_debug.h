@@ -32,6 +32,7 @@ namespace Zoombini2 {
 
 class Zoombini2Engine;
 class Animation;
+class BitBlock;
 class ManagedSurface32;
 
 /**
@@ -49,6 +50,8 @@ struct DialogDebugCommand {
 		kDrawAreaMask,
 		/** Show frames of an animation or sprite resource. */
 		kDrawAnimation,
+		/** Show one decoded bitmap. */
+		kDrawImage,
 		/** Plot one pixel. */
 		kPlotPoint,
 		/** Plot a line */
@@ -61,6 +64,8 @@ struct DialogDebugCommand {
 	Type _type = Type::kNone;
 	/** Animation (.an) or sprite (.rb) resource path for @ref DialogDebugCommand::Type::kDrawAnimation. */
 	Common::Path _animPath;
+	/** Bitmap resource path for @ref DialogDebugCommand::Type::kDrawImage. */
+	Common::Path _imagePath;
 	/** Zero-based starting frame for @ref DialogDebugCommand::Type::kDrawAnimation. */
 	int _startFrame = 0;
 	/** Pixel position, first line endpoint, or rectangle's top-left corner for a plot command. */
@@ -77,6 +82,11 @@ struct DialogDebugCommand {
 		_type = Type::kDrawAnimation;
 		_animPath = path;
 		_startFrame = startFrame;
+	}
+	/** Select a bitmap preview for @p path. */
+	void setDrawImage(const Common::Path &path) {
+		_type = Type::kDrawImage;
+		_imagePath = path;
 	}
 	/** Plot @p point using @p color. */
 	void setPlotPoint(const Common::Point32 &point, const RGBColor &color) {
@@ -105,6 +115,7 @@ struct DialogDebugCommand {
  *
  * The area-mask view snapshots the screen on open and masks rejected drop areas with black.
  * The animation view renders resource frames over a blank sheet and permits manual frame stepping.
+ * The bitmap view renders an independently decoded image over white.
  * Plot views snapshot the current screen and draw one primitive over it through the shared graphics interface.
  * Gameplay timing is paused until the view closes.
  * Every view closes on any click or ESC key.
@@ -137,11 +148,13 @@ public:
 private:
 	/** Release the loaded animation or sprite, if any. */
 	void freeAnimation();
+	/** Release the independently loaded preview bitmap. */
+	void freeImage();
 	/** Return the number of frames in the loaded animation view. */
 	int getFrameCount() const;
 	/** Refresh the animation title from the current frame index. */
 	void updateAnimationTitle();
-	/** Prepare the plot canvas and title, drawing rectangle edges before clipping so offscreen edges stay offscreen. */
+	/** Prepare the plot canvas and title, clipping primitive edges to the screen. */
 	void preparePlot(const DialogDebugCommand &cmd);
 	/** Draw the stored title line over a title bar at the top of @p screen. */
 	void drawTitleText(ManagedSurface32 *screen) const;
@@ -158,6 +171,8 @@ private:
 	Common::String _titleText;
 	/** Loaded animation for the animation view, or nullptr. */
 	Animation *_animation = nullptr;
+	/** Bitmap released when its preview closes. */
+	BitBlock *_image = nullptr;
 	/** Whether the active animation view uses one page-cached RLE sprite. */
 	bool _singleFrameSprite = false;
 	/** Resource path of the loaded animation or sprite. */

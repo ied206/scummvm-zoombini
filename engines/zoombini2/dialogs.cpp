@@ -600,16 +600,19 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	_colorAssistPopUp->appendEntry(_("Original colors"), static_cast<uint32>(Zoombini2MetaEngine::ColorAssistMode::kOriginal));
 	_colorAssistPopUp->appendEntry(_("Enhanced color distinction"), static_cast<uint32>(Zoombini2MetaEngine::ColorAssistMode::kEnhancedDistinction));
 	_colorAssistPopUp->appendEntry(_("Red-green color blind assist"), static_cast<uint32>(Zoombini2MetaEngine::ColorAssistMode::kRedGreenBlindAssist));
-	_fixFleenDepartureStreakCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.FixFleenDepartureStreak",
-															   _("Remove stray streaks from fleeing Fleens"),
-															   _("Hides stray brown streaks in some Fleen departure frames in Magic Mirrors."));
 	_enhancedKbdShortcutsCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.EnhancedKbdShortcuts",
 															_("Enable enhanced keyboard shortcuts"),
 															_("Enables some ScummVM-only keyboard shortcuts for quality of life improvements."));
+	_fixFleenDepartStreakCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.FixFleenDepartStreak",
+															_("Magic Mirrors: Remove stray streaks from fleeing Fleens"),
+															_("Hides stray brown streaks in some Fleen departure frames in Magic Mirrors."));
+	_chezNorfClueSubtitlesCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ChezNorfClueSubtitles",
+															 _("Chez Norf: Show English subtitles on Norf clues"),
+															 _("Shows the original English clues."));
 	if (Common::checkGameGUIOption(GAMEOPTION_HELP_PAGE_COLOR_KEYING, ConfMan.get("guioptions", domain))) {
-		_transparentHelpPagesCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.TransparentHelpPages",
-																_("Remove solid color behind help text"),
-																_("Uses the help sheet's corner color as a transparency key for affected releases."));
+		_helpDialogTransparentBodyCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.HelpDialogTransparentBody",
+																	 _("Remove solid color behind body in help dialogs"),
+																	 _("Uses the help sheet's corner color as a transparency key for affected releases."));
 	}
 
 	new SeparatorWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GameplayAdjustmentSeparator");
@@ -626,7 +629,10 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 															 _("On level three, swaps the hidden axes of two levers if the first direct lever press would enter a Fleen cell."));
 	_allowRestoreL4PracticePuzzlesCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.RestoreL4PracticePuzzles",
 																	 _("Restore Level 4 puzzles in practice mode"),
-																	 _("Adds a Level 4 practice-map tab, giving access to a restored level 4. Puzzles without a recovered level remain at Level 3."));
+																	 _("Make Level 4 accessible in practice-mode map legend. "
+																	   "Even though the Level 4 was cut from the final release, most of its logic was retained in the original binary. "
+																	   "Level 4 logic for Chez Norf, Snowboard Gulch was recovered from the demo, which actually serves as a beta binary. "
+																	   "Mystic Marsh, Snowboard Gulch lacks the background resourcce for level 4; This option reconstructs them with best-effort. "));
 	const Common::U32String prngAlgorithmTooltip = _("Selects the pseudo random number generator algorithm.");
 	_prngAlgorithmLabel = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.PrngAlgorithmLabel", _("PRNG Algorithm:"), prngAlgorithmTooltip);
 	_prngAlgorithmLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
@@ -694,9 +700,10 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 		.addWidget("ColorAssistLabel", "", optionLabelWidth, lineHeight)
 		.addWidget("ColorAssist", "", 210)
 		.closeLayout()
-		.addWidget("FixFleenDepartureStreak", "Checkbox")
 		.addWidget("EnhancedKbdShortcuts", "Checkbox")
-		.addWidget("TransparentHelpPages", "Checkbox")
+		.addWidget("FixFleenDepartStreak", "Checkbox")
+		.addWidget("ChezNorfClueSubtitles", "Checkbox")
+		.addWidget("HelpDialogTransparentBody", "Checkbox")
 		.addSpace(10)
 		.addWidget("GameplayAdjustmentSeparator", "", -1, 2)
 		.addWidget("GameplayAdjustment", "", -1)
@@ -763,11 +770,12 @@ void Zoombini2OptionsWidget::load() {
 		_colorAssistPopUp->setSelectedTag(static_cast<uint32>(Zoombini2MetaEngine::ColorAssistMode::kOriginal));
 		break;
 	}
-	_fixFleenDepartureStreakCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigFixFleenDepartureStreak, _domain));
 	_enhancedKbdShortcutsCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _domain));
-	if (_transparentHelpPagesCheckbox)
-		_transparentHelpPagesCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigTransparentHelpPages, _domain));
+	_fixFleenDepartStreakCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigFixFleenDepartStreak, _domain));
+	if (_helpDialogTransparentBodyCheckbox)
+		_helpDialogTransparentBodyCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigHelpDialogTransparentBody, _domain));
 	_debugHotkeysCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigDebugHotkeys, _domain));
+	_chezNorfClueSubtitlesCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigChezNorfClueSubtitles, _domain));
 	_greedyWaterslideCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _domain));
 	_aquacubeSafeFirstMoveCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove, _domain));
 	_allowRestoreL4PracticePuzzlesCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigRestoreL4PracticePuzzles, _domain));
@@ -793,11 +801,12 @@ bool Zoombini2OptionsWidget::save() {
 	ConfMan.setInt(Zoombini2MetaEngine::kConfigAudioOutputMode, static_cast<int>(audioOutputMode), _domain);
 	ConfMan.setInt(Zoombini2MetaEngine::kConfigBezierCurveDataType, static_cast<int>(bezierCurveDataType), _domain);
 	ConfMan.setInt(Zoombini2MetaEngine::kConfigColorAssistMode, static_cast<int>(colorAssistMode), _domain);
-	ConfMan.setBool(Zoombini2MetaEngine::kConfigFixFleenDepartureStreak, _fixFleenDepartureStreakCheckbox->getState(), _domain);
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _enhancedKbdShortcutsCheckbox->getState(), _domain);
-	if (_transparentHelpPagesCheckbox)
-		ConfMan.setBool(Zoombini2MetaEngine::kConfigTransparentHelpPages, _transparentHelpPagesCheckbox->getState(), _domain);
+	ConfMan.setBool(Zoombini2MetaEngine::kConfigFixFleenDepartStreak, _fixFleenDepartStreakCheckbox->getState(), _domain);
+	if (_helpDialogTransparentBodyCheckbox)
+		ConfMan.setBool(Zoombini2MetaEngine::kConfigHelpDialogTransparentBody, _helpDialogTransparentBodyCheckbox->getState(), _domain);
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigDebugHotkeys, _debugHotkeysCheckbox->getState(), _domain);
+	ConfMan.setBool(Zoombini2MetaEngine::kConfigChezNorfClueSubtitles, _chezNorfClueSubtitlesCheckbox->getState(), _domain);
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _greedyWaterslideCheckbox->getState(), _domain);
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove, _aquacubeSafeFirstMoveCheckbox->getState(), _domain);
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigRestoreL4PracticePuzzles, _allowRestoreL4PracticePuzzlesCheckbox->getState(), _domain);

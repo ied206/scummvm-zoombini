@@ -85,12 +85,12 @@ const char *DialogHelp::getLevelHelpFileSuffix(int level) {
 }
 
 bool DialogHelp::isPageValid(PageId pageId, int level, int sheet) {
-	const char *difficultySuffix = getLevelHelpFileSuffix(level);
-	if (!difficultySuffix)
+	const char *levelSuffix = getLevelHelpFileSuffix(level);
+	if (!levelSuffix)
 		return false;
 
 	// Construct help page path
-	Common::String path = Common::String::format(kHelpPageFormat, static_cast<int>(pageId), difficultySuffix, sheet);
+	Common::String path = Common::String::format(kHelpPageFormat, static_cast<int>(pageId), levelSuffix, sheet);
 
 	// Check if file exists in archive
 	return _vm->hasResource(path);
@@ -105,7 +105,7 @@ bool DialogHelp::open(PageId pageId, int level) {
 	_currentPageId = pageId;
 	_currentLevel = level;
 	_currentSheet = 1;
-	_transparentHelpPages = (_vm->getFeatures() & GF_Z2_SOLID_HELP_PAGES) != 0 && ConfMan.getBool(Zoombini2MetaEngine::kConfigTransparentHelpPages);
+	_transparentHelpPages = (_vm->getFeatures() & GF_Z2_SOLID_HELP_PAGES) != 0 && ConfMan.getBool(Zoombini2MetaEngine::kConfigHelpDialogTransparentBody);
 
 	_vm->setDialogPaused(true);
 
@@ -147,12 +147,12 @@ bool DialogHelp::loadPage(PageId pageId, int level, int sheet) {
 	// Free existing sheet
 	freePage();
 
-	const char *difficultySuffix = getLevelHelpFileSuffix(level);
-	if (!difficultySuffix)
+	const char *levelSuffix = getLevelHelpFileSuffix(level);
+	if (!levelSuffix)
 		return false;
 
 	// Construct help sheet path
-	Common::String path = Common::String::format(kHelpPageFormat, static_cast<int>(pageId), difficultySuffix, sheet);
+	Common::String path = Common::String::format(kHelpPageFormat, static_cast<int>(pageId), levelSuffix, sheet);
 
 	// Load help page
 	if (!_vm->_gfx->loadPageBitBlock(path))

@@ -130,7 +130,7 @@ protected:
 	void drawPrimaryPageLayer(ManagedSurface32 *screen);
 	/** Render active roster entries in stable ascending logical-Y order, with the held entry last. */
 	void renderZoombinis(ManagedSurface32 *screen) const;
-	/** Selected difficulty captured for this puzzle instance. */
+	/** Selected level captured for this puzzle instance. */
 	int _puzzleLevel;
 	/** Path of the first-layer background used by puzzle-specific redraws. */
 	Common::String _backgroundPath;
