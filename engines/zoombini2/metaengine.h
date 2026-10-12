@@ -63,12 +63,14 @@ public:
 	};
 	/** Target configuration key selecting datatype for Bezier curve calculations. */
 	static constexpr const char *kConfigBezierCurveDataType = "bezier_curve_datatype";
-	/** Target configuration key hiding the stray Fleen departure streaks. */
-	static constexpr const char *kConfigFixFleenDepartureStreak = "fix_fleen_depart_streak";
 	/** Target configuration key enabling the enhanced keyboard shortcut set. */
 	static constexpr const char *kConfigEnhancedKbdShortcuts = "enhanced_kbd_shortcuts";
+	/** Target configuration key hiding the stray Fleen departure streaks. */
+	static constexpr const char *kConfigFixFleenDepartStreak = "fix_fleen_depart_streak";
 	/** Target configuration key making solid help-sheet backgrounds transparent. */
-	static constexpr const char *kConfigTransparentHelpPages = "transparent_help_pages";
+	static constexpr const char *kConfigHelpDialogTransparentBody = "help_dialog_transparent_body";
+	/** Target configuration key enabling optional English Norf clue subtitles. */
+	static constexpr const char *kConfigChezNorfClueSubtitles = "cheznorf_clue_subtitles";
 	/** Target configuration key enabling the developer hotkeys. */
 	static constexpr const char *kConfigDebugHotkeys = "debug_hotkeys";
 	/** Target configuration key selecting the alternate level-one Waterslide pairing. */

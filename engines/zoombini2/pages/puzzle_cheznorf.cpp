@@ -20,7 +20,6 @@
  */
 
 #include "zoombini2/pages/puzzle_cheznorf.h"
-#include "common/debug.h"
 #include "zoombini2/graphics.h"
 #include "zoombini2/random.h"
 #include "zoombini2/scripts.h"
@@ -56,6 +55,18 @@ constexpr Common::Point32 PuzzleChezNorf::kFoodPositions[9];
 constexpr Common::Point32 PuzzleChezNorf::kFoodOffsets[9];
 
 constexpr PuzzleChezNorf::Layout PuzzleChezNorf::kLayouts[12];
+constexpr PuzzleChezNorf::L4Layout PuzzleChezNorf::kL4Layouts[4];
+constexpr byte PuzzleChezNorf::kL4Answers[48][6][3];
+constexpr PuzzleChezNorf::ClueTextEntry PuzzleChezNorf::kClueTextEntries[401];
+
+Common::String PuzzleChezNorf::getClueText(int layout, int norf, const int clue[3]) {
+	for (const ClueTextEntry &entry : kClueTextEntries) {
+		if (entry.layout == layout && entry.norf == norf && entry.clue[0] == clue[0] && entry.clue[1] == clue[1] && entry.clue[2] == clue[2])
+			return entry.text;
+	}
+	warning("Chez Norf subtitle missing for layout %d, Norf %d, clue %d/%d/%d", layout, norf, clue[0], clue[1], clue[2]);
+	return Common::String();
+}
 
 PuzzleChezNorf::PuzzleChezNorf(Zoombini2Engine *vm) : PuzzleBase(vm, kPageChezNorf) {
 	_puzzleName = kPuzzleName;
@@ -89,9 +100,10 @@ Common::Point32 PuzzleChezNorf::tablePosition(int index, int y) {
 
 void PuzzleChezNorf::init() {
 	PuzzleBase::init();
-	_level = CLIP(_puzzleLevel, 1, 3);
-	_tableCount = _level == 3 ? 6 : 4;
+	_level = CLIP(_puzzleLevel, 1, 4);
+	_tableCount = 3 <= _level ? 6 : 4;
 	_traySupply = 6 - _level;
+	_submissionLimit = _level == 4 ? _tableCount + _traySupply - 1 : 8;
 	_remaining = static_cast<int>(_puzzleZoombinis.size());
 	generateRules();
 	loadResources();
@@ -128,6 +140,19 @@ void PuzzleChezNorf::generateRules() {
 		} while (_foodValues[first + 2] == _foodValues[first] || _foodValues[first + 2] == _foodValues[first + 1]);
 	}
 	_foodValues[9] = 9;
+	if (_level == 4) {
+		const L4Layout &layout = kL4Layouts[variant];
+		const int answer = layout.firstAnswer + _vm->_rnd->getRandomNumber(layout.answerCount - 1);
+		for (int i = 0; i < _tableCount; i++) {
+			for (int course = 0; course < 3; course++) {
+				_norfs[i].answer.food[course] = _foodValues[kL4Answers[answer][i][course]];
+				_norfs[i].clue[course] = _foodValues[layout.clues[i][course]];
+			}
+			for (int j = 0; j < 2; j++)
+				_norfs[i].gesture[j] = layout.gestures[i][j];
+		}
+		return;
+	}
 	const Layout &layout = kLayouts[4 * (_level - 1) + variant];
 	for (int i = 0; i < _tableCount; i++) {
 		for (int course = 0; course < 3; course++) {
@@ -145,7 +170,7 @@ void PuzzleChezNorf::loadResources() {
 		gfx->loadPageRleBlock(Common::String::format(kFoodFormat, kFoodNames[i]));
 	for (int i = 0; i < 3; i++)
 		gfx->loadPageRleBlock(Common::String::format(kFoodFormat, kMemoSymbolNames[i]));
-	gfx->loadPageRleBlock(Common::String::format(kFoodFormat, kPanelNames[_level - 1]));
+	gfx->loadPageRleBlock(Common::String::format(kFoodFormat, kPanelNames[MIN(_level, 3) - 1]));
 	gfx->loadPageRleBlock(_level == 1 ? kSmallMealTrayPath : kMealTrayPath);
 	gfx->loadPageRleBlock(kHighlightPath);
 	gfx->loadPageRleBlock(kNorfPath);
@@ -271,6 +296,8 @@ void PuzzleChezNorf::playSound(int index) {
 }
 
 void PuzzleChezNorf::playClue(const Common::Path &path) {
+	if (_level == 4)
+		return;
 	if (SoundManager *sound = _vm->getSoundManager()) {
 		sound->unload(_clueSpeechSound);
 		_clueSpeechSound = sound->load(true, path, false);
@@ -279,12 +306,14 @@ void PuzzleChezNorf::playClue(const Common::Path &path) {
 }
 
 void PuzzleChezNorf::queueSpeech(const Common::Path &path) {
+	if (_level == 4)
+		return;
 	if (SoundManager *sound = _vm->getSoundManager())
 		sound->queueSpeech(path);
 }
 
 void PuzzleChezNorf::sayClue(int index) {
-	Common::String path = Common::String::format(kClueFormat, index + (_level == 3 ? 1 : 3), _layout);
+	Common::String path = Common::String::format(kClueFormat, index + (3 <= _level ? 1 : 3), _layout);
 	for (int value : _norfs[index].clue) {
 		if (value < 9)
 			path += Common::String::format("-%c%d", 'A' + value / 3, value % 3 + 1);
@@ -295,6 +324,14 @@ void PuzzleChezNorf::sayClue(int index) {
 		path += "-C0";
 	path += ".wav";
 	playClue(Common::Path(path));
+	_clueSubtitleLines.clear();
+	if (_level == 4 || _vm->showChezNorfSubtitles()) {
+		const Common::String text = getClueText(_layout, index + 1, _norfs[index].clue);
+		if (!text.empty()) {
+			Gfx::TextConf conf;
+			_vm->_gfx->wordWrapText(Common::U32String(text), 572, _clueSubtitleLines, conf);
+		}
+	}
 	if (_idleNorf == index && _bodyRunners[kIdle04]->isActive()) {
 		_bodyRunners[kIdle04]->stop();
 		_capRunners[index][kIdle04]->stop();
@@ -322,8 +359,7 @@ void PuzzleChezNorf::updateCursor() {
 		Zoombini2Engine::CursorType::kDrinkMilk,
 		Zoombini2Engine::CursorType::kDessertFruitPie,
 		Zoombini2Engine::CursorType::kDessertWatermelon,
-		Zoombini2Engine::CursorType::kDessertIceCream
-	};
+		Zoombini2Engine::CursorType::kDessertIceCream};
 	const bool available = _phase == kReady00 && !_departAfterSpeech;
 	const int tray = trayAt(_pointer);
 	const bool hover = available && (0 <= foodAt(_pointer) || 0 <= norfAt(_pointer) || (0 <= tray && mealComplete(_trays[tray])));
@@ -468,7 +504,7 @@ void PuzzleChezNorf::finishMotion(Motion motion) {
 		startMotion(_recipient, kRejectReturn01);
 		break;
 	case kRejectReturn01:
-		_dismissPending = _submissions == 8;
+		_dismissPending = _submissions == _submissionLimit;
 		break;
 	case kAccept03:
 		_releasePending = true;
@@ -536,14 +572,15 @@ void PuzzleChezNorf::checkMeal() {
 	int feedback = 1;
 	if (accepted)
 		feedback = 3;
-	else if (_submissions == 8)
+	else if (_submissions == _submissionLimit)
 		feedback = 2;
-	queueSpeech(Common::Path(Common::String::format(kFeedbackFormat, _recipient + 7 - _tableCount, feedback)));
+	if (SoundManager *sound = _vm->getSoundManager())
+		sound->queueSpeech(Common::Path(Common::String::format(kFeedbackFormat, _recipient + 7 - _tableCount, feedback)));
 	debug(1, "ChezNorf: result=%s submissions=%d", accepted ? "accepted" : "rejected", _submissions);
 }
 
 void PuzzleChezNorf::releaseCohort() {
-	const int count = _level == 3 && 2 <= _successCount ? 1 : 2;
+	const int count = 3 <= _level && 2 <= _successCount ? 1 : 2;
 	const uint32 now = _vm->getTotalPlayTime();
 	for (int i = 0; i < count && 0 < _remaining; i++) {
 		const int index = _remaining - 1;
@@ -587,6 +624,8 @@ void PuzzleChezNorf::dismissWaiter() {
 void PuzzleChezNorf::onUpdate() {
 	const uint32 now = _vm->getTotalPlayTime();
 	SoundManager *sound = _vm->getSoundManager();
+	if (_level != 4 && !_clueSubtitleLines.empty() && (!_vm->showChezNorfSubtitles() || !sound || !sound->isPlaying(_clueSpeechSound)))
+		_clueSubtitleLines.clear();
 	if (_departAfterSpeech && (!sound || !sound->hasPendingSpeech())) {
 		_vm->_returningFromPuzzle = true;
 		_vm->_mapTransitionSourcePageId = kPageChezNorf;
@@ -625,7 +664,7 @@ void PuzzleChezNorf::onActorsRendered() {
 		if (!moving && _phase == kRelease05) {
 			_successCount += 1;
 			_canDepart = true;
-			const bool terminal = _remaining == 0 || _submissions == 8;
+			const bool terminal = _remaining == 0 || _submissions == _submissionLimit;
 			_phase = terminal ? kFinished07 : kReady00;
 			if (terminal)
 				_vm->restartGoBlink();
@@ -686,7 +725,7 @@ void PuzzleChezNorf::drawTray(ManagedSurface32 *screen, const Common::Point32 &p
 
 void PuzzleChezNorf::onRenderContent(ManagedSurface32 *screen) {
 	drawPrimaryPageLayer(screen);
-	_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kFoodFormat, kPanelNames[_level - 1]), Common::Point32());
+	_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kFoodFormat, kPanelNames[MIN(_level, 3) - 1]), Common::Point32());
 	for (int i = 0; i < (_level == 1 ? 6 : 9); i++)
 		_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kFoodFormat, kFoodNames[i]), kFoodPositions[i]);
 	static constexpr int kNoteTop[3] = {
@@ -752,6 +791,23 @@ void PuzzleChezNorf::onRenderForeground(ManagedSurface32 *screen) {
 	}
 	if (_vm->showChezNorfDebugOverlay())
 		drawDebugOverlay(screen);
+	if (!_clueSubtitleLines.empty())
+		drawClueSubtitle(screen);
+}
+
+void PuzzleChezNorf::drawClueSubtitle(ManagedSurface32 *screen) {
+	Gfx *gfx = _vm->_gfx;
+	Gfx::TextConf conf;
+	conf.fillColor = Gfx::PredefinedColor::kWhite03.toPixel(screen->format);
+	conf.hAlign = Graphics::kTextAlignCenter;
+	const int lineHeight = gfx->getFontHeight(conf) + 2;
+	const int height = lineHeight * _clueSubtitleLines.size() + 12;
+	gfx->fillRect(screen, Common::Rect32(184, 12, 780, 12 + height), Gfx::PredefinedColor::kBlack.toPixel(screen->format));
+	int y = 18;
+	for (const Common::U32String &line : _clueSubtitleLines) {
+		gfx->drawString(screen, line, Common::Point32(196, y), 572, conf);
+		y += lineHeight;
+	}
 }
 
 void PuzzleChezNorf::drawDebugOverlay(ManagedSurface32 *screen) {
@@ -836,7 +892,7 @@ Common::String PuzzleChezNorf::debugGetAnswer() const {
 }
 
 PuzzleChanceInfo PuzzleChezNorf::debugGetChances() const {
-	return PuzzleChanceInfo(PuzzleChanceInfo::Type::kSubmit, 8, _submissions, "meal submission");
+	return PuzzleChanceInfo(PuzzleChanceInfo::Type::kSubmit, _submissionLimit, _submissions, "meal submission");
 }
 
 bool PuzzleChezNorf::debugCanSetChances() const {
@@ -844,10 +900,10 @@ bool PuzzleChezNorf::debugCanSetChances() const {
 }
 
 bool PuzzleChezNorf::debugSetChances(int remaining) {
-	if (!debugCanSetChances() || remaining < 0 || 8 < remaining)
+	if (!debugCanSetChances() || remaining < 0 || _submissionLimit < remaining)
 		return false;
 	clearSelection();
-	_submissions = 8 - remaining;
+	_submissions = _submissionLimit - remaining;
 	const int available = MIN(_tableCount, remaining);
 	_traySupply = remaining - available + 1;
 	for (int i = 0; i < _tableCount; i++) {

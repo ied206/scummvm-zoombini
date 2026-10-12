@@ -344,7 +344,7 @@ void ShelterBooliewood::loadCrowdActors(uint32 now) {
 		const Common::String path = Common::String::format(kCrowdRouteFormat, i + 1);
 		actor.path = PathObject::loadFromPAT(_vm, Common::Path(path));
 		if (actor.path && !actor.path->segments.empty()) {
-			const CurveSegment *first = actor.path->segments[0];
+			const CubicBezierCurve *first = actor.path->segments[0];
 			const Common::Point32 pathPos = first->getStartPosition();
 			actor.waitPos = Common::Point32(pathPos.x - 40, pathPos.y - 70);
 		} else {

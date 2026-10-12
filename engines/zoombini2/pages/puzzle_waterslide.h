@@ -34,7 +34,7 @@ public:
 	PuzzleWaterslide(Zoombini2Engine *vm);
 	/** Release active decoration and valve animation runners. */
 	~PuzzleWaterslide() override;
-	/** Generate the difficulty board, load resources, and arrange the party. */
+	/** Generate the level board, load resources, and arrange the party. */
 	void init() override;
 	/** Advance the valve, cascade, and Zoombini discharge sequence. */
 	void onUpdate() override;
@@ -225,7 +225,7 @@ private:
 	void loadResources();
 	/** Construct a deterministic party when the page runs without a saved roster. */
 	void createDemoParty();
-	/** Generate the three difficulty-specific graph and trait-placement variants. */
+	/** Generate the three level-specific graph and trait-placement variants. */
 	void generateEasy();
 	void generateMedium();
 	void generateHard();
@@ -266,7 +266,7 @@ private:
 	static void onAspirationComplete(void *context, ZoombiniRunner *zoombini);
 	static void onCascadeComplete(void *context, AnimationRunner *runner);
 
-	/** Difficulty, current transition phase, connection count, and held party member. */
+	/** Level, current transition phase, connection count, and held party member. */
 	int _level = 1;
 	Phase _phase = kInteractive00;
 	int _connectionCount = 0;

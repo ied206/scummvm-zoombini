@@ -34,6 +34,34 @@
 
 namespace Zoombini2 {
 
+/** Parse bounded integer text without reporting diagnostics. */
+class StringParser {
+public:
+	enum class Result {
+		kSuccess,
+		kEmptyInput,
+		kInvalidInput,
+		kTrailingCharacters,
+		kConversionFailure,
+		kOutOfRange
+	};
+
+	/** Settings for the accepted integer syntax. */
+	struct ParseConf {
+		bool allowHexadecimal;
+	};
+
+	/** Accept only decimal integer text. */
+	static const ParseConf kDecimalProfile;
+	/** Accept decimal integer text and 0x-prefixed hexadecimal values. */
+	static const ParseConf kDecimalOrHexProfile;
+
+	/** Leave @p result unchanged when parsing fails. */
+	static Result parseSignedInt(const char *text, int32 &result, const ParseConf &profile);
+	/** Leave @p result unchanged when parsing fails. */
+	static Result parseUnsignedInt(const char *text, uint32 &result, const ParseConf &profile);
+};
+
 class AlphaBlendLUT;
 class Animation;
 class AreaMask;
@@ -364,15 +392,15 @@ PointFixed32 operator*(int32 left, const PointFixed32 &right);
  *
  * The original-compatible evaluator stores all scalar state in @ref Fixed32.
  * The optional gameplay-improvement evaluator instantiates the same template
- * with @ref Float32. @ref CurveSegment::evaluate advances either evaluator from
+ * with @ref Float32. @ref CubicBezierCurve::evaluate advances either evaluator from
  * the stored start tick, step, and optional initial wait.
  */
-class CurveSegment : public Common::NonCopyable {
+class CubicBezierCurve : public Common::NonCopyable {
 public:
 	/** Construct an empty segment using the selected numeric representation. */
-	explicit CurveSegment(bool useFloatingPoint = false);
+	explicit CubicBezierCurve(bool useFloatingPoint = false);
 	/** Release the selected numeric evaluator. */
-	~CurveSegment();
+	~CubicBezierCurve();
 	/** Initialize control points, timing values, and polynomial coefficients. */
 	void init(const Common::Point32 &start, const Common::Point32 &ctrl0, const Common::Point32 &ctrl1, const Common::Point32 &end, int stepVal, int waitVal);
 	/** Derive polynomial coefficients from the four control points. */
@@ -425,7 +453,7 @@ private:
  */
 struct PathObject : public Common::NonCopyable {
 	/** Ordered segments released with this path. */
-	Common::Array<CurveSegment *> segments;
+	Common::Array<CubicBezierCurve *> segments;
 	/** Index of the segment currently being evaluated. */
 	int currentSegment = 0;
 	/** Whether the path restarts after the last segment. */
@@ -465,6 +493,12 @@ private:
 	Zoombini2Engine *_vm;
 	/** Apply the live engine option to every already loaded segment. */
 	void synchronizeNumericMode();
+	/** Parse a complete PAT FIRST or NEXT record into coordinates and timing values. */
+	static bool parsePATSegmentRecord(const Common::String &line, bool first, Common::Array<int> &coordinates, int &stepValue, int &waitValue);
+	/** Parse one complete base-10 integer token. */
+	static bool parsePATIntegerToken(const Common::String &token, int &value);
+	/** Check the separator sequence following a token in a PAT record. */
+	static bool matchesPATSeparator(const Common::String &separators, char expected);
 	/** Parse a PAT stream only after establishing its first segment. */
 	static PathObject *loadPATStream(Zoombini2Engine *vm, Common::SeekableReadStream &stream);
 };
@@ -617,6 +651,10 @@ public:
 	Common::Point32 getDragOffset() const { return _dragOffset; }
 	/** Replace the retained path and begin evaluating it at @p tickCount. */
 	void startMovement(PathObject *path, uint32 tickCount);
+	/** Load @p path as a PAT resource and retain it; leave the current path unchanged on failure. */
+	bool loadMovementPathFromPAT(Zoombini2Engine *vm, const Common::Path &path);
+	/** Begin evaluating the retained path at @p tickCount. */
+	void startMovement(uint32 tickCount);
 	/** Retain a page-configured path without restarting it. */
 	void setMovementPath(PathObject *path) { _movementPath = path; }
 	/** Return whether this Zoombini currently has a retained movement path. */

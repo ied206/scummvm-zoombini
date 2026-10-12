@@ -45,6 +45,7 @@ bool DialogDebug::open(const DialogDebugCommand &cmd) {
 		return false;
 
 	freeAnimation();
+	freeImage();
 	_viewType = DialogDebugCommand::Type::kNone;
 	_titleText.clear();
 
@@ -87,6 +88,15 @@ bool DialogDebug::open(const DialogDebugCommand &cmd) {
 		updateAnimationTitle();
 		break;
 	}
+	case DialogDebugCommand::Type::kDrawImage: {
+		_image = new BitBlock(_vm);
+		if (!_image->load(cmd._imagePath)) {
+			freeImage();
+			return false;
+		}
+		_titleText = Common::String::format("[Image] %s (%d x %d)", cmd._imagePath.toString('/').c_str(), _image->getWidth(), _image->getHeight());
+		break;
+	}
 	case DialogDebugCommand::Type::kPlotPoint:
 	case DialogDebugCommand::Type::kPlotLine:
 	case DialogDebugCommand::Type::kPlotRect:
@@ -111,6 +121,7 @@ void DialogDebug::close() {
 	_isActive = false;
 	_viewType = DialogDebugCommand::Type::kNone;
 	freeAnimation();
+	freeImage();
 	_vm->setDialogPaused(false);
 }
 
@@ -119,6 +130,11 @@ void DialogDebug::freeAnimation() {
 	_animation = nullptr;
 	_singleFrameSprite = false;
 	_frameIndex = 0;
+}
+
+void DialogDebug::freeImage() {
+	delete _image;
+	_image = nullptr;
 }
 
 int DialogDebug::getFrameCount() const {
@@ -152,13 +168,7 @@ void DialogDebug::preparePlot(const DialogDebugCommand &cmd) {
 		_titleText = Common::String::format("[Plot Line] from (%d, %d) to (%d, %d) color(%s)", start.x, start.y, end.x, end.y, colorText.c_str());
 		break;
 	case DialogDebugCommand::Type::kPlotRect: {
-		const Common::Point32 topRight(end.x - 1, start.y);
-		const Common::Point32 bottomLeft(start.x, end.y - 1);
-		const Common::Point32 bottomRight(end.x - 1, end.y - 1);
-		_vm->_gfx->drawLine(_savedScreen, start, topRight, color);
-		_vm->_gfx->drawLine(_savedScreen, bottomLeft, bottomRight, color);
-		_vm->_gfx->drawLine(_savedScreen, start, bottomLeft, color);
-		_vm->_gfx->drawLine(_savedScreen, topRight, bottomRight, color);
+		_vm->_gfx->frameRect(_savedScreen, Common::Rect(start.x, start.y, end.x, end.y), color);
 		_titleText = Common::String::format("[Plot Rect] from (%d, %d) to (%d, %d) color(%s)", start.x, start.y, end.x, end.y, colorText.c_str());
 		break;
 	}
@@ -193,7 +203,7 @@ void DialogDebug::drawEscText(ManagedSurface32 *screen, const Common::String &ke
 	conf.fillColor = Gfx::PredefinedColor::kWhite03.toPixel(screen->format);
 	const int escWidth = _vm->_gfx->getTextWidth(text, conf);
 	_vm->_gfx->drawString(screen, text,
-						Common::Point32(ManagedSurface32::kScreenSize.width - escWidth - kTitleX, kTitleY), Gfx::kNoMaxWidth, conf);
+						  Common::Point32(ManagedSurface32::kScreenSize.width - escWidth - kTitleX, kTitleY), Gfx::kNoMaxWidth, conf);
 }
 
 void DialogDebug::onRenderContent(ManagedSurface32 *screen) {
@@ -201,6 +211,12 @@ void DialogDebug::onRenderContent(ManagedSurface32 *screen) {
 		return;
 
 	switch (_viewType) {
+	case DialogDebugCommand::Type::kDrawImage: {
+		const uint32 white = screen->format.ARGBToColor(255, 255, 255, 255);
+		_vm->_gfx->fillRect(screen, Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), white);
+		_vm->_gfx->drawBitBlock(screen, _image, Common::Point32(0, 0));
+		break;
+	}
 	case DialogDebugCommand::Type::kDrawAnimation: {
 		const uint32 white = screen->format.ARGBToColor(255, 255, 255, 255);
 		_vm->_gfx->fillRect(screen, Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), white);

@@ -106,9 +106,9 @@ constexpr const char *InteractiveMap::kSegmentDirs[];
 // Branch resources use b-before-a slot order rather than alphabetical suffix order.
 constexpr const char *InteractiveMap::kSegmentFiles[];
 constexpr const char *InteractiveMap::kLegendFiles[];
-constexpr const char32_t *InteractiveMap::kLevel4TabLabelEn;
-constexpr const char32_t *InteractiveMap::kLevel4TabLabelKo;
-constexpr RGBColor InteractiveMap::kLevel4Color;
+constexpr const char32_t *InteractiveMap::kL4TabLabelEn;
+constexpr const char32_t *InteractiveMap::kL4TabLabelKo;
+constexpr RGBColor InteractiveMap::kL4Color;
 
 // ============================================================================
 // Construction / Destruction
@@ -204,7 +204,7 @@ void InteractiveMap::init() {
 	// --- Set initial level ---
 	if (isPracticeMode()) {
 		_currentLevel = _vm->getPracticeLevel();
-		if (_currentLevel == 4 && !_vm->allowCutLevel4PracticePuzzles()) {
+		if (_currentLevel == 4 && !_vm->allowCutL4PracticePuzzles()) {
 			_currentLevel = 3;
 			_vm->setPracticeLevel(_currentLevel);
 		}
@@ -490,7 +490,7 @@ void InteractiveMap::computeStats() {
 // ============================================================================
 
 void InteractiveMap::onUpdate() {
-	if (isPracticeMode() && _currentLevel == 4 && !_vm->allowCutLevel4PracticePuzzles()) {
+	if (isPracticeMode() && _currentLevel == 4 && !_vm->allowCutL4PracticePuzzles()) {
 		_currentLevel = 3;
 		_vm->setPracticeLevel(_currentLevel);
 	}
@@ -581,8 +581,8 @@ void InteractiveMap::onRenderContent(ManagedSurface32 *screen) {
 			if (!_legends[tabToShow].empty())
 				_vm->_gfx->drawPageBitBlock(screen, _legends[tabToShow], Common::Point32(590, 427));
 		}
-		if (_vm->allowCutLevel4PracticePuzzles()) {
-			drawLevel4Legend(screen);
+		if (_vm->allowCutL4PracticePuzzles()) {
+			drawL4Legend(screen);
 		}
 	}
 
@@ -629,33 +629,27 @@ void InteractiveMap::onRenderForeground(ManagedSurface32 *screen) {
 // ============================================================================
 
 void InteractiveMap::drawPracticeSegments(ManagedSurface32 *screen) {
-	// Practice skips duplicate slot 13 and uses each puzzle's available level.
+	// Practice skips duplicate slot 13 and draws every route at the selected level.
 
 	for (int slot = 0; slot < kNumSegments; slot++) {
 		if (slot == 13)
 			continue;
-		const int level = getPracticePuzzleLevel(kSegmentPageIds[slot]);
+		const int level = _currentLevel;
 		const int tier = MIN(level, kNumLevelTiers - 1);
 		if (_segments[tier][slot].empty())
 			continue;
 		if (level == 4) {
 			RleBlock *segment = _vm->_gfx->loadPageRleBlock(_segments[tier][slot]);
 			if (segment)
-				segment->drawToScreenSolidColor(screen, kSegmentPos[slot], kLevel4Color, _vm->getAlphaLUT());
+				segment->drawToScreenSolidColor(screen, kSegmentPos[slot], kL4Color, _vm->getAlphaLUT());
 		} else {
 			_vm->_gfx->drawPageRleBlock(screen, _segments[tier][slot], kSegmentPos[slot]);
 		}
 	}
 }
 
-int InteractiveMap::getPracticePuzzleLevel(PageId pageId) const {
-	if (_currentLevel == 4 && !Zoombini2Engine::supportsInternalPracticeLevel4(pageId))
-		return 3;
-	return _currentLevel;
-}
-
 bool InteractiveMap::selectPracticeLevel(int level) {
-	if (level < 1 || 4 < level || (level == 4 && !_vm->allowCutLevel4PracticePuzzles()))
+	if (level < 1 || 4 < level || (level == 4 && !_vm->allowCutL4PracticePuzzles()))
 		return false;
 	_currentLevel = level;
 	_vm->setPracticeLevel(level);
@@ -664,27 +658,27 @@ bool InteractiveMap::selectPracticeLevel(int level) {
 	return true;
 }
 
-void InteractiveMap::drawLevel4Legend(ManagedSurface32 *screen) const {
+void InteractiveMap::drawL4Legend(ManagedSurface32 *screen) const {
 	if (!screen)
 		return;
 
-	const uint32 fillColor = kLevel4Color.toPixel(screen->format);
+	const uint32 fillColor = kL4Color.toPixel(screen->format);
 	const uint32 outlineColor = screen->format.ARGBToColor(255, 255, 242, 0); // #FFF200
 
 	// Draw a slanted rect to be clicked on.
-	for (int y = kLevel4TabTop; y < kLevel4TabBottom; y++) {
+	for (int y = kL4TabTop; y < kL4TabBottom; y++) {
 		// Graphics::Surface does not support filling of a slanted rect.
 		// Draw line by line to mitigate this limitation, think as a HDMA trick on 2D game consoles.
-		const int slant = (y - kLevel4TabTop) * kLevel4TabSlant / (kLevel4TabBottom - kLevel4TabTop);
-		screen->fillRect(Common::Rect32(kLevel4TabLeft - slant, y, kLevel4TabRight - slant, y + 1), fillColor);
+		const int slant = (y - kL4TabTop) * kL4TabSlant / (kL4TabBottom - kL4TabTop);
+		screen->fillRect(Common::Rect32(kL4TabLeft - slant, y, kL4TabRight - slant, y + 1), fillColor);
 	}
 
 	// Frame a slanted rect on hover.
 	if (_hoveredLegendTab == 4) {
-		_vm->_gfx->drawLine(screen, Common::Point32(kLevel4TabLeft, kLevel4TabTop), Common::Point32(kLevel4TabRight, kLevel4TabTop), outlineColor, kLevel4TabBorderThickness);
-		_vm->_gfx->drawLine(screen, Common::Point32(kLevel4TabLeft - kLevel4TabSlant, kLevel4TabBottom), Common::Point32(kLevel4TabRight - kLevel4TabSlant, kLevel4TabBottom), outlineColor, kLevel4TabBorderThickness);
-		_vm->_gfx->drawLine(screen, Common::Point32(kLevel4TabLeft, kLevel4TabTop), Common::Point32(kLevel4TabLeft - kLevel4TabSlant, kLevel4TabBottom), outlineColor, kLevel4TabBorderThickness);
-		_vm->_gfx->drawLine(screen, Common::Point32(kLevel4TabRight, kLevel4TabTop), Common::Point32(kLevel4TabRight - kLevel4TabSlant, kLevel4TabBottom), outlineColor, kLevel4TabBorderThickness);
+		_vm->_gfx->drawLine(screen, Common::Point32(kL4TabLeft, kL4TabTop), Common::Point32(kL4TabRight, kL4TabTop), outlineColor, kL4TabBorderThickness);
+		_vm->_gfx->drawLine(screen, Common::Point32(kL4TabLeft - kL4TabSlant, kL4TabBottom), Common::Point32(kL4TabRight - kL4TabSlant, kL4TabBottom), outlineColor, kL4TabBorderThickness);
+		_vm->_gfx->drawLine(screen, Common::Point32(kL4TabLeft, kL4TabTop), Common::Point32(kL4TabLeft - kL4TabSlant, kL4TabBottom), outlineColor, kL4TabBorderThickness);
+		_vm->_gfx->drawLine(screen, Common::Point32(kL4TabRight, kL4TabTop), Common::Point32(kL4TabRight - kL4TabSlant, kL4TabBottom), outlineColor, kL4TabBorderThickness);
 	}
 
 	// Draw a label explaining restoration of cut level - Level4.
@@ -700,15 +694,15 @@ void InteractiveMap::drawLevel4Legend(ManagedSurface32 *screen) const {
 	Common::U32String label;
 	switch (_vm->getLanguage()) {
 	case Common::KO_KOR:
-		label = kLevel4TabLabelKo;
+		label = kL4TabLabelKo;
 		break;
 	default:
-		label = kLevel4TabLabelEn;
+		label = kL4TabLabelEn;
 		break;
 	}
 
-	const int textX = kLevel4TabRight + kLevel4TabTextMargin;
-	int textY = kLevel4TabTop + (kLevel4TabBottom - kLevel4TabTop - fontHeight) / 2;
+	const int textX = kL4TabRight + kL4TabTextMargin;
+	int textY = kL4TabTop + (kL4TabBottom - kL4TabTop - fontHeight) / 2;
 	// In some releases, L1-L3 label can take up to two lines.
 	// Our L4 label should be moved to bottom a bit in that case.
 	switch (_vm->getLanguage()) {
@@ -722,7 +716,16 @@ void InteractiveMap::drawLevel4Legend(ManagedSurface32 *screen) const {
 		break;
 	}
 
-	const int maxWidth = kLevel4TabTextRightEdge - textX - kLevel4TabTextMargin;
+	int textRightEdge;
+	switch (_vm->getLanguage()) {
+	case Common::KO_KOR:
+		textRightEdge = kL4TabTextRightEdgeKo;
+		break;
+	default:
+		textRightEdge = kL4TabTextRightEdgeEn;
+		break;
+	}
+	const int maxWidth = textRightEdge - textX - kL4TabTextMargin;
 	if (maxWidth <= 0)
 		return;
 
@@ -916,7 +919,7 @@ EventHandleResult InteractiveMap::onLButtonDown(const Common::Point &pos) {
 		}
 		if (_currentLevel == 0)
 			return EventHandleResult::kConsumed;
-		gs->_level = isPracticeMode() ? getPracticePuzzleLevel(static_cast<PageId>(clicked)) : _currentLevel;
+		gs->_level = _currentLevel;
 
 		switch (clicked) {
 		case 0:
@@ -1002,8 +1005,8 @@ int InteractiveMap::hitTestLegendTab(const Common::Point32 &pos) const {
 	// Level 3: x in (597, 734), y in (472, 488)
 	if (597 < pos.x && pos.x < 734 && 472 < pos.y && pos.y < 488)
 		return 3;
-	if (_vm->allowCutLevel4PracticePuzzles() && kLevel4TabLeft - kLevel4TabSlant < pos.x && pos.x < kLevel4TabRight &&
-		kLevel4TabTop < pos.y && pos.y < kLevel4TabBottom)
+	if (_vm->allowCutL4PracticePuzzles() && kL4TabLeft - kL4TabSlant < pos.x && pos.x < kL4TabRight &&
+		kL4TabTop < pos.y && pos.y < kL4TabBottom)
 		return 4;
 	return 0;
 }

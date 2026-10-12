@@ -388,7 +388,7 @@ void PuzzleBoolies::init() {
 	PuzzleBase::init();
 	startPageMusic(Common::Path(kMusicPath));
 	if (_puzzleLevel < 1 || 4 < _puzzleLevel) {
-		warning("Boolies: unsupported difficulty %d", _puzzleLevel);
+		warning("Boolies: unsupported level %d", _puzzleLevel);
 		_phase = Phase::kFinished05;
 		return;
 	}

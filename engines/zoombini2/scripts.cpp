@@ -23,6 +23,7 @@
 
 #include "common/ptr.h"
 #include "common/textconsole.h"
+#include "common/tokenizer.h"
 #include "common/util.h"
 
 #include "zoombini2/graphics.h"
@@ -30,7 +31,79 @@
 #include "zoombini2/scripts.h"
 #include "zoombini2/zoombini2.h"
 
+#include <errno.h>
+#include <limits.h>
+#include <stdint.h>
+#include <stdlib.h>
+
 namespace Zoombini2 {
+
+const StringParser::ParseConf StringParser::kDecimalProfile = {false};
+const StringParser::ParseConf StringParser::kDecimalOrHexProfile = {true};
+
+StringParser::Result StringParser::parseSignedInt(const char *text, int32 &result, const ParseConf &conf) {
+	if (!text || text[0] == '\0')
+		return Result::kEmptyInput;
+
+	const char *digits = text;
+	while (Common::isSpace(digits[0]))
+		digits += 1;
+
+	int base = 10;
+	if (conf.allowHexadecimal && digits[0] == '0' && (digits[1] == 'x' || digits[1] == 'X'))
+		base = 16;
+
+	char *endPtr = nullptr;
+	errno = 0;
+	const long parsed = strtol(text, &endPtr, base);
+
+	if (errno == ERANGE)
+		return Result::kOutOfRange;
+	if (errno != 0)
+		return Result::kConversionFailure;
+	if (endPtr == text)
+		return Result::kInvalidInput;
+	if (*endPtr != '\0')
+		return Result::kTrailingCharacters;
+	if (parsed < INT32_MIN || INT32_MAX < parsed)
+		return Result::kOutOfRange;
+
+	result = static_cast<int32>(parsed);
+	return Result::kSuccess;
+}
+
+StringParser::Result StringParser::parseUnsignedInt(const char *text, uint32 &result, const ParseConf &conf) {
+	if (!text || text[0] == '\0')
+		return Result::kEmptyInput;
+
+	const char *digits = text;
+	while (Common::isSpace(digits[0]))
+		digits += 1;
+	if (digits[0] == '-')
+		return Result::kInvalidInput;
+
+	int base = 10;
+	if (conf.allowHexadecimal && digits[0] == '0' && (digits[1] == 'x' || digits[1] == 'X'))
+		base = 16;
+
+	char *endPtr = nullptr;
+	errno = 0;
+	const unsigned long parsed = strtoul(text, &endPtr, base);
+
+	if (errno == ERANGE)
+		return Result::kOutOfRange;
+	if (errno != 0)
+		return Result::kConversionFailure;
+	if (endPtr == text)
+		return Result::kInvalidInput;
+	if (*endPtr != '\0')
+		return Result::kTrailingCharacters;
+	if (UINT32_MAX < parsed)
+		return Result::kOutOfRange;
+
+	result = static_cast<uint32>(parsed);
+	return Result::kSuccess;
+}
 
 // ============================================================================
 // AnimationRunner
@@ -447,10 +520,10 @@ PointFixed32 operator*(int32 left, const PointFixed32 &right) {
 }
 
 // ============================================================================
-// CurveSegment - runtime-selected cubic Bezier numeric representation.
+// CubicBezierCurve - runtime-selected cubic Bezier numeric representation.
 // ============================================================================
 
-class CurveSegment::Evaluator {
+class CubicBezierCurve::Evaluator {
 public:
 	virtual ~Evaluator() {}
 	virtual void init(const Common::Point32 &start, const Common::Point32 &control0, const Common::Point32 &control1, const Common::Point32 &end,
@@ -466,7 +539,7 @@ public:
 	virtual Float32 getParameter() const = 0;
 };
 
-struct CurveSegment::FixedNumeric {
+struct CubicBezierCurve::FixedNumeric {
 	typedef Fixed32 Scalar;
 	typedef PointFixed32 Point;
 
@@ -478,7 +551,7 @@ struct CurveSegment::FixedNumeric {
 	static bool greater(const Scalar &left, const Scalar &right) { return left > right; }
 };
 
-struct CurveSegment::FloatNumeric {
+struct CubicBezierCurve::FloatNumeric {
 	typedef Float32 Scalar;
 
 	struct Point {
@@ -507,7 +580,7 @@ struct CurveSegment::FloatNumeric {
 };
 
 template<typename Numeric>
-class CurveSegment::TypedEvaluator : public CurveSegment::Evaluator {
+class CubicBezierCurve::TypedEvaluator : public CubicBezierCurve::Evaluator {
 public:
 	typedef typename Numeric::Scalar Scalar;
 	typedef typename Numeric::Point Point;
@@ -596,16 +669,15 @@ private:
 	}
 };
 
-CurveSegment::CurveSegment(bool useFloatingPoint)
+CubicBezierCurve::CubicBezierCurve(bool useFloatingPoint)
 	: _evaluator(createEvaluator(useFloatingPoint)), _useFloatingPoint(useFloatingPoint) {
 }
 
-CurveSegment::~CurveSegment() {
+CubicBezierCurve::~CubicBezierCurve() {
 	delete _evaluator;
 }
 
-void CurveSegment::init(const Common::Point32 &start, const Common::Point32 &control0, const Common::Point32 &control1, const Common::Point32 &end,
-						int stepValue, int waitInitial) {
+void CubicBezierCurve::init(const Common::Point32 &start, const Common::Point32 &control0, const Common::Point32 &control1, const Common::Point32 &end, int stepValue, int waitInitial) {
 	_start = start;
 	_control0 = control0;
 	_control1 = control1;
@@ -617,54 +689,54 @@ void CurveSegment::init(const Common::Point32 &start, const Common::Point32 &con
 	_evaluator->init(start, control0, control1, end, stepValue, waitInitial);
 }
 
-void CurveSegment::computeCoeffs() {
+void CubicBezierCurve::computeCoeffs() {
 	assert(_initialized);
 	_evaluator->computeCoeffs();
 	_coefficientsReady = true;
 }
 
-bool CurveSegment::evaluate(uint32 tickCount, Common::Point32 &outPosition) {
+bool CubicBezierCurve::evaluate(uint32 tickCount, Common::Point32 &outPosition) {
 	assert(_coefficientsReady);
 	return _evaluator->evaluate(tickCount, outPosition);
 }
 
-Common::Point32 CurveSegment::getStartPosition() const {
+Common::Point32 CubicBezierCurve::getStartPosition() const {
 	return _start;
 }
 
-Common::Point32 CurveSegment::getEndPosition() const {
+Common::Point32 CubicBezierCurve::getEndPosition() const {
 	return _end;
 }
 
-Common::Point32 CurveSegment::getPosition() const {
+Common::Point32 CubicBezierCurve::getPosition() const {
 	return _initialized ? _evaluator->getPosition() : Common::Point32();
 }
 
-void CurveSegment::setStartTime(uint32 tickCount) {
+void CubicBezierCurve::setStartTime(uint32 tickCount) {
 	_evaluator->setStartTime(tickCount);
 }
 
-void CurveSegment::setStepValue(int stepValue) {
+void CubicBezierCurve::setStepValue(int stepValue) {
 	if (_stepValue == stepValue)
 		return;
 	_stepValue = stepValue;
 	rebuildEvaluator();
 }
 
-void CurveSegment::setFloatingPointMode(bool useFloatingPoint) {
+void CubicBezierCurve::setFloatingPointMode(bool useFloatingPoint) {
 	if (_useFloatingPoint == useFloatingPoint)
 		return;
 	_useFloatingPoint = useFloatingPoint;
 	rebuildEvaluator();
 }
 
-CurveSegment::Evaluator *CurveSegment::createEvaluator(bool useFloatingPoint) {
+CubicBezierCurve::Evaluator *CubicBezierCurve::createEvaluator(bool useFloatingPoint) {
 	if (useFloatingPoint)
 		return new TypedEvaluator<FloatNumeric>();
 	return new TypedEvaluator<FixedNumeric>();
 }
 
-void CurveSegment::rebuildEvaluator() {
+void CubicBezierCurve::rebuildEvaluator() {
 	const uint32 previousStartTime = _evaluator->getStartTime();
 	const int previousWaitRemaining = _evaluator->getWaitRemaining();
 	const Float32 previousParameter = _evaluator->getParameter();
@@ -685,7 +757,7 @@ void CurveSegment::rebuildEvaluator() {
 }
 
 // ============================================================================
-// PathObject - Bezier path composed of chained CurveSegments.
+// PathObject - Bezier path composed of chained CubicBezierCurves.
 // ============================================================================
 
 PathObject::PathObject(Zoombini2Engine *vm)
@@ -697,9 +769,8 @@ PathObject::~PathObject() {
 		delete segments[i];
 }
 
-void PathObject::appendSegment(const Common::Point32 &start, const Common::Point32 &control0, const Common::Point32 &control1, const Common::Point32 &end,
-							   int stepValue, int waitInitial) {
-	CurveSegment *segment = new CurveSegment(_vm->getBezierCurveDataType() == Zoombini2MetaEngine::BezierCurveDataType::kF32FloatingPoint);
+void PathObject::appendSegment(const Common::Point32 &start, const Common::Point32 &control0, const Common::Point32 &control1, const Common::Point32 &end, int stepValue, int waitInitial) {
+	CubicBezierCurve *segment = new CubicBezierCurve(_vm->getBezierCurveDataType() == Zoombini2MetaEngine::BezierCurveDataType::kF32FloatingPoint);
 	segment->init(start, control0, control1, end, stepValue, waitInitial);
 	segments.push_back(segment);
 	endPos = end;
@@ -724,19 +795,106 @@ PathObject *PathObject::loadFromPAT(Zoombini2Engine *vm, const Common::Path &pat
 	return loadPATStream(vm, *stream);
 }
 
+bool PathObject::parsePATIntegerToken(const Common::String &token, int &value) {
+	int32 parsed = 0;
+	if (StringParser::parseSignedInt(token.c_str(), parsed, StringParser::kDecimalProfile) != StringParser::Result::kSuccess ||
+		parsed < INT_MIN || INT_MAX < parsed)
+		return false;
+	value = static_cast<int>(parsed);
+	return true;
+}
+
+bool PathObject::matchesPATSeparator(const Common::String &separators, char expected) {
+	if (expected == '\0') {
+		for (uint i = 0; i < separators.size(); i++) {
+			if (!Common::isSpace(separators[i]))
+				return false;
+		}
+		return true;
+	}
+
+	if (expected == ',') {
+		if (separators.empty() || separators[0] != ',')
+			return false;
+		for (uint i = 1; i < separators.size(); i++) {
+			if (!Common::isSpace(separators[i]))
+				return false;
+		}
+		return true;
+	}
+
+	if (expected == ' ') {
+		if (separators.empty())
+			return false;
+		for (uint i = 0; i < separators.size(); i++) {
+			if (!Common::isSpace(separators[i]))
+				return false;
+		}
+		return true;
+	}
+
+	return separators == Common::String(expected);
+}
+
+bool PathObject::parsePATSegmentRecord(const Common::String &line, bool first, Common::Array<int> &coordinates, int &stepValue, int &waitValue) {
+	coordinates.clear();
+	if (first && !line.hasPrefix("FIRST=coord:"))
+		return false;
+	const uint coordCount = first ? 8 : 6;
+
+	Common::StringTokenizer tokenizer(line, "=,: \t\r\n");
+	if (tokenizer.empty())
+		return false;
+
+	const Common::String key = tokenizer.nextToken();
+	if (first) {
+		if (key != "FIRST")
+			return false;
+	} else {
+		int extensionIndex = 0;
+		if (!key.hasPrefix("NEXT_") || !parsePATIntegerToken(key.substr(5), extensionIndex))
+			return false;
+		(void)extensionIndex;
+	}
+	if (!matchesPATSeparator(tokenizer.delimitersAtTokenEnd(), '='))
+		return false;
+
+	if (tokenizer.empty() || tokenizer.nextToken() != "coord" || !matchesPATSeparator(tokenizer.delimitersAtTokenEnd(), ':'))
+		return false;
+
+	for (uint i = 0; i < coordCount; i++) {
+		int coordinate = 0;
+		if (tokenizer.empty() || !parsePATIntegerToken(tokenizer.nextToken(), coordinate))
+			return false;
+		coordinates.push_back(coordinate);
+		const char separator = i + 1 < coordCount ? ',' : ' ';
+		if (!matchesPATSeparator(tokenizer.delimitersAtTokenEnd(), separator))
+			return false;
+	}
+
+	if (tokenizer.empty() || tokenizer.nextToken() != "step" || !matchesPATSeparator(tokenizer.delimitersAtTokenEnd(), ':') ||
+		tokenizer.empty() || !parsePATIntegerToken(tokenizer.nextToken(), stepValue) ||
+		!matchesPATSeparator(tokenizer.delimitersAtTokenEnd(), ' '))
+		return false;
+
+	if (tokenizer.empty() || tokenizer.nextToken() != "wait" || !matchesPATSeparator(tokenizer.delimitersAtTokenEnd(), ':') ||
+		tokenizer.empty() || !parsePATIntegerToken(tokenizer.nextToken(), waitValue))
+		return false;
+
+	return matchesPATSeparator(tokenizer.delimitersAtTokenEnd(), '\0') && tokenizer.empty();
+}
+
 PathObject *PathObject::loadPATStream(Zoombini2Engine *vm, Common::SeekableReadStream &f) {
 	PathObject *obj = new PathObject(vm);
 
 	// Read FIRST line
 	Common::String line = f.readLine();
-	if (line.hasPrefix("FIRST=coord:")) {
-		int x0, y0, cx0, cy0, cx1, cy1, x1, y1, stepVal, waitVal;
-		if (sscanf(line.c_str(),
-				   "FIRST=coord:%d,%d,%d,%d,%d,%d,%d,%d step:%d wait:%d",
-				   &x0, &y0, &cx0, &cy0, &cx1, &cy1, &x1, &y1,
-				   &stepVal, &waitVal) >= 10) {
-			obj->appendSegment(Common::Point32(x0, y0), Common::Point32(cx0, cy0), Common::Point32(cx1, cy1), Common::Point32(x1, y1), stepVal, waitVal);
-		}
+	Common::Array<int> coordinates;
+	int stepVal = 0;
+	int waitVal = 0;
+	if (parsePATSegmentRecord(line, true, coordinates, stepVal, waitVal)) {
+		obj->appendSegment(Common::Point32(coordinates[0], coordinates[1]), Common::Point32(coordinates[2], coordinates[3]),
+						   Common::Point32(coordinates[4], coordinates[5]), Common::Point32(coordinates[6], coordinates[7]), stepVal, waitVal);
 	}
 
 	if (obj->segments.empty()) {
@@ -752,14 +910,11 @@ PathObject *PathObject::loadPATStream(Zoombini2Engine *vm, Common::SeekableReadS
 			break;
 
 		// Parse the continuation coordinates, speed, and endpoint wait.
-		int ext, ncx0, ncy0, ncx1, ncy1, nx1, ny1, stepVal, waitVal;
-		// Skip the leading 'N' and parse the remaining `EXT` record.
-		if (sscanf(line.c_str() + 1,
-				   "EXT_%d=coord:%d,%d,%d,%d,%d,%d step:%d wait:%d",
-				   &ext, &ncx0, &ncy0, &ncx1, &ncy1, &nx1, &ny1, &stepVal, &waitVal) >= 9) {
-			CurveSegment *prev = obj->segments.back();
+		if (parsePATSegmentRecord(line, false, coordinates, stepVal, waitVal)) {
+			CubicBezierCurve *prev = obj->segments.back();
 			// P0 comes from previous segment's P1
-			obj->appendSegment(prev->getEndPosition(), Common::Point32(ncx0, ncy0), Common::Point32(ncx1, ncy1), Common::Point32(nx1, ny1), stepVal, waitVal);
+			obj->appendSegment(prev->getEndPosition(), Common::Point32(coordinates[0], coordinates[1]),
+							   Common::Point32(coordinates[2], coordinates[3]), Common::Point32(coordinates[4], coordinates[5]), stepVal, waitVal);
 		}
 	}
 
@@ -769,7 +924,7 @@ PathObject *PathObject::loadPATStream(Zoombini2Engine *vm, Common::SeekableReadS
 	}
 
 	// Set endpoint from last segment
-	CurveSegment *last = obj->segments.back();
+	CubicBezierCurve *last = obj->segments.back();
 	obj->endPos = last->getEndPosition();
 
 	return obj;
@@ -815,7 +970,7 @@ bool PathObject::advance(uint32 tickCount, Common::Point32 &outPos) {
 		return false;
 	}
 
-	CurveSegment *seg = segments[currentSegment];
+	CubicBezierCurve *seg = segments[currentSegment];
 	if (seg->evaluate(tickCount, outPos))
 		return true;
 
@@ -824,7 +979,7 @@ bool PathObject::advance(uint32 tickCount, Common::Point32 &outPos) {
 	if (static_cast<int>(segments.size()) <= currentSegment) {
 		if (looping && 1 < segments.size()) {
 			currentSegment = 1;
-			CurveSegment *next = segments[currentSegment];
+			CubicBezierCurve *next = segments[currentSegment];
 			next->computeCoeffs();
 			next->setStartTime(tickCount);
 			next->evaluate(tickCount, outPos);
@@ -837,7 +992,7 @@ bool PathObject::advance(uint32 tickCount, Common::Point32 &outPos) {
 	}
 
 	// Compute coefficients for the next segment and evaluate it
-	CurveSegment *next = segments[currentSegment];
+	CubicBezierCurve *next = segments[currentSegment];
 	next->computeCoeffs();
 	next->setStartTime(tickCount);
 	next->evaluate(tickCount, outPos);
@@ -939,6 +1094,19 @@ void ZoombiniRunner::setPosition(const Common::Point32 &pos) {
 void ZoombiniRunner::startMovement(PathObject *path, uint32 tickCount) {
 	clearMovement();
 	_movementPath = path;
+	startMovement(tickCount);
+}
+
+bool ZoombiniRunner::loadMovementPathFromPAT(Zoombini2Engine *vm, const Common::Path &path) {
+	PathObject *movementPath = PathObject::loadFromPAT(vm, path);
+	if (!movementPath)
+		return false;
+	clearMovement();
+	_movementPath = movementPath;
+	return true;
+}
+
+void ZoombiniRunner::startMovement(uint32 tickCount) {
 	if (_movementPath)
 		_movementPath->start(tickCount);
 }

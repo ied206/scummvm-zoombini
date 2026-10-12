@@ -1449,6 +1449,11 @@ void Gfx::fillRect(ManagedSurface32 *destSurface, const Common::Rect &rect, uint
 		destSurface->fillRect(rect, color);
 }
 
+void Gfx::frameRect(ManagedSurface32 *destSurface, const Common::Rect &rect, uint32 color) const {
+	if (destSurface)
+		destSurface->frameRect(rect, color);
+}
+
 void Gfx::drawLine(ManagedSurface32 *destSurface, const Common::Point32 &start, const Common::Point32 &end, uint32 color, int thickness) const {
 	if (!destSurface || thickness <= 0)
 		return;
@@ -1457,6 +1462,41 @@ void Gfx::drawLine(ManagedSurface32 *destSurface, const Common::Point32 &start, 
 		destSurface->drawLine(start.x, start.y, end.x, end.y, color);
 	else
 		destSurface->drawThickLine(start.x, start.y, end.x, end.y, thickness, thickness, color);
+}
+
+void Gfx::drawCubicBezierCurve(ManagedSurface32 *destSurface, CubicBezierCurve &curve, uint32 color, int thickness) const {
+	if (!destSurface)
+		return;
+	const Common::Rect32 sampleBounds(0, 0, destSurface->w, destSurface->h);
+	drawCubicBezierCurve(destSurface, curve, color, thickness, sampleBounds);
+}
+
+void Gfx::drawCubicBezierCurve(ManagedSurface32 *destSurface, CubicBezierCurve &curve, uint32 color, int thickness, const Common::Rect32 &sampleBounds) const {
+	if (!destSurface || thickness <= 0)
+		return;
+
+	static constexpr uint32 kEvaluationInterval = 5;
+	static constexpr uint32 kMaxEvaluationCount = 1024;
+	curve.computeCoeffs();
+	curve.setStartTime(0);
+	Common::Point32 previous = curve.getStartPosition();
+	bool completed = false;
+	for (uint32 sample = 0; sample < kMaxEvaluationCount; sample++) {
+		Common::Point32 current;
+		const uint32 tickCount = sample * kEvaluationInterval;
+		if (!curve.evaluate(tickCount, current)) {
+			completed = true;
+			break;
+		}
+		if (sampleBounds.contains(previous) && sampleBounds.contains(current))
+			drawLine(destSurface, previous, current, color, thickness);
+		previous = current;
+	}
+	if (completed) {
+		const Common::Point32 end = curve.getEndPosition();
+		if (sampleBounds.contains(previous) && sampleBounds.contains(end))
+			drawLine(destSurface, previous, end, color, thickness);
+	}
 }
 
 void Gfx::drawString(ManagedSurface32 *destSurface, const Common::U32String &text, const Common::Point32 &pos, int maxWidth, const TextConf &conf) const {
