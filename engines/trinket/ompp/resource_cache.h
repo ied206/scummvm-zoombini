@@ -31,7 +31,11 @@
 namespace Trinket {
 namespace OM {
 
-/** Scene-lifetime source bytes. Streams own their position and pin immutable data. */
+/**
+ * Cache immutable source bytes for use by @ref Trinket::Shell::Scene.
+ * Streams have independent read positions and share ownership of their cached bytes.
+ * Clearing the cache releases its references while already-open streams retain their data.
+ */
 class ResourceCache : public ResourceProvider {
 public:
 	explicit ResourceCache(const ResourceProvider &source) : _source(source) {}

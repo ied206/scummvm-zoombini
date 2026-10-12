@@ -29,7 +29,12 @@ class Game;
 class Options;
 class QuitDialog;
 
-/** Application-owned MPS scheduler and borrowed native window/game services. */
+/**
+ * Application-owned MPS scheduler and borrowed native window/game services.
+ * MPS creates native game objects through registered factories.
+ * @ref Trinket::Shell::ResourcePaths resolves asset names against the engine's indexed provider.
+ * @ref Trinket::Shell::Scene loads visual resources and owns sprites used by those objects.
+ */
 class ScriptSession : private Core::ScriptRuntime::Functions, private Core::ScriptScheduler::Loader, private Shell::ActionSystem::Factory, private Shell::ScenePortEnvironment::Window, private Shell::Movie::Host, private Shell::ResourcePort::Host, private WorldPort::Host, private AttributeCharacter::AnimationResources, private Shell::Character::Resources {
 public:
 	explicit ScriptSession(Game &game);

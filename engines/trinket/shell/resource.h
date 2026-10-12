@@ -31,24 +31,39 @@
 namespace Trinket {
 namespace Shell {
 
-/** INX directory and BUL payload integration used by the Z3 runtime family. */
+/**
+ * Indexed access to resources packed in BUL containers.
+ * The INX directory maps virtual paths to BUL identifiers, offsets and stored lengths.
+ * Its *bulkFiles directory maps those identifiers to filenames and header checksum values.
+ * @ref Trinket::Shell::IndexedResources::load keeps the index in memory; BUL payloads are read on demand.
+ * Z3 looks up the full virtual filename; the INX entry selects the BUL, not the first path component.
+ * RR1Cloud9 instead resolves library/type/ID tuples through @ref Trinket::RR1Cloud9::Resources.
+ * Z3's loose MPS, XML and movie files use their own file loaders.
+ */
 class IndexedResources : public OM::ResourceProvider {
 public:
+	/** Read the complete INX tree and build lookup tables for resources and BUL files. */
 	bool load(const Common::Path &indexPath);
+	/**
+	 * Return an owned stream containing only the requested resource payload.
+	 * Validate the BUL header value, record bounds and stored filename before skipping the name prefix.
+	 * Resource decoding and game-object creation belong to consumers such as @ref Trinket::Shell::Scene.
+	 * @return A payload stream, or nullptr if lookup or validation fails.
+	 */
 	Common::SeekableReadStream *open(const Common::String &name) const override;
 	uint size() const { return _entries.size(); }
 	const Common::String &getError() const { return _error; }
 
 private:
 	struct Entry {
-		Common::String name;
-		uint16 bulk;
-		uint32 offset;
-		uint32 size;
+		Common::String name; ///< Leaf filename stored before the payload in the BUL.
+		uint16 bulk;         ///< Index into the BUL table built from *bulkFiles.
+		uint32 offset;       ///< Start of the stored filename within the BUL.
+		uint32 size;         ///< Byte length of the filename, terminating zero and payload together.
 	};
 	struct Bulk {
-		Common::String name;
-		uint32 checksum;
+		Common::String name; ///< BUL filename opened through the file search system.
+		uint32 checksum;     ///< Expected value of the BUL's first four bytes.
 	};
 	Common::Array<byte> _index;
 	Common::Array<Bulk> _bulks;

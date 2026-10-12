@@ -32,7 +32,23 @@
 namespace Trinket {
 namespace OM {
 
-/** OM resource-only NE libraries map their own numeric types to four-character tags. */
+/**
+ * Read resource-only NE containers used by RR1Cloud9 and the TLC launcher.
+ * Each library maps its own numeric types to four-character OM tags.
+ * Its embedded table maps numeric type/ID pairs to file spans using the table's alignment shift.
+ * Unlike @ref Trinket::Shell::IndexedResources, no separate INX or BUL filename prefix is involved.
+ * @ref Trinket::OM::NEResourceLibrary::open returns stored bytes; the game's resource provider handles wrappers such as NC1.
+ *
+ * @note @ref Common::NEResources limits each type to 256 entries; RR1Cloud9's r1ca1.rsc has 484 LIPS entries.
+ * NE name-table records contain a type-name string followed by a resource-name string, both null-terminated.
+ * RR1Cloud9 stores tags such as ASEQ in the type-name field and leaves the resource-name field empty for numeric IDs.
+ * The shared reader assumes an empty type-name field, skips its first byte, and treats the following string as an ID alias.
+ * It therefore misreads these named types. The original OM loader uses Windows resource APIs to resolve them.
+ * Both table readers are private and non-virtual, so inheritance cannot replace those incompatible steps.
+ * This reader indexes the complete numeric table and maps the libraries' named types to their numeric ordinals.
+ *
+ * FIXME: Integrate this into @ref Common::NEResources once these incompatibilities are addressed.
+ */
 class NEResourceLibrary {
 public:
 	NEResourceLibrary() = default;

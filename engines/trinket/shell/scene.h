@@ -130,13 +130,18 @@ private:
 	Sprite &operator=(const Sprite &) = delete;
 };
 
-/** Owns scene images and visual objects; callbacks are dispatched by the game. */
+/**
+ * Own scene images, animation assets and visual objects; callbacks are dispatched by the game.
+ * @ref Trinket::OM::ResourceCache retains source bytes; sprites using the same path share an animation asset.
+ * Each sprite keeps its own position and playback state.
+ */
 class Scene {
 public:
 	explicit Scene(const OM::ResourceProvider &resources) : _resources(resources) {}
 	~Scene();
 	void clear();
 	bool setBackground(const Common::String &path);
+	/** Load or reuse an animation asset and create a scene-owned @ref Trinket::Shell::Sprite. */
 	Sprite *add(const Common::String &path, int z, int action = 0, bool button = false);
 	void remove(Sprite *sprite);
 	void setDepth(Sprite *sprite, int z);
