@@ -77,7 +77,7 @@ private:
 	bool Cmd_Go(int argc, const char **argv);
 	bool CmdSub_GoXfer(int argc, const char **argv);
 	bool CmdSub_GoPractice(int argc, const char **argv);
-	const TransitionMapTrans::RouteDest *findGoDestination(const char *name, bool puzzleOnly);
+	const TransitionMapTrans::RouteDest *findGoDest(const char *name, bool puzzleOnly);
 	void printGoDestinations(bool puzzleOnly);
 	bool Cmd_Puzzle(int argc, const char **argv);
 	bool CmdSub_PuzzleFinish(int argc, const char **argv);
@@ -127,9 +127,9 @@ private:
 	static constexpr const char *kDebugDumpPathFormat = "dumps/ZOOMBINI2_%s_%04u.%s";
 	/** Dispatch the selected resource or save export. */
 	bool Cmd_Dump(int argc, const char **argv);
-	/** Render one bitmap over white and export it. */
+	/** Render one bitmap over white and export it as PNG. */
 	bool CmdSub_DumpImage(int argc, const char **argv);
-	/** Render and export each decoded frame over white. */
+	/** Render each decoded frame over white and export it as PNG. */
 	bool CmdSub_DumpAnimation(int argc, const char **argv);
 	/** Serialize the live named adventure to a fresh dump file. */
 	bool CmdSub_DumpSave(int argc, const char **argv);
@@ -147,16 +147,16 @@ private:
 	bool parseDebugResourcePath(const char *text, Common::Path &path);
 	/** Load an independent frame sequence or one explicit RB sprite. */
 	bool loadDebugAnimation(const Common::Path &path, Animation &animation, RleBlock &sprite, bool &singleFrame);
-	/** Parse the supported image format and diagnose unavailable PNG support. */
-	bool parseDebugImageFormat(const char *text, bool &png);
+	/** Refuse image export when this build lacks PNG support. */
+	bool checkPNGExportSupport();
 	/** Validate the signed 16-bit surface boundary and limit export allocation. */
 	bool validateDebugImageSize(const Size32 &size);
 	/** Build a bounded filename component from a logical resource name. */
 	static Common::String makeDebugDumpStem(const Common::String &name);
 	/** Open a fresh numbered file below the dump directory. */
 	bool openDebugDump(Common::DumpFile &out, const Common::String &stem, const char *extension, Common::Path &path);
-	/** Write one rendered image and report its result. */
-	bool exportDebugSurface(const Graphics::Surface &surface, const Common::String &stem, bool png);
+	/** Write one rendered PNG image and report its result. */
+	bool exportDebugSurface(const Graphics::Surface &surface, const Common::String &stem);
 	/** Print one supported group of read-only state fields. */
 	bool printDebugStateGroup(const Common::String &group);
 	/** Plot a point, line, or rectangle over the current screen through @ref Zoombini2Console::Cmd_Plot. */
