@@ -1,0 +1,5 @@
+# This file is included from the main "configure" script
+# add_engine [name] [desc] [build-by-default] [subengines] [base games] [deps] [components]
+add_engine trinket "Trinket" no "zoombini3 rr1cloud9" "" "highres 16bit jpeg bink"
+add_engine zoombini3 "Zoombinis: Island Odyssey" yes "" "" ""
+add_engine rr1cloud9 "Reader Rabbit 1st Grade: Capers on Cloud Nine!" yes "" "" ""
