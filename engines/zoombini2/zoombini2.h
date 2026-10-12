@@ -112,9 +112,7 @@ public:
 		kQueued,
 		kNoActivePage,
 		kInvalidLevel,
-		kUnsupportedLevel4,
 		kPracticeRequiresPuzzle,
-		kUnavailableCurrentLevel4,
 		kUnreachableDestination
 	};
 
@@ -167,7 +165,7 @@ public:
 	/** Queue a UI-text confirmation and retain its completion callback. */
 	bool requestUiTextMsgBox(const Common::U32String &text, Common::BaseCallback<DialogMsgBoxButton> *callback,
 							 const Common::Point32 &pos = Common::Point32(-1, -1));
-	/** Open the help overlay for the current page and difficulty. */
+	/** Open the help overlay for the current page and level. */
 	bool openHelpDialog(PageId pageId, int level);
 	/** Open a console debug view. */
 	bool openDebugDialog(const DialogDebugCommand &cmd);
@@ -194,7 +192,7 @@ public:
 	/** Return whether the enhanced keyboard shortcut set is enabled. */
 	bool useEnhancedKbdShortcuts() const { return _enhancedKbdShortcuts; }
 	/** Return whether the practice map exposes recoverable level 4 puzzles. */
-	bool allowCutLevel4PracticePuzzles() const { return _allowCutLevel4PracticePuzzles; }
+	bool allowCutL4PracticePuzzles() const { return _allowCutL4PracticePuzzles; }
 	/**
 	 * Return the reference rate used to convert frame-derived motion and random-event quotas to elapsed-time updates.
 	 * This covers Booliewood scrolling, Aqua Cube bubble spawning, and banked idle or celebration rolls.
@@ -203,6 +201,8 @@ public:
 	int getLogicPacingHz() const;
 	/** Return whether the Chez Norf diagnostic overlay key is currently held. */
 	bool showChezNorfDebugOverlay() const { return _debugHotkeysEnabled && _debugOverlayKeyDown; }
+	/** Return whether optional English Norf clue subtitles are enabled. */
+	bool showChezNorfSubtitles() const { return _chezNorfSubtitlesEnabled; }
 	/** Report the active target's developer-hotkey gate. */
 	bool areBuiltinDebugHotkeysEnabled() const { return _debugHotkeysEnabled; }
 	/** Return the target-prefixed roster-trait filename used in the configured save location. */
@@ -218,12 +218,10 @@ public:
 	bool hasResource(const Common::String &path) const;
 	/** Return and clear the validated direct-practice request, if the startup command supplied one. */
 	bool takePracticePuzzleLaunch(PageId &pageId, int &level, uint &partySize);
-	/** Queue a console-only practice launch without exposing an unsupported map tier. */
+	/** Queue a console-only practice launch on @p pageId at @p level with @p partySize Zoombinis. */
 	void queueDebugPracticeLaunch(PageId pageId, int level, uint partySize);
 	/** Validate and queue a debugger-requested route through the map transition. */
 	DebugRouteRequestResult requestDebugMapTransition(PageId targetPageId, PageId sourcePageId, RouteBranch routeBranch, uint level);
-	/** Return whether this page supports the debug-only level 4 practice tier. */
-	static bool supportsInternalPracticeLevel4(PageId pageId);
 	/** Return the practice-map level retained for this engine session. */
 	int getPracticeLevel() const { return _practiceLevel; }
 	/** Retain a validated practice-map level for later map visits. */
@@ -328,7 +326,7 @@ public:
 
 private:
 	class ResourceFileResolver;
-	/** Decimal factor separating a direct-practice page ID from its difficulty. */
+	/** Decimal factor separating a direct-practice page ID from its level. */
 	static constexpr int kPracticeBootParamPageFactor = 100;
 	static constexpr uint kCursorCount = static_cast<uint>(CursorType::kRestoreBase);
 	static constexpr const char *kCursorPaths[kCursorCount] = {
@@ -457,6 +455,8 @@ private:
 	bool _unlockFrameRate = false;
 	/** Whether the developer hotkeys are active. */
 	bool _debugHotkeysEnabled = false;
+	/** Whether original executable text may be extracted for Norf clue subtitles. */
+	bool _chezNorfSubtitlesEnabled = false;
 	/** Whether newly started stereo game-audio streams retain both channels. */
 	bool _stereoOutputEnabled = false;
 	/** Color-only presentation assistance for similar colors and red-green color vision deficiency. */
@@ -472,7 +472,7 @@ private:
 	/** Whether the enhanced keyboard shortcut set is enabled. */
 	bool _enhancedKbdShortcuts = false;
 	/** Whether the practice map exposes recoverable level 4 puzzles. */
-	bool _allowCutLevel4PracticePuzzles = false;
+	bool _allowCutL4PracticePuzzles = false;
 	/** Selected preset for frame-derived gameplay pacing. */
 	Zoombini2MetaEngine::LogicPacingMode _logicPacingMode = Zoombini2MetaEngine::LogicPacingMode::k75Hz;
 	/** Held state of the global puzzle-completion key. */

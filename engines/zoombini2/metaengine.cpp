@@ -41,9 +41,10 @@ void Zoombini2MetaEngine::registerDefaultSettings(const Common::String &target) 
 	ConfMan.registerDefault(kConfigEnableSavefileReadOnlyToggle, false);
 	ConfMan.registerDefault(kConfigAudioOutputMode, static_cast<int>(AudioOutputMode::kMonoDownmix));
 	ConfMan.registerDefault(kConfigBezierCurveDataType, static_cast<int>(BezierCurveDataType::kQ10FixedPoint));
-	ConfMan.registerDefault(kConfigFixFleenDepartureStreak, true);
+	ConfMan.registerDefault(kConfigFixFleenDepartStreak, true);
 	ConfMan.registerDefault(kConfigEnhancedKbdShortcuts, true);
-	ConfMan.registerDefault(kConfigTransparentHelpPages, true);
+	ConfMan.registerDefault(kConfigHelpDialogTransparentBody, true);
+	ConfMan.registerDefault(kConfigChezNorfClueSubtitles, false);
 	ConfMan.registerDefault(kConfigDebugHotkeys, false);
 	ConfMan.registerDefault(kConfigGreedyWaterslidePairing, false);
 	ConfMan.registerDefault(kConfigAquacubeSafeFirstMove, false);

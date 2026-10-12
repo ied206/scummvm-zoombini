@@ -41,7 +41,7 @@ bool MagicWallMaze::readCount(Common::SeekableReadStream &stream, int &count, in
 
 bool MagicWallMaze::readLayout(Common::SeekableReadStream &stream, Layout &layout) {
 	int count;
-	if (!readCount(stream, layout.difficulty, 4) || !readCount(stream, layout.weight, 32767) || !readCount(stream, count, 10) || count == 0)
+	if (!readCount(stream, layout.level, 4) || !readCount(stream, layout.weight, 32767) || !readCount(stream, count, 10) || count == 0)
 		return false;
 	for (int i = 0; i < count; i++) {
 		if (stream.size() - stream.pos() < 4)
@@ -161,19 +161,19 @@ int MagicWallMaze::solve(const Common::Array<int> &positions, int depth) const {
 	return 0;
 }
 
-bool MagicWallMaze::generate(int difficulty, Random &random) {
+bool MagicWallMaze::generate(int level, Random &random) {
 	_generationSequence.clear();
 	_initialPositions.clear();
 	int totalWeight = 0;
 	for (const Layout &layout : _layouts) {
-		if (layout.difficulty == difficulty)
+		if (layout.level == level)
 			totalWeight += layout.weight;
 	}
 	if (totalWeight == 0)
 		return false;
 	int choice = random.getRandomNumber(totalWeight - 1);
 	for (uint i = 0; i < _layouts.size(); i++) {
-		if (_layouts[i].difficulty != difficulty)
+		if (_layouts[i].level != level)
 			continue;
 		if (choice < _layouts[i].weight) {
 			_layoutIndex = i;
@@ -390,7 +390,7 @@ void PuzzleMagicWall::init() {
 void PuzzleMagicWall::newPuzzle() {
 	_ready = _maze.generate(_puzzleLevel, *_vm->_rnd);
 	if (!_ready)
-		error("MagicWall: no usable layout for difficulty %d", _puzzleLevel);
+		error("MagicWall: no usable layout for level %d", _puzzleLevel);
 	for (Beetle &beetle : _beetles)
 		delete beetle.path;
 	_beetles.clear();
@@ -401,7 +401,7 @@ void PuzzleMagicWall::newPuzzle() {
 	}
 	_movingRule = -1;
 	_hoveredTablet = -1;
-	debug(1, "MagicWall: phase=%d difficulty=%d layout=%d points=%u tablets=%u", static_cast<int>(_phase), _puzzleLevel,
+	debug(1, "MagicWall: phase=%d level=%d layout=%d points=%u tablets=%u", static_cast<int>(_phase), _puzzleLevel,
 		  _maze.layoutIndex(), _maze.positions().size(), _maze.rules().size());
 	for (uint i = 0; i < _maze.positions().size(); i++)
 		debug(2, "MagicWall: beetle %u at %d", i, _maze.positions()[i]);

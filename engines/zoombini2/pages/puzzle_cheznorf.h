@@ -37,7 +37,7 @@ public:
 	PuzzleChezNorf(Zoombini2Engine *vm);
 	/** Release active tray paths and animation runners. */
 	~PuzzleChezNorf() override;
-	/** Select a difficulty layout, load art, and arrange the waiting Zoombinis. */
+	/** Select a level layout, load art, and arrange the waiting Zoombinis. */
 	void init() override;
 	/** Begin or continue the click selected at @p pos. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
@@ -66,24 +66,24 @@ private:
 	static constexpr const char *kPuzzleName = "Chez Norf";
 	/** Chez Norf dining-room background loaded into the first page layer. */
 	static constexpr const char *kBackgroundPath = "#bmp/chez_norf/baquegund";
-	/** Path format for the food, note-symbol, and difficulty-specific order-panel RLE sprites. */
+	/** Path format for the food, note-symbol, and level-specific order-panel RLE sprites. */
 	static constexpr const char *kFoodFormat = "bmp/chez_norf/%s";
 	/** Food resource names ordered as three mains, three drinks, then three desserts. */
 	static constexpr const char *kFoodNames[9] = {
-		"miam_sandwitch", ///< MainDish - Sandwitch
-		"miam_poisson", ///< MainDish - Fish
-		"miam_salade", ///< MainDish - Salad
-		"glouglou_cafe", ///< Drink - Coffee
+		"miam_sandwitch",  ///< MainDish - Sandwitch
+		"miam_poisson",    ///< MainDish - Fish
+		"miam_salade",     ///< MainDish - Salad
+		"glouglou_cafe",   ///< Drink - Coffee
 		"glouglou_orange", ///< Drink - OrangeJuice
-		"glouglou_lait", ///< Drink - Milk
-		"slurp_tarte", ///< Desert - FruitPie
-		"slurp_pasteque", ///< Desert - Watermelon
-		"slurp_glace", ///< Desert - IceCream
+		"glouglou_lait",   ///< Drink - Milk
+		"slurp_tarte",     ///< Desert - FruitPie
+		"slurp_pasteque",  ///< Desert - Watermelon
+		"slurp_glace",     ///< Desert - IceCream
 	};
 	/** Player note sprites for confirmed, rejected, and uncertain food deductions. */
 	static constexpr const char *kMemoSymbolNames[3] = {
-		"symb_OK", ///< 'V'
-		"symb_NO", ///< 'X'
+		"symb_OK",    ///< 'V'
+		"symb_NO",    ///< 'X'
 		"symb_MAYBE", ///< '?'
 	};
 	/** Order-panel RLE sprites indexed by Level 1, 2, and 3. */
@@ -189,14 +189,14 @@ private:
 		Meal accepted;
 		Meal rejected;
 	};
-	/** One difficulty-layout variant encoded in food, clue, and gesture indices. */
+	/** One level-layout variant encoded in food, clue, and gesture indices. */
 	struct Layout {
 		/** Required meals, spoken clues, and directional gestures for up to six tables. */
 		byte answers[6][3];
 		byte clues[6][3];
 		byte gestures[6][2];
 	};
-	/** Four release-matched variants for each of the three selectable difficulties. */
+	/** Four release-matched variants for each of the three selectable levels. */
 	static constexpr Layout kLayouts[12] = {
 		{
 			// Layout 11
@@ -271,6 +271,533 @@ private:
 			{{0, 0}, {0, 0}, {1, 2}, {0, 0}, {0, 0}, {0, 0}},
 		},
 	};
+	struct L4Layout {
+		byte clues[6][3];
+		byte gestures[6][2];
+		int firstAnswer;
+		int answerCount;
+	};
+	static constexpr L4Layout kL4Layouts[4] = {
+		{
+			// Layout 41
+			{
+				{6, 8, 9},
+				{1, 9, 9},
+				{4, 5, 9},
+				{7, 9, 9},
+				{3, 9, 9},
+				{9, 9, 9},
+			},
+			{
+				{0, 0},
+				{0, 0},
+				{2, 1},
+				{1, 0},
+				{0, 0},
+				{0, 0},
+			},
+			0,
+			12,
+		},
+		{
+			// Layout 42
+			{
+				{1, 9, 9},
+				{6, 9, 9},
+				{4, 9, 9},
+				{7, 9, 9},
+				{0, 9, 9},
+				{2, 9, 9},
+			},
+			{
+				{0, 0},
+				{0, 0},
+				{0, 0},
+				{0, 0},
+				{0, 0},
+				{0, 0},
+			},
+			12,
+			4,
+		},
+		{
+			// Layout 43
+			{
+				{9, 9, 9},
+				{0, 9, 9},
+				{7, 9, 9},
+				{5, 9, 9},
+				{1, 9, 9},
+				{9, 9, 9},
+			},
+			{
+				{0, 0},
+				{0, 0},
+				{0, 0},
+				{0, 0},
+				{2, 0},
+				{0, 0},
+			},
+			16,
+			16,
+		},
+		{
+			// Layout 44
+			{
+				{8, 9, 9},
+				{9, 9, 9},
+				{9, 9, 9},
+				{9, 9, 9},
+				{5, 9, 9},
+				{0, 9, 9},
+			},
+			{
+				{0, 0},
+				{0, 0},
+				{0, 0},
+				{0, 0},
+				{0, 0},
+				{0, 0},
+			},
+			32,
+			16,
+		},
+	};
+	static constexpr byte kL4Answers[48][6][3] = {
+		{
+			// Layout 41, branch 0
+			{2, 3, 6},
+			{1, 4, 7},
+			{0, 3, 8},
+			{2, 5, 8},
+			{1, 5, 7},
+			{0, 3, 7},
+		},
+		{
+			// Layout 41, branch 1
+			{0, 3, 6},
+			{1, 4, 7},
+			{2, 3, 8},
+			{0, 5, 8},
+			{1, 5, 7},
+			{2, 3, 7},
+		},
+		{
+			// Layout 41, branch 2
+			{2, 3, 6},
+			{1, 4, 7},
+			{0, 3, 8},
+			{2, 5, 8},
+			{1, 3, 7},
+			{0, 5, 7},
+		},
+		{
+			// Layout 41, branch 3
+			{0, 3, 6},
+			{1, 4, 7},
+			{2, 3, 8},
+			{0, 5, 8},
+			{1, 3, 7},
+			{2, 5, 7},
+		},
+		{
+			// Layout 41, branch 4
+			{2, 3, 6},
+			{1, 4, 8},
+			{0, 3, 7},
+			{2, 3, 8},
+			{1, 5, 7},
+			{0, 5, 7},
+		},
+		{
+			// Layout 41, branch 5
+			{2, 3, 6},
+			{1, 4, 8},
+			{0, 3, 7},
+			{2, 3, 8},
+			{1, 5, 7},
+			{0, 5, 7},
+		},
+		{
+			// Layout 41, branch 6
+			{2, 3, 6},
+			{1, 4, 8},
+			{0, 3, 8},
+			{2, 5, 7},
+			{1, 5, 7},
+			{0, 3, 7},
+		},
+		{
+			// Layout 41, branch 7
+			{0, 3, 6},
+			{1, 4, 8},
+			{2, 3, 8},
+			{0, 5, 7},
+			{1, 5, 7},
+			{2, 3, 7},
+		},
+		{
+			// Layout 41, branch 8
+			{2, 3, 6},
+			{1, 4, 8},
+			{0, 3, 8},
+			{2, 5, 7},
+			{1, 3, 7},
+			{0, 5, 7},
+		},
+		{
+			// Layout 41, branch 9
+			{0, 3, 6},
+			{1, 4, 8},
+			{2, 3, 8},
+			{0, 5, 7},
+			{1, 3, 7},
+			{2, 5, 7},
+		},
+		{
+			// Layout 41, branch 10
+			{2, 3, 6},
+			{1, 4, 8},
+			{0, 3, 8},
+			{2, 3, 7},
+			{1, 5, 7},
+			{0, 5, 7},
+		},
+		{
+			// Layout 41, branch 11
+			{2, 3, 6},
+			{1, 4, 8},
+			{0, 3, 8},
+			{2, 3, 7},
+			{1, 5, 7},
+			{0, 5, 7},
+		},
+		{
+			// Layout 42, branch 0
+			{1, 4, 6},
+			{1, 5, 8},
+			{1, 3, 7},
+			{0, 4, 7},
+			{0, 4, 8},
+			{0, 4, 6},
+		},
+		{
+			// Layout 42, branch 1
+			{0, 4, 6},
+			{0, 4, 8},
+			{0, 4, 7},
+			{1, 5, 7},
+			{1, 3, 8},
+			{1, 4, 6},
+		},
+		{
+			// Layout 42, branch 2
+			{1, 4, 6},
+			{1, 3, 8},
+			{1, 5, 7},
+			{0, 4, 7},
+			{0, 4, 8},
+			{0, 4, 6},
+		},
+		{
+			// Layout 42, branch 3
+			{0, 4, 6},
+			{0, 4, 8},
+			{0, 4, 7},
+			{1, 3, 7},
+			{1, 5, 8},
+			{1, 4, 6},
+		},
+		{
+			// Layout 43, branch 0
+			{1, 3, 6},
+			{0, 4, 6},
+			{1, 4, 7},
+			{1, 5, 6},
+			{2, 5, 8},
+			{2, 3, 6},
+		},
+		{
+			// Layout 43, branch 1
+			{1, 3, 6},
+			{0, 4, 6},
+			{1, 4, 7},
+			{1, 5, 6},
+			{2, 3, 6},
+			{2, 5, 8},
+		},
+		{
+			// Layout 43, branch 2
+			{1, 3, 8},
+			{0, 4, 8},
+			{1, 4, 7},
+			{1, 5, 6},
+			{2, 5, 8},
+			{2, 3, 6},
+		},
+		{
+			// Layout 43, branch 3
+			{1, 3, 8},
+			{0, 4, 8},
+			{1, 4, 7},
+			{1, 5, 6},
+			{2, 3, 6},
+			{2, 5, 8},
+		},
+		{
+			// Layout 43, branch 4
+			{1, 3, 6},
+			{0, 4, 6},
+			{1, 4, 7},
+			{1, 5, 8},
+			{2, 5, 6},
+			{2, 3, 8},
+		},
+		{
+			// Layout 43, branch 5
+			{1, 3, 6},
+			{0, 4, 6},
+			{1, 4, 7},
+			{1, 5, 8},
+			{2, 3, 8},
+			{2, 5, 6},
+		},
+		{
+			// Layout 43, branch 6
+			{1, 3, 8},
+			{0, 4, 8},
+			{1, 4, 7},
+			{1, 5, 8},
+			{2, 5, 6},
+			{2, 3, 8},
+		},
+		{
+			// Layout 43, branch 7
+			{1, 3, 8},
+			{0, 4, 8},
+			{1, 4, 7},
+			{1, 5, 8},
+			{2, 3, 8},
+			{2, 5, 6},
+		},
+		{
+			// Layout 43, branch 8
+			{1, 4, 6},
+			{0, 3, 6},
+			{1, 3, 7},
+			{1, 5, 6},
+			{2, 5, 8},
+			{2, 4, 6},
+		},
+		{
+			// Layout 43, branch 9
+			{1, 4, 6},
+			{0, 3, 6},
+			{1, 3, 7},
+			{1, 5, 6},
+			{2, 4, 6},
+			{2, 5, 8},
+		},
+		{
+			// Layout 43, branch 10
+			{1, 4, 8},
+			{0, 3, 8},
+			{1, 3, 7},
+			{1, 5, 6},
+			{2, 5, 8},
+			{2, 4, 6},
+		},
+		{
+			// Layout 43, branch 11
+			{1, 4, 8},
+			{0, 3, 8},
+			{1, 3, 7},
+			{1, 5, 6},
+			{2, 4, 6},
+			{2, 5, 8},
+		},
+		{
+			// Layout 43, branch 12
+			{1, 4, 6},
+			{0, 3, 6},
+			{1, 3, 7},
+			{1, 5, 8},
+			{2, 5, 6},
+			{2, 4, 8},
+		},
+		{
+			// Layout 43, branch 13
+			{1, 4, 6},
+			{0, 3, 6},
+			{1, 3, 7},
+			{1, 5, 8},
+			{2, 4, 8},
+			{2, 5, 6},
+		},
+		{
+			// Layout 43, branch 14
+			{1, 4, 8},
+			{0, 3, 8},
+			{1, 3, 7},
+			{1, 5, 8},
+			{2, 5, 6},
+			{2, 4, 8},
+		},
+		{
+			// Layout 43, branch 15
+			{1, 4, 8},
+			{0, 3, 8},
+			{1, 3, 7},
+			{1, 5, 8},
+			{2, 4, 8},
+			{2, 5, 6},
+		},
+		{
+			// Layout 44, branch 0
+			{0, 4, 8},
+			{1, 3, 6},
+			{0, 4, 8},
+			{0, 4, 7},
+			{0, 5, 8},
+			{0, 4, 7},
+		},
+		{
+			// Layout 44, branch 1
+			{0, 4, 8},
+			{1, 3, 7},
+			{0, 4, 8},
+			{0, 4, 6},
+			{0, 5, 8},
+			{0, 4, 6},
+		},
+		{
+			// Layout 44, branch 2
+			{0, 4, 8},
+			{1, 3, 6},
+			{0, 4, 8},
+			{0, 4, 8},
+			{0, 5, 7},
+			{0, 4, 8},
+		},
+		{
+			// Layout 44, branch 3
+			{0, 4, 8},
+			{1, 3, 7},
+			{0, 4, 8},
+			{0, 4, 8},
+			{0, 5, 6},
+			{0, 4, 8},
+		},
+		{
+			// Layout 44, branch 4
+			{0, 3, 8},
+			{1, 4, 6},
+			{0, 3, 8},
+			{0, 3, 7},
+			{0, 5, 8},
+			{0, 3, 7},
+		},
+		{
+			// Layout 44, branch 5
+			{0, 3, 8},
+			{1, 4, 7},
+			{0, 3, 8},
+			{0, 3, 6},
+			{0, 5, 8},
+			{0, 3, 6},
+		},
+		{
+			// Layout 44, branch 6
+			{0, 3, 8},
+			{1, 4, 6},
+			{0, 3, 8},
+			{0, 3, 8},
+			{0, 5, 7},
+			{0, 3, 8},
+		},
+		{
+			// Layout 44, branch 7
+			{0, 3, 8},
+			{1, 4, 7},
+			{0, 3, 8},
+			{0, 3, 8},
+			{0, 5, 6},
+			{0, 3, 8},
+		},
+		{
+			// Layout 44, branch 8
+			{0, 4, 8},
+			{2, 3, 6},
+			{0, 4, 8},
+			{0, 4, 7},
+			{0, 5, 8},
+			{0, 4, 7},
+		},
+		{
+			// Layout 44, branch 9
+			{0, 4, 8},
+			{2, 3, 7},
+			{0, 4, 8},
+			{0, 4, 6},
+			{0, 5, 8},
+			{0, 4, 6},
+		},
+		{
+			// Layout 44, branch 10
+			{0, 4, 8},
+			{2, 3, 6},
+			{0, 4, 8},
+			{0, 4, 8},
+			{0, 5, 7},
+			{0, 4, 8},
+		},
+		{
+			// Layout 44, branch 11
+			{0, 4, 8},
+			{2, 3, 7},
+			{0, 4, 8},
+			{0, 4, 8},
+			{0, 5, 6},
+			{0, 4, 8},
+		},
+		{
+			// Layout 44, branch 12
+			{0, 3, 8},
+			{2, 4, 6},
+			{0, 3, 8},
+			{0, 3, 7},
+			{0, 5, 8},
+			{0, 3, 7},
+		},
+		{
+			// Layout 44, branch 13
+			{0, 3, 8},
+			{2, 4, 7},
+			{0, 3, 8},
+			{0, 3, 6},
+			{0, 5, 8},
+			{0, 3, 6},
+		},
+		{
+			// Layout 44, branch 14
+			{0, 3, 8},
+			{2, 4, 6},
+			{0, 3, 8},
+			{0, 3, 8},
+			{0, 5, 7},
+			{0, 3, 8},
+		},
+		{
+			// Layout 44, branch 15
+			{0, 3, 8},
+			{2, 4, 7},
+			{0, 3, 8},
+			{0, 3, 8},
+			{0, 5, 6},
+			{0, 3, 8},
+		},
+	};
+
 	/** Screen origins and tray-relative offsets for the nine food sprites. */
 	static constexpr Common::Point32 kFoodPositions[9] = {
 		{121, 412},
@@ -343,6 +870,420 @@ private:
 	void drawTray(ManagedSurface32 *screen, const Common::Point32 &pos, const Meal &meal);
 	/** Draw the console-only answer overlay. */
 	void drawDebugOverlay(ManagedSurface32 *screen);
+	/** Draw the optional English caption for the currently playing direct clue. */
+	void drawClueSubtitle(ManagedSurface32 *screen);
+	/** Original selection key and retained English sentence for a Chez Norf clue. */
+	struct ClueTextEntry {
+		int layout;
+		int norf;
+		int clue[3];
+		const char *text;
+	};
+	static constexpr ClueTextEntry kClueTextEntries[401] = {
+		{11, 1, {0, 9, 9}, "I'm the only one who wants a sandwich"},
+		{11, 1, {1, 9, 9}, "I'm the only one who wants fish"},
+		{11, 1, {2, 9, 9}, "I'm the only one who wants a salad"},
+		{11, 2, {0, 9, 9}, "Everyone over there wants a sandwich, YUCK ! (points right)"},
+		{11, 2, {1, 9, 9}, "Everyone over there wants fish, YUCK ! (points right)"},
+		{11, 2, {2, 9, 9}, "Everyone over there wants a salad, YUCK ! (points right)"},
+		{11, 3, {3, 9, 9}, "Everyone else wants coffee, YUCK !"},
+		{11, 3, {4, 9, 9}, "Everyone else wants orange juice, YUCK !"},
+		{11, 3, {5, 9, 9}, "Everyone else wants milk, YUCK !"},
+		{11, 4, {3, 9, 9}, "No one wants coffee"},
+		{11, 4, {4, 9, 9}, "No one wants orange juice"},
+		{11, 4, {5, 9, 9}, "No one wants milk"},
+		{12, 1, {0, 9, 9}, "I'm the only one who wants a sandwich"},
+		{12, 1, {1, 9, 9}, "I'm the only one who wants fish"},
+		{12, 1, {2, 9, 9}, "I'm the only one who wants a salad"},
+		{12, 2, {3, 9, 9}, "Both my neighbors want coffee"},
+		{12, 2, {4, 9, 9}, "Both my neighbors want orange juice"},
+		{12, 2, {5, 9, 9}, "Both my neighbors want milk"},
+		{12, 3, {0, 9, 9}, "The only one who wants a sandwich is over there (points left)"},
+		{12, 3, {1, 9, 9}, "The only one who wants fish is over there (points left)"},
+		{12, 3, {2, 9, 9}, "The only one who wants a salad is over there (points left)"},
+		{12, 4, {3, 9, 9}, "I'm the only one who wants coffee"},
+		{12, 4, {4, 9, 9}, "I'm the only one who wants orange juice"},
+		{12, 4, {5, 9, 9}, "I'm the only one who wants milk"},
+		{13, 1, {3, 0, 9}, "No one wants coffee or a sandwich"},
+		{13, 1, {3, 1, 9}, "No one wants coffee or fish"},
+		{13, 1, {3, 2, 9}, "No one wants coffee or a salad"},
+		{13, 1, {4, 0, 9}, "No one wants orange juice or a sandwich"},
+		{13, 1, {4, 1, 9}, "No one wants orange juice or fish"},
+		{13, 1, {4, 2, 9}, "No one wants orange juice or a salad"},
+		{13, 1, {5, 0, 9}, "No one wants milk or a sandwich"},
+		{13, 1, {5, 1, 9}, "No one wants milk or fish"},
+		{13, 1, {5, 2, 9}, "No one wants milk or a salad"},
+		{13, 2, {0, 9, 9}, "Both my neighbors want a sandwich, YUCK !"},
+		{13, 2, {1, 9, 9}, "Both my neighbors want fish, YUCK !"},
+		{13, 2, {2, 9, 9}, "Both my neighbors want a salad, YUCK !"},
+		{13, 3, {9, 9, 9}, "Both my neighbors want the same dish"},
+		{13, 4, {3, 9, 9}, "Everyone else wants coffee, YUCK !"},
+		{13, 4, {4, 9, 9}, "Everyone else wants orange juice, YUCK !"},
+		{13, 4, {5, 9, 9}, "Everyone else wants milk, YUCK !"},
+		{14, 1, {0, 9, 9}, "I don't want a sandwich"},
+		{14, 1, {1, 9, 9}, "I don't want fish"},
+		{14, 1, {2, 9, 9}, "I don't want a salad"},
+		{14, 2, {0, 1, 9}, "The person who wants a sandwich is not sitting next to the person who wants fish"},
+		{14, 2, {0, 2, 9}, "The person who wants a sandwich is not sitting next to the person who wants a salad"},
+		{14, 2, {1, 0, 9}, "The person who wants fish is not sitting next to the person who wants a sandwich"},
+		{14, 2, {1, 2, 9}, "The person who wants fish is not sitting next to the person who wants a salad"},
+		{14, 2, {2, 0, 9}, "The person who wants a salad is not sitting next to the person who wants a sandwich"},
+		{14, 2, {2, 1, 9}, "The person who wants a salad is not sitting next to the person who wants fish"},
+		{14, 3, {0, 9, 9}, "One neighbor and I both want a sandwich"},
+		{14, 3, {1, 9, 9}, "One neighbor and I both want fish"},
+		{14, 3, {2, 9, 9}, "One neighbor and I both want a salad"},
+		{14, 4, {3, 4, 9}, "No one wants coffee or orange juice"},
+		{14, 4, {3, 5, 9}, "No one wants coffee or milk"},
+		{14, 4, {4, 3, 9}, "No one wants orange juice or coffee"},
+		{14, 4, {4, 5, 9}, "No one wants orange juice or milk"},
+		{14, 4, {5, 3, 9}, "No one wants milk or coffee"},
+		{14, 4, {5, 4, 9}, "No one wants milk or orange juice"},
+		{21, 1, {0, 6, 9}, "Two of us want a sandwich. I'm the only one who wants fruit pie"},
+		{21, 1, {0, 7, 9}, "Two of us want a sandwich. I'm the only one who wants watermelon"},
+		{21, 1, {0, 8, 9}, "Two of us want a sandwich. I'm the only one who wants ice cream"},
+		{21, 1, {1, 6, 9}, "Two of us want fish. I'm the only one who wants fruit pie"},
+		{21, 1, {1, 7, 9}, "Two of us want fish. I'm the only one who wants watermelon"},
+		{21, 1, {1, 8, 9}, "Two of us want fish. I'm the only one who wants ice cream"},
+		{21, 1, {2, 6, 9}, "Two of us want a salad. I'm the only one who wants fruit pie"},
+		{21, 1, {2, 7, 9}, "Two of us want a salad. I'm the only one who wants watermelon"},
+		{21, 1, {2, 8, 9}, "Two of us want a salad. I'm the only one who wants ice cream"},
+		{21, 2, {6, 7, 9}, "Everyone over there wants fruit pie. I want watermelon (points right)"},
+		{21, 2, {6, 8, 9}, "Everyone over there wants fruit pie. I want ice cream (points right)"},
+		{21, 2, {7, 6, 9}, "Everyone over there wants watermelon. I want fruit pie (points right)"},
+		{21, 2, {7, 8, 9}, "Everyone over there wants watermelon. I want ice cream (points right)"},
+		{21, 2, {8, 6, 9}, "Everyone over there wants ice cream. I want fruit pie (points right)"},
+		{21, 2, {8, 7, 9}, "Everyone over there wants ice cream. I want watermelon (points right)"},
+		{21, 3, {3, 0, 9}, "I'm the only one who wants coffee. Both my neighbors want a sandwich (points both)"},
+		{21, 3, {3, 1, 9}, "I'm the only one who wants coffee. Both my neighbors want fish (points both)"},
+		{21, 3, {3, 2, 9}, "I'm the only one who wants coffee. Both my neighbors want a salad (points both)"},
+		{21, 3, {4, 0, 9}, "I'm the only one who wants orange juice. Both my neighbors want a sandwich (points both)"},
+		{21, 3, {4, 1, 9}, "I'm the only one who wants orange juice. Both my neighbors want fish (points both)"},
+		{21, 3, {4, 2, 9}, "I'm the only one who wants orange juice. Both my neighbors want a salad (points both)"},
+		{21, 3, {5, 0, 9}, "I'm the only one who wants milk. Both my neighbors want a sandwich (points both)"},
+		{21, 3, {5, 1, 9}, "I'm the only one who wants milk. Both my neighbors want fish (points both)"},
+		{21, 3, {5, 2, 9}, "I'm the only one who wants milk. Both my neighbors want a salad (points both)"},
+		{21, 4, {3, 4, 9}, "I want coffee, but two others want orange juice"},
+		{21, 4, {3, 5, 9}, "I want coffee, but two others want milk"},
+		{21, 4, {4, 3, 9}, "I want orange juice, but two others want coffee"},
+		{21, 4, {4, 5, 9}, "I want orange juice, but two others want milk"},
+		{21, 4, {5, 3, 9}, "I want milk, but two others want coffee"},
+		{21, 4, {5, 4, 9}, "I want milk, but two others want orange juice"},
+		{22, 1, {0, 9, 9}, "Someone wants a sandwich, YUCK !"},
+		{22, 1, {1, 9, 9}, "Someone wants fish, YUCK !"},
+		{22, 1, {2, 9, 9}, "Someone wants a salad, YUCK !"},
+		{22, 2, {0, 3, 9}, "Neither of my neighbors want a sandwich, and no one wants coffee"},
+		{22, 2, {0, 4, 9}, "Neither of my neighbors want a sandwich, and no one wants orange juice"},
+		{22, 2, {0, 5, 9}, "Neither of my neighbors want a sandwich, and no one wants milk"},
+		{22, 2, {1, 3, 9}, "Neither of my neighbors want fish, and no one wants coffee"},
+		{22, 2, {1, 4, 9}, "Neither of my neighbors want fish, and no one wants orange juice"},
+		{22, 2, {1, 5, 9}, "Neither of my neighbors want fish, and no one wants milk"},
+		{22, 2, {2, 3, 9}, "Neither of my neighbors want a salad, and no one wants coffee"},
+		{22, 2, {2, 4, 9}, "Neither of my neighbors want a salad, and no one wants orange juice"},
+		{22, 2, {2, 5, 9}, "Neither of my neighbors want a salad, and no one wants milk"},
+		{22, 3, {3, 6, 9}, "Everyone else wants coffee. Everyone over there wants fruit pie, YUCK ! (points left)"},
+		{22, 3, {3, 7, 9}, "Everyone else wants coffee. Everyone over there wants watermelon, YUCK ! (points left)"},
+		{22, 3, {3, 8, 9}, "Everyone else wants coffee. Everyone over there wants ice cream, YUCK ! (points left)"},
+		{22, 3, {4, 6, 9}, "Everyone else wants orange juice. Everyone over there wants fruit pie, YUCK ! (points left)"},
+		{22, 3, {4, 7, 9}, "Everyone else wants orange juice. Everyone over there wants watermelon, YUCK ! (points left)"},
+		{22, 3, {4, 8, 9}, "Everyone else wants orange juice. Everyone over there wants ice cream, YUCK ! (points left)"},
+		{22, 3, {5, 6, 9}, "Everyone else wants milk. Everyone over there wants fruit pie, YUCK ! (points left)"},
+		{22, 3, {5, 7, 9}, "Everyone else wants milk. Everyone over there wants watermelon, YUCK ! (points left)"},
+		{22, 3, {5, 8, 9}, "Everyone else wants milk. Everyone over there wants ice cream, YUCK ! (points left)"},
+		{22, 4, {0, 6, 9}, "Two of us want a sandwich. I'm the only one who wants fruit pie"},
+		{22, 4, {0, 7, 9}, "Two of us want a sandwich. I'm the only one who wants watermelon"},
+		{22, 4, {0, 8, 9}, "Two of us want a sandwich. I'm the only one who wants ice cream"},
+		{22, 4, {1, 6, 9}, "Two of us want fish. I'm the only one who wants fruit pie"},
+		{22, 4, {1, 7, 9}, "Two of us want fish. I'm the only one who wants watermelon"},
+		{22, 4, {1, 8, 9}, "Two of us want fish. I'm the only one who wants ice cream"},
+		{22, 4, {2, 6, 9}, "Two of us want a salad. I'm the only one who wants fruit pie"},
+		{22, 4, {2, 7, 9}, "Two of us want a salad. I'm the only one who wants watermelon"},
+		{22, 4, {2, 8, 9}, "Two of us want a salad. I'm the only one who wants ice cream"},
+		{23, 1, {0, 1, 9}, "The two who wants a sandwich are next to each other, and so are the two who want fish"},
+		{23, 1, {0, 2, 9}, "The two who wants a sandwich are next to each other, and so are the two who want a salad"},
+		{23, 1, {1, 0, 9}, "The two who wants fish are next to each other, and so are the two who want a sandwich"},
+		{23, 1, {1, 2, 9}, "The two who wants fish are next to each other, and so are the two who want a salad"},
+		{23, 1, {2, 0, 9}, "The two who wants a salad are next to each other, and so are the two who want a sandwich"},
+		{23, 1, {2, 1, 9}, "The two who wants a salad are next to each other, and so are the two who want fish"},
+		{23, 2, {6, 3, 9}, "One of them is the only one who wants fruit pie, and the other one is the only one who wants coffee (points right)"},
+		{23, 2, {6, 4, 9}, "One of them is the only one who wants fruit pie, and the other one is the only one who wants orange juice (points right)"},
+		{23, 2, {6, 5, 9}, "One of them is the only one who wants fruit pie, and the other one is the only one who wants milk (points right)"},
+		{23, 2, {7, 3, 9}, "One of them is the only one who wants watermelon, and the other one is the only one who wants coffee (points right)"},
+		{23, 2, {7, 4, 9}, "One of them is the only one who wants watermelon, and the other one is the only one who wants orange juice (points right)"},
+		{23, 2, {7, 5, 9}, "One of them is the only one who wants watermelon, and the other one is the only one who wants milk (points right)"},
+		{23, 2, {8, 3, 9}, "One of them is the only one who wants ice cream, and the other one is the only one who wants coffee (points right)"},
+		{23, 2, {8, 4, 9}, "One of them is the only one who wants ice cream, and the other one is the only one who wants orange juice (points right)"},
+		{23, 2, {8, 5, 9}, "One of them is the only one who wants ice cream, and the other one is the only one who wants milk (points right)"},
+		{23, 3, {6, 3, 9}, "No one wants fruit pie. Only my neighbor and I want coffee"},
+		{23, 3, {6, 4, 9}, "No one wants fruit pie. Only my neighbor and I want orange juice"},
+		{23, 3, {6, 5, 9}, "No one wants fruit pie. Only my neighbor and I want milk"},
+		{23, 3, {7, 3, 9}, "No one wants watermelon. Only my neighbor and I want coffee"},
+		{23, 3, {7, 4, 9}, "No one wants watermelon. Only my neighbor and I want orange juice"},
+		{23, 3, {7, 5, 9}, "No one wants watermelon. Only my neighbor and I want milk"},
+		{23, 3, {8, 3, 9}, "No one wants ice cream. Only my neighbor and I want coffee"},
+		{23, 3, {8, 4, 9}, "No one wants ice cream. Only my neighbor and I want orange juice"},
+		{23, 3, {8, 5, 9}, "No one wants ice cream. Only my neighbor and I want milk"},
+		{23, 4, {0, 6, 9}, "I want a sandwich, but I don't want fruit pie"},
+		{23, 4, {0, 7, 9}, "I want a sandwich, but I don't want watermelon"},
+		{23, 4, {0, 8, 9}, "I want a sandwich, but I don't want ice cream"},
+		{23, 4, {1, 6, 9}, "I want fish, but I don't want fruit pie"},
+		{23, 4, {1, 7, 9}, "I want fish, but I don't want watermelon"},
+		{23, 4, {1, 8, 9}, "I want fish, but I don't want ice cream"},
+		{23, 4, {2, 6, 9}, "I want a salad, but I don't want fruit pie"},
+		{23, 4, {2, 7, 9}, "I want a salad, but I don't want watermelon"},
+		{23, 4, {2, 8, 9}, "I want a salad, but I don't want ice cream"},
+		{24, 1, {3, 9, 9}, "No one has the same drink as their neighbor. No one wants coffee"},
+		{24, 1, {4, 9, 9}, "No one has the same drink as their neighbor. No one wants orange juice"},
+		{24, 1, {5, 9, 9}, "No one has the same drink as their neighbor. No one wants milk"},
+		{24, 2, {0, 9, 9}, "Everyone who wants a sandwich wants a different dessert"},
+		{24, 2, {1, 9, 9}, "Everyone who wants fish wants a different dessert"},
+		{24, 2, {2, 9, 9}, "Everyone who wants a salad wants a different dessert"},
+		{24, 3, {0, 6, 9}, "I'm the only one who wants a sandwich. One of my neighbor and I both want fruit pie"},
+		{24, 3, {0, 7, 9}, "I'm the only one who wants a sandwich. One of my neighbor and I both want watermelon"},
+		{24, 3, {0, 8, 9}, "I'm the only one who wants a sandwich. One of my neighbor and I both want ice cream"},
+		{24, 3, {1, 6, 9}, "I'm the only one who wants fish. One of my neighbor and I both want fruit pie"},
+		{24, 3, {1, 7, 9}, "I'm the only one who wants fish. One of my neighbor and I both want watermelon"},
+		{24, 3, {1, 8, 9}, "I'm the only one who wants fish. One of my neighbor and I both want ice cream"},
+		{24, 3, {2, 6, 9}, "I'm the only one who wants a salad. One of my neighbor and I both want fruit pie"},
+		{24, 3, {2, 7, 9}, "I'm the only one who wants a salad. One of my neighbor and I both want watermelon"},
+		{24, 3, {2, 8, 9}, "I'm the only one who wants a salad. One of my neighbor and I both want ice cream"},
+		{24, 4, {0, 6, 3}, "No one wants a sandwich. I'm the only one who wants fruit pie. I don't want coffee"},
+		{24, 4, {0, 6, 4}, "No one wants a sandwich. I'm the only one who wants fruit pie. I don't want orange juice"},
+		{24, 4, {0, 6, 5}, "No one wants a sandwich. I'm the only one who wants fruit pie. I don't want milk"},
+		{24, 4, {0, 7, 3}, "No one wants a sandwich. I'm the only one who wants watermelon. I don't want coffee"},
+		{24, 4, {0, 7, 4}, "No one wants a sandwich. I'm the only one who wants watermelon. I don't want orange juice"},
+		{24, 4, {0, 7, 5}, "No one wants a sandwich. I'm the only one who wants watermelon. I don't want milk"},
+		{24, 4, {0, 8, 3}, "No one wants a sandwich. I'm the only one who wants ice cream. I don't want coffee"},
+		{24, 4, {0, 8, 4}, "No one wants a sandwich. I'm the only one who wants ice cream. I don't want orange juice"},
+		{24, 4, {0, 8, 5}, "No one wants a sandwich. I'm the only one who wants ice cream. I don't want milk"},
+		{24, 4, {1, 6, 3}, "No one wants fish. I'm the only one who wants fruit pie. I don't want coffee"},
+		{24, 4, {1, 6, 4}, "No one wants fish. I'm the only one who wants fruit pie. I don't want orange juice"},
+		{24, 4, {1, 6, 5}, "No one wants fish. I'm the only one who wants fruit pie. I don't want milk"},
+		{24, 4, {1, 7, 3}, "No one wants fish. I'm the only one who wants watermelon. I don't want coffee"},
+		{24, 4, {1, 7, 4}, "No one wants fish. I'm the only one who wants watermelon. I don't want orange juice"},
+		{24, 4, {1, 7, 5}, "No one wants fish. I'm the only one who wants watermelon. I don't want milk"},
+		{24, 4, {1, 8, 3}, "No one wants fish. I'm the only one who wants ice cream. I don't want coffee"},
+		{24, 4, {1, 8, 4}, "No one wants fish. I'm the only one who wants ice cream. I don't want orange juice"},
+		{24, 4, {1, 8, 5}, "No one wants fish. I'm the only one who wants ice cream. I don't want milk"},
+		{24, 4, {2, 6, 3}, "No one wants a salad. I'm the only one who wants fruit pie. I don't want coffee"},
+		{24, 4, {2, 6, 4}, "No one wants a salad. I'm the only one who wants fruit pie. I don't want orange juice"},
+		{24, 4, {2, 6, 5}, "No one wants a salad. I'm the only one who wants fruit pie. I don't want milk"},
+		{24, 4, {2, 7, 3}, "No one wants a salad. I'm the only one who wants watermelon. I don't want coffee"},
+		{24, 4, {2, 7, 4}, "No one wants a salad. I'm the only one who wants watermelon. I don't want orange juice"},
+		{24, 4, {2, 7, 5}, "No one wants a salad. I'm the only one who wants watermelon. I don't want milk"},
+		{24, 4, {2, 8, 3}, "No one wants a salad. I'm the only one who wants ice cream. I don't want coffee"},
+		{24, 4, {2, 8, 4}, "No one wants a salad. I'm the only one who wants ice cream. I don't want orange juice"},
+		{24, 4, {2, 8, 5}, "No one wants a salad. I'm the only one who wants ice cream. I don't want milk"},
+		{31, 1, {6, 6, 3}, "I'm not one of the four who want fruit pie. No one who wants fruit pie wants coffee"},
+		{31, 1, {6, 6, 4}, "I'm not one of the four who want fruit pie. No one who wants fruit pie wants orange juice"},
+		{31, 1, {6, 6, 5}, "I'm not one of the four who want fruit pie. No one who wants fruit pie wants milk"},
+		{31, 1, {7, 7, 3}, "I'm not one of the four who want watermelon. No one who wants watermelon wants coffee"},
+		{31, 1, {7, 7, 4}, "I'm not one of the four who want watermelon. No one who wants watermelon wants orange juice"},
+		{31, 1, {7, 7, 5}, "I'm not one of the four who want watermelon. No one who wants watermelon wants milk"},
+		{31, 1, {8, 8, 3}, "I'm not one of the four who want ice cream. No one who wants ice cream wants coffee"},
+		{31, 1, {8, 8, 4}, "I'm not one of the four who want ice cream. No one who wants ice cream wants orange juice"},
+		{31, 1, {8, 8, 5}, "I'm not one of the four who want ice cream. No one who wants ice cream wants milk"},
+		{31, 2, {0, 3, 9}, "Neither of my neighbors want a sandwich, but both want coffee (points both)"},
+		{31, 2, {0, 4, 9}, "Neither of my neighbors want a sandwich, but both want orange juice (points both)"},
+		{31, 2, {0, 5, 9}, "Neither of my neighbors want a sandwich, but both want milk (points both)"},
+		{31, 2, {1, 3, 9}, "Neither of my neighbors want fish, but both want coffee (points both)"},
+		{31, 2, {1, 4, 9}, "Neither of my neighbors want fish, but both want orange juice (points both)"},
+		{31, 2, {1, 5, 9}, "Neither of my neighbors want fish, but both want milk (points both)"},
+		{31, 2, {2, 3, 9}, "Neither of my neighbors want a salad, but both want coffee (points both)"},
+		{31, 2, {2, 4, 9}, "Neither of my neighbors want a salad, but both want orange juice (points both)"},
+		{31, 2, {2, 5, 9}, "Neither of my neighbors want a salad, but both want milk (points both)"},
+		{31, 3, {6, 0, 9}, "No one wants fruit pie. I'm the only one who wants a sandwich"},
+		{31, 3, {6, 1, 9}, "No one wants fruit pie. I'm the only one who wants fish"},
+		{31, 3, {6, 2, 9}, "No one wants fruit pie. I'm the only one who wants a salad"},
+		{31, 3, {7, 0, 9}, "No one wants watermelon. I'm the only one who wants a sandwich"},
+		{31, 3, {7, 1, 9}, "No one wants watermelon. I'm the only one who wants fish"},
+		{31, 3, {7, 2, 9}, "No one wants watermelon. I'm the only one who wants a salad"},
+		{31, 3, {8, 0, 9}, "No one wants ice cream. I'm the only one who wants a sandwich"},
+		{31, 3, {8, 1, 9}, "No one wants ice cream. I'm the only one who wants fish"},
+		{31, 3, {8, 2, 9}, "No one wants ice cream. I'm the only one who wants a salad"},
+		{31, 4, {3, 0, 9}, "I want coffee. Three of us want a sandwich"},
+		{31, 4, {3, 1, 9}, "I want coffee. Three of us want fish"},
+		{31, 4, {3, 2, 9}, "I want coffee. Three of us want salad"},
+		{31, 4, {4, 0, 9}, "I want orange juice. Three of us want a sandwich"},
+		{31, 4, {4, 1, 9}, "I want orange juice. Three of us want fish"},
+		{31, 4, {4, 2, 9}, "I want orange juice. Three of us want salad"},
+		{31, 4, {5, 0, 9}, "I want milk. Three of us want a sandwich"},
+		{31, 4, {5, 1, 9}, "I want milk. Three of us want fish"},
+		{31, 4, {5, 2, 9}, "I want milk. Three of us want salad"},
+		{31, 5, {0, 9, 9}, "Both my neighbors want a sandwich, YUCK ! (points both)"},
+		{31, 5, {1, 9, 9}, "Both my neighbors want fish, YUCK ! (points both)"},
+		{31, 5, {2, 9, 9}, "Both my neighbors want a salad, YUCK ! (points both)"},
+		{31, 6, {3, 9, 9}, "One of my neighbors wants coffee, and so does one of their neighbors, and so does someone else (points both)"},
+		{31, 6, {4, 9, 9}, "One of my neighbors wants orange juice, and so does one of their neighbors, and so does someone else (points both)"},
+		{31, 6, {5, 9, 9}, "One of my neighbors wants milk, and so does one of their neighbors, and so does someone else (points both)"},
+		{32, 1, {0, 6, 8}, "Everyone who wants a sandwich also wants fruit pie. No one wants ice cream"},
+		{32, 1, {0, 6, 7}, "Everyone who wants a sandwich also wants fruit pie. No one wants watermelon"},
+		{32, 1, {0, 7, 6}, "Everyone who wants a sandwich also wants watermelon. No one wants fruit pie"},
+		{32, 1, {0, 7, 8}, "Everyone who wants a sandwich also wants watermelon. No one wants ice cream"},
+		{32, 1, {0, 8, 6}, "Everyone who wants a sandwich also wants ice cream. No one wants fruit pie"},
+		{32, 1, {0, 8, 7}, "Everyone who wants a sandwich also wants ice cream. No one wants watermelon"},
+		{32, 1, {1, 6, 8}, "Everyone who wants fish also wants fruit pie. No one wants ice cream"},
+		{32, 1, {1, 6, 7}, "Everyone who wants fish also wants fruit pie. No one wants watermelon"},
+		{32, 1, {1, 7, 6}, "Everyone who wants fish also wants watermelon. No one wants fruit pie"},
+		{32, 1, {1, 7, 8}, "Everyone who wants fish also wants watermelon. No one wants ice cream"},
+		{32, 1, {1, 8, 6}, "Everyone who wants fish also wants ice cream. No one wants fruit pie"},
+		{32, 1, {1, 8, 7}, "Everyone who wants fish also wants ice cream. No one wants watermelon"},
+		{32, 1, {2, 6, 8}, "Everyone who wants a salad also wants fruit pie. No one wants ice cream"},
+		{32, 1, {2, 6, 7}, "Everyone who wants a salad also wants fruit pie. No one wants watermelon"},
+		{32, 1, {2, 7, 6}, "Everyone who wants a salad also wants watermelon. No one wants fruit pie"},
+		{32, 1, {2, 7, 8}, "Everyone who wants a salad also wants watermelon. No one wants ice cream"},
+		{32, 1, {2, 8, 6}, "Everyone who wants a salad also wants ice cream. No one wants fruit pie"},
+		{32, 1, {2, 8, 7}, "Everyone who wants a salad also wants ice cream. No one wants watermelon"},
+		{32, 2, {6, 6, 9}, "I want fruit pie, and the other two who want fruit pie are neighbors"},
+		{32, 2, {7, 7, 9}, "I want watermelon, and the other two who want watermelon are neighbors"},
+		{32, 2, {8, 8, 9}, "I want ice cream, and the other two who want ice cream are neighbors"},
+		{32, 3, {3, 4, 9}, "Three of us want coffee, but I'm the only one who wants orange juice"},
+		{32, 3, {3, 5, 9}, "Three of us want coffee, but I'm the only one who wants milk"},
+		{32, 3, {4, 3, 9}, "Three of us want orange juice, but I'm the only one who wants coffee"},
+		{32, 3, {4, 5, 9}, "Three of us want orange juice, but I'm the only one who wants milk"},
+		{32, 3, {5, 3, 9}, "Three of us want milk, but I'm the only one who wants coffee"},
+		{32, 3, {5, 4, 9}, "Three of us want milk, but I'm the only one who wants orange juice"},
+		{32, 4, {0, 9, 9}, "One of my neighbors is the only one who wants a sandwich"},
+		{32, 4, {1, 9, 9}, "One of my neighbors is the only one who wants fish"},
+		{32, 4, {2, 9, 9}, "One of my neighbors is the only one who wants a salad"},
+		{32, 5, {0, 9, 9}, "All three sandwiches are over there (points left)"},
+		{32, 5, {1, 9, 9}, "All three fishes are over there (points left)"},
+		{32, 5, {2, 9, 9}, "All three salads are over there (points left)"},
+		{32, 6, {3, 6, 9}, "Two of us want coffee with their fruit pie, but not me"},
+		{32, 6, {3, 7, 9}, "Two of us want coffee with their watermelon, but not me"},
+		{32, 6, {3, 8, 9}, "Two of us want coffee with their ice cream, but not me"},
+		{32, 6, {4, 6, 9}, "Two of us want orange juice with their fruit pie, but not me"},
+		{32, 6, {4, 7, 9}, "Two of us want orange juice with their watermelon, but not me"},
+		{32, 6, {4, 8, 9}, "Two of us want orange juice with their ice cream, but not me"},
+		{32, 6, {5, 6, 9}, "Two of us want milk with their fruit pie, but not me"},
+		{32, 6, {5, 7, 9}, "Two of us want milk with their watermelon, but not me"},
+		{32, 6, {5, 8, 9}, "Two of us want milk with their ice cream, but not me"},
+		{33, 1, {6, 3, 9}, "I'm the only one who wants fruit pie. Two want coffee. YUCK !"},
+		{33, 1, {6, 4, 9}, "I'm the only one who wants fruit pie. Two want orange juice. YUCK !"},
+		{33, 1, {6, 5, 9}, "I'm the only one who wants fruit pie. Two want milk. YUCK !"},
+		{33, 1, {7, 3, 9}, "I'm the only one who wants watermelon. Two want coffee. YUCK !"},
+		{33, 1, {7, 4, 9}, "I'm the only one who wants watermelon. Two want orange juice. YUCK !"},
+		{33, 1, {7, 5, 9}, "I'm the only one who wants watermelon. Two want milk. YUCK !"},
+		{33, 1, {8, 3, 9}, "I'm the only one who wants ice cream. Two want coffee. YUCK !"},
+		{33, 1, {8, 4, 9}, "I'm the only one who wants ice cream. Two want orange juice. YUCK !"},
+		{33, 1, {8, 5, 9}, "I'm the only one who wants ice cream. Two want milk. YUCK !"},
+		{33, 2, {9, 9, 9}, "Both my neighbors want different desserts from the rest of us"},
+		{33, 3, {3, 9, 9}, "Everyone over there wants the same drink, but no one wants coffee (points right)"},
+		{33, 3, {4, 9, 9}, "Everyone over there wants the same drink, but no one wants orange juice (points right)"},
+		{33, 3, {5, 9, 9}, "Everyone over there wants the same drink, but no one wants milk (points right)"},
+		{33, 4, {0, 1, 9}, "Both of my neighbors want a sandwich, but no one wants fish"},
+		{33, 4, {0, 2, 9}, "Both of my neighbors want a sandwich, but no one wants a salad"},
+		{33, 4, {1, 0, 9}, "Both of my neighbors want fish, but no one wants a sandwich"},
+		{33, 4, {1, 2, 9}, "Both of my neighbors want fish, but no one wants a salad"},
+		{33, 4, {2, 0, 9}, "Both of my neighbors want a salad, but no one wants a sandwich"},
+		{33, 4, {2, 1, 9}, "Both of my neighbors want a salad, but no one wants fish"},
+		{33, 5, {0, 9, 9}, "The two on the ends want a sandwich, and so does someone else"},
+		{33, 5, {1, 9, 9}, "The two on the ends want fish, and so does someone else"},
+		{33, 5, {2, 9, 9}, "The two on the ends want a salad, and so does someone else"},
+		{33, 6, {6, 9, 9}, "Two neighbors want the same meal. They don't want fruit pie"},
+		{33, 6, {7, 9, 9}, "Two neighbors want the same meal. They don't want watermelon"},
+		{33, 6, {8, 9, 9}, "Two neighbors want the same meal. They don't want ice cream"},
+		{34, 1, {0, 9, 9}, "Two want a sandwich. YUCK !"},
+		{34, 1, {1, 9, 9}, "Two want fish. YUCK !"},
+		{34, 1, {2, 9, 9}, "Two want a salad. YUCK !"},
+		{34, 2, {3, 0, 9}, "The two who want coffee also want a sandwich"},
+		{34, 2, {3, 1, 9}, "The two who want coffee also want fish"},
+		{34, 2, {3, 2, 9}, "The two who want coffee also want a salad"},
+		{34, 2, {4, 0, 9}, "The two who want orange juice also want a sandwich"},
+		{34, 2, {4, 1, 9}, "The two who want orange juice also want fish"},
+		{34, 2, {4, 2, 9}, "The two who want orange juice also want a salad"},
+		{34, 2, {5, 0, 9}, "The two who want milk also want a sandwich"},
+		{34, 2, {5, 1, 9}, "The two who want milk also want fish"},
+		{34, 2, {5, 2, 9}, "The two who want milk also want a salad"},
+		{34, 3, {6, 7, 9}, "Everyone over there wants fruit pie. Everyone over there wants watermelon (points right then left)"},
+		{34, 3, {6, 8, 9}, "Everyone over there wants fruit pie. Everyone over there wants ice cream (points right then left)"},
+		{34, 3, {7, 6, 9}, "Everyone over there wants watermelon. Everyone over there wants fruit pie (points right then left)"},
+		{34, 3, {7, 8, 9}, "Everyone over there wants watermelon. Everyone over there wants ice cream (points right then left)"},
+		{34, 3, {8, 6, 9}, "Everyone over there wants ice cream. Everyone over there wants fruit pie (points right then left)"},
+		{34, 3, {8, 7, 9}, "Everyone over there wants ice cream. Everyone over there wants watermelon (points right then left)"},
+		{34, 4, {6, 0, 9}, "Everyone who wants fruit pie also wants a sandwich"},
+		{34, 4, {6, 1, 9}, "Everyone who wants fruit pie also wants fish"},
+		{34, 4, {6, 2, 9}, "Everyone who wants fruit pie also wants a salad"},
+		{34, 4, {7, 0, 9}, "Everyone who wants watermelon also wants a sandwich"},
+		{34, 4, {7, 1, 9}, "Everyone who wants watermelon also wants fish"},
+		{34, 4, {7, 2, 9}, "Everyone who wants watermelon also wants a salad"},
+		{34, 4, {8, 0, 9}, "Everyone who wants ice cream also wants a sandwich"},
+		{34, 4, {8, 1, 9}, "Everyone who wants ice cream also wants fish"},
+		{34, 4, {8, 2, 9}, "Everyone who wants ice cream also wants a salad"},
+		{34, 5, {3, 9, 9}, "Both my neighbors want coffee. YUCK !"},
+		{34, 5, {4, 9, 9}, "Both my neighbors want orange juice. YUCK !"},
+		{34, 5, {5, 9, 9}, "Both my neighbors want milk. YUCK !"},
+		{34, 6, {3, 9, 9}, "The two who want coffee are neighbors"},
+		{34, 6, {4, 9, 9}, "The two who want orange juice are neighbors"},
+		{34, 6, {5, 9, 9}, "The two who want milk are neighbors"},
+		{41, 1, {6, 7, 9}, "I'm the only one who wants fruit pie, and two others want watermelon"},
+		{41, 1, {6, 8, 9}, "I'm the only one who wants fruit pie, and two others want ice cream"},
+		{41, 1, {7, 6, 9}, "I'm the only one who wants watermelon, and two others want fruit pie"},
+		{41, 1, {7, 8, 9}, "I'm the only one who wants watermelon, and two others want ice cream"},
+		{41, 1, {8, 6, 9}, "I'm the only one who wants ice cream, and two others want fruit pie"},
+		{41, 1, {8, 7, 9}, "I'm the only one who wants ice cream, and two others want watermelon"},
+		{41, 2, {0, 9, 9}, "I want a sandwich"},
+		{41, 2, {1, 9, 9}, "I want fish"},
+		{41, 2, {2, 9, 9}, "I want a salad"},
+		{41, 3, {3, 4, 9}, "Someone other there wants coffee. The only one who want orange juice are over there (points left then right)"},
+		{41, 3, {3, 5, 9}, "Someone other there wants coffee. The only one who want milk are over there (points left then right)"},
+		{41, 3, {4, 3, 9}, "Someone other there wants orange juice. The only one who want coffee are over there (points left then right)"},
+		{41, 3, {4, 5, 9}, "Someone other there wants orange juice. The only one who want milk are over there (points left then right)"},
+		{41, 3, {5, 3, 9}, "Someone other there wants milk. The only one who want coffee are over there (points left then right)"},
+		{41, 3, {5, 4, 9}, "Someone other there wants milk. The only one who want orange juice are over there (points left then right)"},
+		{41, 4, {6, 9, 9}, "These two want fruit pie (points right)"},
+		{41, 4, {7, 9, 9}, "These two want watermelon (points right)"},
+		{41, 4, {8, 9, 9}, "These two want ice cream (points right)"},
+		{41, 5, {3, 9, 9}, "Each of the three who want coffee wants a different dessert"},
+		{41, 5, {4, 9, 9}, "Each of the three who want orange juice wants a different dessert"},
+		{41, 5, {5, 9, 9}, "Each of the three who want milk wants a different dessert"},
+		{41, 6, {9, 9, 9}, "Any three in a row want different main dishes from each other"},
+		{42, 1, {0, 9, 9}, "Everyone who wants a sandwich wants a different drink and a different dessert, and they are all in a row"},
+		{42, 1, {1, 9, 9}, "Everyone who wants fish wants a different drink and a different dessert, and they are all in a row"},
+		{42, 1, {2, 9, 9}, "Everyone who wants a salad wants a different drink and a different dessert, and they are all in a row"},
+		{42, 2, {6, 9, 9}, "The two on the ends have the same drink and they both have fruit pie"},
+		{42, 2, {7, 9, 9}, "The two on the ends have the same drink and they both have watermelon"},
+		{42, 2, {8, 9, 9}, "The two on the ends have the same drink and they both have ice cream"},
+		{42, 3, {3, 9, 9}, "There are more coffees than any other item"},
+		{42, 3, {4, 9, 9}, "There are more orange juices than any other item"},
+		{42, 3, {5, 9, 9}, "There are more milk glasses than any other item"},
+		{42, 4, {6, 9, 9}, "I want fruit pie and so does one of my neighbors"},
+		{42, 4, {7, 9, 9}, "I want watermelon and so does one of my neighbors"},
+		{42, 4, {8, 9, 9}, "I want ice cream and so does one of my neighbors"},
+		{42, 5, {0, 9, 9}, "Everyone who wants a sandwich wants a different dessert"},
+		{42, 5, {1, 9, 9}, "Everyone who wants fish wants a different dessert"},
+		{42, 5, {2, 9, 9}, "Everyone who wants a salad wants a different dessert"},
+		{42, 6, {0, 9, 9}, "No one wants a sandwich"},
+		{42, 6, {1, 9, 9}, "No one wants fish"},
+		{42, 6, {2, 9, 9}, "No one wants a salad"},
+		{43, 1, {9, 9, 9}, "Everyone has exactly one thing in common with each neighbor"},
+		{43, 2, {0, 9, 9}, "I'm the only one who wants a sandwich"},
+		{43, 2, {1, 9, 9}, "I'm the only one who wants fish"},
+		{43, 2, {2, 9, 9}, "I'm the only one who wants a salad"},
+		{43, 3, {6, 9, 9}, "I'm the only one who wants fruit pie"},
+		{43, 3, {7, 9, 9}, "I'm the only one who wants watermelon"},
+		{43, 3, {8, 9, 9}, "I'm the only one who wants ice cream"},
+		{43, 4, {3, 9, 9}, "I want coffee"},
+		{43, 4, {4, 9, 9}, "I want orange juice"},
+		{43, 4, {5, 9, 9}, "I want milk"},
+		{43, 5, {0, 9, 9}, "There are more sandwiches than any other main dishes, and they are all other there (points left)"},
+		{43, 5, {1, 9, 9}, "There are more fishes than any other main dishes, and they are all other there (points left)"},
+		{43, 5, {2, 9, 9}, "There are more salads than any other main dishes, and they are all other there (points left)"},
+		{43, 6, {9, 9, 9}, "The same number of us want coffee, orange juice, and milk"},
+		{44, 1, {6, 9, 9}, "If someone doesn't want fruit pie, all their neighbors do"},
+		{44, 1, {7, 9, 9}, "If someone doesn't want watermelon, all their neighbors do"},
+		{44, 1, {8, 9, 9}, "If someone doesn't want ice cream, all their neighbors do"},
+		{44, 2, {9, 9, 9}, "No one else wants anything I want"},
+		{44, 3, {9, 9, 9}, "Someone two seats away wants the same meal as I do"},
+		{44, 4, {9, 9, 9}, "Someone two seats away wants the same meal as I do"},
+		{44, 5, {3, 9, 9}, "I'm the only one who wants coffee"},
+		{44, 5, {4, 9, 9}, "I'm the only one who wants orange juice"},
+		{44, 5, {5, 9, 9}, "I'm the only one who wants milk"},
+		{44, 6, {0, 9, 9}, "There are more sandwiches than any other item"},
+		{44, 6, {1, 9, 9}, "There are more fishes than any other item"},
+		{44, 6, {2, 9, 9}, "There are more salads than any other item"},
+	};
+	/** Return the English text for the exact @p layout, @p norf, and @p clue selection. */
+	static Common::String getClueText(int layout, int norf, const int clue[3]);
 	/** Return whether the required meal categories have all been selected. */
 	bool mealComplete(const Meal &meal) const;
 	/** Return whether the selected tray may be submitted to @p table. */
@@ -359,10 +1300,12 @@ private:
 	int norfAt(const Common::Point32 &pos) const;
 	static Common::Point32 tablePosition(int index, int y);
 
-	/** Selected difficulty, active table count, and chosen layout identifier. */
+	/** Selected level, active table count, and chosen layout identifier. */
 	int _level = 1;
 	int _tableCount = 4;
 	int _layout = 11;
+	/** Restored level 4 ends when its original tray supply is exhausted. */
+	int _submissionLimit = 8;
 	/** Food-category lookup plus all active Norf rules and source trays. */
 	int _foodValues[10] = {};
 	Norf _norfs[6];
@@ -407,6 +1350,8 @@ private:
 	bool _releasePending = false;
 	/** Interruptible clue speech and indexed service-effect handles. */
 	int _clueSpeechSound = -1;
+	/** Page-owned original text cache and current caption lines. */
+	Common::Array<Common::U32String> _clueSubtitleLines;
 	int _sounds[8] = {
 		-1,
 		-1,

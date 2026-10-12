@@ -233,12 +233,14 @@ private:
 	GUI::StaticTextWidget *_colorAssistLabel = nullptr;
 	/** Color-assistance choices. */
 	GUI::PopUpWidget *_colorAssistPopUp = nullptr;
-	/** Toggle hiding the stray streaks in the Fleen departure animation. */
-	GUI::CheckboxWidget *_fixFleenDepartureStreakCheckbox = nullptr;
 	/** Toggle enabling the enhanced keyboard shortcut set. */
 	GUI::CheckboxWidget *_enhancedKbdShortcutsCheckbox = nullptr;
+	/** Toggle hiding the stray streaks in the Fleen departure animation. */
+	GUI::CheckboxWidget *_fixFleenDepartStreakCheckbox = nullptr;
+	/** Toggle optional English subtitles for the Norfs' spoken clues. */
+	GUI::CheckboxWidget *_chezNorfClueSubtitlesCheckbox = nullptr;
 	/** Toggle keying the solid color from affected help-sheet bitmaps. */
-	GUI::CheckboxWidget *_transparentHelpPagesCheckbox = nullptr;
+	GUI::CheckboxWidget *_helpDialogTransparentBodyCheckbox = nullptr;
 	/** Toggle for the F2, F3, P, and Chez Norf C developer keys. */
 	GUI::CheckboxWidget *_debugHotkeysCheckbox = nullptr;
 	/** Toggle selecting the alternate level-one Waterslide pairing. */

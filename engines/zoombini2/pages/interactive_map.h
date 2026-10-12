@@ -134,23 +134,24 @@ private:
 	/** Number of legend bitmaps, including the inactive legend. */
 	static constexpr int kNumLegends = 4;
 	/** Level 4 practice tab drawn beyond the three original legend rows. */
-	static constexpr int kLevel4TabLeft = 590;
-	static constexpr int kLevel4TabRight = 625;
-	static constexpr int kLevel4TabTop = 497;
-	static constexpr int kLevel4TabBottom = 508;
-	static constexpr int kLevel4TabSlant = 3;
+	static constexpr int kL4TabLeft = 590;
+	static constexpr int kL4TabRight = 625;
+	static constexpr int kL4TabTop = 497;
+	static constexpr int kL4TabBottom = 508;
+	static constexpr int kL4TabSlant = 3;
 	/** Outline thickness in pixels for the level 4 practice tab. */
-	static constexpr int kLevel4TabBorderThickness = 2;
+	static constexpr int kL4TabBorderThickness = 2;
 	/** Restored level 4 practice-tab label drawn right of the tab. */
-	static constexpr const char32_t *kLevel4TabLabelEn = U"RESTORED LVL";
+	static constexpr const char32_t *kL4TabLabelEn = U"RESTORED LEVEL";
 	/** Restored level 4 practice-tab label drawn right of the tab. */
-	static constexpr const char32_t *kLevel4TabLabelKo = U"삭제되었던 단계";
+	static constexpr const char32_t *kL4TabLabelKo = U"삭제되었던 단계";
 	/** Brown fill shared by the level 4 legend tab and the level 4 practice route. */
-	static constexpr RGBColor kLevel4Color = RGBColor(43, 4, 2); // #2B0402
+	static constexpr RGBColor kL4Color = RGBColor(43, 4, 2); // #2B0402
 	/** Horizontal margin between the level 4 tab, its label, and the legend edge. */
-	static constexpr int kLevel4TabTextMargin = 10;
+	static constexpr int kL4TabTextMargin = 10;
 	/** Right edge of the level 4 label zone on the legend scroll. */
-	static constexpr int kLevel4TabTextRightEdge = 740;
+	static constexpr int kL4TabTextRightEdgeEn = 760;
+	static constexpr int kL4TabTextRightEdgeKo = 740;
 
 	/** Icon hit-test rectangles in map coordinates. */
 	static const Common::Rect kIconHitRects[kNumIcons];
@@ -298,10 +299,8 @@ private:
 	int hitTestLegendTab(const Common::Point32 &pos) const;
 	/** Apply a practice-map level after checking the optional level 4 tier. */
 	bool selectPracticeLevel(int level);
-	/** Return the effective practice difficulty for one puzzle. */
-	int getPracticePuzzleLevel(PageId pageId) const;
 	/** Draw the optional dark level 4 tab beneath the original legend with its restored label in black with a yellow outline, shrinking the label when it exceeds the legend. */
-	void drawLevel4Legend(ManagedSurface32 *screen) const;
+	void drawL4Legend(ManagedSurface32 *screen) const;
 
 	/** Return whether this page uses direct practice selection. */
 	bool isPracticeMode() const { return _mode == kMapScreenPractice; }

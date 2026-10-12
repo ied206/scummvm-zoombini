@@ -209,7 +209,7 @@ private:
 	static constexpr const char *kAmbientFormat = "sounds/wlf12.%d.wav";
 	/** Perfect-clear Go-button speech format; the argument is the voice variant number. */
 	static constexpr const char *kPerfectGoFormat = "sounds/wld11.%d.wav";
-	/** Difficulty-specific score-panel/grid origins and cannon muzzle positions. */
+	/** Level-specific score-panel/grid origins and cannon muzzle positions. */
 	static constexpr Common::Point32 kPanelOrigins[6] = {
 		{182, 88},
 		{344, 88},
@@ -1103,7 +1103,7 @@ private:
 
 	/** Load board art, runner grids, paths, effects, and music. */
 	void loadResources();
-	/** Construct the selected difficulty grid and its easy-mode panel sequence. */
+	/** Construct the selected level grid and its easy-mode panel sequence. */
 	void buildGrid();
 	void generateEasyPanel();
 	/** Shuffle candidate values and compare a cell's four target traits. */
@@ -1130,7 +1130,7 @@ private:
 	Common::Array<Cell> _cells;
 	/** Completed level-1 panels retain 0 to 30 cells in groups of 6; other levels retain none. */
 	Common::Array<Cell> _easyHistory;
-	/** Difficulty/grid dimensions, active panel/targets, player input, and ammunition state. */
+	/** Level/grid dimensions, active panel/targets, player input, and ammunition state. */
 	int _level = 1;
 	int _columns = 3;
 	int _cellCount = 6;

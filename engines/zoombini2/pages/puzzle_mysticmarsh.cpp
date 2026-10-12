@@ -161,7 +161,7 @@ int MysticMarshGrid::select(Common::Array<int> &used, Feature a, bool matchA, Fe
 	return pick(candidates, used);
 }
 
-void MysticMarshGrid::init(const Common::Array<ZmbTrait> &party, int difficulty, Random &randomSource) {
+void MysticMarshGrid::init(const Common::Array<ZmbTrait> &party, int level, Random &randomSource) {
 	_party = party;
 	_random = &randomSource;
 	_generation = GenerationInfo();
@@ -175,7 +175,7 @@ void MysticMarshGrid::init(const Common::Array<ZmbTrait> &party, int difficulty,
 		memcpy(_initialCells, _cells, sizeof(_cells));
 		return;
 	}
-	if (difficulty == 1) {
+	if (level == 1) {
 		const int layout = randomBelow(2);
 		Cell best[kCellCount];
 		GenerationInfo bestGeneration;
@@ -194,13 +194,13 @@ void MysticMarshGrid::init(const Common::Array<ZmbTrait> &party, int difficulty,
 		}
 		memcpy(_cells, best, sizeof(best));
 		_generation = bestGeneration;
-	} else if (difficulty == 2) {
+	} else if (level == 2) {
 		generateMedium();
-	} else if (difficulty == 3) {
+	} else if (level == 3) {
 		generateHard();
 	} else {
-		generateLevel4();
-		correctLevel4Arrow();
+		generateL4();
+		correctL4Arrow();
 	}
 	memcpy(_initialCells, _cells, sizeof(_cells));
 }
@@ -791,7 +791,7 @@ void MysticMarshGrid::generateHard() {
 	}
 }
 
-int MysticMarshGrid::pickLevel4Singleton(Feature &feature) {
+int MysticMarshGrid::pickL4Singleton(Feature &feature) {
 	int available[5][6] = {};
 	for (uint actor = 0; actor < _party.size(); actor++) {
 		for (int axis = 1; axis <= 4; axis++)
@@ -822,7 +822,7 @@ int MysticMarshGrid::pickLevel4Singleton(Feature &feature) {
 	return selected;
 }
 
-bool MysticMarshGrid::pickLevel4Constrained(int excludedActor, Feature &feature) {
+bool MysticMarshGrid::pickL4Constrained(int excludedActor, Feature &feature) {
 	int available[5][6] = {};
 	for (uint actor = 0; actor < _party.size(); actor++) {
 		if (static_cast<int>(actor) == excludedActor)
@@ -868,7 +868,7 @@ bool MysticMarshGrid::pickLevel4Constrained(int excludedActor, Feature &feature)
 	return false;
 }
 
-MysticMarshGrid::Feature MysticMarshGrid::pickLevel4Pair(Feature primary, Feature secondary, int excludedActor) {
+MysticMarshGrid::Feature MysticMarshGrid::pickL4Pair(Feature primary, Feature secondary, int excludedActor) {
 	int available[5][6] = {};
 	for (uint actor = 0; actor < _party.size(); actor++) {
 		if (static_cast<int>(actor) == excludedActor)
@@ -954,7 +954,7 @@ MysticMarshGrid::Feature MysticMarshGrid::pickLevel4Pair(Feature primary, Featur
 	return empty;
 }
 
-void MysticMarshGrid::correctLevel4Arrow() {
+void MysticMarshGrid::correctL4Arrow() {
 	// The conditional right-arrow symbol communicates the intended rightward route.
 	// The original level 4 template sets direction 4, leaving matching Zoombinis in this cell.
 	// Correcting the generated cell is required to make its behavior match that intent.
@@ -967,7 +967,7 @@ void MysticMarshGrid::correctLevel4Arrow() {
 	}
 }
 
-void MysticMarshGrid::generateLevel4() {
+void MysticMarshGrid::generateL4() {
 	loadLayout(8);
 	if (_party.size() <= 6) {
 		_cells[index(13, 5)].type = 45;
@@ -983,7 +983,7 @@ void MysticMarshGrid::generateLevel4() {
 		clearCell(4, 3);
 	}
 	Feature primary;
-	int singletonActor = pickLevel4Singleton(primary);
+	int singletonActor = pickL4Singleton(primary);
 	if (singletonActor < 0) {
 		clearCell(7, 9);
 		primary.trait = randomBelow(4) + 1;
@@ -991,8 +991,8 @@ void MysticMarshGrid::generateLevel4() {
 		singletonActor = 0;
 	}
 	Feature secondary;
-	const bool constrained = pickLevel4Constrained(singletonActor, secondary);
-	const Feature pair = pickLevel4Pair(primary, constrained ? secondary : Feature(), singletonActor);
+	const bool constrained = pickL4Constrained(singletonActor, secondary);
+	const Feature pair = pickL4Pair(primary, constrained ? secondary : Feature(), singletonActor);
 	setFeature(8, 1, primary);
 	setFeature(7, 9, primary);
 	setFeature(4, 7, pair);
@@ -1002,12 +1002,12 @@ void MysticMarshGrid::generateLevel4() {
 		_cells[index(11, 3)].type = 16;
 		_cells[index(11, 3)].direction = 0;
 	}
-	_generation.level4Features[0][0] = primary.trait;
-	_generation.level4Features[0][1] = primary.value;
-	_generation.level4Features[1][0] = constrained ? secondary.trait : 0;
-	_generation.level4Features[1][1] = constrained ? secondary.value : 0;
-	_generation.level4Features[2][0] = pair.trait;
-	_generation.level4Features[2][1] = pair.value;
+	_generation.l4Features[0][0] = primary.trait;
+	_generation.l4Features[0][1] = primary.value;
+	_generation.l4Features[1][0] = constrained ? secondary.trait : 0;
+	_generation.l4Features[1][1] = constrained ? secondary.value : 0;
+	_generation.l4Features[2][0] = pair.trait;
+	_generation.l4Features[2][1] = pair.value;
 	Common::Array<int> order;
 	int remainingBeforePair = 0;
 	if (constrained) {
@@ -1070,7 +1070,7 @@ void MysticMarshGrid::generateLevel4() {
 				order.push_back(actor);
 		}
 	}
-	_generation.level4Order = order;
+	_generation.l4Order = order;
 	int stageNodes[6] = {
 		-1,
 		-1,
@@ -1560,7 +1560,7 @@ bool MysticMarshGrid::findAnswer(Common::Array<AnswerLaunch> &answer, bool &from
 	if (_layout <= 1)
 		order = _generation.selectionOrder;
 	else if (_layout == 8)
-		order = _generation.level4Order;
+		order = _generation.l4Order;
 	uint seen = 0;
 	for (int actor : order) {
 		if (actor < 0 || static_cast<int>(_party.size()) <= actor || (seen & (1U << actor))) {
@@ -1635,7 +1635,7 @@ PuzzleMysticMarsh::PuzzleMysticMarsh(Zoombini2Engine *vm) : PuzzleBase(vm, kPage
 }
 
 PuzzleMysticMarsh::~PuzzleMysticMarsh() {
-	delete _level4Background;
+	delete _l4Background;
 	for (uint i = 0; i < _bubbles.size(); i++)
 		delete _bubbles[i].path;
 	delete _craterAnimation;
@@ -1656,8 +1656,8 @@ Common::Point32 MysticMarshL4Background::cellPosition(int index) {
 void PuzzleMysticMarsh::init() {
 	_initialAnswer.clear();
 	PuzzleBase::init();
-	delete _level4Background;
-	_level4Background = nullptr;
+	delete _l4Background;
+	_l4Background = nullptr;
 	Common::Array<ZmbTrait> party;
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++)
 		party.push_back(_puzzleZoombinis[i]->getTraits());
@@ -1667,7 +1667,7 @@ void PuzzleMysticMarsh::init() {
 	_backgroundIndex = _grid.background();
 	int artworkIndex = _backgroundIndex;
 	if (_backgroundIndex == 6) {
-		artworkIndex = kLevel4FallbackBackgroundIndex;
+		artworkIndex = kL4FallbackBackgroundIndex;
 		warning("Mystic Marsh: background6 is missing; composing level 4 artwork from background%d", artworkIndex);
 	}
 	loadPrimaryLayerBackground(Common::Path(Common::String::format(kBackgroundFormat, artworkIndex)));
@@ -1701,7 +1701,7 @@ void PuzzleMysticMarsh::init() {
 		_dropTargets.push_back(target);
 	}
 	_lastTick = _vm->getTotalPlayTime();
-	debug(1, "Mystic Marsh: difficulty=%d layout=%d background=%d party=%u craters=%u", _puzzleLevel, _grid.layout(), _backgroundIndex,
+	debug(1, "Mystic Marsh: level=%d layout=%d background=%d party=%u craters=%u", _puzzleLevel, _grid.layout(), _backgroundIndex,
 		  _puzzleZoombinis.size(), _slots.size());
 }
 
@@ -1927,13 +1927,13 @@ void PuzzleMysticMarsh::onRenderBackground(ManagedSurface32 *screen) {
 		drawPrimaryPageLayer(screen);
 		return;
 	}
-	if (!_level4Background) {
-		_level4Background = new ManagedSurface32(ManagedSurface32::kScreenSize, screen->format);
-		_level4Background->fillRect(Common::Rect32(0, 0, screen->w, screen->h), Gfx::PredefinedColor::kBlack.toPixel(screen->format));
-		drawPrimaryPageLayer(_level4Background);
-		MysticMarshL4Background::compose(_level4Background);
+	if (!_l4Background) {
+		_l4Background = new ManagedSurface32(ManagedSurface32::kScreenSize, screen->format);
+		_l4Background->fillRect(Common::Rect32(0, 0, screen->w, screen->h), Gfx::PredefinedColor::kBlack.toPixel(screen->format));
+		drawPrimaryPageLayer(_l4Background);
+		MysticMarshL4Background::compose(_l4Background);
 	}
-	screen->blitFrom(*_level4Background);
+	screen->blitFrom(*_l4Background);
 	MysticMarshL4Background::drawGrid(screen, _drawCells);
 }
 
@@ -2244,7 +2244,7 @@ void MysticMarshL4Background::drawGrid(ManagedSurface32 *screen, const MysticMar
 
 void PuzzleMysticMarsh::onRenderContent(ManagedSurface32 *screen) {
 	if (_backgroundIndex == 6) {
-		const Common::Point32 position = MysticMarshL4Background::cellPosition(kLevel4RejectVisualCellIndex);
+		const Common::Point32 position = MysticMarshL4Background::cellPosition(kL4RejectVisualCellIndex);
 		drawColorSymbol(screen, kRejectCellType - 2, Common::Point32(position.x + 3, position.y + 61));
 	}
 	for (int i = 0; i < MysticMarshGrid::kCellCount; i++) {

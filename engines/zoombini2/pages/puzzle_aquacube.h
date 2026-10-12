@@ -37,7 +37,7 @@ public:
 	PuzzleAquacube(Zoombini2Engine *vm);
 	/** Release movement paths, page runners, animations, and loaded audio. */
 	~PuzzleAquacube() override;
-	/** Load page resources and generate the current difficulty's randomized board. */
+	/** Load page resources and generate the current level's randomized board. */
 	void init() override;
 	/** Advance movement, warp, rescue, chase, departure, and bubble state. */
 	void onUpdate() override;
@@ -155,7 +155,7 @@ private:
 		kWarpButtonOff00 = 0,
 		/** Warp planning is active and awaits selected levers. */
 		kWarpButtonOn01 = 1,
-		/** Warp is unavailable at the current difficulty or quota. */
+		/** Warp is unavailable at the current level or quota. */
 		kWarpButtonDisabled02 = 2
 	};
 	/**
@@ -226,7 +226,7 @@ private:
 		/** Banked spawn-roll quota; the original two-in-600 roll runs once per 1000 banked units. */
 		int64 _spawnQuota = 0;
 	};
-	/** Eight-node cube layout used by the first two difficulty tables. */
+	/** Eight-node cube layout used by the first two level tables. */
 	static constexpr NodeLayout kEasyNodes[8] = {
 		{{1, 3, 4, -1}, {162, 530}, {kDown, kLeft, kFront, kUnused}},
 		{{0, 2, 5, -1}, {524, 530}, {kDown, kRight, kFront, kUnused}},
@@ -237,7 +237,7 @@ private:
 		{{7, 5, 2, -1}, {458, 136}, {kUp, kRight, kBack, kUnused}},
 		{{6, 4, 3, -1}, {218, 136}, {kUp, kLeft, kBack, kUnused}},
 	};
-	/** Sixteen-node inner and outer cube layout used by the hard difficulty table. */
+	/** Sixteen-node inner and outer cube layout used by the hard-level table. */
 	static constexpr NodeLayout kHardNodes[16] = {
 		{{1, 3, 12, 4}, {165, 533}, {kDown, kLeft, kFront, kOuter}},
 		{{0, 2, 13, 5}, {527, 533}, {kDown, kRight, kFront, kOuter}},
@@ -339,7 +339,7 @@ private:
 	/** Allow the timer to execute its queued warp levers. */
 	static void onTimerComplete(void *context, AnimationRunner *runner);
 
-	/** Selected difficulty table index. */
+	/** Selected level table index. */
 	int _level = 1;
 	/** Number of active graph nodes for the selected board. */
 	int _numNodes = 8;
@@ -347,7 +347,7 @@ private:
 	int _dimensions = 3;
 	/** Number of resolved arrivals allowed before the puzzle completes. */
 	int _maxSteps = 6;
-	/** Number of warp plans available to the selected difficulty. */
+	/** Number of warp plans available at the selected level. */
 	int _warpQuota = 0;
 	/** Index of the node that currently contains the light. */
 	int _ballNode = 0;

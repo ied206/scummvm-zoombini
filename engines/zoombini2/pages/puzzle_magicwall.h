@@ -55,8 +55,8 @@ public:
 	typedef Common::Array<Rule> Variant;
 	/** One resource-defined board layout and the rules offered on its tablets. */
 	struct Layout {
-		/** Difficulty branch and weighted random-selection value. */
-		int difficulty = 0;
+		/** Level branch and weighted random-selection value. */
+		int level = 0;
 		int weight = 0;
 		/** Beetle point locations and the three rule groups read from the layout resource. */
 		Common::Array<Common::Point32> points;
@@ -64,8 +64,8 @@ public:
 	};
 	/** Read bounded layout records, retaining complete records before damaged trailing data. */
 	bool load(Common::SeekableReadStream &stream);
-	/** Choose a weighted layout for @p difficulty and construct its initial scrambled board. */
-	bool generate(int difficulty, Random &random);
+	/** Choose a weighted layout for @p level and construct its initial scrambled board. */
+	bool generate(int level, Random &random);
 	/** Apply the player's selected tablet rule to the current beetle positions. */
 	void apply(int ruleIndex);
 	/** Return whether the beetle of @p color occupies its matching endpoint. */

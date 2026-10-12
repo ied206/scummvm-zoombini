@@ -31,9 +31,9 @@ namespace Zoombini2 {
 class Zoombini2Engine;
 
 /**
- * Displays context-sensitive help for one puzzle and difficulty level.
+ * Displays context-sensitive help for one puzzle level.
  *
- * @ref DialogHelp::kHelpPageFormat selects a sheet by page ID, difficulty suffix, and one-based sheet number.
+ * @ref DialogHelp::kHelpPageFormat selects a sheet by page ID, level suffix, and one-based sheet number.
  * The dialog pauses gameplay and retains a screen snapshot until it closes, when it restores the screen and resumes the clock.
  * A missing sheet leaves the help frame open; level 4 displays a ScummVM-added notice.
  */
@@ -70,7 +70,7 @@ public:
 private:
 	/** RLE frame drawn behind the active help sheet and navigation controls. */
 	static constexpr const char *kHelpFramePath = "Bmp/MENU/help_screen_main.rb";
-	/** RLE placeholder shown when a supported difficulty has no loaded help sheet. */
+	/** RLE placeholder shown when a supported level has no loaded help sheet. */
 	static constexpr const char *kPlaceholderPath = "Bmp/MENU/help_screen_placeholder.rb";
 	/** Default bit-block image for the OK button. */
 	static constexpr const char *kOkButtonNormalPath = "Bmp/MENU/help_screen_okbutton_normal.bb";
@@ -84,7 +84,7 @@ private:
 	static constexpr const char *kRightArrowNormalPath = "Bmp/MENU/help_screen_rightarro_norma.bb";
 	/** Disabled bit-block image for the next-sheet arrow. */
 	static constexpr const char *kRightArrowEmptyPath = "Bmp/MENU/help_screen_rightarro_empty.bb";
-	/** Format for page help-sheet paths: page ID, difficulty suffix, and one-based sheet number. */
+	/** Format for page help-sheet paths: page ID, level suffix, and one-based sheet number. */
 	static constexpr const char *kHelpPageFormat = "Bmp/help/%02d_help_%s_%02d.bb";
 	/** Localized notices added by ScummVM; the original engine provides no level 4 help message or help sheet. */
 	static constexpr const char *kMissingHelpTextEnglish = "No help resource is available for level 4.";

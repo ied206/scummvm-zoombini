@@ -147,6 +147,7 @@ class AnimationRunner;
 class AreaMask;
 class BitBlock;
 class BmtFont;
+class CubicBezierCurve;
 class ManagedSurface32;
 class PageLayerStack;
 class RleBlock;
@@ -306,8 +307,14 @@ public:
 	void fillRect(ManagedSurface32 *destSurface, const Common::Rect32 &rect, uint32 color) const;
 	/** Fill a clipped rectangle. */
 	void fillRect(ManagedSurface32 *destSurface, const Common::Rect &rect, uint32 color) const;
+	/** Draw a rectangle outline, clipping its edges to the destination surface. */
+	void frameRect(ManagedSurface32 *destSurface, const Common::Rect &rect, uint32 color) const;
 	/** Draw a line with a square pen of @p thickness pixels. */
 	void drawLine(ManagedSurface32 *destSurface, const Common::Point32 &start, const Common::Point32 &end, uint32 color, int thickness = 1) const;
+	/** Evaluate @p curve in five-millisecond steps, drawing chords inside the destination surface. */
+	void drawCubicBezierCurve(ManagedSurface32 *destSurface, CubicBezierCurve &curve, uint32 color, int thickness = 1) const;
+	/** Evaluate @p curve in five-millisecond steps, drawing chords inside @p sampleBounds. */
+	void drawCubicBezierCurve(ManagedSurface32 *destSurface, CubicBezierCurve &curve, uint32 color, int thickness, const Common::Rect32 &sampleBounds) const;
 	/**
 	 * Bundles the settings for one @ref Gfx::drawString call.
 	 * Mirrors the Z1 TextConf pattern: the font family travels as an enum and @ref Gfx resolves the object.

@@ -270,6 +270,13 @@ void SoundManager::stopAll(int id) {
 	stop(id, -1);
 }
 
+void SoundManager::stopAll(SoundCategory category) {
+	for (uint i = 0; i < _buffers.size(); i++) {
+		if (_buffers[i]->category == category)
+			releasePlayback(*_buffers[i]);
+	}
+}
+
 void SoundManager::pause(int id) {
 	SoundBuffer *buf = findBuffer(id);
 	if (!buf)

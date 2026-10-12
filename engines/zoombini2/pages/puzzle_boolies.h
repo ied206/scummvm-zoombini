@@ -300,9 +300,9 @@ private:
 	static Common::Point32 getReadyHoldPosition(int index);
 	/** Load the page's sprites, animations, and sound effects. */
 	void loadResources();
-	/** Generate the active values on @p row for the selected difficulty. */
+	/** Generate the active values on @p row for the selected level. */
 	void generateRow(int row);
-	/** Draw the original difficulty-specific random values for one four-slot row. */
+	/** Draw the original level-specific random values for one four-slot row. */
 	void sampleRowValues(byte (&values)[kSlotCount]);
 	/** Schedule a new signed ball challenge at game tick @p now. */
 	void beginRound(uint32 now);
@@ -316,7 +316,7 @@ private:
 	void startNextFeeder(uint32 now);
 	/** Replace the completed cohort with the already prepared one. */
 	void promoteNextChallenge(uint32 now);
-	/** Choose the signed challenge type for the selected difficulty. */
+	/** Choose the signed challenge type for the selected level. */
 	int pickChallengeType();
 	/** Release the previous challenge's ball paths. */
 	void clearBalls();

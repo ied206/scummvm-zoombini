@@ -208,7 +208,7 @@ enum class PageCategory {
 	kTransition = 2,
 	/** Modal overlay retaining its underlying page. */
 	kDialog = 3,
-	/** Difficulty-dependent rescue-mission puzzle. */
+	/** Level-dependent rescue-mission puzzle. */
 	kPuzzle = 4,
 	/** Party assembly, storage, or arrival hub. */
 	kShelter = 5,
