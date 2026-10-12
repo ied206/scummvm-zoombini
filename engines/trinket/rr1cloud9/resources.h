@@ -28,10 +28,23 @@
 namespace Trinket {
 namespace RR1Cloud9 {
 
-/** Explicit library names keep page resources with overlapping IDs separate. */
+/**
+ * RR1Cloud9 game assets use NE-format RSC libraries.
+ * Each library has its own resource table and tag-to-type mapping, read by @ref Trinket::OM::NEResourceLibrary.
+ * Explicit library names keep page resources with overlapping IDs separate.
+ * Libraries are cached on demand; requested payloads are returned as caller-owned streams.
+ */
 class Resources : public OM::ResourceProvider {
 public:
 	bool load(Common::Path &gamePath);
+	/**
+	 * Resolve library/id.extension to an NE resource; r1map/4300.ao means r1map.rsc, ASEQ, ID 4300.
+	 * Extensions select the resource tag; the first component is library ownership, not a virtual directory.
+	 * common searches r1com, compre, com, comsfx and comtunz in that order.
+	 * Names have no leading slash; Z3's @ref Trinket::Shell::ResourcePaths root syntax does not apply here.
+	 * Bare filenames and samples/filename open loose files instead of NE entries.
+	 * Expand NC1-wrapped ASEQ/RRGB payloads before returning them to OM consumers.
+	 */
 	Common::SeekableReadStream *open(const Common::String &name) const override;
 
 private:

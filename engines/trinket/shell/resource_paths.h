@@ -16,14 +16,27 @@
 namespace Trinket {
 namespace Shell {
 
-/** Ordered virtual search paths over a borrowed INX/BUL provider. */
+/**
+ * Apply MPS working-directory and ordered search-path rules to a borrowed provider.
+ * Lookup starts in the current virtual directory, or at the provider root for names beginning with '/'.
+ * Unresolved names then try search paths in insertion order.
+ * These are resource paths, not host filesystem directories.
+ */
 class ResourcePaths : public OM::ResourceProvider {
 public:
 	explicit ResourcePaths(const OM::ResourceProvider &provider) : _provider(provider) {}
+	/** Append a virtual search path used when the initial lookup fails. */
 	void addPath(const Common::String &path);
 	void removeAllPaths() { _paths.clear(); }
+	/** Change the virtual working directory independently of the search-path list. */
 	void use(const Common::String &directory);
+	/** Return the matched provider-relative name, or an empty string if lookup fails. */
 	Common::String resolve(const Common::String &name) const;
+	/**
+	 * Append the extension if needed and return the resolved name anchored with '/'.
+	 * The anchor lets consumers reopen it through this resolver without adding the working directory again.
+	 * @return An anchored resource path, or an empty string if lookup fails.
+	 */
 	Common::String resourcePath(const Common::String &id, const Common::String &extension) const;
 	Common::SeekableReadStream *open(const Common::String &name) const override;
 
