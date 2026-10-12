@@ -30,7 +30,10 @@ namespace Trinket {
 /** OM foundations: ompp32x.dll in games and ompp32x.tlc in the TLC launcher. */
 namespace OM {
 
-/** Resource streams have independent positions and are owned by the caller. */
+/**
+ * Supply named resource bytes to consumers such as @ref Trinket::Shell::Scene and @ref Trinket::OM::Sound.
+ * Each returned stream is owned by the caller and has an independent read position.
+ */
 class ResourceProvider {
 public:
 	virtual ~ResourceProvider() {}
