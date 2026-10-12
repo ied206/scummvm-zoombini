@@ -20,8 +20,6 @@
  */
 
 #include "common/debug.h"
-#include "common/file.h"
-#include "common/tokenizer.h"
 #include "common/util.h"
 
 #include "zoombini2/graphics.h"

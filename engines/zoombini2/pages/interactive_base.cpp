@@ -28,8 +28,6 @@
 #include "zoombini2/zoombini2.h"
 
 #include "common/callback.h"
-#include "common/config-manager.h"
-#include "common/keyboard.h"
 #include "zoombini2/metaengine.h"
 
 namespace Zoombini2 {
@@ -319,7 +317,7 @@ void Sidebar::returnToMap() {
 
 void Sidebar::requestAbandonConfirmation() {
 	_vm->requestMsgBox(Common::Path(kAbandonConfirmationPath),
-									new Common::Callback<Sidebar, DialogMsgBoxButton>(this, &Sidebar::handleAbandonConfirmation));
+					   new Common::Callback<Sidebar, DialogMsgBoxButton>(this, &Sidebar::handleAbandonConfirmation));
 }
 
 void Sidebar::handleAbandonConfirmation(DialogMsgBoxButton button) {

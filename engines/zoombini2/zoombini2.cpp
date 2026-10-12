@@ -166,6 +166,7 @@ void Zoombini2Engine::initializePath(const Common::FSNode &gamePath) {
 	if (!installedRoot.isDirectory())
 		warning("Zoombini2Engine: installed resource root is unavailable");
 
+	clearPagePATCache();
 	delete _resourceFileResolver;
 	_resourceFileResolver = new ResourceFileResolver(cdDataRoot, installedRoot);
 }
@@ -217,6 +218,28 @@ void Zoombini2Engine::clearZoombiniAnimationCache() {
 	for (ZoombiniAnimationCache::iterator entry = _zoombiniAnimationCache.begin(); entry != _zoombiniAnimationCache.end(); entry++)
 		delete entry->_value;
 	_zoombiniAnimationCache.clear();
+}
+
+PathObject *Zoombini2Engine::loadPagePATPath(const Common::Path &path) {
+	Common::String logicalPath = path.toString('/');
+
+	logicalPath.replace('\\', '/');
+	const Common::Path key(logicalPath);
+	PATPathCache::const_iterator cached = _pagePATPaths.find(key);
+
+	if (cached != _pagePATPaths.end())
+		return cached->_value ? cached->_value->createUnstartedCopy() : nullptr;
+
+	const PathObject *pathTemplate = PathObject::loadUncachedPAT(this, key);
+
+	_pagePATPaths[key] = pathTemplate;
+	return pathTemplate ? pathTemplate->createUnstartedCopy() : nullptr;
+}
+
+void Zoombini2Engine::clearPagePATCache() {
+	for (PATPathCache::iterator entry = _pagePATPaths.begin(); entry != _pagePATPaths.end(); entry++)
+		delete entry->_value;
+	_pagePATPaths.clear();
 }
 
 bool Zoombini2Engine::writeGameSave(const Common::String &savefileName) {
@@ -1235,6 +1258,7 @@ void Zoombini2Engine::destroyCurrentPage() {
 		// Clear the screen so a replacement page using double buffering cannot present stale content.
 		_gfx->getScreen()->fillRect(Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), 0);
 	}
+	clearPagePATCache();
 }
 
 /**

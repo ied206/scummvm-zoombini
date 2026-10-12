@@ -24,7 +24,6 @@
 #include "zoombini2/sound.h"
 #include "zoombini2/zoombini2.h"
 
-#include "common/debug.h"
 #include "common/system.h"
 
 namespace Zoombini2 {
