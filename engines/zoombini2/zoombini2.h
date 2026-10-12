@@ -54,6 +54,7 @@ class DialogBase;
 struct DialogDebugCommand;
 enum class DialogMsgBoxButton;
 class PageBase;
+struct PathObject;
 class RleBlock;
 class SoundManager;
 class Sidebar;
@@ -212,6 +213,8 @@ public:
 
 	/** Load or return a shared Zoombini sprite grid and select its page-configured frame delay. */
 	const ZoombiniAnimation *loadZoombiniAnimation(const Common::Path &path, uint32 frameDelay);
+	/** Create an independent playback path for the caller to delete; reuse the page's parsed PAT. */
+	PathObject *loadPagePATPath(const Common::Path &path);
 	/** Open an original logical resource name through the engine's CD/installed-root resolver. */
 	Common::SeekableReadStream *openResourceFile(const Common::String &path) const;
 	/** Return whether @p path resolves through the engine's CD/installed-root resolver. */
@@ -362,6 +365,7 @@ private:
 	bool writeGameSavefile(const Common::String &savefileName);
 
 	typedef Common::HashMap<Common::Path, ZoombiniAnimation *, Common::Path::IgnoreCase_Hash, Common::Path::IgnoreCase_EqualTo> ZoombiniAnimationCache;
+	typedef Common::HashMap<Common::Path, const PathObject *, Common::Path::IgnoreCase_Hash, Common::Path::IgnoreCase_EqualTo> PATPathCache;
 
 	/** Cursor pixels derived once from a cached RLE sprite. */
 	struct CursorImage {
@@ -383,6 +387,8 @@ private:
 	ResourceFileResolver *_resourceFileResolver = nullptr;
 	/** Immutable animation sets shared by page lifetimes. */
 	ZoombiniAnimationCache _zoombiniAnimationCache;
+	/** Unstarted PAT templates and failed loads retained for the current page. */
+	PATPathCache _pagePATPaths;
 
 	/** Default or interactive cursor requested by the active page. */
 	CursorType _baseCursorType = CursorType::kDefault;
@@ -499,6 +505,8 @@ private:
 	bool applyDebugPuzzleCompletion();
 	/** Release every Zoombini sprite grid cached by this game instance. */
 	void clearZoombiniAnimationCache();
+	/** Release parsed PAT templates and failed-load entries after the current page is destroyed. */
+	void clearPagePATCache();
 	/** Load and register the game cursor. */
 	void initCursor();
 	/** Convert @p sprite to BGRA cursor pixels. */

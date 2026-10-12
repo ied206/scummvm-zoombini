@@ -26,11 +26,12 @@
 #include "common/textconsole.h"
 #include "common/util.h"
 
+#ifdef ENABLE_EVENTRECORDER
 #include "gui/EventRecorder.h"
+#endif
 
 #include "zoombini2/metaengine.h"
 #include "zoombini2/random.h"
-#include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 

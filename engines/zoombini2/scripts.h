@@ -395,10 +395,14 @@ PointFixed32 operator*(int32 left, const PointFixed32 &right);
  * with @ref Float32. @ref CubicBezierCurve::evaluate advances either evaluator from
  * the stored start tick, step, and optional initial wait.
  */
-class CubicBezierCurve : public Common::NonCopyable {
+class CubicBezierCurve {
 public:
 	/** Construct an empty segment using the selected numeric representation. */
 	explicit CubicBezierCurve(bool useFloatingPoint = false);
+	/** Copy the numeric mode and complete curve state into an independent evaluator. */
+	CubicBezierCurve(const CubicBezierCurve &other);
+	/** Replace this curve with an independent copy of @p other, including playback progress. */
+	CubicBezierCurve &operator=(const CubicBezierCurve &other);
 	/** Release the selected numeric evaluator. */
 	~CubicBezierCurve();
 	/** Initialize control points, timing values, and polynomial coefficients. */
@@ -476,7 +480,7 @@ public:
 	/** Return whether a non-looping path has reached its final endpoint. */
 	bool isFinished() const { return _finished; }
 
-	/** Parse and return a newly allocated path, or nullptr on failure. */
+	/** Return a newly allocated playback path from the page PAT cache, or nullptr on failure. */
 	static PathObject *loadFromPAT(Zoombini2Engine *vm, const Common::Path &path);
 	/** Append one segment and retain its final endpoint using the selected numeric representation. */
 	void appendSegment(const Common::Point32 &start, const Common::Point32 &ctrl0, const Common::Point32 &ctrl1, const Common::Point32 &end,
@@ -489,7 +493,12 @@ public:
 	bool advance(uint32 tickCount, Common::Point32 &outPos);
 
 private:
-	/** Borrowed vm used to select the path evaluator and open PAT resources. */
+	friend class Zoombini2Engine;
+	/** Read and parse a PAT resource on a page-cache miss. */
+	static PathObject *loadUncachedPAT(Zoombini2Engine *vm, const Common::Path &path);
+	/** Instantiate the unstarted PAT template using the current numeric mode. */
+	PathObject *createUnstartedCopy() const;
+	/** Borrowed vm used to select the path evaluator and request cached PAT resources. */
 	Zoombini2Engine *_vm;
 	/** Apply the live engine option to every already loaded segment. */
 	void synchronizeNumericMode();

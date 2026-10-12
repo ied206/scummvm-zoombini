@@ -27,7 +27,6 @@
 #include "common/textconsole.h"
 #include "common/util.h"
 
-#include "image/bmp.h"
 #ifdef USE_PNG
 #include "image/png.h"
 #endif
@@ -44,9 +43,6 @@
 #include "zoombini2/state.h"
 #include "zoombini2/text.h"
 #include "zoombini2/zoombini2.h"
-
-#include <limits.h>
-#include <string.h>
 
 namespace Zoombini2 {
 
@@ -393,7 +389,7 @@ bool Zoombini2Console::Cmd_ManBuiltinDebug(int argc, const char **argv) {
 	return true;
 }
 
-const TransitionMapTrans::RouteDest *Zoombini2Console::findGoDestination(const char *name, bool puzzleOnly) {
+const TransitionMapTrans::RouteDest *Zoombini2Console::findGoDest(const char *name, bool puzzleOnly) {
 	int pageNumber = -1;
 	const char *digits = name;
 	while (Common::isSpace(digits[0]))
@@ -456,7 +452,7 @@ bool Zoombini2Console::CmdSub_GoPractice(int argc, const char **argv) {
 		debugPrintf("No active Zoombini2 game page.\n\n");
 		return true;
 	}
-	const TransitionMapTrans::RouteDest *destination = findGoDestination(argv[2], true);
+	const TransitionMapTrans::RouteDest *destination = findGoDest(argv[2], true);
 	if (!destination) {
 		debugPrintf("Unknown puzzle '%s'. Use go practice without arguments for the list.\n\n", argv[2]);
 		return true;
@@ -491,7 +487,7 @@ bool Zoombini2Console::CmdSub_GoXfer(int argc, const char **argv) {
 		debugPrintf("No active Zoombini2 game page.\n\n");
 		return true;
 	}
-	const TransitionMapTrans::RouteDest *destination = findGoDestination(argv[2], false);
+	const TransitionMapTrans::RouteDest *destination = findGoDest(argv[2], false);
 	if (!destination) {
 		debugPrintf("Unknown destination '%s'. Use go xfer without arguments for the list.\n\n", argv[2]);
 		return true;
@@ -1028,19 +1024,11 @@ bool Zoombini2Console::loadDebugAnimation(const Common::Path &path, Animation &a
 	return true;
 }
 
-bool Zoombini2Console::parseDebugImageFormat(const char *text, bool &png) {
-	png = false;
-	if (!text || scumm_stricmp(text, "bmp") == 0)
-		return true;
-	if (scumm_stricmp(text, "png") != 0) {
-		debugPrintf("Image format must be bmp or png.\n\n");
-		return false;
-	}
+bool Zoombini2Console::checkPNGExportSupport() {
 #ifdef USE_PNG
-	png = true;
 	return true;
 #else
-	debugPrintf("PNG export is unavailable in this build. Use bmp.\n\n");
+	debugPrintf("Bitmap export requires a build with PNG support.\n\n");
 	return false;
 #endif
 }
@@ -1080,30 +1068,30 @@ bool Zoombini2Console::openDebugDump(Common::DumpFile &out, const Common::String
 	return false;
 }
 
-bool Zoombini2Console::exportDebugSurface(const Graphics::Surface &surface, const Common::String &stem, bool png) {
+bool Zoombini2Console::exportDebugSurface(const Graphics::Surface &surface, const Common::String &stem) {
+#ifndef USE_PNG
+	(void)surface;
+	(void)stem;
+	return false;
+#else
 	Common::DumpFile out;
 	Common::Path path;
-	if (!openDebugDump(out, stem, png ? "png" : "bmp", path))
+	if (!openDebugDump(out, stem, "png", path))
 		return false;
-	bool written = false;
-#ifdef USE_PNG
-	if (png)
-		written = Image::writePNG(out, surface);
-	else
-#endif
-		written = Image::writeBMP(out, surface);
+	const bool written = Image::writePNG(out, surface);
 	const bool okay = written && out.flush() && !out.err();
 	out.close();
 	debugPrintf("%s %s (%d x %d).\n", okay ? "Exported" : "Failed to export", path.toString('/').c_str(), surface.w, surface.h);
 	return okay;
+#endif
 }
 
 bool Zoombini2Console::Cmd_Dump(int argc, const char **argv) {
 	if (argc < 2 || (argc == 2 && isHelpOption(argv[1]))) {
 		debugPrintf("Export decoded Z2 resources or the live saved-adventure state.\n");
 		debugPrintf("Usage: %s <image|animation|save> [arguments]\n\n", kCmdDump);
-		debugPrintf("  image <path> [bmp|png]      Export one bitmap over white.\n");
-		debugPrintf("  animation <path> [bmp|png]  Export every decoded frame over white.\n");
+		debugPrintf("  image <path>                Export one bitmap over white as PNG.\n");
+		debugPrintf("  animation <path>            Export every decoded frame over white as PNG.\n");
 		debugPrintf("  save                        Export the live adventure in the .mk layout.\n\n");
 		debugPrintf("Numbered files below dumps/ preserve existing exports.\n\n");
 		printHelpOption();
@@ -1120,17 +1108,18 @@ bool Zoombini2Console::Cmd_Dump(int argc, const char **argv) {
 }
 
 bool Zoombini2Console::CmdSub_DumpImage(int argc, const char **argv) {
-	if (hasHelpOption(argc, argv) || argc < 3 || 4 < argc) {
+	if (hasHelpOption(argc, argv) || argc != 3) {
 		debugPrintf("Export one decoded bitmap composited over white.\n");
-		debugPrintf("Usage: %s image <path> [bmp|png]\n\n", kCmdDump);
+		debugPrintf("Usage: %s image <path>\n\n", kCmdDump);
 		debugPrintf("The bitmap resolver prefers a matching .bb cache for .bmp or extensionless names.\n");
-		debugPrintf("The default format is BMP. PNG requires libpng support.\n\n");
+		debugPrintf("Bitmap resources are always exported as PNG and require PNG support in this build.\n\n");
 		printHelpOption();
 		return true;
 	}
+	if (!checkPNGExportSupport())
+		return true;
 	Common::Path path;
-	bool png = false;
-	if (!parseDebugResourcePath(argv[2], path) || !parseDebugImageFormat(argc == 4 ? argv[3] : nullptr, png))
+	if (!parseDebugResourcePath(argv[2], path))
 		return true;
 	BitBlock image(_vm);
 	if (!image.load(path)) {
@@ -1146,23 +1135,25 @@ bool Zoombini2Console::CmdSub_DumpImage(int argc, const char **argv) {
 	Common::ScopedPtr<ManagedSurface32> surface(_vm->_gfx->createSurface(image.getSize()));
 	surface->fillRect(Common::Rect(surface->w, surface->h), surface->format.ARGBToColor(255, 255, 255, 255));
 	_vm->_gfx->drawBitBlock(surface.get(), &image, Common::Point32());
-	exportDebugSurface(surface->rawSurface(), makeDebugDumpStem(path.toString('/')), png);
+	exportDebugSurface(surface->rawSurface(), makeDebugDumpStem(path.toString('/')));
 	debugPrintf("\n");
 	return true;
 }
 
 bool Zoombini2Console::CmdSub_DumpAnimation(int argc, const char **argv) {
-	if (hasHelpOption(argc, argv) || argc < 3 || 4 < argc) {
+	if (hasHelpOption(argc, argv) || argc != 3) {
 		debugPrintf("Export every decoded animation frame or one explicit RB sprite, composited over white.\n");
-		debugPrintf("Usage: %s animation <path> [bmp|png]\n\n", kCmdDump);
-		debugPrintf("Frame names use zero-based indices. The default format is BMP.\n");
+		debugPrintf("Usage: %s animation <path>\n\n", kCmdDump);
+		debugPrintf("Frame names use zero-based indices; all images are exported as PNG.\n");
+		debugPrintf("PNG support is required in this build.\n");
 		debugPrintf("Recoverable animation prefixes follow the existing decoder's salvage policy.\n\n");
 		printHelpOption();
 		return true;
 	}
+	if (!checkPNGExportSupport())
+		return true;
 	Common::Path path;
-	bool png = false;
-	if (!parseDebugResourcePath(argv[2], path) || !parseDebugImageFormat(argc == 4 ? argv[3] : nullptr, png))
+	if (!parseDebugResourcePath(argv[2], path))
 		return true;
 	Animation animation(_vm);
 	RleBlock sprite(_vm);
@@ -1184,7 +1175,7 @@ bool Zoombini2Console::CmdSub_DumpAnimation(int argc, const char **argv) {
 		surface->fillRect(Common::Rect(surface->w, surface->h), surface->format.ARGBToColor(255, 255, 255, 255));
 		_vm->_gfx->drawRleBlock(surface.get(), frame, Common::Point32());
 		const Common::String frameStem = Common::String::format("%s_frame%04d", stem.c_str(), i);
-		if (!exportDebugSurface(surface->rawSurface(), frameStem, png))
+		if (!exportDebugSurface(surface->rawSurface(), frameStem))
 			break;
 		exported += 1;
 	}

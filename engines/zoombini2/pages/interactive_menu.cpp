@@ -21,7 +21,6 @@
 
 #include <string.h>
 
-#include "common/algorithm.h"
 #include "common/callback.h"
 #include "common/debug.h"
 #include "zoombini2/graphics.h"
