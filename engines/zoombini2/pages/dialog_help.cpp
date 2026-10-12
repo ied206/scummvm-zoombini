@@ -26,7 +26,6 @@
 #include "zoombini2/zoombini2.h"
 
 #include "common/config-manager.h"
-#include "common/file.h"
 #include "common/system.h"
 #include "common/ustr.h"
 #include "graphics/font.h"

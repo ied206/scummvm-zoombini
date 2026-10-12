@@ -24,8 +24,6 @@
 #include "zoombini2/sound.h"
 #include "zoombini2/zoombini2.h"
 
-#include "common/debug.h"
-
 namespace Zoombini2 {
 
 PageLayer::PageLayer(Zoombini2Engine *vm, byte scrollDirection, const Common::Path &backgroundPath)

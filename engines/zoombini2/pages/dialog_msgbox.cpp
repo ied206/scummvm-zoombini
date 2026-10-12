@@ -20,7 +20,6 @@
  */
 
 #include "zoombini2/pages/dialog_msgbox.h"
-#include "common/debug.h"
 #include "common/system.h"
 #include "graphics/font.h"
 #include "zoombini2/graphics.h"

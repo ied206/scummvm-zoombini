@@ -526,6 +526,7 @@ PointFixed32 operator*(int32 left, const PointFixed32 &right) {
 class CubicBezierCurve::Evaluator {
 public:
 	virtual ~Evaluator() {}
+	virtual Evaluator *clone() const = 0;
 	virtual void init(const Common::Point32 &start, const Common::Point32 &control0, const Common::Point32 &control1, const Common::Point32 &end,
 					  int stepValue, int waitInitial) = 0;
 	virtual void computeCoeffs() = 0;
@@ -586,6 +587,10 @@ public:
 	typedef typename Numeric::Point Point;
 
 	TypedEvaluator() = default;
+
+	Evaluator *clone() const override {
+		return new TypedEvaluator<Numeric>(*this);
+	}
 
 	void init(const Common::Point32 &start, const Common::Point32 &control0, const Common::Point32 &control1, const Common::Point32 &end,
 			  int stepValue, int waitInitial) override {
@@ -671,6 +676,31 @@ private:
 
 CubicBezierCurve::CubicBezierCurve(bool useFloatingPoint)
 	: _evaluator(createEvaluator(useFloatingPoint)), _useFloatingPoint(useFloatingPoint) {
+}
+
+CubicBezierCurve::CubicBezierCurve(const CubicBezierCurve &other)
+	: _evaluator(other._evaluator->clone()), _start(other._start), _control0(other._control0), _control1(other._control1), _end(other._end),
+	  _stepValue(other._stepValue), _waitInitial(other._waitInitial), _initialized(other._initialized),
+	  _coefficientsReady(other._coefficientsReady), _useFloatingPoint(other._useFloatingPoint) {
+}
+
+CubicBezierCurve &CubicBezierCurve::operator=(const CubicBezierCurve &other) {
+	if (this == &other)
+		return *this;
+
+	Evaluator *evaluator = other._evaluator->clone();
+	delete _evaluator;
+	_evaluator = evaluator;
+	_start = other._start;
+	_control0 = other._control0;
+	_control1 = other._control1;
+	_end = other._end;
+	_stepValue = other._stepValue;
+	_waitInitial = other._waitInitial;
+	_initialized = other._initialized;
+	_coefficientsReady = other._coefficientsReady;
+	_useFloatingPoint = other._useFloatingPoint;
+	return *this;
 }
 
 CubicBezierCurve::~CubicBezierCurve() {
@@ -769,6 +799,21 @@ PathObject::~PathObject() {
 		delete segments[i];
 }
 
+PathObject *PathObject::createUnstartedCopy() const {
+	PathObject *path = new PathObject(_vm);
+	const bool useFloatingPoint = _vm->getBezierCurveDataType() == Zoombini2MetaEngine::BezierCurveDataType::kF32FloatingPoint;
+
+	for (uint i = 0; i < segments.size(); i++) {
+		CubicBezierCurve *segment = new CubicBezierCurve(*segments[i]);
+
+		segment->setFloatingPointMode(useFloatingPoint);
+		path->segments.push_back(segment);
+	}
+	path->looping = looping;
+	path->endPos = endPos;
+	return path;
+}
+
 void PathObject::appendSegment(const Common::Point32 &start, const Common::Point32 &control0, const Common::Point32 &control1, const Common::Point32 &end, int stepValue, int waitInitial) {
 	CubicBezierCurve *segment = new CubicBezierCurve(_vm->getBezierCurveDataType() == Zoombini2MetaEngine::BezierCurveDataType::kF32FloatingPoint);
 	segment->init(start, control0, control1, end, stepValue, waitInitial);
@@ -787,6 +832,10 @@ void PathObject::appendSegment(const Common::Point32 &start, const Common::Point
  * step and wait values.
  */
 PathObject *PathObject::loadFromPAT(Zoombini2Engine *vm, const Common::Path &path) {
+	return vm->loadPagePATPath(path);
+}
+
+PathObject *PathObject::loadUncachedPAT(Zoombini2Engine *vm, const Common::Path &path) {
 	Common::ScopedPtr<Common::SeekableReadStream> stream(vm->openResourceFile(path.toString('/')));
 	if (!stream) {
 		warning("PathObject: cannot open PAT '%s'", path.toString().c_str());

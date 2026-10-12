@@ -19,7 +19,6 @@
  *
  */
 
-#include "common/debug.h"
 #include "common/textconsole.h"
 
 #include "zoombini2/graphics.h"
