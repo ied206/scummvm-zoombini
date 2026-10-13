@@ -60,6 +60,9 @@ public:
 	void pause(bool paused, uint32 time);
 	Common::String click(Common::Point point);
 	bool event(const Common::Event &event);
+	void setMousePosition(Common::Point point) { _mouse = point; }
+	void updateNavigationCursor();
+	void releaseNavigationCursor();
 	bool active() const { return !_name.empty(); }
 	bool blocksMap() const;
 	bool wantsQueenMovie() const { return !_queenArriving && _queenPhase == kQueenMovie; }
@@ -110,6 +113,9 @@ private:
 	World &_world;
 	const Page *_page = nullptr;
 	Common::String _name;
+	Common::Point _mouse = Common::Point(-1, -1);
+	Graphics::Surface _navigationCursors[8];
+	int _navigationCursor = -1;
 	Common::HashMap<Common::String, Shell::Character *> _actors;
 	Common::Array<Speech> _speech;
 	Common::ScopedPtr<OM::Sound> _queuedSound;

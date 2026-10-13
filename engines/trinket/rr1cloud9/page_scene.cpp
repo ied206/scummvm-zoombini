@@ -21,6 +21,7 @@
 
 #include "trinket/rr1cloud9/page_scene.h"
 
+#include "graphics/cursorman.h"
 #include "trinket/rr1cloud9/ca1_cloud_floors.h"
 #include "trinket/rr1cloud9/ca2_flipbook.h"
 #include "trinket/rr1cloud9/cg2_sheep_crossing.h"
@@ -43,6 +44,9 @@ namespace RR1Cloud9 {
 PageScene::PageScene(TrinketEngine &vm, Shell::Scene &scene, World &world) : _vm(vm), _scene(scene), _world(world), _chestPaths(vm.resources()) {}
 
 void PageScene::clear() {
+	releaseNavigationCursor();
+	for (auto &cursor : _navigationCursors)
+		cursor.free();
 	delete _rainGame;
 	_rainGame = nullptr;
 	delete _skyRide;
@@ -416,6 +420,7 @@ bool PageScene::enter(const Page &page, const Common::String &name, bool practic
 }
 
 void PageScene::pause(bool paused, uint32 time) {
+	releaseNavigationCursor();
 	if (_paused == paused)
 		return;
 	if (paused) {
@@ -1177,6 +1182,55 @@ bool PageScene::event(const Common::Event &event) {
 
 bool PageScene::blocksMap() const {
 	return chestBusy() || _putAwayPending || _putAwayActive || sceneBusy();
+}
+
+void PageScene::releaseNavigationCursor() {
+	if (0 <= _navigationCursor) {
+		CursorMan.popCursor();
+		_navigationCursor = -1;
+	}
+}
+
+void PageScene::updateNavigationCursor() {
+	releaseNavigationCursor();
+	if (!_page || _paused || _practice || _chestOpen || _dragged || _draggingChest || _openingGate || blocksMap())
+		return;
+	if (_flipbook && _flipbook->hasCustomCursor())
+		return;
+	if (_cloudFloors && _cloudFloors->hasCustomCursor())
+		return;
+	if (_scene.hitSprite(_mouse, _page->number("kNavHotspotZ") + 1, INT_MAX, true))
+		return;
+	for (const auto &actor : _actors)
+		if (actor._value->visible && actor._value->bounds().contains(_mouse))
+			return;
+	for (const auto &exit : _page->exits()) {
+		if (!exit.rect.contains(_mouse) || exit.cursor < 4066 || 4073 < exit.cursor)
+			continue;
+		int index = exit.cursor - 4066;
+		Graphics::Surface &cursor = _navigationCursors[index];
+		if (!cursor.getPixels()) {
+			Common::String path = Common::String::format("common/%d.ao", exit.cursor);
+			Common::ScopedPtr<Common::SeekableReadStream> stream(_vm.resources().open(path));
+			Common::ScopedPtr<Common::SeekableReadStream> palette(_vm.resources().open(Common::String::format("common/%d.rgb", exit.cursor)));
+			Core::Animation animation;
+			if (!stream || !animation.load(*stream) || (palette && !animation.loadPalette(*palette)) || !animation.decode(0, cursor))
+				return;
+		}
+		static const Common::Point hotspots[] = {
+			Common::Point(16, 1),
+			Common::Point(30, 13),
+			Common::Point(1, 13),
+			Common::Point(17, 31),
+			Common::Point(3, 1),
+			Common::Point(28, 1),
+			Common::Point(1, 28),
+			Common::Point(30, 28),
+		};
+		CursorMan.pushCursor(cursor, hotspots[index].x, hotspots[index].y, 0);
+		_navigationCursor = index;
+		return;
+	}
 }
 
 bool PageScene::sceneBusy() const {

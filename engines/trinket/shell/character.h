@@ -79,7 +79,7 @@ private:
 		uint32 deadline = 0;
 		bool repeat = true;
 		Common::Array<Sprite *> sprites;
-		Common::Array<bool> registered;
+		Common::Array<bool> hideSettle;
 		Common::Array<uint> available;
 	};
 	struct SpeechPart {
@@ -102,7 +102,7 @@ private:
 	Common::Array<ChorPart> _chor;
 	Sprite *_settle = nullptr, *_animation = nullptr, *_fidget = nullptr;
 	int _fidgetGroup = -1;
-	bool _fidgetRegistered = false;
+	bool _fidgetHidesSettle = false;
 	uint _speechResource = 0;
 	uint32 _time = 0, _pauseTime = 0, _chorDeadline = 0, _chorInterval = 0, _chorFrame = 0;
 	bool _paused = false, _keepVisible = true;
@@ -118,7 +118,7 @@ private:
 	void finish();
 	void restoreSettle();
 	bool addFidgetGroup(uint groupTag, uint minimum, uint maximum, bool repeat);
-	bool addFidget(uint groupTag, uint resource);
+	bool addFidget(uint groupTag, uint resource, bool hideSettle);
 	bool setSpeechAnims(const Core::ScriptArguments &arguments);
 	bool playSpeechParts(uint resource);
 	bool playChoreography(uint resource);

@@ -483,8 +483,11 @@ bool Game::takeReturnToLauncherRequest() {
 }
 
 void Game::event(const Common::Event &event) {
-	if (event.type == Common::EVENT_MOUSEMOVE || event.type == Common::EVENT_LBUTTONDOWN || event.type == Common::EVENT_LBUTTONUP)
+	_presentation.releaseNavigationCursor();
+	if (event.type == Common::EVENT_MOUSEMOVE || event.type == Common::EVENT_LBUTTONDOWN || event.type == Common::EVENT_LBUTTONUP) {
+		_presentation.setMousePosition(event.mouse);
 		debug(5, "RR1Cloud9: pointer %d at %d,%d", event.type, event.mouse.x, event.mouse.y);
+	}
 	if (_movieStage != kNoMovie) {
 		if (_movieStage == kClosing || _movieStage == kReplay) {
 			if (event.type == Common::EVENT_LBUTTONDOWN || event.type == Common::EVENT_KEYDOWN)
@@ -590,8 +593,11 @@ void Game::event(const Common::Event &event) {
 		}
 		return;
 	}
-	if (_presentation.event(event) || event.type != Common::EVENT_LBUTTONDOWN)
+	bool handled = _presentation.event(event);
+	if (handled || event.type != Common::EVENT_LBUTTONDOWN) {
+		_presentation.updateNavigationCursor();
 		return;
+	}
 	Common::String action = _presentation.click(event.mouse);
 	if (!action.empty()) {
 		if (action == "map")
@@ -620,6 +626,8 @@ void Game::event(const Common::Event &event) {
 }
 
 void Game::draw(OM::Canvas &canvas, uint32 time) {
+	// Activity cursors must update beneath the navigation cursor.
+	_presentation.releaseNavigationCursor();
 	_time = time;
 	if (_movieStage != kNoMovie) {
 		if (_movie.endOfVideo()) {
@@ -707,6 +715,7 @@ void Game::draw(OM::Canvas &canvas, uint32 time) {
 	_scene.update(time, sounds);
 	_presentation.playSounds(sounds);
 	_presentation.draw(canvas);
+	_presentation.updateNavigationCursor();
 }
 
 Common::String Game::debugPageCommand(const Common::String &command) {
