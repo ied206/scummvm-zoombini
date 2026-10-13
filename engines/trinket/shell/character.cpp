@@ -141,7 +141,7 @@ bool Character::addFidgetGroup(uint groupTag, uint minimum, uint maximum, bool r
 	return true;
 }
 
-bool Character::addFidget(uint groupTag, uint resource) {
+bool Character::addFidget(uint groupTag, uint resource, bool hideSettle) {
 	for (uint i = 0; i < _groups.size(); i++) {
 		FidgetGroup &group = _groups[i];
 		if (group.tag != groupTag)
@@ -153,7 +153,8 @@ bool Character::addFidget(uint groupTag, uint resource) {
 		sprite->setPauseListener(&_fidgetLink);
 		group.available.push_back(group.sprites.size());
 		group.sprites.push_back(sprite);
-		group.registered.push_back(_registerFidgets);
+		// Position registration does not control the settled pose's visibility.
+		group.hideSettle.push_back(hideSettle);
 		return true;
 	}
 	return false;
@@ -166,7 +167,7 @@ void Character::finishFidget() {
 	_fidget = nullptr;
 	schedule(_groups[_fidgetGroup]);
 	_fidgetGroup = -1;
-	if (_settle && _fidgetRegistered)
+	if (_settle && _fidgetHidesSettle)
 		_settle->visible = visible && !isBusy();
 }
 
@@ -181,8 +182,8 @@ void Character::updateFidgets() {
 			uint choice = _random.draw() % group.available.size();
 			_fidget = group.sprites[group.available[choice]];
 			_fidgetGroup = i;
-			_fidgetRegistered = group.registered[group.available[choice]];
-			if (_fidgetRegistered && _settle)
+			_fidgetHidesSettle = group.hideSettle[group.available[choice]];
+			if (_fidgetHidesSettle && _settle)
 				_settle->visible = false;
 			_fidget->startAnimation(1);
 			_fidget->setPauseListener(&_fidgetLink);
@@ -560,8 +561,8 @@ bool Character::play(const Common::String &method, const Core::ScriptArguments &
 	if (method == "addFidgetGroup" && (arguments.size() == 3 || arguments.size() == 4))
 		return addFidgetGroup(arguments[0].integer(), arguments[1].integer(), arguments[2].integer(),
 							  arguments.size() == 3 || arguments[3].integer() != 0);
-	if (method == "addFidget" && arguments.size() == 2)
-		return addFidget(arguments[0].integer(), arguments[1].integer());
+	if (method == "addFidget" && (arguments.size() == 2 || arguments.size() == 3))
+		return addFidget(arguments[0].integer(), arguments[1].integer(), arguments.size() == 2 || arguments[2].integer() != 0);
 	if (method == "setSpeechAnims")
 		return setSpeechAnims(arguments);
 	if (method == "playSpeech" && !arguments.empty() && arguments.size() <= 3) {

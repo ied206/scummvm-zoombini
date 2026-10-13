@@ -37,6 +37,7 @@ public:
 	explicit Flipbook(PageScene &host) : _host(host) {}
 	~Flipbook();
 	bool enter();
+	bool hasCustomCursor() const { return 0 <= _cursor || _cursorHidden; }
 	void checkpoint();
 	void advance(uint32 time);
 	void update(uint32 time);
