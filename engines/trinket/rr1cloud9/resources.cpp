@@ -80,16 +80,16 @@ bool Resources::load(Common::Path &gamePath) {
 Common::SeekableReadStream *Resources::openLibrary(const Common::String &library, const Common::String &tag, uint id) const {
 	auto found = _libraries.find(library);
 	if (found != _libraries.end())
-		return unpack(found->_value->open(tag, id), tag);
+		return unpack(found->_value->getResource(tag, id), tag);
 	for (const Common::Path &directory : _directories) {
 		Common::Path path = directory.join(library + ".rsc");
 		if (!Common::FSNode(path).exists())
 			continue;
-		Common::SharedPtr<OM::NEResourceLibrary> resource(new OM::NEResourceLibrary());
-		if (!resource->load(path))
+		Common::SharedPtr<Common::NEResources> resource(new Common::NEResources());
+		if (!resource->loadFromEXE(Common::FSNode(path).createReadStream()))
 			return nullptr;
 		_libraries[library] = resource;
-		return unpack(resource->open(tag, id), tag);
+		return unpack(resource->getResource(tag, id), tag);
 	}
 	return nullptr;
 }
