@@ -22,11 +22,11 @@
 #ifndef TRINKET_LAUNCHER_APPLICATION_H
 #define TRINKET_LAUNCHER_APPLICATION_H
 
+#include "common/formats/winexe_ne.h"
 #include "common/savefile.h"
 #include "graphics/wincursor.h"
 #include "trinket/launcher/registry.h"
 #include "trinket/ompp/font.h"
-#include "trinket/ompp/ne_resource.h"
 #include "trinket/ompp/sound.h"
 #include "trinket/ompp/xml.h"
 #include "trinket/shell/scene.h"
@@ -96,9 +96,9 @@ private:
 	Common::String _musicPath;
 	Common::String _typed;
 	Common::Path _root;
-	mutable OM::NEResourceLibrary _common, _signin, _product;
-	mutable OM::NEResourceLibrary _brands, _parents, _audio, _news;
-	mutable OM::NEResourceLibrary _worldLibraries[6];
+	mutable Common::NEResources _common, _signin, _product;
+	mutable Common::NEResources _brands, _parents, _audio, _news;
+	mutable Common::NEResources _worldLibraries[6];
 	OM::XMLParser _layout, _startupLayout;
 	OM::XMLParser _homeLayout, _parentsLayout;
 	OM::XMLParser _demoLayouts[6], _newsLayout;

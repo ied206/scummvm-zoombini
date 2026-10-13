@@ -8,7 +8,6 @@ MODULE_OBJS := \
 	ompp/canvas.o \
 	ompp/font.o \
 	ompp/resource_cache.o \
-	ompp/ne_resource.o \
 	ompp/sound.o \
 	ompp/xml.o \
 	puzzle/core.o \

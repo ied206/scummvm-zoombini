@@ -109,9 +109,12 @@ bool Application::load(const Common::Path &gamePath, const char *product) {
 	if (!startup.loadFile(Common::FSNode(root.join(kStartupXML))) || !startup.parse())
 		return false;
 	_defaultMusic = startup.number("startup/music");
-	if (!_common.load(root.join(kCommon)) || !_signin.load(root.join(kSignin)) ||
-		!_brands.load(root.join(kBrands)) || !_parents.load(root.join(kParents)) || !_audio.load(root.join(kAudio)) ||
-		!_product.load(root.join(Common::String::format(kProductRSC, product)))) {
+	if (!_common.loadFromEXE(Common::FSNode(root.join(kCommon)).createReadStream()) ||
+		!_signin.loadFromEXE(Common::FSNode(root.join(kSignin)).createReadStream()) ||
+		!_brands.loadFromEXE(Common::FSNode(root.join(kBrands)).createReadStream()) ||
+		!_parents.loadFromEXE(Common::FSNode(root.join(kParents)).createReadStream()) ||
+		!_audio.loadFromEXE(Common::FSNode(root.join(kAudio)).createReadStream()) ||
+		!_product.loadFromEXE(Common::FSNode(root.join(Common::String::format(kProductRSC, product))).createReadStream())) {
 		warning("Trinket: failed to load launcher NE libraries from %s", root.toString().c_str());
 		return false;
 	}
@@ -128,14 +131,14 @@ bool Application::load(const Common::Path &gamePath, const char *product) {
 	}
 	_gameSignin = _startupLayout.get("startup/signin/execute") == "no";
 	for (uint i = 0; i < ARRAYSIZE(kDemoXML); i++) {
-		if (!_worldLibraries[i].load(root.join(kWorldLibraries[i])))
+		if (!_worldLibraries[i].loadFromEXE(Common::FSNode(root.join(kWorldLibraries[i])).createReadStream()))
 			return false;
 		if (!_demoLayouts[i].loadFile(Common::FSNode(root.join("rsc").join(kDemoXML[i]))) || !_demoLayouts[i].parse())
 			return false;
 	}
-	if (!_news.load(root.join(kNews)))
+	if (!_news.loadFromEXE(Common::FSNode(root.join(kNews)).createReadStream()))
 		return false;
-	Common::ScopedPtr<Common::SeekableReadStream> news(_news.open("LXML", 10002));
+	Common::ScopedPtr<Common::SeekableReadStream> news(_news.getResource(Common::String("LXML"), 10002));
 	if (!news)
 		return false;
 	Common::String newsXML;
@@ -178,24 +181,25 @@ Common::SeekableReadStream *Application::open(const Common::String &name) const 
 		tag = "NFNT";
 	if (!tag || !id)
 		return nullptr;
+	const Common::WinResourceID type = Common::String(tag);
 	if (name.hasPrefix("signin/"))
-		return _signin.open(tag, id);
+		return _signin.getResource(type, id);
 	if (name.hasPrefix("product/")) {
-		Common::SeekableReadStream *stream = _product.open(tag, id);
+		Common::SeekableReadStream *stream = _product.getResource(type, id);
 		if (stream)
 			return stream;
 	}
-	Common::SeekableReadStream *stream = _common.open(tag, id);
+	Common::SeekableReadStream *stream = _common.getResource(type, id);
 	if (!stream)
-		stream = _brands.open(tag, id);
+		stream = _brands.getResource(type, id);
 	if (!stream)
-		stream = _parents.open(tag, id);
+		stream = _parents.getResource(type, id);
 	if (!stream)
-		stream = _audio.open(tag, id);
+		stream = _audio.getResource(type, id);
 	if (!stream)
-		stream = _news.open(tag, id);
+		stream = _news.getResource(type, id);
 	for (uint i = 0; !stream && i < ARRAYSIZE(_worldLibraries); i++)
-		stream = _worldLibraries[i].open(tag, id);
+		stream = _worldLibraries[i].getResource(type, id);
 	return stream;
 }
 
@@ -428,7 +432,7 @@ bool Application::addContentScript(const OM::XMLParser &xml, const Common::Strin
 		return addContentGrid(xml);
 	if (script == "initMyCDRROMs") {
 		// Disc-only product packs have no installed-product icon.
-		Common::ScopedPtr<Common::SeekableReadStream> icon(_product.open("ASEQ", 2051));
+		Common::ScopedPtr<Common::SeekableReadStream> icon(_product.getResource(Common::String("ASEQ"), 2051));
 		if (!icon)
 			return true;
 		int action = kContentLink2000 + _links.size();

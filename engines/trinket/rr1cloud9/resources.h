@@ -22,15 +22,16 @@
 #ifndef TRINKET_RR1CLOUD9_RESOURCES_H
 #define TRINKET_RR1CLOUD9_RESOURCES_H
 
+#include "common/formats/winexe_ne.h"
 #include "common/ptr.h"
-#include "trinket/ompp/ne_resource.h"
+#include "trinket/ompp/resource.h"
 
 namespace Trinket {
 namespace RR1Cloud9 {
 
 /**
  * RR1Cloud9 game assets use NE-format RSC libraries.
- * Each library has its own resource table and tag-to-type mapping, read by @ref Trinket::OM::NEResourceLibrary.
+ * Each library has its own resource table and tag-to-type mapping, read by @ref Common::NEResources.
  * Explicit library names keep page resources with overlapping IDs separate.
  * Libraries are cached on demand; requested payloads are returned as caller-owned streams.
  */
@@ -50,7 +51,7 @@ public:
 private:
 	static Common::SeekableReadStream *unpack(Common::SeekableReadStream *stream, const Common::String &tag);
 	Common::Array<Common::Path> _directories;
-	mutable Common::HashMap<Common::String, Common::SharedPtr<OM::NEResourceLibrary>> _libraries;
+	mutable Common::HashMap<Common::String, Common::SharedPtr<Common::NEResources>> _libraries;
 	Common::SeekableReadStream *openLibrary(const Common::String &library, const Common::String &tag, uint id) const;
 };
 
