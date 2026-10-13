@@ -29,12 +29,13 @@
 namespace Trinket {
 namespace RR1Cloud9 {
 
-/** Authored presentation and exits for the navigation-only runtime. */
+/** Authored scene presentation, exits and their hover cursor resources. */
 class Page {
 public:
 	struct Exit {
 		Common::Rect rect;
 		Common::String destination;
+		int cursor = 0;
 	};
 	bool load(const OM::ResourceProvider &resources, const Common::String &name);
 	Common::String text(const Common::String &name) const;
@@ -45,7 +46,7 @@ public:
 private:
 	Core::Script _script;
 	Common::Array<Exit> _exits;
-	const Core::Script::Variable *constant(const Common::String &name) const;
+	const Core::Script::Variable *constant(const Common::String &name, uint depth = 0) const;
 };
 
 } // End of namespace RR1Cloud9

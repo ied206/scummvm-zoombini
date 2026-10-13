@@ -42,6 +42,7 @@ public:
 	bool click(Common::Point point);
 	bool event(const Common::Event &event);
 	bool busy() const { return _phase != kTravelling || _correctRoute || 0 <= _dragged; }
+	bool hasCustomCursor() const { return 0 < _cursor; }
 	void pause(bool paused);
 	void resume(uint32 elapsed) {
 		_nextTick += elapsed;

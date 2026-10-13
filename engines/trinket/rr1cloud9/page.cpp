@@ -26,7 +26,9 @@
 namespace Trinket {
 namespace RR1Cloud9 {
 
-const Core::Script::Variable *Page::constant(const Common::String &name) const {
+const Core::Script::Variable *Page::constant(const Common::String &name, uint depth) const {
+	if (8 <= depth)
+		return nullptr;
 	const Core::Script::Variable *value = _script.find(name);
 	if (value && (value->type == 2 || value->type == 3))
 		return value;
@@ -38,8 +40,11 @@ const Core::Script::Variable *Page::constant(const Common::String &name) const {
 		int target = operands[instruction.operand], source = operands[instruction.operand + 1];
 		if (target < 0 || source < 0 || variables.size() <= static_cast<uint>(target) || variables.size() <= static_cast<uint>(source))
 			continue;
-		if (variables[target].name == name && variables[source].classification == 1 && operands[instruction.operand + 2] == -1)
-			return &variables[source];
+		if (variables[target].name == name && operands[instruction.operand + 2] == -1) {
+			if (variables[source].classification == 1)
+				return &variables[source];
+			return constant(variables[source].name, depth + 1);
+		}
 	}
 	return nullptr;
 }
@@ -80,6 +85,7 @@ bool Page::load(const OM::ResourceProvider &resources, const Common::String &nam
 			Exit exit;
 			exit.rect = Common::Rect(left, top, right, bottom);
 			exit.destination = destination;
+			exit.cursor = number(Common::String::format("kNavHSCursors.%d", direction));
 			if (!destination.empty() && !exit.rect.isEmpty())
 				_exits.push_back(exit);
 		}
