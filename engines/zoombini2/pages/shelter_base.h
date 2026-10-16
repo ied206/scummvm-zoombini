@@ -42,7 +42,6 @@ public:
 };
 
 class Animation;
-class ZoombiniAnimation;
 class ZoombiniRunner;
 struct StorageRecord;
 
@@ -67,6 +66,8 @@ public:
 	 * pages with player-arranged departure slots override this.
 	 */
 	virtual bool isDepartingMember(const ZoombiniRunner *zoombini) const;
+	/** Return whether at least one live member is selected to leave this rescue site. */
+	bool debugCanDepart() const override;
 
 protected:
 	/** Bind a concrete rescue site to @p vm. */
@@ -93,8 +94,6 @@ protected:
 	void refillDepartureRoster(StorageRecord **storage);
 	/** Persist every non-departing member in @p storage and write the active save. */
 	void saveRescueRoster(StorageRecord **storage);
-	/** Load the shared Zoombini sprite grid for drawing the waiting roster from @ref ShelterRescueSiteBase::kRosterAnimationPath through the engine cache. */
-	void loadRosterAnimation();
 	/**
 	 * Queue an arrival speech for sequential playback.
 	 * @param path Audio resource path to play after earlier arrival speech.
@@ -112,7 +111,6 @@ protected:
 	bool isDeparting() const { return _phase == 1; }
 	/** Draw the wrapping waiting-roster backdrop beneath its Zoombinis. */
 	void drawRosterBackdrop(ManagedSurface32 *screen, int scrollX) const;
-
 	/** Return the concrete site's waiting storage. */
 	virtual StorageRecord **getRescueStorage() const = 0;
 	/** Draw site-specific layers before the common scroll controls and waiting roster. */
@@ -137,7 +135,6 @@ private:
 	/** Dimensions of one visible roster slot. */
 	static constexpr Size32 kSlotSize = Size32(40, 57);
 	/** Shared sprite grid of Zoombinis at their normal gameplay size, used to draw the waiting roster. */
-	static constexpr const char *kRosterAnimationPath = "bmp/zombis/littleZomb.anm";
 
 	/** Selection marker path for the current rescue site. */
 	Common::String _selectorPath;
@@ -167,8 +164,6 @@ private:
 	int _speechSoundId = -1;
 	/** Arrival speech paths awaiting sequential playback. */
 	Common::Array<Common::String> _speechQueue;
-	/** Immutable sprite grid borrowed from the engine cache and retained across page transitions. */
-	const ZoombiniAnimation *_zoombiniAnimation = nullptr;
 	/** Runtime party chosen to leave this rescue site. */
 	Common::Array<ZoombiniRunner *> _departureRoster;
 };

@@ -150,7 +150,7 @@ private:
 	/** Number of attention-blink transitions still pending. */
 	int _goBlinkTogglesRemaining = 0;
 	/** Page identifier associated with the current Go-button blink state. */
-	PageId _goPageId = kPageNone;
+	PageId _goPageId = PageId::kPageNone_M1;
 	/** Gameplay tick at which the next attention-blink transition occurs. */
 	uint32 _goBlinkDeadline = 0;
 

@@ -53,10 +53,13 @@ public:
 	void init() override;
 	/** Advance feature controls, entrance paths, and concurrent return paths. */
 	void onUpdate() override;
-	/** Draw the shelter, feature stations, and boarding party. */
+	/** Draw the shelter artwork, feature controls and their hover animations. */
 	void onRenderContent(ManagedSurface32 *screen) override;
+	/** Draw the Zoombinis assigned to boarding slots. */
 	void onRenderActors(ManagedSurface32 *screen) override;
+	/** Start due fidget motions and advance visible boarding Zoombinis after drawing. */
 	void onActorsRendered() override;
+	/** Draw the large Zoombini preview using the currently selected station traits. */
 	void onRenderForeground(ManagedSurface32 *screen) override;
 	/** Draw and advance the held Zoombini above the shared sidebar. */
 	void renderDragOverlay(ManagedSurface32 *screen, bool advanceState) override;
@@ -123,12 +126,6 @@ private:
 	static constexpr const char *kCreateButtonPath = "bmp/zombiniville/bumper-Valid.an";
 	/** Layered sprite grid used to preview the selected Zoombini features. */
 	static constexpr const char *kBigZombAnimationPath = "bmp/zombiniville/BigZomb/BigZomb.anm";
-	/** Little-Zoombini sprite grid used for characters in the boarding area. */
-	static constexpr const char *kLittleZombAnimationPath = "bmp/zombis/littleZomb.anm";
-	/** Zoombini animation used while dragging a party member into or out of the boarding area. */
-	static constexpr const char *kPickupZombAnimationPath = "bmp/zombis/pris/pris.anm";
-	/** Alternate idle Zoombini sprite grid used for party members in the boarding area. */
-	static constexpr const char *kIdleZombAnimationPath = "bmp/zombis/attente2/attenteZomb2.anm";
 	/** Background music for the Zoombiniville picker page. */
 	static constexpr const char *kMusicPath = "#sounds/music/ZMR-PickerScreen.wav";
 	/** Sound effect played when a trait value is selected. */
@@ -159,14 +156,8 @@ private:
 	/** Hover and pointer-exit sequence for Create Selected. */
 	AnimationRunner *_createButtonRunner = nullptr;
 
-	/** Borrowed immutable large-sprite grid retained in the engine cache. */
+	/** Large picker grid borrowed from the graphics cache. */
 	const ZoombiniAnimation *_bigZombAnimation = nullptr;
-	/** Borrowed immutable small-sprite grid retained in the engine cache. */
-	const ZoombiniAnimation *_littleZombAnimation = nullptr;
-	/** Borrowed immutable pickup-sprite grid retained in the engine cache. */
-	const ZoombiniAnimation *_pickupZombAnimation = nullptr;
-	/** Borrowed immutable random-idle sprite grid retained in the engine cache. */
-	const ZoombiniAnimation *_idleZombAnimation = nullptr;
 
 	/** Current value for one feature station. */
 	struct FeatureStation {
@@ -189,6 +180,7 @@ private:
 	Common::Array<ZoombiniRunner *> _boardingZoombinis;
 	/** Independent occupancy retained for one original Zombiniville slot. */
 	struct BoardingSlotState {
+		/** Whether a Zoombini has been assigned to this departure slot. */
 		bool occupied = false;
 	};
 	/** Sixteen fixed boarding slots whose occupancy is independent of roster order. */

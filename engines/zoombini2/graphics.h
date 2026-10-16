@@ -42,10 +42,14 @@ namespace Zoombini2 {
 
 /** One RGB color with eight bits per channel and no alpha component. */
 struct RGBColor {
+	/** Red channel intensity from 0 to 255. */
 	byte r;
+	/** Green channel intensity from 0 to 255. */
 	byte g;
+	/** Blue channel intensity from 0 to 255. */
 	byte b;
 
+	/** Construct an RGB color from channel intensities, defaulting to black. */
 	constexpr RGBColor(byte red = 0, byte green = 0, byte blue = 0) : r(red), g(green), b(blue) {}
 	/** Return this color as a lowercase #rrggbb string. */
 	Common::String toString() const {
@@ -73,10 +77,14 @@ class AlphaBlendLUT;
  */
 template<typename T, typename ConcreteSize>
 struct SizeBase {
+	/** Horizontal extent in the caller's coordinate units. */
 	T width;
+	/** Vertical extent in the caller's coordinate units. */
 	T height;
 
+	/** Construct a size with zero width and height. */
 	constexpr SizeBase() : width(0), height(0) {}
+	/** Construct a size from dimensions in the caller's coordinate units. */
 	constexpr SizeBase(T widthValue, T heightValue) : width(widthValue), height(heightValue) {}
 
 	/** Create a size by adding the @p delta dimensions to this size. */
@@ -123,7 +131,9 @@ struct SizeBase {
 #define BEGIN_Z2_SIZE_TYPE(T, Size) \
 	struct Size : public SizeBase<T, Size> {
 #define END_Z2_SIZE_TYPE(T, Size)                                                                       \
+	/** Construct a size with zero width and height. */                                                 \
 	constexpr Size() : SizeBase() {}                                                                    \
+	/** Construct a size from dimensions in the caller's coordinate units. */                           \
 	constexpr Size(T widthValue, T heightValue) : SizeBase(widthValue, heightValue) {}                  \
 	}                                                                                                   \
 	;                                                                                                   \
@@ -137,6 +147,7 @@ struct SizeBase {
 BEGIN_Z2_SIZE_TYPE(int16, Size16)
 END_Z2_SIZE_TYPE(int16, Size16)
 BEGIN_Z2_SIZE_TYPE(int32, Size32)
+/** Copy the dimensions of a 16-bit size into 32-bit coordinate storage. */
 constexpr Size32(const Size16 &size) : SizeBase(static_cast<int32>(size.width), static_cast<int32>(size.height)) {}
 END_Z2_SIZE_TYPE(int32, Size32)
 
@@ -154,14 +165,66 @@ class RleBlock;
 class ZoombiniRunner;
 class ZoombiniAnimation;
 
+/** Shared Zoombini sprite grids retained across page changes. */
+enum class ZmbAnimationKind {
+	/**
+	 * Basic 'little-size' (according to the filename, anyway) sprite grid.
+	 * For example, Zoombinis waiting to be placed on turtles in CrazyTurtle.
+	 */
+	kBasic,
+	/**
+	 * Celebration sprite grid used after successful placements and puzzle completion.
+	 * For example, a Zoombini reacting after an accepted placement in CrazyTurtle.
+	 */
+	kCelebration,
+	/**
+	 * Tumbling sprite grid used when a Zoombini falls.
+	 * For example, a Zoombini falling after a rejected placement in CrazyTurtle.
+	 */
+	kFalling,
+	/**
+	 * Suction sprite grid used when a Zoombini enters a cascade.
+	 * For example, a connected Zoombini being pulled into the cascade in Waterslide.
+	 */
+	kSuction,
+	/**
+	 * Floating sprite grid used while a Zoombini rides a bubble.
+	 * For example, a Zoombini riding a moving bubble in MysticMarsh.
+	 */
+	kFloating,
+	/**
+	 * Jumping sprite grid used for the leap into the cannon.
+	 * For example, a Zoombini jumping into the cannon in WallOfFleens.
+	 */
+	kJumping,
+	/**
+	 * Pick-up sprite grid used while dragging a Zoombini.
+	 * For example, a Zoombini being dragged onto a turtle in CrazyTurtle.
+	 */
+	kPickup,
+	/**
+	 * Fidget sprite grid played occasionally while a Zoombini waits.
+	 * For example, an occasional idle motion by a waiting Zoombini at RescueSite I.
+	 */
+	kFidget,
+	/**
+	 * Tiny sprite grid used by @ref TransitionMapTrans for travel between pages.
+	 * For example, the party walking from CrazyTurtle to Waterslide.
+	 */
+	kMapTransTiny,
+};
+
 /**
  * Provides the fixed game surface, cached artwork, and text rendering used by pages.
  * Page bitmap pointers remain valid until @ref Gfx::clearPageBitmapCache; dialogs and pages must release their references before that call.
- * Shared bitmaps and the text font remain available until this graphics interface is destroyed.
+ * Shared bitmaps, Zoombini grids, and the text font remain available until this graphics interface is destroyed.
  * Surfaces returned by @ref Gfx::createSurface are separate allocations that the caller must delete.
  */
 class Gfx : public Common::NonCopyable {
 public:
+	/** Dimensions of the fixed internal game screen. */
+	static constexpr Size32 kScreenSize = Size32(800, 600);
+
 	/** Sentinel for drawing text without a caller-specified width limit. */
 	static constexpr int kNoMaxWidth = -1;
 
@@ -169,6 +232,13 @@ public:
 	explicit Gfx(Zoombini2Engine *vm);
 	/** Release the graphics interface for one game instance. */
 	~Gfx();
+
+	/** Load or reuse a game-lifetime sprite grid with the caller-specified frame delay. */
+	const ZoombiniAnimation *loadZoombiniAnimation(const Common::Path &path, uint32 frameDelay);
+	/** Cache every common grid once at engine startup with its shared frame delay. */
+	void loadCommonZoombiniAnimations();
+	/** Return a startup-cached common grid and record page use without loading resources or changing timing. */
+	const ZoombiniAnimation *getCommonZoombiniAnimation(ZmbAnimationKind animKind) const;
 
 	/** Return the fixed drawing surface for this game instance. */
 	ManagedSurface32 *getScreen() const { return _screen; }
@@ -276,6 +346,11 @@ public:
 	/** Compose body, Feet, Nose, Hair and Eyes, retaining frame zero for single-frame entries. */
 	void drawZoombini(ManagedSurface32 *destSurface, const ZoombiniAnimation *animation, const ZmbTrait &traits,
 					  const Common::Point32 &pos, int cell, int frame, const Common::Rect32 *clip = nullptr) const;
+	/** Compose a previously loaded common Zoombini grid. */
+	void drawZoombini(ManagedSurface32 *destSurface, ZmbAnimationKind animKind, const ZmbTrait &traits,
+					  const Common::Point32 &pos, int cell, int frame, const Common::Rect32 *clip = nullptr) const {
+		drawZoombini(destSurface, getCommonZoombiniAnimation(animKind), traits, pos, cell, frame, clip);
+	}
 	/** Compose the same layers with an explicit blend table for compatibility callers. */
 	static void drawZoombini(ManagedSurface32 *destSurface, const ZoombiniAnimation *animation, const ZmbTrait &traits,
 							 const Common::Point32 &pos, int cell, int frame, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip = nullptr);
@@ -321,11 +396,17 @@ public:
 	 */
 	/** Common fixed UI and bitmap text colors as RGB values; pack with @ref RGBColor::toPixel for the destination surface. */
 	struct PredefinedColor {
+		/** Black used for text, outlines and background fills. */
 		static constexpr RGBColor kBlack = RGBColor(0, 0, 0);
+		/** Dark gray for the bitmap font's original color code 0. */
 		static constexpr RGBColor kDark00 = RGBColor(16, 16, 16);
+		/** Blue for the bitmap font's original color code 1. */
 		static constexpr RGBColor kBlue01 = RGBColor(0, 0, 255);
+		/** Green for the bitmap font's original color code 2. */
 		static constexpr RGBColor kGreen02 = RGBColor(0, 255, 0);
+		/** White for the bitmap font's original color code 3. */
 		static constexpr RGBColor kWhite03 = RGBColor(255, 255, 255);
+		/** Red for the bitmap font's original color code 4. */
 		static constexpr RGBColor kRed04 = RGBColor(255, 0, 0);
 	};
 	enum class FontKind {
@@ -393,9 +474,22 @@ public:
 	void wordWrapText(const Common::U32String &text, int maxWidth, Common::Array<Common::U32String> &lines, const TextConf &conf) const;
 
 private:
+	typedef Common::HashMap<Common::Path, ZoombiniAnimation *, Common::Path::IgnoreCase_Hash, Common::Path::IgnoreCase_EqualTo> ZoombiniAnimationCache;
+
+	struct ZmbAnimationKindHash {
+		/** Hash a common animation kind by its underlying enum value. */
+		uint operator()(ZmbAnimationKind animKind) const {
+			return static_cast<uint>(animKind);
+		}
+	};
+	typedef Common::HashMap<ZmbAnimationKind, const ZoombiniAnimation *, ZmbAnimationKindHash> CommonZoombiniAnimationMap;
+
 	struct MaskedBitBlockEntry {
+		/** Logical path of the color bitmap used as this cache key. */
 		Common::String colorPath;
+		/** Logical path of the alpha bitmap paired with the color bitmap. */
 		Common::String alphaPath;
+		/** Composed color/alpha bitmap released when the page cache clears, or nullptr after a failed load. */
 		BitBlock *bitmap;
 	};
 	typedef Common::HashMap<Common::String, RleBlock *, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> RleBlockCache;
@@ -403,11 +497,35 @@ private:
 
 	/** Reuse a decoded resource or a cached failed load. */
 	RleBlock *loadRleBlock(RleBlockCache &cache, const Common::String &key);
+	/** Reuse a decoded bitmap or a failed-load entry from the selected cache. */
 	BitBlock *loadBitBlock(BitBlockCache &cache, const Common::String &key);
+	/** Load or reuse a page bitmap composed from the specified color and alpha resources. */
 	BitBlock *loadMaskedBitBlock(const Common::String &colorKey, const Common::String &alphaKey);
+	/** Release every cached Zoombini grid after page and runner teardown. */
+	void clearZoombiniAnimationCache();
 	/** Release every value in one path-indexed cache. */
 	static void clearRleBlockCache(RleBlockCache &cache);
+	/** Delete every bitmap retained in the selected path cache and clear its entries. */
 	static void clearBitBlockCache(BitBlockCache &cache);
+
+	/** Shared normal-size Zoombini sprite grid. */
+	static constexpr const char *kBasicZoombiniAnimationPath = "bmp/zombis/littleZomb.anm";
+	/** Shared Zoombini celebration sprite grid. */
+	static constexpr const char *kCelebrationZoombiniAnimationPath = "bmp/zombis/attente/attenteZomb.anm";
+	/** Shared falling Zoombini sprite grid. */
+	static constexpr const char *kFallingZoombiniAnimationPath = "bmp/zombis/tombe/tombe.anm";
+	/** Shared Zoombini sprite grid for entering a cascade. */
+	static constexpr const char *kSuctionZoombiniAnimationPath = "bmp/zombis/aspiration/aspiration.anm";
+	/** Shared floating Zoombini sprite grid. */
+	static constexpr const char *kFloatingZoombiniAnimationPath = "bmp/zombis/flotte/flotte.anm";
+	/** Shared jumping Zoombini sprite grid. */
+	static constexpr const char *kJumpingZoombiniAnimationPath = "bmp/zombis/saut/saut.anm";
+	/** Shared Zoombini pick-up animation. */
+	static constexpr const char *kPickupZoombiniAnimationPath = "bmp/zombis/pris/pris.anm";
+	/** Shared alternate idle Zoombini sprite grid used by the rescue shelters. */
+	static constexpr const char *kFidgetZoombiniAnimationPath = "bmp/zombis/attente2/attenteZomb2.anm";
+	/** Tiny Zoombini sprite grid used for MapTrans page transitions. */
+	static constexpr const char *kMapTransTinyZoombiniAnimationPath = "bmp/transition1/PitiZomb3.anm";
 
 	/** Name plate sprite shown while dragging a Zoombini. */
 	static constexpr const char *kNameBoxSpritePath = "bmp/menu/name_box.rb";
@@ -419,13 +537,21 @@ private:
 	RleBlock *_dropTargetGlowSprite = nullptr;
 	/** Active page background borrowed from the page bitmap cache. */
 	BitBlock *_background = nullptr;
-	/** Decoded bitmaps borrowed by the current page and its transient controls. */
+	/** RLE sprites released when the page cache is cleared. */
 	RleBlockCache _pageRleBlocks;
+	/** Uncompressed bitmaps released when the page cache is cleared. */
 	BitBlockCache _pageBitBlocks;
+	/** Color-and-alpha bitmap pairs released when the page cache is cleared. */
 	Common::Array<MaskedBitBlockEntry> _pageMaskedBitBlocks;
-	/** Decoded bitmaps borrowed by UI and cursors that survive page changes. */
+	/** RLE sprites retained across page changes and released with the graphics interface. */
 	RleBlockCache _sharedRleBlocks;
+	/** Uncompressed bitmaps retained across page changes and released with the graphics interface. */
 	BitBlockCache _sharedBitBlocks;
+	/** Decoded sprite grids retained until the graphics interface is destroyed. */
+	ZoombiniAnimationCache _zoombiniAnimationCache;
+	/** Common grids borrowed from the path cache after engine startup initialization. */
+	CommonZoombiniAnimationMap _commonZoombiniAnimations;
+
 	/** Fixed drawing surface presented by the engine. */
 	ManagedSurface32 *_screen = nullptr;
 	/** Page layer collection released with the graphics interface. */
@@ -436,18 +562,14 @@ private:
 };
 
 /**
- * Screen surface with 32-bit coordinates.
+ * Managed surface adapter with 32-bit coordinate helpers.
  *
- * @remarks The game renders into a fixed 800x600 surface, while original
- * resource coordinates use 32-bit values. This adapter accepts Point32 and
- * Rect32 without exposing the ScummVM base surface to Z2 callers.
+ * Accepts Point32 and Rect32 while retaining the dimensions and pixel format
+ * supplied by the caller.
  */
 class ManagedSurface32 : public Graphics::ManagedSurface {
 public:
-	/** Dimensions of the fixed internal game screen. */
-	static constexpr Size32 kScreenSize = Size32(800, 600);
-
-	/** Create a screen surface with the supplied dimensions and pixel format. */
+	/** Create a surface with the supplied dimensions and pixel format. */
 	ManagedSurface32(const Size32 &size, const Graphics::PixelFormat &pixelFormat)
 		: Graphics::ManagedSurface(size.width, size.height, pixelFormat) {}
 
@@ -510,6 +632,10 @@ public:
 	 * @param value Source or destSurface color-channel value.
 	 */
 	byte scale(byte factor, byte value) const { return _values[factor][value]; }
+	/** Scale each RGB channel by @p factor using the /256 lookup table. */
+	RGBColor scale(byte factor, const RGBColor &color) const {
+		return RGBColor(scale(factor, color.r), scale(factor, color.g), scale(factor, color.b));
+	}
 	/** Scale source and destination channels separately, then add with saturation at 255. */
 	RGBColor blend(const RGBColor &srcColor, const RGBColor &destColor, byte sourceFactor, byte destFactor) const;
 
@@ -569,6 +695,9 @@ public:
 	 */
 	bool load(const Common::Path &basePath);
 
+	/** Record cache use of the actual bitmap and optional alpha-mask source files. */
+	void recordPageCacheUse() const;
+
 	/** Allocate a zeroed bitmap and optionally a fully transparent alpha mask. */
 	void createEmpty(const Size32 &size, bool withAlpha);
 
@@ -616,6 +745,10 @@ private:
 	byte *_pixels = nullptr;
 	/** Optional one-byte-per-pixel alpha storage held by this bitmap, or nullptr. */
 	byte *_alphaMap = nullptr;
+	/** Resolved source files retained with the decoded bitmap for later cache requests. */
+	Common::Path _resourcePath;
+	/** Resolved optional alpha-mask source retained for later cache requests. */
+	Common::Path _alphaResourcePath;
 
 	/** Clip and convert a bitmap region, optionally treating the full bitmap's top-left color as transparent. */
 	void drawToSurfaceInternal(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &srcRect, bool useColorKey) const;
@@ -693,6 +826,8 @@ public:
 	bool loadFromFile(const Common::Path &path);
 	/** Resolve @p basePath to an RB cache path and load it. */
 	bool load(const Common::Path &basePath);
+	/** Record cache use of the resolved standalone sprite file. */
+	void recordPageCacheUse() const;
 	/** Load the recoverable prefix of an ANM frame with a trusted size boundary. */
 	bool loadAnimationFrame(Common::SeekableReadStream *stream, uint32 outerSize);
 
@@ -757,8 +892,11 @@ private:
 	};
 	/** Target color and source adjustment used while drawing a recolored frame. */
 	struct RecolorSettings {
+		/** Replacement color applied to matching source pixels. */
 		RGBColor targetColor;
+		/** Nonzero source intensity divisor used when scaling to the replacement color. */
 		byte sourceBrightness;
+		/** Whether recoloring retains source brightness and saturation variation. */
 		bool preserveGradient;
 	};
 
@@ -774,6 +912,8 @@ private:
 	uint32 _pixelCount = 0;
 	/** Whether a structurally bounded frame prefix has been loaded. */
 	bool _loaded = false;
+	/** Resolved standalone RB path; embedded animation frames have no separate file. */
+	Common::Path _resourcePath;
 
 	/** Decode the structurally bounded span prefix into metadata and aligned pixels, reporting whether a malformed tail was discarded. */
 	static bool decodeSpans(const byte *srcData, uint32 srcSize, Common::Array<Span> &spans, uint32 *&pixels, uint32 &pixelCount, bool &salvaged);
@@ -868,8 +1008,11 @@ public:
 	bool hasMarkedByteAt(const Common::Point32 &point) const;
 
 private:
+	/** Borrowed engine used to resolve the mask resource. */
 	Zoombini2Engine *_vm;
+	/** Decoded mask width and height in pixels. */
 	Size32 _size = Size32();
+	/** Decoded palette index for each mask pixel in row-major order; zero is unmarked. */
 	Common::Array<byte> _pixels;
 
 	/** Decode an uncompressed 1-bit BMP into palette indices, or return false. */
@@ -898,7 +1041,7 @@ private:
  * The outer size precedes the embedded @ref RleBlock header and must match the
  * payload size stored in that header.
  * This differs from `.an`, where the duplicate size follows the RLE header.
- * The file does not store playback timing; @ref ZoombiniAnimation::setFrameDelay supplies one page-configured delay for the loaded grid.
+ * The file does not store playback timing; @ref ZoombiniAnimation::setFrameDelay supplies the delay shared by users of the loaded grid.
  */
 class ZoombiniAnimation : public Common::NonCopyable {
 public:
@@ -918,9 +1061,11 @@ public:
 
 	/** Load every recoverable grid entry from @p path. */
 	bool loadFromFile(const Common::Path &path);
-	/** Set the page-configured delay shared by every Zoombini using this grid. */
+	/** Record that the active page reused this grid's ANM resource. */
+	void recordPageCacheUse() const;
+	/** Set the frame delay shared by every Zoombini using this grid. */
 	void setFrameDelay(uint32 frameDelay) { _frameDelay = frameDelay; }
-	/** Return the page-configured delay shared by every Zoombini using this grid. */
+	/** Return the frame delay shared by every Zoombini using this grid. */
 	uint32 getFrameDelay() const { return _frameDelay; }
 	/** Return a borrowed frame, or nullptr when either index is invalid. */
 	const RleBlock *getFrame(int cellIndex, int frameIndex) const;
@@ -937,7 +1082,9 @@ public:
 private:
 	/** Borrowed vm used to open the ANM resource and construct its frames. */
 	Zoombini2Engine *_vm;
-	/** Page-configured delay retained beside the shared sprite grid. */
+	/** Logical ANM path retained for page resource-use tracking. */
+	Common::Path _resourcePath;
+	/** Caller-configured frame delay retained beside the shared sprite grid. */
 	uint32 _frameDelay = 0;
 	/** Represents the frames assigned to one sprite-grid entry. */
 	struct Cell {
@@ -1060,7 +1207,7 @@ private:
 enum MenuButtonId {
 	kMenuButtonNext = 0,     ///< Scroll toward the preceding visible savefile rows.
 	kMenuButtonPrev = 1,     ///< Scroll toward the following visible savefile rows.
-	kMenuButtonStart = 2,    ///< Start the selected saved adventure.
+	kMenuButtonStart = 2,    ///< Start the selected saved game.
 	kMenuButtonOptions = 3,  ///< Open the volume panel.
 	kMenuButtonNew = 4,      ///< Begin entry of a new savefile name.
 	kMenuButtonPractice = 5, ///< Open the practice map.
@@ -1134,7 +1281,9 @@ public:
 	 * @return True when the release's expected glyph count was extracted.
 	 */
 	bool load(const Common::Path &basePath);
+	/** Return the loaded glyph height in pixels, or zero while unloaded. */
 	int getFontHeight() const override;
+	/** Return the largest glyph advance in pixels, or zero while unloaded. */
 	int getMaxCharWidth() const override;
 	/** Return the glyph advance, including spacing, or zero for an unsupported byte or an unloaded font. */
 	int getCharWidth(uint32 character) const override;
@@ -1228,7 +1377,10 @@ private:
 	void drawGlyph(Graphics::Surface *destSurface, const Glyph &glyph, const Common::Point32 &pos, const RGBColor &color, const AlphaBlendLUT &alphaLUT) const;
 };
 
-/** Result of one @ref VolumePanel input-and-draw pass. */
+/**
+ * Semantic outcome of one @ref VolumePanel input pass.
+ * These results are independent of panel button selectors and slider drag codes.
+ */
 enum VolumePanelResult {
 	kVolumePanelOpen,    ///< The panel remains open without a new volume change.
 	kVolumePanelChanged, ///< At least one preview volume changed during this pass.
@@ -1313,26 +1465,67 @@ public:
 	static int volumeToPixel(int volume);
 
 private:
-	/** Resource paths for panel artwork and audio previews. */
+	/**
+	 * Slider captured by a drag or awaiting an audio preview.
+	 *
+	 * Original drag codes and panel button selectors share numbers but have separate meanings:
+	 * - 0 means no slider here, but Apply in the panel button selector.
+	 * - 1 is not a valid slider code; it means Cancel in the panel button selector.
+	 * - 2/3/4 identify music/SFX/speech in both contexts.
+	 *
+	 * Apply and Cancel are returned as @ref VolumePanelResult, never stored as @ref VolumePanel::SliderKind.
+	 */
+	enum SliderKind {
+		kSlider_None00 = 0,   ///< No captured slider or pending audio preview.
+		kSlider_Music02 = 2,  ///< Music volume.
+		kSlider_Sfx03 = 3,    ///< Sound-effect volume.
+		kSlider_Speech04 = 4, ///< Speech volume.
+	};
+
+	/** Convert a 0-2 music/SFX/speech label index to its 2-4 slider code. */
+	static SliderKind getSliderKind(int labelIndex);
+	/** Return the label for a music, sound-effect, or speech slider. */
+	UIButton &getSliderLabel(SliderKind sliderKind);
+
+	/** Gauge sprite shared by the three volume sliders. */
 	static constexpr const char *kGaugeImagePath = "bmp/menu/OPTION - Jauge.rb";
+	/** Color artwork for the Apply button in its normal state. */
 	static constexpr const char *kOkNormalPath = "bmp/menu/MENU - Valid - OK";
+	/** Alpha mask for the Apply button in its normal state. */
 	static constexpr const char *kOkNormalMaskPath = "bmp/menu/MENUValidOK-a";
+	/** Color artwork for the highlighted Apply button. */
 	static constexpr const char *kOkHighlightPath = "bmp/menu/MENU - Valid - OK highlight";
+	/** Alpha mask for the highlighted Apply button. */
 	static constexpr const char *kOkHighlightMaskPath = "bmp/menu/OKHighlight-a";
+	/** Color artwork for the Cancel button in its normal state. */
 	static constexpr const char *kNoNormalPath = "bmp/menu/MENU - Valid - NO";
+	/** Alpha mask for the Cancel button in its normal state. */
 	static constexpr const char *kNoNormalMaskPath = "bmp/menu/MENUValidNO-a";
+	/** Color artwork for the highlighted Cancel button. */
 	static constexpr const char *kNoHighlightPath = "bmp/menu/MENU - Valid - NO highlight";
+	/** Alpha mask for the highlighted Cancel button. */
 	static constexpr const char *kNoHighlightMaskPath = "bmp/menu/NOHighlight-a";
+	/** Color artwork for the music label in its normal state. */
 	static constexpr const char *kMusicNormalPath = "bmp/menu/OPTION - Musique NORMAL";
+	/** Color artwork for the highlighted music label. */
 	static constexpr const char *kMusicHighlightPath = "bmp/menu/OPTION - Musique HIGHLIGHT";
+	/** Alpha mask shared by the music label's states. */
 	static constexpr const char *kMusicMaskPath = "bmp/menu/OPTIONMusique-a";
+	/** Color artwork for the sound-effect label in its normal state. */
 	static constexpr const char *kSfxNormalPath = "bmp/menu/OPTION - Bruitages NORMAL";
+	/** Color artwork for the highlighted sound-effect label. */
 	static constexpr const char *kSfxHighlightPath = "bmp/menu/OPTION - Bruitages HILITE";
+	/** Alpha mask shared by the sound-effect label's states. */
 	static constexpr const char *kSfxMaskPath = "bmp/menu/OPTION_Bruitages-a";
+	/** Color artwork for the speech label in its normal state. */
 	static constexpr const char *kSpeechNormalPath = "bmp/menu/OPTION - Dialogues NORMAL";
+	/** Color artwork for the highlighted speech label. */
 	static constexpr const char *kSpeechHighlightPath = "bmp/menu/OPTION - Dialogues HILITE";
+	/** Alpha mask shared by the speech label's states. */
 	static constexpr const char *kSpeechMaskPath = "bmp/menu/OPTIONDialogues-a";
+	/** Sample played to preview the speech volume. */
 	static constexpr const char *kSpeechPreviewSoundPath = "sounds/voice.wav";
+	/** Sample played to preview the sound-effect volume. */
 	static constexpr const char *kSfxPreviewSoundPath = "sounds/fx/03-BS01.wav";
 
 	/** Borrowed vm used by the panel's gauge and button resources. */
@@ -1346,14 +1539,14 @@ private:
 	int _sfxSliderX = kSliderMaxX;
 	/** Current speech gauge endpoint. */
 	int _speechSliderX = kSliderMaxX;
-	/** Dragged slider index, or -1 when no slider is captured. */
-	int _activeSlider = -1;
+	/** Slider captured by the current drag, or @ref VolumePanel::kSlider_None00 when no drag is active. */
+	SliderKind _activeSlider = kSlider_None00;
 	/** Most recent mouse pos observed while the primary button was held. */
 	Common::Point32 _heldMousePos = Common::Point32();
 	/** Whether held-mouse coordinates are available for the next release. */
 	bool _hasHeldMouse = false;
-	/** Most recently released slider awaiting category-specific audio preview. */
-	int _lastAdjustedSlider = -1;
+	/** Released slider awaiting audio preview, or @ref VolumePanel::kSlider_None00 when no preview is pending. */
+	SliderKind _lastAdjustedSlider = kSlider_None00;
 	/** Borrowed sound manager that retains the panel's logical preview records. */
 	SoundManager *_soundManager = nullptr;
 	/** Speech preview sound identifier retained by the panel. */
@@ -1363,7 +1556,7 @@ private:
 
 	/** Gauge sprite held by this panel and shared by the three slider rows. */
 	RleBlock *_gaugeImage = nullptr;
-	/** Music, sound-effect, and speech label buttons. */
+	/** Music/SFX/speech label buttons indexed 0/1/2, independently of the slider codes. */
 	UIButton _sliderLabels[3];
 	/** Apply button. */
 	UIButton _okButton;

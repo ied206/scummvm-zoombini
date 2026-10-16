@@ -36,7 +36,7 @@ constexpr const char *TransitionCredits::kDemoMusicPath;
 
 TransitionCredits::TransitionCredits(Zoombini2Engine *vm)
 	: TransitionBase(vm) {
-	_pageId = kPageCredits;
+	_pageId = PageId::kPageCredits_16;
 }
 
 void TransitionCredits::init() {
@@ -50,8 +50,8 @@ void TransitionCredits::init() {
 	}
 
 	_maxScrollY = 0;
-	if (ManagedSurface32::kScreenSize.height < backgroundSize.height)
-		_maxScrollY = backgroundSize.height - ManagedSurface32::kScreenSize.height;
+	if (Gfx::kScreenSize.height < backgroundSize.height)
+		_maxScrollY = backgroundSize.height - Gfx::kScreenSize.height;
 
 	_scrollY = 0.0f;
 	_scrollActive = true;
@@ -76,7 +76,7 @@ void TransitionCredits::onUpdate() {
 
 	if (_scrollActive) {
 		if (_initialWait) {
-			if (now > _endTime)
+			if (_endTime < now)
 				_initialWait = false;
 		} else {
 			_redrawNeeded = true;
@@ -91,7 +91,7 @@ void TransitionCredits::onUpdate() {
 
 		_lastUpdateTime = now;
 	} else {
-		if (now > _endTime)
+		if (_endTime < now)
 			_finished = true;
 	}
 
@@ -110,7 +110,7 @@ void TransitionCredits::onRenderContent(ManagedSurface32 *screen) {
 		return;
 
 	const int y = static_cast<int>(_scrollY);
-	int srcBottom = y + ManagedSurface32::kScreenSize.height;
+	int srcBottom = y + Gfx::kScreenSize.height;
 	if (backgroundSize.height < srcBottom)
 		srcBottom = backgroundSize.height;
 

@@ -40,8 +40,17 @@
 
 namespace Zoombini2 {
 
+constexpr Size32 Gfx::kScreenSize;
 constexpr int Gfx::kNoMaxWidth;
-constexpr Size32 ManagedSurface32::kScreenSize;
+constexpr const char *Gfx::kBasicZoombiniAnimationPath;
+constexpr const char *Gfx::kCelebrationZoombiniAnimationPath;
+constexpr const char *Gfx::kFallingZoombiniAnimationPath;
+constexpr const char *Gfx::kSuctionZoombiniAnimationPath;
+constexpr const char *Gfx::kFloatingZoombiniAnimationPath;
+constexpr const char *Gfx::kJumpingZoombiniAnimationPath;
+constexpr const char *Gfx::kPickupZoombiniAnimationPath;
+constexpr const char *Gfx::kFidgetZoombiniAnimationPath;
+constexpr const char *Gfx::kMapTransTinyZoombiniAnimationPath;
 constexpr Graphics::PixelFormat RleBlock::kSourceFormat;
 constexpr Size32 VolumePanel::kLabelSize;
 constexpr const char *VolumePanel::kGaugeImagePath;
@@ -64,6 +73,15 @@ constexpr const char *VolumePanel::kSpeechHighlightPath;
 constexpr const char *VolumePanel::kSpeechMaskPath;
 constexpr const char *VolumePanel::kSpeechPreviewSoundPath;
 constexpr const char *VolumePanel::kSfxPreviewSoundPath;
+
+constexpr const char *Gfx::kNameBoxSpritePath;
+constexpr RGBColor Gfx::PredefinedColor::kBlack;
+constexpr RGBColor Gfx::PredefinedColor::kDark00;
+constexpr RGBColor Gfx::PredefinedColor::kBlue01;
+constexpr RGBColor Gfx::PredefinedColor::kGreen02;
+constexpr RGBColor Gfx::PredefinedColor::kWhite03;
+constexpr RGBColor Gfx::PredefinedColor::kRed04;
+constexpr const char *Gfx::kDropTargetGlowPath;
 
 void ManagedSurface32::fillRect(const Common::Rect32 &rect, uint32 color) {
 	if (!rect.isValidRect())
@@ -156,7 +174,8 @@ RGBColor AlphaBlendLUT::blend(const RGBColor &srcColor, const RGBColor &destColo
 		static_cast<byte>(MIN<int>(scale(sourceFactor, srcColor.b) + scale(destFactor, destColor.b), 255)));
 }
 
-BitBlock::BitBlock(Zoombini2Engine *vm) : _vm(vm) {
+BitBlock::BitBlock(Zoombini2Engine *vm)
+	: _vm(vm) {
 }
 
 BitBlock::~BitBlock() {
@@ -190,6 +209,8 @@ bool BitBlock::loadFromColorAlphaBMP(const Common::Path &colorPath, const Common
 		return false;
 	}
 
+	loaded._resourcePath = colorPath;
+	loaded._alphaResourcePath = alphaPath;
 	swapData(loaded);
 
 	return true;
@@ -206,6 +227,7 @@ bool BitBlock::loadFromColorBMP(const Common::Path &colorPath) {
 	if (!loaded.loadColorBMP(&colorFile))
 		return false;
 
+	loaded._resourcePath = colorPath;
 	swapData(loaded);
 	return true;
 }
@@ -297,6 +319,8 @@ bool BitBlock::loadBBStream(Common::SeekableReadStream &f, const Common::Path &b
 	_size = size;
 	_pixels = pixels;
 	_alphaMap = nullptr;
+	_resourcePath = bbPath;
+	_alphaResourcePath.clear();
 
 	return true;
 }
@@ -325,12 +349,20 @@ bool BitBlock::load(const Common::Path &basePath) {
 	return loadFromColorBMP(srcPath);
 }
 
+void BitBlock::recordPageCacheUse() const {
+	_vm->recordPageResourceCacheUse(_resourcePath.toString('/'), Zoombini2Engine::PageResourceType::kBitmap);
+	if (!_alphaResourcePath.empty())
+		_vm->recordPageResourceCacheUse(_alphaResourcePath.toString('/'), Zoombini2Engine::PageResourceType::kBitmap);
+}
+
 void BitBlock::createEmpty(const Size32 &size, bool withAlpha) {
 	delete[] _pixels;
 	delete[] _alphaMap;
 	_size = size;
 	_pixels = new byte[size.width * size.height * 4]();
 	_alphaMap = withAlpha ? new byte[size.width * size.height]() : nullptr;
+	_resourcePath.clear();
+	_alphaResourcePath.clear();
 }
 
 bool BitBlock::loadColorBMP(Common::SeekableReadStream *stream) {
@@ -397,6 +429,8 @@ void BitBlock::swapData(BitBlock &other) {
 	SWAP(_size, other._size);
 	SWAP(_pixels, other._pixels);
 	SWAP(_alphaMap, other._alphaMap);
+	SWAP(_resourcePath, other._resourcePath);
+	SWAP(_alphaResourcePath, other._alphaResourcePath);
 }
 
 byte BitBlock::blendChannel(byte src, byte dest, byte mask) {
@@ -543,7 +577,8 @@ void BitBlock::drawRleMaskBlend(ManagedSurface32 *dst, const Common::Point32 &po
 	}
 }
 
-RleBlock::RleBlock(Zoombini2Engine *vm) : _vm(vm) {
+RleBlock::RleBlock(Zoombini2Engine *vm)
+	: _vm(vm) {
 }
 
 RleBlock::~RleBlock() {
@@ -556,6 +591,7 @@ void RleBlock::swapData(RleBlock &other) {
 	SWAP(_pixels, other._pixels);
 	SWAP(_pixelCount, other._pixelCount);
 	SWAP(_loaded, other._loaded);
+	SWAP(_resourcePath, other._resourcePath);
 }
 
 /**
@@ -615,6 +651,7 @@ bool RleBlock::loadFromStream(Common::SeekableReadStream *stream) {
 	_pixels = pixels;
 	_pixelCount = pixelCount;
 	_loaded = true;
+	_resourcePath.clear();
 
 	return true;
 }
@@ -639,12 +676,17 @@ bool RleBlock::loadFromFile(const Common::Path &path) {
 		return false;
 	if (f.pos() != f.size())
 		warning("RleBlock: ignoring %" PRIu64 " trailing bytes in '%s'", f.size() - f.pos(), resolvedPath.toString().c_str());
+	loaded._resourcePath = resolvedPath;
 	swapData(loaded);
 	return true;
 }
 
 bool RleBlock::load(const Common::Path &basePath) {
 	return loadFromFile(basePath);
+}
+
+void RleBlock::recordPageCacheUse() const {
+	_vm->recordPageResourceCacheUse(_resourcePath.toString('/'), Zoombini2Engine::PageResourceType::kSprite);
 }
 
 bool RleBlock::loadAnimationFrame(Common::SeekableReadStream *stream, uint32 outerSize) {
@@ -695,6 +737,7 @@ bool RleBlock::loadAnimationFrame(Common::SeekableReadStream *stream, uint32 out
 	_pixels = pixels;
 	_pixelCount = pixelCount;
 	_loaded = true;
+	_resourcePath.clear();
 	return true;
 }
 
@@ -991,10 +1034,7 @@ void RleBlock::drawToScreenInternal(ManagedSurface32 *destSurface, const Common:
 						RGBColor adjustedColor;
 						if (recolorPixel(srcPixel, true, recolor->targetColor, recolor->sourceBrightness, recolor->preserveGradient, adjustedColor)) {
 							const byte alpha = 255 - invAlpha;
-							sourceColor = RGBColor(
-								alphaLUT.scale(alpha, adjustedColor.r),
-								alphaLUT.scale(alpha, adjustedColor.g),
-								alphaLUT.scale(alpha, adjustedColor.b));
+							sourceColor = alphaLUT.scale(alpha, adjustedColor);
 						}
 					}
 					const RGBColor destColor = RGBColor::fromPixel(READ_UINT32(dstPixel), destSurface->format);
@@ -1012,19 +1052,11 @@ void RleBlock::drawToScreenInternal(ManagedSurface32 *destSurface, const Common:
 	}
 }
 
-constexpr const char *Gfx::kNameBoxSpritePath;
-constexpr RGBColor Gfx::PredefinedColor::kBlack;
-constexpr RGBColor Gfx::PredefinedColor::kDark00;
-constexpr RGBColor Gfx::PredefinedColor::kBlue01;
-constexpr RGBColor Gfx::PredefinedColor::kGreen02;
-constexpr RGBColor Gfx::PredefinedColor::kWhite03;
-constexpr RGBColor Gfx::PredefinedColor::kRed04;
-constexpr const char *Gfx::kDropTargetGlowPath;
-
-Gfx::Gfx(Zoombini2Engine *vm) : _vm(vm) {
+Gfx::Gfx(Zoombini2Engine *vm)
+	: _vm(vm) {
 	static constexpr Graphics::PixelFormat bgra32 = Graphics::PixelFormat::createFormatBGRA32();
-	initGraphics(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height, &bgra32);
-	_screen = new ManagedSurface32(ManagedSurface32::kScreenSize, bgra32);
+	initGraphics(Gfx::kScreenSize.width, Gfx::kScreenSize.height, &bgra32);
+	_screen = new ManagedSurface32(Gfx::kScreenSize, bgra32);
 	_pageLayerStack = new PageLayerStack(vm);
 	_dropTargetGlowSprite = loadSharedRleBlock(kDropTargetGlowPath);
 	if (!_dropTargetGlowSprite)
@@ -1033,10 +1065,79 @@ Gfx::Gfx(Zoombini2Engine *vm) : _vm(vm) {
 
 Gfx::~Gfx() {
 	delete _pageLayerStack;
+	clearZoombiniAnimationCache();
 	clearPageBitmapCache();
 	clearRleBlockCache(_sharedRleBlocks);
 	clearBitBlockCache(_sharedBitBlocks);
 	delete _screen;
+}
+
+const ZoombiniAnimation *Gfx::loadZoombiniAnimation(const Common::Path &path, uint32 frameDelay) {
+	const Common::Path key = Zoombini2Engine::normalizeResourcePath(path.toString('/'));
+	ZoombiniAnimationCache::const_iterator cached = _zoombiniAnimationCache.find(key);
+	if (cached != _zoombiniAnimationCache.end()) {
+		cached->_value->setFrameDelay(frameDelay);
+		_vm->recordPageResourceCacheUse(key.toString('/'), Zoombini2Engine::PageResourceType::kZoombiniAnimation);
+		return cached->_value;
+	}
+
+	ZoombiniAnimation *animation = new ZoombiniAnimation(_vm);
+	if (!animation->loadFromFile(key)) {
+		delete animation;
+		return nullptr;
+	}
+	animation->setFrameDelay(frameDelay);
+	_zoombiniAnimationCache[key] = animation;
+	_vm->recordPageResourceCacheUse(key.toString('/'), Zoombini2Engine::PageResourceType::kZoombiniAnimation);
+	return animation;
+}
+
+void Gfx::loadCommonZoombiniAnimations() {
+	if (!_commonZoombiniAnimations.empty())
+		return;
+
+	/** Resource and shared playback timing for one common Zoombini grid. */
+	struct CommonAnimationDefinition {
+		/** Common-grid identity used by pages and runners. */
+		ZmbAnimationKind animKind;
+		/** Logical ANM path resolved during engine startup. */
+		const char *path;
+		/** Shared frame duration in milliseconds. */
+		uint32 frameDelay;
+	};
+	static constexpr CommonAnimationDefinition kDefinitions[] = {
+		{ZmbAnimationKind::kBasic, kBasicZoombiniAnimationPath, 50},
+		{ZmbAnimationKind::kCelebration, kCelebrationZoombiniAnimationPath, 50},
+		{ZmbAnimationKind::kFalling, kFallingZoombiniAnimationPath, 70},
+		{ZmbAnimationKind::kSuction, kSuctionZoombiniAnimationPath, 50},
+		{ZmbAnimationKind::kFloating, kFloatingZoombiniAnimationPath, 190},
+		{ZmbAnimationKind::kJumping, kJumpingZoombiniAnimationPath, 70},
+		{ZmbAnimationKind::kPickup, kPickupZoombiniAnimationPath, 100},
+		{ZmbAnimationKind::kFidget, kFidgetZoombiniAnimationPath, 50},
+		{ZmbAnimationKind::kMapTransTiny, kMapTransTinyZoombiniAnimationPath, 50},
+	};
+	for (int i = 0; i < ARRAYSIZE(kDefinitions); i++) {
+		const CommonAnimationDefinition &def = kDefinitions[i];
+		const ZoombiniAnimation *animation = loadZoombiniAnimation(Common::Path(def.path), def.frameDelay);
+		_commonZoombiniAnimations[def.animKind] = animation;
+		if (!animation)
+			warning("Gfx: Failed to load common Zoombini animation '%s'", def.path);
+	}
+}
+
+const ZoombiniAnimation *Gfx::getCommonZoombiniAnimation(ZmbAnimationKind animKind) const {
+	CommonZoombiniAnimationMap::const_iterator entry = _commonZoombiniAnimations.find(animKind);
+	if (entry == _commonZoombiniAnimations.end() || !entry->_value)
+		return nullptr;
+	entry->_value->recordPageCacheUse();
+	return entry->_value;
+}
+
+void Gfx::clearZoombiniAnimationCache() {
+	for (ZoombiniAnimationCache::iterator entry = _zoombiniAnimationCache.begin(); entry != _zoombiniAnimationCache.end(); entry++)
+		delete entry->_value;
+	_zoombiniAnimationCache.clear();
+	_commonZoombiniAnimations.clear();
 }
 
 void Gfx::clearPageLayers() {
@@ -1046,8 +1147,11 @@ void Gfx::clearPageLayers() {
 
 RleBlock *Gfx::loadRleBlock(RleBlockCache &cache, const Common::String &key) {
 	RleBlockCache::const_iterator cached = cache.find(key);
-	if (cached != cache.end())
+	if (cached != cache.end()) {
+		if (cached->_value)
+			cached->_value->recordPageCacheUse();
 		return cached->_value;
+	}
 
 	RleBlock *sprite = new RleBlock(_vm);
 	const bool loaded = sprite->loadFromFile(Common::Path(key));
@@ -1056,13 +1160,18 @@ RleBlock *Gfx::loadRleBlock(RleBlockCache &cache, const Common::String &key) {
 		sprite = nullptr;
 	}
 	cache[key] = sprite;
+	if (sprite)
+		sprite->recordPageCacheUse();
 	return sprite;
 }
 
 BitBlock *Gfx::loadBitBlock(BitBlockCache &cache, const Common::String &key) {
 	BitBlockCache::const_iterator cached = cache.find(key);
-	if (cached != cache.end())
+	if (cached != cache.end()) {
+		if (cached->_value)
+			cached->_value->recordPageCacheUse();
 		return cached->_value;
+	}
 
 	BitBlock *bitmap = new BitBlock(_vm);
 	const bool loaded = bitmap->load(Common::Path(key));
@@ -1071,14 +1180,18 @@ BitBlock *Gfx::loadBitBlock(BitBlockCache &cache, const Common::String &key) {
 		bitmap = nullptr;
 	}
 	cache[key] = bitmap;
+	if (bitmap)
+		bitmap->recordPageCacheUse();
 	return bitmap;
 }
 
 BitBlock *Gfx::loadMaskedBitBlock(const Common::String &colorKey, const Common::String &alphaKey) {
-	for (uint index = 0; index < _pageMaskedBitBlocks.size(); index++) {
-		const MaskedBitBlockEntry &entry = _pageMaskedBitBlocks[index];
-		if (entry.colorPath.equalsIgnoreCase(colorKey) && entry.alphaPath.equalsIgnoreCase(alphaKey))
+	for (uint i = 0; i < _pageMaskedBitBlocks.size(); i++) {
+		const MaskedBitBlockEntry &entry = _pageMaskedBitBlocks[i];
+		if (entry.colorPath.equalsIgnoreCase(colorKey) && entry.alphaPath.equalsIgnoreCase(alphaKey)) {
+			entry.bitmap->recordPageCacheUse();
 			return entry.bitmap;
+		}
 	}
 
 	const Common::Path colorFilePath(colorKey);
@@ -1090,6 +1203,7 @@ BitBlock *Gfx::loadMaskedBitBlock(const Common::String &colorKey, const Common::
 	}
 	const MaskedBitBlockEntry entry = {colorKey, alphaKey, bitmap};
 	_pageMaskedBitBlocks.push_back(entry);
+	bitmap->recordPageCacheUse();
 	return bitmap;
 }
 
@@ -1109,8 +1223,8 @@ void Gfx::clearPageBitmapCache() {
 	_background = nullptr;
 	clearRleBlockCache(_pageRleBlocks);
 	clearBitBlockCache(_pageBitBlocks);
-	for (uint index = 0; index < _pageMaskedBitBlocks.size(); index++)
-		delete _pageMaskedBitBlocks[index].bitmap;
+	for (uint i = 0; i < _pageMaskedBitBlocks.size(); i++)
+		delete _pageMaskedBitBlocks[i].bitmap;
 	_pageMaskedBitBlocks.clear();
 }
 
@@ -1570,7 +1684,8 @@ void Gfx::wordWrapText(const Common::U32String &text, int maxWidth, Common::Arra
 // Animation
 // ============================================================================
 
-Animation::Animation(Zoombini2Engine *vm) : _vm(vm) {
+Animation::Animation(Zoombini2Engine *vm)
+	: _vm(vm) {
 }
 
 Animation::~Animation() {
@@ -1643,7 +1758,8 @@ const RleBlock *Animation::getFrame(int index) const {
 // AreaMask
 // ============================================================================
 
-AreaMask::AreaMask(Zoombini2Engine *vm) : _vm(vm) {
+AreaMask::AreaMask(Zoombini2Engine *vm)
+	: _vm(vm) {
 }
 
 bool AreaMask::loadOneBitBitmap(Common::SeekableReadStream &stream, const Common::Path &path) {
@@ -1677,7 +1793,7 @@ bool AreaMask::loadOneBitBitmap(Common::SeekableReadStream &stream, const Common
 	if (0xFFFFFFFFU < pixelCount)
 		return false;
 	const uint32 stride = (static_cast<uint32>(width) + 31) / 32 * 4;
-	if (static_cast<uint64>(pixelOffset) + static_cast<uint64>(stride) * static_cast<uint64>(height) > static_cast<uint64>(stream.size())) {
+	if (stream.size() < pixelOffset + static_cast<int64>(stride) * height) {
 		warning("AreaMask: truncated 1-bit bitmap '%s'", path.toString().c_str());
 		stream.seek(0);
 		return false;
@@ -1776,7 +1892,8 @@ ZoombiniAnimation::Cell::~Cell() {
 		delete frames[i];
 }
 
-ZoombiniAnimation::ZoombiniAnimation(Zoombini2Engine *vm) : _vm(vm) {
+ZoombiniAnimation::ZoombiniAnimation(Zoombini2Engine *vm)
+	: _vm(vm) {
 }
 
 ZoombiniAnimation::~ZoombiniAnimation() {
@@ -1845,12 +1962,17 @@ bool ZoombiniAnimation::loadFromFile(const Common::Path &path) {
 	if (cellIndex == 0 && recoveredFrameCount == 0)
 		return false;
 
-	for (int index = 0; index < kCellCount; index++)
-		_cells[index].frames.swap(loadedCells[index].frames);
+	for (int i = 0; i < kCellCount; i++)
+		_cells[i].frames.swap(loadedCells[i].frames);
+	_resourcePath = path;
 
 	debug(2, "ZoombiniAnimation: loaded %d of %d cells and %u frames from '%s'%s", cellIndex, kCellCount, recoveredFrameCount,
 		  path.toString().c_str(), complete ? "" : " with salvage warnings");
 	return true;
+}
+
+void ZoombiniAnimation::recordPageCacheUse() const {
+	_vm->recordPageResourceCacheUse(_resourcePath.toString('/'), Zoombini2Engine::PageResourceType::kZoombiniAnimation);
 }
 
 const RleBlock *ZoombiniAnimation::getFrame(int cellIndex, int frameIndex) const {
@@ -2064,7 +2186,7 @@ int UIButton::drawAndHitTest(ManagedSurface32 *dst, const Common::Point32 &mouse
 		rleToDraw->drawToScreen(dst, Common::Point32(_rect.left, _rect.top), alphaLUT);
 	}
 	if (_overlay && _overlayClipRight) {
-		const Common::Rect32 clip(0, 0, *_overlayClipRight, MIN(static_cast<int>(dst->h), ManagedSurface32::kScreenSize.height));
+		const Common::Rect32 clip(0, 0, *_overlayClipRight, MIN(static_cast<int>(dst->h), Gfx::kScreenSize.height));
 		_overlay->drawToScreenClipped(dst, Common::Point32(_rect.left + _overlayOffset.x, _rect.top + _overlayOffset.y), clip, alphaLUT);
 	}
 
@@ -2077,7 +2199,8 @@ int UIButton::drawAndHitTest(ManagedSurface32 *dst, const Common::Point32 &mouse
 // BitmapFont - bitmap-based font for UI text rendering.
 // ============================================================================
 
-BmtFont::BmtFont(Zoombini2Engine *vm) : _vm(vm) {
+BmtFont::BmtFont(Zoombini2Engine *vm)
+	: _vm(vm) {
 }
 
 bool BmtFont::load(const Common::Path &basePath) {
@@ -2128,7 +2251,7 @@ bool BmtFont::load(const Common::Path &basePath) {
 			col += 1;
 		}
 
-		if (col >= size.width)
+		if (size.width <= col)
 			break;
 
 		const int startCol = col;
@@ -2162,10 +2285,16 @@ bool BmtFont::load(const Common::Path &basePath) {
 	}
 
 	int expectedGlyphs = 81;
-	if (_vm->isHebrew())
+	switch (_vm->getLanguage()) {
+	case Common::HE_ISR:
 		expectedGlyphs = 80;
-	else if (_vm->isSwedish())
+		break;
+	case Common::SV_SWE:
 		expectedGlyphs = 84;
+		break;
+	default:
+		break;
+	}
 	if (glyphIndex != expectedGlyphs) {
 		warning("BitmapFont: expected %d glyphs but found %d in '%s'", expectedGlyphs, glyphIndex, colorPath.toString().c_str());
 		return false;
@@ -2177,124 +2306,87 @@ bool BmtFont::load(const Common::Path &basePath) {
 	return true;
 }
 
-int BmtFont::charToGlyphIndex(uint32 c) const {
-	if (255 < c)
+int BmtFont::charToGlyphIndex(uint32 character) const {
+	if (255 < character)
 		return -1;
-	const byte value = static_cast<byte>(c);
-	const bool hebrew = _vm->isHebrew();
-	if (hebrew && 0xE0 <= value && value <= 0xFA) {
-		static constexpr byte kHebrewGlyphs[] = {
-			45,
-			28,
-			29,
-			44,
-			47,
-			46,
-			51,
-			35,
-			50,
-			33,
-			37,
-			31,
-			36,
-			40,
-			39,
-			34,
-			27,
-			49,
-			32,
-			64,
-			41,
-			62,
-			38,
-			30,
-			43,
-			26,
-			63,
-		};
-		return kHebrewGlyphs[value - 0xE0];
-	}
-	if (_vm->isSwedish()) {
-		switch (value) {
-		case 0xC6:
-			return 62;
-		case 0xD8:
-			return 63;
-		case 0xC5:
-			return 64;
-		case 0xC4:
-			return 65;
-		case 0xD6:
-			return 66;
-		case 0xE6:
-			return 67;
-		case 0xF8:
-			return 68;
-		case 0xE5:
-			return 69;
-		case 0xE4:
-			return 70;
-		case 0xF6:
-			return 71;
-		default:
-			break;
+	if ('A' <= character && character <= 'Z')
+		return character - 'A';
+	if ('a' <= character && character <= 'z')
+		return character - 'a' + 26;
+	if ('0' <= character && character <= '9')
+		return character - '0' + 52;
+
+	switch (_vm->getLanguage()) {
+	case Common::HE_ISR:
+		if (0xE0 <= character && character <= 0xFA) {
+			static constexpr byte kHebrewGlyphs[] = {
+				45,
+				28,
+				29,
+				44,
+				47,
+				46,
+				51,
+				35,
+				50,
+				33,
+				37,
+				31,
+				36,
+				40,
+				39,
+				34,
+				27,
+				49,
+				32,
+				64,
+				41,
+				62,
+				38,
+				30,
+				43,
+				26,
+				63,
+			};
+			return kHebrewGlyphs[character - 0xE0];
 		}
-	}
-	if (c >= 'A' && c <= 'Z') {
-		return c - 'A'; // 0-25
-	}
-	if (c >= 'a' && c <= 'z') {
-		return c - 'a' + 26; // 26-51
-	}
-	if (c >= '0' && c <= '9') {
-		return c - '0' + 52; // 52-61
-	}
-	if (_vm->isSwedish())
+		break;
+	case Common::SV_SWE: {
+		static constexpr byte kSwedishCharacters[] = {
+			0xC6,
+			0xD8,
+			0xC5,
+			0xC4,
+			0xD6,
+			0xE6,
+			0xF8,
+			0xE5,
+			0xE4,
+			0xF6,
+		};
+		for (int i = 0; i < ARRAYSIZE(kSwedishCharacters); i++) {
+			if (character == kSwedishCharacters[i])
+				return 62 + i;
+		}
 		return -1;
-	if (c == '_')
+	}
+	default:
+		break;
+	}
+
+	if (character == '_')
 		return 80;
-	return asciiPunctuationToGlyphIndex(c);
+	return asciiPunctuationToGlyphIndex(character);
 }
 
 int BmtFont::asciiPunctuationToGlyphIndex(uint32 character) {
-	switch (character) {
-	case '.':
-		return 62;
-	case ',':
-		return 63;
-	case ';':
-		return 64;
-	case ':':
-		return 65;
-	case '/':
-		return 66;
-	case '(':
-		return 67;
-	case ')':
-		return 68;
-	case '-':
-		return 69;
-	case '+':
-		return 70;
-	case '=':
-		return 71;
-	case '@':
-		return 72;
-	case '&':
-		return 73;
-	case '#':
-		return 74;
-	case '\'':
-		return 75;
-	case '?':
-		return 76;
-	case '!':
-		return 77;
-	case '*':
-		return 78;
-	default:
+	static constexpr char kPunctuationCharacters[] = ".,;:/()-+=@&#'?!*";
+	if (character == 0 || 255 < character)
 		return -1;
-	}
+	const char *entry = strchr(kPunctuationCharacters, character);
+	if (!entry)
+		return -1;
+	return 62 + static_cast<int>(entry - kPunctuationCharacters);
 }
 
 int BmtFont::getFontHeight() const {
@@ -2383,7 +2475,7 @@ int BmtFont::drawString(ManagedSurface32 *dst, const Common::Point32 &pos, const
 	// Hebrew visits game bytes backwards; only digits move the pen left.
 	for (uint i = 0; i < text.size(); i++) {
 		const byte c = static_cast<byte>(text[text.size() - i - 1]);
-		if (hasWidthLimit && curX + getBoundingBox(c).right > rightX)
+		if (hasWidthLimit && rightX < curX + getBoundingBox(c).right)
 			break;
 		drawChar(dst, c, curX, pos.y, color);
 		const int advance = getCharWidth(c);
@@ -2438,7 +2530,7 @@ VolumePanel::VolumePanel(Zoombini2Engine *vm)
 }
 
 VolumePanel::~VolumePanel() {
-	for (int i = 0; i < 3; i++)
+	for (int i = 0; i < ARRAYSIZE(_sliderLabels); i++)
 		_sliderLabels[i].setOverlay(nullptr, Common::Point32(), nullptr);
 	if (_soundManager) {
 		if (0 <= _speechPreviewSoundId)
@@ -2446,6 +2538,14 @@ VolumePanel::~VolumePanel() {
 		if (0 <= _sfxPreviewSoundId)
 			_soundManager->unload(_sfxPreviewSoundId);
 	}
+}
+
+VolumePanel::SliderKind VolumePanel::getSliderKind(int labelIndex) {
+	return static_cast<SliderKind>(kSlider_Music02 + labelIndex);
+}
+
+UIButton &VolumePanel::getSliderLabel(SliderKind sliderKind) {
+	return _sliderLabels[sliderKind - kSlider_Music02];
 }
 
 bool VolumePanel::init(SoundManager *soundManager) {
@@ -2465,27 +2565,30 @@ bool VolumePanel::init(SoundManager *soundManager) {
 	if (!_noButton.loadImagesWithMask(Common::Path(kNoNormalPath), Common::Path(kNoNormalMaskPath), Common::Path(kNoHighlightPath), Common::Path(kNoHighlightMaskPath)))
 		loaded = false;
 
-	_sliderLabels[0].setRect(Common::Point32(kLabelX, kMusicLabelY), kLabelSize);
+	UIButton &musicLabel = getSliderLabel(kSlider_Music02);
+	musicLabel.setRect(Common::Point32(kLabelX, kMusicLabelY), kLabelSize);
 	const Common::Path musicMask(kMusicMaskPath);
-	if (!_sliderLabels[0].loadImagesWithMask(Common::Path(kMusicNormalPath), musicMask, Common::Path(kMusicHighlightPath), musicMask))
+	if (!musicLabel.loadImagesWithMask(Common::Path(kMusicNormalPath), musicMask, Common::Path(kMusicHighlightPath), musicMask))
 		loaded = false;
 
-	_sliderLabels[1].setRect(Common::Point32(kLabelX, kSfxLabelY), kLabelSize);
+	UIButton &sfxLabel = getSliderLabel(kSlider_Sfx03);
+	sfxLabel.setRect(Common::Point32(kLabelX, kSfxLabelY), kLabelSize);
 	const Common::Path sfxMask(kSfxMaskPath);
-	if (!_sliderLabels[1].loadImagesWithMask(Common::Path(kSfxNormalPath), sfxMask, Common::Path(kSfxHighlightPath), sfxMask))
+	if (!sfxLabel.loadImagesWithMask(Common::Path(kSfxNormalPath), sfxMask, Common::Path(kSfxHighlightPath), sfxMask))
 		loaded = false;
 
-	_sliderLabels[2].setRect(Common::Point32(kLabelX, kSpeechLabelY), kLabelSize);
+	UIButton &speechLabel = getSliderLabel(kSlider_Speech04);
+	speechLabel.setRect(Common::Point32(kLabelX, kSpeechLabelY), kLabelSize);
 	const Common::Path speechMask(kSpeechMaskPath);
-	if (!_sliderLabels[2].loadImagesWithMask(Common::Path(kSpeechNormalPath), speechMask, Common::Path(kSpeechHighlightPath), speechMask))
+	if (!speechLabel.loadImagesWithMask(Common::Path(kSpeechNormalPath), speechMask, Common::Path(kSpeechHighlightPath), speechMask))
 		loaded = false;
 
 	_musicSliderX = volumeToPixel(_settings.getMusic());
 	_sfxSliderX = volumeToPixel(_settings.getSfx());
 	_speechSliderX = volumeToPixel(_settings.getSpeech());
-	_sliderLabels[0].setOverlay(_gaugeImage, Common::Point32(kSliderMinX - kLabelX, kMusicGaugeY - kMusicLabelY), &_musicSliderX);
-	_sliderLabels[1].setOverlay(_gaugeImage, Common::Point32(kSliderMinX - kLabelX, kSfxGaugeY - kSfxLabelY), &_sfxSliderX);
-	_sliderLabels[2].setOverlay(_gaugeImage, Common::Point32(kSliderMinX - kLabelX, kSpeechGaugeY - kSpeechLabelY), &_speechSliderX);
+	musicLabel.setOverlay(_gaugeImage, Common::Point32(kSliderMinX - kLabelX, kMusicGaugeY - kMusicLabelY), &_musicSliderX);
+	sfxLabel.setOverlay(_gaugeImage, Common::Point32(kSliderMinX - kLabelX, kSfxGaugeY - kSfxLabelY), &_sfxSliderX);
+	speechLabel.setOverlay(_gaugeImage, Common::Point32(kSliderMinX - kLabelX, kSpeechGaugeY - kSpeechLabelY), &_speechSliderX);
 	if (_soundManager) {
 		_speechPreviewSoundId = _soundManager->load(false, Common::Path(kSpeechPreviewSoundPath), false);
 		_sfxPreviewSoundId = _soundManager->load(false, Common::Path(kSfxPreviewSoundPath), false);
@@ -2499,7 +2602,7 @@ int VolumePanel::pixelToVolume(int x) {
 	int vol = (100 * (x - kSliderMinX)) / kSliderRange;
 	if (vol < 0)
 		vol = 0;
-	if (vol > 100)
+	if (100 < vol)
 		vol = 100;
 	return vol;
 }
@@ -2535,53 +2638,57 @@ VolumePanelResult VolumePanel::handleMouseInput(const Common::Point32 &mousePos,
 	if (mouseDown) {
 		_heldMousePos = mousePos;
 		_hasHeldMouse = true;
-		int hoveredSlider = -1;
-		for (int i = 0; i < 3; i++) {
+		SliderKind hoveredSlider = kSlider_None00;
+		for (int i = 0; i < ARRAYSIZE(_sliderLabels); i++) {
 			if (_sliderLabels[i].containsPoint(mousePos)) {
-				hoveredSlider = i;
+				hoveredSlider = getSliderKind(i);
 				break;
 			}
 		}
-		if (0 <= hoveredSlider) {
+		if (hoveredSlider != kSlider_None00) {
 			_activeSlider = hoveredSlider;
 			switch (hoveredSlider) {
-			case 0:
+			case kSlider_Music02:
 				_musicSliderX = mousePos.x;
 				break;
-			case 1:
+			case kSlider_Sfx03:
 				_sfxSliderX = mousePos.x;
 				break;
-			case 2:
+			case kSlider_Speech04:
 				_speechSliderX = mousePos.x;
+				break;
+			default:
 				break;
 			}
 		}
 	} else {
-		int releasedSlider = _activeSlider;
-		_activeSlider = -1;
+		SliderKind releasedSlider = _activeSlider;
+		_activeSlider = kSlider_None00;
 		if (mouseReleased) {
 			if (_hasHeldMouse)
 				effectivePos = _heldMousePos;
 			_hasHeldMouse = false;
-			if (releasedSlider < 0) {
-				for (int i = 0; i < 3; i++) {
+			if (releasedSlider == kSlider_None00) {
+				for (int i = 0; i < ARRAYSIZE(_sliderLabels); i++) {
 					if (_sliderLabels[i].containsPoint(effectivePos)) {
-						releasedSlider = i;
+						releasedSlider = getSliderKind(i);
 						break;
 					}
 				}
 			}
-			if (0 <= releasedSlider) {
+			if (releasedSlider != kSlider_None00) {
 				const int newVolume = pixelToVolume(effectivePos.x);
 				switch (releasedSlider) {
-				case 0:
+				case kSlider_Music02:
 					setMusicVolume(newVolume);
 					break;
-				case 1:
+				case kSlider_Sfx03:
 					setSfxVolume(newVolume);
 					break;
-				case 2:
+				case kSlider_Speech04:
 					setSpeechVolume(newVolume);
+					break;
+				default:
 					break;
 				}
 				_lastAdjustedSlider = releasedSlider;
@@ -2598,21 +2705,29 @@ VolumePanelResult VolumePanel::handleMouseInput(const Common::Point32 &mousePos,
 }
 
 void VolumePanel::playPreviewSound() {
-	const int adjustedSlider = _lastAdjustedSlider;
-	_lastAdjustedSlider = -1;
+	const SliderKind adjustedSlider = _lastAdjustedSlider;
+	_lastAdjustedSlider = kSlider_None00;
 	if (!_soundManager)
 		return;
 
-	if (adjustedSlider == 1 && 0 <= _sfxPreviewSoundId) {
-		_soundManager->playWithVolume(_sfxPreviewSoundId, _settings.getSfx());
-	} else if (adjustedSlider == 2 && 0 <= _speechPreviewSoundId) {
-		_soundManager->stop(_speechPreviewSoundId);
-		_soundManager->playWithVolume(_speechPreviewSoundId, _settings.getSpeech());
+	switch (adjustedSlider) {
+	case kSlider_Sfx03:
+		if (0 <= _sfxPreviewSoundId)
+			_soundManager->playWithVolume(_sfxPreviewSoundId, _settings.getSfx());
+		break;
+	case kSlider_Speech04:
+		if (0 <= _speechPreviewSoundId) {
+			_soundManager->stop(_speechPreviewSoundId);
+			_soundManager->playWithVolume(_speechPreviewSoundId, _settings.getSpeech());
+		}
+		break;
+	default:
+		break;
 	}
 }
 
 void VolumePanel::draw(ManagedSurface32 *dst, const Common::Point32 &mousePos, const AlphaBlendLUT &alphaLUT) {
-	for (int i = 0; i < 3; i++)
+	for (int i = 0; i < ARRAYSIZE(_sliderLabels); i++)
 		_sliderLabels[i].drawAndHitTest(dst, mousePos, alphaLUT);
 	_okButton.drawAndHitTest(dst, mousePos, alphaLUT);
 	_noButton.drawAndHitTest(dst, mousePos, alphaLUT);

@@ -29,7 +29,6 @@
 namespace Zoombini2 {
 
 class Animation;
-class ZoombiniAnimation;
 class ZoombiniRunner;
 
 /**
@@ -49,9 +48,11 @@ public:
 	void init() override;
 	/** Advance dancers, decorative Zoombinis, fireworks, and speech deadlines. */
 	void onUpdate() override;
-	/** Draw the complete fixed celebration scene. */
+	/** Draw the celebration backdrop, dancers and active fireworks. */
 	void onRenderContent(ManagedSurface32 *screen) override;
+	/** Draw the two decorative Zoombinis sorted by their screen Y coordinates. */
 	void onRenderActors(ManagedSurface32 *screen) override;
+	/** Advance decorative Zoombini frames and schedule their next motions after drawing. */
 	void onActorsRendered() override;
 	/** Return to the sign-in menu on any click. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
@@ -60,6 +61,8 @@ public:
 	bool hasSidebar() const override { return false; }
 	/** Suppress the shelter Go action on the final celebration. */
 	bool hasGoButton() const override { return false; }
+	/** Permit debug travel with a retained village party, excluding the decorative celebration actors. */
+	bool debugCanDepart() const override;
 
 private:
 	/** Number of independent firework animations. */
@@ -84,10 +87,6 @@ private:
 		"bmp/final/FWGREEN.an",
 		"bmp/final/FWRED.an",
 	};
-	/** Little-Zoombini sprite grid used by the two decorative celebration characters. */
-	static constexpr const char *kZoombiniAnimationPath = "bmp/zombis/littleZomb.anm";
-	/** Alternate idle Zoombini sprite grid used for decorative characters' idle motion. */
-	static constexpr const char *kWalkingZoombiniAnimationPath = "bmp/zombis/attente/attenteZomb.anm";
 	/** Background music for the final celebration. */
 	static constexpr const char *kMusicPath = "#sounds/music/Booliewood_Finale.wav";
 	/** Opening speech played when the celebration page starts. */
@@ -108,13 +107,19 @@ private:
 
 	/** Runtime position, animation, and parabolic motion for one firework. */
 	struct FireworkState {
+		/** Firework animation released with the page, or nullptr when unavailable. */
 		Animation *animation = nullptr;
+		/** Current firework bounds in screen pixels, also used for collision checks. */
 		Common::Rect collisionRect = Common::Rect(1000, 1000, 1001, 1001);
 		/** Initial screen position used by the parabolic trajectory. */
 		Common::Point32 startPos = Common::Point32();
+		/** Number of trajectory updates since launch, used by the vertical parabola. */
 		int timeStep = 0;
+		/** Current frame within the firework animation. */
 		int frame = 0;
+		/** Gameplay timestamp in milliseconds for the next firework frame. */
 		uint32 nextFrameTime = 0;
+		/** Whether the firework animation is still playing. */
 		bool active = true;
 	};
 
@@ -171,10 +176,6 @@ private:
 	Animation *_revealFlare1 = nullptr;
 	/** Dormant second reveal flare managed by this page. */
 	Animation *_revealFlare2 = nullptr;
-	/** Borrowed immutable seated sprite grid retained in the engine cache. */
-	const ZoombiniAnimation *_zoombiniAnimation = nullptr;
-	/** Borrowed immutable walking sprite grid retained in the engine cache. */
-	const ZoombiniAnimation *_walkingZoombiniAnimation = nullptr;
 	/** Firework states in blue, green, red order. */
 	FireworkState _fireworks[kFireworkCount] = {};
 

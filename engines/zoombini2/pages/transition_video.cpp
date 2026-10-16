@@ -27,6 +27,7 @@
 
 #include "zoombini2/graphics.h"
 #include "zoombini2/pages/transition_video.h"
+#include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
@@ -47,29 +48,29 @@ TransitionVideo::TransitionVideo(Zoombini2Engine *vm, PageId pageId)
 	_pageId = pageId;
 
 	switch (pageId) {
-	case kPageLogoTLC:
+	case PageId::kPageLogoTLC_17:
 		_videoPath = selectMoviePath(kLogoTlcPath, kLogoTlcHalfPath);
-		_nextPageId = kPageLogoPolygon;
+		_nextPageId = PageId::kPageLogoPolygon_25;
 		break;
-	case kPageLogoPolygon:
+	case PageId::kPageLogoPolygon_25:
 		_videoPath = Common::Path(kLogoPolygonPath);
-		_nextPageId = kPageTitleScreen;
+		_nextPageId = PageId::kPageTitleScreen_24;
 		break;
-	case kPageCutsceneFirst:
+	case PageId::kPageCutsceneFirst_18:
 		_videoPath = selectMoviePath(kCutsceneFirstPath, kCutsceneFirstHalfPath);
-		_nextPageId = kPageZombiniville;
+		_nextPageId = PageId::kPageZombiniville_00;
 		break;
-	case kPageCutsceneSecond:
+	case PageId::kPageCutsceneSecond_20:
 		_videoPath = selectMoviePath(kCutsceneSecondPath, kCutsceneSecondHalfPath);
-		_nextPageId = kPageRescue1;
+		_nextPageId = PageId::kPageRescue1_04;
 		break;
-	case kPageCutsceneThird:
+	case PageId::kPageCutsceneThird_21:
 		_videoPath = selectMoviePath(kCutsceneThirdPath, kCutsceneThirdHalfPath);
-		_nextPageId = kPageRescue2;
+		_nextPageId = PageId::kPageRescue2_09;
 		break;
-	case kPageLogoArisuMedia:
+	case PageId::kPageLogoArisuMedia_1972:
 		_videoPath = Common::Path(kLogoArisuPath);
-		_nextPageId = kPageLogoTLC;
+		_nextPageId = PageId::kPageLogoTLC_17;
 		break;
 	default:
 		warning("TransitionVideo: Unknown page %d", static_cast<int>(pageId));
@@ -94,6 +95,19 @@ TransitionVideo::~TransitionVideo() {
 
 void TransitionVideo::init() {
 	debug(1, "TransitionVideo::init - %s", _videoPath.toString('/').c_str());
+
+	if (_vm->_state) {
+		switch (_pageId) {
+		case PageId::kPageCutsceneSecond_20:
+			_vm->_state->markRescue1MoviePlayed();
+			break;
+		case PageId::kPageCutsceneThird_21:
+			_vm->_state->markRescue2MoviePlayed();
+			break;
+		default:
+			break;
+		}
+	}
 
 	_decoder = new Video::BinkDecoder();
 	_decoder->setSoundType(Audio::Mixer::kMusicSoundType);
@@ -124,7 +138,7 @@ void TransitionVideo::onUpdate() {
 		const Graphics::Surface *frame = _decoder->decodeNextFrame();
 		if (frame) {
 			const Size32 frameSize(frame->w, frame->h);
-			const Size32 frameOffset = (ManagedSurface32::kScreenSize - frameSize) / 2;
+			const Size32 frameOffset = (Gfx::kScreenSize - frameSize) / 2;
 			_framePos = Common::Point32(frameOffset.width, frameOffset.height);
 
 			// Cache the decoded frame in screen format

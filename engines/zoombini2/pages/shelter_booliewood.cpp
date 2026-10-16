@@ -33,8 +33,6 @@ namespace Zoombini2 {
 
 constexpr const char *ShelterBooliewood::kAttractionPaths[];
 constexpr const char *ShelterBooliewood::kBackgroundPath;
-constexpr const char *ShelterBooliewood::kSeatedAnimationPath;
-constexpr const char *ShelterBooliewood::kWalkingZoombiniAnimationPath;
 constexpr const char *ShelterBooliewood::kContentMarkerPath;
 constexpr const char *ShelterBooliewood::kPascontentMarkerPath;
 constexpr const char *ShelterBooliewood::kWalkingAnimationPath;
@@ -49,7 +47,7 @@ constexpr const char *ShelterBooliewood::kCrowdPattern[27];
 
 ShelterBooliewood::ShelterBooliewood(Zoombini2Engine *vm)
 	: ShelterBase(vm) {
-	_pageId = kPageBooliewood;
+	_pageId = PageId::kPageBooliewood_12;
 	resetSeats();
 }
 
@@ -74,12 +72,16 @@ ShelterBooliewood::~ShelterBooliewood() {
 	_vm->_state->clearActiveZoombinis();
 }
 
+bool ShelterBooliewood::debugCanDepart() const {
+	return !_vm->_state->_savedRoster.empty();
+}
+
 void ShelterBooliewood::init() {
 	debug(1, "BooliewoodPage::init");
 	GameState *state = _vm->_state;
-	const bool firstVisit = !state->hasPageVisit(kPageBooliewood, 1);
+	const bool firstVisit = !state->hasPageVisit(PageId::kPageBooliewood_12, 1);
 	state->_hasReachedBooliewood = 1;
-	state->registerPageVisit(kPageBooliewood, 1);
+	state->registerPageVisit(PageId::kPageBooliewood_12, 1);
 
 	const int rescuedTotal = state->_rescuedBoolieCount;
 	_developmentStage = 4;
@@ -95,13 +97,6 @@ void ShelterBooliewood::init() {
 	if (!_vm->_gfx->loadPageBitBlock(kBackgroundPath)) {
 		warning("BooliewoodPage: Failed to load background");
 	}
-
-	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path(kSeatedAnimationPath), 50);
-	if (!_zoombiniAnimation)
-		warning("BooliewoodPage: Failed to load littleZomb.anm");
-	_walkingZoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path(kWalkingZoombiniAnimationPath), 50);
-	if (!_walkingZoombiniAnimation)
-		warning("BooliewoodPage: Failed to load attenteZomb.anm");
 
 	_vm->_gfx->loadPageRleBlock(kContentMarkerPath);
 	_vm->_gfx->loadPageRleBlock(kPascontentMarkerPath);
@@ -219,7 +214,7 @@ void ShelterBooliewood::buildSeatedCommunity(uint32 now) {
 		Common::Point32 pos;
 		if (assignSeat(pos))
 			zoombini->setPosition(pos);
-		zoombini->setDefaultAnimation(_zoombiniAnimation, kSeatedZoombiniCell);
+		zoombini->setDefaultAnimation(ZmbAnimationKind::kBasic, kSeatedZoombiniCell);
 		zoombini->setInputEnabled(false);
 	}
 
@@ -228,7 +223,7 @@ void ShelterBooliewood::buildSeatedCommunity(uint32 now) {
 		historicalCount = 0;
 	if (180 < historicalCount)
 		historicalCount = 180;
-	int walkingQuota = historicalCount / 5;
+	int celebrationQuota = historicalCount / 5;
 	const uint maxVisibleCount = kMaximumVisibleZoombinis;
 	for (int i = 0; i < historicalCount && _vm->_state->_activeZoombinis.size() < maxVisibleCount; i++) {
 		Common::Point32 pos;
@@ -236,12 +231,12 @@ void ShelterBooliewood::buildSeatedCommunity(uint32 now) {
 			break;
 		ZoombiniRunner *zoombini = createHistoricalZoombini(state->_completedTraitHashes[i]);
 		zoombini->setPosition(pos);
-		zoombini->setDefaultAnimation(_zoombiniAnimation, kSeatedZoombiniCell);
+		zoombini->setDefaultAnimation(ZmbAnimationKind::kBasic, kSeatedZoombiniCell);
 		zoombini->setInputEnabled(false);
 		_vm->_state->_activeZoombinis.push_back(zoombini);
-		if (walkingQuota != 0 && _vm->_rnd->getRandomNumber(1) != 0) {
-			zoombini->startAnimation(_walkingZoombiniAnimation, kSeatedZoombiniCell, now);
-			walkingQuota -= 1;
+		if (celebrationQuota != 0 && _vm->_rnd->getRandomNumber(1) != 0) {
+			zoombini->startAnimation(ZmbAnimationKind::kCelebration, kSeatedZoombiniCell, now);
+			celebrationQuota -= 1;
 		}
 	}
 }
@@ -254,7 +249,7 @@ void ShelterBooliewood::updateSeatedAnimations(uint32 now) {
 }
 
 ZoombiniRunner *ShelterBooliewood::createHistoricalZoombini(int32 traitHash) {
-	ZoombiniRunner *zoombini = new ZoombiniRunner();
+	ZoombiniRunner *zoombini = new ZoombiniRunner(_vm);
 	zoombini->setTraits(ZmbTrait::fromHash(static_cast<uint16>(traitHash)));
 	return zoombini;
 }
@@ -298,7 +293,7 @@ void ShelterBooliewood::loadAttractions(uint32 now) {
 void ShelterBooliewood::updateAttractions(uint32 now) {
 	for (int i = 0; i < kAttractionCount; i++) {
 		AttractionState &attraction = _attractions[i];
-		if (!attraction.active || !attraction.animation || attraction.nextFrameTime > now)
+		if (!attraction.active || !attraction.animation || now < attraction.nextFrameTime)
 			continue;
 		attraction.frame += 1;
 		if (attraction.animation->getFrameCount() <= attraction.frame) {
@@ -342,7 +337,7 @@ void ShelterBooliewood::loadCrowdActors(uint32 now) {
 	for (int i = 0; i < kCrowdActorCount; i++) {
 		CrowdActorState &actor = _crowdActors[i];
 		const Common::String path = Common::String::format(kCrowdRouteFormat, i + 1);
-		actor.path = PathObject::loadFromPAT(_vm, Common::Path(path));
+		actor.path = _vm->loadPagePATPath(Common::Path(path));
 		if (actor.path && !actor.path->segments.empty()) {
 			const CubicBezierCurve *first = actor.path->segments[0];
 			const Common::Point32 pathPos = first->getStartPosition();
@@ -440,7 +435,7 @@ void ShelterBooliewood::updateScroll(uint32 now) {
 		}
 	}
 	_scrollX += delta;
-	while (_scrollX < -ManagedSurface32::kScreenSize.width)
+	while (_scrollX < -Gfx::kScreenSize.width)
 		_scrollX += kPanoramaWidth;
 	while (kPanoramaWidth <= _scrollX)
 		_scrollX -= kPanoramaWidth - 1;
@@ -448,7 +443,7 @@ void ShelterBooliewood::updateScroll(uint32 now) {
 
 int ShelterBooliewood::getActorScreenX(int sceneX) const {
 	int screenX = sceneX - _scrollX;
-	if (kPanoramaWidth - ManagedSurface32::kScreenSize.width < _scrollX)
+	if (kPanoramaWidth - Gfx::kScreenSize.width < _scrollX)
 		screenX += kPanoramaWidth;
 	return screenX;
 }
@@ -470,17 +465,17 @@ void ShelterBooliewood::drawBackground(ManagedSurface32 *screen) const {
 	const int width = _vm->_gfx->getPageBitBlockSize(kBackgroundPath).width;
 	if (width == 0)
 		return;
-	if (width <= ManagedSurface32::kScreenSize.width) {
+	if (width <= Gfx::kScreenSize.width) {
 		_vm->_gfx->drawPageBitBlock(screen, kBackgroundPath, Common::Point32(0, 0));
 		return;
 	}
 	const int origin = (_scrollX + width) % width;
 	const int tailWidth = width - origin;
-	if (ManagedSurface32::kScreenSize.width <= tailWidth) {
-		_vm->_gfx->drawPageBitBlockSubRect(screen, kBackgroundPath, Common::Point32(0, 0), Common::Rect(origin, 0, origin + ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height));
+	if (Gfx::kScreenSize.width <= tailWidth) {
+		_vm->_gfx->drawPageBitBlockSubRect(screen, kBackgroundPath, Common::Point32(0, 0), Common::Rect(origin, 0, origin + Gfx::kScreenSize.width, Gfx::kScreenSize.height));
 	} else {
-		_vm->_gfx->drawPageBitBlockSubRect(screen, kBackgroundPath, Common::Point32(0, 0), Common::Rect(origin, 0, width, ManagedSurface32::kScreenSize.height));
-		_vm->_gfx->drawPageBitBlockSubRect(screen, kBackgroundPath, Common::Point32(tailWidth, 0), Common::Rect(0, 0, ManagedSurface32::kScreenSize.width - tailWidth, ManagedSurface32::kScreenSize.height));
+		_vm->_gfx->drawPageBitBlockSubRect(screen, kBackgroundPath, Common::Point32(0, 0), Common::Rect(origin, 0, width, Gfx::kScreenSize.height));
+		_vm->_gfx->drawPageBitBlockSubRect(screen, kBackgroundPath, Common::Point32(tailWidth, 0), Common::Rect(0, 0, Gfx::kScreenSize.width - tailWidth, Gfx::kScreenSize.height));
 	}
 }
 
@@ -529,7 +524,7 @@ void ShelterBooliewood::drawRescuedCrowd(ManagedSurface32 *screen) const {
 }
 
 void ShelterBooliewood::drawSeatedCommunity(ManagedSurface32 *screen) const {
-	if (!_zoombiniAnimation)
+	if (!_vm->_gfx->getCommonZoombiniAnimation(ZmbAnimationKind::kBasic))
 		return;
 	const uint maxVisibleCount = kMaximumVisibleZoombinis;
 	const uint count = MIN<uint>(_vm->_state->_activeZoombinis.size(), maxVisibleCount);

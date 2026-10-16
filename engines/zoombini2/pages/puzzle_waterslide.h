@@ -34,6 +34,12 @@ public:
 	PuzzleWaterslide(Zoombini2Engine *vm);
 	/** Release active decoration and valve animation runners. */
 	~PuzzleWaterslide() override;
+	/** Return the puzzle name used by debug answer descriptions. */
+	const char *getPageName() const override { return kPageName; }
+	/** Return the 1-based route containing this puzzle. */
+	int getRouteNumber() const override { return kRouteNumber; }
+	/** Return the 1-based puzzle number within its route. */
+	int getRoutePuzzleIdx() const override { return kRoutePuzzleIdx; }
 	/** Generate the level board, load resources, and arrange the party. */
 	void init() override;
 	/** Advance the valve, cascade, and Zoombini discharge sequence. */
@@ -62,7 +68,12 @@ public:
 	Common::String debugGetChanceDetails() const override;
 
 private:
-	static constexpr const char *kPuzzleName = "Pipes of Paloo";
+	/** Static puzzle name used by debug answer descriptions. */
+	static constexpr const char *kPageName = "Pipes of Paloo";
+	/** 1-based route number used by the puzzle console. */
+	static constexpr int kRouteNumber = 1;
+	/** 1-based puzzle number within the route used by the puzzle console. */
+	static constexpr int kRoutePuzzleIdx = 2;
 	/** Pipes of Paloo background loaded into the first page layer. */
 	static constexpr const char *kBackgroundPath = "#bmp/waterslide/waterslides";
 	/** Background music played while Pipes of Paloo is active. */
@@ -107,12 +118,6 @@ private:
 	static constexpr const char *kCascadeFormat = "bmp/waterslide/pipe - cascade %d";
 	/** Area mask used to constrain Zoombini drag-and-drop hit testing. */
 	static constexpr const char *kAreaPath = "bmp/waterslide/area.bmt";
-	/** Zoombini animation used while dragging a character between pipe endpoints. */
-	static constexpr const char *kPickupPath = "bmp/zombis/pris/pris.anm";
-	/** Zoombini idle animation restored after the discharge sequence. */
-	static constexpr const char *kIdlePath = "bmp/zombis/attente/attenteZomb.anm";
-	/** Zoombini animation played as a connected character is pulled into the cascade. */
-	static constexpr const char *kAspirationPath = "bmp/zombis/aspiration/aspiration.anm";
 	/** Sound-effects path format used for the six Waterslide effect identifiers. */
 	static constexpr const char *kSoundFormat = "sounds/fx/%s.wav";
 	/** Praise speech played when all eight expected connections are made. */
@@ -136,23 +141,36 @@ private:
 	};
 	/** Generated endpoints name board slots; a negative axis denotes an unlabeled connection. */
 	struct Edge {
-		/** Endpoint slots, trait axis, and currently satisfied connection flag. */
+		/** First endpoint slot of this graph connection. */
 		int a = -1;
+		/** Second endpoint slot of this graph connection. */
 		int b = -1;
+		/** Trait axis used by this connection; -1 denotes an unlabeled edge. */
 		int axis = -1;
+		/** Whether the currently placed pair satisfies this connection. */
 		bool connected = false;
 	};
 	/** Candidate pair returned while generating one trait-labeled graph edge. */
 	struct Pair {
-		/** Endpoint slots and their shared trait axis. */
+		/** First endpoint slot of this candidate pair. */
 		int a = -1;
+		/** Second endpoint slot of this graph connection. */
 		int b = -1;
+		/** Trait axis used by this connection; -1 denotes an unlabeled edge. */
 		int axis = -1;
 	};
 	/** Screen placement and art type for one possible graph edge. */
 	struct GraphPlacement {
-		/** Endpoint slots, pipe type, and screen location for its trait label. */
-		int a, b, type, labelX, labelY;
+		/** First board-slot endpoint of the pipe. */
+		int a;
+		/** Second board-slot endpoint of the pipe. */
+		int b;
+		/** Pipe artwork variant selected for this edge. */
+		int type;
+		/** Trait-label x coordinate in page pixels. */
+		int labelX;
+		/** Trait-label y coordinate in page pixels. */
+		int labelY;
 	};
 	/** Adjacency candidates used to construct a connected sixteen-slot graph. */
 	static constexpr int kNeighbors[16][5] = {
@@ -192,6 +210,7 @@ private:
 		{37, 423},
 		{31, 367},
 	};
+	/** Pipe artwork and label anchors for each drawable endpoint pair. */
 	static constexpr GraphPlacement kGraphPlacements[26] = {
 		{0, 6, 1, 542, 380},
 		{9, 15, 1, 252, 272},
@@ -225,9 +244,11 @@ private:
 	void loadResources();
 	/** Construct a deterministic party when the page runs without a saved roster. */
 	void createDemoParty();
-	/** Generate the three level-specific graph and trait-placement variants. */
+	/** Generate the easy-level pipe graph and its trait-placement constraints. */
 	void generateEasy();
+	/** Generate the medium-level pipe graph and its trait-placement constraints. */
 	void generateMedium();
+	/** Generate the hard-level pipe graph and its trait-placement constraints. */
 	void generateHard();
 	/** Build a graph and return its root slot, optionally selecting it randomly. */
 	int generateGraph(bool randomRoot);
@@ -241,52 +262,60 @@ private:
 	void addEdge(int a, int b, int axis);
 	/** Create droppable slot targets for the current graph. */
 	void setupTargets();
-	/** Convert a graph slot or logical edge to its page-space draw data. */
+	/** Return the page-pixel anchor for a graph slot. */
 	static Common::Point32 graphPosition(int slot);
+	/** Return the artwork placement matching an edge's unordered endpoints, or nullptr. */
 	static const GraphPlacement *graphPlacement(const Edge &edge);
 	/** Update each edge's satisfied flag after a slot assignment changes. */
 	void evaluateConnections();
 	/** Return whether both occupants of @p edge match its required trait axis. */
 	bool matches(const Edge &edge) const;
-	/** Test and search an assignment for console answer generation. */
-	bool debugPlacementMatches(int slot, int actor, const Common::Array<int> &assignment) const;
-	bool debugFindPlacement(Common::Array<int> &assignment, uint32 used, int &budget) const;
+	/** Return the slot at a zero-based display row and column, or -1 for a gap. */
+	int debugCellSlot(int row, int column) const;
 	/** Start the valve animation and the following cascade sequence. */
 	void activateValve();
 	/** Start the next eligible Zoombini's drain animation. */
 	void dischargeNext();
-	/** Play indexed pipe or valve sound and count free visible Zoombinis. */
+	/** Play the indexed pipe or valve sound effect. */
 	void playSound(int sound);
+	/** Return the number of roster members not yet eligible to leave the puzzle. */
 	int countFreeZoombinis() const;
-	/** Draw the graph and its decorative animated scenery. */
+	/** Draw the pipe graph, its occupants and trait labels. */
 	void drawBoard(ManagedSurface32 *screen) const;
+	/** Draw and advance the tree, fountain and active cascade animations. */
 	void drawDecorations(ManagedSurface32 *screen);
-	/** Receive slot reassignment and animation completion callbacks. */
+	/** Update puzzle state after a Zoombini is assigned to a graph slot. */
 	static void onSlotChanged(void *context, int slot, int zoombini);
+	/** Hide the rider after its suction animation completes. */
 	static void onAspirationComplete(void *context, ZoombiniRunner *zoombini);
+	/** Hide the current cascade rider and clear the held-roster index. */
 	static void onCascadeComplete(void *context, AnimationRunner *runner);
 
-	/** Level, current transition phase, connection count, and held party member. */
-	int _level = 1;
+	/** Current interaction, discharge or departure stage. */
 	Phase _phase = kInteractive00;
+	/** Number of graph edges satisfied by the current placement. */
 	int _connectionCount = 0;
+	/** Puzzle-roster index currently held by the pointer, or -1 when none is held. */
 	int _heldZoombini = -1;
-	/** Levels 1-3 and internal level 4 keep one eligibility flag per party member, up to 16. */
+	/** All levels keep one eligibility flag per party member, up to 16. */
 	Common::Array<bool> _eligible;
-	/** Active flags: level 1 uses party size, up to 16; levels 2 and 3 and internal level 4 use all 16 slots. */
+	/** Active flags: L1 uses party size, up to 16; L2-L4 use all 16 slots. */
 	Common::Array<bool> _activeSlot;
-	/** Solution entries: level 1 uses party size, up to 16; levels 2 and 3 and internal level 4 use all 16 slots. */
+	/** Each active slot names a distinct participant in the intended solution; inactive slots contain -1. */
 	Common::Array<int> _solution;
-	/** Levels 1-3 and internal level 4 keep one generation-order entry per party member, up to 16. */
+	/** All levels keep one generation-order entry per party member, up to 16. */
 	Common::Array<int> _generationOrder;
 	/** Graph connections for the generated board. */
 	Common::Array<Edge> _edges;
-	/** Targets: level 1 uses party size, up to 16; levels 2 and 3 and internal level 4 use all 16 slots. */
+	/** Targets: L1 uses party size, up to 16; L2-L4 use all 16 slots. */
 	Common::Array<ZmbDropTarget> _targets;
 	/** Valve/cascade placement, discharge timing, and deferred Go/speech state. */
 	Common::Point32 _valvePos;
+	/** Current cascade presentation anchor in page pixels. */
 	Common::Point32 _cascadePos;
+	/** Gameplay tick in milliseconds when water discharge began. */
 	uint32 _dischargeStart = 0;
+	/** Whether departure is waiting for the current speech or animation. */
 	bool _goPending = false;
 	/** Indexed pipe and valve effects. */
 	int _sounds[6] = {
@@ -300,17 +329,20 @@ private:
 
 	/** Decorative and valve animation resources plus their active runners. */
 	Animation *_tree = nullptr;
+	/** Fountain animation data released with the page. */
 	Animation *_fountain = nullptr;
+	/** Valve animation data released with the page. */
 	Animation *_valve = nullptr;
+	/** Water-cascade animation data released with the page. */
 	Animation *_cascade = nullptr;
+	/** Playback state for the valve animation. */
 	AnimationRunner *_valveRunner = nullptr;
+	/** Playback state for the cascade animation. */
 	AnimationRunner *_cascadeRunner = nullptr;
+	/** Playback state for the tree animation. */
 	AnimationRunner *_treeRunner = nullptr;
+	/** Playback state for the fountain animation. */
 	AnimationRunner *_fountainRunner = nullptr;
-	/** Zoombini animations for dragging, waiting, and cascade aspiration. */
-	const ZoombiniAnimation *_pickup = nullptr;
-	const ZoombiniAnimation *_idle = nullptr;
-	const ZoombiniAnimation *_aspiration = nullptr;
 };
 
 } // End of namespace Zoombini2

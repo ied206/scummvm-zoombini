@@ -23,6 +23,7 @@
 #include "zoombini2/graphics.h"
 #include "zoombini2/metaengine.h"
 #include "zoombini2/sound.h"
+#include "zoombini2/text.h"
 #include "zoombini2/zoombini2.h"
 
 #include "common/config-manager.h"
@@ -41,8 +42,6 @@ constexpr const char *DialogHelp::kLeftArrowEmptyPath;
 constexpr const char *DialogHelp::kRightArrowNormalPath;
 constexpr const char *DialogHelp::kRightArrowEmptyPath;
 constexpr const char *DialogHelp::kHelpPageFormat;
-constexpr const char *DialogHelp::kMissingHelpTextEnglish;
-constexpr const char *DialogHelp::kMissingHelpTextKorean;
 
 DialogHelp::DialogHelp(Zoombini2Engine *vm)
 	: DialogBase(vm) {
@@ -61,7 +60,7 @@ DialogHelp::DialogHelp(Zoombini2Engine *vm)
 	_vm->_gfx->loadSharedBitBlock(kRightArrowEmptyPath);
 
 	// Create the saved screen buffer in the current game screen format.
-	_savedScreen = _vm->_gfx->createSurface(ManagedSurface32::kScreenSize);
+	_savedScreen = _vm->_gfx->createSurface(Gfx::kScreenSize);
 }
 
 DialogHelp::~DialogHelp() {
@@ -136,7 +135,7 @@ void DialogHelp::close() {
 
 	_vm->setDialogPaused(false);
 
-	_currentPageId = kPageNone;
+	_currentPageId = PageId::kPageNone_M1;
 	_currentLevel = -1;
 	_currentSheet = 1;
 	_transparentHelpPages = false;
@@ -173,8 +172,7 @@ void DialogHelp::drawMissingHelpText(ManagedSurface32 *screen) const {
 	if (fontHeight <= 0)
 		return;
 
-	const char *text = _vm->isKorean() ? kMissingHelpTextKorean : kMissingHelpTextEnglish;
-	const Common::U32String message(text, Common::kUtf8);
+	const Common::U32String &message = _vm->_text->getLocalizedString(Text::kMissingLevel4Help);
 	const int y = kMissingHelpTextCenterY - fontHeight / 2;
 	_vm->_gfx->drawString(screen, message, Common::Point32(kMissingHelpTextX, y), kMissingHelpTextWidth, conf);
 }

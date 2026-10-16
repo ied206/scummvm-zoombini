@@ -44,13 +44,15 @@ public:
 	/** Stop and release the decoder and retained frame. */
 	~TransitionVideo() override;
 
-	/** Open the video, select its audio volume, and begin playback. */
+	/** Record story progress, open the video, select its audio volume, and begin playback. */
 	void init() override;
 	/** Decode due frames and request the next page after playback. */
 	void onUpdate() override;
 	/** Draw the most recently decoded frame at its centered position. */
 	void onRenderContent(ManagedSurface32 *screen) override;
+	/** Skip a started video on pointer press; otherwise pass the input through. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	/** Skip a started video on any key press; otherwise pass the input through. */
 	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
 
 	/** Request a black screen behind the centered video frame. */
@@ -78,13 +80,14 @@ private:
 	/** Arisu Media studio logo Bink movie shown before the TLC logo. */
 	static constexpr const char *kLogoArisuPath = "movies/arisu.bik";
 
+	/** Queue the next page if playback has started and report whether input was consumed. */
 	EventHandleResult skip();
 	/** Select the full-size movie when present, otherwise use the half-size path. */
 	Common::Path selectMoviePath(const char *fullSizePath, const char *halfSizePath) const;
 	/** Original logical video resource name selected for the current page. */
 	Common::Path _videoPath = Common::Path();
 	/** Page requested when playback finishes or fails to start. */
-	PageId _nextPageId = kPageNone;
+	PageId _nextPageId = PageId::kPageNone_M1;
 	/** Bink Video decoder. */
 	Video::VideoDecoder *_decoder = nullptr;
 	/** Whether decoder playback started successfully. */

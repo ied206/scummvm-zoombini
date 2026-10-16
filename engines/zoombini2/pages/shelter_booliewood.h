@@ -39,8 +39,7 @@ class ZoombiniRunner;
  *
  * Arrival shelter that presents the rescued community across a scrolling panorama.
  *
- * @remark The save is considered complete after 400 Zoombinis arrive;
- * This page is only shown if the save is not complete.
+ * @remark The finale replaces this panorama when the rescued Boolie total reaches 400.
  */
 class ShelterBooliewood : public ShelterBase {
 public:
@@ -53,23 +52,26 @@ public:
 	void init() override;
 	/** Advance scrolling, attractions, walking Boolies, and crowd speech. */
 	void onUpdate() override;
+	/** Queue a panorama scroll when a left or right edge region is clicked. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
-	/** Draw the current cyclic viewport of the Booliewood panorama. */
+	/** Draw the rescued-crowd markers beneath the seated community. */
 	void onRenderContent(ManagedSurface32 *screen) override;
+	/** Draw the current viewport of the cyclic Booliewood background. */
 	void onRenderBackground(ManagedSurface32 *screen) override;
+	/** Draw seated incoming and historical Zoombinis. */
 	void onRenderActors(ManagedSurface32 *screen) override;
+	/** Advance the displayed active party's animations after drawing. */
 	void onActorsRendered() override;
+	/** Draw attraction animations and walking or waiting decorative Boolies. */
 	void onRenderForeground(ManagedSurface32 *screen) override;
 	/** Report that Booliewood has no forward Go action. */
 	bool hasGoButton() const override { return false; }
+	/** Permit debug travel with a retained village party, excluding the completed community displayed here. */
+	bool debugCanDepart() const override;
 
 private:
 	/** Installed 4000-by-600 panorama used as the scrolling Booliewood scene background. */
 	static constexpr const char *kBackgroundPath = "#bmp/booliewood/background";
-	/** Little-Zoombini sprite grid used for the seated community members. */
-	static constexpr const char *kSeatedAnimationPath = "bmp/zombis/littleZomb.anm";
-	/** Standard idle Zoombini sprite grid used for community members who animate while seated. */
-	static constexpr const char *kWalkingZoombiniAnimationPath = "bmp/zombis/attente/attenteZomb.anm";
 	/** Crowd marker for Boolies recorded as content in the historical arrival mask. */
 	static constexpr const char *kContentMarkerPath = "bmp/booliewood/piti_bool/content.rb";
 	/** Crowd marker for Boolies recorded as pas-content in the historical arrival mask. */
@@ -138,21 +140,33 @@ private:
 
 	/** Runtime state for one attraction animation. */
 	struct AttractionState {
+		/** Attraction animation released with the page, or nullptr when unavailable. */
 		Animation *animation = nullptr;
+		/** Attraction drawing anchor in panorama pixels. */
 		Common::Point32 pos = Common::Point32();
+		/** Current frame within the attraction animation. */
 		int frame = 0;
+		/** Gameplay timestamp in milliseconds for the next attraction frame. */
 		uint32 nextFrameTime = 0;
+		/** Whether this attraction participates in the current development stage. */
 		bool active = false;
 	};
 
 	/** Runtime state for one Boolie that alternates between waiting and walking. */
 	struct CrowdActorState {
+		/** Walking route released with the page, or nullptr when unavailable. */
 		PathObject *path = nullptr;
+		/** Waiting-animation anchor in panorama pixels. */
 		Common::Point32 waitPos = Common::Point32();
+		/** Current drawing anchor in panorama pixels. */
 		Common::Point32 pos = Common::Point32();
+		/** Gameplay timestamp in milliseconds when the next walk may begin. */
 		uint32 nextWalkTime = 0;
+		/** Gameplay timestamp in milliseconds for the next waiting or walking frame. */
 		uint32 nextFrameTime = 0;
+		/** Current frame in the selected waiting or walking animation. */
 		int frame = 0;
+		/** Whether the actor is following its route instead of waiting. */
 		bool walking = false;
 	};
 
@@ -220,7 +234,7 @@ private:
 	/** Seat incoming and historical Zoombinis from the active savefile. */
 	void buildSeatedCommunity(uint32 now);
 	/** Reconstruct one historical Zoombini from @p traitHash. */
-	static ZoombiniRunner *createHistoricalZoombini(int32 traitHash);
+	ZoombiniRunner *createHistoricalZoombini(int32 traitHash);
 	/** Advance the looping attenteZomb frames assigned to historical Zoombinis. */
 	void updateSeatedAnimations(uint32 now);
 
@@ -284,10 +298,6 @@ private:
 	/** Decorative walking actor state. */
 	CrowdActorState _crowdActors[kCrowdActorCount] = {};
 
-	/** Immutable seated sprite grid borrowed from the engine cache and retained across page transitions. */
-	const ZoombiniAnimation *_zoombiniAnimation = nullptr;
-	/** Immutable walking sprite grid borrowed from the engine cache and retained across page transitions. */
-	const ZoombiniAnimation *_walkingZoombiniAnimation = nullptr;
 	/** Shared walking animation used by the 17 decorative actors. */
 	Animation *_walkingAnimation = nullptr;
 	/** Shared waiting animation used by the 17 decorative actors. */

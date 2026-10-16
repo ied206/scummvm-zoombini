@@ -31,13 +31,14 @@
 #include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
+#include "zoombini2/text.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
 constexpr const char *InteractiveMap::kBackgroundPath;
 constexpr const char *InteractiveMap::kPracticeStatsPath;
-constexpr const char *InteractiveMap::kSavedGameStatsPath;
+constexpr const char *InteractiveMap::kJourneyStatsPath;
 constexpr const char *InteractiveMap::kBlipSoundPath;
 constexpr const char *InteractiveMap::kDisabledIconFormat;
 constexpr const char *InteractiveMap::kIconFormat;
@@ -55,6 +56,36 @@ constexpr const char *InteractiveMap::kQuitNormalPath;
 constexpr const char *InteractiveMap::kQuitHighlightPath;
 constexpr const char *InteractiveMap::kQuitConfirmationPath;
 
+/**
+ * Title sprite draw positions {x, y}.
+ * Each entry supplies the title origin for one page icon.
+ */
+constexpr Common::Point32 InteractiveMap::kTitlePos[kNumTitles];
+
+/** Stat label Y positions. */
+constexpr int InteractiveMap::kStatLabelY[4];
+
+/**
+ * Title sprite filenames per page (0-12).
+ */
+constexpr const char *InteractiveMap::kTitleFiles[];
+
+/**
+ * Segment draw positions {x, y}.
+ * Slots 12 and 13 intentionally share a position.
+ * Slot 13 duplicates slot 12 (both 661, 101).
+ */
+constexpr Common::Point32 InteractiveMap::kSegmentPos[kNumSegments];
+
+/** Journey route drawing order and difficulty sources. */
+constexpr InteractiveMap::RouteSegmentDraw InteractiveMap::kJourneyRouteSegments[];
+constexpr const char *InteractiveMap::kSegmentDirs[];
+
+// Branch resources use b-before-a slot order rather than alphabetical suffix order.
+constexpr const char *InteractiveMap::kSegmentFiles[];
+constexpr const char *InteractiveMap::kLegendFiles[];
+constexpr RGBColor InteractiveMap::kL4Color;
+
 // ============================================================================
 // Static map-screen geometry and resource tables.
 // ============================================================================
@@ -64,59 +95,30 @@ constexpr const char *InteractiveMap::kQuitConfirmationPath;
  * The right and bottom edges remain exclusive, matching the original hit test.
  */
 const Common::Rect InteractiveMap::kIconHitRects[kNumIcons] = {
-	Common::Rect(155, 343, 194, 418), //  0 ShelterZombiniville
-	Common::Rect(168, 259, 209, 301), //  1 CrazyTurtle
-	Common::Rect(237, 206, 297, 256), //  2 Waterslide
-	Common::Rect(305, 241, 359, 287), //  3 Aquacube
-	Common::Rect(355, 290, 409, 335), //  4 Rescue1
-	Common::Rect(441, 341, 470, 379), //  5 MysticMarsh
-	Common::Rect(424, 235, 454, 268), //  6 MagicWall
-	Common::Rect(517, 346, 559, 390), //  7 WallOfFleens
-	Common::Rect(515, 215, 546, 262), //  8 ChezNorf
-	Common::Rect(531, 277, 589, 321), //  9 Rescue2
-	Common::Rect(591, 237, 639, 264), // 10 Snowboard
-	Common::Rect(642, 190, 685, 235), // 11 Boolies
-	Common::Rect(709, 48, 798, 124)   // 12 Booliewood
+	Common::Rect(155, 343, 194, 418), //<  0 Zombiniville
+	Common::Rect(168, 259, 209, 301), //<  1 CrazyTurtle
+	Common::Rect(237, 206, 297, 256), //<  2 Waterslide
+	Common::Rect(305, 241, 359, 287), //<  3 Aquacube
+	Common::Rect(355, 290, 409, 335), //<  4 RescueSite1
+	Common::Rect(441, 341, 470, 379), //<  5 MysticMarsh
+	Common::Rect(424, 235, 454, 268), //<  6 MagicWall
+	Common::Rect(517, 346, 559, 390), //<  7 WallOfFleens
+	Common::Rect(515, 215, 546, 262), //<  8 ChezNorf
+	Common::Rect(531, 277, 589, 321), //<  9 RescueSite2
+	Common::Rect(591, 237, 639, 264), //< 10 Snowboard
+	Common::Rect(642, 190, 685, 235), //< 11 Boolies
+	Common::Rect(709, 48, 798, 124),  //< 12 Booliewood
 };
-/**
- * Title sprite draw positions {x, y}.
- * Each entry supplies the title origin for one page icon.
- */
-constexpr Common::Point32 InteractiveMap::kTitlePos[kNumTitles];
-/** Stat label Y positions. */
-constexpr int InteractiveMap::kStatLabelY[4];
-/**
- * Title sprite filenames per page (0-12).
- */
-constexpr const char *InteractiveMap::kTitleFiles[];
-/**
- * Segment draw positions {x, y}.
- * Slots 12 and 13 intentionally share a position.
- * Slot 13 duplicates slot 12 (both 661, 101).
- */
-constexpr Common::Point32 InteractiveMap::kSegmentPos[kNumSegments];
-/**
- * Segment-to-page mapping for saved-game page-level drawing.
- * The saved-game route uses each mapped page's stored level.
- * Index = segment slot, value = page ID.
- * Slot 12 is unused in saved-game mode.
- */
-constexpr PageId InteractiveMap::kSegmentPageIds[kNumSegments];
-constexpr const char *InteractiveMap::kSegmentDirs[];
-// Branch resources use b-before-a slot order rather than alphabetical suffix order.
-constexpr const char *InteractiveMap::kSegmentFiles[];
-constexpr const char *InteractiveMap::kLegendFiles[];
-constexpr const char32_t *InteractiveMap::kL4TabLabelEn;
-constexpr const char32_t *InteractiveMap::kL4TabLabelKo;
-constexpr RGBColor InteractiveMap::kL4Color;
-
 // ============================================================================
 // Construction / Destruction
 // ============================================================================
 
-InteractiveMap::InteractiveMap(Zoombini2Engine *vm, MapScreenMode mode)
+InteractiveMap::InteractiveMap(Zoombini2Engine *vm, GameMode mode)
 	: InteractiveBase(vm), _mode(mode) {
-	_pageId = kPageMapScreen;
+	if (inPracticeMode())
+		_pageId = PageId::kPageMapPractice_M3;
+	else
+		_pageId = PageId::kPageMapJourney_M4;
 }
 
 InteractiveMap::~InteractiveMap() {
@@ -132,15 +134,15 @@ InteractiveMap::~InteractiveMap() {
 // ============================================================================
 
 void InteractiveMap::init() {
-	debug(1, "MapScreenPage::init (mode=%d)", _mode);
+	debug(1, "MapScreenPage::init (mode=%s)", inPracticeMode() ? "practice" : "journey");
 	SoundManager *sm = _vm->getSoundManager();
 	GameState *gs = _vm->_state;
-	if (!isPracticeMode() && _vm->_isSavedGame)
+	if (inJourneyMode() && _vm->inJourneyMode())
 		_vm->writeGameSave(gs->getPlayerName());
 	_vm->_state->clearActiveZoombinis();
-	_vm->_isSavedGame = !isPracticeMode();
-	if (isPracticeMode()) {
-		PageId practicePageId = kPageNone;
+	_vm->setGameMode(_mode);
+	if (inPracticeMode()) {
+		PageId practicePageId = PageId::kPageNone_M1;
 		int practiceLevel = 0;
 		uint practicePartySize = 0;
 		if (_vm->takePracticePuzzleLaunch(practicePageId, practiceLevel, practicePartySize)) {
@@ -148,15 +150,15 @@ void InteractiveMap::init() {
 			gs->_level = _currentLevel;
 			_vm->_returningFromPuzzle = false;
 			createPracticeParty(_vm, practicePageId, practicePartySize);
-			_vm->_mapTransitionSourcePageId = practicePageId;
+			_vm->_mapTransitSrcPageId = practicePageId;
 			_vm->requestPageChange(practicePageId);
 			return;
 		}
 	}
 
-	// The saved-game map always exposes the starting hub.
-	if (!isPracticeMode()) {
-		gs->_pageLevel[static_cast<int>(kPageZombiniville)] = 1;
+	// The journey map always exposes the starting hub.
+	if (inJourneyMode()) {
+		gs->setPageLevel(PageId::kPageZombiniville_00, 1);
 	}
 
 	// --- Background ---
@@ -182,15 +184,15 @@ void InteractiveMap::init() {
 	loadSegments();
 
 	// --- Stats overlays (both always loaded) ---
-	// Practice and saved-game maps use different statistics panels.
+	// Practice and journey maps use different statistics panels.
 	if (_vm->_gfx->loadPageRleBlock(kPracticeStatsPath))
 		_statsPracticePath = kPracticeStatsPath;
 	else
 		_statsPracticePath.clear();
-	if (_vm->_gfx->loadPageRleBlock(kSavedGameStatsPath))
-		_statsSavedGamePath = kSavedGameStatsPath;
+	if (_vm->_gfx->loadPageRleBlock(kJourneyStatsPath))
+		_statsJourneyPath = kJourneyStatsPath;
 	else
-		_statsSavedGamePath.clear();
+		_statsJourneyPath.clear();
 
 	// --- Legend bitmaps (all 4: off, level1, level2, level3) ---
 	for (int i = 0; i < kNumLegends; i++) {
@@ -202,14 +204,14 @@ void InteractiveMap::init() {
 	}
 
 	// --- Set initial level ---
-	if (isPracticeMode()) {
+	if (inPracticeMode()) {
 		_currentLevel = _vm->getPracticeLevel();
 		if (_currentLevel == 4 && !_vm->allowCutL4PracticePuzzles()) {
 			_currentLevel = 3;
 			_vm->setPracticeLevel(_currentLevel);
 		}
 	} else {
-		// Saved-game routes use per-page levels.
+		// Journey routes use per-page levels.
 		_currentLevel = gs->getLevel();
 	}
 
@@ -232,7 +234,7 @@ void InteractiveMap::init() {
 void InteractiveMap::setupIcons() {
 	GameState *gs = _vm->_state;
 
-	if (isPracticeMode()) {
+	if (inPracticeMode()) {
 		// Practice mode:
 		// Hubs (0,4,9,12): gray, not clickable.
 		// Puzzles (1-3, 5-8, 10-11): colored, clickable.
@@ -253,7 +255,7 @@ void InteractiveMap::setupIcons() {
 			}
 		}
 	} else {
-		// Saved-game mode:
+		// Journey mode:
 		if (400 <= gs->_rescuedBoolieCount) {
 			// Endgame state: all gray except Booliewood (icon 12).
 			for (int i = 0; i < kNumIcons; i++) {
@@ -346,7 +348,7 @@ void InteractiveMap::createPracticeParty(Zoombini2Engine *vm, PageId pageId, uin
 		if (!practiceCandidateFitsPack(vm, traits))
 			continue;
 
-		ZoombiniRunner *zoombini = new ZoombiniRunner();
+		ZoombiniRunner *zoombini = new ZoombiniRunner(vm);
 		zoombini->setTraits(traits);
 		zoombini->setInputEnabled(true);
 		zoombini->setCanAdvanceFromPage(false);
@@ -384,10 +386,15 @@ void InteractiveMap::loadSegments() {
 
 void InteractiveMap::loadButtons() {
 	struct ButtonSetup {
+		/** Button hit rectangle in map-page pixels. */
 		Common::Rect rect;
+		/** Whether this button loads RLE sprites rather than uncompressed bitmaps. */
 		bool isRle;
+		/** Resource key for the button's normal appearance. */
 		const char *normalName;
+		/** Resource key for the button's hover appearance. */
 		const char *hiliteName;
+		/** Resource key for the disabled appearance, or null when none is supplied. */
 		const char *grayName;
 	};
 
@@ -406,8 +413,8 @@ void InteractiveMap::loadButtons() {
 		 kQuitNormalPath,
 		 kQuitHighlightPath, nullptr},
 	};
-	// Button 2: Game in practice mode or Entraine in saved-game mode
-	if (isPracticeMode())
+	// Button 2: Game in practice mode or Entraine in journey mode
+	if (inPracticeMode())
 		setup[2] = ButtonSetup{Common::Rect(468, 561, 613, 600), true,
 							   kGameNormalPath,
 							   kGameHighlightPath,
@@ -429,7 +436,7 @@ void InteractiveMap::loadButtons() {
 
 		// Button 2 is always enabled for a saved game.
 		// Practice can switch back to the active game only after one exists.
-		if (i == 2 && isPracticeMode()) {
+		if (i == 2 && inPracticeMode()) {
 			btn.enabled = gs && !gs->getPlayerName().empty();
 		} else {
 			btn.enabled = true;
@@ -490,7 +497,7 @@ void InteractiveMap::computeStats() {
 // ============================================================================
 
 void InteractiveMap::onUpdate() {
-	if (isPracticeMode() && _currentLevel == 4 && !_vm->allowCutL4PracticePuzzles()) {
+	if (inPracticeMode() && _currentLevel == 4 && !_vm->allowCutL4PracticePuzzles()) {
 		_currentLevel = 3;
 		_vm->setPracticeLevel(_currentLevel);
 	}
@@ -504,7 +511,7 @@ void InteractiveMap::onUpdate() {
 	_hoveredIcon = hitTestIcon(mouseEventPos);
 
 	// Legend tabs are available in practice mode only.
-	if (isPracticeMode()) {
+	if (inPracticeMode()) {
 		_hoveredLegendTab = hitTestLegendTab(mousePos);
 	} else {
 		_hoveredLegendTab = 0;
@@ -532,23 +539,23 @@ void InteractiveMap::onRenderContent(ManagedSurface32 *screen) {
 	_vm->_gfx->drawBackground(screen, Common::Point32(0, 0));
 
 	// 2. Path segments
-	if (isPracticeMode()) {
+	if (inPracticeMode()) {
 		drawPracticeSegments(screen);
 	} else {
-		drawSavedGameSegments(screen);
+		drawJourneySegments(screen);
 	}
 
 	// 3. Stats panel and text
-	if (isPracticeMode()) {
+	if (inPracticeMode()) {
 		// New-game mode: only draw stats_scr3 panel, no numbers or name.
 		// Practice mode shows instructions without player statistics.
 		if (!_statsPracticePath.empty())
 			_vm->_gfx->drawPageRleBlock(screen, _statsPracticePath, Common::Point32(10, 10));
 	} else {
 		// Load-game mode: draw stats_scr1 panel + player name + stat numbers.
-		// Saved-game mode shows the player name and four progress rows.
-		if (!_statsSavedGamePath.empty())
-			_vm->_gfx->drawPageRleBlock(screen, _statsSavedGamePath, Common::Point32(10, 10));
+		// Journey mode shows the player name and four progress rows.
+		if (!_statsJourneyPath.empty())
+			_vm->_gfx->drawPageRleBlock(screen, _statsJourneyPath, Common::Point32(10, 10));
 
 		Gfx::TextConf conf;
 		conf.fontKind = Gfx::FontKind::kBmtFont;
@@ -562,7 +569,7 @@ void InteractiveMap::onRenderContent(ManagedSurface32 *screen) {
 		_vm->_gfx->drawString(screen, name, Common::Point32(nameX, 10), Gfx::kNoMaxWidth, conf);
 
 		// Stat numbers (right-aligned at x=226, Y from kStatLabelY)
-		for (int i = 0; i < 4; i++) {
+		for (int i = 0; i < ARRAYSIZE(_stats); i++) {
 			Common::String valStr = Common::String::format("%d", _stats[i]);
 			int valWidth = _vm->_gfx->getTextWidth(valStr, conf);
 			_vm->_gfx->drawString(screen, valStr, Common::Point32(226 - valWidth, kStatLabelY[i]), Gfx::kNoMaxWidth, conf);
@@ -571,7 +578,7 @@ void InteractiveMap::onRenderContent(ManagedSurface32 *screen) {
 
 	// 4. Practice legend
 	// The legend highlights only the tab currently under the mouse.
-	if (isPracticeMode()) {
+	if (inPracticeMode()) {
 		// Always draw legend_off base
 		if (!_legends[0].empty())
 			_vm->_gfx->drawPageBitBlock(screen, _legends[0], Common::Point32(590, 427));
@@ -691,15 +698,7 @@ void InteractiveMap::drawL4Legend(ManagedSurface32 *screen) const {
 	if (fontHeight <= 0)
 		return;
 
-	Common::U32String label;
-	switch (_vm->getLanguage()) {
-	case Common::KO_KOR:
-		label = kL4TabLabelKo;
-		break;
-	default:
-		label = kL4TabLabelEn;
-		break;
-	}
+	const Common::U32String &label = _vm->_text->getLocalizedString(Text::kRestoredLevelLabel);
 
 	const int textX = kL4TabRight + kL4TabTextMargin;
 	int textY = kL4TabTop + (kL4TabBottom - kL4TabTop - fontHeight) / 2;
@@ -741,34 +740,16 @@ void InteractiveMap::drawL4Legend(ManagedSurface32 *screen) const {
 }
 
 // ============================================================================
-// Saved-game route drawing
+// Journey route drawing
 // ============================================================================
 
-void InteractiveMap::drawSavedGameSegments(ManagedSurface32 *screen) {
-	// Draw specific slots using each page's stored level.
-	// Draw order: 10, 1, 2, 3, 5, 4, 7, 6, 9, 8, 0, 11, 13
-	// (Skips slot 12, draws slot 13 instead at same position.)
+void InteractiveMap::drawJourneySegments(ManagedSurface32 *screen) {
 	GameState *gs = _vm->_state;
 
-	static constexpr int drawOrder[] = {
-		10,
-		1,
-		2,
-		3,
-		5,
-		4,
-		7,
-		6,
-		9,
-		8,
-		0,
-		11,
-		13,
-	};
-	for (int idx = 0; idx < 13; idx++) {
-		int slot = drawOrder[idx];
-		PageId pageId = kSegmentPageIds[slot];
-		int tier = gs->_pageLevel[static_cast<int>(pageId)];
+	for (int i = 0; i < ARRAYSIZE(kJourneyRouteSegments); i++) {
+		const RouteSegmentDraw &segment = kJourneyRouteSegments[i];
+		const int slot = segment.segmentSlot;
+		int tier = gs->getPageLevel(segment.levelPageId);
 		if (tier < 0 || kNumLevelTiers <= tier)
 			tier = 0;
 
@@ -785,13 +766,19 @@ EventHandleResult InteractiveMap::handleVolumePanelInput(const Common::Point &po
 	if (!_volumePanel)
 		return EventHandleResult::kPassthrough;
 	const VolumePanelResult result = _volumePanel->handleMouseInput(Common::Point32(pos), _volumePanelMouseDown, mouseReleased);
-	if (result == kVolumePanelChanged) {
+	switch (result) {
+	case kVolumePanelChanged:
 		applyVolumePanelVolumes(true, false);
 		_volumePanel->playPreviewSound();
-	} else if (result == kVolumePanelApply) {
+		break;
+	case kVolumePanelApply:
 		closeVolumePanel(true);
-	} else if (result == kVolumePanelCancel) {
+		break;
+	case kVolumePanelCancel:
 		closeVolumePanel(false);
+		break;
+	default:
+		break;
 	}
 	return EventHandleResult::kConsumed;
 }
@@ -819,15 +806,15 @@ EventHandleResult InteractiveMap::onKeyDown(const Common::KeyState &key, bool re
 	if (repeat)
 		return EventHandleResult::kConsumed;
 	if ((key.flags & Common::KBD_CTRL) != 0 && key.keycode == Common::KEYCODE_p) {
-		if (isPracticeMode()) {
+		if (inPracticeMode()) {
 			if (_buttons[2].enabled)
-				_vm->requestPageChange(kPageMenuLoad);
+				_vm->requestPageChange(PageId::kPageMapJourney_M4);
 		} else {
-			_vm->requestPageChange(kPageMenuPractice);
+			_vm->requestPageChange(PageId::kPageMapPractice_M3);
 		}
 		return EventHandleResult::kConsumed;
 	}
-	if (isPracticeMode() && key.hasFlags(0)) {
+	if (inPracticeMode() && key.hasFlags(0)) {
 		int level = 0;
 		switch (key.keycode) {
 		case Common::KEYCODE_1:
@@ -862,7 +849,7 @@ EventHandleResult InteractiveMap::onLButtonDown(const Common::Point &pos) {
 	}
 
 	// Check practice level tabs.
-	if (isPracticeMode()) {
+	if (inPracticeMode()) {
 		const int tab = hitTestLegendTab(Common::Point32(pos));
 		if (selectPracticeLevel(tab)) {
 			return EventHandleResult::kConsumed;
@@ -878,18 +865,18 @@ EventHandleResult InteractiveMap::onLButtonDown(const Common::Point &pos) {
 		switch (btnClicked) {
 		case 0:
 			debug(1, "MapScreenPage: Files button clicked");
-			_vm->requestPageChange(kPageMenuOptions);
+			_vm->requestPageChange(PageId::kPageMenuOptions_M2);
 			break;
 		case 1:
 			debug(1, "MapScreenPage: Options button clicked");
 			openVolumePanel();
 			break;
 		case 2:
-			debug(1, "MapScreenPage: Game/Entraine button clicked (mode=%d)", _mode);
-			if (isPracticeMode()) {
-				_vm->requestPageChange(kPageMenuLoad);
+			debug(1, "MapScreenPage: Game/Entraine button clicked (mode=%s)", inPracticeMode() ? "practice" : "journey");
+			if (inPracticeMode()) {
+				_vm->requestPageChange(PageId::kPageMapJourney_M4);
 			} else {
-				_vm->requestPageChange(kPageMenuPractice);
+				_vm->requestPageChange(PageId::kPageMapPractice_M3);
 			}
 			break;
 		case 3:
@@ -912,10 +899,10 @@ EventHandleResult InteractiveMap::onLButtonDown(const Common::Point &pos) {
 			_vm->getSoundManager()->play(_blipSoundId);
 		}
 
-		// Saved-game navigation uses the selected page's stored level.
+		// Journey navigation uses the selected page's stored level.
 		GameState *gs = _vm->_state;
-		if (!isPracticeMode()) {
-			_currentLevel = gs->_pageLevel[clicked];
+		if (inJourneyMode()) {
+			_currentLevel = gs->getPageLevel(static_cast<PageId>(clicked));
 		}
 		if (_currentLevel == 0)
 			return EventHandleResult::kConsumed;
@@ -923,22 +910,22 @@ EventHandleResult InteractiveMap::onLButtonDown(const Common::Point &pos) {
 
 		switch (clicked) {
 		case 0:
-			_vm->requestPageChange(kPageZombiniville);
+			_vm->requestPageChange(PageId::kPageZombiniville_00);
 			break;
 		case 4:
-			_vm->requestPageChange(kPageRescue1);
+			_vm->requestPageChange(PageId::kPageRescue1_04);
 			break;
 		case 9:
-			_vm->requestPageChange(kPageRescue2);
+			_vm->requestPageChange(PageId::kPageRescue2_09);
 			break;
 		case 12:
-			_vm->requestPageChange(kPageBooliewood);
+			_vm->requestPageChange(PageId::kPageBooliewood_12);
 			break;
 		default:
 			_vm->_returningFromPuzzle = false;
-			if (isPracticeMode())
+			if (inPracticeMode())
 				createPracticeParty(_vm, static_cast<PageId>(clicked));
-			_vm->_mapTransitionSourcePageId = static_cast<PageId>(clicked);
+			_vm->_mapTransitSrcPageId = static_cast<PageId>(clicked);
 			_vm->requestPageChange(static_cast<PageId>(clicked));
 			break;
 		}
@@ -964,7 +951,7 @@ int InteractiveMap::hitTestButton(const Common::Point &pos) const {
 }
 
 int InteractiveMap::hitTestIcon(const Common::Point &pos) const {
-	if (isPracticeMode()) {
+	if (inPracticeMode()) {
 		// Practice mode checks puzzle icons only.
 		for (int i = 1; i < 12; i++) {
 			if (!_iconClickable[i])
@@ -976,7 +963,7 @@ int InteractiveMap::hitTestIcon(const Common::Point &pos) const {
 			}
 		}
 	} else {
-		// Saved-game mode checks all enabled hub and final icons.
+		// Journey mode checks all enabled hub and final icons.
 		for (int i = 0; i < kNumIcons; i++) {
 			if (!_iconClickable[i])
 				continue;
@@ -1050,21 +1037,21 @@ void InteractiveMap::requestQuitConfirmation() {
 
 void InteractiveMap::handleQuitConfirmation(DialogMsgBoxButton button) {
 	if (button == DialogMsgBoxButton::kOkay01)
-		_vm->requestPageChange(kPageCredits);
+		_vm->requestPageChange(PageId::kPageCredits_16);
 }
 
 uint InteractiveMap::getPracticePartySize(PageId pageId) {
 	switch (pageId) {
-	case kPageCrazyTurtle:
-	case kPageWaterslide:
-	case kPageAquacube:
+	case PageId::kPageCrazyTurtle_01:
+	case PageId::kPageWaterslide_02:
+	case PageId::kPageAquacube_03:
 		return kMaxPackSize;
-	case kPageMysticMarsh:
-	case kPageMagicWall:
-	case kPageWallOfFleens:
-	case kPageChezNorf:
-	case kPageSnowboard:
-	case kPageBoolies:
+	case PageId::kPageMysticMarsh_05:
+	case PageId::kPageMagicWall_06:
+	case PageId::kPageWallOfFleens_07:
+	case PageId::kPageChezNorf_08:
+	case PageId::kPageSnowboard_10:
+	case PageId::kPageBoolies_11:
 		return kPostRescuePackSize;
 	default:
 		return 0;

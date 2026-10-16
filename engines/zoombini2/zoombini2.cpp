@@ -79,22 +79,26 @@ constexpr const char *Zoombini2Engine::kDebugZoombiniSetFileNameFormat;
 /** Resolve original logical resource names against their distinct physical roots. */
 class Zoombini2Engine::ResourceFileResolver : public Common::NonCopyable {
 public:
+	/** Create disc and installed directory views retained until resolver destruction. */
 	ResourceFileResolver(const Common::FSNode &cdDataDirectory, const Common::FSNode &installedDirectory)
 		: _cdDataDirectory(cdDataDirectory.isDirectory() ? new Common::FSDirectory(cdDataDirectory, 8) : nullptr),
 		  _installedDirectory(installedDirectory.isDirectory() ? new Common::FSDirectory(installedDirectory, 8) : nullptr) {
 	}
 
+	/** Delete the retained disc and installed directory views. */
 	~ResourceFileResolver() {
 		delete _cdDataDirectory;
 		delete _installedDirectory;
 	}
 
+	/** Return whether the logical resource exists in its selected physical root. */
 	bool hasFile(const Common::String &path) const {
 		Common::Path relativePath;
 		const Common::FSDirectory *directory = resolvePath(path, relativePath);
 		return directory && directory->hasFile(relativePath);
 	}
 
+	/** Return a newly allocated stream for the logical resource, or nullptr when unavailable. */
 	Common::SeekableReadStream *openFile(const Common::String &path) const {
 		Common::Path relativePath;
 		const Common::FSDirectory *directory = resolvePath(path, relativePath);
@@ -102,19 +106,11 @@ public:
 	}
 
 private:
+	/** Select the disc or installed directory and write its normalized relative path. */
 	const Common::FSDirectory *resolvePath(const Common::String &path, Common::Path &relativePath) const {
-		Common::String logicalPath(path);
-		logicalPath.replace('\\', '/');
-		uint offset = 0;
+		const Common::String logicalPath = normalizeResourcePath(path).toString('/');
 		const bool useInstalledDirectory = !logicalPath.empty() && logicalPath[0] == '#';
-		if (useInstalledDirectory)
-			offset += 1;
-		else if (logicalPath.hasPrefixIgnoreCase("Data/"))
-			offset += 5;
-		if (offset < logicalPath.size() && logicalPath[offset] == '.')
-			offset += 1;
-		if (offset < logicalPath.size() && logicalPath[offset] == '/')
-			offset += 1;
+		const uint offset = useInstalledDirectory ? 1 : 0;
 		if (logicalPath.size() <= offset)
 			return nullptr;
 
@@ -122,9 +118,79 @@ private:
 		return useInstalledDirectory ? _installedDirectory : _cdDataDirectory;
 	}
 
+	/** Disc Data directory view released with this resolver, or nullptr when absent. */
 	Common::FSDirectory *_cdDataDirectory;
+	/** Installed HD directory view released with this resolver, or nullptr when absent. */
 	Common::FSDirectory *_installedDirectory;
 };
+
+Common::Path Zoombini2Engine::normalizeResourcePath(const Common::String &path) {
+	Common::String logicalPath(path);
+	logicalPath.replace('\\', '/');
+	const bool installed = !logicalPath.empty() && logicalPath[0] == '#';
+	uint offset = 0;
+	if (installed)
+		offset = 1;
+	else if (logicalPath.hasPrefixIgnoreCase("Data/"))
+		offset = 5;
+	if (offset < logicalPath.size() && logicalPath[offset] == '.')
+		offset += 1;
+	if (offset < logicalPath.size() && logicalPath[offset] == '/')
+		offset += 1;
+	logicalPath = logicalPath.substr(offset);
+	if (installed && !logicalPath.empty())
+		logicalPath = "#" + logicalPath;
+	return Common::Path(logicalPath, '/');
+}
+
+Zoombini2Engine::PageResourceType Zoombini2Engine::inferPageResourceType(const Common::Path &path) {
+	const Common::String name = path.toString('/');
+	if (name.hasSuffixIgnoreCase(".bb") || name.hasSuffixIgnoreCase(".bmp"))
+		return PageResourceType::kBitmap;
+	if (name.hasSuffixIgnoreCase(".rb"))
+		return PageResourceType::kSprite;
+	if (name.hasSuffixIgnoreCase(".an"))
+		return PageResourceType::kAnimation;
+	if (name.hasSuffixIgnoreCase(".anm"))
+		return PageResourceType::kZoombiniAnimation;
+	if (name.hasSuffixIgnoreCase(".pat"))
+		return PageResourceType::kPath;
+	if (name.hasSuffixIgnoreCase(".wav"))
+		return PageResourceType::kSound;
+	if (name.hasSuffixIgnoreCase(".bik"))
+		return PageResourceType::kVideo;
+	if (name.hasSuffixIgnoreCase(".ztl"))
+		return PageResourceType::kLayout;
+	return PageResourceType::kUnknown;
+}
+
+void Zoombini2Engine::recordPageResource(const Common::String &path, bool cacheUsed, PageResourceType type) const {
+	const Common::Path key = normalizeResourcePath(path);
+	if (key.empty())
+		return;
+	PageResourceIndex::const_iterator found = _pageResourceIndex.find(key);
+	uint index;
+	if (found == _pageResourceIndex.end()) {
+		index = _pageResources.size();
+		PageResource resource;
+		resource.path = key;
+		resource.type = inferPageResourceType(key);
+		_pageResources.push_back(resource);
+		_pageResourceIndex[key] = index;
+	} else {
+		index = found->_value;
+	}
+	if (type != PageResourceType::kUnknown)
+		_pageResources[index].type = type;
+	if (cacheUsed)
+		_pageResources[index].cacheUsed = true;
+	else
+		_pageResources[index].opened = true;
+}
+
+void Zoombini2Engine::recordPageResourceCacheUse(const Common::String &path, PageResourceType type) const {
+	recordPageResource(path, true, type);
+}
 
 Common::FSNode Zoombini2Engine::findChildDirectoryIgnoreCase(const Common::FSNode &directory, const char *name) {
 	Common::FSList children;
@@ -167,6 +233,8 @@ void Zoombini2Engine::initializePath(const Common::FSNode &gamePath) {
 		warning("Zoombini2Engine: installed resource root is unavailable");
 
 	clearPagePATCache();
+	_pageResources.clear();
+	_pageResourceIndex.clear();
 	delete _resourceFileResolver;
 	_resourceFileResolver = new ResourceFileResolver(cdDataRoot, installedRoot);
 }
@@ -181,13 +249,13 @@ Zoombini2Engine::Zoombini2Engine(OSystem *syst, const Zoombini2GameDescription *
 }
 
 Zoombini2Engine::~Zoombini2Engine() {
-	_nextPageId = kPageNone;
+	_nextPageId = PageId::kPageNone_M1;
 	destroyCurrentPage();
 	clearCursorImages(0);
+	delete _puzzleRetryState;
 	if (_state)
 		writeGameSave(_state->getPlayerName());
 	delete _state;
-	clearZoombiniAnimationCache();
 
 	delete _sidebar;
 	delete _soundManager;
@@ -197,42 +265,26 @@ Zoombini2Engine::~Zoombini2Engine() {
 	delete _resourceFileResolver;
 }
 
-const ZoombiniAnimation *Zoombini2Engine::loadZoombiniAnimation(const Common::Path &path, uint32 frameDelay) {
-	ZoombiniAnimationCache::const_iterator cached = _zoombiniAnimationCache.find(path);
-	if (cached != _zoombiniAnimationCache.end()) {
-		cached->_value->setFrameDelay(frameDelay);
-		return cached->_value;
-	}
-
-	ZoombiniAnimation *animation = new ZoombiniAnimation(this);
-	if (!animation->loadFromFile(path)) {
-		delete animation;
-		return nullptr;
-	}
-	animation->setFrameDelay(frameDelay);
-	_zoombiniAnimationCache[path] = animation;
-	return animation;
-}
-
-void Zoombini2Engine::clearZoombiniAnimationCache() {
-	for (ZoombiniAnimationCache::iterator entry = _zoombiniAnimationCache.begin(); entry != _zoombiniAnimationCache.end(); entry++)
-		delete entry->_value;
-	_zoombiniAnimationCache.clear();
-}
-
 PathObject *Zoombini2Engine::loadPagePATPath(const Common::Path &path) {
 	Common::String logicalPath = path.toString('/');
 
 	logicalPath.replace('\\', '/');
 	const Common::Path key(logicalPath);
+	// Reuse the page's cached template, returning a separate copy for playback.
 	PATPathCache::const_iterator cached = _pagePATPaths.find(key);
 
-	if (cached != _pagePATPaths.end())
+	if (cached != _pagePATPaths.end()) {
+		if (cached->_value)
+			recordPageResourceCacheUse(logicalPath, PageResourceType::kPath);
 		return cached->_value ? cached->_value->createUnstartedCopy() : nullptr;
+	}
 
-	const PathObject *pathTemplate = PathObject::loadUncachedPAT(this, key);
+	// On a cache miss, read the PAT file and cache its template or the failed load.
+	const PathObject *pathTemplate = PathObject::loadFromPAT(this, key);
 
 	_pagePATPaths[key] = pathTemplate;
+	if (pathTemplate)
+		recordPageResourceCacheUse(logicalPath, PageResourceType::kPath);
 	return pathTemplate ? pathTemplate->createUnstartedCopy() : nullptr;
 }
 
@@ -243,7 +295,7 @@ void Zoombini2Engine::clearPagePATCache() {
 }
 
 bool Zoombini2Engine::writeGameSave(const Common::String &savefileName) {
-	if (!_isSavedGame || !_state || _state->getPlayerName().empty() || savefileName.empty() || _activeSavefileName.empty())
+	if (inPracticeMode() || !_state || _state->getPlayerName().empty() || savefileName.empty() || _activeSavefileName.empty())
 		return true;
 	const Common::String &activeSavefileName = _activeSavefileName;
 	if (isGameSaveWriteLocked(activeSavefileName) || _activeSavefileReadOnly)
@@ -254,7 +306,7 @@ bool Zoombini2Engine::writeGameSave(const Common::String &savefileName) {
 void Zoombini2Engine::resetGameState() {
 	_activeSavefileName.clear();
 	_activeSavefileReadOnly = false;
-	_isSavedGame = false;
+	setGameMode(GameMode::kPracticeMode);
 	if (_state)
 		_state->init();
 }
@@ -346,13 +398,13 @@ bool Zoombini2Engine::isGameSaveReadOnly(const Common::String &savefileName) con
 }
 
 bool Zoombini2Engine::takePracticePuzzleLaunch(PageId &pageId, int &level, uint &partySize) {
-	if (_practicePageId == kPageNone || _practicePuzzleLevel == 0)
+	if (_practicePageId == PageId::kPageNone_M1 || _practicePuzzleLevel == 0)
 		return false;
 
 	pageId = _practicePageId;
 	level = _practicePuzzleLevel;
 	partySize = _practicePartySize;
-	_practicePageId = kPageNone;
+	_practicePageId = PageId::kPageNone_M1;
 	_practicePuzzleLevel = 0;
 	_practicePartySize = 0;
 	return true;
@@ -363,8 +415,8 @@ void Zoombini2Engine::queueDebugPracticeLaunch(PageId pageId, int level, uint pa
 	_practicePuzzleLevel = level;
 	_practicePartySize = partySize;
 	_debugPracticeResetState = true;
-	_isSavedGame = false;
-	requestPageChange(kPageMenuPractice);
+	setGameMode(GameMode::kPracticeMode);
+	requestPageChange(PageId::kPageMapPractice_M3);
 }
 
 Zoombini2Engine::DebugRouteRequestResult Zoombini2Engine::requestDebugMapTransition(PageId targetPageId, PageId sourcePageId, RouteBranch routeBranch, uint level) {
@@ -374,29 +426,44 @@ Zoombini2Engine::DebugRouteRequestResult Zoombini2Engine::requestDebugMapTransit
 		return DebugRouteRequestResult::kInvalidLevel;
 
 	const uint targetPartySize = InteractiveMap::getPracticePartySize(targetPageId);
-	if (targetPartySize == 0 && (level != 0 || !_isSavedGame))
+	if (targetPartySize == 0 && (level != 0 || inPracticeMode()))
 		return DebugRouteRequestResult::kPracticeRequiresPuzzle;
 
 	const int rescuedBoolies = level == 0 ? _state->_rescuedBoolieCount : 0;
 	if (TransitionMapTrans::getDestPage(sourcePageId, routeBranch, rescuedBoolies) != targetPageId)
 		return DebugRouteRequestResult::kUnreachableDestination;
+	if (level == 0 && inJourneyMode() && (!_currentPage->debugCanDepart() || (_state->_activeZoombinis.empty() && _state->_savedRoster.empty())))
+		return DebugRouteRequestResult::kNoTravelingParty;
 
 	if (level != 0) {
-		_isSavedGame = false;
+		setGameMode(GameMode::kPracticeMode);
 		_debugXferPracticeLevel = static_cast<int>(level);
 		_debugXferPracticeTarget = targetPageId;
 		_debugXferResetState = true;
-	} else if (_isSavedGame) {
-		_currentPage->debugPrepareRouteDeparture();
-	} else {
-		_debugXferPracticeLevel = _state->getLevel();
+	} else if (inPracticeMode()) {
+		switch (_currentPageId) {
+		case PageId::kPageMapPractice_M3:
+			if (_nextPageId == PageId::kPageNone_M1)
+				_debugXferPracticeLevel = getPracticeLevel();
+			else
+				_debugXferPracticeLevel = _state->getLevel();
+			break;
+		case PageId::kPageMapTrans_22:
+			if (_debugXferPracticeLevel == 0)
+				_debugXferPracticeLevel = _state->getLevel();
+			break;
+		default:
+			_debugXferPracticeLevel = _state->getLevel();
+			break;
+		}
 		_debugXferPracticeTarget = targetPageId;
 	}
 
-	_mapTransitionSourcePageId = sourcePageId;
+	_mapTransitSrcPageId = sourcePageId;
 	_routeDirection = routeBranch;
-	_debugXferDestination = targetPartySize != 0 ? targetPageId : sourcePageId;
-	requestPageChange(kPageMapTrans);
+	_debugXferDest = targetPartySize != 0 ? targetPageId : sourcePageId;
+	_debugMapTransition = true;
+	requestPageChange(PageId::kPageMapTrans_22);
 	return DebugRouteRequestResult::kQueued;
 }
 
@@ -444,7 +511,7 @@ void Zoombini2Engine::handleQuitRequest() {
 		quitGame();
 		return;
 	}
-	if (getCurrentPageId() == kPageCredits)
+	if (getCurrentPageId() == PageId::kPageCredits_16)
 		return;
 
 	g_system->getEventManager()->resetQuit();
@@ -467,7 +534,7 @@ void Zoombini2Engine::handleQuitConfirmation(DialogMsgBoxButton button) {
 		if (isDemo())
 			quitGame();
 		else
-			requestPageChange(kPageCredits);
+			requestPageChange(PageId::kPageCredits_16);
 	}
 }
 
@@ -579,11 +646,12 @@ Common::Error Zoombini2Engine::run() {
 	if (!_text->loadTextFont())
 		warning("Zoombini2Engine: Failed to load bitmap text strip");
 	_gfx = new Gfx(this);
+	_gfx->loadCommonZoombiniAnimations();
 	initCursor();
 	_soundManager = new SoundManager(this, _mixer);
 	_soundManager->setStereoOutputEnabled(_stereoOutputEnabled);
 	syncSoundSettings();
-	_state = new GameState();
+	_state = new GameState(this);
 	_sidebar = new Sidebar(this); // Shared Help, Map, Go buttons
 	setDebugger(new Zoombini2Console(this));
 
@@ -622,15 +690,22 @@ void Zoombini2Engine::initCursor() {
 }
 
 void Zoombini2Engine::setCursor(CursorType type) {
-	if (type == CursorType::kDefault || type == CursorType::kInteractive) {
+	switch (type) {
+	case CursorType::kDefault:
+	case CursorType::kInteractive:
 		_baseCursorType = type;
-	} else if (type == CursorType::kRestoreBase) {
+		break;
+	case CursorType::kRestoreBase:
 		_pageCursorType = type;
-	} else if (static_cast<uint>(type) < kCursorCount) {
-		_pageCursorType = type;
-	} else {
-		warning("Zoombini2Engine: Invalid cursor type %u", static_cast<uint>(type));
-		return;
+		break;
+	default:
+		if (static_cast<uint>(type) < kCursorCount) {
+			_pageCursorType = type;
+		} else {
+			warning("Zoombini2Engine: Invalid cursor type %u", static_cast<uint>(type));
+			return;
+		}
+		break;
 	}
 
 	const CursorType activeType = _pageCursorType == CursorType::kRestoreBase ? _baseCursorType : _pageCursorType;
@@ -813,7 +888,6 @@ void Zoombini2Engine::refreshEngineSettings() {
 		break;
 	}
 	_useGreedyWaterslidePairing = ConfMan.getBool(Zoombini2MetaEngine::kConfigGreedyWaterslidePairing);
-	_useAquacubeSafeFirstMove = ConfMan.getBool(Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove);
 	const int bezierCurveDataTypeValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigBezierCurveDataType);
 	_bezierCurveDataType = static_cast<Zoombini2MetaEngine::BezierCurveDataType>(bezierCurveDataTypeValue);
 	_fixFleenDepartStreak = ConfMan.getBool(Zoombini2MetaEngine::kConfigFixFleenDepartStreak);
@@ -958,8 +1032,8 @@ bool Zoombini2Engine::runBuiltinDebugAction(BuiltinDebugAction action) {
 }
 
 bool Zoombini2Engine::applyDebugPuzzleCompletion() {
-	if (_currentPageId == kPageZombiniville || _currentPageId == kPageRescue1 || _currentPageId == kPageRescue2 || _currentPageId == kPageBooliewood ||
-		_currentPageId == kPageFinal)
+	if (_currentPageId == PageId::kPageZombiniville_00 || _currentPageId == PageId::kPageRescue1_04 || _currentPageId == PageId::kPageRescue2_09 || _currentPageId == PageId::kPageBooliewood_12 ||
+		_currentPageId == PageId::kPageFinal_23)
 		return false;
 
 	for (uint i = 0; i < _state->_activeZoombinis.size(); i++) {
@@ -1009,7 +1083,7 @@ void Zoombini2Engine::processEvents() {
 				break;
 			}
 			if (event.kbd.keycode == Common::KEYCODE_k && event.kbd.hasFlags(Common::KBD_CTRL) && isSavefileReadOnlyToggleEnabled()) {
-				if (_currentPageId == kPageMenuOptions || _currentPageId == kPageMenuAlt)
+				if (_currentPageId == PageId::kPageMenuOptions_M2)
 					_pendingPageEvents.push_back(event);
 				else if (!event.kbdRepeat && !_activeSavefileName.empty())
 					toggleGameSaveWriteLock(_activeSavefileName);
@@ -1025,18 +1099,30 @@ void Zoombini2Engine::processEvents() {
 				break;
 			}
 			if (_debugHotkeysEnabled) {
-				if (event.kbd.keycode == Common::KEYCODE_p)
+				switch (event.kbd.keycode) {
+				case Common::KEYCODE_p:
 					_debugCompletionKeyDown = true;
-				else if (event.kbd.keycode == Common::KEYCODE_c)
+					break;
+				case Common::KEYCODE_c:
 					_debugOverlayKeyDown = true;
+					break;
+				default:
+					break;
+				}
 			}
 			_pendingPageEvents.push_back(event);
 			break;
 		case Common::EVENT_KEYUP:
-			if (event.kbd.keycode == Common::KEYCODE_p)
+			switch (event.kbd.keycode) {
+			case Common::KEYCODE_p:
 				_debugCompletionKeyDown = false;
-			else if (event.kbd.keycode == Common::KEYCODE_c)
+				break;
+			case Common::KEYCODE_c:
 				_debugOverlayKeyDown = false;
+				break;
+			default:
+				break;
+			}
 			_pendingPageEvents.push_back(event);
 			break;
 		default:
@@ -1046,7 +1132,7 @@ void Zoombini2Engine::processEvents() {
 }
 
 void Zoombini2Engine::applyPendingPageChange() {
-	if (_nextPageId == kPageNone)
+	if (_nextPageId == PageId::kPageNone_M1)
 		return;
 
 	const PageId requestedPage = _nextPageId;
@@ -1063,7 +1149,7 @@ bool Zoombini2Engine::dispatchPageEvents() {
 	// Event dispatch temporarily replays each event's mouse position. The sidebar then polls the final position for this frame.
 	const Common::Point32 polledMousePos = _mousePos;
 	for (const Common::Event &event : _pendingPageEvents) {
-		if (_nextPageId != kPageNone)
+		if (_nextPageId != PageId::kPageNone_M1)
 			break;
 		DialogBase *dialog = getActiveDialog();
 		const bool dialogEventWasActive = dialog != nullptr;
@@ -1102,7 +1188,7 @@ bool Zoombini2Engine::dispatchPageEvents() {
 void Zoombini2Engine::drawFrame() {
 	ManagedSurface32 *screen = _gfx->getScreen();
 	if (!_currentPage) {
-		screen->fillRect(Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), 0);
+		screen->fillRect(Common::Rect32(Gfx::kScreenSize.width, Gfx::kScreenSize.height), 0);
 		return;
 	}
 
@@ -1111,14 +1197,14 @@ void Zoombini2Engine::drawFrame() {
 	const bool dialogWasActive = dispatchPageEvents();
 	DialogBase *dialog = getActiveDialog();
 	const bool pageRendered = !dialogWasActive && !dialog;
-	const bool advanceState = _nextPageId == kPageNone;
+	const bool advanceState = _nextPageId == PageId::kPageNone_M1;
 	if (pageRendered)
 		_currentPage->onFrame(screen, advanceState);
 
 	// The shared sidebar polls the final frame mouse state before drawing its controls.
 	DialogBase *dialogBeforeSidebar = dialog;
 	if (_sidebar && (!dialog || dialog->drawsSidebarOnTop()))
-		_sidebar->drawAndHandleInput(screen, _nextPageId == kPageNone);
+		_sidebar->drawAndHandleInput(screen, _nextPageId == PageId::kPageNone_M1);
 	dialog = getActiveDialog();
 	if (dialog && (dialog == dialogBeforeSidebar || dialog->drawsSidebarOnTop())) {
 		dialog->render(screen);
@@ -1159,7 +1245,7 @@ void Zoombini2Engine::presentFrame() {
 		return;
 	_lastPresentTimeMs = now;
 	ManagedSurface32 *screen = _gfx->getScreen();
-	g_system->copyRectToScreen(screen->getPixels(), screen->pitch, 0, 0, ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height);
+	g_system->copyRectToScreen(screen->getPixels(), screen->pitch, 0, 0, Gfx::kScreenSize.width, Gfx::kScreenSize.height);
 	g_system->updateScreen();
 }
 
@@ -1206,13 +1292,16 @@ void Zoombini2Engine::runFrame() {
 
 void Zoombini2Engine::mainGameLoop() {
 	if (isDemo()) {
-		_nextPageId = kPageTitleScreen;
+		_nextPageId = PageId::kPageTitleScreen_24;
 	} else if (configurePracticeBootParamLaunch()) {
-		_nextPageId = kPageMenuPractice;
+		_nextPageId = PageId::kPageMapPractice_M3;
 	} else {
 		// The Korean release starts with the ArisuMedia logo before the TLC and Polygon logos.
 		// Other releases start with the TLC logo.
-		_nextPageId = getLanguage() == Common::KO_KOR ? kPageLogoArisuMedia : kPageLogoTLC;
+		if (getLanguage() == Common::KO_KOR)
+			_nextPageId = PageId::kPageLogoArisuMedia_1972;
+		else
+			_nextPageId = PageId::kPageLogoTLC_17;
 	}
 
 	while (!shouldQuit())
@@ -1256,9 +1345,19 @@ void Zoombini2Engine::destroyCurrentPage() {
 		_gfx->clearPageLayers();
 		_gfx->clearPageBitmapCache();
 		// Clear the screen so a replacement page using double buffering cannot present stale content.
-		_gfx->getScreen()->fillRect(Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), 0);
+		_gfx->getScreen()->fillRect(Common::Rect32(Gfx::kScreenSize.width, Gfx::kScreenSize.height), 0);
 	}
 	clearPagePATCache();
+	_pageResources.clear();
+	_pageResourceIndex.clear();
+}
+
+bool Zoombini2Engine::debugRetryPuzzle() {
+	if (!_currentPage || _currentPage->getCategory() != PageCategory::kPuzzle || !_puzzleRetryState || _nextPageId != PageId::kPageNone_M1)
+		return false;
+	_debugPuzzleRetryPending = true;
+	requestPageChange(_currentPageId);
+	return true;
 }
 
 /**
@@ -1266,125 +1365,131 @@ void Zoombini2Engine::destroyCurrentPage() {
  */
 void Zoombini2Engine::switchPage(PageId pageId) {
 	debug(1, "Zoombini2: Switching from page %d to page %d", static_cast<int>(_currentPageId), static_cast<int>(pageId));
-	if (_currentPageId == kPageBoolies && pageId == kPageMapTrans)
-		_state->recordBooliesCompletion();
+	const bool retryPuzzle = _debugPuzzleRetryPending && pageId == _currentPageId;
+	_debugPuzzleRetryPending = false;
 	destroyCurrentPage();
+	if (retryPuzzle) {
+		delete _state;
+		_state = _puzzleRetryState;
+		_puzzleRetryState = nullptr;
+		_rnd->setSeed(_puzzleRetrySeed);
+	}
+	delete _puzzleRetryState;
+	_puzzleRetryState = nullptr;
 	_zoombiniWalkingFlag = false;
-	if (pageId == kPageMenuPractice && _debugPracticeResetState) {
+	if (pageId != PageId::kPageMapTrans_22)
+		_debugMapTransition = false;
+	if (pageId == PageId::kPageMapPractice_M3 && _debugPracticeResetState) {
 		resetGameState();
 		_debugPracticeResetState = false;
 	}
-	if (pageId == kPageMapTrans && _debugXferDestination != kPageNone) {
+	if (pageId == PageId::kPageMapTrans_22 && _debugXferDest != PageId::kPageNone_M1) {
 		if (_debugXferResetState) {
 			resetGameState();
 			_state->_level = _debugXferPracticeLevel;
 			_debugXferResetState = false;
 		}
-		const uint routePartySize = InteractiveMap::getPracticePartySize(_debugXferDestination);
-		while (routePartySize < _state->_activeZoombinis.size()) {
-			delete _state->_activeZoombinis.back();
-			_state->_activeZoombinis.pop_back();
+		const uint routePartySize = InteractiveMap::getPracticePartySize(_debugXferDest);
+		if (inJourneyMode())
+			_state->prepareDebugRouteParty(_debugXferDest, routePartySize);
+		else {
+			while (routePartySize < _state->_activeZoombinis.size()) {
+				delete _state->_activeZoombinis.back();
+				_state->_activeZoombinis.pop_back();
+			}
 		}
-		if (_state && _state->_activeZoombinis.empty())
-			InteractiveMap::createPracticeParty(this, _debugXferDestination);
-		_debugXferDestination = kPageNone;
+		if (inPracticeMode() && _state->_activeZoombinis.empty())
+			InteractiveMap::createPracticeParty(this, _debugXferDest);
+		_debugXferDest = PageId::kPageNone_M1;
+		_state->_currentPage = _mapTransitSrcPageId;
 	}
 	if (pageId == _debugXferPracticeTarget && _debugXferPracticeLevel != 0) {
 		_state->_level = _debugXferPracticeLevel;
 		_debugXferPracticeLevel = 0;
-		_debugXferPracticeTarget = kPageNone;
+		_debugXferPracticeTarget = PageId::kPageNone_M1;
 	}
-	_nextPageId = kPageNone;
+	_nextPageId = PageId::kPageNone_M1;
 	_currentPageId = pageId;
 
 	switch (pageId) {
-	case kPageLogoTLC:
-		_currentPage = new TransitionVideo(this, kPageLogoTLC);
+	case PageId::kPageMapJourney_M4:
+		_currentPage = new InteractiveMap(this, GameMode::kJourneyMode);
 		break;
-	case kPageLogoPolygon:
-		_currentPage = new TransitionVideo(this, kPageLogoPolygon);
+	case PageId::kPageMapPractice_M3:
+		_currentPage = new InteractiveMap(this, GameMode::kPracticeMode);
 		break;
-	case kPageCutsceneFirst:
-		_isSavedGame = true;
-		_currentPage = new TransitionVideo(this, kPageCutsceneFirst);
-		break;
-	case kPageCutsceneSecond:
-		if (_state)
-			_state->markRescue1MoviePlayed();
-		_currentPage = new TransitionVideo(this, kPageCutsceneSecond);
-		break;
-	case kPageCutsceneThird:
-		if (_state)
-			_state->markRescue2MoviePlayed();
-		_currentPage = new TransitionVideo(this, kPageCutsceneThird);
-		break;
-	case kPageTitleScreen:
-		_currentPage = new TransitionTitle(this);
-		break;
-	case kPageMenuPractice:
-		_currentPage = new InteractiveMap(this, kMapScreenPractice);
-		break;
-	case kPageMenuLoad:
-		_currentPage = new InteractiveMap(this, kMapScreenSavedGame);
-		break;
-	case kPageMapScreen:
-		_currentPage = new InteractiveMap(this, kMapScreenSavedGame);
-		break;
-	case kPageMenuOptions:
-	case kPageMenuAlt:
-		// Open the save-file menu from the map's Parties button.
+	case PageId::kPageMenuOptions_M2:
 		_currentPage = new InteractiveMenu(this);
 		break;
-	case kPageZombiniville:
+	case PageId::kPageZombiniville_00:
 		_currentPage = new ShelterZombiniville(this);
 		break;
-	case kPageMapTrans:
-		_currentPage = new TransitionMapTrans(this);
-		break;
-	case kPageMysticMarsh:
-		_currentPage = new PuzzleMysticMarsh(this);
-		break;
-	case kPageChezNorf:
-		_currentPage = new PuzzleChezNorf(this);
-		break;
-	case kPageWallOfFleens:
-		_currentPage = new PuzzleWallOfFleens(this);
-		break;
-	case kPageBooliewood:
-		_currentPage = new ShelterBooliewood(this);
-		break;
-	case kPageCrazyTurtle:
+	case PageId::kPageCrazyTurtle_01:
 		_currentPage = new PuzzleCrazyTurtle(this);
 		break;
-	case kPageBoolies:
-		_currentPage = new PuzzleBoolies(this);
-		break;
-	case kPageMagicWall:
-		_currentPage = new PuzzleMagicWall(this);
-		break;
-	case kPageAquacube:
-		_currentPage = new PuzzleAquacube(this);
-		break;
-	case kPageSnowboard:
-		_currentPage = new PuzzleSnowboard(this);
-		break;
-	case kPageWaterslide:
+	case PageId::kPageWaterslide_02:
 		_currentPage = new PuzzleWaterslide(this);
 		break;
-	case kPageRescue1:
+	case PageId::kPageAquacube_03:
+		_currentPage = new PuzzleAquacube(this);
+		break;
+	case PageId::kPageRescue1_04:
 		_currentPage = new ShelterRescueSite1(this);
 		break;
-	case kPageRescue2:
+	case PageId::kPageMysticMarsh_05:
+		_currentPage = new PuzzleMysticMarsh(this);
+		break;
+	case PageId::kPageMagicWall_06:
+		_currentPage = new PuzzleMagicWall(this);
+		break;
+	case PageId::kPageWallOfFleens_07:
+		_currentPage = new PuzzleWallOfFleens(this);
+		break;
+	case PageId::kPageChezNorf_08:
+		_currentPage = new PuzzleChezNorf(this);
+		break;
+	case PageId::kPageRescue2_09:
 		_currentPage = new ShelterRescueSite2(this);
 		break;
-	case kPageFinal:
-		_currentPage = new ShelterFinal(this);
+	case PageId::kPageSnowboard_10:
+		_currentPage = new PuzzleSnowboard(this);
 		break;
-	case kPageCredits:
+	case PageId::kPageBoolies_11:
+		_currentPage = new PuzzleBoolies(this);
+		break;
+	case PageId::kPageBooliewood_12:
+		_currentPage = new ShelterBooliewood(this);
+		break;
+	case PageId::kPageCredits_16:
 		_currentPage = new TransitionCredits(this);
 		break;
-	case kPageLogoArisuMedia:
-		_currentPage = new TransitionVideo(this, kPageLogoArisuMedia);
+	case PageId::kPageLogoTLC_17:
+		_currentPage = new TransitionVideo(this, PageId::kPageLogoTLC_17);
+		break;
+	case PageId::kPageCutsceneFirst_18:
+		setGameMode(GameMode::kJourneyMode);
+		_currentPage = new TransitionVideo(this, PageId::kPageCutsceneFirst_18);
+		break;
+	case PageId::kPageCutsceneSecond_20:
+		_currentPage = new TransitionVideo(this, PageId::kPageCutsceneSecond_20);
+		break;
+	case PageId::kPageCutsceneThird_21:
+		_currentPage = new TransitionVideo(this, PageId::kPageCutsceneThird_21);
+		break;
+	case PageId::kPageMapTrans_22:
+		_currentPage = new TransitionMapTrans(this);
+		break;
+	case PageId::kPageFinal_23:
+		_currentPage = new ShelterFinal(this);
+		break;
+	case PageId::kPageTitleScreen_24:
+		_currentPage = new TransitionTitle(this);
+		break;
+	case PageId::kPageLogoPolygon_25:
+		_currentPage = new TransitionVideo(this, PageId::kPageLogoPolygon_25);
+		break;
+	case PageId::kPageLogoArisuMedia_1972:
+		_currentPage = new TransitionVideo(this, PageId::kPageLogoArisuMedia_1972);
 		break;
 	default:
 		warning("Zoombini2: Unknown page %d", static_cast<int>(pageId));
@@ -1392,21 +1497,27 @@ void Zoombini2Engine::switchPage(PageId pageId) {
 	}
 
 	if (_currentPage) {
-		// The original publishes one effective level per page switch. Puzzle
-		// destinations carry their stored world level, while shelter, movie,
-		// and transition destinations pass 0, which is coerced to level 1. Mirror
-		// that coercion so non-puzzle pages (e.g. Booliewood) always resolve the
-		// easy help sheet instead of a missing medium/hard one.
-		if (_state && _currentPage->getCategory() != PageCategory::kPuzzle)
+		if (_state && _currentPage->getCategory() == PageCategory::kPuzzle) {
+			_puzzleRetryState = _state->cloneForPageEntry();
+			_puzzleRetrySeed = _rnd->getSeed();
+		}
+		// Non-puzzle pages use level one for help sheets and journey-map access.
+		if (_state && _currentPage->getCategory() != PageCategory::kPuzzle) {
 			_state->_level = 1;
+			if (inJourneyMode())
+				_state->setPageLevel(pageId, 1);
+		}
 		_currentPage->init();
-		if (_state && kPageZombiniville <= pageId && pageId <= kPageBooliewood)
-			_state->_currentGameplayPageId = pageId;
+		if (_state && PageId::kPageZombiniville_00 <= pageId && pageId <= PageId::kPageBooliewood_12)
+			_state->_currentPage = pageId;
 	}
 }
 
 Common::SeekableReadStream *Zoombini2Engine::openResourceFile(const Common::String &path) const {
-	return _resourceFileResolver ? _resourceFileResolver->openFile(path) : nullptr;
+	Common::SeekableReadStream *stream = _resourceFileResolver ? _resourceFileResolver->openFile(path) : nullptr;
+	if (stream)
+		recordPageResource(path, false);
+	return stream;
 }
 
 bool Zoombini2Engine::hasResource(const Common::String &path) const {

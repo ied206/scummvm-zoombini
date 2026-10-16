@@ -35,7 +35,8 @@
 
 namespace Zoombini2 {
 
-Random::Random(const Common::String &name) : _scummRnd(name) {
+Random::Random(const Common::String &name)
+	: _scummRnd(name) {
 	const int prngAlgorithmVal = ConfMan.getInt(Zoombini2MetaEngine::kConfigPrngAlgorithm);
 	_prngAlgorithm = static_cast<Zoombini2MetaEngine::PrngAlgorithm>(prngAlgorithmVal);
 

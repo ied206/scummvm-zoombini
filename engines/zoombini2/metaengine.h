@@ -75,8 +75,6 @@ public:
 	static constexpr const char *kConfigDebugHotkeys = "debug_hotkeys";
 	/** Target configuration key selecting the alternate level-one Waterslide pairing. */
 	static constexpr const char *kConfigGreedyWaterslidePairing = "greedy_waterslide_pairing";
-	/** Target configuration key protecting Aqua Cube's first direct lever move from a Fleen. */
-	static constexpr const char *kConfigAquacubeSafeFirstMove = "aquacube_safe_first_move";
 	/** Target configuration key exposing recoverable level 4 puzzles on the practice map. */
 	static constexpr const char *kConfigRestoreL4PracticePuzzles = "restore_l4_practice_puzzles";
 	/** Persisted and runtime pseudo-random generator selection. */
@@ -112,16 +110,24 @@ public:
 	static constexpr const char *kConfigFrameRate = "frame_rate";
 	/** Target configuration key bypassing the presentation limiter while retaining elapsed-time logic updates. */
 	static constexpr const char *kConfigUnlockFrameRate = "unlock_frame_rate";
+	/** Lowest configurable presentation rate in frames per second. */
 	static constexpr int kMinFrameRate = 30;
+	/** Default presentation rate in frames per second. */
 	static constexpr int kDefaultFrameRate = 60;
+	/** Highest configurable presentation rate in frames per second. */
 	static constexpr int kMaxFrameRate = 240;
 
+	/** Return the engine identifier used by the launcher. */
 	const char *getName() const override { return "zoombini2"; }
 
+	/** Construct the runtime engine for a detected game description. */
 	Common::Error createInstance(OSystem *syst, Engine **engine, const Zoombini2::Zoombini2GameDescription *desc) const override;
 
+	/** Report the launcher and save-management features supported by this engine. */
 	bool hasFeature(MetaEngineFeature f) const override;
+	/** Register engine-specific option defaults for the supplied target. */
 	void registerDefaultSettings(const Common::String &target) const override;
+	/** Create the engine-specific launcher options widget. */
 	GUI::OptionsContainerWidget *buildEngineOptionsWidget(GUI::GuiObject *boss, const Common::String &name, const Common::String &target) const override;
 };
 

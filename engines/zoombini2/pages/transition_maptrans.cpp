@@ -33,27 +33,26 @@ namespace Zoombini2 {
 
 constexpr const char *TransitionMapTrans::kSpeechFormat;
 constexpr const char *TransitionMapTrans::kRouteFormat;
-constexpr const char *TransitionMapTrans::kZoombiniAnimationPath;
 constexpr const char *TransitionMapTrans::kMusicPath;
 constexpr const char *TransitionMapTrans::kMapTransitionOverlayPathFormat;
 constexpr const char *TransitionMapTrans::kMapTransitionBackgroundPathFormat;
 constexpr int TransitionMapTrans::kFinalPageRescueThreshold;
 
 const TransitionMapTrans::RouteDest TransitionMapTrans::kRouteDestinations[] = {
-	{"crazyturtle", kPageCrazyTurtle, kPageZombiniville, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
-	{"waterslide", kPageWaterslide, kPageCrazyTurtle, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
-	{"aquacube", kPageAquacube, kPageWaterslide, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
-	{"rescue1", kPageRescue1, kPageAquacube, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
-	{"mysticmarsh", kPageMysticMarsh, kPageRescue1, Zoombini2Engine::RouteBranch::kRight02, RouteRescueCondition::kAnyCount},
-	{"magicwall", kPageMagicWall, kPageRescue1, Zoombini2Engine::RouteBranch::kLeft01, RouteRescueCondition::kAnyCount},
-	{"walloffleens", kPageWallOfFleens, kPageMysticMarsh, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
-	{"cheznorf", kPageChezNorf, kPageMagicWall, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
-	{"rescue2", kPageRescue2, kPageWallOfFleens, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
-	{"rescue2norf", kPageRescue2, kPageChezNorf, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
-	{"snowboard", kPageSnowboard, kPageRescue2, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
-	{"boolies", kPageBoolies, kPageSnowboard, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
-	{"booliewood", kPageBooliewood, kPageBoolies, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kBelowFinalThreshold},
-	{"final", kPageFinal, kPageBoolies, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAtOrAboveFinalThreshold}};
+	{"crazyturtle", PageId::kPageCrazyTurtle_01, PageId::kPageZombiniville_00, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
+	{"waterslide", PageId::kPageWaterslide_02, PageId::kPageCrazyTurtle_01, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
+	{"aquacube", PageId::kPageAquacube_03, PageId::kPageWaterslide_02, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
+	{"rescue1", PageId::kPageRescue1_04, PageId::kPageAquacube_03, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
+	{"mysticmarsh", PageId::kPageMysticMarsh_05, PageId::kPageRescue1_04, Zoombini2Engine::RouteBranch::kRight02, RouteRescueCondition::kAnyCount},
+	{"magicwall", PageId::kPageMagicWall_06, PageId::kPageRescue1_04, Zoombini2Engine::RouteBranch::kLeft01, RouteRescueCondition::kAnyCount},
+	{"walloffleens", PageId::kPageWallOfFleens_07, PageId::kPageMysticMarsh_05, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
+	{"cheznorf", PageId::kPageChezNorf_08, PageId::kPageMagicWall_06, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
+	{"rescue2", PageId::kPageRescue2_09, PageId::kPageWallOfFleens_07, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
+	{"rescue2norf", PageId::kPageRescue2_09, PageId::kPageChezNorf_08, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
+	{"snowboard", PageId::kPageSnowboard_10, PageId::kPageRescue2_09, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
+	{"boolies", PageId::kPageBoolies_11, PageId::kPageSnowboard_10, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAnyCount},
+	{"booliewood", PageId::kPageBooliewood_12, PageId::kPageBoolies_11, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kBelowFinalThreshold},
+	{"final", PageId::kPageFinal_23, PageId::kPageBoolies_11, Zoombini2Engine::RouteBranch::kNone00, RouteRescueCondition::kAtOrAboveFinalThreshold}};
 
 // ============================================================================
 // TransitionMapTrans - route-map transition.
@@ -61,7 +60,7 @@ const TransitionMapTrans::RouteDest TransitionMapTrans::kRouteDestinations[] = {
 
 TransitionMapTrans::TransitionMapTrans(Zoombini2Engine *vm)
 	: TransitionBase(vm) {
-	_pageId = kPageMapTrans;
+	_pageId = PageId::kPageMapTrans_22;
 }
 
 TransitionMapTrans::~TransitionMapTrans() {
@@ -84,25 +83,25 @@ void TransitionMapTrans::queueTravelSpeech(PageId srcPage) {
 		return;
 
 	switch (srcPage) {
-	case kPageZombiniville:
-		if (!state->hasPageVisit(kPageCrazyTurtle, 1)) {
+	case PageId::kPageZombiniville_00:
+		if (!state->hasPageVisit(PageId::kPageCrazyTurtle_01, 1)) {
 			queueSpeech(kSpeechTur11);
 		} else {
-			if (state->hasPageVisit(kPageBooliewood, 1))
+			if (state->hasPageVisit(PageId::kPageBooliewood_12, 1))
 				queueSpeech(kSpeechZbv31_3);
 			else
 				queueSpeech(kSpeechZbv31_2);
 			queueSpeech(Common::String::format(kSpeechTur21Format, getRandomBinarySpeechVariant()));
 		}
 		break;
-	case kPageCrazyTurtle:
-		if (state->hasPageVisit(kPageWaterslide, 1))
+	case PageId::kPageCrazyTurtle_01:
+		if (state->hasPageVisit(PageId::kPageWaterslide_02, 1))
 			queueSpeech(Common::String::format(kSpeechWsl21Format, getRandomBinarySpeechVariant()));
 		else
 			queueSpeech(kSpeechWsl11);
 		break;
-	case kPageWaterslide:
-		if (!state->hasPageVisit(kPageAquacube, 1)) {
+	case PageId::kPageWaterslide_02:
+		if (!state->hasPageVisit(PageId::kPageAquacube_03, 1)) {
 			queueSpeech(kSpeechAqu11_1_1);
 			queueSpeech(kSpeechAqu11_1_2);
 			queueSpeech(kSpeechAqu11_1_3);
@@ -110,60 +109,60 @@ void TransitionMapTrans::queueTravelSpeech(PageId srcPage) {
 			queueSpeech(Common::String::format(kSpeechAqu21Format, getRandomBinarySpeechVariant()));
 		}
 		break;
-	case kPageAquacube:
+	case PageId::kPageAquacube_03:
 		queueSpeech(kSpeechAqu31);
 		break;
-	case kPageRescue1:
+	case PageId::kPageRescue1_04:
 		if (_vm->_routeDirection == Zoombini2Engine::RouteBranch::kLeft01) {
-			if (state->hasPageVisit(kPageMagicWall, 1))
+			if (state->hasPageVisit(PageId::kPageMagicWall_06, 1))
 				queueSpeech(Common::String::format(kSpeechMgw21Format, getRandomBinarySpeechVariant()));
 			else
 				queueSpeech(kSpeechMgw11);
 		} else {
-			if (state->hasPageVisit(kPageMysticMarsh, 1))
+			if (state->hasPageVisit(PageId::kPageMysticMarsh_05, 1))
 				queueSpeech(Common::String::format(kSpeechMym21Format, getRandomBinarySpeechVariant()));
 			else
 				queueSpeech(kSpeechMym11);
 		}
 		break;
-	case kPageMysticMarsh:
-		if (state->hasPageVisit(kPageWallOfFleens, 1))
+	case PageId::kPageMysticMarsh_05:
+		if (state->hasPageVisit(PageId::kPageWallOfFleens_07, 1))
 			queueSpeech(Common::String::format(kSpeechWlf21Format, getRandomBinarySpeechVariant()));
 		else
 			queueSpeech(kSpeechWlf11);
 		break;
-	case kPageMagicWall:
-		if (!state->hasPageVisit(kPageChezNorf, 1)) {
+	case PageId::kPageMagicWall_06:
+		if (!state->hasPageVisit(PageId::kPageChezNorf_08, 1)) {
 			queueSpeech(kSpeechCzn11_1);
 			queueSpeech(kSpeechCzn11_2);
 		} else {
 			queueSpeech(Common::String::format(kSpeechCzn21Format, getRandomBinarySpeechVariant()));
 		}
 		break;
-	case kPageWallOfFleens:
+	case PageId::kPageWallOfFleens_07:
 		queueSpeech(kSpeechBc211);
 		break;
-	case kPageChezNorf:
+	case PageId::kPageChezNorf_08:
 		queueSpeech(kSpeechBc212);
 		break;
-	case kPageRescue2:
-		if (!state->hasPageVisit(kPageSnowboard, 1)) {
+	case PageId::kPageRescue2_09:
+		if (!state->hasPageVisit(PageId::kPageSnowboard_10, 1)) {
 			queueSpeech(kSpeechSwb11);
 			queueSpeech(kSpeechSwb11B);
 		} else {
 			queueSpeech(Common::String::format(kSpeechSwb21Format, getRandomBinarySpeechVariant()));
 		}
 		break;
-	case kPageSnowboard:
-		if (!state->hasPageVisit(kPageBoolies, 1)) {
+	case PageId::kPageSnowboard_10:
+		if (!state->hasPageVisit(PageId::kPageBoolies_11, 1)) {
 			queueSpeech(kSpeechBlp11);
 			queueSpeech(kSpeechBlp11B);
 		} else {
 			queueSpeech(Common::String::format(kSpeechBlp21Format, getRandomBinarySpeechVariant()));
 		}
 		break;
-	case kPageBoolies:
-		if (!state->hasPageVisit(kPageBooliewood, 1)) {
+	case PageId::kPageBoolies_11:
+		if (!state->hasPageVisit(PageId::kPageBooliewood_12, 1)) {
 			queueSpeech(kSpeechBlw11_1);
 			queueSpeech(kSpeechBlw11_3);
 		} else {
@@ -238,9 +237,9 @@ void TransitionMapTrans::cleanupPaths() {
 
 void TransitionMapTrans::init() {
 	debug(1, "MapTransition::init (source=%d, route=%d)",
-		  static_cast<int>(_vm->_mapTransitionSourcePageId), static_cast<int>(_vm->_routeDirection));
+		  static_cast<int>(_vm->_mapTransitSrcPageId), static_cast<int>(_vm->_routeDirection));
 
-	const PageId src = _vm->_mapTransitionSourcePageId;
+	const PageId src = _vm->_mapTransitSrcPageId;
 	const Zoombini2Engine::RouteBranch routeBranch = _vm->_routeDirection;
 	_vm->_skipMode = false;
 	_transitionFinished = false;
@@ -248,9 +247,9 @@ void TransitionMapTrans::init() {
 
 	// Select the map region from the source page.
 	int mapRegion;
-	if (kPageZombiniville <= src && src <= kPageAquacube)
+	if (PageId::kPageZombiniville_00 <= src && src <= PageId::kPageAquacube_03)
 		mapRegion = 1;
-	else if (kPageRescue1 <= src && src <= kPageChezNorf)
+	else if (PageId::kPageRescue1_04 <= src && src <= PageId::kPageChezNorf_08)
 		mapRegion = 2;
 	else
 		mapRegion = 3;
@@ -258,43 +257,49 @@ void TransitionMapTrans::init() {
 	// Select the walking path from the source page.
 	Common::String patName;
 	switch (src) {
-	case kPageZombiniville:
+	case PageId::kPageZombiniville_00:
 		patName = "tr1 - map1.pat";
 		break;
-	case kPageCrazyTurtle:
+	case PageId::kPageCrazyTurtle_01:
 		patName = "tr2 - map1.pat";
 		break;
-	case kPageWaterslide:
+	case PageId::kPageWaterslide_02:
 		patName = "tr3 - map1.pat";
 		break;
-	case kPageAquacube:
+	case PageId::kPageAquacube_03:
 		patName = "tr4 - map1.pat";
 		break;
-	case kPageRescue1:
-		if (routeBranch == Zoombini2Engine::RouteBranch::kLeft01)
+	case PageId::kPageRescue1_04:
+		switch (routeBranch) {
+		case Zoombini2Engine::RouteBranch::kLeft01:
 			patName = "tr5 - map2.pat";
-		else if (routeBranch == Zoombini2Engine::RouteBranch::kRight02)
+			break;
+		case Zoombini2Engine::RouteBranch::kRight02:
 			patName = "tr8 - map2.pat";
+			break;
+		default:
+			break;
+		}
 		break;
-	case kPageMysticMarsh:
+	case PageId::kPageMysticMarsh_05:
 		patName = "tr9 - map2.pat";
 		break;
-	case kPageMagicWall:
+	case PageId::kPageMagicWall_06:
 		patName = "tr6 - map2.pat";
 		break;
-	case kPageWallOfFleens:
+	case PageId::kPageWallOfFleens_07:
 		patName = "tr10 - map2.pat";
 		break;
-	case kPageChezNorf:
+	case PageId::kPageChezNorf_08:
 		patName = "tr7 - map2.pat";
 		break;
-	case kPageRescue2:
+	case PageId::kPageRescue2_09:
 		patName = "tr11 - map3.pat";
 		break;
-	case kPageSnowboard:
+	case PageId::kPageSnowboard_10:
 		patName = "tr12 - map3.pat";
 		break;
-	case kPageBoolies:
+	case PageId::kPageBoolies_11:
 		patName = "tr13 - map3.pat";
 		break;
 	default:
@@ -304,7 +309,7 @@ void TransitionMapTrans::init() {
 	_patPath = Common::Path(Common::String::format(kRouteFormat, patName.c_str()));
 
 	_targetPageId = getDestPage(src, routeBranch, _vm->_state->_rescuedBoolieCount);
-	if (_targetPageId == kPageNone) {
+	if (_targetPageId == PageId::kPageNone_M1) {
 		warning("MapTransition: refusing invalid source/branch combination (%d, %d)",
 				static_cast<int>(src), static_cast<int>(routeBranch));
 		_vm->requestPageChange(src);
@@ -315,11 +320,10 @@ void TransitionMapTrans::init() {
 	delete _compositedBg;
 	_compositedBg = createMapTransitionBackground(src, mapRegion);
 
-	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path(kZoombiniAnimationPath), 50);
-	if (!_zoombiniAnimation)
+	if (!_vm->_gfx->getCommonZoombiniAnimation(ZmbAnimationKind::kMapTransTiny))
 		warning("MapTransition: Failed to load PitiZomb3.anm");
 
-	// Preserve the previous page grid for cleanup, then install the map-only grid.
+	// Preserve the previous page grid for cleanup, then install the tiny MapTrans travel grid.
 	const uint32 now = _vm->getTotalPlayTime();
 	const uint numZoombinis = _vm->_state->_activeZoombinis.size();
 	for (uint i = 0; i < numZoombinis; i++) {
@@ -328,14 +332,14 @@ void TransitionMapTrans::init() {
 		zoombini->setHidden(true);
 		zoombini->setInputEnabled(false);
 		zoombini->startDirectionTrackedAnimation(now);
-		zoombini->setActiveAnimation(_zoombiniAnimation);
+		zoombini->setActiveAnimation(ZmbAnimationKind::kMapTransTiny);
 	}
 	_nextWalkIndex = 0;
 	_nextWalkTime = 0;
 	_completedCount = 0;
 
 	debug(1, "MapTransition: source=%d -> target=%d (region %d, path=%s, zoombinis=%u)",
-		  src, _targetPageId, mapRegion, _patPath.toString().c_str(), numZoombinis);
+		  static_cast<int>(src), static_cast<int>(_targetPageId), mapRegion, _patPath.toString().c_str(), numZoombinis);
 	queueTravelSpeech(src);
 
 	// Play transition music
@@ -344,7 +348,7 @@ void TransitionMapTrans::init() {
 }
 
 ManagedSurface32 *TransitionMapTrans::createMapTransitionBackground(PageId srcPageId, int mapRegion) {
-	ManagedSurface32 *background = _vm->_gfx->createSurface(ManagedSurface32::kScreenSize);
+	ManagedSurface32 *background = _vm->_gfx->createSurface(Gfx::kScreenSize);
 
 	const Common::String backgroundPath = Common::String::format(kMapTransitionBackgroundPathFormat, mapRegion);
 	BitBlock *bitmap = _vm->_gfx->loadPageBitBlock(backgroundPath);
@@ -352,7 +356,7 @@ ManagedSurface32 *TransitionMapTrans::createMapTransitionBackground(PageId srcPa
 		_vm->_gfx->drawBitBlock(background, bitmap, Common::Point32(0, 0));
 	} else {
 		warning("MapTransition: Failed to load background %s", backgroundPath.c_str());
-		_vm->_gfx->fillRect(background, Common::Rect32(0, 0, ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), 0);
+		_vm->_gfx->fillRect(background, Common::Rect32(0, 0, Gfx::kScreenSize.width, Gfx::kScreenSize.height), 0);
 	}
 
 	drawMapOverlays(background, srcPageId, mapRegion);
@@ -395,10 +399,10 @@ void TransitionMapTrans::drawMapOverlays(ManagedSurface32 *dst, PageId srcPageId
 	switch (mapRegion) {
 	case 1: {
 		// Map region one covers ShelterZombiniville through Rescue Site I.
-		const bool seg01vis = visible(kPageZombiniville, kPageCrazyTurtle);
-		const bool seg02vis = visible(kPageCrazyTurtle, kPageWaterslide);
-		const bool seg03vis = visible(kPageWaterslide, kPageAquacube);
-		const bool seg04vis = visible(kPageAquacube, kPageRescue1);
+		const bool seg01vis = visible(PageId::kPageZombiniville_00, PageId::kPageCrazyTurtle_01);
+		const bool seg02vis = visible(PageId::kPageCrazyTurtle_01, PageId::kPageWaterslide_02);
+		const bool seg03vis = visible(PageId::kPageWaterslide_02, PageId::kPageAquacube_03);
+		const bool seg04vis = visible(PageId::kPageAquacube_03, PageId::kPageRescue1_04);
 
 		if (seg01vis)
 			drawOverlaySprite(dst, kOverlaySegment01, Common::Point32(264, 206));
@@ -425,42 +429,42 @@ void TransitionMapTrans::drawMapOverlays(ManagedSurface32 *dst, PageId srcPageId
 
 	case 2: {
 		// Map region two covers both routes between the rescue sites.
-		const bool northRoute = gs->hasPageVisit(kPageMagicWall, 1) || _vm->_routeDirection == Zoombini2Engine::RouteBranch::kLeft01;
-		const bool southRoute = gs->hasPageVisit(kPageMysticMarsh, 1) || _vm->_routeDirection == Zoombini2Engine::RouteBranch::kRight02;
+		const bool northRoute = gs->hasPageVisit(PageId::kPageMagicWall_06, 1) || _vm->_routeDirection == Zoombini2Engine::RouteBranch::kLeft01;
+		const bool southRoute = gs->hasPageVisit(PageId::kPageMysticMarsh_05, 1) || _vm->_routeDirection == Zoombini2Engine::RouteBranch::kRight02;
 
 		// Unconditional: start of route from Rescue1
 		drawOverlaySprite(dst, kOverlaySegment03, Common::Point32(-18, 198));
 		drawOverlaySprite(dst, kOverlaySegment04, Common::Point32(99, 280));
 
 		// Top path: fork, Magic Wall, Chez Norf, then Rescue Site II.
-		if (northRoute && visible(kPageRescue1, kPageMagicWall))
+		if (northRoute && visible(PageId::kPageRescue1_04, PageId::kPageMagicWall_06))
 			drawOverlaySprite(dst, kOverlaySegment05a, Common::Point32(201, 260));
 
 		// Magic Wall to Chez Norf segment.
-		const bool czNorfSeg = gs->isPageVisited(kPageChezNorf) ||
-							   (srcPageId == kPageMagicWall && gs->isPageVisited(kPageMagicWall) && !gs->hasPageVisit(kPageChezNorf, 1));
+		const bool czNorfSeg = gs->isPageVisited(PageId::kPageChezNorf_08) ||
+							   (srcPageId == PageId::kPageMagicWall_06 && gs->isPageVisited(PageId::kPageMagicWall_06) && !gs->hasPageVisit(PageId::kPageChezNorf_08, 1));
 		if (czNorfSeg)
 			drawOverlaySprite(dst, kOverlaySegment06a, Common::Point32(310, 230));
 
 		// Chez Norf to Rescue Site II segment.
-		if (gs->hasPageVisit(kPageChezNorf, 1)) {
-			if (gs->isPageVisited(kPageRescue2) || (srcPageId == kPageChezNorf && gs->isPageVisited(kPageChezNorf) && !gs->hasPageVisit(kPageRescue2, 1)))
+		if (gs->hasPageVisit(PageId::kPageChezNorf_08, 1)) {
+			if (gs->isPageVisited(PageId::kPageRescue2_09) || (srcPageId == PageId::kPageChezNorf_08 && gs->isPageVisited(PageId::kPageChezNorf_08) && !gs->hasPageVisit(PageId::kPageRescue2_09, 1)))
 				drawOverlaySprite(dst, kOverlaySegment07a, Common::Point32(480, 233));
 		}
 
 		// Bottom path: fork, Mystic Marsh, Wall of Fleens, then Rescue Site II.
-		if (southRoute && visible(kPageRescue1, kPageMysticMarsh))
+		if (southRoute && visible(PageId::kPageRescue1_04, PageId::kPageMysticMarsh_05))
 			drawOverlaySprite(dst, kOverlaySegment05b, Common::Point32(164, 376));
 
 		// Mystic Marsh to Wall of Fleens segment.
-		const bool wofSeg = gs->isPageVisited(kPageWallOfFleens) ||
-							(srcPageId == kPageMysticMarsh && gs->isPageVisited(kPageMysticMarsh) && !gs->hasPageVisit(kPageWallOfFleens, 1));
+		const bool wofSeg = gs->isPageVisited(PageId::kPageWallOfFleens_07) ||
+							(srcPageId == PageId::kPageMysticMarsh_05 && gs->isPageVisited(PageId::kPageMysticMarsh_05) && !gs->hasPageVisit(PageId::kPageWallOfFleens_07, 1));
 		if (wofSeg)
 			drawOverlaySprite(dst, kOverlaySegment06b, Common::Point32(339, 476));
 
 		// Wall of Fleens to Rescue Site II segment.
-		if (gs->hasPageVisit(kPageWallOfFleens, 1)) {
-			if (gs->isPageVisited(kPageRescue2) || (srcPageId == kPageWallOfFleens && gs->isPageVisited(kPageWallOfFleens) && !gs->hasPageVisit(kPageRescue2, 1)))
+		if (gs->hasPageVisit(PageId::kPageWallOfFleens_07, 1)) {
+			if (gs->isPageVisited(PageId::kPageRescue2_09) || (srcPageId == PageId::kPageWallOfFleens_07 && gs->isPageVisited(PageId::kPageWallOfFleens_07) && !gs->hasPageVisit(PageId::kPageRescue2_09, 1)))
 				drawOverlaySprite(dst, kOverlaySegment07b, Common::Point32(512, 360));
 		}
 
@@ -469,30 +473,30 @@ void TransitionMapTrans::drawMapOverlays(ManagedSurface32 *dst, PageId srcPageId
 		drawOverlaySprite(dst, kOverlayIcon05, Common::Point32(116, 315));
 
 		// Top route icons
-		if (northRoute && visible(kPageRescue1, kPageMagicWall))
+		if (northRoute && visible(PageId::kPageRescue1_04, PageId::kPageMagicWall_06))
 			drawOverlaySprite(dst, kOverlayIcon06a, Common::Point32(259, 210));
 		if (czNorfSeg)
 			drawOverlaySprite(dst, kOverlayIcon07a, Common::Point32(440, 170));
 
 		// Rescue2 icon (reachable from either path)
-		if (gs->isPageVisited(kPageRescue2) ||
-			(srcPageId == kPageChezNorf && gs->isPageVisited(kPageChezNorf) && !gs->hasPageVisit(kPageRescue2, 1)) ||
-			(srcPageId == kPageWallOfFleens && gs->isPageVisited(kPageWallOfFleens) && !gs->hasPageVisit(kPageRescue2, 1)))
+		if (gs->isPageVisited(PageId::kPageRescue2_09) ||
+			(srcPageId == PageId::kPageChezNorf_08 && gs->isPageVisited(PageId::kPageChezNorf_08) && !gs->hasPageVisit(PageId::kPageRescue2_09, 1)) ||
+			(srcPageId == PageId::kPageWallOfFleens_07 && gs->isPageVisited(PageId::kPageWallOfFleens_07) && !gs->hasPageVisit(PageId::kPageRescue2_09, 1)))
 			drawOverlaySprite(dst, kOverlayIcon08, Common::Point32(476, 271));
 
 		// Bottom route icons
-		if (southRoute && visible(kPageRescue1, kPageMysticMarsh))
+		if (southRoute && visible(PageId::kPageRescue1_04, PageId::kPageMysticMarsh_05))
 			drawOverlaySprite(dst, kOverlayIcon06b, Common::Point32(290, 418));
-		if (visible(kPageMysticMarsh, kPageWallOfFleens))
+		if (visible(PageId::kPageMysticMarsh_05, PageId::kPageWallOfFleens_07))
 			drawOverlaySprite(dst, kOverlayIcon07b, Common::Point32(443, 430));
 		break;
 	}
 
 	case 3: {
 		// Map region three covers Rescue Site II through the finale.
-		const bool northRouteVisited = gs->hasPageVisit(kPageMagicWall, 1);
-		const bool czNorfFlag = gs->hasPageVisit(kPageChezNorf, 1);
-		const bool wofFlag = gs->hasPageVisit(kPageWallOfFleens, 1);
+		const bool northRouteVisited = gs->hasPageVisit(PageId::kPageMagicWall_06, 1);
+		const bool czNorfFlag = gs->hasPageVisit(PageId::kPageChezNorf_08, 1);
+		const bool wofFlag = gs->hasPageVisit(PageId::kPageWallOfFleens_07, 1);
 
 		// Previous route segments (show which path was taken)
 		if (northRouteVisited) {
@@ -508,10 +512,10 @@ void TransitionMapTrans::drawMapOverlays(ManagedSurface32 *dst, PageId srcPageId
 		drawOverlaySprite(dst, kOverlaySegment08, Common::Point32(313, 407));
 
 		// Snowboard Gulch to Boolie Boggle.
-		if (visible(kPageSnowboard, kPageBoolies))
+		if (visible(PageId::kPageSnowboard_10, PageId::kPageBoolies_11))
 			drawOverlaySprite(dst, kOverlaySegment09, Common::Point32(434, 328));
 		// Boolie Boggle to the finale.
-		if (visible(kPageBoolies, kPageBooliewood))
+		if (visible(PageId::kPageBoolies_11, PageId::kPageBooliewood_12))
 			drawOverlaySprite(dst, kOverlaySegment10, Common::Point32(527, 111));
 
 		// Prior-route icons remain conditional on saved progress.
@@ -526,9 +530,9 @@ void TransitionMapTrans::drawMapOverlays(ManagedSurface32 *dst, PageId srcPageId
 		drawOverlaySprite(dst, kOverlayIcon09, Common::Point32(367, 367));
 
 		// Conditional icons
-		if (visible(kPageSnowboard, kPageBoolies))
+		if (visible(PageId::kPageSnowboard_10, PageId::kPageBoolies_11))
 			drawOverlaySprite(dst, kOverlayIcon10, Common::Point32(469, 273));
-		if (visible(kPageBoolies, kPageBooliewood))
+		if (visible(PageId::kPageBoolies_11, PageId::kPageBooliewood_12))
 			drawOverlaySprite(dst, kOverlayIcon11, Common::Point32(608, -12));
 		break;
 	}
@@ -548,10 +552,10 @@ void TransitionMapTrans::walkZoombinis() {
 	const uint numZoombinis = _vm->_state->_activeZoombinis.size();
 
 	// Start the next Zoombini walking if its strict 800-millisecond gate has passed.
-	if (_nextWalkIndex < numZoombinis && now > _nextWalkTime) {
+	if (_nextWalkIndex < numZoombinis && _nextWalkTime < now) {
 		_nextWalkTime = now + 800;
 
-		PathObject *path = PathObject::loadFromPAT(_vm, _patPath);
+		PathObject *path = _vm->loadPagePATPath(_patPath);
 		if (path) {
 			ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[_nextWalkIndex];
 			zoombini->setHidden(false);
@@ -593,15 +597,15 @@ PageId TransitionMapTrans::getPostTransitionPage() const {
 	if (!gameState)
 		return _targetPageId;
 
-	const PageId src = _vm->_mapTransitionSourcePageId;
-	if (src == kPageAquacube && !gameState->hasPlayedRescue1Movie()) {
+	const PageId src = _vm->_mapTransitSrcPageId;
+	if (src == PageId::kPageAquacube_03 && !gameState->hasPlayedRescue1Movie()) {
 		const int zoombiniCount = static_cast<int>(_vm->_state->_activeZoombinis.size()) + gameState->_rescue1ArrivalCount;
 		if (kRescue1MovieMinimumZoombinis <= zoombiniCount)
-			return kPageCutsceneSecond;
+			return PageId::kPageCutsceneSecond_20;
 	}
 
-	if ((src == kPageWallOfFleens || src == kPageChezNorf) && !gameState->hasPlayedRescue2Movie()) {
-		return kPageCutsceneThird;
+	if ((src == PageId::kPageWallOfFleens_07 || src == PageId::kPageChezNorf_08) && !gameState->hasPlayedRescue2Movie()) {
+		return PageId::kPageCutsceneThird_21;
 	}
 
 	return _targetPageId;
@@ -612,21 +616,45 @@ void TransitionMapTrans::finishTransition() {
 		return;
 	_transitionFinished = true;
 
-	const PageId nextPage = getPostTransitionPage();
-	const bool targetUsesPageLevel =
-		(kPageCrazyTurtle <= _targetPageId && _targetPageId <= kPageAquacube) ||
-		(kPageMysticMarsh <= _targetPageId && _targetPageId <= kPageChezNorf) ||
-		(kPageSnowboard <= _targetPageId && _targetPageId <= kPageBoolies);
-	if (_vm->_isSavedGame && targetUsesPageLevel) {
-		GameState *state = _vm->_state;
-		const int storedLevel = state->getPageLevel(_targetPageId);
-		const int activeLevel = state->activatePageLevel(_targetPageId);
-		if (storedLevel != 0 && (storedLevel < 1 || 4 < storedLevel)) {
-			warning("MapTransition: dest page %d has invalid stored level %d; using level %d", static_cast<int>(_targetPageId), storedLevel, activeLevel);
-		}
-		debug(1, "MapTransition: dest page %d selects stored level %d", static_cast<int>(_targetPageId), activeLevel);
+	if (_vm->_mapTransitSrcPageId == PageId::kPageBoolies_11 && !_vm->isDebugMapTransition()) {
+		_vm->_state->recordBooliesCompletion();
+		_targetPageId = getDestPage(PageId::kPageBoolies_11, _vm->_routeDirection, _vm->_state->_rescuedBoolieCount);
 	}
-	_vm->_mapTransitionSourcePageId = _targetPageId;
+	switch (_targetPageId) {
+	case PageId::kPageBooliewood_12:
+	case PageId::kPageFinal_23:
+		if (_vm->isDebugMapTransition())
+			_vm->_state->stashActiveZoombinis();
+		break;
+	default:
+		break;
+	}
+
+	const PageId nextPage = getPostTransitionPage();
+	switch (_targetPageId) {
+	case PageId::kPageCrazyTurtle_01:
+	case PageId::kPageWaterslide_02:
+	case PageId::kPageAquacube_03:
+	case PageId::kPageMysticMarsh_05:
+	case PageId::kPageMagicWall_06:
+	case PageId::kPageWallOfFleens_07:
+	case PageId::kPageChezNorf_08:
+	case PageId::kPageSnowboard_10:
+	case PageId::kPageBoolies_11:
+		if (_vm->inJourneyMode()) {
+			GameState *state = _vm->_state;
+			const int storedLevel = state->getPageLevel(_targetPageId);
+			const int activeLevel = state->activatePageLevel(_targetPageId);
+			if (storedLevel != 0 && (storedLevel < 1 || 4 < storedLevel)) {
+				warning("MapTransition: dest page %d has invalid stored level %d; using level %d", static_cast<int>(_targetPageId), storedLevel, activeLevel);
+			}
+			debug(1, "MapTransition: dest page %d selects stored level %d", static_cast<int>(_targetPageId), activeLevel);
+		}
+		break;
+	default:
+		break;
+	}
+	_vm->_mapTransitSrcPageId = _targetPageId;
 	_vm->requestPageChange(nextPage);
 }
 
@@ -685,7 +713,7 @@ PageId TransitionMapTrans::getDestPage(PageId src, Zoombini2Engine::RouteBranch 
 		if (routeDest.source != src)
 			continue;
 
-		if (src == kPageRescue1 && routeDest.branch != routeBranch)
+		if (src == PageId::kPageRescue1_04 && routeDest.branch != routeBranch)
 			continue;
 
 		if (routeDest.rescueCondition == RouteRescueCondition::kBelowFinalThreshold &&
@@ -697,7 +725,7 @@ PageId TransitionMapTrans::getDestPage(PageId src, Zoombini2Engine::RouteBranch 
 		return routeDest.target;
 	}
 
-	return kPageNone;
+	return PageId::kPageNone_M1;
 }
 
 } // End of namespace Zoombini2

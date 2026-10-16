@@ -29,7 +29,7 @@
 
 namespace Zoombini2 {
 
-constexpr const char *PuzzleAquacube::kPuzzleName;
+constexpr const char *PuzzleAquacube::kPageName;
 constexpr const char *PuzzleAquacube::kBackgroundPath;
 constexpr const char *PuzzleAquacube::kMusicPath;
 constexpr const char *PuzzleAquacube::kLightPath;
@@ -59,8 +59,8 @@ constexpr Common::Point32 PuzzleAquacube::kLeverPositions[4];
 constexpr Common::Point32 PuzzleAquacube::kIndicatorPositions[4];
 constexpr int PuzzleAquacube::kShotX[11];
 
-PuzzleAquacube::PuzzleAquacube(Zoombini2Engine *vm) : PuzzleBase(vm, kPageAquacube) {
-	_puzzleName = kPuzzleName;
+PuzzleAquacube::PuzzleAquacube(Zoombini2Engine *vm)
+	: PuzzleBase(vm, PageId::kPageAquacube_03) {
 	_initialBackgroundPath = kBackgroundPath;
 }
 
@@ -68,11 +68,11 @@ PuzzleAquacube::~PuzzleAquacube() {
 	delete _ballPath;
 	delete _chasePath;
 	delete _timer;
-	for (AnimationRunner *runner : _flare)
+	for (AnimationRunner *runner : _flareRunners)
 		delete runner;
-	for (AnimationRunner *runner : _angry)
+	for (AnimationRunner *runner : _angryFleenRunners)
 		delete runner;
-	for (AnimationRunner *runner : _chase)
+	for (AnimationRunner *runner : _chaseFleenRunners)
 		delete runner;
 	for (Animation *animation : _animations)
 		delete animation;
@@ -88,16 +88,17 @@ PuzzleAquacube::~PuzzleAquacube() {
 
 void PuzzleAquacube::init() {
 	PuzzleBase::init();
-	_level = CLIP(_puzzleLevel, 1, 4);
-	_numNodes = _level < 3 ? 8 : 16;
-	_dimensions = _level < 3 ? 3 : 4;
-	_maxSteps = _level < 3 ? 6 : 11;
-	_warpQuota = MIN(_level - 1, 2);
+	_numNodes = _puzzleLevel < 3 ? 8 : 16;
+	_dimensions = _puzzleLevel < 3 ? 3 : 4;
+	_maxSteps = _puzzleLevel < 3 ? 6 : 11;
+	_warpQuota = MIN(_puzzleLevel - 1, 2);
 	loadResources();
 	setupBoard();
 	_lastTick = _vm->getTotalPlayTime();
+	if (_vm->inJourneyMode())
+		_vm->_state->registerPageVisit(PageId::kPageAquacube_03, 1);
 	startPageMusic(Common::Path(kMusicPath));
-	debug(1, "AquaCube: level=%d nodes=%d party=%u start=%d warps=%d", _level, _numNodes, _puzzleZoombinis.size(), _ballNode, _warpQuota);
+	debug(1, "AquaCube: level=%d nodes=%d party=%u start=%d warps=%d", _puzzleLevel, _numNodes, _puzzleZoombinis.size(), _ballNode, _warpQuota);
 }
 
 AnimationRunner *PuzzleAquacube::loadRunner(const Common::Path &path, int frames, int repeats, uint32 delay) {
@@ -115,32 +116,32 @@ AnimationRunner *PuzzleAquacube::loadRunner(const Common::Path &path, int frames
 void PuzzleAquacube::loadResources() {
 	Gfx *gfx = _vm->_gfx;
 	gfx->loadPageRleBlock(kLightPath);
-	gfx->loadPageRleBlock(kBallPaths[_level < 3 ? 0 : 1]);
-	for (int i = 0; i < 3; i++) {
-		gfx->loadPageRleBlock(Common::String::format(kCubeFormat, _level < 3 ? "easy" : "hard", i + 1));
+	gfx->loadPageRleBlock(kBallPaths[_puzzleLevel < 3 ? 0 : 1]);
+	for (int i = 0; i < ARRAYSIZE(kWarpPaths); i++) {
+		gfx->loadPageRleBlock(Common::String::format(kCubeFormat, _puzzleLevel < 3 ? "easy" : "hard", i + 1));
 		gfx->loadPageRleBlock(kWarpPaths[i]);
 		gfx->loadPageRleBlock(Common::String::format(kBubbleFormat, i + 1));
 	}
-	for (int i = 0; i < 2; i++) {
+	for (int i = 0; i < ARRAYSIZE(_flareRunners); i++) {
 		gfx->loadPageRleBlock(kLeverPaths[i]);
 		gfx->loadPageRleBlock(kIndicatorPaths[i]);
 		gfx->loadPageRleBlock(kShotPaths[i]);
-		_flare[i] = loadRunner(Common::Path(Common::String::format(kFlareFormat, i + 1)), 8, 1, 80);
+		_flareRunners[i] = loadRunner(Common::Path(Common::String::format(kFlareFormat, i + 1)), 8, 1, 80);
 	}
-	_flare[0]->setCompletionCallback(&onFlareComplete, this);
+	_flareRunners[0]->setCompletionCallback(&onFlareComplete, this);
 	gfx->loadPageRleBlock(kTimerEmptyPath);
 	_timer = loadRunner(Common::Path(kTimerPath), 7, 1, 857);
 	_timer->setCompletionCallback(&onTimerComplete, this);
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < ARRAYSIZE(_angryFleenRunners); i++) {
 		gfx->loadPageRleBlock(Common::String::format(kFleenFormat, i + 1));
-		_angry[i] = loadRunner(Common::Path(Common::String::format(kAngryFormat, i + 1)), 11, 2, 80);
-		_angry[i]->setCompletionCallback(&onAngryComplete, this);
-		_chase[i] = loadRunner(Common::Path(Common::String::format(kChaseFormat, i + 1)), 11, 2, 80);
+		_angryFleenRunners[i] = loadRunner(Common::Path(Common::String::format(kAngryFormat, i + 1)), 11, 2, 80);
+		_angryFleenRunners[i]->setCompletionCallback(&onAngryComplete, this);
+		_chaseFleenRunners[i] = loadRunner(Common::Path(Common::String::format(kChaseFormat, i + 1)), 11, 2, 80);
 	}
-	_smallest = _vm->loadZoombiniAnimation(Common::Path(kSmallestPath), 10);
-	_idle = _vm->loadZoombiniAnimation(Common::Path(kIdlePath), 50);
+	_smallest = _vm->_gfx->loadZoombiniAnimation(Common::Path(kSmallestPath), 10);
+	_idle = _vm->_gfx->loadZoombiniAnimation(Common::Path(kIdlePath), 50);
 	if (SoundManager *sound = _vm->getSoundManager())
-		for (int i = 0; i < 5; i++)
+		for (int i = 0; i < ARRAYSIZE(_sounds); i++)
 			_sounds[i] = sound->load(true, Common::Path(kSoundPaths[i]), false);
 }
 
@@ -170,12 +171,12 @@ void PuzzleAquacube::setupBoard() {
 		_axisMap[button] = axis;
 		flips[axis] = _vm->_rnd->getRandomNumber(1);
 	}
-	const NodeLayout *layout = _level < 3 ? kEasyNodes : kHardNodes;
+	const NodeLayout *layout = _puzzleLevel < 3 ? kEasyNodes : kHardNodes;
 	for (int i = 0; i < _numNodes; i++) {
 		Node &node = _nodes[i];
 		node = Node();
 		node.pos = layout[i].pos;
-		for (int axis = 0; axis < 4; axis++)
+		for (int axis = 0; axis < ARRAYSIZE(node.adj); axis++)
 			node.adj[axis] = layout[i].adj[axis];
 		for (int axis = 0; axis < _dimensions; axis++) {
 			const NodeCoordinateLabel label = layout[i].labels[axis];
@@ -184,9 +185,9 @@ void PuzzleAquacube::setupBoard() {
 		}
 	}
 	int start = 0;
-	if (_level < 3) {
+	if (_puzzleLevel < 3) {
 		putFleen(7, 1);
-		if (_level == 2)
+		if (_puzzleLevel == 2)
 			start = 1 << _vm->_rnd->getRandomNumber(2);
 	} else {
 		putFleen(15, 1);
@@ -208,7 +209,7 @@ void PuzzleAquacube::setupBoard() {
 			extra = candidates[_vm->_rnd->getRandomNumber(7)];
 		} while (_nodes[findNode(extra)].state == kFleen03);
 		putFleen(extra, 4);
-		if (_level == 4) {
+		if (_puzzleLevel == 4) {
 			do {
 				start = 1 << _vm->_rnd->getRandomNumber(3);
 			} while (_nodes[findNode(start)].state == kFleen03);
@@ -218,7 +219,7 @@ void PuzzleAquacube::setupBoard() {
 	_nodes[_ballNode].state = kStart02;
 	_ballPos = _nodes[_ballNode].pos;
 	_pendingInitialArrival = true;
-	const Common::Point32 offset = _level < 3 ? Common::Point32(-2, 6) : Common::Point32(-5, 5);
+	const Common::Point32 offset = _puzzleLevel < 3 ? Common::Point32(-2, 6) : Common::Point32(-5, 5);
 	int slot = 0;
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
 		while (_nodes[slot].state != kEmpty01 && _nodes[slot].state != kOccupied00)
@@ -228,7 +229,7 @@ void PuzzleAquacube::setupBoard() {
 		node.occupants[node.occupantCount] = i;
 		ZoombiniRunner *actor = _puzzleZoombinis[i];
 		actor->clearMovement();
-		actor->setSavedAnimation(_zoombiniAnimation);
+		actor->setSavedAnimation(ZmbAnimationKind::kBasic);
 		actor->resetAnimation();
 		actor->setActiveAnimation(_smallest);
 		actor->setHidden(false);
@@ -262,30 +263,6 @@ void PuzzleAquacube::moveBall(int axis) {
 	playSound(3);
 }
 
-void PuzzleAquacube::protectFirstDirectMoveFromFleen(int lever) {
-	if (_level != 3 || _stepsUsed != 0 || !_vm->useAquacubeSafeFirstMove())
-		return;
-
-	const int fleenAxis = _axisMap[lever];
-	const int fleenNode = _nodes[_ballNode].adj[fleenAxis];
-	if (_nodes[fleenNode].state != kFleen03)
-		return;
-
-	for (int safeLever = 0; safeLever < _dimensions; safeLever++) {
-		if (safeLever == lever)
-			continue;
-		const int safeAxis = _axisMap[safeLever];
-		const int safeNode = _nodes[_ballNode].adj[safeAxis];
-		if (_nodes[safeNode].state != kOccupied00)
-			continue;
-
-		_axisMap[lever] = safeAxis;
-		_axisMap[safeLever] = fleenAxis;
-		warning("AquaCube adjustment: first lever %d remapped from Fleen node %d to occupied node %d via lever %d", lever + 1, fleenNode, safeNode, safeLever + 1);
-		return;
-	}
-}
-
 void PuzzleAquacube::finishPuzzle() {
 	if (_finished)
 		return;
@@ -309,7 +286,8 @@ void PuzzleAquacube::resolveArrival() {
 	if (_stepsUsed == _maxSteps)
 		finishPuzzle();
 	Node &node = _nodes[_ballNode];
-	if (node.state == kOccupied00) {
+	switch (node.state) {
+	case kOccupied00:
 		_rescued.clear();
 		for (int i = 0; i < node.occupantCount; i++) {
 			const int index = node.occupants[i];
@@ -321,16 +299,20 @@ void PuzzleAquacube::resolveArrival() {
 			actor->setExitComplete(true);
 			_vm->_zoombiniWalkingFlag = true;
 			_rescued.push_back(index);
-			_flare[0]->startAt(actor->getScreenPosition() - Common::Point32(90, 90), _vm->getTotalPlayTime());
+			_flareRunners[0]->startAt(actor->getScreenPosition() - Common::Point32(90, 90), _vm->getTotalPlayTime());
 			playSound(1);
 		}
 		node.occupantCount = 0;
-	} else if (node.state == kFleen03) {
+		break;
+	case kFleen03:
 		_vm->_zoombiniWalkingFlag = false;
 		node.state = kEmpty01;
 		_fleenIndex = node.fleenType - 1;
-		_angry[_fleenIndex]->startAt(Common::Point32(573, 67), _vm->getTotalPlayTime());
+		_angryFleenRunners[_fleenIndex]->startAt(Common::Point32(573, 67), _vm->getTotalPlayTime());
 		playSound(1);
+		break;
+	default:
+		break;
 	}
 	debug(1, "AquaCube arrival: node=%d steps=%d rescued=%d warps=%d finished=%d", _ballNode, _stepsUsed, _freedCount, _warpsUsed, _finished);
 }
@@ -339,7 +321,7 @@ void PuzzleAquacube::onFlareComplete(void *context, AnimationRunner *runner) {
 	PuzzleAquacube *page = static_cast<PuzzleAquacube *>(context);
 	for (int index : page->_rescued)
 		page->_puzzleZoombinis[index]->setHidden(false);
-	page->_flare[1]->startAt(runner->getPosition(), page->_vm->getTotalPlayTime());
+	page->_flareRunners[1]->startAt(runner->getPosition(), page->_vm->getTotalPlayTime());
 }
 
 void PuzzleAquacube::onTimerComplete(void *context, AnimationRunner *runner) {
@@ -406,8 +388,8 @@ void PuzzleAquacube::onUpdate() {
 	const uint32 tick = _vm->getTotalPlayTime();
 	SoundManager *sound = _vm->getSoundManager();
 	if (_goPending && (!sound || !sound->hasPendingSpeech())) {
-		_vm->_mapTransitionSourcePageId = kPageAquacube;
-		_vm->requestPageChange(kPageMapTrans);
+		_vm->_mapTransitSrcPageId = PageId::kPageAquacube_03;
+		_vm->requestPageChange(PageId::kPageMapTrans_22);
 		return;
 	}
 	if (_finished)
@@ -428,11 +410,11 @@ void PuzzleAquacube::onUpdate() {
 		} else {
 			Common::Point32 pos;
 			_chasePath->advance(tick, pos);
-			if (!_chase[_fleenIndex]->isActive()) {
-				_chase[_fleenIndex]->start(tick);
+			if (!_chaseFleenRunners[_fleenIndex]->isActive()) {
+				_chaseFleenRunners[_fleenIndex]->start(tick);
 				playSound(4);
 			}
-			_chase[_fleenIndex]->setPosition(pos);
+			_chaseFleenRunners[_fleenIndex]->setPosition(pos);
 		}
 	}
 	_actorsEscaping = false;
@@ -490,16 +472,16 @@ void PuzzleAquacube::onRenderBackground(ManagedSurface32 *screen) {
 void PuzzleAquacube::onRenderContent(ManagedSurface32 *screen) {
 	Gfx *gfx = _vm->_gfx;
 	const Common::Point32 origin(96, 152);
-	const char *cubeKind = _level < 3 ? "easy" : "hard";
+	const char *cubeKind = _puzzleLevel < 3 ? "easy" : "hard";
 	gfx->drawPageRleBlock(screen, Common::String::format(kCubeFormat, cubeKind, 3), origin);
 	gfx->drawPageRleBlock(screen, Common::String::format(kCubeFormat, cubeKind, 2), origin);
-	if (3 <= _level)
+	if (3 <= _puzzleLevel)
 		for (int i = 8; i < 12; i++)
 			gfx->drawPageRleBlock(screen, kBallPaths[1], _nodes[i].pos);
 	gfx->drawPageRleBlock(screen, Common::String::format(kCubeFormat, cubeKind, 1), origin);
 	for (int i = 0; i < _numNodes; i++) {
-		if (_level < 3 || i < 8 || 12 <= i)
-			gfx->drawPageRleBlock(screen, kBallPaths[_level < 3 ? 0 : 1], _nodes[i].pos);
+		if (_puzzleLevel < 3 || i < 8 || 12 <= i)
+			gfx->drawPageRleBlock(screen, kBallPaths[_puzzleLevel < 3 ? 0 : 1], _nodes[i].pos);
 		if (_nodes[i].state == kFleen03)
 			gfx->drawPageRleBlock(screen, Common::String::format(kFleenFormat, _nodes[i].fleenType), _nodes[i].pos + Common::Point32(10, 6));
 	}
@@ -509,7 +491,7 @@ void PuzzleAquacube::onRenderContent(ManagedSurface32 *screen) {
 	}
 	for (int i = 0; i < _maxSteps; i++)
 		gfx->drawPageRleBlock(screen, kShotPaths[i < _stepsUsed ? 1 : 0], Common::Point32(kShotX[i], 565));
-	if (1 < _level) {
+	if (1 < _puzzleLevel) {
 		WarpButtonState warpState = kWarpButtonDisabled02;
 		if (_warpPlanning)
 			warpState = kWarpButtonOn01;
@@ -517,7 +499,7 @@ void PuzzleAquacube::onRenderContent(ManagedSurface32 *screen) {
 			warpState = kWarpButtonOff00;
 		gfx->drawPageRleBlock(screen, kWarpPaths[warpState], Common::Point32(641, 541));
 		gfx->drawPageRleBlock(screen, kTimerEmptyPath, Common::Point32(666, 544));
-		gfx->drawAndUpdateAnimationRunner(screen, _timer, _vm->getTotalPlayTime(), 0, ManagedSurface32::kScreenSize.width);
+		gfx->drawAndUpdateAnimationRunner(screen, _timer, _vm->getTotalPlayTime(), 0, Gfx::kScreenSize.width);
 	}
 }
 
@@ -537,18 +519,18 @@ void PuzzleAquacube::onRenderForeground(ManagedSurface32 *screen) {
 			gfx->drawPageRleBlock(screen, Common::String::format(kBubbleFormat, bubble.type + 1), Common::Point32(static_cast<int>(bubble.x), static_cast<int>(bubble.y)));
 	gfx->drawPageRleBlock(screen, kLightPath, _ballPos - Common::Point32(60, 50));
 	const uint32 tick = _vm->getTotalPlayTime();
-	for (AnimationRunner *runner : _angry)
-		gfx->drawAndUpdateAnimationRunner(screen, runner, tick, 0, ManagedSurface32::kScreenSize.width);
-	for (AnimationRunner *runner : _chase)
-		gfx->drawAndUpdateAnimationRunner(screen, runner, tick, 0, ManagedSurface32::kScreenSize.width);
-	for (AnimationRunner *runner : _flare)
-		gfx->drawAndUpdateAnimationRunner(screen, runner, tick, 0, ManagedSurface32::kScreenSize.width);
+	for (AnimationRunner *runner : _angryFleenRunners)
+		gfx->drawAndUpdateAnimationRunner(screen, runner, tick, 0, Gfx::kScreenSize.width);
+	for (AnimationRunner *runner : _chaseFleenRunners)
+		gfx->drawAndUpdateAnimationRunner(screen, runner, tick, 0, Gfx::kScreenSize.width);
+	for (AnimationRunner *runner : _flareRunners)
+		gfx->drawAndUpdateAnimationRunner(screen, runner, tick, 0, Gfx::kScreenSize.width);
 }
 
 EventHandleResult PuzzleAquacube::onLButtonUp(const Common::Point &pos) {
 	if (_finished || _ballPath || _chasePath || _actorsEscaping)
 		return EventHandleResult::kPassthrough;
-	for (AnimationRunner *runner : _angry)
+	for (AnimationRunner *runner : _angryFleenRunners)
 		if (runner->isActive())
 			return EventHandleResult::kPassthrough;
 	const Size32 warpButtonSize = _vm->_gfx->getPageRleBlockSize(kWarpPaths[1]);
@@ -569,10 +551,8 @@ EventHandleResult PuzzleAquacube::onLButtonUp(const Common::Point &pos) {
 			_leverOn[i] = true;
 			if (_warpPlanning)
 				_warpPending[i] = true;
-			else {
-				protectFirstDirectMoveFromFleen(i);
+			else
 				moveBall(_axisMap[i]);
-			}
 			return EventHandleResult::kConsumed;
 		}
 	}
@@ -592,7 +572,7 @@ bool PuzzleAquacube::canUseGoButton() const {
 }
 
 bool PuzzleAquacube::onGoButtonPressed() {
-	if (!_vm->_isSavedGame || countFreeZoombinis() < 4)
+	if (_vm->inPracticeMode() || countFreeZoombinis() < 4)
 		return true;
 	if (_goPending)
 		return false;
@@ -603,34 +583,74 @@ bool PuzzleAquacube::onGoButtonPressed() {
 }
 
 Common::String PuzzleAquacube::debugGetAnswer() const {
+	static constexpr const char *kAxisSides[4][2] = {
+		{"left", "right"},
+		{"up", "down"},
+		{"front", "back"},
+		{"outer", "inner"},
+	};
 	Common::String answer = debugAnswerHeader();
-	answer += "\n";
-	const Node &current = _nodes[_ballNode];
-	answer += Common::String::format("  Ball at (%d, %d).\n", current.pos.x, current.pos.y);
-	answer += "  Levers from this bubble (left to right):\n";
+	answer += "\n  [*] Lever legend (left to right):\n";
 	for (int lever = 0; lever < _dimensions; lever++) {
-		const Node &next = _nodes[current.adj[_axisMap[lever]]];
-		const char *status = next.state == kFleen03 ? "Fleen" : next.occupantCount ? "Zoombinis" : "empty";
-		answer += Common::String::format("    Lever %d -> (%d, %d): %s\n", lever + 1, next.pos.x, next.pos.y, status);
-		for (int occupant = 0; occupant < next.occupantCount; occupant++)
-			answer += Common::String::format("      %s\n", debugActorDescription(next.occupants[occupant]).c_str());
+		const Common::Point32 &pos = kLeverPositions[lever];
+		const int axis = _axisMap[lever];
+		answer += Common::String::format("    - Lever %d (%3d, %3d): %5s <-> %5s\n", lever + 1, pos.x, pos.y, kAxisSides[axis][0], kAxisSides[axis][1]);
 	}
-	if (_level == 3 && _stepsUsed == 0 && _vm->useAquacubeSafeFirstMove())
-		answer += "  First-move adjustment: a Fleen lever can swap with the first lever leading to Zoombinis.\n";
-	answer += "  Other occupied bubbles:\n";
-	bool foundOther = false;
-	for (int i = 0; i < _numNodes; i++) {
-		const Node &node = _nodes[i];
-		if (i == _ballNode || !node.occupantCount)
-			continue;
-		foundOther = true;
-		answer += Common::String::format("    (%d, %d):\n", node.pos.x, node.pos.y);
-		for (int occupant = 0; occupant < node.occupantCount; occupant++)
-			answer += Common::String::format("      %s\n", debugActorDescription(node.occupants[occupant]).c_str());
+	if (1 < _puzzleLevel) {
+		answer += '\n';
+		answer += "  [*] Warp Gimmick\n";
+		answer += "  Pressing the 'Big Red Button' triggers a warp for a few seconds, which costs one move.\n";
+		answer += "  You can batch multiple levers in the peroid; only the final cell counts.\n";
 	}
-	if (!foundOther)
-		answer += "    (none)\n";
-	answer += "  A warp visits selected levers from left to right and resolves only its final bubble.\n";
+	answer += '\n';
+	answer += Common::String::format("  [*] Level %d Strategy\n", _puzzleLevel);
+	switch (_puzzleLevel) {
+	case 1:
+		answer += "    - Pull two different levers to identify all three axes.\n";
+		answer += "      - The Fleen is at the starting cell's antipode (all three axes reversed).\n";
+		answer += "      - Do not pull every levers in a row to avoid the Fleen cell.\n";
+		answer += "    - Finish with a single-stroke path.\n";
+		break;
+	case 2:
+		answer += "    WARP: One chance available.\n";
+		answer += "    - Pulling any first lever is safe.\n";
+		answer += "    If the first pull lands next to the Fleen:\n";
+		answer += "      - Warp with any two different levers.\n";
+		answer += "      - Identify all three axes by watching warp's batch-move.\n";
+		answer += "      - Finish with a single-stroke path.\n";
+		answer += "    Otherwise:\n";
+		answer += "      - Pull a different lever, identifying every axes in the process.\n";
+		answer += "      - The remaining path consists of two single-stroke paths.\n";
+		answer += "      - Finish with a 'single-stroke -> warp -> single-stroke' plan.\n";
+		break;
+	case 3:
+		answer += "    WARP: Two chances available.\n";
+		answer += "    - Warp with any two different levers; this is always safe.\n";
+		answer += "    If both unused axes are safe:\n";
+		answer += "      - Try either lever directly; infer the last axis.\n";
+		answer += "      - Finish with a 'single-stroke -> warp -> single-stroke' plan.\n";
+		answer += "    Otherwise:\n";
+		answer += "      - Warp with one known lever and one unused lever.\n";
+		answer += "      - You can infer the last axis from the warp-move result.\n";
+		answer += "      - Finish with a single-stroke path.\n";
+		break;
+	case 4:
+		answer += "    WARP: Two chances available.\n";
+		answer += "    - Pull any lever once, this is always safe.\n";
+		answer += "    - Check the current cell's antipode (all four axes reversed).\n";
+		answer += "    If the antipode contains a Fleen:\n";
+		answer += "      - Warp with any two unused levers.\n";
+		answer += "    Otherwise:\n";
+		answer += "      - Warp with all four levers.\n";
+		answer += "    Now you have identified every four axes.\n";
+		answer += "      - Finish with a 'single-stroke -> warp -> single-stroke' plan.\n";
+		break;
+	default:
+		break;
+	}
+	if (1 < _puzzleLevel) {
+		answer += "  Watch levers left to right to identify their axes.\n";
+	}
 	return answer;
 }
 
@@ -639,15 +659,13 @@ PuzzleChanceInfo PuzzleAquacube::debugGetChances() const {
 }
 
 bool PuzzleAquacube::debugCanSetChances() const {
-	return !_debugFinishPending && !_finished && !_goPending && !_ballPath && !_warpPlanning && !_actorsEscaping && !_pendingInitialArrival;
+	return !_debugFinishPending && !_finished && !_goPending && _stepsUsed < _maxSteps && _freedCount < static_cast<int>(_puzzleZoombinis.size());
 }
 
 bool PuzzleAquacube::debugSetChances(int remaining) {
-	if (!debugCanSetChances() || remaining < 0 || _maxSteps < remaining)
+	if (!debugCanSetChances() || remaining < 1 || _maxSteps < remaining)
 		return false;
 	_stepsUsed = _maxSteps - remaining;
-	if (!remaining)
-		finishPuzzle();
 	return true;
 }
 

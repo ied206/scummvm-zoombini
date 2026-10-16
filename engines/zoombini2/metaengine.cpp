@@ -47,7 +47,6 @@ void Zoombini2MetaEngine::registerDefaultSettings(const Common::String &target) 
 	ConfMan.registerDefault(kConfigChezNorfClueSubtitles, false);
 	ConfMan.registerDefault(kConfigDebugHotkeys, false);
 	ConfMan.registerDefault(kConfigGreedyWaterslidePairing, false);
-	ConfMan.registerDefault(kConfigAquacubeSafeFirstMove, false);
 	ConfMan.registerDefault(kConfigRestoreL4PracticePuzzles, false);
 	ConfMan.registerDefault(kConfigPrngAlgorithm, static_cast<int>(PrngAlgorithm::kOriginalPrng));
 	ConfMan.registerDefault(kConfigColorAssistMode, static_cast<int>(ColorAssistMode::kOriginal));

@@ -25,7 +25,6 @@
 #include "common/array.h"
 #include "common/rect.h"
 #include "common/str.h"
-#include "common/ustr.h"
 
 #include "zoombini2/graphics.h"
 #include "zoombini2/pages/interactive_base.h"
@@ -62,14 +61,19 @@ public:
 	void onUpdate() override;
 	/** Draw the saved-game list or the volume panel managed by this page. */
 	void onRenderContent(ManagedSurface32 *screen) override;
+	/** Draw the open volume panel above the sign-in page. */
 	void onRenderForeground(ManagedSurface32 *screen) override;
 	/** Dispatch a click to the list, buttons, or the volume panel managed by this page. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 	/** Toggle the file row under a right-button press when the test control is enabled. */
 	EventHandleResult onRButtonDown(const Common::Point &pos) override;
+	/** Release a captured volume slider and process the panel's resulting action. */
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
+	/** Consume pointer movement while the options screen is modal. */
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
+	/** Handle save-name editing and the enabled savefile write-lock shortcut. */
 	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
+	/** Return whether the options screen currently blocks sign-in input. */
 	bool hasActiveDialog() const override { return _state == MenuScreenState::kOptions01; }
 
 private:
@@ -84,12 +88,12 @@ private:
 	 */
 	class SaveFileList {
 	public:
-		/** Editing stages used by keyboard entry and prefix matching. */
-		enum EditState {
-			kEditIdle00 = 0,        ///< No savefile name is being edited.
-			kEditPrefixMatch01 = 1, ///< Typed text currently selects an existing prefix match.
-			kEditProvisional02 = 2, ///< A new row exists but has not been explicitly confirmed.
-			kEditExplicit03 = 3     ///< The new row is in explicit text-entry mode.
+		/** Text-input states for incremental list search and new-name entry. */
+		enum TextInputState {
+			kInputIdle00 = 0,           ///< No active keyboard search or new-name entry.
+			kInputSearchMatch01 = 1,    ///< Incremental search selects an existing name by its prefix.
+			kInputSearchNewEntry02 = 2, ///< No prefix matched; edits a new row, with Backspace able to restore a match.
+			kInputTextEntry03 = 3       ///< New-name text entry without prefix selection, entered through the New button.
 		};
 
 		/** Result of appending one keyboard character. */
@@ -120,9 +124,9 @@ private:
 		bool handleClick(const Common::Point &pos);
 		/** Normalize and apply @p c to selection or the active edit buffer. */
 		TextInputResult handleCharacter(char c);
-		/** Remove one edit character or leave explicit editing. */
+		/** Remove one input character or discard an empty new-name row. */
 		bool handleBackspace();
-		/** Begin a provisional row or confirm the current edit buffer. */
+		/** Begin a new row or switch the current row to text-entry mode. */
 		void beginOrConfirmNewEntry();
 
 		/** Move selection one item toward the start of the list. */
@@ -146,8 +150,8 @@ private:
 		bool canBeginNewEntry() const;
 		/** Return whether selection refers to an existing list item. */
 		bool hasValidSelection() const { return _validSelection; }
-		/** Return whether a provisional or explicit new row is active. */
-		bool isEditing() const { return kEditProvisional02 <= _editState; }
+		/** Return whether a new-name row is being edited. */
+		bool isEditing() const { return kInputSearchNewEntry02 <= _textInputState; }
 		/** Return whether the selected existing item is displayed as read-only. */
 		bool isSelectedReadOnly() const;
 		/** Return whether the edit buffer contains at least one character. */
@@ -157,8 +161,8 @@ private:
 		Common::String getSelectedName() const;
 		/** Return an existing name differing from the active new entry only by letter case. */
 		Common::String getCaseInsensitiveConflictName() const;
-		/** Return the active editing stage. */
-		EditState getEditState() const { return _editState; }
+		/** Return the active text-input state. */
+		TextInputState getTextInputState() const { return _textInputState; }
 		/** Return the number of savefile rows. */
 		int getItemCount() const { return static_cast<int>(_items.size()); }
 		/** Return the selected row index. */
@@ -194,8 +198,8 @@ private:
 		Common::Array<bool> _readOnly;
 		/** Text being used for prefix matching or a new savefile row. */
 		Common::String _editBuffer;
-		/** Active editing stage. */
-		EditState _editState = kEditIdle00;
+		/** Active text-input state. */
+		TextInputState _textInputState = kInputIdle00;
 		/** Selected row index. */
 		int _selectedIndex = 0;
 		/** Index of the first visible row. */
@@ -275,26 +279,19 @@ private:
 	static constexpr const char *kDeleteConfirmationPath = "bmp/menu/Quit_panel_text_suppr";
 	/** Bit-block message shown when the Quit action confirms leaving the menu for credits. */
 	static constexpr const char *kQuitConfirmationPath = "bmp/menu/Quit_panel_text_quit";
-	/** English confirmation text for a case-only save-name collision. */
-	static constexpr const char *kCaseCollisionConfirmationEnglish =
-		"A save that differs only in letter case exists.\nThe new save will overwrite it.\nAre you sure to overwrite?";
-	/** Korean confirmation text for a case-only save-name collision. */
-	static constexpr const char *kCaseCollisionConfirmationKorean =
-		u8"대소문자만 다른 저장파일 이름이 있습니다.\n새 파일은 기존 저장파일을 덮어씁니다.\n덮어쓸까요?";
-	/** English confirmation text for opening a save without progress writes. */
-	static constexpr const char *kReadOnlyLoadConfirmationEnglish =
-		"This saved game will open in read-only mode.\nProgress will not be saved.\nContinue?";
-	/** Korean confirmation text for opening a save without progress writes. */
-	static constexpr const char *kReadOnlyLoadConfirmationKorean =
-		u8"이 저장파일은 읽기 전용 모드로 열립니다.\n진행 상황은 저장되지 않습니다.\n계속할까요?";
 
+	/** Refresh navigation, Start and New button availability from the savefile-list state. */
 	void updateButtonAvailability();
+	/** Process volume-panel input, apply live changes and handle Apply or Cancel; consume input while open. */
 	EventHandleResult handleVolumePanelInput(const Common::Point &pos, bool mouseReleased);
+	/** Previous pointer-button state used to detect volume-panel press and release edges. */
 	bool _volumePanelMouseDown = false;
 
 	/** Screen origin of the saved-game list. */
 	static constexpr Common::Point32 kFileListPos = Common::Point32(157, 286);
+	/** Width and height in page pixels of the saved-game selector. */
 	static constexpr Size32 kSelectorSize = Size32(520, 201);
+	/** Allowed release-byte characters for savefile-name keyboard entry. */
 	static constexpr const char *kValidNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ";
 	/** Characters accepted by the Hebrew release in addition to its Hebrew byte range. */
 	static constexpr const char *kHebrewValidNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ,.; ";
@@ -367,10 +364,6 @@ private:
 	void handleReadOnlyLoadConfirmation(DialogMsgBoxButton button);
 	/** Apply the shared quit-confirmation result. */
 	void handleQuitConfirmation(DialogMsgBoxButton button);
-	/** Return release-appropriate case-collision confirmation text. */
-	Common::U32String getCaseCollisionConfirmationText() const;
-	/** Return release-appropriate read-only load confirmation text. */
-	Common::U32String getReadOnlyLoadConfirmationText() const;
 
 	/** Open the volume options panel. */
 	void openOptionsDialog();

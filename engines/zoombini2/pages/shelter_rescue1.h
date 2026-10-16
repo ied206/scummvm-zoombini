@@ -27,8 +27,6 @@
 
 namespace Zoombini2 {
 
-class ZoombiniAnimation;
-
 /** Rescue Site I waiting shelter and Route2/Route3 branch selector. */
 class ShelterRescueSite1 : public ShelterRescueSiteBase {
 public:
@@ -87,12 +85,6 @@ private:
 	static constexpr const char *kScrollRightPath = "bmp/rescue1/button_right.an";
 	/** Background music played at Rescue Site I. */
 	static constexpr const char *kMusicPath = "#sounds/music/C1-BB02.wav";
-	/** Little-Zoombini sprite grid used for the rescue-site party. */
-	static constexpr const char *kLittleZombAnimationPath = "bmp/zombis/littleZomb.anm";
-	/** Zoombini animation used while dragging party members between roster slots. */
-	static constexpr const char *kPickupZombAnimationPath = "bmp/zombis/pris/pris.anm";
-	/** Alternate idle Zoombini sprite grid used by the rescue-site party. */
-	static constexpr const char *kIdleZombAnimationPath = "bmp/zombis/attente2/attenteZomb2.anm";
 	/** Area mask used to constrain rescue-site Zoombini drag-and-drop hit testing. */
 	static constexpr const char *kAreaMaskPath = "bmp/rescue1/area.bmt";
 	/** Missing-arrivals speech format; the argument is the number of arrivals still needed. */
@@ -115,7 +107,7 @@ private:
 	/** Number of departure seats scanned by the gate. */
 	static constexpr int kDepartureSeatCount = 8;
 	/**
-	 * Drop records accepted by @ref ZoombiniRunner::handlePointerInput.
+	 * Drop records accepted by @ref ZoombiniRunner::handleHoldAndDrop.
 	 *
 	 * Twenty waiting-grid records plus eight departure-seat rects built from
 	 * the original seat table, matching the 28-record original allocation.
@@ -217,12 +209,6 @@ private:
 	const Common::Point32 _portalPos = Common::Point32(520, 84);
 	/** Portal-foreground draw position. */
 	const Common::Point32 _portalTopPos = Common::Point32(518, 99);
-	/** Shared little-Zoombini grid borrowed for boarding actives. */
-	const ZoombiniAnimation *_littleZombAnimation = nullptr;
-	/** Shared pickup grid borrowed for boarding actives. */
-	const ZoombiniAnimation *_pickupZombAnimation = nullptr;
-	/** Shared idle grid borrowed for boarding actives. */
-	const ZoombiniAnimation *_idleZombAnimation = nullptr;
 	/** Waiting-grid and departure-seat drop records. */
 	Common::Array<ZmbDropTarget> _dropTargets;
 	/** First storage row shown in the visible roster grid. */

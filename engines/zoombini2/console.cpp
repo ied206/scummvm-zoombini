@@ -49,13 +49,26 @@ namespace Zoombini2 {
 constexpr RGBColor Zoombini2Console::kDefaultPlotColor;
 constexpr const char *Zoombini2Console::kDebugDumpPathFormat;
 
-Zoombini2Console::Zoombini2Console(Zoombini2Engine *vm) : GUI::Debugger(), _vm(vm) {
+const Zoombini2Console::ResourceTypeInfo Zoombini2Console::kResourceTypes[] = {
+	{Zoombini2Engine::PageResourceType::kBitmap, "bitmap", "bb"},
+	{Zoombini2Engine::PageResourceType::kBitmap, "bitmap", "bmp"},
+	{Zoombini2Engine::PageResourceType::kSprite, "sprite", "rb"},
+	{Zoombini2Engine::PageResourceType::kAnimation, "animation", "an"},
+	{Zoombini2Engine::PageResourceType::kZoombiniAnimation, "zoombini", "anm"},
+	{Zoombini2Engine::PageResourceType::kPath, "path", "pat"},
+	{Zoombini2Engine::PageResourceType::kSound, "sound", "wav"},
+	{Zoombini2Engine::PageResourceType::kVideo, "video", "bik"},
+	{Zoombini2Engine::PageResourceType::kLayout, "layout", "ztl"},
+	{Zoombini2Engine::PageResourceType::kUnknown, "unknown", "unknown"}};
+
+Zoombini2Console::Zoombini2Console(Zoombini2Engine *vm)
+	: GUI::Debugger(), _vm(vm) {
 	registerCmd(kCmdSfx, WRAP_METHOD(Zoombini2Console, Cmd_Sfx));
 	registerCmd(kCmdBgm, WRAP_METHOD(Zoombini2Console, Cmd_Bgm));
 	registerCmd(kCmdGo, WRAP_METHOD(Zoombini2Console, Cmd_Go));
 	registerCmd(kCmdDraw, WRAP_METHOD(Zoombini2Console, Cmd_Draw));
 	registerCmd(kCmdDump, WRAP_METHOD(Zoombini2Console, Cmd_Dump));
-	registerCmd(kCmdPrint, WRAP_METHOD(Zoombini2Console, Cmd_Print));
+	registerCmd(kCmdList, WRAP_METHOD(Zoombini2Console, Cmd_List));
 	registerCmd(kCmdState, WRAP_METHOD(Zoombini2Console, Cmd_State));
 	registerCmd(kCmdManShortcuts, WRAP_METHOD(Zoombini2Console, Cmd_ManShortcuts));
 	registerCmd(kCmdPlot, WRAP_METHOD(Zoombini2Console, Cmd_Plot));
@@ -417,7 +430,7 @@ void Zoombini2Console::printGoDestinations(bool puzzleOnly) {
 		if (puzzleOnly && InteractiveMap::getPracticePartySize(destination.target) == 0)
 			continue;
 		debugPrintf("  %-15s page %2d%s\n", destination.name, static_cast<int>(destination.target),
-					puzzleOnly ? " (internal level 4)" : "");
+					puzzleOnly ? " (restored level 4)" : "");
 	}
 }
 
@@ -441,7 +454,7 @@ bool Zoombini2Console::Cmd_Go(int argc, const char **argv) {
 bool Zoombini2Console::CmdSub_GoPractice(int argc, const char **argv) {
 	if (hasHelpOption(argc, argv) || argc < 4 || 5 < argc) {
 		debugPrintf("Usage: go practice <puzzle> <level> [count]\n");
-		debugPrintf("Puzzle accepts a name or page number. Level is 1-3, or internal level 4.\n");
+		debugPrintf("Puzzle accepts a name or page number. Level is 1-3, or restored level 4.\n");
 		debugPrintf("Count defaults to the route party size: 16 before Rescue I, 8 afterward.\n");
 		debugPrintf("Available puzzles:\n");
 		printGoDestinations(true);
@@ -477,7 +490,8 @@ bool Zoombini2Console::CmdSub_GoXfer(int argc, const char **argv) {
 	if (hasHelpOption(argc, argv) || argc < 3 || 4 < argc) {
 		debugPrintf("Usage: go xfer <destination> [level]\n");
 		debugPrintf("Destination accepts a name or page number. An explicit level starts isolated practice.\n");
-		debugPrintf("Without a level, the current saved-adventure or practice level is retained.\n");
+		debugPrintf("Without a level, the current journey or practice level is retained.\n");
+		debugPrintf("Rescue sites use seated members; surplus and uncompleted arrival parties return to the village.\n");
 		debugPrintf("Available destinations:\n");
 		printGoDestinations(false);
 		debugPrintf("\n");
@@ -506,6 +520,9 @@ bool Zoombini2Console::CmdSub_GoXfer(int argc, const char **argv) {
 	case Zoombini2Engine::DebugRouteRequestResult::kNoActivePage:
 		debugPrintf("No active Zoombini2 game page.\n\n");
 		return true;
+	case Zoombini2Engine::DebugRouteRequestResult::kNoTravelingParty:
+		debugPrintf("No traveling party. Select Zoombinis first, or supply a level for isolated practice.\n\n");
+		return true;
 	case Zoombini2Engine::DebugRouteRequestResult::kInvalidLevel:
 		debugPrintf("Invalid level '%u'. Must be 1-4.\n\n", level);
 		return true;
@@ -527,19 +544,20 @@ bool Zoombini2Console::Cmd_Draw(int argc, const char **argv) {
 		debugPrintf("  %s\n", kSubCmdDrawAreaMask);
 		debugPrintf("      Show the active page only where its area mask accepts drops,\n");
 		debugPrintf("      masking the rest with black.\n\n");
-		debugPrintf("  %s <path> [start-frame]\n", kSubCmdDrawAnimation);
-		debugPrintf("      Show frames of an animation (.an) or sprite (.rb) resource.\n\n");
+		debugPrintf("  %s <path> [start-frame]\n", kSubCmdDrawSprites);
+		debugPrintf("      Show a numbered sprite sheet from an .an or .rb resource. Alias: sprite.\n\n");
 		debugPrintf("  %s <path>\n", kSubCmdDrawImage);
 		debugPrintf("      Show a decoded bitmap (.bb/.bmp) over white.\n\n");
 		debugPrintf("  %s <path> | --text \"message\"\n", kSubCmdDrawMsgBox);
 		debugPrintf("      Preview a bitmap message or UTF-8 UI text without a game callback.\n\n");
+		printResourcePathHelp();
 		debugPrintf("Options:\n");
 		printHelpOption();
 		return true;
 	}
 
 	if (argc < 2) {
-		debugPrintf("Usage: %s <%s|%s|%s|%s> [arguments]\n", kCmdDraw, kSubCmdDrawAreaMask, kSubCmdDrawAnimation,
+		debugPrintf("Usage: %s <%s|%s|%s|%s> [arguments]\n", kCmdDraw, kSubCmdDrawAreaMask, kSubCmdDrawSprites,
 					kSubCmdDrawImage, kSubCmdDrawMsgBox);
 		debugPrintf("\n");
 		return true;
@@ -547,15 +565,15 @@ bool Zoombini2Console::Cmd_Draw(int argc, const char **argv) {
 
 	if (scumm_stricmp(argv[1], kSubCmdDrawAreaMask) == 0)
 		return CmdSub_DrawAreaMask(argc, argv);
-	if (scumm_stricmp(argv[1], kSubCmdDrawAnimation) == 0)
-		return CmdSub_DrawAnimation(argc, argv);
+	if (scumm_stricmp(argv[1], kSubCmdDrawSprites) == 0 || scumm_stricmp(argv[1], kSubCmdDrawSprite) == 0)
+		return CmdSub_DrawSprites(argc, argv);
 	if (scumm_stricmp(argv[1], kSubCmdDrawImage) == 0)
 		return CmdSub_DrawImage(argc, argv);
 	if (scumm_stricmp(argv[1], kSubCmdDrawMsgBox) == 0)
 		return CmdSub_DrawMsgBox(argc, argv);
 
 	debugPrintf("Unknown %s subcommand '%s'.\n", kCmdDraw, argv[1]);
-	debugPrintf("Usage: %s <%s|%s|%s|%s> [arguments]\n", kCmdDraw, kSubCmdDrawAreaMask, kSubCmdDrawAnimation,
+	debugPrintf("Usage: %s <%s|%s|%s|%s> [arguments]\n", kCmdDraw, kSubCmdDrawAreaMask, kSubCmdDrawSprites,
 				kSubCmdDrawImage, kSubCmdDrawMsgBox);
 	debugPrintf("\n");
 	return true;
@@ -594,22 +612,25 @@ bool Zoombini2Console::CmdSub_DrawAreaMask(int argc, const char **argv) {
 	return false;
 }
 
-bool Zoombini2Console::CmdSub_DrawAnimation(int argc, const char **argv) {
+bool Zoombini2Console::CmdSub_DrawSprites(int argc, const char **argv) {
 	if (hasHelpOption(argc, argv)) {
-		debugPrintf("Show one frame of an animation or sprite resource in the debug dialog.\n");
-		debugPrintf("Usage: %s %s <path> [start-frame]\n\n", kCmdDraw, kSubCmdDrawAnimation);
+		debugPrintf("Show a numbered sprite sheet from an .an or .rb resource in the debug dialog.\n");
+		debugPrintf("Usage: %s %s <path> [start-frame]\n\n", kCmdDraw, kSubCmdDrawSprites);
+		debugPrintf("Alias: %s %s <path> [start-frame]\n\n", kCmdDraw, kSubCmdDrawSprite);
 		debugPrintf("<path> is an animation (.an) or sprite (.rb) resource path,\n");
 		debugPrintf("with or without its extension. Frames are numbered from 0;\n");
-		debugPrintf("[start-frame] defaults to 0. Use the Left/Right keys to\n");
-		debugPrintf("step frames. Click or press ESC while the dialog is shown\n");
-		debugPrintf("to close it.\n\n");
+		debugPrintf("[start-frame] defaults to 0 and selects the first frame on the sheet.\n");
+		debugPrintf("Frames retain their aspect ratio and shrink only when larger than the preview cells.\n");
+		debugPrintf("Use the Left/Right keys to browse sheets when the frames do not fit on one screen.\n");
+		debugPrintf("Click or press ESC while the dialog is shown to close it.\n\n");
+		printResourcePathHelp();
 		debugPrintf("Options:\n");
 		printHelpOption();
 		return true;
 	}
 
 	if (argc < 3 || 4 < argc) {
-		debugPrintf("Usage: %s %s <path> [start-frame]\n", kCmdDraw, kSubCmdDrawAnimation);
+		debugPrintf("Usage: %s %s <path> [start-frame]\n", kCmdDraw, kSubCmdDrawSprites);
 		debugPrintf("\n");
 		return true;
 	}
@@ -622,9 +643,12 @@ bool Zoombini2Console::CmdSub_DrawAnimation(int argc, const char **argv) {
 	}
 
 	DialogDebugCommand cmd;
-	cmd.setDrawAnimation(Common::Path(argv[2]), static_cast<int>(startFrame));
+	Common::Path path;
+	if (!parseDebugResourcePath(argv[2], path))
+		return true;
+	cmd.setDrawSprites(path, static_cast<int>(startFrame));
 	if (!_vm->openDebugDialog(cmd)) {
-		debugPrintf("Cannot open animation '%s' at frame %u\n", argv[2], startFrame);
+		debugPrintf("Cannot open sprite sheet '%s' at frame %u\n", path.toString('/').c_str(), startFrame);
 		debugPrintf("\n");
 		return true;
 	}
@@ -712,8 +736,8 @@ bool Zoombini2Console::CmdSub_PlotPoint(int argc, const char **argv) {
 		debugPrintf("\n");
 		return true;
 	}
-	if (point.x < 0 || ManagedSurface32::kScreenSize.width <= point.x || point.y < 0 || ManagedSurface32::kScreenSize.height <= point.y) {
-		debugPrintf("Coordinates out of bounds (screen size: %d x %d).\n\n", ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height);
+	if (point.x < 0 || Gfx::kScreenSize.width <= point.x || point.y < 0 || Gfx::kScreenSize.height <= point.y) {
+		debugPrintf("Coordinates out of bounds (screen size: %d x %d).\n\n", Gfx::kScreenSize.width, Gfx::kScreenSize.height);
 		return true;
 	}
 
@@ -790,6 +814,7 @@ bool Zoombini2Console::CmdSub_PlotRect(int argc, const char **argv) {
 bool Zoombini2Console::Cmd_Puzzle(int argc, const char **argv) {
 	if (argc < 2 || isHelpOption(argv[1])) {
 		debugPrintf("Inspect or control the active puzzle.\nUsage: page|puzzle <subcommand> [arguments]\n\n");
+		debugPrintf("  retry                        Retry the same puzzle from the beginning.\n");
 		debugPrintf("  finish                       Accept the party and depart.\n");
 		debugPrintf("  answer                       Print the generated rules/answer without changing state.\n");
 		debugPrintf("  chance|chances [get]          Show remaining chances and other resource budgets.\n");
@@ -799,10 +824,12 @@ bool Zoombini2Console::Cmd_Puzzle(int argc, const char **argv) {
 		if (puzzle && puzzle->debugCanSetChances())
 			chanceSupport = "supported";
 		debugPrintf("Chance setting is %s in the active page state.\n", chanceSupport);
-		debugPrintf("Commands work in practice and saved adventures, independently of the in-game debug hotkey flag.\n");
+		debugPrintf("Commands work in practice and journey modes, independently of the in-game debug hotkey flag.\n");
 		debugPrintf("Use puzzle <subcommand> --help for details.\n\n");
 		return true;
 	}
+	if (scumm_stricmp(argv[1], "retry") == 0)
+		return CmdSub_PuzzleRetry(argc, argv);
 	if (scumm_stricmp(argv[1], "finish") == 0)
 		return CmdSub_PuzzleFinish(argc, argv);
 	if (scumm_stricmp(argv[1], "answer") == 0)
@@ -813,10 +840,28 @@ bool Zoombini2Console::Cmd_Puzzle(int argc, const char **argv) {
 	return true;
 }
 
+bool Zoombini2Console::CmdSub_PuzzleRetry(int argc, const char **argv) {
+	if (hasHelpOption(argc, argv) || argc != 2) {
+		debugPrintf("Usage: page|puzzle retry\nRetry the current puzzle with its original party, level and generated rules.\n");
+		debugPrintf("Progress and chances return to their state at puzzle entry. Works in practice and journey modes.\n\n");
+		return true;
+	}
+	if (!dynamic_cast<PuzzleBase *>(_vm->getCurrentPage())) {
+		debugPrintf("Current page is not a puzzle page.\n\n");
+		return true;
+	}
+	if (!_vm->debugRetryPuzzle()) {
+		debugPrintf("Cannot retry while a page change is pending or no puzzle entry checkpoint is available.\n\n");
+		return true;
+	}
+	debugPrintf("Retrying the current puzzle.\n\n");
+	return false;
+}
+
 bool Zoombini2Console::CmdSub_PuzzleFinish(int argc, const char **argv) {
 	if (hasHelpOption(argc, argv) || argc != 2) {
 		debugPrintf("Usage: page|puzzle finish\nAccept the whole party and trigger regular departure.\n");
-		debugPrintf("Practice returns to its map; saved adventures retain the accepted party and advance along the route.\n\n");
+		debugPrintf("Practice mode returns to its map; journey mode retains the accepted party and advances along the route.\n\n");
 		return true;
 	}
 	PuzzleBase *puzzle = dynamic_cast<PuzzleBase *>(_vm->getCurrentPage());
@@ -888,7 +933,7 @@ bool Zoombini2Console::CmdSub_PuzzleChance(int argc, const char **argv) {
 	if (hasHelpOption(argc, argv) || (!query && !set)) {
 		debugPrintf("Usage: page|puzzle chance|chances [get|set <remaining>]\n");
 		debugPrintf("Without an argument, show the chance model and remaining count.\n");
-		debugPrintf("Set accepts a decimal or 0x-prefixed integer from zero through the opportunity limit.\n");
+		debugPrintf("Set accepts a decimal or 0x-prefixed integer from one through the opportunity limit.\n");
 		const char *chanceSupport = "unsupported";
 		if (puzzle && puzzle->debugCanSetChances())
 			chanceSupport = "supported";
@@ -903,15 +948,15 @@ bool Zoombini2Console::CmdSub_PuzzleChance(int argc, const char **argv) {
 		}
 		uint remaining;
 		if (!parseUnsignedInt(argv[3], remaining) || INT_MAX < remaining) {
-			debugPrintf("Invalid remaining chances '%s'. Must be a non-negative integer.\n\n", argv[3]);
+			debugPrintf("Invalid remaining chances '%s'. Must be a positive integer.\n\n", argv[3]);
 			return true;
 		}
 		if (!puzzle || !puzzle->debugCanSetChances() || info.opportunities < 0) {
 			debugPrintf("The active page state does not support adjusting chances.\n\n");
 			return true;
 		}
-		if (info.opportunities < 0 || static_cast<uint>(info.opportunities) < remaining) {
-			debugPrintf("Remaining chances must be between 0 and %d.\n\n", info.opportunities);
+		if (remaining == 0 || static_cast<uint>(info.opportunities) < remaining) {
+			debugPrintf("Remaining chances must be between 1 and %d.\n\n", info.opportunities);
 			return true;
 		}
 		if (!puzzle->debugSetChances(static_cast<int>(remaining))) {
@@ -925,12 +970,18 @@ bool Zoombini2Console::CmdSub_PuzzleChance(int argc, const char **argv) {
 	if (0 <= info.opportunities) {
 		debugPrintf("  One chance is used per [%s].\n", info.unit ? info.unit : "attempt");
 		debugPrintf("  Opportunities: %d\n  Chances left:  %d\n  Chances used:  %d\n", info.opportunities, info.chancesLeft(), info.used);
-	} else if (info.type == PuzzleChanceInfo::Type::kInfinite) {
-		debugPrintf("  The player can try without any chance limitation.\n");
-	} else if (info.type == PuzzleChanceInfo::Type::kNone) {
-		debugPrintf("  This page is not a puzzle.\n");
 	} else {
-		debugPrintf("  This puzzle has no single countable chance budget.\n");
+		switch (info.type) {
+		case PuzzleChanceInfo::Type::kInfinite:
+			debugPrintf("  The player can try without any chance limitation.\n");
+			break;
+		case PuzzleChanceInfo::Type::kNone:
+			debugPrintf("  This page is not a puzzle.\n");
+			break;
+		default:
+			debugPrintf("  This puzzle has no single countable chance budget.\n");
+			break;
+		}
 	}
 	if (puzzle)
 		debugPrintf("%s", puzzle->debugGetChanceDetails().c_str());
@@ -940,6 +991,17 @@ bool Zoombini2Console::CmdSub_PuzzleChance(int argc, const char **argv) {
 
 bool Zoombini2Console::parseDebugResourcePath(const char *text, Common::Path &path) {
 	Common::String normalized(text);
+	if (!normalized.empty() && normalized[0] == '@') {
+		uint32 handle = 0;
+		if (!parseUnsignedInt(text + 1, handle))
+			return false;
+		const Common::Array<Zoombini2Engine::PageResource> &resources = _vm->getPageResources();
+		if (handle == 0 || resources.size() < handle) {
+			debugPrintf("Unknown resource handle '%s'. Use list resource for this page's handles.\n\n", text);
+			return false;
+		}
+		normalized = resources[handle - 1].path.toString('/');
+	}
 	normalized.replace('\\', '/');
 	Common::String relative = normalized;
 	if (!relative.empty() && relative[0] == '#')
@@ -953,6 +1015,11 @@ bool Zoombini2Console::parseDebugResourcePath(const char *text, Common::Path &pa
 	return true;
 }
 
+void Zoombini2Console::printResourcePathHelp() {
+	debugPrintf("Use list resource [type] [filter] to list this page's file paths and types.\n");
+	debugPrintf("A listed @number can replace <path>; handles reset on page transitions.\n\n");
+}
+
 bool Zoombini2Console::CmdSub_DrawImage(int argc, const char **argv) {
 	if (hasHelpOption(argc, argv) || argc != 3) {
 		debugPrintf("Preview a decoded bitmap over white in the debug dialog.\n");
@@ -960,6 +1027,7 @@ bool Zoombini2Console::CmdSub_DrawImage(int argc, const char **argv) {
 		debugPrintf("Use a logical .bb/.bmp path or an extensionless bitmap name.\n");
 		debugPrintf("Prefix installed resources with #. Large images are clipped to the game screen.\n");
 		debugPrintf("Click or press ESC to close the preview.\n\n");
+		printResourcePathHelp();
 		printHelpOption();
 		return true;
 	}
@@ -981,6 +1049,7 @@ bool Zoombini2Console::CmdSub_DrawMsgBox(int argc, const char **argv) {
 		debugPrintf("Usage: %s %s <path>\n", kCmdDraw, kSubCmdDrawMsgBox);
 		debugPrintf("       %s %s --text \"message\"\n\n", kCmdDraw, kSubCmdDrawMsgBox);
 		debugPrintf("The preview has no game callback. Both buttons only close it.\n\n");
+		printResourcePathHelp();
 		printHelpOption();
 		return true;
 	}
@@ -1088,18 +1157,19 @@ bool Zoombini2Console::exportDebugSurface(const Graphics::Surface &surface, cons
 
 bool Zoombini2Console::Cmd_Dump(int argc, const char **argv) {
 	if (argc < 2 || (argc == 2 && isHelpOption(argv[1]))) {
-		debugPrintf("Export decoded Z2 resources or the live saved-adventure state.\n");
+		debugPrintf("Export decoded Z2 resources or the live journey state.\n");
 		debugPrintf("Usage: %s <image|animation|save> [arguments]\n\n", kCmdDump);
 		debugPrintf("  image <path>                Export one bitmap over white as PNG.\n");
-		debugPrintf("  animation <path>            Export every decoded frame over white as PNG.\n");
-		debugPrintf("  save                        Export the live adventure in the .mk layout.\n\n");
+		debugPrintf("  animation <path>            Export every decoded frame over white as PNG. Alias: anm.\n");
+		debugPrintf("  save                        Export the live journey in the .mk layout.\n\n");
 		debugPrintf("Numbered files below dumps/ preserve existing exports.\n\n");
+		printResourcePathHelp();
 		printHelpOption();
 		return true;
 	}
 	if (scumm_stricmp(argv[1], "image") == 0)
 		return CmdSub_DumpImage(argc, argv);
-	if (scumm_stricmp(argv[1], "animation") == 0)
+	if (scumm_stricmp(argv[1], kSubCmdDumpAnimation) == 0 || scumm_stricmp(argv[1], kSubCmdDumpAnimationAlias) == 0)
 		return CmdSub_DumpAnimation(argc, argv);
 	if (scumm_stricmp(argv[1], "save") == 0)
 		return CmdSub_DumpSave(argc, argv);
@@ -1113,6 +1183,7 @@ bool Zoombini2Console::CmdSub_DumpImage(int argc, const char **argv) {
 		debugPrintf("Usage: %s image <path>\n\n", kCmdDump);
 		debugPrintf("The bitmap resolver prefers a matching .bb cache for .bmp or extensionless names.\n");
 		debugPrintf("Bitmap resources are always exported as PNG and require PNG support in this build.\n\n");
+		printResourcePathHelp();
 		printHelpOption();
 		return true;
 	}
@@ -1144,9 +1215,11 @@ bool Zoombini2Console::CmdSub_DumpAnimation(int argc, const char **argv) {
 	if (hasHelpOption(argc, argv) || argc != 3) {
 		debugPrintf("Export every decoded animation frame or one explicit RB sprite, composited over white.\n");
 		debugPrintf("Usage: %s animation <path>\n\n", kCmdDump);
+		debugPrintf("Alias: %s %s <path>\n\n", kCmdDump, kSubCmdDumpAnimationAlias);
 		debugPrintf("Frame names use zero-based indices; all images are exported as PNG.\n");
 		debugPrintf("PNG support is required in this build.\n");
 		debugPrintf("Recoverable animation prefixes follow the existing decoder's salvage policy.\n\n");
+		printResourcePathHelp();
 		printHelpOption();
 		return true;
 	}
@@ -1185,16 +1258,16 @@ bool Zoombini2Console::CmdSub_DumpAnimation(int argc, const char **argv) {
 
 bool Zoombini2Console::CmdSub_DumpSave(int argc, const char **argv) {
 	if (hasHelpOption(argc, argv) || argc != 2) {
-		debugPrintf("Export the live saved-adventure state using the existing .mk serializer.\n");
+		debugPrintf("Export the live journey state using the existing .mk serializer.\n");
 		debugPrintf("Usage: %s save\n\n", kCmdDump);
 		debugPrintf("The export includes unsaved changes and follows the serializer's active-party rules.\n");
 		debugPrintf("It writes a fresh dump file without writing the player's stored save.\n");
-		debugPrintf("A named saved adventure must be active; practice mode is unavailable.\n\n");
+		debugPrintf("A named journey must be active; practice mode is unavailable.\n\n");
 		printHelpOption();
 		return true;
 	}
-	if (!_vm->_state || !_vm->_isSavedGame || _vm->_state->getPlayerName().empty()) {
-		debugPrintf("No named saved adventure is active.\n\n");
+	if (!_vm->_state || _vm->inPracticeMode() || _vm->_state->getPlayerName().empty()) {
+		debugPrintf("No named journey is active.\n\n");
 		return true;
 	}
 	Common::DumpFile out;
@@ -1210,54 +1283,106 @@ bool Zoombini2Console::CmdSub_DumpSave(int argc, const char **argv) {
 	return true;
 }
 
-bool Zoombini2Console::Cmd_Print(int argc, const char **argv) {
+bool Zoombini2Console::Cmd_List(int argc, const char **argv) {
 	if (argc < 2 || (argc == 2 && isHelpOption(argv[1]))) {
-		debugPrintf("Inspect Z2 animation resources and registered general-object runners.\n");
-		debugPrintf("Usage: %s <animation|runners> [arguments]\n\n", kCmdPrint);
-		debugPrintf("  animation <path>  Print decoded frame count and dimensions.\n");
-		debugPrintf("  runners           Print the current page-layer runner registry.\n\n");
+		debugPrintf("List Z2 resource accesses and registered general-object runners.\n");
+		debugPrintf("Usage: %s <resource|runners> [arguments]\n\n", kCmdList);
+		debugPrintf("  resource [type] [filter]  List resources used during the current page lifetime.\n");
+		debugPrintf("  runners                   List the current page-layer runner registry.\n\n");
+		printResourcePathHelp();
 		printHelpOption();
 		return true;
 	}
-	if (scumm_stricmp(argv[1], "animation") == 0)
-		return CmdSub_PrintAnimation(argc, argv);
+	if (scumm_stricmp(argv[1], "resource") == 0 || scumm_stricmp(argv[1], "resources") == 0)
+		return CmdSub_ListResource(argc, argv);
 	if (scumm_stricmp(argv[1], "runners") == 0)
-		return CmdSub_PrintRunners(argc, argv);
-	debugPrintf("Unknown print subcommand '%s'. Use %s --help.\n\n", argv[1], kCmdPrint);
+		return CmdSub_ListRunners(argc, argv);
+	debugPrintf("Unknown list subcommand '%s'. Use %s --help.\n\n", argv[1], kCmdList);
 	return true;
 }
 
-bool Zoombini2Console::CmdSub_PrintAnimation(int argc, const char **argv) {
-	if (hasHelpOption(argc, argv) || argc != 3) {
-		debugPrintf("Inspect an independently decoded animation or explicit RB sprite.\n");
-		debugPrintf("Usage: %s animation <path>\n\n", kCmdPrint);
-		debugPrintf("Frame indices start at zero. Playback durations are authored by the page, not the AN file.\n\n");
+const char *Zoombini2Console::getResourceTypeName(Zoombini2Engine::PageResourceType type) {
+	for (uint i = 0; i < ARRAYSIZE(kResourceTypes); i++) {
+		if (kResourceTypes[i].type == type)
+			return kResourceTypes[i].name;
+	}
+	return "unknown";
+}
+
+bool Zoombini2Console::parseResourceType(const char *text, Zoombini2Engine::PageResourceType &type) {
+	for (uint i = 0; i < ARRAYSIZE(kResourceTypes); i++) {
+		const ResourceTypeInfo &info = kResourceTypes[i];
+		if (scumm_stricmp(text, info.name) == 0 || scumm_stricmp(text, info.extension) == 0) {
+			type = info.type;
+			return true;
+		}
+	}
+	return false;
+}
+
+bool Zoombini2Console::CmdSub_ListResource(int argc, const char **argv) {
+	if (hasHelpOption(argc, argv) || argc < 2 || 4 < argc) {
+		debugPrintf("List successful resource file opens and cache requests since the last page transition.\n");
+		debugPrintf("Usage: %s resource [type] [filter]\n\n", kCmdList);
+		debugPrintf("Types: bitmap (bb/bmp), sprite (rb), animation (an), zoombini (anm),\n");
+		debugPrintf("       path (pat), sound (wav), video (bik), layout (ztl), unknown, all.\n");
+		debugPrintf("Type names and extension aliases ignore case; all includes every type.\n");
+		debugPrintf("The optional filter matches any part of the path, ignoring case.\n");
+		debugPrintf("A single argument that is not a type is treated as a path filter.\n");
+		debugPrintf("Paths name the resolved files, including their extensions.\n");
+		debugPrintf("Includes dialogs and console previews; an opened file need not still have a live stream.\n");
+		debugPrintf("Cache labels describe successful requests, including hits on shared caches.\n");
+		debugPrintf("File opens and cache requests for the same resolved path share one entry.\n");
+		debugPrintf("Filtering retains handle numbers; new resources append without renumbering them.\n");
+		debugPrintf("The resources subcommand is an alias for resource.\n\n");
+		printResourcePathHelp();
 		printHelpOption();
 		return true;
 	}
-	Common::Path path;
-	if (!parseDebugResourcePath(argv[2], path))
-		return true;
-	Animation animation(_vm);
-	RleBlock sprite(_vm);
-	bool singleFrame = false;
-	if (!loadDebugAnimation(path, animation, sprite, singleFrame))
-		return true;
-	const int count = singleFrame ? 1 : animation.getFrameCount();
-	debugPrintf("Animation %s: %d decoded frames.\n", path.toString('/').c_str(), count);
-	for (int i = 0; i < count; i++) {
-		const RleBlock *frame = singleFrame ? &sprite : animation.getFrame(i);
-		if (frame)
-			debugPrintf("  frame %d: %d x %d\n", i, frame->getWidth(), frame->getHeight());
+	Zoombini2Engine::PageResourceType type = Zoombini2Engine::PageResourceType::kUnknown;
+	bool filterByType = false;
+	Common::String filter;
+	if (2 < argc) {
+		if (scumm_stricmp(argv[2], "all") == 0) {
+			if (argc == 4)
+				filter = argv[3];
+		} else if (parseResourceType(argv[2], type)) {
+			filterByType = true;
+			if (argc == 4)
+				filter = argv[3];
+		} else if (argc == 3) {
+			filter = argv[2];
+		} else {
+			debugPrintf("Unknown resource type '%s'. Use %s resource --help.\n\n", argv[2], kCmdList);
+			return true;
+		}
 	}
-	debugPrintf("\n");
+	const Common::Array<Zoombini2Engine::PageResource> &resources = _vm->getPageResources();
+	filter.toLowercase();
+	debugPrintf("Page %d: %u recorded resource paths.\n", static_cast<int>(_vm->getCurrentPageId()), resources.size());
+	uint shown = 0;
+	for (uint i = 0; i < resources.size(); i++) {
+		const Zoombini2Engine::PageResource &resource = resources[i];
+		if (filterByType && resource.type != type)
+			continue;
+		const Common::String name = resource.path.toString('/');
+		Common::String match(name);
+		match.toLowercase();
+		if (!filter.empty() && !match.contains(filter))
+			continue;
+		debugPrintf("  @%u  [%s] [%s%s%s] %s\n", i + 1, getResourceTypeName(resource.type), resource.opened ? "open" : "",
+					resource.opened && resource.cacheUsed ? ", " : "",
+					resource.cacheUsed ? "cache" : "", name.c_str());
+		shown += 1;
+	}
+	debugPrintf("%u matching paths. Use @number in place of a resource path; handles reset on page transitions.\n\n", shown);
 	return true;
 }
 
-bool Zoombini2Console::CmdSub_PrintRunners(int argc, const char **argv) {
+bool Zoombini2Console::CmdSub_ListRunners(int argc, const char **argv) {
 	if (hasHelpOption(argc, argv) || argc != 2) {
 		debugPrintf("List registered general-object animation runners without advancing them.\n");
-		debugPrintf("Usage: %s runners\n\n", kCmdPrint);
+		debugPrintf("Usage: %s runners\n\n", kCmdList);
 		debugPrintf("Lists layer/index, position, active state, mode, timing/frame indices, and input flags.\n");
 		debugPrintf("Standalone page-local runners are outside the layer registry. Use state get party for Zoombinis.\n\n");
 		printHelpOption();
@@ -1293,20 +1418,21 @@ bool Zoombini2Console::CmdSub_PrintRunners(int argc, const char **argv) {
 bool Zoombini2Console::printDebugStateGroup(const Common::String &group) {
 	const GameState &state = *_vm->_state;
 	if (group.equalsIgnoreCase("page")) {
-		debugPrintf("page: current=%d gameplay=%d level=%d savedAdventure=%d\n", static_cast<int>(_vm->getCurrentPageId()),
-					static_cast<int>(state._currentGameplayPageId), state.getLevel(), _vm->_isSavedGame);
+		debugPrintf("page: current=%d gameplay=%d level=%d mode=%s\n", static_cast<int>(_vm->getCurrentPageId()),
+					static_cast<int>(state._currentPage), state.getLevel(), _vm->inPracticeMode() ? "practice" : "journey");
 	} else if (group.equalsIgnoreCase("progress")) {
 		debugPrintf("progress: rescue1=%u rescue2=%u booliewood=%u rescuedBoolies=%d rescue1Arrivals=%d completedZoombinis=%d\n",
 					state._hasReachedRescue1, state._hasReachedRescue2, state._hasReachedBooliewood, state._rescuedBoolieCount,
 					state._rescue1ArrivalCount, state._completedZoombiniCount);
-		for (int i = 0; i < 100; i++) {
+		for (int i = 0; i < state.getPageLevelCount(); i++) {
 			const PageId page = static_cast<PageId>(i);
+			const int level = state.getPageLevel(page);
 			const uint visit1 = state.getPageVisitCount(page, 1);
 			const uint visit2 = state.getPageVisitCount(page, 2);
 			const uint visit3 = state.getPageVisitCount(page, 3);
-			if (state._pageLevel[i] == 0 && state._perfectClearCount[i] == 0 && visit1 == 0 && visit2 == 0 && visit3 == 0)
+			if (level == 0 && state._perfectClearCount[i] == 0 && visit1 == 0 && visit2 == 0 && visit3 == 0)
 				continue;
-			debugPrintf("  page %d: level=%d perfectClears=%d visits=(%u,%u,%u)\n", i, state.getPageLevel(page), state._perfectClearCount[i],
+			debugPrintf("  page %d: level=%d perfectClears=%d visits=(%u,%u,%u)\n", i, level, state._perfectClearCount[i],
 						visit1, visit2, visit3);
 		}
 	} else if (group.equalsIgnoreCase("population")) {
@@ -1399,8 +1525,8 @@ bool Zoombini2Console::Cmd_ManShortcuts(int argc, const char **argv) {
 	debugPrintf("  Esc/Click   Close the debug dialog.\n");
 	debugPrintf("  Left/Right  Step animation frames.\n\n");
 	debugPrintf("[Enhanced shortcuts] (%s)\n", _vm->useEnhancedKbdShortcuts() ? "enabled" : "disabled");
-	debugPrintf("  Map:        Ctrl+P switches adventure/practice; 1-3 select practice level.\n");
-	debugPrintf("              4 selects the internal practice level where supported.\n");
+	debugPrintf("  Map:        Ctrl+P switches journey/practice modes; 1-3 select practice level.\n");
+	debugPrintf("              4 selects the restored practice level where supported.\n");
 	debugPrintf("  Zombiniville: Delete removes the held Zoombini; Shift+Delete removes the whole party.\n");
 	debugPrintf("  Message box: Enter accepts; Esc cancels.\n\n");
 	debugPrintf("Map volume-panel Esc cancels that panel. The help overlay uses its on-screen controls.\n\n");
