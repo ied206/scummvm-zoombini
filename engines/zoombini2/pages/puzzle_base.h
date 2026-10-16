@@ -112,7 +112,7 @@ protected:
 	const char *_initialBackgroundPath = nullptr;
 	/** Banner shared by all puzzle answer reports. */
 	Common::String debugAnswerHeader() const;
-	/** Describe a party member by displayed name and named traits for a debug answer. */
+	/** Describe a party member with the name padded to the six-character generation limit, followed by named traits. */
 	Common::String debugActorDescription(int index) const;
 	/** Whether a forced departure has already been requested. */
 	bool _debugFinishPending = false;

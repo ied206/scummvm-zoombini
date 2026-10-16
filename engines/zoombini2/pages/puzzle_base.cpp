@@ -123,7 +123,7 @@ Common::String PuzzleBase::debugActorDescription(int index) const {
 	if (index < 0 || static_cast<int>(_puzzleZoombinis.size()) <= index)
 		return "(none)";
 	const ZoombiniRunner *actor = _puzzleZoombinis[index];
-	return Common::String::format("Zoombini (%s): %s", actor->getName().c_str(), actor->getTraits().toStr().c_str());
+	return Common::String::format("Zoombini (%-6s): %s", actor->getName().c_str(), actor->getTraits().toStr().c_str());
 }
 
 void PuzzleBase::debugForceFinish() {

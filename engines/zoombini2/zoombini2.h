@@ -39,8 +39,9 @@
 
 #include "zoombini2/detection.h"
 #include "zoombini2/graphics.h"
-#include "zoombini2/metaengine.h"
 #include "zoombini2/random.h"
+#include "zoombini2/scripts.h"
+#include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 
 namespace Common {
@@ -59,7 +60,7 @@ class RleBlock;
 class SoundManager;
 class Sidebar;
 class ZoombiniRunner;
-class Text;
+class TextManager;
 
 /**
  * Coordinates input, page transitions, and rendering for one game session.
@@ -184,8 +185,8 @@ public:
 	void saveSoundVolumes(int music, int sfx, int speech);
 	/** Return whether the alternate level-one Waterslide pairing is enabled. */
 	bool useGreedyWaterslidePairing() const { return _useGreedyWaterslidePairing; }
-	/** Return whether Bezier paths use floating-point rather than original Q10 calculations. */
-	Zoombini2MetaEngine::BezierCurveDataType getBezierCurveDataType() const { return _bezierCurveDataType; }
+	/** Return the numeric representation selected for Bezier path calculations. */
+	BezierCurveDataType getBezierCurveDataType() const { return _bezierCurveDataType; }
 	/** Return whether the Wall of Fleens departure artwork correction is enabled. */
 	bool fixFleenDepartStreak() const { return _fixFleenDepartStreak; }
 	/** Return whether the enhanced keyboard shortcut set is enabled. */
@@ -330,7 +331,7 @@ public:
 	bool debugRetryPuzzle();
 
 	/** Return the active color-only presentation setting. */
-	Zoombini2MetaEngine::ColorAssistMode getColorAssistMode() const { return _colorAssistMode; }
+	ColorAssistMode getColorAssistMode() const { return _colorAssistMode; }
 	/** Return the gameplay millisecond snapshot captured before the current page pass. */
 	uint32 getFrameTickCount() const { return _cachedGameTickCount; }
 	/** Return gameplay milliseconds elapsed between the last two page passes. */
@@ -341,7 +342,7 @@ public:
 	/** Shared graphics interface used by pages and engine rendering. */
 	Gfx *_gfx = nullptr;
 	/** Game text fonts and release-encoded conversion used by graphics and pages. */
-	Text *_text = nullptr;
+	TextManager *_text = nullptr;
 
 	/** Whether the next puzzle entry restores the saved party retained by the current game state. */
 	bool _returningFromPuzzle = false;
@@ -543,14 +544,14 @@ private:
 	bool _debugHotkeysEnabled = false;
 	/** Whether original executable text may be extracted for Norf clue subtitles. */
 	bool _chezNorfSubtitlesEnabled = false;
-	/** Whether newly started stereo game-audio streams retain both channels. */
-	bool _stereoOutputEnabled = false;
+	/** Channel handling selected for newly started game-audio streams. */
+	AudioOutputMode _audioOutputMode = AudioOutputMode::kMonoDownmix;
 	/** Color-only presentation assistance for similar colors and red-green color vision deficiency. */
-	Zoombini2MetaEngine::ColorAssistMode _colorAssistMode = Zoombini2MetaEngine::ColorAssistMode::kOriginal;
+	ColorAssistMode _colorAssistMode = ColorAssistMode::kOriginal;
 	/** Whether Waterslide level one uses the alternate greedy pairing. */
 	bool _useGreedyWaterslidePairing = false;
-	/** Whether Bezier paths use the optional floating-point evaluator. */
-	Zoombini2MetaEngine::BezierCurveDataType _bezierCurveDataType = Zoombini2MetaEngine::BezierCurveDataType::kQ10FixedPoint;
+	/** Numeric representation selected for Bezier path calculations. */
+	BezierCurveDataType _bezierCurveDataType = BezierCurveDataType::kQ10FixedPoint;
 	/** Whether the departing Fleen omits the malformed white-nose frames. */
 	bool _fixFleenDepartStreak = true;
 	/** Whether the enhanced keyboard shortcut set is enabled. */
@@ -558,7 +559,7 @@ private:
 	/** Whether the practice map exposes recoverable level 4 puzzles. */
 	bool _allowCutL4PracticePuzzles = false;
 	/** Selected preset for frame-derived gameplay pacing. */
-	Zoombini2MetaEngine::LogicPacingMode _logicPacingMode = Zoombini2MetaEngine::LogicPacingMode::k75Hz;
+	LogicPacingMode _logicPacingMode = LogicPacingMode::k75Hz;
 	/** Held state of the global puzzle-completion key. */
 	bool _debugCompletionKeyDown = false;
 	/** Held state of the Chez Norf diagnostic-overlay key. */

@@ -38,6 +38,9 @@
 #include "zoombini2/dialogs.h"
 #include "zoombini2/graphics.h"
 #include "zoombini2/metaengine.h"
+#include "zoombini2/random.h"
+#include "zoombini2/scripts.h"
+#include "zoombini2/sound.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
 
@@ -597,22 +600,22 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	_audioOutputLabel = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.AudioOutputLabel", _("Game audio:"), audioOutputTooltip);
 	_audioOutputLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
 	_audioOutputPopUp = new GUI::PopUpWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.AudioOutput", audioOutputTooltip);
-	_audioOutputPopUp->appendEntry(_("Mono Downmix (Original)"), static_cast<uint32>(Zoombini2MetaEngine::AudioOutputMode::kMonoDownmix));
-	_audioOutputPopUp->appendEntry(_("Stereo Playback"), static_cast<uint32>(Zoombini2MetaEngine::AudioOutputMode::kStereoPlayback));
+	_audioOutputPopUp->appendEntry(_("Mono Downmix (Original)"), static_cast<uint32>(AudioOutputMode::kMonoDownmix));
+	_audioOutputPopUp->appendEntry(_("Stereo Playback"), static_cast<uint32>(AudioOutputMode::kStereoPlayback));
 	const Common::U32String bezierCurveDataTypeTooltip = _("Select datatype for Bezier curve computation.");
 	_bezierCurveDataTypeLabel = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.BezierCurveDataTypeLabel", _("Bezier curve datatype:"), bezierCurveDataTypeTooltip);
 	_bezierCurveDataTypeLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
 	_bezierCurveDataTypePopUp = new GUI::PopUpWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.BezierCurveDataType", bezierCurveDataTypeTooltip);
-	_bezierCurveDataTypePopUp->appendEntry(_("Q10 fixed-point (Original)"), static_cast<uint32>(Zoombini2MetaEngine::BezierCurveDataType::kQ10FixedPoint));
-	_bezierCurveDataTypePopUp->appendEntry(_("F32 floating-point"), static_cast<uint32>(Zoombini2MetaEngine::BezierCurveDataType::kF32FloatingPoint));
+	_bezierCurveDataTypePopUp->appendEntry(_("Q10 fixed-point (Original)"), static_cast<uint32>(BezierCurveDataType::kQ10FixedPoint));
+	_bezierCurveDataTypePopUp->appendEntry(_("F32 floating-point"), static_cast<uint32>(BezierCurveDataType::kF32FloatingPoint));
 	_colorAssistLabel = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ColorAssistLabel",
 												  _("Color assistance:"));
 	_colorAssistLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
 	_colorAssistPopUp = new GUI::PopUpWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ColorAssist",
 											 _("Adjusts Zoombini noses and puzzle colors."));
-	_colorAssistPopUp->appendEntry(_("Original colors"), static_cast<uint32>(Zoombini2MetaEngine::ColorAssistMode::kOriginal));
-	_colorAssistPopUp->appendEntry(_("Enhanced color distinction"), static_cast<uint32>(Zoombini2MetaEngine::ColorAssistMode::kEnhancedDistinction));
-	_colorAssistPopUp->appendEntry(_("Red-green color blind assist"), static_cast<uint32>(Zoombini2MetaEngine::ColorAssistMode::kRedGreenBlindAssist));
+	_colorAssistPopUp->appendEntry(_("Original colors"), static_cast<uint32>(ColorAssistMode::kOriginal));
+	_colorAssistPopUp->appendEntry(_("Enhanced color distinction"), static_cast<uint32>(ColorAssistMode::kEnhancedDistinction));
+	_colorAssistPopUp->appendEntry(_("Red-green color blind assist"), static_cast<uint32>(ColorAssistMode::kRedGreenBlindAssist));
 	_enhancedKbdShortcutsCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.EnhancedKbdShortcuts",
 															_("Enable enhanced keyboard shortcuts"),
 															_("Enables some ScummVM-only keyboard shortcuts for quality of life improvements."));
@@ -647,8 +650,8 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	_prngAlgorithmLabel = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.PrngAlgorithmLabel", _("PRNG Algorithm:"), prngAlgorithmTooltip);
 	_prngAlgorithmLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
 	_prngAlgorithmPopUp = new GUI::PopUpWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.PrngAlgorithm", prngAlgorithmTooltip);
-	_prngAlgorithmPopUp->appendEntry(_("Original PRNG"), static_cast<uint32>(Zoombini2MetaEngine::PrngAlgorithm::kOriginalPrng));
-	_prngAlgorithmPopUp->appendEntry(_("ScummVM Standard PRNG"), static_cast<uint32>(Zoombini2MetaEngine::PrngAlgorithm::kStandardPrng));
+	_prngAlgorithmPopUp->appendEntry(_("Original PRNG"), static_cast<uint32>(PrngAlgorithmKind::kOriginalPrng));
+	_prngAlgorithmPopUp->appendEntry(_("ScummVM Standard PRNG"), static_cast<uint32>(PrngAlgorithmKind::kStandardPrng));
 	_frameRateLabel = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.FrameRateLabel", _("Frame rate (FPS):"));
 	_frameRateLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
 	_frameRateNumberBox = new FrameRateNumberBox(widgetsBoss(), "Zoombini2EngineOptionsDialog.FrameRate",
@@ -660,8 +663,8 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 										_("Selects the reference frame rate used to normalize logic pacing. "
 										  "Affects panorama scrolling speed in Booliewood and how often idle animations are triggered. "
 										  "Does not affect the rendering frame rate."));
-	_pacingPopUp->appendEntry(_("60Hz (LCD preset)"), static_cast<uint32>(Zoombini2MetaEngine::LogicPacingMode::k60Hz));
-	_pacingPopUp->appendEntry(_("75Hz (CRT preset)"), static_cast<uint32>(Zoombini2MetaEngine::LogicPacingMode::k75Hz));
+	_pacingPopUp->appendEntry(_("60Hz (LCD preset)"), static_cast<uint32>(LogicPacingMode::k60Hz));
+	_pacingPopUp->appendEntry(_("75Hz (CRT preset)"), static_cast<uint32>(LogicPacingMode::k75Hz));
 	_unlockFrameRateCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.UnlockFrameRate",
 													   _("Unlock frame rate"),
 													   _("Removes the engine frame-rate limit. Display VSync may still limit presentation."),
@@ -743,40 +746,40 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 void Zoombini2OptionsWidget::load() {
 	_savefileReadOnlyToggleCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigEnableSavefileReadOnlyToggle, _domain));
 	const int audioOutputValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigAudioOutputMode, _domain);
-	const Zoombini2MetaEngine::AudioOutputMode audioOutputMode = static_cast<Zoombini2MetaEngine::AudioOutputMode>(audioOutputValue);
+	const AudioOutputMode audioOutputMode = static_cast<AudioOutputMode>(audioOutputValue);
 	switch (audioOutputMode) {
-	case Zoombini2MetaEngine::AudioOutputMode::kMonoDownmix:
-	case Zoombini2MetaEngine::AudioOutputMode::kStereoPlayback:
+	case AudioOutputMode::kMonoDownmix:
+	case AudioOutputMode::kStereoPlayback:
 		_audioOutputPopUp->setSelectedTag(static_cast<uint32>(audioOutputMode));
 		break;
 	default:
 		warning("Zoombini2OptionsWidget::load(): Invalid %s(%d)", Zoombini2MetaEngine::kConfigAudioOutputMode, audioOutputValue);
-		_audioOutputPopUp->setSelectedTag(static_cast<uint32>(Zoombini2MetaEngine::AudioOutputMode::kMonoDownmix));
+		_audioOutputPopUp->setSelectedTag(static_cast<uint32>(AudioOutputMode::kMonoDownmix));
 		break;
 	}
 	const int bezierCurveDataTypeValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigBezierCurveDataType, _domain);
-	const Zoombini2MetaEngine::BezierCurveDataType bezierCurveDataType = static_cast<Zoombini2MetaEngine::BezierCurveDataType>(bezierCurveDataTypeValue);
+	const BezierCurveDataType bezierCurveDataType = static_cast<BezierCurveDataType>(bezierCurveDataTypeValue);
 	switch (bezierCurveDataType) {
-	case Zoombini2MetaEngine::BezierCurveDataType::kQ10FixedPoint:
-	case Zoombini2MetaEngine::BezierCurveDataType::kF32FloatingPoint:
+	case BezierCurveDataType::kQ10FixedPoint:
+	case BezierCurveDataType::kF32FloatingPoint:
 		_bezierCurveDataTypePopUp->setSelectedTag(static_cast<uint32>(bezierCurveDataType));
 		break;
 	default:
 		warning("Zoombini2OptionsWidget::load(): Invalid %s(%d)", Zoombini2MetaEngine::kConfigBezierCurveDataType, bezierCurveDataTypeValue);
-		_bezierCurveDataTypePopUp->setSelectedTag(static_cast<uint32>(Zoombini2MetaEngine::BezierCurveDataType::kQ10FixedPoint));
+		_bezierCurveDataTypePopUp->setSelectedTag(static_cast<uint32>(BezierCurveDataType::kQ10FixedPoint));
 		break;
 	}
 	const int colorAssistValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigColorAssistMode, _domain);
-	const Zoombini2MetaEngine::ColorAssistMode colorAssistMode = static_cast<Zoombini2MetaEngine::ColorAssistMode>(colorAssistValue);
+	const ColorAssistMode colorAssistMode = static_cast<ColorAssistMode>(colorAssistValue);
 	switch (colorAssistMode) {
-	case Zoombini2MetaEngine::ColorAssistMode::kOriginal:
-	case Zoombini2MetaEngine::ColorAssistMode::kEnhancedDistinction:
-	case Zoombini2MetaEngine::ColorAssistMode::kRedGreenBlindAssist:
+	case ColorAssistMode::kOriginal:
+	case ColorAssistMode::kEnhancedDistinction:
+	case ColorAssistMode::kRedGreenBlindAssist:
 		_colorAssistPopUp->setSelectedTag(static_cast<uint32>(colorAssistMode));
 		break;
 	default:
 		warning("Zoombini2OptionsWidget::load(): Invalid %s(%d)", Zoombini2MetaEngine::kConfigColorAssistMode, colorAssistValue);
-		_colorAssistPopUp->setSelectedTag(static_cast<uint32>(Zoombini2MetaEngine::ColorAssistMode::kOriginal));
+		_colorAssistPopUp->setSelectedTag(static_cast<uint32>(ColorAssistMode::kOriginal));
 		break;
 	}
 	_enhancedKbdShortcutsCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _domain));
@@ -799,11 +802,11 @@ bool Zoombini2OptionsWidget::save() {
 	const int frameRate = _frameRateNumberBox->getValue();
 	_frameRateNumberBox->setValue(frameRate);
 
-	const Zoombini2MetaEngine::AudioOutputMode audioOutputMode = static_cast<Zoombini2MetaEngine::AudioOutputMode>(_audioOutputPopUp->getSelectedTag());
-	const Zoombini2MetaEngine::BezierCurveDataType bezierCurveDataType = static_cast<Zoombini2MetaEngine::BezierCurveDataType>(_bezierCurveDataTypePopUp->getSelectedTag());
-	const Zoombini2MetaEngine::ColorAssistMode colorAssistMode = static_cast<Zoombini2MetaEngine::ColorAssistMode>(_colorAssistPopUp->getSelectedTag());
-	const Zoombini2MetaEngine::PrngAlgorithm prngAlgorithm = static_cast<Zoombini2MetaEngine::PrngAlgorithm>(_prngAlgorithmPopUp->getSelectedTag());
-	const Zoombini2MetaEngine::LogicPacingMode logicPacingMode = static_cast<Zoombini2MetaEngine::LogicPacingMode>(_pacingPopUp->getSelectedTag());
+	const AudioOutputMode audioOutputMode = static_cast<AudioOutputMode>(_audioOutputPopUp->getSelectedTag());
+	const BezierCurveDataType bezierCurveDataType = static_cast<BezierCurveDataType>(_bezierCurveDataTypePopUp->getSelectedTag());
+	const ColorAssistMode colorAssistMode = static_cast<ColorAssistMode>(_colorAssistPopUp->getSelectedTag());
+	const PrngAlgorithmKind prngAlgorithm = static_cast<PrngAlgorithmKind>(_prngAlgorithmPopUp->getSelectedTag());
+	const LogicPacingMode logicPacingMode = static_cast<LogicPacingMode>(_pacingPopUp->getSelectedTag());
 
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigEnableSavefileReadOnlyToggle, _savefileReadOnlyToggleCheckbox->getState(), _domain);
 	ConfMan.setInt(Zoombini2MetaEngine::kConfigAudioOutputMode, static_cast<int>(audioOutputMode), _domain);

@@ -2422,22 +2422,32 @@ void PuzzleMysticMarsh::drawColorSymbol(ManagedSurface32 *screen, int symbolInde
 		group = symbolIndex - 27;
 	else if (49 <= symbolIndex && symbolIndex <= 55)
 		group = symbolIndex - 49;
-	if (group < 0 || _vm->getColorAssistMode() != Zoombini2MetaEngine::ColorAssistMode::kRedGreenBlindAssist) {
+	if (group < 0) {
 		_vm->_gfx->drawPageRleBlock(screen, key, pos);
 		return;
 	}
-	static constexpr RGBColor kGroupColors[7] = {
-		RGBColor(0, 64, 255),
-		RGBColor(42, 91, 140),
-		RGBColor(65, 217, 141),
-		RGBColor(178, 89, 0),
-		RGBColor(115, 115, 115),
-		RGBColor(0, 217, 217),
-		RGBColor(217, 217, 65),
-	};
-	const RleBlock *sprite = _vm->_gfx->loadPageRleBlock(key);
-	if (sprite)
-		sprite->drawToScreenRecolored(screen, pos, kGroupColors[group], _vm->getAlphaLUT());
+	switch (_vm->getColorAssistMode()) {
+	case ColorAssistMode::kRedGreenBlindAssist: {
+		static constexpr RGBColor kGroupColors[7] = {
+			RGBColor(0, 64, 255),
+			RGBColor(42, 91, 140),
+			RGBColor(65, 217, 141),
+			RGBColor(178, 89, 0),
+			RGBColor(115, 115, 115),
+			RGBColor(0, 217, 217),
+			RGBColor(217, 217, 65),
+		};
+		const RleBlock *sprite = _vm->_gfx->loadPageRleBlock(key);
+		if (sprite)
+			sprite->drawToScreenRecolored(screen, pos, kGroupColors[group], _vm->getAlphaLUT());
+		break;
+	}
+	case ColorAssistMode::kOriginal:
+	case ColorAssistMode::kEnhancedDistinction:
+	default:
+		_vm->_gfx->drawPageRleBlock(screen, key, pos);
+		return;
+	}
 }
 
 void PuzzleMysticMarsh::onRenderActors(ManagedSurface32 *screen) {
@@ -2607,7 +2617,7 @@ Common::String PuzzleMysticMarsh::debugGetAnswer() const {
 	for (uint i = 0; i < launches.size(); i++) {
 		const MysticMarshGrid::AnswerLaunch &launch = launches[i];
 		const ZoombiniRunner *actor = _puzzleZoombinis[launch.actor];
-		_initialAnswer += Common::String::format("    %u. Zoombini (%s) to Crater (r%d, c%d): %s\n", i + 1, actor->getName().c_str(),
+		_initialAnswer += Common::String::format("    %u. Zoombini (%-6s) to Crater (r%d, c%d): %s\n", i + 1, actor->getName().c_str(),
 												 launch.cell % MysticMarshGrid::kRows + 1, launch.cell / MysticMarshGrid::kRows + 1,
 												 actor->getTraits().toStr().c_str());
 	}

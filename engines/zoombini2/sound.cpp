@@ -218,8 +218,15 @@ void SoundManager::play(int id) {
 	} else {
 		audioStream = stream;
 	}
-	if (!_stereoOutputEnabled && audioStream->isStereo())
-		audioStream = new MonoAudioStream(audioStream);
+	switch (_audioOutputMode) {
+	case AudioOutputMode::kStereoPlayback:
+		break;
+	case AudioOutputMode::kMonoDownmix:
+	default:
+		if (audioStream->isStereo())
+			audioStream = new MonoAudioStream(audioStream);
+		break;
+	}
 
 	byte volume = normalizeVolume(buf->volume);
 	if (buf->usesCategoryVolume)

@@ -20,6 +20,7 @@
  */
 
 #include "zoombini2/pages/puzzle_magicwall.h"
+#include "common/algorithm.h"
 #include "common/debug.h"
 #include "common/stream.h"
 #include "common/textconsole.h"
@@ -40,6 +41,7 @@ constexpr const char *PuzzleMagicWall::kDotFormat;
 constexpr const char *PuzzleMagicWall::kBugFormat;
 constexpr const char *PuzzleMagicWall::kDirectionFormat;
 constexpr const char *PuzzleMagicWall::kLightFormat;
+constexpr const char *PuzzleMagicWall::kStoneLightPath;
 constexpr const char *PuzzleMagicWall::kTabletPath;
 constexpr const char *PuzzleMagicWall::kTabletDotPath;
 constexpr const char *PuzzleMagicWall::kLeverPath;
@@ -53,7 +55,6 @@ constexpr const char *PuzzleMagicWall::kGateSoundPath;
 constexpr const char *PuzzleMagicWall::kLeverSoundPath;
 constexpr const char *PuzzleMagicWall::kRetreatSpeechPath;
 constexpr const char *PuzzleMagicWall::kPerfectSpeechFormat;
-constexpr const char *PuzzleMagicWall::kColors[11];
 constexpr byte PuzzleMagicWall::kDotSourceBrightness[10];
 constexpr byte PuzzleMagicWall::kBugSourceBrightness[10];
 constexpr Common::Point32 PuzzleMagicWall::kTabletPositions[5];
@@ -61,66 +62,67 @@ constexpr Common::Point32 PuzzleMagicWall::kGatePositions[4];
 constexpr Common::Point32 PuzzleMagicWall::kRosterPositions[8];
 constexpr Common::Point32 PuzzleMagicWall::kLightPositions[10];
 
-bool MagicWallMaze::readCount(Common::SeekableReadStream &stream, int &count, int maximum) {
+bool MagicWallBoard::readCount(Common::SeekableReadStream &stream, int &count, int maximum) {
 	if (stream.size() - stream.pos() < 2)
 		return false;
 	count = stream.readSint16LE();
 	return !stream.err() && 0 <= count && count <= maximum;
 }
 
-bool MagicWallMaze::readLayout(Common::SeekableReadStream &stream, Layout &layout) {
-	int count;
-	if (!readCount(stream, layout.level, 4) || !readCount(stream, layout.weight, 32767) || !readCount(stream, count, 10) || count == 0)
+bool MagicWallBoard::readLayout(Common::SeekableReadStream &stream, LayoutDef &layout) {
+	int vertexCount;
+	if (!readCount(stream, layout.puzzleLevel, 4) || !readCount(stream, layout.selectionWeight, 32767) ||
+		!readCount(stream, vertexCount, 10) || vertexCount == 0)
 		return false;
-	for (int i = 0; i < count; i++) {
+	for (int i = 0; i < vertexCount; i++) {
 		if (stream.size() - stream.pos() < 4)
 			return false;
 		const int x = stream.readSint16LE();
 		const int y = stream.readSint16LE();
-		layout.points.push_back(Common::Point32(x, y));
+		layout.vertexCoords.push_back(Common::Point32(x, y));
 	}
-	for (int group = 0; group < ARRAYSIZE(layout.groups); group++) {
-		int variants;
-		if (!readCount(stream, variants, 32767) || variants == 0)
+	for (int choiceGroup = 0; choiceGroup < ARRAYSIZE(layout.ruleSetCandidates); choiceGroup++) {
+		int candidateCount;
+		if (!readCount(stream, candidateCount, 32767) || candidateCount == 0)
 			return false;
-		for (int v = 0; v < variants; v++) {
-			int rules;
-			if (!readCount(stream, rules, 5))
+		for (int i = 0; i < candidateCount; i++) {
+			int ruleCount;
+			if (!readCount(stream, ruleCount, 5))
 				return false;
-			Variant variant;
-			for (int r = 0; r < rules; r++) {
-				int edges;
-				if (!readCount(stream, edges, 100))
+			RuleSet ruleSet;
+			for (int j = 0; j < ruleCount; j++) {
+				int edgeCount;
+				if (!readCount(stream, edgeCount, 100))
 					return false;
 				Rule rule;
-				for (int e = 0; e < edges; e++) {
+				for (int k = 0; k < edgeCount; k++) {
 					if (stream.size() - stream.pos() < 6)
 						return false;
 					Edge edge;
 					edge.from = stream.readSint16LE();
 					edge.to = stream.readSint16LE();
 					const int kind = stream.readSint16LE();
-					if (edge.from < 0 || count <= edge.from || edge.to < 0 || count <= edge.to || kind < 0 || 1 < kind)
+					if (edge.from < 0 || vertexCount <= edge.from || edge.to < 0 || vertexCount <= edge.to || kind < 0 || 1 < kind)
 						return false;
 					edge.swap = kind == 1;
 					rule.push_back(edge);
 				}
-				variant.push_back(rule);
+				ruleSet.push_back(rule);
 			}
-			layout.groups[group].push_back(variant);
+			layout.ruleSetCandidates[choiceGroup].push_back(ruleSet);
 		}
 	}
 	return !stream.err();
 }
 
-bool MagicWallMaze::load(Common::SeekableReadStream &stream) {
+bool MagicWallBoard::load(Common::SeekableReadStream &stream) {
 	_layouts.clear();
 	_layoutIndex = -1;
 	int count;
 	if (!readCount(stream, count, 32767))
 		return false;
 	for (int i = 0; i < count; i++) {
-		Layout layout;
+		LayoutDef layout;
 		if (!readLayout(stream, layout)) {
 			warning("MagicWall: incomplete layout %d; retaining %u complete layouts", i, _layouts.size());
 			break;
@@ -130,7 +132,7 @@ bool MagicWallMaze::load(Common::SeekableReadStream &stream) {
 	return !_layouts.empty();
 }
 
-bool MagicWallMaze::isIdentity(const Common::Array<int> &positions) {
+bool MagicWallBoard::isIdentity(const Common::Array<int> &positions) {
 	for (uint i = 0; i < positions.size(); i++) {
 		if (positions[i] != static_cast<int>(i))
 			return false;
@@ -138,7 +140,7 @@ bool MagicWallMaze::isIdentity(const Common::Array<int> &positions) {
 	return true;
 }
 
-void MagicWallMaze::applyRule(const Rule &rule, Common::Array<int> &positions, bool simultaneous) {
+void MagicWallBoard::applyRule(const Rule &rule, Common::Array<int> &positions, bool simultaneous) {
 	Common::Array<bool> consumed;
 	consumed.resize(positions.size());
 	for (const Edge &edge : rule) {
@@ -163,7 +165,7 @@ void MagicWallMaze::applyRule(const Rule &rule, Common::Array<int> &positions, b
 	}
 }
 
-void MagicWallMaze::scramble(Random &random) {
+void MagicWallBoard::scramble(Random &random) {
 	_generationSequence.clear();
 	int count;
 	do {
@@ -176,7 +178,7 @@ void MagicWallMaze::scramble(Random &random) {
 	}
 }
 
-int MagicWallMaze::solve(const Common::Array<int> &positions, int depth) const {
+int MagicWallBoard::solve(const Common::Array<int> &positions, int depth) const {
 	if (isIdentity(positions))
 		return 1;
 	for (const Rule &rule : _rules) {
@@ -190,34 +192,34 @@ int MagicWallMaze::solve(const Common::Array<int> &positions, int depth) const {
 	return 0;
 }
 
-bool MagicWallMaze::generate(int level, Random &random) {
+bool MagicWallBoard::generate(int puzzleLevel, Random &random) {
 	_generationSequence.clear();
 	_initialPositions.clear();
 	int totalWeight = 0;
-	for (const Layout &layout : _layouts) {
-		if (layout.level == level)
-			totalWeight += layout.weight;
+	for (const LayoutDef &layout : _layouts) {
+		if (layout.puzzleLevel == puzzleLevel)
+			totalWeight += layout.selectionWeight;
 	}
 	if (totalWeight == 0)
 		return false;
 	int choice = random.getRandomNumber(totalWeight - 1);
 	for (uint i = 0; i < _layouts.size(); i++) {
-		if (_layouts[i].level != level)
+		if (_layouts[i].puzzleLevel != puzzleLevel)
 			continue;
-		if (choice < _layouts[i].weight) {
+		if (choice < _layouts[i].selectionWeight) {
 			_layoutIndex = i;
 			break;
 		}
-		choice -= _layouts[i].weight;
+		choice -= _layouts[i].selectionWeight;
 	}
-	const Layout &selected = layout();
+	const LayoutDef &selectedLayout = layout();
 	_rules.clear();
-	for (int group = 0; group < ARRAYSIZE(selected.groups); group++) {
-		const Common::Array<Variant> &variants = selected.groups[group];
-		const int variantIndex = random.getRandomNumber(variants.size() - 1);
-		const Variant &variant = variants[variantIndex];
-		if (!variant.empty() && !variant[0].empty()) {
-			for (const Rule &rule : variant) {
+	for (int choiceGroup = 0; choiceGroup < ARRAYSIZE(selectedLayout.ruleSetCandidates); choiceGroup++) {
+		const Common::Array<RuleSet> &candidates = selectedLayout.ruleSetCandidates[choiceGroup];
+		const int candidateIndex = random.getRandomNumber(candidates.size() - 1);
+		const RuleSet &selectedRuleSet = candidates[candidateIndex];
+		if (!selectedRuleSet.empty() && !selectedRuleSet[0].empty()) {
+			for (const Rule &rule : selectedRuleSet) {
 				if (!rule.empty())
 					_rules.push_back(rule);
 			}
@@ -231,7 +233,7 @@ bool MagicWallMaze::generate(int level, Random &random) {
 				SWAP(edge.from, edge.to);
 		}
 	}
-	_positions.resize(selected.points.size());
+	_positions.resize(selectedLayout.vertexCoords.size());
 	Common::Array<int> candidate;
 	Common::Array<int> candidateSequence;
 	for (int attempt = 0; attempt < 6; attempt++) {
@@ -254,20 +256,22 @@ bool MagicWallMaze::generate(int level, Random &random) {
 	return true;
 }
 
-void MagicWallMaze::apply(int ruleIndex) {
+void MagicWallBoard::apply(int ruleIndex) {
 	if (0 <= ruleIndex && ruleIndex < static_cast<int>(_rules.size()))
 		applyRule(_rules[ruleIndex], _positions, true);
 }
 
-bool MagicWallMaze::matched(int color) const {
-	return static_cast<int>(_positions.size()) <= color || _positions[color] == color;
+bool MagicWallBoard::matched(VertexColor vertexColor) const {
+	return _positions.size() <= vertexColor || _positions[vertexColor] == static_cast<int>(vertexColor);
 }
 
-bool MagicWallMaze::gateMatched(int gate) const {
-	return matched(gate) && matched(gate + 4) && matched(gate + 8);
+bool MagicWallBoard::gateMatched(int gate) const {
+	return matched(static_cast<VertexColor>(gate)) &&
+		   matched(static_cast<VertexColor>(gate + 4)) &&
+		   matched(static_cast<VertexColor>(gate + 8));
 }
 
-bool MagicWallMaze::debugEncodePositions(const Common::Array<int> &positions, uint64 &state) {
+bool MagicWallBoard::debugEncodePositions(const Common::Array<int> &positions, uint64 &state) {
 	state = 0;
 	if (positions.empty() || 10 < positions.size())
 		return false;
@@ -282,7 +286,7 @@ bool MagicWallMaze::debugEncodePositions(const Common::Array<int> &positions, ui
 	return true;
 }
 
-uint MagicWallMaze::debugPermutationRank(uint64 state, uint count) {
+uint MagicWallBoard::debugPermutationRank(uint64 state, uint count) {
 	uint rank = 0;
 	uint used = 0;
 	for (uint i = 0; i < count; i++) {
@@ -297,7 +301,7 @@ uint MagicWallMaze::debugPermutationRank(uint64 state, uint count) {
 	return rank;
 }
 
-Common::Array<int> MagicWallMaze::debugRuleMapping(uint rule) const {
+Common::Array<int> MagicWallBoard::debugRuleMapping(uint rule) const {
 	Common::Array<int> mapping;
 	for (uint i = 0; i < _positions.size(); i++)
 		mapping.push_back(i);
@@ -305,7 +309,7 @@ Common::Array<int> MagicWallMaze::debugRuleMapping(uint rule) const {
 	return mapping;
 }
 
-Common::Array<Common::Array<int>> MagicWallMaze::debugTabletPaths(uint rule) const {
+Common::Array<Common::Array<int>> MagicWallBoard::debugTabletPaths(uint rule) const {
 	Common::Array<Common::Array<int>> paths;
 	const Common::Array<int> mapping = debugRuleMapping(rule);
 	uint64 encoded;
@@ -327,14 +331,14 @@ Common::Array<Common::Array<int>> MagicWallMaze::debugTabletPaths(uint rule) con
 	return paths;
 }
 
-bool MagicWallMaze::debugCrossesGroup(const Common::Array<int> &mapping, uint group) {
+bool MagicWallBoard::debugCrossesGroup(const Common::Array<int> &mapping, uint group) {
 	for (uint point = 0; point < mapping.size(); point++)
 		if (static_cast<bool>(group & (1U << point)) != static_cast<bool>(group & (1U << mapping[point])))
 			return true;
 	return false;
 }
 
-const char *MagicWallMaze::debugTabletRole(uint rule) const {
+const char *MagicWallBoard::debugTabletRole(uint rule) const {
 	const Common::Array<int> mapping = debugRuleMapping(rule);
 	uint moved = 0;
 	for (uint point = 0; point < mapping.size(); point++)
@@ -467,7 +471,7 @@ const char *MagicWallMaze::debugTabletRole(uint rule) const {
 	}
 }
 
-MagicWallMaze::SolutionResult MagicWallMaze::debugAnswerSolver(Common::Array<int> &sequence, uint &visited) const {
+MagicWallBoard::SolutionResult MagicWallBoard::debugAnswerSolver(Common::Array<int> &sequence, uint &visited) const {
 	static constexpr uint kMaxStates = 500000;
 	sequence.clear();
 	visited = 0;
@@ -540,7 +544,7 @@ MagicWallMaze::SolutionResult MagicWallMaze::debugAnswerSolver(Common::Array<int
 	return SolutionResult::kSolved;
 }
 
-const char *MagicWallMaze::debugLayoutAdvice() const {
+const char *MagicWallBoard::debugLayoutAdvice() const {
 	static constexpr const char *kAdvice[] = {
 		"- Two rows, pair exchanges: each tablet swaps beetles across one edge.\n"
 		"    - To swap distant beetles and restore intermediate ones, press tablets along a path, "
@@ -632,12 +636,19 @@ PuzzleMagicWall::~PuzzleMagicWall() {
 
 void PuzzleMagicWall::loadResources() {
 	Gfx *gfx = _vm->_gfx;
-	for (int i = 0; i < ARRAYSIZE(kColors) - 1; i++) {
-		gfx->loadPageRleBlock(Common::String::format(kDotFormat, kColors[i]));
-		gfx->loadPageRleBlock(Common::String::format(kBugFormat, kColors[i]));
+	const VertexColorNameMap &vertexColorNames = getVertexColorNames();
+	Common::Array<MagicWallBoard::VertexColor> vertexColors;
+	for (VertexColorNameMap::const_iterator entry = vertexColorNames.begin(); entry != vertexColorNames.end(); entry++)
+		vertexColors.push_back(entry->_key);
+	// Preserve ordinal load order so page-resource handles stay stable.
+	Common::sort(vertexColors.begin(), vertexColors.end());
+	for (MagicWallBoard::VertexColor vertexColor : vertexColors) {
+		gfx->loadPageRleBlock(Common::String::format(kDotFormat, vertexColorNames[vertexColor]));
+		gfx->loadPageRleBlock(Common::String::format(kBugFormat, vertexColorNames[vertexColor]));
 	}
-	for (int i = 0; i < ARRAYSIZE(kColors); i++)
-		gfx->loadPageRleBlock(Common::String::format(kLightFormat, kColors[i]));
+	for (MagicWallBoard::VertexColor vertexColor : vertexColors)
+		gfx->loadPageRleBlock(Common::String::format(kLightFormat, vertexColorNames[vertexColor]));
+	gfx->loadPageRleBlock(kStoneLightPath);
 	for (int i = 0; i < 8; i++)
 		gfx->loadPageRleBlock(Common::String::format(kDirectionFormat, i + 1));
 	gfx->loadPageRleBlock(kTabletPath);
@@ -693,7 +704,7 @@ void PuzzleMagicWall::init() {
 		runner->setCanAdvanceFromPage(false);
 	}
 	Common::SeekableReadStream *stream = _vm->openResourceFile(kLayoutPath);
-	const bool loaded = stream && _maze.load(*stream);
+	const bool loaded = stream && _board.load(*stream);
 	delete stream;
 	if (!loaded)
 		error("MagicWall: no bounded puzzle layouts in %s", kLayoutPath);
@@ -703,31 +714,31 @@ void PuzzleMagicWall::init() {
 }
 
 void PuzzleMagicWall::newPuzzle() {
-	_ready = _maze.generate(_puzzleLevel, *_vm->_rnd);
+	_ready = _board.generate(_puzzleLevel, *_vm->_rnd);
 	if (!_ready)
 		error("MagicWall: no usable layout for level %d", _puzzleLevel);
 	for (Beetle &beetle : _beetles)
 		delete beetle.path;
 	_beetles.clear();
-	_beetles.resize(_maze.positions().size());
-	for (uint i = 0; i < _maze.positions().size(); i++) {
-		_beetles[i].position = vertexPosition(_maze.positions()[i]) + Common::Point32(5, 8);
+	_beetles.resize(_board.positions().size());
+	for (uint i = 0; i < _board.positions().size(); i++) {
+		_beetles[i].position = vertexPosition(_board.positions()[i]) + Common::Point32(5, 8);
 		_beetles[i].direction = 0;
 	}
 	_movingRule = -1;
 	_hoveredTablet = -1;
 	debug(1, "MagicWall: phase=%d level=%d layout=%d points=%u tablets=%u", static_cast<int>(_phase), _puzzleLevel,
-		  _maze.layoutIndex(), _maze.positions().size(), _maze.rules().size());
-	for (uint i = 0; i < _maze.positions().size(); i++)
-		debug(2, "MagicWall: beetle %u at %d", i, _maze.positions()[i]);
-	for (uint i = 0; i < _maze.rules().size(); i++) {
-		for (const MagicWallMaze::Edge &edge : _maze.rules()[i])
+		  _board.layoutIndex(), _board.positions().size(), _board.rules().size());
+	for (uint i = 0; i < _board.positions().size(); i++)
+		debug(2, "MagicWall: beetle %u at %d", i, _board.positions()[i]);
+	for (uint i = 0; i < _board.rules().size(); i++) {
+		for (const MagicWallBoard::Edge &edge : _board.rules()[i])
 			debug(2, "MagicWall: rule %u edge %d %d %d", i, edge.from, edge.to, edge.swap);
 	}
 }
 
 Common::Point32 PuzzleMagicWall::vertexPosition(int index) const {
-	const Common::Point32 &point = _maze.layout().points[index];
+	const Common::Point32 &point = _board.layout().vertexCoords[index];
 	return Common::Point32(300 + 40 * point.x, -15 + 40 * point.y);
 }
 
@@ -769,14 +780,14 @@ int PuzzleMagicWall::directionIndex(const Common::Point32 &from, const Common::P
 void PuzzleMagicWall::startRule(int index) {
 	if (!_ready || _phase == Phase::kFinished || _nextPuzzlePending || gatesActive() || runnersMoving() || beetlesMoving())
 		return;
-	const Common::Array<int> before = _maze.positions();
-	_maze.apply(index);
+	const Common::Array<int> before = _board.positions();
+	_board.apply(index);
 	const uint32 now = _vm->getTotalPlayTime();
 	for (uint i = 0; i < before.size(); i++) {
-		if (before[i] == _maze.positions()[i])
+		if (before[i] == _board.positions()[i])
 			continue;
 		Beetle &beetle = _beetles[i];
-		const Common::Point32 end = vertexPosition(_maze.positions()[i]);
+		const Common::Point32 end = vertexPosition(_board.positions()[i]);
 		const Common::Point32 third((end.x - beetle.position.x) / 3, (end.y - beetle.position.y) / 3);
 		beetle.path = new PathObject(_vm);
 		beetle.path->appendSegment(beetle.position, beetle.position + third, end - third, end, 10, 0);
@@ -815,7 +826,7 @@ void PuzzleMagicWall::submit() {
 		sound->play(_leverSound);
 	bool accepted = false;
 	for (int gate = 0; gate < ARRAYSIZE(_gateRunners); gate++) {
-		if (!_maze.gateMatched(gate))
+		if (!_board.gateMatched(gate))
 			continue;
 		const int index = _exited[gate] ? gate + 4 : gate;
 		if (static_cast<int>(_puzzleZoombinis.size()) <= index || _exited[index])
@@ -908,8 +919,8 @@ void PuzzleMagicWall::onRenderBackground(ManagedSurface32 *screen) {
 }
 
 Common::Point32 PuzzleMagicWall::tabletPoint(int tablet, int point, int inset) const {
-	const Common::Point32 &p = _maze.layout().points[point];
-	const int firstX = _maze.layout().points[0].x;
+	const Common::Point32 &p = _board.layout().vertexCoords[point];
+	const int firstX = _board.layout().vertexCoords[0].x;
 	const Common::Point32 origin = kTabletPositions[tablet];
 	return Common::Point32(origin.x + 3 * p.x + inset,
 						   origin.y + 3 * p.y + inset - static_cast<int>(3 * (p.x - firstX) * -0.5));
@@ -948,21 +959,21 @@ void PuzzleMagicWall::drawRipple(ManagedSurface32 *screen, Common::Point32 from,
 }
 
 void PuzzleMagicWall::drawTablets(ManagedSurface32 *screen) {
-	for (uint i = 0; i < _maze.rules().size(); i++) {
+	for (uint i = 0; i < _board.rules().size(); i++) {
 		_vm->_gfx->drawPageRleBlock(screen, kTabletPath, kTabletPositions[i] - Common::Point32(5, 5));
 		if (_nextPuzzlePending || _phase == Phase::kFinished)
 			continue;
-		for (const MagicWallMaze::Edge &edge : _maze.rules()[i])
+		for (const MagicWallBoard::Edge &edge : _board.rules()[i])
 			drawRipple(screen, tabletPoint(i, edge.from, 12), tabletPoint(i, edge.to, 12), 255);
-		for (uint point = 0; point < _maze.layout().points.size(); point++)
+		for (uint point = 0; point < _board.layout().vertexCoords.size(); point++)
 			_vm->_gfx->drawPageRleBlock(screen, kTabletDotPath, tabletPoint(i, point, 10));
 	}
 }
 
 void PuzzleMagicWall::drawConnections(ManagedSurface32 *screen, int index) {
-	if (index < 0 || static_cast<int>(_maze.rules().size()) <= index)
+	if (index < 0 || static_cast<int>(_board.rules().size()) <= index)
 		return;
-	for (const MagicWallMaze::Edge &edge : _maze.rules()[index]) {
+	for (const MagicWallBoard::Edge &edge : _board.rules()[index]) {
 		Common::Point32 from = vertexPosition(edge.from) + Common::Point32(25, 25);
 		Common::Point32 to = vertexPosition(edge.to) + Common::Point32(25, 25);
 		if (!edge.swap) {
@@ -1000,46 +1011,85 @@ void PuzzleMagicWall::drawConnections(ManagedSurface32 *screen, int index) {
 void PuzzleMagicWall::drawBeetles(ManagedSurface32 *screen) {
 	if (_phase == Phase::kFinished || _nextPuzzlePending)
 		return;
-	for (uint i = 0; i < _maze.positions().size(); i++) {
-		drawColorSprite(screen, kBugFormat, i, _beetles[i].position, kBugSourceBrightness[i]);
+	for (uint i = 0; i < _board.positions().size(); i++) {
+		const MagicWallBoard::VertexColor vertexColor = static_cast<MagicWallBoard::VertexColor>(i);
+		drawVertexColorSprite(screen, kBugFormat, vertexColor, _beetles[i].position, kBugSourceBrightness[vertexColor]);
 		_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kDirectionFormat, _beetles[i].direction + 1), _beetles[i].position);
 	}
 }
 
-bool PuzzleMagicWall::colorAssistRGB(Zoombini2MetaEngine::ColorAssistMode mode, uint color, RGBColor &displayColor) {
-	if (10 <= color || mode == Zoombini2MetaEngine::ColorAssistMode::kOriginal)
+PuzzleMagicWall::VertexColorNameMap PuzzleMagicWall::createVertexColorNames() {
+	VertexColorNameMap names;
+	names[MagicWallBoard::kVertexColor00_Blue] = "blue";
+	names[MagicWallBoard::kVertexColor01_Green] = "green";
+	names[MagicWallBoard::kVertexColor02_Navy] = "navy";
+	names[MagicWallBoard::kVertexColor03_Orange] = "orange";
+	names[MagicWallBoard::kVertexColor04_Purple] = "purple";
+	names[MagicWallBoard::kVertexColor05_Red] = "red";
+	names[MagicWallBoard::kVertexColor06_Rose] = "rose";
+	names[MagicWallBoard::kVertexColor07_Turquoise] = "turquoise";
+	names[MagicWallBoard::kVertexColor08_Violet] = "violet";
+	names[MagicWallBoard::kVertexColor09_Yellow] = "yellow";
+	return names;
+}
+
+const PuzzleMagicWall::VertexColorNameMap &PuzzleMagicWall::getVertexColorNames() {
+	static const VertexColorNameMap names = createVertexColorNames();
+	return names;
+}
+
+PuzzleMagicWall::VertexColorPalette PuzzleMagicWall::createRedGreenVertexColorPalette() {
+	VertexColorPalette palette;
+	palette[MagicWallBoard::kVertexColor00_Blue] = RGBColor(0, 64, 255);
+	palette[MagicWallBoard::kVertexColor01_Green] = RGBColor(65, 217, 141);
+	palette[MagicWallBoard::kVertexColor02_Navy] = RGBColor(42, 91, 140);
+	palette[MagicWallBoard::kVertexColor03_Orange] = RGBColor(178, 89, 0);
+	palette[MagicWallBoard::kVertexColor04_Purple] = RGBColor(115, 115, 115);
+	palette[MagicWallBoard::kVertexColor05_Red] = RGBColor(100, 40, 32);
+	palette[MagicWallBoard::kVertexColor06_Rose] = RGBColor(0, 217, 217);
+	palette[MagicWallBoard::kVertexColor07_Turquoise] = RGBColor(0, 191, 255);
+	palette[MagicWallBoard::kVertexColor08_Violet] = RGBColor(0, 108, 217);
+	palette[MagicWallBoard::kVertexColor09_Yellow] = RGBColor(217, 217, 65);
+	return palette;
+}
+
+bool PuzzleMagicWall::vertexColorAssistRGB(ColorAssistMode mode, MagicWallBoard::VertexColor vertexColor, RGBColor &displayColor) {
+	switch (mode) {
+	case ColorAssistMode::kOriginal:
+	default:
 		return false;
-	if (mode == Zoombini2MetaEngine::ColorAssistMode::kEnhancedDistinction) {
-		if (color == 6) {
+	case ColorAssistMode::kEnhancedDistinction:
+		if (vertexColor == MagicWallBoard::kVertexColor06_Rose) {
 			displayColor = RGBColor(240, 32, 205);
 			return true;
 		}
-		if (color == 7) {
+		if (vertexColor == MagicWallBoard::kVertexColor07_Turquoise) {
 			displayColor = RGBColor(178, 255, 212);
 			return true;
 		}
 		return false;
+	case ColorAssistMode::kRedGreenBlindAssist: {
+		static const VertexColorPalette palette = createRedGreenVertexColorPalette();
+		const VertexColorPalette::const_iterator entry = palette.find(vertexColor);
+		if (entry == palette.end())
+			return false;
+		displayColor = entry->_value;
+		return true;
 	}
-	static constexpr RGBColor kRedGreenColors[10] = {
-		RGBColor(0, 64, 255),
-		RGBColor(65, 217, 141),
-		RGBColor(42, 91, 140),
-		RGBColor(178, 89, 0),
-		RGBColor(115, 115, 115),
-		RGBColor(100, 40, 32),
-		RGBColor(0, 217, 217),
-		RGBColor(0, 191, 255),
-		RGBColor(0, 108, 217),
-		RGBColor(217, 217, 65),
-	};
-	displayColor = kRedGreenColors[color];
-	return true;
+	}
 }
 
-void PuzzleMagicWall::drawColorSprite(ManagedSurface32 *screen, const char *format, uint color, const Common::Point32 &pos, byte sourceBrightness) const {
-	const Common::String key = Common::String::format(format, kColors[color]);
+void PuzzleMagicWall::drawVertexColorSprite(ManagedSurface32 *screen, const char *format, MagicWallBoard::VertexColor vertexColor,
+											const Common::Point32 &pos, byte sourceBrightness) const {
+	const VertexColorNameMap &vertexColorNames = getVertexColorNames();
+	const VertexColorNameMap::const_iterator entry = vertexColorNames.find(vertexColor);
+	if (entry == vertexColorNames.end()) {
+		warning("MagicWall: no resource suffix for vertex color %u", static_cast<uint>(vertexColor));
+		return;
+	}
+	const Common::String key = Common::String::format(format, entry->_value);
 	RGBColor displayColor;
-	if (colorAssistRGB(_vm->getColorAssistMode(), color, displayColor)) {
+	if (vertexColorAssistRGB(_vm->getColorAssistMode(), vertexColor, displayColor)) {
 		const RleBlock *sprite = _vm->_gfx->loadPageRleBlock(key);
 		if (sprite)
 			sprite->drawToScreenRecolored(screen, pos, displayColor, _vm->getAlphaLUT(), nullptr, sourceBrightness);
@@ -1055,22 +1105,24 @@ void PuzzleMagicWall::onRenderContent(ManagedSurface32 *screen) {
 		drawTablets(screen);
 		if (!_nextPuzzlePending)
 			drawConnections(screen, beetlesMoving() ? _movingRule : _hoveredTablet);
-		for (uint i = 0; i < _maze.positions().size(); i++) {
+		for (uint i = 0; i < _board.positions().size(); i++) {
+			const MagicWallBoard::VertexColor vertexColor = static_cast<MagicWallBoard::VertexColor>(i);
 			const Common::Point32 pos = vertexPosition(i);
 			if (!_backgroundPath.empty())
 				_vm->_gfx->drawPageBitBlockSubRect(screen, _backgroundPath, pos, Common::Rect(pos.x, pos.y, pos.x + 50, pos.y + 50));
-			drawColorSprite(screen, kDotFormat, i, vertexPosition(i), kDotSourceBrightness[i]);
+			drawVertexColorSprite(screen, kDotFormat, vertexColor, vertexPosition(i), kDotSourceBrightness[vertexColor]);
 		}
 		drawBeetles(screen);
 	}
 	bool allMatched = true;
-	for (uint i = 0; i < _maze.positions().size(); i++) {
-		const bool lit = _phase != Phase::kFinished && _maze.matched(i);
+	for (uint i = 0; i < _board.positions().size(); i++) {
+		const MagicWallBoard::VertexColor vertexColor = static_cast<MagicWallBoard::VertexColor>(i);
+		const bool lit = _phase != Phase::kFinished && _board.matched(vertexColor);
 		if (lit)
-			drawColorSprite(screen, kLightFormat, i, kLightPositions[i] - Common::Point32(6, 5), 255);
+			drawVertexColorSprite(screen, kLightFormat, vertexColor, kLightPositions[i] - Common::Point32(6, 5), 255);
 		else
-			_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kLightFormat, kColors[10]), kLightPositions[i] - Common::Point32(6, 5));
-		if (!_maze.matched(i))
+			_vm->_gfx->drawPageRleBlock(screen, kStoneLightPath, kLightPositions[i] - Common::Point32(6, 5));
+		if (!_board.matched(vertexColor))
 			allMatched = false;
 	}
 	if (allMatched && _phase != Phase::kFinished && !_leverRunner->isActive())
@@ -1103,7 +1155,7 @@ bool PuzzleMagicWall::inside(const Common::Point &pos, int x, int y, int width, 
 int PuzzleMagicWall::tabletAt(const Common::Point &pos) const {
 	if (!_ready || _phase == Phase::kFinished || _nextPuzzlePending)
 		return -1;
-	for (uint i = 0; i < _maze.rules().size(); i++) {
+	for (uint i = 0; i < _board.rules().size(); i++) {
 		if (inside(pos, kTabletPositions[i].x, kTabletPositions[i].y, 50, 50))
 			return i;
 	}
@@ -1174,24 +1226,24 @@ Common::String PuzzleMagicWall::debugGetAnswer() const {
 	answer += "\n  Goal: move each beetle onto the vertex of its own color.\n";
 	uint layoutNumber = 0;
 	uint layoutCount = 0;
-	for (uint i = 0; i < _maze.layouts().size(); i++) {
-		const MagicWallMaze::Layout &layout = _maze.layouts()[i];
-		if (layout.level != _maze.layout().level || layout.weight == 0)
+	for (uint i = 0; i < _board.layouts().size(); i++) {
+		const MagicWallBoard::LayoutDef &layout = _board.layouts()[i];
+		if (layout.puzzleLevel != _board.layout().puzzleLevel || layout.selectionWeight == 0)
 			continue;
 		layoutCount += 1;
-		if (static_cast<int>(i) == _maze.layoutIndex())
+		if (static_cast<int>(i) == _board.layoutIndex())
 			layoutNumber = layoutCount;
 	}
-	answer += Common::String::format("\n  [*] Layout (%02u/%02u) strategy\n    %s\n", layoutNumber, layoutCount, _maze.debugLayoutAdvice());
+	answer += Common::String::format("\n  [*] Layout (%02u/%02u) strategy\n    %s\n", layoutNumber, layoutCount, _board.debugLayoutAdvice());
 	if (_phase == Phase::kFinished)
 		return answer + "  Both boards are complete; use Go.\n";
 	if (_nextPuzzlePending || gatesActive() || runnersMoving() || beetlesMoving())
 		return answer + "  Wait for the current movement or board change, then request the answer again.\n";
 	Common::Array<int> sequence;
 	uint visited = 0;
-	const MagicWallMaze::SolutionResult result = _maze.debugAnswerSolver(sequence, visited);
+	const MagicWallBoard::SolutionResult result = _board.debugAnswerSolver(sequence, visited);
 	switch (result) {
-	case MagicWallMaze::SolutionResult::kSolved:
+	case MagicWallBoard::SolutionResult::kSolved:
 		if (sequence.empty()) {
 			answer += "    The beetles already match their vertices.\n";
 		} else {
@@ -1206,10 +1258,10 @@ Common::String PuzzleMagicWall::debugGetAnswer() const {
 			answer += "\n";
 		}
 		break;
-	case MagicWallMaze::SolutionResult::kUnreachable:
+	case MagicWallBoard::SolutionResult::kUnreachable:
 		answer += "  No solution is reachable from this board setup.\n";
 		break;
-	case MagicWallMaze::SolutionResult::kLimit:
+	case MagicWallBoard::SolutionResult::kLimit:
 		answer += "  The search reached its budget limit; this does not prove the board unsolvable.\n";
 		break;
 	default:
@@ -1217,9 +1269,9 @@ Common::String PuzzleMagicWall::debugGetAnswer() const {
 	}
 	answer += "\n  [*] Tablet Paths (left-to-right):\n";
 	uint pathIndex = 0;
-	for (uint rule = 0; rule < _maze.rules().size(); rule++) {
-		answer += Common::String::format("    Tablet %u: %s\n", rule + 1, _maze.debugTabletRole(rule));
-		for (const Common::Array<int> &path : _maze.debugTabletPaths(rule)) {
+	for (uint rule = 0; rule < _board.rules().size(); rule++) {
+		answer += Common::String::format("    Tablet %u: %s\n", rule + 1, _board.debugTabletRole(rule));
+		for (const Common::Array<int> &path : _board.debugTabletPaths(rule)) {
 			answer += Common::String::format("      Path %c (", static_cast<char>('A' + pathIndex));
 			for (uint vertex = 0; vertex < path.size(); vertex++) {
 				if (0 < vertex)

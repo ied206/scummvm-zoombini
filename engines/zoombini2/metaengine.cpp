@@ -24,7 +24,11 @@
 #include "common/config-manager.h"
 
 #include "zoombini2/dialogs.h"
+#include "zoombini2/graphics.h"
 #include "zoombini2/metaengine.h"
+#include "zoombini2/random.h"
+#include "zoombini2/scripts.h"
+#include "zoombini2/sound.h"
 #include "zoombini2/zoombini2.h"
 
 Common::Error Zoombini2MetaEngine::createInstance(OSystem *syst, Engine **engine, const Zoombini2::Zoombini2GameDescription *desc) const {
@@ -39,8 +43,8 @@ bool Zoombini2MetaEngine::hasFeature(MetaEngineFeature f) const {
 void Zoombini2MetaEngine::registerDefaultSettings(const Common::String &target) const {
 	(void)target;
 	ConfMan.registerDefault(kConfigEnableSavefileReadOnlyToggle, false);
-	ConfMan.registerDefault(kConfigAudioOutputMode, static_cast<int>(AudioOutputMode::kMonoDownmix));
-	ConfMan.registerDefault(kConfigBezierCurveDataType, static_cast<int>(BezierCurveDataType::kQ10FixedPoint));
+	ConfMan.registerDefault(kConfigAudioOutputMode, static_cast<int>(Zoombini2::AudioOutputMode::kMonoDownmix));
+	ConfMan.registerDefault(kConfigBezierCurveDataType, static_cast<int>(Zoombini2::BezierCurveDataType::kQ10FixedPoint));
 	ConfMan.registerDefault(kConfigFixFleenDepartStreak, true);
 	ConfMan.registerDefault(kConfigEnhancedKbdShortcuts, true);
 	ConfMan.registerDefault(kConfigHelpDialogTransparentBody, true);
@@ -48,9 +52,9 @@ void Zoombini2MetaEngine::registerDefaultSettings(const Common::String &target) 
 	ConfMan.registerDefault(kConfigDebugHotkeys, false);
 	ConfMan.registerDefault(kConfigGreedyWaterslidePairing, false);
 	ConfMan.registerDefault(kConfigRestoreL4PracticePuzzles, false);
-	ConfMan.registerDefault(kConfigPrngAlgorithm, static_cast<int>(PrngAlgorithm::kOriginalPrng));
-	ConfMan.registerDefault(kConfigColorAssistMode, static_cast<int>(ColorAssistMode::kOriginal));
-	ConfMan.registerDefault(kConfigLogicPacingMode, static_cast<int>(LogicPacingMode::k75Hz));
+	ConfMan.registerDefault(kConfigPrngAlgorithm, static_cast<int>(Zoombini2::PrngAlgorithmKind::kOriginalPrng));
+	ConfMan.registerDefault(kConfigColorAssistMode, static_cast<int>(Zoombini2::ColorAssistMode::kOriginal));
+	ConfMan.registerDefault(kConfigLogicPacingMode, static_cast<int>(Zoombini2::LogicPacingMode::k75Hz));
 	ConfMan.registerDefault(kConfigFrameRate, kDefaultFrameRate);
 	ConfMan.registerDefault(kConfigUnlockFrameRate, false);
 }

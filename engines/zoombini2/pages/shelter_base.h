@@ -30,6 +30,10 @@
 
 namespace Zoombini2 {
 
+class Animation;
+class ZoombiniRunner;
+struct StorageRecord;
+
 /** Party assembly, storage, and arrival hubs with direct access to the map. */
 class ShelterBase : public InteractiveBase {
 public:
@@ -40,10 +44,6 @@ public:
 	/** Identify this page as a shelter for global page policy. */
 	bool isShelter() const override { return true; }
 };
-
-class Animation;
-class ZoombiniRunner;
-struct StorageRecord;
 
 /** Common waiting-roster, scrolling, and departure lifecycle for both rescue sites. */
 class ShelterRescueSiteBase : public ShelterBase {

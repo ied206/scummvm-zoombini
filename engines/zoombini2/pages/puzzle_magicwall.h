@@ -23,8 +23,9 @@
 #define ZOOMBINI2_PAGES_PUZZLE_MAGICWALL_H
 
 #include "common/array.h"
+#include "common/hashmap.h"
 #include "common/rect.h"
-#include "zoombini2/metaengine.h"
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/puzzle_base.h"
 
 namespace Common {
@@ -41,8 +42,24 @@ struct RGBColor;
 class Random;
 
 /** Resource-defined beetle permutations and weighted puzzle generation. */
-class MagicWallMaze {
+class MagicWallBoard {
 public:
+	/** Original color ordinals shared by beetles, target vertices and gate lamps. */
+	enum VertexColor : uint {
+		kVertexColor00_Blue = 0,
+		kVertexColor01_Green = 1,
+		kVertexColor02_Navy = 2,
+		kVertexColor03_Orange = 3,
+		kVertexColor04_Purple = 4,
+		kVertexColor05_Red = 5,
+		kVertexColor06_Rose = 6,
+		kVertexColor07_Turquoise = 7,
+		kVertexColor08_Violet = 8,
+		kVertexColor09_Yellow = 9,
+		/** Neutral lamp for an unmatched vertex; no beetle uses this ordinal. */
+		kVertexColor10_Stone = 10,
+	};
+
 	struct Edge {
 		/** Source vertex index in one tablet rule. */
 		int from = 0;
@@ -51,38 +68,47 @@ public:
 		/** Whether applying this edge exchanges the beetles at both endpoints. */
 		bool swap = false;
 	};
-	/** One tablet operation and its selectable variants. */
+	/** Vertex transfers and swaps performed by one tablet. */
 	typedef Common::Array<Edge> Rule;
-	typedef Common::Array<Rule> Variant;
+	/** Ordered tablet rules; each resource candidate contains one such set. */
+	typedef Common::Array<Rule> RuleSet;
 	/** One resource-defined board layout and the rules offered on its tablets. */
-	struct Layout {
-		/** Difficulty branch for which this layout is eligible. */
-		int level = 0;
-		/** Relative selection weight among layouts eligible for the requested level. */
-		int weight = 0;
+	struct LayoutDef {
+		/** Puzzle level for which this layout can be selected. */
+		int puzzleLevel = 0;
+		/**
+		 * Raw relative weight w; W is the sum of weights for layouts with the same puzzle level.
+		 * Nominal selection chance is w / W (100 * w / W percent); weights 2, 3, 5 give 20%, 30%, 50%.
+		 * Zero weight is never selected; W == 0 prevents board generation.
+		 * The original PRNG's modulo reduction may bias these nominal probabilities.
+		 */
+		int selectionWeight = 0;
 		/** Beetle vertex locations in the layout's local coordinate system. */
-		Common::Array<Common::Point32> points;
-		/** Resource-defined tablet variants, indexed by the three rule groups. */
-		Common::Array<Variant> groups[3];
+		Common::Array<Common::Point32> vertexCoords;
+		/**
+		 * Candidate tablet-rule sets in three independent choice groups.
+		 * Generation selects one set from each group and combines their tablet rules.
+		 */
+		Common::Array<RuleSet> ruleSetCandidates[3];
 	};
 	/** Read bounded layout records, retaining complete records before damaged trailing data. */
 	bool load(Common::SeekableReadStream &stream);
-	/** Choose a weighted layout for @p level and construct its initial scrambled board. */
-	bool generate(int level, Random &random);
+	/** Choose a weighted layout for @p puzzleLevel and construct its initial scrambled board. */
+	bool generate(int puzzleLevel, Random &random);
 	/** Apply the player's selected tablet rule to the current beetle positions. */
 	void apply(int ruleIndex);
-	/** Return whether the beetle of @p color occupies its matching vertex. */
-	bool matched(int color) const;
+	/** Return whether the beetle of @p vertexColor occupies its matching vertex. */
+	bool matched(VertexColor vertexColor) const;
 	/** Return whether every beetle needed by @p gate is at its matching vertex. */
 	bool gateMatched(int gate) const;
 	/** Return the selected resource layout index. */
 	int layoutIndex() const { return _layoutIndex; }
 	/** Return the selected gate and tablet layout. */
-	const Layout &layout() const { return _layouts[_layoutIndex]; }
+	const LayoutDef &layout() const { return _layouts[_layoutIndex]; }
 	/** Return all layouts loaded from the maze resource. */
-	const Common::Array<Layout> &layouts() const { return _layouts; }
+	const Common::Array<LayoutDef> &layouts() const { return _layouts; }
 	/** Return the selected logical gate and tablet rules. */
-	const Variant &rules() const { return _rules; }
+	const RuleSet &rules() const { return _rules; }
 	/** Return the current vertex occupied by each beetle. */
 	const Common::Array<int> &positions() const { return _positions; }
 	/** Return the initial vertex occupied by each beetle after board generation. */
@@ -115,7 +141,7 @@ private:
 	/** Read a count only when it fits @p maximum and the resource's trusted bounds. */
 	static bool readCount(Common::SeekableReadStream &stream, int &count, int maximum);
 	/** Decode one structurally complete layout record from the resource stream. */
-	static bool readLayout(Common::SeekableReadStream &stream, Layout &layout);
+	static bool readLayout(Common::SeekableReadStream &stream, LayoutDef &layout);
 	/** Apply a whole rule once per beetle, or sequentially when constructing a scramble. */
 	static void applyRule(const Rule &rule, Common::Array<int> &positions, bool simultaneous);
 	/** Return whether @p positions has every beetle at its matching point. */
@@ -131,11 +157,11 @@ private:
 	/** Build an initial board by applying selected rules sequentially. */
 	void scramble(Random &random);
 	/** All decoded layouts, selected layout index, active rules, and current beetle positions. */
-	Common::Array<Layout> _layouts;
+	Common::Array<LayoutDef> _layouts;
 	/** Index of the selected resource layout, or -1 before generation. */
 	int _layoutIndex = -1;
 	/** Tablet operations selected for the current board. */
-	Variant _rules;
+	RuleSet _rules;
 	/** Current vertex occupied by each beetle color. */
 	Common::Array<int> _positions;
 	/** Sequential construction operations for the selected initial board, not a player solution. */
@@ -197,7 +223,7 @@ private:
 	static constexpr int kRoutePuzzleIdx = 1;
 	/** Beetle Bug Alley board background loaded into the first page layer. */
 	static constexpr const char *kBackgroundPath = "#bmp/magic_wall/magic wall";
-	/** ZTL board data containing weighted layouts, tablet points, and rule variants. */
+	/** ZTL board data containing weighted layouts, vertex coordinates, and candidate tablet-rule sets. */
 	static constexpr const char *kLayoutPath = "bmp/magic_wall/default.ztl";
 	/** Looping Beetle Bug Alley soundtrack. */
 	static constexpr const char *kMusicPath = "#sounds/music/06-BB01.wav";
@@ -207,8 +233,10 @@ private:
 	static constexpr const char *kBugFormat = "bmp/magic_wall/bug_c_%s";
 	/** Path format for one of eight beetle-facing direction overlays. */
 	static constexpr const char *kDirectionFormat = "bmp/magic_wall/bug_%d";
-	/** Path format for matched-color lamps and the neutral stone lamp. */
+	/** Path format for matched-color lamps. */
 	static constexpr const char *kLightFormat = "bmp/magic_wall/mini-light-%s";
+	/** Neutral stone lamp drawn for a vertex whose beetle does not match. */
+	static constexpr const char *kStoneLightPath = "bmp/magic_wall/mini-light-pierre";
 	/** RLE image drawn as the frame for each rule tablet. */
 	static constexpr const char *kTabletPath = "bmp/magic_wall/mini-map";
 	/** RLE vertex marker drawn on a rule tablet. */
@@ -235,28 +263,25 @@ private:
 	static constexpr const char *kRetreatSpeechPath = "sounds/DW-Cave.wav";
 	/** One of four randomized praise lines played after all Zoombinis are rescued. */
 	static constexpr const char *kPerfectSpeechFormat = "sounds/wld11.%d.wav";
-	/** Resource color suffixes for ten beetles plus the neutral stone lamp used for unmatched vertices. */
-	static constexpr const char *kColors[11] = {
-		"blue",
-		"green",
-		"navy",
-		"orange",
-		"purple",
-		"red",
-		"rose",
-		"turquoise",
-		"violet",
-		"yellow",
-		"pierre",
-	};
+	/** Resource filename suffixes keyed by original beetle-color identity. */
+	typedef Common::HashMap<MagicWallBoard::VertexColor, const char *, Common::Hash<uint>> VertexColorNameMap;
+	/** Build the resource suffix mapping for the ten beetle identities. */
+	static VertexColorNameMap createVertexColorNames();
+	/** Return the immutable resource suffix mapping reused across page instances. */
+	static const VertexColorNameMap &getVertexColorNames();
 	/** Upper-range channels of the shaded vertex discs, avoiding clipped highlights after recoloring. */
 	static constexpr byte kDotSourceBrightness[10] = {164, 154, 168, 154, 156, 220, 172, 140, 126, 128};
 	/** Peak channels at the centers of the ten source beetle sprites. */
 	static constexpr byte kBugSourceBrightness[10] = {228, 180, 130, 208, 157, 201, 197, 200, 213, 208};
-	/** Select a display color for one beetle and its matching vertex. */
-	static bool colorAssistRGB(Zoombini2MetaEngine::ColorAssistMode mode, uint color, RGBColor &displayColor);
+	/** Replacement RGB colors keyed by beetle and target-vertex identity. */
+	typedef Common::HashMap<MagicWallBoard::VertexColor, RGBColor, Common::Hash<uint>> VertexColorPalette;
+	/** Build the red-green assistance palette without treating color ordinals as array offsets. */
+	static VertexColorPalette createRedGreenVertexColorPalette();
+	/** Select a display RGB color for a beetle identity, leaving the neutral stone lamp unchanged. */
+	static bool vertexColorAssistRGB(ColorAssistMode mode, MagicWallBoard::VertexColor vertexColor, RGBColor &displayColor);
 	/** Draw one identity-colored RLE resource with the current display palette. */
-	void drawColorSprite(ManagedSurface32 *screen, const char *format, uint color, const Common::Point32 &pos, byte sourceBrightness) const;
+	void drawVertexColorSprite(ManagedSurface32 *screen, const char *format, MagicWallBoard::VertexColor vertexColor,
+							   const Common::Point32 &pos, byte sourceBrightness) const;
 	/** Screen locations for tablets, gates, roster runners, and gate lights. */
 	static constexpr Common::Point32 kTabletPositions[5] = {
 		{350, 400},
@@ -344,7 +369,7 @@ private:
 	static void gateDone(void *context, AnimationRunner *runner);
 
 	/** Resource-defined board, tablet rules and current beetle permutation. */
-	MagicWallMaze _maze;
+	MagicWallBoard _board;
 	/** Beetles on the current board, one per layout vertex: L1/L2 use 5-8, L3 uses 6-9, and L4 uses 8-9. */
 	Common::Array<Beetle> _beetles;
 	/** Animation data for the four exit gates, released with the page. */

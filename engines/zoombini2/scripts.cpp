@@ -737,14 +737,14 @@ private:
 	}
 };
 
-CubicBezierCurve::CubicBezierCurve(bool useFloatingPoint)
-	: _evaluator(createEvaluator(useFloatingPoint)), _useFloatingPoint(useFloatingPoint) {
+CubicBezierCurve::CubicBezierCurve(BezierCurveDataType dataType)
+	: _evaluator(createEvaluator(dataType)), _dataType(dataType) {
 }
 
 CubicBezierCurve::CubicBezierCurve(const CubicBezierCurve &other)
 	: _evaluator(other._evaluator->clone()), _start(other._start), _control0(other._control0), _control1(other._control1), _end(other._end),
 	  _stepValue(other._stepValue), _waitInitial(other._waitInitial), _initialized(other._initialized),
-	  _coefficientsReady(other._coefficientsReady), _useFloatingPoint(other._useFloatingPoint) {
+	  _coefficientsReady(other._coefficientsReady), _dataType(other._dataType) {
 }
 
 CubicBezierCurve &CubicBezierCurve::operator=(const CubicBezierCurve &other) {
@@ -762,7 +762,7 @@ CubicBezierCurve &CubicBezierCurve::operator=(const CubicBezierCurve &other) {
 	_waitInitial = other._waitInitial;
 	_initialized = other._initialized;
 	_coefficientsReady = other._coefficientsReady;
-	_useFloatingPoint = other._useFloatingPoint;
+	_dataType = other._dataType;
 	return *this;
 }
 
@@ -816,17 +816,21 @@ void CubicBezierCurve::setStepValue(int stepValue) {
 	rebuildEvaluator();
 }
 
-void CubicBezierCurve::setFloatingPointMode(bool useFloatingPoint) {
-	if (_useFloatingPoint == useFloatingPoint)
+void CubicBezierCurve::setDataType(BezierCurveDataType dataType) {
+	if (_dataType == dataType)
 		return;
-	_useFloatingPoint = useFloatingPoint;
+	_dataType = dataType;
 	rebuildEvaluator();
 }
 
-CubicBezierCurve::Evaluator *CubicBezierCurve::createEvaluator(bool useFloatingPoint) {
-	if (useFloatingPoint)
+CubicBezierCurve::Evaluator *CubicBezierCurve::createEvaluator(BezierCurveDataType dataType) {
+	switch (dataType) {
+	case BezierCurveDataType::kF32FloatingPoint:
 		return new TypedEvaluator<FloatNumeric>();
-	return new TypedEvaluator<FixedNumeric>();
+	case BezierCurveDataType::kQ10FixedPoint:
+	default:
+		return new TypedEvaluator<FixedNumeric>();
+	}
 }
 
 void CubicBezierCurve::rebuildEvaluator() {
@@ -835,7 +839,7 @@ void CubicBezierCurve::rebuildEvaluator() {
 	const Float32 previousParameter = _evaluator->getParameter();
 
 	delete _evaluator;
-	_evaluator = createEvaluator(_useFloatingPoint);
+	_evaluator = createEvaluator(_dataType);
 	if (!_initialized)
 		return;
 
@@ -864,12 +868,12 @@ PathObject::~PathObject() {
 
 PathObject *PathObject::createUnstartedCopy() const {
 	PathObject *path = new PathObject(_vm);
-	const bool useFloatingPoint = _vm->getBezierCurveDataType() == Zoombini2MetaEngine::BezierCurveDataType::kF32FloatingPoint;
+	const BezierCurveDataType dataType = _vm->getBezierCurveDataType();
 
 	for (uint i = 0; i < segments.size(); i++) {
 		CubicBezierCurve *segment = new CubicBezierCurve(*segments[i]);
 
-		segment->setFloatingPointMode(useFloatingPoint);
+		segment->setDataType(dataType);
 		path->segments.push_back(segment);
 	}
 	path->looping = looping;
@@ -878,7 +882,7 @@ PathObject *PathObject::createUnstartedCopy() const {
 }
 
 void PathObject::appendSegment(const Common::Point32 &start, const Common::Point32 &control0, const Common::Point32 &control1, const Common::Point32 &end, int stepValue, int waitInitial) {
-	CubicBezierCurve *segment = new CubicBezierCurve(_vm->getBezierCurveDataType() == Zoombini2MetaEngine::BezierCurveDataType::kF32FloatingPoint);
+	CubicBezierCurve *segment = new CubicBezierCurve(_vm->getBezierCurveDataType());
 	segment->init(start, control0, control1, end, stepValue, waitInitial);
 	segments.push_back(segment);
 	endPos = end;
@@ -997,12 +1001,12 @@ PathObject *PathObject::loadPATStream(Zoombini2Engine *vm, Common::SeekableReadS
 
 	// Read FIRST line
 	Common::String line = f.readLine();
-	Common::Array<int> coordinates;
+	Common::Array<int> coords;
 	int stepVal = 0;
 	int waitVal = 0;
-	if (parsePATSegmentRecord(line, true, coordinates, stepVal, waitVal)) {
-		obj->appendSegment(Common::Point32(coordinates[0], coordinates[1]), Common::Point32(coordinates[2], coordinates[3]),
-						   Common::Point32(coordinates[4], coordinates[5]), Common::Point32(coordinates[6], coordinates[7]), stepVal, waitVal);
+	if (parsePATSegmentRecord(line, true, coords, stepVal, waitVal)) {
+		obj->appendSegment(Common::Point32(coords[0], coords[1]), Common::Point32(coords[2], coords[3]),
+						   Common::Point32(coords[4], coords[5]), Common::Point32(coords[6], coords[7]), stepVal, waitVal);
 	}
 
 	if (obj->segments.empty()) {
@@ -1018,11 +1022,11 @@ PathObject *PathObject::loadPATStream(Zoombini2Engine *vm, Common::SeekableReadS
 			break;
 
 		// Parse the continuation coordinates, speed, and endpoint wait.
-		if (parsePATSegmentRecord(line, false, coordinates, stepVal, waitVal)) {
+		if (parsePATSegmentRecord(line, false, coords, stepVal, waitVal)) {
 			CubicBezierCurve *prev = obj->segments.back();
 			// P0 comes from previous segment's P1
-			obj->appendSegment(prev->getEndPosition(), Common::Point32(coordinates[0], coordinates[1]),
-							   Common::Point32(coordinates[2], coordinates[3]), Common::Point32(coordinates[4], coordinates[5]), stepVal, waitVal);
+			obj->appendSegment(prev->getEndPosition(), Common::Point32(coords[0], coords[1]),
+							   Common::Point32(coords[2], coords[3]), Common::Point32(coords[4], coords[5]), stepVal, waitVal);
 		}
 	}
 
@@ -1108,9 +1112,9 @@ bool PathObject::advance(uint32 tickCount, Common::Point32 &outPos) {
 }
 
 void PathObject::synchronizeNumericMode() {
-	const bool useFloatingPoint = _vm->getBezierCurveDataType() == Zoombini2MetaEngine::BezierCurveDataType::kF32FloatingPoint;
+	const BezierCurveDataType dataType = _vm->getBezierCurveDataType();
 	for (uint i = 0; i < segments.size(); i++)
-		segments[i]->setFloatingPointMode(useFloatingPoint);
+		segments[i]->setDataType(dataType);
 }
 
 ZoombiniRunner::ZoombiniRunner(Zoombini2Engine *vm)

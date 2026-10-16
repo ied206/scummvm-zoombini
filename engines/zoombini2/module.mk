@@ -10,7 +10,7 @@ MODULE_OBJS := \
 	scripts.o \
 	sound.o \
 	state.o \
-	text.o \
+	text_manager.o \
 	pages/dialog_base.o \
 	pages/dialog_debug.o \
 	pages/dialog_help.o \

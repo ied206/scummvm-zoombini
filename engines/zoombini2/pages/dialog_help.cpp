@@ -21,9 +21,9 @@
 
 #include "zoombini2/pages/dialog_help.h"
 #include "zoombini2/graphics.h"
+#include "zoombini2/text_manager.h"
 #include "zoombini2/metaengine.h"
 #include "zoombini2/sound.h"
-#include "zoombini2/text.h"
 #include "zoombini2/zoombini2.h"
 
 #include "common/config-manager.h"
@@ -172,7 +172,7 @@ void DialogHelp::drawMissingHelpText(ManagedSurface32 *screen) const {
 	if (fontHeight <= 0)
 		return;
 
-	const Common::U32String &message = _vm->_text->getLocalizedString(Text::kMissingLevel4Help);
+	const Common::U32String &message = _vm->_text->getLocalizedString(TextManager::kMissingLevel4Help);
 	const int y = kMissingHelpTextCenterY - fontHeight / 2;
 	_vm->_gfx->drawString(screen, message, Common::Point32(kMissingHelpTextX, y), kMissingHelpTextWidth, conf);
 }

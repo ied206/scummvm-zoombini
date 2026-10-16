@@ -35,7 +35,7 @@
 #include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
-#include "zoombini2/text.h"
+#include "zoombini2/text_manager.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
@@ -1347,7 +1347,7 @@ void Gfx::drawZoombini(ManagedSurface32 *screen, const ZoombiniAnimation *animat
 	if (!screen || !animation || cell < 0 || ZoombiniAnimation::kDim0 <= cell || frame < 0)
 		return;
 	const int baseIndex = cell * ZoombiniAnimation::kDim1 * ZoombiniAnimation::kDim2;
-	const Zoombini2MetaEngine::ColorAssistMode colorAssistMode = animation->getColorAssistMode();
+	const ColorAssistMode colorAssistMode = animation->getColorAssistMode();
 	for (int layer = 0; layer < ZoombiniAnimation::kDim1; layer++) {
 		int variant = 0;
 		if (0 < layer)
@@ -1411,26 +1411,30 @@ void Gfx::drawZoombiniPreview(ManagedSurface32 *screen, const ZoombiniAnimation 
 	}
 }
 
-bool Gfx::noseColorRGB(Zoombini2MetaEngine::ColorAssistMode mode, byte value, RGBColor &color) {
+bool Gfx::noseColorRGB(ColorAssistMode mode, byte value, RGBColor &color) {
 	if (value < 1 || ZmbTrait::kTraitValueCount < value)
 		return false;
-	if (mode == Zoombini2MetaEngine::ColorAssistMode::kEnhancedDistinction) {
+	switch (mode) {
+	case ColorAssistMode::kEnhancedDistinction:
 		if (value != 5)
 			return false;
 		color = RGBColor(167, 108, 212);
 		return true;
+	case ColorAssistMode::kRedGreenBlindAssist: {
+		static constexpr RGBColor kNoseColors[ZmbTrait::kTraitValueCount] = {
+			RGBColor(230, 159, 0),
+			RGBColor(255, 255, 255),
+			RGBColor(0, 182, 217),
+			RGBColor(101, 121, 255),
+			RGBColor(102, 0, 68),
+		};
+		color = kNoseColors[value - 1];
+		return true;
 	}
-	if (mode != Zoombini2MetaEngine::ColorAssistMode::kRedGreenBlindAssist)
+	case ColorAssistMode::kOriginal:
+	default:
 		return false;
-	static constexpr RGBColor kNoseColors[ZmbTrait::kTraitValueCount] = {
-		RGBColor(230, 159, 0),
-		RGBColor(255, 255, 255),
-		RGBColor(0, 182, 217),
-		RGBColor(101, 121, 255),
-		RGBColor(102, 0, 68),
-	};
-	color = kNoseColors[value - 1];
-	return true;
+	}
 }
 
 RGBColor Gfx::recolorNoseGradientRGB(const RGBColor &srcColor, const RGBColor &targetColor) {
@@ -1488,7 +1492,7 @@ int Gfx::drawString(ManagedSurface32 *destSurface, const Common::String &text, c
 			return 0;
 		return bmtFont->drawString(destSurface, pos, text, maxWidth, conf.fillColor);
 	}
-	const Common::U32String decoded = Text::toU32String(text, _vm->getLanguage());
+	const Common::U32String decoded = TextManager::toU32String(text, _vm->getLanguage());
 	TextConf alignedConf = conf;
 	alignedConf.hAlign = Graphics::kTextAlignLeft;
 	drawString(destSurface, decoded, pos, maxWidth, alignedConf);
@@ -1503,7 +1507,7 @@ int Gfx::getTextWidth(const Common::String &text, const TextConf &conf) const {
 			return 0;
 		return bmtFont->getStringLayoutWidth(text);
 	}
-	return getTextWidth(Text::toU32String(text, _vm->getLanguage()), conf);
+	return getTextWidth(TextManager::toU32String(text, _vm->getLanguage()), conf);
 }
 
 void Gfx::drawDragNameTooltip(ManagedSurface32 *destSurface, const Common::String &name) {
@@ -1616,7 +1620,7 @@ void Gfx::drawString(ManagedSurface32 *destSurface, const Common::U32String &tex
 	if (!destSurface)
 		return;
 	if (conf.fontKind == FontKind::kBmtFont) {
-		drawString(destSurface, Text::fromU32String(text, _vm->getLanguage()), pos, maxWidth, conf);
+		drawString(destSurface, TextManager::fromU32String(text, _vm->getLanguage()), pos, maxWidth, conf);
 		return;
 	}
 	const int effectiveMaxWidth = maxWidth == kNoMaxWidth ? destSurface->w : maxWidth;
@@ -1646,7 +1650,7 @@ void Gfx::drawString(ManagedSurface32 *destSurface, const Common::U32String &tex
 
 int Gfx::getTextWidth(const Common::U32String &text, const TextConf &conf) const {
 	if (conf.fontKind == FontKind::kBmtFont)
-		return getTextWidth(Text::fromU32String(text, _vm->getLanguage()), conf);
+		return getTextWidth(TextManager::fromU32String(text, _vm->getLanguage()), conf);
 	const Graphics::Font *font = _vm->_text->resolveFont(conf.fontKind);
 	return font ? font->getStringWidth(text) : 0;
 }
@@ -1667,9 +1671,9 @@ void Gfx::wordWrapText(const Common::U32String &text, int maxWidth, Common::Arra
 		if (!bmtFont)
 			return;
 		Common::Array<Common::String> encodedLines;
-		bmtFont->wordWrapText(Text::fromU32String(text, _vm->getLanguage()), maxWidth, encodedLines);
+		bmtFont->wordWrapText(TextManager::fromU32String(text, _vm->getLanguage()), maxWidth, encodedLines);
 		for (uint i = 0; i < encodedLines.size(); i++)
-			lines.push_back(Text::toU32String(encodedLines[i], _vm->getLanguage()));
+			lines.push_back(TextManager::toU32String(encodedLines[i], _vm->getLanguage()));
 		return;
 	}
 	const Graphics::Font *font = _vm->_text->resolveFont(conf.fontKind);
@@ -1990,7 +1994,7 @@ int ZoombiniAnimation::getFrameCount(int cellIndex) const {
 	return _cells[cellIndex].frames.size();
 }
 
-Zoombini2MetaEngine::ColorAssistMode ZoombiniAnimation::getColorAssistMode() const {
+ColorAssistMode ZoombiniAnimation::getColorAssistMode() const {
 	return _vm->getColorAssistMode();
 }
 
@@ -2023,6 +2027,8 @@ UIButton::~UIButton() {
 }
 
 void UIButton::clearImages() {
+	// Images are shared through the graphics page cache and released by @ref Gfx::clearPageBitmapCache.
+	// Drop only this button's borrowed references so the cache and other buttons keep valid images.
 	_normalBB = nullptr;
 	_hoverBB = nullptr;
 	_disabledBB = nullptr;
