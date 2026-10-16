@@ -24,11 +24,11 @@
 #include "common/callback.h"
 #include "common/debug.h"
 #include "zoombini2/graphics.h"
+#include "zoombini2/text_manager.h"
 #include "zoombini2/pages/dialog_msgbox.h"
 #include "zoombini2/pages/interactive_menu.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
-#include "zoombini2/text.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
@@ -460,7 +460,7 @@ void InteractiveMenu::requestCaseCollisionConfirmation(const Common::String &pla
 	_pendingCaseCollisionSavefileName = savefileName;
 	Common::BaseCallback<DialogMsgBoxButton> *callback =
 		new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleCaseCollisionConfirmation);
-	const Common::U32String &message = _vm->_text->getLocalizedString(Text::kConfirmCaseCollision);
+	const Common::U32String &message = _vm->_text->getLocalizedString(TextManager::kConfirmCaseCollision);
 	if (!_vm->requestUiTextMsgBox(message, callback)) {
 		_pendingCaseCollisionPlayerName.clear();
 		_pendingCaseCollisionSavefileName.clear();
@@ -471,7 +471,7 @@ void InteractiveMenu::requestReadOnlyLoadConfirmation(const Common::String &save
 	_pendingReadOnlySavefileName = savefileName;
 	Common::BaseCallback<DialogMsgBoxButton> *callback =
 		new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleReadOnlyLoadConfirmation);
-	const Common::U32String &message = _vm->_text->getLocalizedString(Text::kConfirmReadOnlyLoad);
+	const Common::U32String &message = _vm->_text->getLocalizedString(TextManager::kConfirmReadOnlyLoad);
 	if (!_vm->requestUiTextMsgBox(message, callback))
 		_pendingReadOnlySavefileName.clear();
 }

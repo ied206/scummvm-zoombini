@@ -43,6 +43,14 @@ namespace Zoombini2 {
 
 class Zoombini2Engine;
 
+/** Persisted selection for mono downmixing or stereo game-audio playback. */
+enum class AudioOutputMode : uint32 {
+	/** Downmix stereo game-audio resources to mono. */
+	kMonoDownmix = 0,
+	/** Preserve both channels of stereo game-audio resources. */
+	kStereoPlayback = 1
+};
+
 /** Maximum volume accepted by the game-facing sound API. */
 const int kMaxVolumePercent = 100;
 
@@ -131,8 +139,8 @@ public:
 	int getMusicVolume() const { return _volumeMusic; }
 	/** Return the global speech volume in the inclusive range 0 through 100. */
 	int getSpeechVolume() const { return _volumeSpeech; }
-	/** Select stereo input streams or downmix them to mono before playback. */
-	void setStereoOutputEnabled(bool enabled) { _stereoOutputEnabled = enabled; }
+	/** Select channel handling for newly started game-audio streams. */
+	void setAudioOutputMode(AudioOutputMode mode) { _audioOutputMode = mode; }
 
 private:
 	/** Retains the path, playback policy, volume, and mixer handles for one sound. */
@@ -199,8 +207,8 @@ private:
 	int _nextId = 1;
 	/** Nested mute-request count. */
 	int _muteRefCount = 0;
-	/** Whether newly started stereo WAV streams retain both channels. */
-	bool _stereoOutputEnabled = false;
+	/** Channel handling applied when a game-audio stream starts. */
+	AudioOutputMode _audioOutputMode = AudioOutputMode::kMonoDownmix;
 
 	/** Return the borrowed sound record for @p id, or nullptr. */
 	SoundBuffer *findBuffer(int id) const;

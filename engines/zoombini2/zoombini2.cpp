@@ -37,6 +37,7 @@
 #include "zoombini2/console.h"
 #include "zoombini2/dialogs.h"
 #include "zoombini2/graphics.h"
+#include "zoombini2/text_manager.h"
 #include "zoombini2/metaengine.h"
 #include "zoombini2/pages/dialog_debug.h"
 #include "zoombini2/pages/dialog_help.h"
@@ -67,7 +68,6 @@
 #include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
-#include "zoombini2/text.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
@@ -633,23 +633,23 @@ void Zoombini2Engine::applyGameSettings() {
 	refreshEngineSettings();
 	if (_rnd) {
 		const int prngAlgorithmVal = ConfMan.getInt(Zoombini2MetaEngine::kConfigPrngAlgorithm);
-		const Zoombini2MetaEngine::PrngAlgorithm prngAlgorithm = static_cast<Zoombini2MetaEngine::PrngAlgorithm>(prngAlgorithmVal);
+		const PrngAlgorithmKind prngAlgorithm = static_cast<PrngAlgorithmKind>(prngAlgorithmVal);
 		_rnd->setAlgorithm(prngAlgorithm);
 	}
 	if (_soundManager)
-		_soundManager->setStereoOutputEnabled(_stereoOutputEnabled);
+		_soundManager->setAudioOutputMode(_audioOutputMode);
 }
 
 Common::Error Zoombini2Engine::run() {
 	// Init subsystems
-	_text = new Text(this);
+	_text = new TextManager(this);
 	if (!_text->loadTextFont())
 		warning("Zoombini2Engine: Failed to load bitmap text strip");
 	_gfx = new Gfx(this);
 	_gfx->loadCommonZoombiniAnimations();
 	initCursor();
 	_soundManager = new SoundManager(this, _mixer);
-	_soundManager->setStereoOutputEnabled(_stereoOutputEnabled);
+	_soundManager->setAudioOutputMode(_audioOutputMode);
 	syncSoundSettings();
 	_state = new GameState(this);
 	_sidebar = new Sidebar(this); // Shared Help, Map, Go buttons
@@ -843,9 +843,9 @@ void Zoombini2Engine::reseedRandomForV10() {
 
 int Zoombini2Engine::getLogicPacingHz() const {
 	switch (_logicPacingMode) {
-	case Zoombini2MetaEngine::LogicPacingMode::k75Hz:
+	case LogicPacingMode::k75Hz:
 		return 75;
-	case Zoombini2MetaEngine::LogicPacingMode::k60Hz:
+	case LogicPacingMode::k60Hz:
 	default:
 		return 60;
 	}
@@ -860,8 +860,7 @@ int Zoombini2Engine::percentToMixerVolume(int volume) {
 }
 
 void Zoombini2Engine::refreshEngineSettings() {
-	const int frameRate = CLIP<int>(ConfMan.getInt(Zoombini2MetaEngine::kConfigFrameRate),
-									Zoombini2MetaEngine::kMinFrameRate, Zoombini2MetaEngine::kMaxFrameRate);
+	const int frameRate = CLIP<int>(ConfMan.getInt(Zoombini2MetaEngine::kConfigFrameRate), Zoombini2MetaEngine::kMinFrameRate, Zoombini2MetaEngine::kMaxFrameRate);
 	const bool unlockFrameRate = ConfMan.getBool(Zoombini2MetaEngine::kConfigUnlockFrameRate);
 	if (_frameRate != frameRate || _unlockFrameRate != unlockFrameRate) {
 		_frameRate = frameRate;
@@ -873,28 +872,27 @@ void Zoombini2Engine::refreshEngineSettings() {
 	_debugHotkeysEnabled = ConfMan.getBool(Zoombini2MetaEngine::kConfigDebugHotkeys);
 	_chezNorfSubtitlesEnabled = ConfMan.getBool(Zoombini2MetaEngine::kConfigChezNorfClueSubtitles);
 	const int audioOutputValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigAudioOutputMode);
-	const Zoombini2MetaEngine::AudioOutputMode audioOutputMode = static_cast<Zoombini2MetaEngine::AudioOutputMode>(audioOutputValue);
-	_stereoOutputEnabled = audioOutputMode == Zoombini2MetaEngine::AudioOutputMode::kStereoPlayback;
+	_audioOutputMode = static_cast<AudioOutputMode>(audioOutputValue);
 	const int colorAssistValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigColorAssistMode);
-	const Zoombini2MetaEngine::ColorAssistMode colorAssistMode = static_cast<Zoombini2MetaEngine::ColorAssistMode>(colorAssistValue);
+	const ColorAssistMode colorAssistMode = static_cast<ColorAssistMode>(colorAssistValue);
 	switch (colorAssistMode) {
-	case Zoombini2MetaEngine::ColorAssistMode::kEnhancedDistinction:
-	case Zoombini2MetaEngine::ColorAssistMode::kRedGreenBlindAssist:
+	case ColorAssistMode::kEnhancedDistinction:
+	case ColorAssistMode::kRedGreenBlindAssist:
 		_colorAssistMode = colorAssistMode;
 		break;
-	case Zoombini2MetaEngine::ColorAssistMode::kOriginal:
+	case ColorAssistMode::kOriginal:
 	default:
-		_colorAssistMode = Zoombini2MetaEngine::ColorAssistMode::kOriginal;
+		_colorAssistMode = ColorAssistMode::kOriginal;
 		break;
 	}
 	_useGreedyWaterslidePairing = ConfMan.getBool(Zoombini2MetaEngine::kConfigGreedyWaterslidePairing);
 	const int bezierCurveDataTypeValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigBezierCurveDataType);
-	_bezierCurveDataType = static_cast<Zoombini2MetaEngine::BezierCurveDataType>(bezierCurveDataTypeValue);
+	_bezierCurveDataType = static_cast<BezierCurveDataType>(bezierCurveDataTypeValue);
 	_fixFleenDepartStreak = ConfMan.getBool(Zoombini2MetaEngine::kConfigFixFleenDepartStreak);
 	_enhancedKbdShortcuts = ConfMan.getBool(Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts);
 	_allowCutL4PracticePuzzles = ConfMan.getBool(Zoombini2MetaEngine::kConfigRestoreL4PracticePuzzles);
 	const int logicPacingValue = ConfMan.getInt(Zoombini2MetaEngine::kConfigLogicPacingMode);
-	_logicPacingMode = static_cast<Zoombini2MetaEngine::LogicPacingMode>(logicPacingValue);
+	_logicPacingMode = static_cast<LogicPacingMode>(logicPacingValue);
 	if (!_debugHotkeysEnabled) {
 		_debugCompletionKeyDown = false;
 		_debugOverlayKeyDown = false;

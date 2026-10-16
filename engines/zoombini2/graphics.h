@@ -35,10 +35,34 @@
 #include "graphics/managed_surface.h"
 #include "graphics/pixelformat.h"
 
-#include "zoombini2/metaengine.h"
 #include "zoombini2/state.h"
 
 namespace Zoombini2 {
+
+class AlphaBlendLUT;
+class Zoombini2Engine;
+class SoundManager;
+class Animation;
+class AnimationRunner;
+class AreaMask;
+class BitBlock;
+class BmtFont;
+class CubicBezierCurve;
+class ManagedSurface32;
+class PageLayerStack;
+class RleBlock;
+class ZoombiniRunner;
+class ZoombiniAnimation;
+
+/** Persisted and runtime selection for color-only presentation assistance. */
+enum class ColorAssistMode : uint32 {
+	/** Preserve the original artwork colors. */
+	kOriginal = 0,
+	/** Make selected similar colors easier to distinguish. */
+	kEnhancedDistinction = 1,
+	/** Use colors chosen for red-green color vision deficiency. */
+	kRedGreenBlindAssist = 2
+};
 
 /** One RGB color with eight bits per channel and no alpha component. */
 struct RGBColor {
@@ -68,8 +92,6 @@ struct RGBColor {
 	/** Return the least RGB channel value. */
 	byte getMinChannel() const { return MIN(r, MIN(g, b)); }
 };
-
-class AlphaBlendLUT;
 
 /**
  * Signed width and height without positional semantics.
@@ -150,20 +172,6 @@ BEGIN_Z2_SIZE_TYPE(int32, Size32)
 /** Copy the dimensions of a 16-bit size into 32-bit coordinate storage. */
 constexpr Size32(const Size16 &size) : SizeBase(static_cast<int32>(size.width), static_cast<int32>(size.height)) {}
 END_Z2_SIZE_TYPE(int32, Size32)
-
-class Zoombini2Engine;
-class SoundManager;
-class Animation;
-class AnimationRunner;
-class AreaMask;
-class BitBlock;
-class BmtFont;
-class CubicBezierCurve;
-class ManagedSurface32;
-class PageLayerStack;
-class RleBlock;
-class ZoombiniRunner;
-class ZoombiniAnimation;
 
 /** Shared Zoombini sprite grids retained across page changes. */
 enum class ZmbAnimationKind {
@@ -362,7 +370,7 @@ public:
 	/** Compose the same picker preview with an explicit blend table. */
 	static void drawZoombiniPreview(ManagedSurface32 *destSurface, const ZoombiniAnimation *animation, const byte (&selectedValues)[ZmbTrait::kTraitKindCount], const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT);
 	/** Select the display color for a nose trait without changing its logical value. */
-	static bool noseColorRGB(Zoombini2MetaEngine::ColorAssistMode mode, byte value, RGBColor &color);
+	static bool noseColorRGB(ColorAssistMode mode, byte value, RGBColor &color);
 	/** Shift a nose pixel toward the display hue while retaining its value and saturation variation. */
 	static RGBColor recolorNoseGradientRGB(const RGBColor &srcColor, const RGBColor &targetColor);
 	/** Draw one visible runner and its available drop-target glow at the scrolled or dragged anchor without advancing animation. */
@@ -1072,7 +1080,7 @@ public:
 	/** Return the number of frames in @p cellIndex, or zero for an invalid cell. */
 	int getFrameCount(int cellIndex) const;
 	/** Return the current presentation setting for this animation's game instance. */
-	Zoombini2MetaEngine::ColorAssistMode getColorAssistMode() const;
+	ColorAssistMode getColorAssistMode() const;
 	/** Return the base layer's dimensions for one Zoombini cell and frame. */
 	Size32 getSpriteSize(int cell, int frame) const;
 	/** Forward legacy drawing calls to @ref Gfx::drawZoombini with the supplied blend table and clip. */
@@ -1109,7 +1117,7 @@ class UIButton {
 public:
 	/** Construct an enabled button bound to @p vm. */
 	explicit UIButton(Zoombini2Engine *vm);
-	/** Release every image retained by the button. */
+	/** Discard the button's borrowed image references. */
 	~UIButton();
 
 	/**
@@ -1195,7 +1203,7 @@ private:
 	/** Borrowed absolute clipping coordinate for the overlay's right edge. */
 	const int *_overlayClipRight = nullptr;
 
-	/** Release all retained state images. */
+	/** Drop borrowed references to state images retained in the graphics page cache. */
 	void clearImages();
 	/** Load one image, preferring the cached bitmap representation. */
 	bool loadImage(const Common::Path &path, BitBlock *&bitmap, RleBlock *&rle);

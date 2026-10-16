@@ -32,6 +32,7 @@
 #endif
 
 #include "zoombini2/graphics.h"
+#include "zoombini2/text_manager.h"
 #include "zoombini2/pages/dialog_debug.h"
 #include "zoombini2/pages/interactive_map.h"
 #include "zoombini2/pages/page_base.h"
@@ -41,7 +42,6 @@
 #include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
-#include "zoombini2/text.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
@@ -1448,7 +1448,7 @@ bool Zoombini2Console::printDebugStateGroup(const Common::String &group) {
 				continue;
 			}
 			const Common::String encodedName = zoombini->getName();
-			const Common::String name = Text::toU32String(encodedName, _vm->getLanguage()).encode(Common::kUtf8);
+			const Common::String name = TextManager::toU32String(encodedName, _vm->getLanguage()).encode(Common::kUtf8);
 			const ZmbTrait &traits = zoombini->getTraits();
 			debugPrintf("  [%u] %s: feet=%u nose=%u hair=%u eyes=%u\n", i, name.c_str(), traits._feet, traits._nose, traits._hair, traits._eyes);
 		}
