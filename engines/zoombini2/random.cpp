@@ -38,7 +38,7 @@ namespace Zoombini2 {
 Random::Random(const Common::String &name)
 	: _scummRnd(name) {
 	const int prngAlgorithmVal = ConfMan.getInt(Zoombini2MetaEngine::kConfigPrngAlgorithm);
-	_prngAlgorithm = static_cast<Zoombini2MetaEngine::PrngAlgorithm>(prngAlgorithmVal);
+	_prngAlgorithm = static_cast<PrngAlgorithmKind>(prngAlgorithmVal);
 
 #ifdef ENABLE_EVENTRECORDER
 	setSeed(g_eventRec.getRandomSeed(name));
@@ -47,7 +47,7 @@ Random::Random(const Common::String &name)
 #endif
 }
 
-void Random::setAlgorithm(Zoombini2MetaEngine::PrngAlgorithm prngAlgorithm) {
+void Random::setAlgorithm(PrngAlgorithmKind prngAlgorithm) {
 	if (_prngAlgorithm == prngAlgorithm)
 		return;
 
@@ -62,9 +62,9 @@ void Random::setSeed(uint32 seed) {
 
 uint32 Random::getSeed() const {
 	switch (_prngAlgorithm) {
-	case Zoombini2MetaEngine::PrngAlgorithm::kOriginalPrng:
+	case PrngAlgorithmKind::kOriginalPrng:
 		return _randState;
-	case Zoombini2MetaEngine::PrngAlgorithm::kStandardPrng:
+	case PrngAlgorithmKind::kStandardPrng:
 	default:
 		return _scummRnd.getSeed();
 	}
@@ -90,9 +90,9 @@ int32 Random::getRandomNumber(int32 max) {
 	assert(0 <= max);
 
 	switch (_prngAlgorithm) {
-	case Zoombini2MetaEngine::PrngAlgorithm::kStandardPrng:
+	case PrngAlgorithmKind::kStandardPrng:
 		return static_cast<int32>(_scummRnd.getRandomNumber(static_cast<uint32>(max)));
-	case Zoombini2MetaEngine::PrngAlgorithm::kOriginalPrng:
+	case PrngAlgorithmKind::kOriginalPrng:
 	default:
 		return getOriginalRandomNumber(max);
 	}

@@ -23,14 +23,14 @@
 #include "gui/ThemeEngine.h"
 #include "gui/gui-manager.h"
 
-#include "zoombini2/text.h"
+#include "zoombini2/text_manager.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
-constexpr const char *Text::kTextFontPath;
+constexpr const char *TextManager::kTextFontPath;
 
-Text::Text(Zoombini2Engine *vm)
+TextManager::TextManager(Zoombini2Engine *vm)
 	: _vm(vm) {
 	static const LocalizedStringMap strings = createLocalizedStrings();
 	const Common::Language language = _vm->getLanguage();
@@ -44,11 +44,11 @@ Text::Text(Zoombini2Engine *vm)
 	}
 }
 
-Text::~Text() {
+TextManager::~TextManager() {
 	delete _bmtFont;
 }
 
-Text::LocalizedStringMap Text::createLocalizedStrings() {
+TextManager::LocalizedStringMap TextManager::createLocalizedStrings() {
 	LocalizedStringMap strings;
 	strings[kRestoredLevelLabel][Common::EN_USA] = U"VERY, VERY HARD";
 	strings[kRestoredLevelLabel][Common::KO_KOR] = U"삭제되었던 4단계";
@@ -68,11 +68,11 @@ Text::LocalizedStringMap Text::createLocalizedStrings() {
 	return strings;
 }
 
-const Common::U32String &Text::getLocalizedString(Key key) const {
+const Common::U32String &TextManager::getLocalizedString(Key key) const {
 	return _strMap[key];
 }
 
-Common::CodePage Text::gameCodePage(Common::Language language) {
+Common::CodePage TextManager::gameCodePage(Common::Language language) {
 	switch (language) {
 	case Common::KO_KOR:
 		return Common::kWindows949;
@@ -88,15 +88,15 @@ Common::CodePage Text::gameCodePage(Common::Language language) {
 	}
 }
 
-Common::U32String Text::toU32String(const Common::String &str, Common::Language language) {
+Common::U32String TextManager::toU32String(const Common::String &str, Common::Language language) {
 	return str.decode(gameCodePage(language));
 }
 
-Common::String Text::fromU32String(const Common::U32String &str, Common::Language language) {
+Common::String TextManager::fromU32String(const Common::U32String &str, Common::Language language) {
 	return str.encode(gameCodePage(language));
 }
 
-bool Text::loadTextFont() {
+bool TextManager::loadTextFont() {
 	if (hasTextFont())
 		return true;
 	if (!_bmtFont)
@@ -104,15 +104,15 @@ bool Text::loadTextFont() {
 	return _bmtFont->load(Common::Path(kTextFontPath));
 }
 
-bool Text::hasTextFont() const {
+bool TextManager::hasTextFont() const {
 	return _bmtFont && _bmtFont->isLoaded();
 }
 
-BmtFont *Text::bmtFont() const {
+BmtFont *TextManager::bmtFont() const {
 	return _bmtFont && _bmtFont->isLoaded() ? _bmtFont : nullptr;
 }
 
-const Graphics::Font *Text::resolveFont(Gfx::FontKind kind) const {
+const Graphics::Font *TextManager::resolveFont(Gfx::FontKind kind) const {
 	switch (kind) {
 	case Gfx::FontKind::kBmtFont:
 		return bmtFont();

@@ -34,15 +34,46 @@
 
 namespace Zoombini2 {
 
-/** Parse bounded integer text without reporting diagnostics. */
+class AlphaBlendLUT;
+class Animation;
+class AreaMask;
+class Random;
+class RleBlock;
+class Zoombini2Engine;
+class ZoombiniAnimation;
+
+/** Numeric representation selected for Bezier curve evaluation. */
+enum class BezierCurveDataType : uint32 {
+	/** Use original-compatible Q10 fixed-point arithmetic. */
+	kQ10FixedPoint = 0,
+	/** Use native F32 floating-point arithmetic. */
+	kF32FloatingPoint = 1,
+};
+
+/** Reference rate for frame-derived motion and random-event quotas, independent of presentation FPS and timed animations. */
+enum class LogicPacingMode : uint32 {
+	/** Normalize frame-derived motion and random-event quotas to 60 updates per second (LCD preset). */
+	k60Hz = 60,
+	/** Normalize frame-derived motion and random-event quotas to 75 updates per second (CRT preset). */
+	k75Hz = 75,
+};
+
+/** Advanced string parser to be used in debug console. */
 class StringParser {
 public:
+	/** Outcome of signed or unsigned 32-bit integer parsing. */
 	enum class Result {
+		/** The entire input was parsed and the destination value was updated. */
 		kSuccess,
+		/** The input pointer is null or points to an empty string. */
 		kEmptyInput,
+		/** No integer was parsed, or unsigned parsing encountered a leading minus sign. */
 		kInvalidInput,
+		/** An integer was parsed, but unconsumed characters remain, including trailing whitespace. */
 		kTrailingCharacters,
+		/** The conversion routine reported an error other than a range error. */
 		kConversionFailure,
+		/** The value lies outside the conversion routine's range or the destination's 32-bit range. */
 		kOutOfRange
 	};
 
@@ -62,14 +93,6 @@ public:
 	/** Leave @p result unchanged when parsing fails. */
 	static Result parseUnsignedInt(const char *text, uint32 &result, const ParseConf &profile);
 };
-
-class AlphaBlendLUT;
-class Animation;
-class AreaMask;
-class Random;
-class RleBlock;
-class Zoombini2Engine;
-class ZoombiniAnimation;
 
 /** Playback modes used by @ref AnimationRunner. */
 enum class AnimationRunnerMode {
@@ -434,7 +457,7 @@ PointFixed32 operator*(int32 left, const PointFixed32 &right);
 class CubicBezierCurve {
 public:
 	/** Construct an empty segment using the selected numeric representation. */
-	explicit CubicBezierCurve(bool useFloatingPoint = false);
+	explicit CubicBezierCurve(BezierCurveDataType dataType = BezierCurveDataType::kQ10FixedPoint);
 	/** Copy the numeric mode and complete curve state into an independent evaluator. */
 	CubicBezierCurve(const CubicBezierCurve &other);
 	/** Replace this curve with an independent copy of @p other, including playback progress. */
@@ -458,7 +481,7 @@ public:
 	/** Replace the raw Q10 step value retained by this segment. */
 	void setStepValue(int stepValue);
 	/** Select the fixed- or floating-point template instance while preserving segment progress. */
-	void setFloatingPointMode(bool useFloatingPoint);
+	void setDataType(BezierCurveDataType dataType);
 
 private:
 	class Evaluator;
@@ -485,11 +508,11 @@ private:
 	bool _initialized = false;
 	/** Whether polynomial coefficients have been computed for the current descriptor. */
 	bool _coefficientsReady = false;
-	/** Whether evaluation uses native float instead of Q10 fixed-point arithmetic. */
-	bool _useFloatingPoint;
+	/** Numeric representation used by the current evaluator. */
+	BezierCurveDataType _dataType;
 
-	/** Allocate the template instance selected by @p useFloatingPoint. */
-	static Evaluator *createEvaluator(bool useFloatingPoint);
+	/** Allocate the template instance selected by @p dataType, defaulting unknown values to Q10. */
+	static Evaluator *createEvaluator(BezierCurveDataType dataType);
 	/** Rebuild the evaluator from the integer path descriptor while retaining runtime progress. */
 	void rebuildEvaluator();
 };

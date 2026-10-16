@@ -26,12 +26,12 @@
 
 #include "graphics/font.h"
 #include "zoombini2/graphics.h"
+#include "zoombini2/text_manager.h"
 #include "zoombini2/pages/dialog_msgbox.h"
 #include "zoombini2/pages/interactive_map.h"
 #include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
-#include "zoombini2/text.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
@@ -698,7 +698,7 @@ void InteractiveMap::drawL4Legend(ManagedSurface32 *screen) const {
 	if (fontHeight <= 0)
 		return;
 
-	const Common::U32String &label = _vm->_text->getLocalizedString(Text::kRestoredLevelLabel);
+	const Common::U32String &label = _vm->_text->getLocalizedString(TextManager::kRestoredLevelLabel);
 
 	const int textX = kL4TabRight + kL4TabTextMargin;
 	int textY = kL4TabTop + (kL4TabBottom - kL4TabTop - fontHeight) / 2;

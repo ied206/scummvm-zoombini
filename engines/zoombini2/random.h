@@ -26,9 +26,15 @@
 #include "common/scummsys.h"
 #include "common/str.h"
 
-#include "zoombini2/metaengine.h"
-
 namespace Zoombini2 {
+
+/** Persisted and runtime pseudo-random generator selection. */
+enum class PrngAlgorithmKind : uint32 {
+	/** Use the MSVC-compatible linear congruential stream. */
+	kOriginalPrng = 0,
+	/** Use @ref Common::RandomSource. */
+	kStandardPrng = 1,
+};
 
 /**
  * Provides the selectable random stream shared by game logic.
@@ -45,7 +51,7 @@ private:
 	/** ScummVM standard PRNG. */
 	Common::RandomSource _scummRnd;
 	/** Currently selected PRNG algorithm. */
-	Zoombini2MetaEngine::PrngAlgorithm _prngAlgorithm;
+	PrngAlgorithmKind _prngAlgorithm;
 
 	/**
 	 * Advance the compatibility state and return an inclusive value from zero through @p max.
@@ -58,7 +64,7 @@ public:
 	explicit Random(const Common::String &name);
 
 	/** Switch algorithms and start a new random sequence only when the selection changes. */
-	void setAlgorithm(Zoombini2MetaEngine::PrngAlgorithm prngAlgorithm);
+	void setAlgorithm(PrngAlgorithmKind prngAlgorithm);
 	/**
 	 * Seed both backing streams.
 	 * The compatibility stream preserves zero exactly; @ref Common::RandomSource substitutes a nonzero seed.

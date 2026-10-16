@@ -46,21 +46,8 @@ class Zoombini2MetaEngine : public AdvancedMetaEngine<Zoombini2::Zoombini2GameDe
 public:
 	/** Target configuration key enabling per-savefile write-lock controls. */
 	static constexpr const char *kConfigEnableSavefileReadOnlyToggle = "enable_savefile_readonly_toggle";
-	/** Persisted selection for mono downmixing or stereo game-audio playback. */
-	enum class AudioOutputMode : uint32 {
-		/** Downmix stereo game-audio resources to mono. */
-		kMonoDownmix = 0,
-		/** Preserve both channels of stereo game-audio resources. */
-		kStereoPlayback = 1
-	};
 	/** Target configuration key selecting game-audio channel handling. */
 	static constexpr const char *kConfigAudioOutputMode = "audio_output_mode";
-	enum class BezierCurveDataType : uint32 {
-		/** Q10 fixed-point arithmetic, same with the original. */
-		kQ10FixedPoint = 0,
-		/** F32 floating-point arithmetic, making use of 'modern' FPU. */
-		kF32FloatingPoint = 1,
-	};
 	/** Target configuration key selecting datatype for Bezier curve calculations. */
 	static constexpr const char *kConfigBezierCurveDataType = "bezier_curve_datatype";
 	/** Target configuration key enabling the enhanced keyboard shortcut set. */
@@ -77,33 +64,10 @@ public:
 	static constexpr const char *kConfigGreedyWaterslidePairing = "greedy_waterslide_pairing";
 	/** Target configuration key exposing recoverable level 4 puzzles on the practice map. */
 	static constexpr const char *kConfigRestoreL4PracticePuzzles = "restore_l4_practice_puzzles";
-	/** Persisted and runtime pseudo-random generator selection. */
-	enum class PrngAlgorithm : uint32 {
-		/** Use the MSVC-compatible linear congruential stream. */
-		kOriginalPrng = 0,
-		/** Use @ref Common::RandomSource. */
-		kStandardPrng = 1,
-	};
 	/** Target configuration key selecting the pseudo-random generator. */
 	static constexpr const char *kConfigPrngAlgorithm = "prng_algorithm";
-	/** Persisted and runtime selection for color-only presentation assistance. */
-	enum class ColorAssistMode : uint32 {
-		/** Preserve the original artwork colors. */
-		kOriginal = 0,
-		/** Make selected similar colors easier to distinguish. */
-		kEnhancedDistinction = 1,
-		/** Use colors chosen for red-green color vision deficiency. */
-		kRedGreenBlindAssist = 2
-	};
 	/** Target configuration key selecting the optional color-only presentation. */
 	static constexpr const char *kConfigColorAssistMode = "color_assist_mode";
-	/** Reference rate for frame-derived motion and random-event quotas, independent of presentation FPS and timed animations. */
-	enum class LogicPacingMode : uint32 {
-		/** Normalize frame-derived motion and random-event quotas to 60 updates per second (LCD preset). */
-		k60Hz = 60,
-		/** Normalize frame-derived motion and random-event quotas to 75 updates per second (CRT preset). */
-		k75Hz = 75,
-	};
 	/** Target configuration key selecting the logic pacing rate mode. */
 	static constexpr const char *kConfigLogicPacingMode = "logic_pacing_mode";
 	/** Target configuration key for the presentation rate; it does not select the logic pacing reference. */

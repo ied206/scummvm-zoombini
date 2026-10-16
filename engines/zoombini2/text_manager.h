@@ -19,8 +19,8 @@
  *
  */
 
-#ifndef ZOOMBINI2_TEXT_H
-#define ZOOMBINI2_TEXT_H
+#ifndef ZOOMBINI2_TEXT_MANAGER_H
+#define ZOOMBINI2_TEXT_MANAGER_H
 
 #include "common/hashmap.h"
 #include "common/language.h"
@@ -42,7 +42,7 @@ class Zoombini2Engine;
  * Retains the bitmap strip and resolves the font for one @ref Gfx::FontKind.
  * Selects added UI messages in the game language, using English when a translation is unavailable.
  */
-class Text : private Common::NonCopyable {
+class TextManager : private Common::NonCopyable {
 public:
 	/** Semantic keys for UI messages added by ScummVM. */
 	enum Key {
@@ -57,9 +57,9 @@ public:
 	};
 
 	/** Create the text manager for @p vm and select its localized UI messages. */
-	explicit Text(Zoombini2Engine *vm);
+	explicit TextManager(Zoombini2Engine *vm);
 	/** Release cached messages and the bitmap strip. */
-	~Text();
+	~TextManager();
 
 	/** Return the cached message for @p key in the game language or English, valid until this text manager is destroyed. */
 	const Common::U32String &getLocalizedString(Key key) const;
