@@ -93,29 +93,53 @@ public:
 	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
 
 private:
+	/** Maximum number of savefiles displayed in the management table. */
 	static constexpr int kMaximumSavefileRows = 99;
+	/** Left edge of the selection column relative to the table, in pixels. */
 	static constexpr int kSelectionX = 0;
+	/** Width of the selection column in pixels. */
 	static constexpr int kSelectionWidth = 24;
+	/** Left edge of the savefile-name column relative to the table, in pixels. */
 	static constexpr int kNameX = kSelectionX + kSelectionWidth;
+	/** Width of the savefile-name column in pixels. */
 	static constexpr int kNameWidth = 106;
+	/** Left edge of the Zoombiniville count column relative to the table, in pixels. */
 	static constexpr int kZombinivilleX = kNameX + kNameWidth;
+	/** Width of the Zoombiniville count column in pixels. */
 	static constexpr int kZombinivilleWidth = 92;
+	/** Left edge of the Rescue Site I count column relative to the table, in pixels. */
 	static constexpr int kRescue1X = kZombinivilleX + kZombinivilleWidth;
+	/** Width of each rescue-site count column in pixels. */
 	static constexpr int kRescueWidth = 72;
+	/** Left edge of the Rescue Site II count column relative to the table, in pixels. */
 	static constexpr int kRescue2X = kRescue1X + kRescueWidth;
+	/** Left edge of the Booliewood count column relative to the table, in pixels. */
 	static constexpr int kBooliewoodX = kRescue2X + kRescueWidth;
+	/** Width of the Booliewood count column in pixels. */
 	static constexpr int kBooliewoodWidth = 92;
+	/** Left edge of the active-party count column relative to the table, in pixels. */
 	static constexpr int kActivePartyX = kBooliewoodX + kBooliewoodWidth;
+	/** Width of the active-party count column in pixels. */
 	static constexpr int kActivePartyWidth = 64;
+	/** Combined width of all savefile-table columns in pixels. */
 	static constexpr int kTableWidth = kActivePartyX + kActivePartyWidth;
+	/** Height of one savefile-table row in pixels. */
 	static constexpr int kTableRowHeight = 24;
+	/** Outer horizontal margin around the table and controls, in pixels. */
 	static constexpr int kDialogMargin = 12;
+	/** Top of the savefile-action buttons relative to the dialog, in pixels. */
 	static constexpr int kActionButtonsTop = 34;
+	/** Top of the table header relative to the dialog, in pixels. */
 	static constexpr int kHeaderTop = 68;
+	/** Top of the scrollable savefile list relative to the dialog, in pixels. */
 	static constexpr int kListTop = 92;
+	/** Visible height of the scrollable savefile list in pixels. */
 	static constexpr int kListHeight = 196;
+	/** Top of the bottom button row relative to the dialog, in pixels. */
 	static constexpr int kBottomButtonsTop = 300;
+	/** Height of the management dialog's buttons in pixels. */
 	static constexpr int kButtonHeight = 28;
+	/** Total height of the management dialog in pixels. */
 	static constexpr int kDialogHeight = 344;
 
 	/** Command used to rename the selected savefile. */
@@ -218,6 +242,7 @@ private:
 	class FrameRateNumberBox;
 	/** Command used to open @ref Zoombini2SaveManagementDialog. */
 	static constexpr uint32 kManageSavefilesCommand = 'z2mg';
+	/** Command emitted when the frame-rate unlock checkbox changes. */
 	static constexpr uint32 kUnlockFrameRateCommand = 'z2ul';
 	/** Enable per-savefile write-lock controls for repeatable tests. */
 	GUI::CheckboxWidget *_savefileReadOnlyToggleCheckbox = nullptr;
@@ -245,8 +270,6 @@ private:
 	GUI::CheckboxWidget *_debugHotkeysCheckbox = nullptr;
 	/** Toggle selecting the alternate level-one Waterslide pairing. */
 	GUI::CheckboxWidget *_greedyWaterslideCheckbox = nullptr;
-	/** Toggle protecting Aqua Cube's first direct lever move from a Fleen. */
-	GUI::CheckboxWidget *_aquacubeSafeFirstMoveCheckbox = nullptr;
 	/** Toggle access to recoverable level 4 puzzles from the practice map. */
 	GUI::CheckboxWidget *_allowRestoreL4PracticePuzzlesCheckbox = nullptr;
 	/** Label used to align the PRNG algorithm selector. */
@@ -266,6 +289,7 @@ private:
 
 	/** Define this widget's overlay-compatible GUI layout. */
 	void defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const override;
+	/** Enable the frame-rate controls according to the unlock checkbox. */
 	void updateFrameRateControls();
 };
 

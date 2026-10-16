@@ -24,13 +24,19 @@
 #include "zoombini2/sound.h"
 #include "zoombini2/zoombini2.h"
 
+#include "common/ptr.h"
 #include "common/system.h"
 
 namespace Zoombini2 {
 
+constexpr int DialogDebug::kSheetPadding;
+constexpr int DialogDebug::kSheetFrameLimit;
+constexpr int DialogDebug::kSheetSourceLimit;
+constexpr const char *DialogDebug::kSheetKeyLegend;
+
 DialogDebug::DialogDebug(Zoombini2Engine *vm)
 	: DialogBase(vm) {
-	_savedScreen = _vm->_gfx->createSurface(ManagedSurface32::kScreenSize);
+	_savedScreen = _vm->_gfx->createSurface(Gfx::kScreenSize);
 }
 
 DialogDebug::~DialogDebug() {
@@ -63,7 +69,7 @@ bool DialogDebug::open(const DialogDebugCommand &cmd) {
 			_titleText = Common::String::format("[AreaMask] page(%d) no area mask", static_cast<int>(page->getPageId()));
 		break;
 	}
-	case DialogDebugCommand::Type::kDrawAnimation: {
+	case DialogDebugCommand::Type::kDrawSprites: {
 		if (cmd._animPath.toString().hasSuffixIgnoreCase(".rb")) {
 			if (!_vm->_gfx->loadPageRleBlock(cmd._animPath.toString('/'))) {
 				freeAnimation();
@@ -78,13 +84,13 @@ bool DialogDebug::open(const DialogDebugCommand &cmd) {
 			}
 		}
 
-		if (getFrameCount() <= cmd._startFrame) {
+		if (cmd._startFrame < 0 || getFrameCount() <= cmd._startFrame) {
 			freeAnimation();
 			return false;
 		}
-		_frameIndex = cmd._startFrame;
+		_sheetStartFrame = cmd._startFrame;
 		_animPath = cmd._animPath;
-		updateAnimationTitle();
+		prepareAnimationSheet();
 		break;
 	}
 	case DialogDebugCommand::Type::kDrawImage: {
@@ -128,7 +134,10 @@ void DialogDebug::freeAnimation() {
 	delete _animation;
 	_animation = nullptr;
 	_singleFrameSprite = false;
-	_frameIndex = 0;
+	_sheetStartFrame = 0;
+	_sheetFrameCapacity = 0;
+	_sheetColumns = 0;
+	_sheetCellSize = Size32();
 }
 
 void DialogDebug::freeImage() {
@@ -144,8 +153,81 @@ int DialogDebug::getFrameCount() const {
 	return 0;
 }
 
+const RleBlock *DialogDebug::getAnimationFrame(int index) const {
+	if (index < 0 || getFrameCount() <= index)
+		return nullptr;
+	if (_singleFrameSprite)
+		return _vm->_gfx->loadPageRleBlock(_animPath.toString('/'));
+	return _animation->getFrame(index);
+}
+
+Size32 DialogDebug::getSheetFrameSize(const Size32 &size) {
+	if (size.width <= kSheetFrameLimit && size.height <= kSheetFrameLimit)
+		return size;
+	if (size.height <= size.width)
+		return Size32(kSheetFrameLimit, MAX(1, static_cast<int>(static_cast<int64>(size.height) * kSheetFrameLimit / size.width)));
+	return Size32(MAX(1, static_cast<int>(static_cast<int64>(size.width) * kSheetFrameLimit / size.height)), kSheetFrameLimit);
+}
+
+void DialogDebug::prepareAnimationSheet() {
+	Gfx *gfx = _vm->_gfx;
+	Gfx::TextConf conf;
+	conf.fontKind = Gfx::FontKind::kDebugFont;
+	conf.fillColor = Gfx::PredefinedColor::kBlack.toPixel(_savedScreen->format);
+	const int labelHeight = gfx->getFontHeight(conf);
+	int cellWidth = 1;
+	int frameHeight = 1;
+	for (int i = 0; i < getFrameCount(); i++) {
+		const RleBlock *frame = getAnimationFrame(i);
+		if (!frame)
+			continue;
+		const Size32 sourceSize(MIN(frame->getWidth(), kSheetSourceLimit), MIN(frame->getHeight(), kSheetSourceLimit));
+		const Size32 previewSize = getSheetFrameSize(sourceSize);
+		const Common::String label = Common::String::format("%d: %d x %d", i, frame->getWidth(), frame->getHeight());
+		cellWidth = MAX(cellWidth, MAX(previewSize.width, gfx->getTextWidth(label, conf)));
+		frameHeight = MAX(frameHeight, previewSize.height);
+	}
+	_sheetCellSize = Size32(cellWidth + kSheetPadding * 2, frameHeight + labelHeight + kSheetPadding * 3);
+	_sheetColumns = MAX(1, (_savedScreen->w - kSheetPadding * 2) / _sheetCellSize.width);
+	const int rows = MAX(1, (_savedScreen->h - getTitleHeight() - kSheetPadding * 2) / _sheetCellSize.height);
+	_sheetFrameCapacity = _sheetColumns * rows;
+	const uint32 white = _savedScreen->format.ARGBToColor(255, 255, 255, 255);
+	const uint32 border = _savedScreen->format.ARGBToColor(255, 192, 192, 192);
+	_savedScreen->fillRect(Common::Rect(_savedScreen->w, _savedScreen->h), white);
+	const int endFrame = MIN(getFrameCount(), _sheetStartFrame + _sheetFrameCapacity);
+	for (int i = _sheetStartFrame; i < endFrame; i++) {
+		const RleBlock *frame = getAnimationFrame(i);
+		if (!frame)
+			continue;
+		const int cellIndex = i - _sheetStartFrame;
+		const int x = kSheetPadding + cellIndex % _sheetColumns * _sheetCellSize.width;
+		const int y = kSheetPadding + cellIndex / _sheetColumns * _sheetCellSize.height;
+		gfx->frameRect(_savedScreen, Common::Rect(x, y, x + _sheetCellSize.width, y + _sheetCellSize.height), border);
+		const Common::String label = Common::String::format("%d: %d x %d", i, frame->getWidth(), frame->getHeight());
+		gfx->drawString(_savedScreen, label, Common::Point32(x + kSheetPadding, y + kSheetPadding), cellWidth, conf);
+		const Size32 sourceSize(MIN(frame->getWidth(), kSheetSourceLimit), MIN(frame->getHeight(), kSheetSourceLimit));
+		const Size32 previewSize = getSheetFrameSize(sourceSize);
+		const Common::Point32 pos(x + (_sheetCellSize.width - previewSize.width) / 2, y + labelHeight + kSheetPadding * 2);
+		if (frame->getWidth() == previewSize.width && frame->getHeight() == previewSize.height) {
+			const Common::Rect32 clip(pos.x, pos.y, pos.x + previewSize.width, pos.y + previewSize.height);
+			gfx->drawRleBlockClipped(_savedScreen, frame, pos, clip);
+		} else {
+			if (sourceSize.width != frame->getWidth() || sourceSize.height != frame->getHeight())
+				warning("DialogDebug: clipping oversized sheet frame %d (%d x %d)", i, frame->getWidth(), frame->getHeight());
+			Common::ScopedPtr<ManagedSurface32> source(gfx->createSurface(sourceSize));
+			source->fillRect(Common::Rect(source->w, source->h), white);
+			gfx->drawRleBlock(source.get(), frame, Common::Point32());
+			_savedScreen->blitFrom(source->rawSurface(), Common::Rect(source->w, source->h),
+								   Common::Rect(pos.x, pos.y, pos.x + previewSize.width, pos.y + previewSize.height));
+		}
+	}
+	updateAnimationTitle();
+}
+
 void DialogDebug::updateAnimationTitle() {
-	_titleText = Common::String::format("[Animation] %s frame(%d/%d)", _animPath.toString().c_str(), _frameIndex, getFrameCount());
+	const int lastFrame = MIN(getFrameCount(), _sheetStartFrame + _sheetFrameCapacity) - 1;
+	_titleText = Common::String::format("[Sprite Sheet] frames(%d-%d/%d) %s", _sheetStartFrame, lastFrame, getFrameCount(),
+										_animPath.toString('/').c_str());
 }
 
 void DialogDebug::preparePlot(const DialogDebugCommand &cmd) {
@@ -176,14 +258,30 @@ void DialogDebug::preparePlot(const DialogDebugCommand &cmd) {
 	}
 }
 
+int DialogDebug::getTitleHeight() const {
+	Gfx::TextConf conf;
+	conf.fontKind = Gfx::FontKind::kDebugTitleFont;
+	const int titleFontHeight = _vm->_gfx->getFontHeight(conf);
+	conf.fontKind = Gfx::FontKind::kDebugFont;
+	const int legendFontHeight = _vm->_gfx->getFontHeight(conf);
+	return MAX(kTitleHeight, kTitleY + MAX(titleFontHeight, legendFontHeight) + kTitleY);
+}
+
 void DialogDebug::drawTitleText(ManagedSurface32 *screen) const {
 	if (_titleText.empty())
 		return;
-	_vm->_gfx->fillRect(screen, Common::Rect32(0, 0, ManagedSurface32::kScreenSize.width, kTitleHeight), 0);
+	_vm->_gfx->fillRect(screen, Common::Rect32(0, 0, Gfx::kScreenSize.width, getTitleHeight()), 0);
 	Gfx::TextConf conf;
 	conf.fontKind = Gfx::FontKind::kDebugTitleFont;
 	conf.fillColor = Gfx::PredefinedColor::kWhite03.toPixel(screen->format);
-	_vm->_gfx->drawString(screen, _titleText, Common::Point32(kTitleX, kTitleY), Gfx::kNoMaxWidth, conf);
+	int maxWidth = Gfx::kNoMaxWidth;
+	if (_viewType == DialogDebugCommand::Type::kDrawSprites) {
+		Gfx::TextConf legendConf;
+		legendConf.fontKind = Gfx::FontKind::kDebugFont;
+		const Common::String legend = Common::String(kSheetKeyLegend) + " [ESC] close";
+		maxWidth = screen->w - _vm->_gfx->getTextWidth(legend, legendConf) - kTitleX * 3;
+	}
+	_vm->_gfx->drawString(screen, _titleText, Common::Point32(kTitleX, kTitleY), maxWidth, conf);
 }
 
 void DialogDebug::drawEscText(ManagedSurface32 *screen, const Common::String &keyLegend) const {
@@ -202,7 +300,7 @@ void DialogDebug::drawEscText(ManagedSurface32 *screen, const Common::String &ke
 	conf.fillColor = Gfx::PredefinedColor::kWhite03.toPixel(screen->format);
 	const int escWidth = _vm->_gfx->getTextWidth(text, conf);
 	_vm->_gfx->drawString(screen, text,
-						  Common::Point32(ManagedSurface32::kScreenSize.width - escWidth - kTitleX, kTitleY), Gfx::kNoMaxWidth, conf);
+						  Common::Point32(Gfx::kScreenSize.width - escWidth - kTitleX, kTitleY), Gfx::kNoMaxWidth, conf);
 }
 
 void DialogDebug::onRenderContent(ManagedSurface32 *screen) {
@@ -211,28 +309,24 @@ void DialogDebug::onRenderContent(ManagedSurface32 *screen) {
 
 	switch (_viewType) {
 	case DialogDebugCommand::Type::kDrawImage: {
-		const uint32 white = screen->format.ARGBToColor(255, 255, 255, 255);
-		_vm->_gfx->fillRect(screen, Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), white);
-		_vm->_gfx->drawBitBlock(screen, _image, Common::Point32(0, 0));
-		break;
-	}
-	case DialogDebugCommand::Type::kDrawAnimation: {
-		const uint32 white = screen->format.ARGBToColor(255, 255, 255, 255);
-		_vm->_gfx->fillRect(screen, Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), white);
-		if (_singleFrameSprite)
-			_vm->_gfx->drawPageRleBlock(screen, _animPath.toString('/'), Common::Point32(0, 0));
-		else if (_animation && 0 <= _frameIndex && _frameIndex < _animation->getFrameCount())
-			_vm->_gfx->drawRleBlock(screen, _animation->getFrame(_frameIndex), Common::Point32(0, 0));
+		const uint32 white = _savedScreen->format.ARGBToColor(255, 255, 255, 255);
+		_vm->_gfx->fillRect(_savedScreen, Common::Rect32(Gfx::kScreenSize.width, Gfx::kScreenSize.height), white);
+		_vm->_gfx->drawBitBlock(_savedScreen, _image, Common::Point32(0, 0));
 		break;
 	}
 	default:
-		screen->copyFrom(*_savedScreen);
 		break;
 	}
 
+	if (_viewType == DialogDebugCommand::Type::kDrawImage || _viewType == DialogDebugCommand::Type::kDrawSprites ||
+		_viewType == DialogDebugCommand::Type::kDrawAreaMask)
+		screen->copyRectToSurface(_savedScreen->rawSurface(), 0, getTitleHeight(), Common::Rect32(_savedScreen->w, _savedScreen->h));
+	else
+		screen->copyFrom(*_savedScreen);
+
 	drawTitleText(screen);
-	if (_viewType == DialogDebugCommand::Type::kDrawAnimation)
-		drawEscText(screen, "[<-/->] frame");
+	if (_viewType == DialogDebugCommand::Type::kDrawSprites)
+		drawEscText(screen, kSheetKeyLegend);
 	else
 		drawEscText(screen);
 }
@@ -258,13 +352,22 @@ EventHandleResult DialogDebug::onKeyDown(const Common::KeyState &key, bool repea
 		close();
 		return EventHandleResult::kConsumed;
 	}
-	if (_viewType == DialogDebugCommand::Type::kDrawAnimation) {
-		if (key.keycode == Common::KEYCODE_LEFT && 0 < _frameIndex) {
-			_frameIndex -= 1;
-			updateAnimationTitle();
-		} else if (key.keycode == Common::KEYCODE_RIGHT && _frameIndex + 1 < getFrameCount()) {
-			_frameIndex += 1;
-			updateAnimationTitle();
+	if (_viewType == DialogDebugCommand::Type::kDrawSprites) {
+		switch (key.keycode) {
+		case Common::KEYCODE_LEFT:
+			if (0 < _sheetStartFrame) {
+				_sheetStartFrame = MAX(0, _sheetStartFrame - _sheetFrameCapacity);
+				prepareAnimationSheet();
+			}
+			break;
+		case Common::KEYCODE_RIGHT:
+			if (_sheetStartFrame + _sheetFrameCapacity < getFrameCount()) {
+				_sheetStartFrame += _sheetFrameCapacity;
+				prepareAnimationSheet();
+			}
+			break;
+		default:
+			break;
 		}
 	}
 	return EventHandleResult::kConsumed;

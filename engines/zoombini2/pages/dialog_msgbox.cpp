@@ -77,7 +77,7 @@ bool DialogMsgBox::openDialog() {
 		return _state == DialogMsgBoxState::kOpen02;
 
 	bool loaded = true;
-	for (int i = 0; i < 3; i++)
+	for (int i = 0; i < ARRAYSIZE(kPanelPaths); i++)
 		loaded = _vm->_gfx->loadPageRleBlock(kPanelPaths[i]) && loaded;
 	if (!_textPath.empty())
 		loaded = _vm->_gfx->loadPageBitBlock(_textPath) && loaded;
@@ -90,9 +90,9 @@ bool DialogMsgBox::openDialog() {
 
 	const Size32 panelSize = _vm->_gfx->getPageRleBlockSize(kPanelPaths[1]);
 	if (_position.x == -1)
-		_position.x = ManagedSurface32::kScreenSize.width / 2 - panelSize.width / 2;
+		_position.x = Gfx::kScreenSize.width / 2 - panelSize.width / 2;
 	if (_position.y == -1)
-		_position.y = ManagedSurface32::kScreenSize.height / 2 - panelSize.height / 2;
+		_position.y = Gfx::kScreenSize.height / 2 - panelSize.height / 2;
 
 	_savedBackground = _vm->_gfx->createSurface(panelSize);
 	_vm->_gfx->captureScreenRegion(_savedBackground,

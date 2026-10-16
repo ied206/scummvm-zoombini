@@ -43,6 +43,12 @@ public:
 	PuzzleSnowboard(Zoombini2Engine *vm);
 	/** Release the cached trail overlay, loaded sounds, and page-owned animations. */
 	~PuzzleSnowboard() override;
+	/** Return the puzzle name used by debug answer descriptions. */
+	const char *getPageName() const override { return kPageName; }
+	/** Return the 1-based route containing this puzzle. */
+	int getRouteNumber() const override { return kRouteNumber; }
+	/** Return the 1-based puzzle number within its route. */
+	int getRoutePuzzleIdx() const override { return kRoutePuzzleIdx; }
 
 	/** Generate the decision tree and place the puzzle roster at the start. */
 	void init() override;
@@ -60,7 +66,7 @@ public:
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
 	/** Update a dragged Zoombini as the pointer moves to @p pos. */
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
-	/** Queue the original Go speech before leaving a saved game. */
+	/** Queue the original Go speech before leaving journey mode. */
 	bool onGoButtonPressed() override;
 	/** Return whether the ride sequence has completed enough successful exits to leave. */
 	bool canUseGoButton() const override;
@@ -74,7 +80,12 @@ public:
 	bool debugSetChances(int remaining) override;
 
 private:
-	static constexpr const char *kPuzzleName = "Snowboard Gulch";
+	/** Static puzzle name used by debug answer descriptions. */
+	static constexpr const char *kPageName = "Snowboard Gulch";
+	/** 1-based route number used by the puzzle console. */
+	static constexpr int kRouteNumber = 4;
+	/** 1-based puzzle number within the route used by the puzzle console. */
+	static constexpr int kRoutePuzzleIdx = 1;
 	/** Snowboard Gulch slope background loaded into the first page layer. */
 	static constexpr const char *kBackgroundPath = "#bmp/snowboard/snowboard-EASY";
 	/** Looping Snowboard Gulch soundtrack. */
@@ -131,26 +142,31 @@ private:
 	static constexpr const char *kSuccessSpeechPath = "sounds/8-E1.wav";
 	/** Arrival speech queued when fewer than eight riders reach the finish. */
 	static constexpr const char *kFailureSpeechPath = "sounds/8-E2.wav";
-	/** One of five randomized praise lines queued for a perfect saved-game departure. */
+	/** One of five randomized praise lines queued for a perfect journey departure. */
 	static constexpr const char *kPerfectGoSpeechFormat = "sounds/WLD11.%d.wav";
 	/** Retreat speech queued before leaving with four or more riders unresolved. */
 	static constexpr const char *kCaveGoSpeechPath = "sounds/DW-Cave.wav";
-	/** Shared pick-up animation played while the pointer carries a Zoombini. */
-	static constexpr const char *kPickupAnimationPath = "bmp/zombis/pris/pris.anm";
-	/** Shared celebration animation used for successful riders after the run. */
-	static constexpr const char *kCelebrationAnimationPath = "bmp/zombis/attente/attenteZomb.anm";
 	/** L1-L3 physical lane count. */
 	static constexpr int kLaneCount = 4;
 	/** Number of lanes used by L4. */
 	static constexpr int kL4LaneCount = 8;
+	/** Number of trait-test nodes in the standard decision tree. */
 	static constexpr int kRuleCount = 3;
+	/** Number of entries in the standard ride endpoint table. */
 	static constexpr int kEndpointCount = 33;
+	/** Maximum number of trait-test nodes, including the L4 tree. */
 	static constexpr int kMaxRuleCount = 7;
+	/** Number of entries in the ㅣ4 endpoint table. */
 	static constexpr int kL4EndpointCount = 48;
+	/** Obstacle animation slot used when a hidden obstacle is revealed. */
 	static constexpr int kRevealAnimIndex = 0;
+	/** Obstacle animation slot used for a collision reaction. */
 	static constexpr int kHitAnimIndex = 1;
+	/** Obstacle animation slot used after a completed ride. */
 	static constexpr int kFinishAnimIndex = 2;
+	/** Obstacle animation slot used when an obstacle is concealed. */
 	static constexpr int kHideAnimIndex = 3;
+	/** Obstacle animation slot used while waiting for a rider. */
 	static constexpr int kIdleAnimIndex = 4;
 
 	/** One trait test, or two different trait tests joined by OR. */
@@ -375,14 +391,12 @@ private:
 	TreeNode _tree[kMaxRuleCount] = {};
 	/** Cached surface of L4 trail drawings. */
 	ManagedSurface32 *_l4TrailOverlay = nullptr;
+	/** Number of lanes enabled by the current difficulty. */
 	int _laneCount = kLaneCount;
+	/** Number of active trait-test nodes for the current difficulty. */
 	int _ruleCount = kRuleCount;
 	/** Board drop region used when a dragged rider is released. */
 	Common::Array<ZmbDropTarget> _dropTargets;
-	/** Shared celebration grid for successful riders after completion. */
-	const ZoombiniAnimation *_celebrationAnimation = nullptr;
-	/** Shared held-Zoombini grid used while a rider follows the pointer. */
-	const ZoombiniAnimation *_pickupAnimation = nullptr;
 	/** One-shot board cover after the final rider is captured. */
 	Animation *_boardAnim = nullptr;
 	/** Lift engine animation at the upper station. */
@@ -421,6 +435,7 @@ private:
 	bool _boardReady = true;
 	/** One-shot board-cover sequence after the last rider is captured. */
 	uint32 _boardCoverAnimationStart = 0;
+	/** Whether the board-cover presentation is currently active. */
 	bool _boardCoverActive = false;
 	/** Tick at which the board generator began its current one-shot cycle. */
 	uint32 _generatorAnimationStart = 0;
@@ -444,9 +459,13 @@ private:
 	bool _goTransitionPending = false;
 	/** Sound handles for board creation, riding, obstacle contact, and lane changes. */
 	int _boardReadySound = -1;
+	/** Loaded snowboard riding sound handle, or -1 when unavailable. */
 	int _rideSound = -1;
+	/** Loaded obstacle collision sound handle, or -1 when unavailable. */
 	int _obstacleHitSound = -1;
+	/** Loaded obstacle reveal sound handle, or -1 when unavailable. */
 	int _obstacleRevealSound = -1;
+	/** Loaded obstacle concealment sound handle, or -1 when unavailable. */
 	int _obstacleHideSound = -1;
 };
 

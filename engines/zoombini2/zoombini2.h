@@ -58,7 +58,6 @@ struct PathObject;
 class RleBlock;
 class SoundManager;
 class Sidebar;
-class ZoombiniAnimation;
 class ZoombiniRunner;
 class Text;
 
@@ -112,6 +111,7 @@ public:
 	enum class DebugRouteRequestResult {
 		kQueued,
 		kNoActivePage,
+		kNoTravelingParty,
 		kInvalidLevel,
 		kPracticeRequiresPuzzle,
 		kUnreachableDestination
@@ -184,8 +184,6 @@ public:
 	void saveSoundVolumes(int music, int sfx, int speech);
 	/** Return whether the alternate level-one Waterslide pairing is enabled. */
 	bool useGreedyWaterslidePairing() const { return _useGreedyWaterslidePairing; }
-	/** Return whether Aqua Cube protects its first direct lever move from a Fleen. */
-	bool useAquacubeSafeFirstMove() const { return _useAquacubeSafeFirstMove; }
 	/** Return whether Bezier paths use floating-point rather than original Q10 calculations. */
 	Zoombini2MetaEngine::BezierCurveDataType getBezierCurveDataType() const { return _bezierCurveDataType; }
 	/** Return whether the Wall of Fleens departure artwork correction is enabled. */
@@ -211,12 +209,48 @@ public:
 	/** Invoke one original developer action without requiring an in-game key event. */
 	bool runBuiltinDebugAction(BuiltinDebugAction action);
 
-	/** Load or return a shared Zoombini sprite grid and select its page-configured frame delay. */
-	const ZoombiniAnimation *loadZoombiniAnimation(const Common::Path &path, uint32 frameDelay);
 	/** Create an independent playback path for the caller to delete; reuse the page's parsed PAT. */
 	PathObject *loadPagePATPath(const Common::Path &path);
+	/** Normalize resolver aliases while retaining the installed-root marker. */
+	static Common::Path normalizeResourcePath(const Common::String &path);
 	/** Open an original logical resource name through the engine's CD/installed-root resolver. */
 	Common::SeekableReadStream *openResourceFile(const Common::String &path) const;
+	/** Resource format recorded for files opened or cached during the current page lifetime. */
+	enum class PageResourceType {
+		/** File format could not be determined from its path or cache caller. */
+		kUnknown,
+		/** Bitmap or bitmap-mask file. */
+		kBitmap,
+		/** Standalone RLE sprite file. */
+		kSprite,
+		/** Animation file. */
+		kAnimation,
+		/** Shared animation grid used for party sprites. */
+		kZoombiniAnimation,
+		/** Cached path-object data. */
+		kPath,
+		/** Audio resource. */
+		kSound,
+		/** Video resource. */
+		kVideo,
+		/** Puzzle layout or definition data. */
+		kLayout
+	};
+	/** A resource path accessed during the current page lifetime. */
+	struct PageResource {
+		/** Resolved resource path retained for display and filtering. */
+		Common::Path path;
+		/** Resource format inferred from the path or supplied by the cache caller. */
+		PageResourceType type = PageResourceType::kUnknown;
+		/** Whether opening the resource file succeeded. */
+		bool opened = false;
+		/** Whether a page cache request used this resource. */
+		bool cacheUsed = false;
+	};
+	/** Successful file opens and cache requests since the last page transition, including dialogs and console previews. */
+	const Common::Array<PageResource> &getPageResources() const { return _pageResources; }
+	/** Remember a successfully returned cache resource without reopening its file. */
+	void recordPageResourceCacheUse(const Common::String &path, PageResourceType type) const;
 	/** Return whether @p path resolves through the engine's CD/installed-root resolver. */
 	bool hasResource(const Common::String &path) const;
 	/** Return and clear the validated direct-practice request, if the startup command supplied one. */
@@ -225,6 +259,14 @@ public:
 	void queueDebugPracticeLaunch(PageId pageId, int level, uint partySize);
 	/** Validate and queue a debugger-requested route through the map transition. */
 	DebugRouteRequestResult requestDebugMapTransition(PageId targetPageId, PageId sourcePageId, RouteBranch routeBranch, uint level);
+	/** Return the active practice or journey mode. */
+	GameMode getGameMode() const { return _gameMode; }
+	/** Return whether gameplay uses practice rules. */
+	bool inPracticeMode() const { return _gameMode == GameMode::kPracticeMode; }
+	/** Return whether gameplay retains journey progress. */
+	bool inJourneyMode() const { return _gameMode == GameMode::kJourneyMode; }
+	/** Select practice or journey rules without attaching or detaching a savefile. */
+	void setGameMode(GameMode mode) { _gameMode = mode; }
 	/** Return the practice-map level retained for this engine session. */
 	int getPracticeLevel() const { return _practiceLevel; }
 	/** Retain a validated practice-map level for later map visits. */
@@ -233,7 +275,7 @@ public:
 	/** Pause or resume the gameplay clock for a game dialog. */
 	void setDialogPaused(bool paused);
 
-	/** Write saved-game state to its active savefile, or succeed without writing during practice, sign-in, or a write lock. */
+	/** Write journey state to its active savefile, or succeed without writing during practice, sign-in, or a write lock. */
 	bool writeGameSave(const Common::String &savefileName);
 	/** Reset the game state and detach its previous automatic-save target. */
 	void resetGameState();
@@ -264,16 +306,28 @@ public:
 	void requestPageChange(PageId pageId) { _nextPageId = pageId; }
 	/** Restart the sidebar Go-button attention blink with original timing. */
 	void restartGoBlink();
-	/** Return whether the pending transition leads back to a map or sign-in flow. */
-	bool isReturningToMap() const { return _nextPageId == kPageMenuLoad || _nextPageId == kPageMenuPractice || _nextPageId == kPageMapScreen; }
+	/** Return whether the pending transition leads back to either map mode. */
+	bool isReturningToMap() const {
+		switch (_nextPageId) {
+		case PageId::kPageMapJourney_M4:
+		case PageId::kPageMapPractice_M3:
+			return true;
+		default:
+			return false;
+		}
+	}
 	/** Return whether the pending page uses the route-map travel transition. */
-	bool isStartingMapTransition() const { return _nextPageId == kPageMapTrans; }
+	bool isStartingMapTransition() const { return _nextPageId == PageId::kPageMapTrans_22; }
+	/** Return whether the current route was requested by the debugger without puzzle completion. */
+	bool isDebugMapTransition() const { return _debugMapTransition; }
 	/** Return the active page identifier. */
 	PageId getCurrentPageId() const { return _currentPageId; }
 	/** Return the borrowed active page. */
 	PageBase *getCurrentPage() { return _currentPage; }
 	/** Return whether game state and a page are both active. */
 	bool hasActiveGamePage() const { return _state && _currentPage; }
+	/** Request a retry from the active puzzle's entry state; reject non-puzzles and pending departures. */
+	bool debugRetryPuzzle();
 
 	/** Return the active color-only presentation setting. */
 	Zoombini2MetaEngine::ColorAssistMode getColorAssistMode() const { return _colorAssistMode; }
@@ -291,22 +345,22 @@ public:
 
 	/** Whether the next puzzle entry restores the saved party retained by the current game state. */
 	bool _returningFromPuzzle = false;
-	/** Whether the active map-screen flow represents a saved adventure. */
-	bool _isSavedGame = false;
 	/** Shared byte-sized gameplay flag consumed by page flow. */
 	byte _gameFlagB = 0;
 	/** Selected Rescue Site I branch for the next map transition. */
 	RouteBranch _routeDirection = RouteBranch::kNone00;
 	/** Gameplay page shown as the source of the next map transition. */
-	PageId _mapTransitionSourcePageId = kPageZombiniville;
+	PageId _mapTransitSrcPageId = PageId::kPageZombiniville_00;
 	/** Destination whose debug map transition needs a fallback traveling party. */
-	PageId _debugXferDestination = kPageNone;
+	PageId _debugXferDest = PageId::kPageNone_M1;
 	/** Explicit console transition level applied after the outgoing page is destroyed. */
 	int _debugXferPracticeLevel = 0;
 	/** Destination that receives the retained practice level after the transition. */
-	PageId _debugXferPracticeTarget = kPageNone;
+	PageId _debugXferPracticeTarget = PageId::kPageNone_M1;
 	/** Whether the debug transition starts a fresh practice session. */
 	bool _debugXferResetState = false;
+	/** Whether departure and map travel bypass normal puzzle completion. */
+	bool _debugMapTransition = false;
 	/** Whether at least one route-transition Zoombini is still walking. */
 	bool _zoombiniWalkingFlag = false;
 	/** Whether the current transition may skip its remaining presentation. */
@@ -315,7 +369,7 @@ public:
 	RouteBranch _lastRouteDirection = RouteBranch::kNone00;
 
 	/** Selected ShelterZombiniville feature values, or -1 for an unselected slot. */
-	int16 _selectedFeatures[ZmbTrait::kTraitKindCount] = {
+	int16 _pickerSelectedTraits[ZmbTrait::kTraitKindCount] = {
 		-1,
 		-1,
 		-1,
@@ -323,7 +377,7 @@ public:
 	};
 
 	/** Deadline or countdown used by the active page transition. */
-	int _pageTransitionTimer = 0;
+	int _pageTransitTimer = 0;
 	/** Shared stage value used by page-transition flow. */
 	int _transitionState = 0;
 
@@ -331,7 +385,9 @@ private:
 	class ResourceFileResolver;
 	/** Decimal factor separating a direct-practice page ID from its level. */
 	static constexpr int kPracticeBootParamPageFactor = 100;
+	/** Number of drawable cursor kinds, excluding the restore-base sentinel. */
 	static constexpr uint kCursorCount = static_cast<uint>(CursorType::kRestoreBase);
+	/** Cursor sprite paths indexed by drawable CursorType values. */
 	static constexpr const char *kCursorPaths[kCursorCount] = {
 		"bmp/cursor/cursor01.rb",
 		"bmp/cursor/cursor02.rb",
@@ -347,7 +403,9 @@ private:
 		"bmp/chez_norf/slurp_pasteque",
 		"bmp/chez_norf/slurp_glace",
 		"bmp/chez_norf/plato_mini"};
+	/** Original artwork for the quit-confirmation message. */
 	static constexpr const char *kQuitConfirmationPath = "bmp/menu/Quit_panel_text_quit";
+	/** Target-specific filename format for persisted debug Zoombini traits. */
 	static constexpr const char *kDebugZoombiniSetFileNameFormat = "%s-zoombini.set";
 	/** Maximum editable roster-document size in bytes. */
 	static constexpr uint32 kDebugZoombiniSetMaxSize = 4096;
@@ -364,15 +422,24 @@ private:
 	/** Write the current game state to @p savefileName after applying its save policy. */
 	bool writeGameSavefile(const Common::String &savefileName);
 
-	typedef Common::HashMap<Common::Path, ZoombiniAnimation *, Common::Path::IgnoreCase_Hash, Common::Path::IgnoreCase_EqualTo> ZoombiniAnimationCache;
 	typedef Common::HashMap<Common::Path, const PathObject *, Common::Path::IgnoreCase_Hash, Common::Path::IgnoreCase_EqualTo> PATPathCache;
+	/** Case-insensitive lookup from normalized resource paths to page resource handles. */
+	typedef Common::HashMap<Common::Path, uint, Common::Path::IgnoreCase_Hash, Common::Path::IgnoreCase_EqualTo> PageResourceIndex;
+	/** Classify file formats without opening or decoding another stream. */
+	static PageResourceType inferPageResourceType(const Common::Path &path);
+	/** Record a successful file open or cache request in the current page listing. */
+	void recordPageResource(const Common::String &path, bool cacheUsed, PageResourceType type = PageResourceType::kUnknown) const;
 
 	/** Cursor pixels derived once from a cached RLE sprite. */
 	struct CursorImage {
+		/** Decoded cursor width and height in pixels. */
 		Size32 size;
+		/** 32-bit cursor pixel storage released with this image. */
 		byte *pixels;
 
+		/** Allocate a zeroed 32-bit pixel buffer for the supplied cursor dimensions. */
 		explicit CursorImage(const Size32 &cursorSize);
+		/** Release this image's cursor pixel buffer. */
 		~CursorImage();
 	};
 
@@ -385,10 +452,12 @@ private:
 
 	/** Original logical resource-name resolver for the CD and installed roots. */
 	ResourceFileResolver *_resourceFileResolver = nullptr;
-	/** Immutable animation sets shared by page lifetimes. */
-	ZoombiniAnimationCache _zoombiniAnimationCache;
 	/** Unstarted PAT templates and failed loads retained for the current page. */
 	PATPathCache _pagePATPaths;
+	/** Append-only resource handles reset after page teardown or a resource-root change. */
+	mutable Common::Array<PageResource> _pageResources;
+	/** Case-insensitive lookup from resource paths to their page-lifetime handles. */
+	mutable PageResourceIndex _pageResourceIndex;
 
 	/** Default or interactive cursor requested by the active page. */
 	CursorType _baseCursorType = CursorType::kDefault;
@@ -426,19 +495,27 @@ private:
 	bool _modalOwnedPress = false;
 
 	/** Active page identifier. */
-	PageId _currentPageId = kPageNone;
+	PageId _currentPageId = PageId::kPageNone_M1;
 	/** Requested replacement page identifier. */
-	PageId _nextPageId = kPageLogoTLC;
+	PageId _nextPageId = PageId::kPageLogoTLC_17;
 	/** Active page, or nullptr between page lifetimes. */
 	PageBase *_currentPage = nullptr;
+	/** Progress and fresh roster identities retained immediately before puzzle initialization. */
+	GameState *_puzzleRetryState = nullptr;
+	/** Random stream state immediately before puzzle initialization. */
+	uint32 _puzzleRetrySeed = 0;
+	/** Whether the pending page replacement restores the active puzzle's entry checkpoint. */
+	bool _debugPuzzleRetryPending = false;
 	/** Validated direct-practice destination pending the practice-map setup. */
-	PageId _practicePageId = kPageNone;
+	PageId _practicePageId = PageId::kPageNone_M1;
 	/** Validated direct-practice level pending the practice-map setup. */
 	int _practicePuzzleLevel = 0;
 	/** Optional console-requested party size; zero selects the route default. */
 	uint _practicePartySize = 0;
-	/** Reset the current adventure only after its active page releases borrowed state. */
+	/** Reset the game state only after its active page releases borrowed state. */
 	bool _debugPracticeResetState = false;
+	/** Runtime practice or journey rules, independent of the attached automatic-save target. */
+	GameMode _gameMode = GameMode::kPracticeMode;
 	/** Practice-map level retained while puzzle pages replace the map. */
 	int _practiceLevel = 1;
 
@@ -456,8 +533,11 @@ private:
 	uint32 _lastFrameElapsedMs = 0;
 	/** Most recent frame slot processed by the engine. */
 	uint64 _lastFrameIndex = 0;
+	/** Whether the scheduler has processed a frame slot since its last reset. */
 	bool _hasFrameIndex = false;
+	/** Configured presentation limit in frames per second. */
 	int _frameRate = 60;
+	/** Whether presentation bypasses the configured frame-rate limit. */
 	bool _unlockFrameRate = false;
 	/** Whether the developer hotkeys are active. */
 	bool _debugHotkeysEnabled = false;
@@ -469,8 +549,6 @@ private:
 	Zoombini2MetaEngine::ColorAssistMode _colorAssistMode = Zoombini2MetaEngine::ColorAssistMode::kOriginal;
 	/** Whether Waterslide level one uses the alternate greedy pairing. */
 	bool _useGreedyWaterslidePairing = false;
-	/** Whether Aqua Cube level three protects its first direct lever move from a Fleen. */
-	bool _useAquacubeSafeFirstMove = false;
 	/** Whether Bezier paths use the optional floating-point evaluator. */
 	Zoombini2MetaEngine::BezierCurveDataType _bezierCurveDataType = Zoombini2MetaEngine::BezierCurveDataType::kQ10FixedPoint;
 	/** Whether the departing Fleen omits the malformed white-nose frames. */
@@ -503,8 +581,6 @@ private:
 	static bool readDebugSetInteger(const char *&cursor, const char *end, int32 &value);
 	/** Apply the global puzzle-completion shortcut to the active roster and page. */
 	bool applyDebugPuzzleCompletion();
-	/** Release every Zoombini sprite grid cached by this game instance. */
-	void clearZoombiniAnimationCache();
 	/** Release parsed PAT templates and failed-load entries after the current page is destroyed. */
 	void clearPagePATCache();
 	/** Load and register the game cursor. */

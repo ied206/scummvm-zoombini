@@ -42,24 +42,30 @@ static constexpr const char *directoryGlobs[] = {
 
 class Zoombini2MetaEngineDetection : public AdvancedMetaEngineDetection<Zoombini2::Zoombini2GameDescription> {
 public:
-	Zoombini2MetaEngineDetection() : AdvancedMetaEngineDetection(Zoombini2::gameDescriptions, zoombini2Games) {
+	/** Configure release detection for the disc and installed resource directory layouts. */
+	Zoombini2MetaEngineDetection()
+		: AdvancedMetaEngineDetection(Zoombini2::gameDescriptions, zoombini2Games) {
 		_maxScanDepth = 5; // Supports INSTALL/HD/Bmp/ZOMBIS and Data/Bmp/ZOMBIS
 		_directoryGlobs = directoryGlobs;
 		_flags = kADFlagMatchFullPaths;
 	}
 
+	/** Return the engine identifier used by the launcher. */
 	const char *getName() const override {
 		return "zoombini2";
 	}
 
+	/** Return the game's display name. */
 	const char *getEngineName() const override {
 		return "Zoombinis: Mountain Rescue";
 	}
 
+	/** Return the original game's copyright notice. */
 	const char *getOriginalCopyright() const override {
 		return "Zoombinis: Mountain Rescue (C) 2001 The Learning Company";
 	}
 
+	/** Add a normalized release tag to the preferred launcher target name. */
 	DetectedGame toDetectedGame(const ADDetectedGame &adGame, ADDetectedGameExtraInfo *extraInfo) const override;
 };
 

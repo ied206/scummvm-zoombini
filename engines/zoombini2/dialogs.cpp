@@ -54,11 +54,14 @@ constexpr uint32 Zoombini2OptionsWidget::kUnlockFrameRateCommand;
 
 class Zoombini2OptionsWidget::SeparatorWidget : public GUI::Widget {
 public:
-	SeparatorWidget(GUI::GuiObject *boss, const Common::String &name) : GUI::Widget(boss, name) {
+	/** Construct a themed horizontal separator in the supplied GUI container. */
+	SeparatorWidget(GUI::GuiObject *boss, const Common::String &name)
+		: GUI::Widget(boss, name) {
 		setFlags(GUI::WIDGET_ENABLED | GUI::WIDGET_CLEARBG);
 	}
 
 protected:
+	/** Draw the themed separator across this widget's bounds. */
 	void drawWidget() override {
 		g_gui.theme()->drawLineSeparator(Common::Rect(_x, _y, _x + _w, _y + _h));
 	}
@@ -66,14 +69,17 @@ protected:
 
 class Zoombini2OptionsWidget::FrameRateNumberBox : public GUI::EditTextWidget {
 public:
+	/** Construct an integer-only frame-rate editor with the supplied initial FPS value. */
 	FrameRateNumberBox(GUI::GuiObject *boss, const Common::String &name, int value, const Common::U32String &tooltip)
 		: GUI::EditTextWidget(boss, name, Common::U32String::format("%d", value), tooltip), _value(value) {}
 
+	/** Set the accepted FPS value and replace the editor's displayed text. */
 	void setValue(int value) {
 		_value = value;
 		setEditString(Common::U32String::format("%d", value));
 	}
 
+	/** Return the edited FPS within configured limits, or the last accepted value for empty or invalid text. */
 	int getValue() const {
 		const Common::U32String &text = getEditString();
 		if (text.empty())
@@ -88,20 +94,24 @@ public:
 	}
 
 protected:
+	/** Accept decimal digits for the frame-rate entry. */
 	bool isCharAllowed(Common::u32char_type_t character) const override {
 		return '0' <= character && character <= '9';
 	}
 
+	/** Normalize the edited FPS text before releasing keyboard focus. */
 	void lostFocusWidget() override {
 		setValue(getValue());
 		GUI::EditTextWidget::lostFocusWidget();
 	}
 
 private:
+	/** Last accepted frame rate in FPS, used while the edit text is empty or invalid. */
 	int _value;
 };
 
-Zoombini2MenuDialog::Zoombini2MenuDialog(Zoombini2Engine *vm) : MainMenuDialog(vm), _vm(vm) {
+Zoombini2MenuDialog::Zoombini2MenuDialog(Zoombini2Engine *vm)
+	: MainMenuDialog(vm), _vm(vm) {
 }
 
 void Zoombini2MenuDialog::handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) {
@@ -144,14 +154,18 @@ void Zoombini2SavefileNameDialog::reflowLayout() {
 }
 
 void Zoombini2SavefileNameDialog::handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) {
-	if (cmd == GUI::kOKCmd) {
+	switch (cmd) {
+	case GUI::kOKCmd:
 		setResult(GUI::kOKCmd);
 		close();
-	} else if (cmd == GUI::kCloseCmd) {
+		break;
+	case GUI::kCloseCmd:
 		setResult(GUI::kCloseCmd);
 		close();
-	} else {
+		break;
+	default:
 		GUI::Dialog::handleCommand(sender, cmd, data);
+		break;
 	}
 }
 
@@ -623,9 +637,6 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	_greedyWaterslideCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.GreedyWaterslide",
 														_("Use alternate Pipes of Paloo pairing"),
 														_("Selects the alternate pairing branch for level one."));
-	_aquacubeSafeFirstMoveCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.AquacubeSafeFirstMove",
-															 _("Protect Aqua Cube's first lever move"),
-															 _("On level three, swaps the hidden axes of two levers if the first direct lever press would enter a Fleen cell."));
 	_allowRestoreL4PracticePuzzlesCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.RestoreL4PracticePuzzles",
 																	 _("Restore Level 4 puzzles in practice mode"),
 																	 _("Make Level 4 accessible in practice-mode map legend. "
@@ -708,7 +719,6 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 		.addWidget("GameplayAdjustment", "", -1)
 		.addWidget("DebugHotkeys", "Checkbox")
 		.addWidget("GreedyWaterslide", "Checkbox")
-		.addWidget("AquacubeSafeFirstMove", "Checkbox")
 		.addWidget("RestoreL4PracticePuzzles", "Checkbox")
 		.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
 		.addPadding(0, 0, 0, 0)
@@ -776,7 +786,6 @@ void Zoombini2OptionsWidget::load() {
 	_debugHotkeysCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigDebugHotkeys, _domain));
 	_chezNorfClueSubtitlesCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigChezNorfClueSubtitles, _domain));
 	_greedyWaterslideCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _domain));
-	_aquacubeSafeFirstMoveCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove, _domain));
 	_allowRestoreL4PracticePuzzlesCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigRestoreL4PracticePuzzles, _domain));
 	_prngAlgorithmPopUp->setSelectedTag(ConfMan.getInt(Zoombini2MetaEngine::kConfigPrngAlgorithm, _domain));
 	_pacingPopUp->setSelectedTag(ConfMan.getInt(Zoombini2MetaEngine::kConfigLogicPacingMode, _domain));
@@ -807,7 +816,6 @@ bool Zoombini2OptionsWidget::save() {
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigDebugHotkeys, _debugHotkeysCheckbox->getState(), _domain);
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigChezNorfClueSubtitles, _chezNorfClueSubtitlesCheckbox->getState(), _domain);
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigGreedyWaterslidePairing, _greedyWaterslideCheckbox->getState(), _domain);
-	ConfMan.setBool(Zoombini2MetaEngine::kConfigAquacubeSafeFirstMove, _aquacubeSafeFirstMoveCheckbox->getState(), _domain);
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigRestoreL4PracticePuzzles, _allowRestoreL4PracticePuzzlesCheckbox->getState(), _domain);
 	ConfMan.setInt(Zoombini2MetaEngine::kConfigPrngAlgorithm, static_cast<int>(prngAlgorithm), _domain);
 	ConfMan.setInt(Zoombini2MetaEngine::kConfigLogicPacingMode, static_cast<int>(logicPacingMode), _domain);

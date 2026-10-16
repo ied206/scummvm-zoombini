@@ -37,24 +37,17 @@ class VolumePanel;
 struct RGBColor;
 struct ZmbTrait;
 
-enum MapScreenMode {
-	/** Allow direct puzzle selection at one shared level. */
-	kMapScreenPractice,
-	/** Show route progress and continue the active saved game. */
-	kMapScreenSavedGame
-};
-
 /**
- * Mountain map with distinct practice and saved-game modes.
+ * Mountain map with distinct practice and journey modes.
  *
  * Practice mode enables puzzle icons and selects one level for the whole
- * route. Saved-game mode enables visited route hubs and draws each route
+ * route. Journey mode enables visited route hubs and draws each route
  * segment at the level stored by the active game.
  */
 class InteractiveMap : public InteractiveBase {
 public:
 	/** Construct a mountain map in @p mode for @p vm. */
-	InteractiveMap(Zoombini2Engine *vm, MapScreenMode mode);
+	InteractiveMap(Zoombini2Engine *vm, GameMode mode);
 	/** Release map controls and the volume panel; bitmap resources remain in the graphics page cache. */
 	~InteractiveMap() override;
 
@@ -68,13 +61,17 @@ public:
 	void onRenderForeground(ManagedSurface32 *screen) override;
 	/** Dispatch a click to a map icon, control, legend tab, or volume panel. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	/** Release a captured volume slider and apply the panel's resulting action. */
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
+	/** Update an open volume panel's slider drag; otherwise pass pointer movement through. */
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
+	/** Handle volume-panel cancellation and enabled map keyboard shortcuts. */
 	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
 	/** Return the required practice-party size for @p pageId, or zero for a shelter or unsupported page. */
 	static uint getPracticePartySize(PageId pageId);
 	/** Create a route-sized or explicitly sized debugging party using the map's practice rules. */
 	static void createPracticeParty(Zoombini2Engine *vm, PageId pageId, uint partySize = 0);
+	/** Return whether the volume panel currently blocks map input. */
 	bool hasActiveDialog() const override { return _volumePanel != nullptr; }
 
 private:
@@ -86,8 +83,8 @@ private:
 	static constexpr const char *kBackgroundPath = "#bmp/Map/background";
 	/** RLE practice-mode panel that labels the map's practice controls. */
 	static constexpr const char *kPracticeStatsPath = "bmp/map/stats_scr3";
-	/** RLE saved-game panel behind the player name and route statistics. */
-	static constexpr const char *kSavedGameStatsPath = "bmp/map/stats_scr1";
+	/** RLE journey panel behind the player name and route statistics. */
+	static constexpr const char *kJourneyStatsPath = "bmp/map/stats_scr1";
 	/** Short selection sound played for map controls and practice-level changes. */
 	static constexpr const char *kBlipSoundPath = "sounds/blip.wav";
 	/** Path format for the gray, unavailable state of a destination icon, with a two-digit icon index. */
@@ -110,9 +107,9 @@ private:
 	static constexpr const char *kGameHighlightPath = "bmp/map/PANEL NL - Game HILITE";
 	/** Disabled RLE sprite for the Game control before a saved game is available. */
 	static constexpr const char *kGameDisabledPath = "bmp/map/PANEL NL - Game Gray";
-	/** Normal BitBlock sprite for switching from the saved-game map to practice mode. */
+	/** Normal BitBlock sprite for switching from the journey map to practice mode. */
 	static constexpr const char *kPracticeNormalPath = "bmp/map/PANEL NL - Entraine NORMAL";
-	/** Hover BitBlock sprite for switching from the saved-game map to practice mode. */
+	/** Hover BitBlock sprite for switching from the journey map to practice mode. */
 	static constexpr const char *kPracticeHighlightPath = "bmp/map/PANEL NL - Entraine HILITE";
 	/** Normal RLE sprite for the Quit control that opens the quit confirmation. */
 	static constexpr const char *kQuitNormalPath = "bmp/map/PANEL NL - Quitter NORMAL";
@@ -121,7 +118,9 @@ private:
 	/** Bit-block message shown when the Quit control asks to confirm leaving the game. */
 	static constexpr const char *kQuitConfirmationPath = "bmp/menu/Quit_panel_text_quit";
 
+	/** Process volume-panel input, apply live changes and handle Apply or Cancel; consume input while open. */
 	EventHandleResult handleVolumePanelInput(const Common::Point &pos, bool mouseReleased);
+	/** Previous pointer-button state used to detect volume-panel press and release edges. */
 	bool _volumePanelMouseDown = false;
 	/** Number of selectable map icons. */
 	static constexpr int kNumIcons = 13;
@@ -134,23 +133,24 @@ private:
 	/** Number of legend bitmaps, including the inactive legend. */
 	static constexpr int kNumLegends = 4;
 	/** Level 4 practice tab drawn beyond the three original legend rows. */
-	static constexpr int kL4TabLeft = 590;
+	static constexpr int kL4TabLeft = 592;
+	/** Right edge of the optional level 4 legend tab in page pixels. */
 	static constexpr int kL4TabRight = 625;
+	/** Top edge of the optional level 4 legend tab in page pixels. */
 	static constexpr int kL4TabTop = 497;
+	/** Bottom edge of the optional level 4 legend tab in page pixels. */
 	static constexpr int kL4TabBottom = 508;
+	/** Horizontal slant of the optional level 4 tab's corners in pixels. */
 	static constexpr int kL4TabSlant = 3;
 	/** Outline thickness in pixels for the level 4 practice tab. */
 	static constexpr int kL4TabBorderThickness = 2;
-	/** Restored level 4 practice-tab label drawn right of the tab. */
-	static constexpr const char32_t *kL4TabLabelEn = U"RESTORED LEVEL";
-	/** Restored level 4 practice-tab label drawn right of the tab. */
-	static constexpr const char32_t *kL4TabLabelKo = U"삭제되었던 단계";
 	/** Brown fill shared by the level 4 legend tab and the level 4 practice route. */
 	static constexpr RGBColor kL4Color = RGBColor(43, 4, 2); // #2B0402
 	/** Horizontal margin between the level 4 tab, its label, and the legend edge. */
-	static constexpr int kL4TabTextMargin = 10;
+	static constexpr int kL4TabTextMargin = 9;
 	/** Right edge of the level 4 label zone on the legend scroll. */
 	static constexpr int kL4TabTextRightEdgeEn = 760;
+	/** Right alignment boundary in page pixels for the Korean level 4 label. */
 	static constexpr int kL4TabTextRightEdgeKo = 740;
 
 	/** Icon hit-test rectangles in map coordinates. */
@@ -191,7 +191,7 @@ private:
 		{661, 101}  // 13 duplicate of segment_10
 	};
 
-	/** Vertical positions for the four saved-game statistics. */
+	/** Vertical positions for the four journey statistics. */
 	static constexpr int kStatLabelY[4] = {
 		15,
 		39,
@@ -199,26 +199,33 @@ private:
 		90,
 	};
 
+	/** One route draw pairing a graphic slot with the page supplying its saved difficulty. */
+	struct RouteSegmentDraw {
+		/** Slot in the route graphics and position arrays. */
+		int segmentSlot;
+		/** Page whose visit state and saved difficulty select the route color. */
+		PageId levelPageId;
+	};
+
 	/**
-	 * Segment-to-page mapping for saved-game page-level drawing.
-	 * Index = segment slot, value = page ID whose level to use.
-	 * Slot 12 is unused in saved-game mode; slot 13 occupies its position.
+	 * Journey route segments in drawing order, with each segment's visit state and difficulty source.
+	 * Slots select matching entries in @ref InteractiveMap::kSegmentFiles and @ref InteractiveMap::kSegmentPos.
+	 * Slot 13 draws the final segment in place of the practice map's slot 12.
 	 */
-	static constexpr PageId kSegmentPageIds[kNumSegments] = {
-		kPageCrazyTurtle,  //  0: CrazyTurtle
-		kPageWaterslide,   //  1: Waterslide
-		kPageAquacube,     //  2: Aquacube
-		kPageAquacube,     //  3: Aquacube
-		kPageMysticMarsh,  //  4: MysticMarsh
-		kPageMagicWall,    //  5: MagicWall
-		kPageWallOfFleens, //  6: WallOfFleens
-		kPageChezNorf,     //  7: ChezNorf
-		kPageWallOfFleens, //  8: WallOfFleens
-		kPageChezNorf,     //  9: ChezNorf
-		kPageSnowboard,    // 10: Snowboard
-		kPageBoolies,      // 11: Boolies
-		kPageBoolies,      // 12: unused in saved-game mode
-		kPageBoolies       // 13: Boolies duplicate
+	static constexpr RouteSegmentDraw kJourneyRouteSegments[] = {
+		{10, PageId::kPageSnowboard_10},   // segment_08
+		{1, PageId::kPageWaterslide_02},   // segment_02
+		{2, PageId::kPageAquacube_03},     // segment_03
+		{3, PageId::kPageAquacube_03},     // segment_04
+		{5, PageId::kPageMagicWall_06},    // segment_05a
+		{4, PageId::kPageMysticMarsh_05},  // segment_05b
+		{7, PageId::kPageChezNorf_08},     // segment_06a
+		{6, PageId::kPageWallOfFleens_07}, // segment_06b
+		{9, PageId::kPageChezNorf_08},     // segment_07a
+		{8, PageId::kPageWallOfFleens_07}, // segment_07b
+		{0, PageId::kPageCrazyTurtle_01},  // segment_01
+		{11, PageId::kPageBoolies_11},     // segment_09
+		{13, PageId::kPageBoolies_11}      // segment_10
 	};
 
 	/** One bottom-panel button with either RLE or bit-block visuals. */
@@ -245,11 +252,11 @@ private:
 	/** Number of controls in the bottom panel. */
 	static constexpr int kNumButtons = 4;
 
-	/** Practice or saved-game behavior selected at construction. */
-	MapScreenMode _mode;
+	/** Practice or journey behavior selected at construction. */
+	GameMode _mode;
 	/** Currently hovered icon, or `-1` when none is hovered. */
 	int _hoveredIcon = -1;
-	/** Practice or selected-page level in the range one through four. */
+	/** Practice or journey-page level in the range one through four. */
 	int _currentLevel = 1;
 	/** Hovered level legend, or zero when none is hovered. */
 	int _hoveredLegendTab = 0;
@@ -262,8 +269,8 @@ private:
 	Common::String _segments[kNumLevelTiers][kNumSegments];
 	/** Practice-mode instruction panel path. */
 	Common::String _statsPracticePath;
-	/** Saved-game progress panel path. */
-	Common::String _statsSavedGamePath;
+	/** Journey progress panel path. */
+	Common::String _statsJourneyPath;
 	/** Legend paths indexed by inactive or active level. */
 	Common::String _legends[kNumLegends];
 
@@ -303,13 +310,15 @@ private:
 	void drawL4Legend(ManagedSurface32 *screen) const;
 
 	/** Return whether this page uses direct practice selection. */
-	bool isPracticeMode() const { return _mode == kMapScreenPractice; }
+	bool inPracticeMode() const { return _mode == GameMode::kPracticeMode; }
+	/** Return whether this page shows journey progress and route navigation. */
+	bool inJourneyMode() const { return _mode == GameMode::kJourneyMode; }
 	/** Return whether @p traits satisfy the practice party's trait distribution limits. */
 	static bool practiceCandidateFitsPack(const Zoombini2Engine *vm, const ZmbTrait &traits);
 	/** Draw every route segment at the practice level. */
 	void drawPracticeSegments(ManagedSurface32 *screen);
-	/** Draw visited route segments at their stored page levels. */
-	void drawSavedGameSegments(ManagedSurface32 *screen);
+	/** Draw visited routes in their saved difficulty colors and unvisited routes in neutral. */
+	void drawJourneySegments(ManagedSurface32 *screen);
 
 	/** Open the volume panel. */
 	void openVolumePanel();

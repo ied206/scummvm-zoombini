@@ -30,8 +30,6 @@
 
 namespace Zoombini2 {
 
-constexpr const char *ShelterRescueSiteBase::kRosterAnimationPath;
-
 constexpr Size32 ShelterRescueSiteBase::kSlotSize;
 
 ShelterRescueSiteBase::ShelterRescueSiteBase(Zoombini2Engine *vm)
@@ -100,7 +98,7 @@ void ShelterRescueSiteBase::prepareWaitingStorage(StorageRecord **storage) {
 }
 
 void ShelterRescueSiteBase::refillDepartureRoster(StorageRecord **storage) {
-	GameState::refillFromStorage(storage, _vm->_state->_activeZoombinis, 8);
+	GameState::refillFromStorage(storage, _vm->_state->_activeZoombinis, 8, _vm);
 	_departureRoster.clear();
 	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
 		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
@@ -115,21 +113,31 @@ void ShelterRescueSiteBase::refillDepartureRoster(StorageRecord **storage) {
 void ShelterRescueSiteBase::saveRescueRoster(StorageRecord **storage) {
 	GameState *state = _vm->_state;
 	Common::Array<ZoombiniRunner *> &roster = _vm->_state->_activeZoombinis;
+	// Classify every seat before removing runners changes their roster indices.
+	for (ZoombiniRunner *zoombini : roster) {
+		const bool departing = _vm->isStartingMapTransition() && isDepartingMember(zoombini);
+		zoombini->setCanAdvanceFromPage(departing);
+		if (!departing)
+			state->retainRosterMember(storage, *zoombini);
+	}
 	for (uint i = 0; i < roster.size();) {
 		ZoombiniRunner *zoombini = roster[i];
-		bool departing = false;
-		if (_vm->isStartingMapTransition())
-			departing = isDepartingMember(zoombini);
-		zoombini->setCanAdvanceFromPage(true);
-		if (departing) {
+		if (zoombini->canAdvanceFromPage()) {
 			i += 1;
 		} else {
-			state->retainRosterMember(storage, *zoombini);
 			delete zoombini;
 			roster.remove_at(i);
 		}
 	}
 	_vm->writeGameSave(state->getPlayerName());
+}
+
+bool ShelterRescueSiteBase::debugCanDepart() const {
+	for (const ZoombiniRunner *zoombini : _vm->_state->_activeZoombinis) {
+		if (isDepartingMember(zoombini))
+			return true;
+	}
+	return false;
 }
 
 bool ShelterRescueSiteBase::isDepartingMember(const ZoombiniRunner *zoombini) const {
@@ -138,12 +146,6 @@ bool ShelterRescueSiteBase::isDepartingMember(const ZoombiniRunner *zoombini) co
 			return true;
 	}
 	return false;
-}
-
-void ShelterRescueSiteBase::loadRosterAnimation() {
-	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path(kRosterAnimationPath), 50);
-	if (!_zoombiniAnimation)
-		warning("RescueSite: Failed to load littleZomb.anm");
 }
 
 void ShelterRescueSiteBase::enqueueSpeech(const Common::String &path) {
@@ -190,14 +192,20 @@ void ShelterRescueSiteBase::beginDeparture() {
 }
 
 void ShelterRescueSiteBase::onUpdate() {
-	if (_phase == 0) {
+	switch (_phase) {
+	case 0:
 		// Wait for the player to choose a route direction.
-	} else if (_phase == 1) {
+		break;
+	case 1: {
 		const uint32 elapsed = _vm->getTotalPlayTime() - _phaseTimer;
 		if (1500 < elapsed) {
-			_vm->_mapTransitionSourcePageId = _pageId;
-			_vm->requestPageChange(kPageMapTrans);
+			_vm->_mapTransitSrcPageId = _pageId;
+			_vm->requestPageChange(PageId::kPageMapTrans_22);
 		}
+		break;
+	}
+	default:
+		break;
 	}
 }
 
@@ -210,7 +218,7 @@ void ShelterRescueSiteBase::onRenderContent(ManagedSurface32 *screen) {
 	if (_buttonDown && 0 < _buttonDown->getFrameCount())
 		_vm->_gfx->drawAnimationFrame(screen, _buttonDown, 0, _buttonDownPos);
 
-	if (!_zoombiniAnimation)
+	if (!_vm->_gfx->getCommonZoombiniAnimation(ZmbAnimationKind::kBasic))
 		return;
 
 	static constexpr int kStandingCell = 33;
@@ -229,8 +237,8 @@ void ShelterRescueSiteBase::onRenderContent(ManagedSurface32 *screen) {
 
 			const int x = _gridBasePos.x + col * kSlotSize.width + 18;
 			const int y = _gridBasePos.y + row * kSlotSize.height + 30;
-			const Common::Rect32 clip(_gridBasePos.x, 0, clipRight, ManagedSurface32::kScreenSize.height);
-			_vm->_gfx->drawZoombini(screen, _zoombiniAnimation, record->getTraits(), Common::Point32(x, y), kStandingCell, 0, &clip);
+			const Common::Rect32 clip(_gridBasePos.x, 0, clipRight, Gfx::kScreenSize.height);
+			_vm->_gfx->drawZoombini(screen, ZmbAnimationKind::kBasic, record->getTraits(), Common::Point32(x, y), kStandingCell, 0, &clip);
 			if (slotIdx == _selectedZoombini && _selectorReady)
 				_vm->_gfx->drawPageRleBlock(screen, _selectorPath, Common::Point32(x - 10, y - 10));
 		}

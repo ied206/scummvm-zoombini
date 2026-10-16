@@ -43,6 +43,12 @@ public:
 	PuzzleBoolies(Zoombini2Engine *vm);
 	/** Release animations and active paths; sprites remain in the graphics page cache. */
 	~PuzzleBoolies() override;
+	/** Return the puzzle name used by debug answer descriptions. */
+	const char *getPageName() const override { return kPageName; }
+	/** Return the 1-based route containing this puzzle. */
+	int getRouteNumber() const override { return kRouteNumber; }
+	/** Return the 1-based puzzle number within its route. */
+	int getRoutePuzzleIdx() const override { return kRoutePuzzleIdx; }
 
 	/** Load the three Boolie groups and place the active Zoombini in the boat. */
 	void init() override;
@@ -62,7 +68,7 @@ public:
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
 	/** Return whether at least one Boolie group has boarded and may depart. */
 	bool canUseGoButton() const override;
-	/** Return immediately or wait for saved-game retreat narration before departure. */
+	/** Return immediately or wait for journey retreat narration before departure. */
 	bool onGoButtonPressed() override;
 	/** Describe active rows and the current/next ball cohorts for the puzzle console. */
 	Common::String debugGetAnswer() const override;
@@ -77,7 +83,12 @@ public:
 	static int getRescuedBooliesPerZoombini(int level);
 
 private:
-	static constexpr const char *kPuzzleName = "Boolie Boggle";
+	/** Static puzzle name used by debug answer descriptions. */
+	static constexpr const char *kPageName = "Boolie Boggle";
+	/** 1-based route number used by the puzzle console. */
+	static constexpr int kRouteNumber = 4;
+	/** 1-based puzzle number within the route used by the puzzle console. */
+	static constexpr int kRoutePuzzleIdx = 2;
 	/** Boolie Boggle board background loaded into the first page layer. */
 	static constexpr const char *kBackgroundPath = "#bmp/Boolies/background";
 	/** Number of Boolie ledges. */
@@ -130,7 +141,7 @@ private:
 	static constexpr const char *kBoardVoicePathFormat = "sounds/blp15.%d.wav";
 	/** Narration played when the completed boat reaches its terminal departure. */
 	static constexpr const char *kCompleteSpeechPath = "sounds/BLP31.wav";
-	/** Narration played before leaving the puzzle for the saved-game map. */
+	/** Narration played before leaving the puzzle for the journey map. */
 	static constexpr const char *kRetreatSpeechPath = "sounds/DW-Cave.wav";
 	/** Duration of each frame in the original Boolie roll sequence. */
 	static constexpr uint32 kRollFrameTime = 30;
@@ -140,17 +151,24 @@ private:
 	static constexpr uint32 kBlockerFrameCount = 3;
 	/** Launch, boarding-check, replacement-walk timing, and replacement screen offsets. */
 	static constexpr uint32 kBallLaunchInterval = 600;
+	/** Delay in gameplay milliseconds before the first challenge ball starts moving. */
 	static constexpr uint32 kFirstBallLaunchDelay = 30;
+	/** Gameplay milliseconds between checks for automatic boat boarding. */
 	static constexpr uint32 kBoardingCheckDelay = 2000;
+	/** Milliseconds per Zoombini walking frame. */
 	static constexpr uint32 kWalkFrameTime = 40;
+	/** Number of frames in the party's walking cycle. */
 	static constexpr uint32 kWalkFrameCount = 11;
+	/** Horizontal pixels advanced per walking step. */
 	static constexpr int kWalkStepX = 30;
+	/** Initial refill x positions in page pixels, indexed by ledge slot. */
 	static constexpr int kRefillStartX[kSlotCount] = {
 		-20,
 		-22,
 		-24,
 		-26,
 	};
+	/** Refill y positions in page pixels, indexed by ledge row. */
 	static constexpr int kRefillY[kRowCount] = {
 		107,
 		221,
@@ -165,6 +183,7 @@ private:
 		88,
 		55,
 	};
+	/** Preview ball y positions in page pixels, indexed by ball slot. */
 	static constexpr int kPreviewHoldY[kMaxChallengeBalls] = {
 		25,
 		27,
@@ -173,6 +192,7 @@ private:
 		23,
 		17,
 	};
+	/** Ready-feeder ball x positions in page pixels, indexed by ball slot. */
 	static constexpr int kReadyHoldX[kMaxChallengeBalls] = {
 		601,
 		633,
@@ -181,6 +201,7 @@ private:
 		674,
 		651,
 	};
+	/** Ready-feeder ball y positions in page pixels, indexed by ball slot. */
 	static constexpr int kReadyHoldY[kMaxChallengeBalls] = {
 		56,
 		49,
@@ -245,10 +266,13 @@ private:
 
 	/** One queued visible transition after a ball changes a Boolie value. */
 	struct Flip {
-		/** Row/slot and source/destination portrait values for one queued visible roll. */
+		/** Zero-based ledge row containing the portrait that is rolling. */
 		int row = 0;
+		/** Zero-based ledge slot whose portrait is rolling. */
 		int slot = 0;
+		/** Boolie portrait value before this visible transition. */
 		byte fromValue = 0;
+		/** Boolie portrait value after this visible transition. */
 		byte toValue = 0;
 	};
 
@@ -362,6 +386,12 @@ private:
 	void advanceBoat(uint32 now);
 	/** Return whether @p row contains no Boolie with value 2. */
 	bool isRowEmpty(int row) const;
+	/** Format a row as binary digits and return its decimal value through @p number. */
+	static Common::String debugBinaryValue(const byte (&values)[kSlotCount], int bitCount, int &number);
+	/** Apply pending ball impacts to a copied row without advancing gameplay or animation. */
+	static void debugApplyBalls(Boolie (&values)[kSlotCount], uint ballCount, int challengeType);
+	/** Describe a copied row before and after a known signed ball batch. */
+	static Common::String debugRowForecast(const Boolie (&values)[kSlotCount], uint ballCount, int challengeType, int bitCount);
 	/** Draw the pin deflector sections and selected-row light. */
 	void drawPinSections(ManagedSurface32 *screen) const;
 	/** Draw lights for the row under the pointer. */
@@ -407,17 +437,21 @@ private:
 	uint32 _boardingCheckAt = 0;
 	/** Whether one replacement Boolie is walking from the left edge. */
 	bool _refillActive = false;
-	/** Whether saved-game departure is waiting for the serialized speech queue. */
+	/** Whether journey departure is waiting for the serialized speech queue. */
 	bool _goPending = false;
 	/** Replacement walker source row/slot, screen X, and animation-cycle start tick. */
 	int _refillRow = -1;
+	/** Ledge slot currently receiving a replacement Boolie. */
 	int _refillSlot = 0;
+	/** Current horizontal position of the incoming Boolie in page pixels. */
 	int _refillX = 0;
+	/** Gameplay tick in milliseconds when the current refill cycle began. */
 	uint32 _refillCycleStart = 0;
 	/** Current ball-challenge phase. */
 	Phase _phase = Phase::kFeeding00;
 	/** Boat travel phase and last movement tick. */
 	BoatState _boatState = BoatState::kReady00;
+	/** Gameplay tick in milliseconds used by the current boat animation. */
 	uint32 _boatTime = 0;
 	/** Puzzle-roster entry currently riding in the boat. */
 	int _activeRunnerIndex = 0;
@@ -447,14 +481,21 @@ private:
 	bool _nextFeedingRequested = false;
 	/** Whether the following cohort has started its upper feeder paths. */
 	bool _nextFeeding = false;
-	/** Number of resolved challenges. */
-	int _completedTurns = 0;
+	/** Number of cohorts that have reached the right-hand ready position. */
+	int _readyTurns = 0;
+	/** Whether the current cohort's balls have reached the ready position. */
+	bool _currentChallengeReady = false;
+	/** Whether all balls in the incoming cohort have reached the ready position. */
+	bool _nextChallengeReady = false;
+	/** Whether the current ready cohort has finished its selected row. */
+	bool _currentChallengeResolved = false;
 	/** Turn threshold checked after each completed challenge. */
 	int _requiredTurns = 0;
 	/** Current horizontal screen position of the boat sprite. */
 	int _boatX = 80;
 	/** Independent next boat, entering while the loaded boat leaves. */
 	int _returnBoatX = -251;
+	/** Whether the return-boat animation is active. */
 	bool _returnBoatActive = false;
 };
 

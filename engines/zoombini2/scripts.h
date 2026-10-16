@@ -48,6 +48,7 @@ public:
 
 	/** Settings for the accepted integer syntax. */
 	struct ParseConf {
+		/** Whether integer parsing accepts an explicit hexadecimal prefix. */
 		bool allowHexadecimal;
 	};
 
@@ -190,40 +191,69 @@ public:
 private:
 	/** One page-authored image-frame selection and its cumulative end time. */
 	struct TimedFrame {
+		/** Image-frame index selected by this timing-table entry. */
 		int16 frameIndex = -1;
+		/** End of this entry relative to the cycle start, in milliseconds. */
 		uint32 cumulativeEndMs = 0;
 	};
 
 	/** Maximum number of entries addressable by the original byte-sized count. */
 	static constexpr uint kMaxTimedFrameCount = 255;
 
+	/** Borrowed engine used for random timing and graphics access. */
 	Zoombini2Engine *_vm;
+	/** Borrowed animation whose frames are selected by the timing table. */
 	const Animation *_animation = nullptr;
+	/** Unscrolled drawing anchor in page pixels. */
 	Common::Point32 _position;
+	/** Playback policy used at cycle boundaries and random-idle gates. */
 	AnimationRunnerMode _mode;
+	/** Ordered image selections and cumulative end times for one cycle. */
 	Common::Array<TimedFrame> _timedFrames;
+	/** Duration of the complete timing table in milliseconds. */
 	uint32 _totalDurationMs = 0;
+	/** Gameplay timestamp in milliseconds at the start of the active cycle. */
 	uint32 _cycleStartTime = 0;
+	/** Gameplay timestamp in milliseconds after which another random-idle cycle may start. */
 	uint32 _randomIdleGateTime = 0;
+	/** Active timing-table entry, or -1 while inactive. */
 	int _currentTimedEntryIndex = -1;
+	/** Entry to jump to at the next cycle boundary, or -1 without a redirect. */
 	int _nextTimedEntryIndex = -1;
+	/** Borrowed runner activated when this runner completes an unredirected play-once cycle. */
 	AnimationRunner *_linkedRunner = nullptr;
+	/** Hit-test bounds in page pixels, independent of the drawing anchor. */
 	Common::Rect32 _hitRect = Common::Rect32();
+	/** Whether the configured hit rectangle participates in pointer hit testing. */
 	bool _hitTestEnabled = false;
+	/** Whether the runner accepts interaction independently of playback. */
 	bool _inputEnabled = true;
+	/** Stable runner index within its owning PageLayer. */
 	uint _layerIndex = 0;
+	/** Optional callback explicitly invoked by an interaction. */
 	Callback _interactionCallback = nullptr;
+	/** Borrowed context passed to the interaction callback. */
 	void *_interactionCallbackContext = nullptr;
+	/** Optional callback invoked at an unredirected cycle boundary. */
 	Callback _completionCallback = nullptr;
+	/** Borrowed context passed to the completion callback. */
 	void *_completionCallbackContext = nullptr;
+	/** Requested background snapshot width and height in pixels. */
 	Size32 _backBufferSize = Size32();
+	/** Surface containing the saved background, released with this runner. */
 	ManagedSurface32 *_backBuffer = nullptr;
+	/** Clipped screen-pixel rectangle retained in the background snapshot. */
 	Common::Rect32 _backBufferScreenRect;
+	/** Drawing anchor used when the background snapshot was captured, in screen pixels. */
 	Common::Point32 _backBufferDrawPosition;
+	/** Whether the saved background rectangle and surface contain a usable snapshot. */
 	bool _backBufferValid = false;
 
+	/** Return a random delay from zero through @p maximumInclusive, or zero without an RNG. */
 	uint32 getRandomDelay(uint32 maximumInclusive) const;
+	/** Return the screen X coordinate after applying the panorama scroll and wrap. */
 	int getScrolledX(int scrollX, int backgroundWidth) const;
+	/** Capture the configured background region at @p drawPosition for later restoration. */
 	void saveBackground(ManagedSurface32 *screen, const Common::Point32 &drawPosition);
 };
 
@@ -245,10 +275,10 @@ static_assert(sizeof(Float32) == 4, "Float32 must use four-byte native float sto
  * @par Representation and range
  * The raw two's-complement word has this layout:
  * @code
- *  31             30                         10 9                  0
- * +----------------+----------------------------+--------------------+
- * | sign bit       | 21 remaining integer bits  | 10 fractional bits |
- * +----------------+----------------------------+--------------------+
+ *  31       30                               10 9                    0
+ * +----------+----------------------------------+--------------------+
+ * | sign bit |       21 remaining integer bits  | 10 fractional bits |
+ * +----------+----------------------------------+--------------------+
  * @endcode
  *
  * The complete word represents `rawValue / 1024`, giving a resolution of
@@ -279,11 +309,18 @@ static_assert(sizeof(Float32) == 4, "Float32 must use four-byte native float sto
  */
 class Fixed32 {
 public:
+	/** Number of fractional bits in the signed Q10 raw representation. */
+	static constexpr int kFractionalBits = 10;
+
 	/** Construct zero. */
 	constexpr Fixed32() {}
 
 	/** Construct a fixed-point value from its signed raw representation. */
 	static constexpr Fixed32 fromRaw(int32 rawValue) { return Fixed32(rawValue); }
+	/** Interpret the supplied 32 bits as a signed Q10 raw value. */
+	static Fixed32 fromRawBits(uint32 value);
+	/** Return the complete signed Q10 raw representation. */
+	int32 getRawValue() const { return _rawValue; }
 	/** Convert an integer to Q10, wrapping inputs outside `-2097152` through `2097151`. */
 	static Fixed32 fromInt(int32 value);
 	/** Quantize a finite in-range floating-point value to Q10 by truncating its scaled raw value toward zero. */
@@ -310,7 +347,7 @@ public:
 	/** Divide by @p right and assign the wrapped result. */
 	void operator/=(const Fixed32 &right);
 	/** Compare the signed raw values. */
-	bool operator>(const Fixed32 &right) const;
+	bool operator<(const Fixed32 &right) const;
 	/** Compare the raw values for equality. */
 	bool operator==(const Fixed32 &right) const;
 	/** Compare the raw values for inequality. */
@@ -319,12 +356,11 @@ public:
 	Common::String toString() const;
 
 private:
+	/** Construct a fixed-point value from its signed Q10 raw representation. */
 	constexpr explicit Fixed32(int32 rawValue) : _rawValue(rawValue) {}
 
-	static Fixed32 fromRawBits(uint32 value);
+	/** Shift the raw bit pattern right by ten with explicit sign extension. */
 	static int32 arithmeticShiftRight(uint32 value);
-	static constexpr int kFractionalBits = 10;
-	friend struct PointFixed32;
 
 	/** Signed 32-bit raw representation retained by this value. */
 	int32 _rawValue = 0;
@@ -431,15 +467,25 @@ private:
 	template<typename Numeric>
 	class TypedEvaluator;
 
+	/** Numeric evaluator replaced on mode changes and released with this curve. */
 	Evaluator *_evaluator;
+	/** Integer start point retained for evaluator reconstruction, in pixels. */
 	Common::Point32 _start = Common::Point32();
+	/** First integer control point retained for evaluator reconstruction, in pixels. */
 	Common::Point32 _control0 = Common::Point32();
+	/** Second integer control point retained for evaluator reconstruction, in pixels. */
 	Common::Point32 _control1 = Common::Point32();
+	/** Integer end point retained for evaluator reconstruction, in pixels. */
 	Common::Point32 _end = Common::Point32();
+	/** Raw Q10 parameter increment applied per five-millisecond elapsed-time step. */
 	int _stepValue = 0;
+	/** Number of extra evaluate calls to retain the endpoint after traversal. */
 	int _waitInitial = 0;
+	/** Whether the segment's control points and timing descriptor have been assigned. */
 	bool _initialized = false;
+	/** Whether polynomial coefficients have been computed for the current descriptor. */
 	bool _coefficientsReady = false;
+	/** Whether evaluation uses native float instead of Q10 fixed-point arithmetic. */
 	bool _useFloatingPoint;
 
 	/** Allocate the template instance selected by @p useFloatingPoint. */
@@ -480,11 +526,15 @@ public:
 	/** Return whether a non-looping path has reached its final endpoint. */
 	bool isFinished() const { return _finished; }
 
-	/** Return a newly allocated playback path from the page PAT cache, or nullptr on failure. */
+	/**
+	 * Read and parse a PAT resource without caching, or return nullptr on failure.
+	 * The caller must delete the returned path; use @ref Zoombini2Engine::loadPagePATPath to reuse the page cache.
+	 */
 	static PathObject *loadFromPAT(Zoombini2Engine *vm, const Common::Path &path);
+	/** Instantiate the unstarted PAT template using the current numeric mode. */
+	PathObject *createUnstartedCopy() const;
 	/** Append one segment and retain its final endpoint using the selected numeric representation. */
-	void appendSegment(const Common::Point32 &start, const Common::Point32 &ctrl0, const Common::Point32 &ctrl1, const Common::Point32 &end,
-					   int stepValue, int waitInitial);
+	void appendSegment(const Common::Point32 &start, const Common::Point32 &ctrl0, const Common::Point32 &ctrl1, const Common::Point32 &end, int stepValue, int waitInitial);
 	/** Reset segment state and begin evaluation at @p tickCount. */
 	void start(uint32 tickCount);
 	/** Replace every segment's raw Q10 step value. */
@@ -493,11 +543,6 @@ public:
 	bool advance(uint32 tickCount, Common::Point32 &outPos);
 
 private:
-	friend class Zoombini2Engine;
-	/** Read and parse a PAT resource on a page-cache miss. */
-	static PathObject *loadUncachedPAT(Zoombini2Engine *vm, const Common::Path &path);
-	/** Instantiate the unstarted PAT template using the current numeric mode. */
-	PathObject *createUnstartedCopy() const;
 	/** Borrowed vm used to select the path evaluator and request cached PAT resources. */
 	Zoombini2Engine *_vm;
 	/** Apply the live engine option to every already loaded segment. */
@@ -527,6 +572,14 @@ struct ZmbDropTarget {
 	void *callbackContext = nullptr;
 	/** Index assigned on the latest occupied transition; ignored while free. */
 	int zoombiniIndex = -1;
+};
+
+/** Input actions accepted by @ref ZoombiniRunner::handleHoldAndDrop. */
+enum class ZmbHoldDropInput {
+	/** Update held movement and highlighting without attempting pickup or placement. */
+	kMoveOnly,
+	/** Process a left-button release to pick up or place a Zoombini. */
+	kLeftButtonRelease
 };
 
 /** Observable result of one common Zoombini pointer-input pass. */
@@ -571,19 +624,25 @@ public:
 	/** Background-width sentinel that suppresses scrolling for the Zoombini renderer. */
 	static constexpr int kUnscrolledBackgroundWidth = -144;
 
-	/** Initialize every field to the inactive runtime baseline. */
-	ZoombiniRunner();
+	/** Initialize inactive fields; @p vm may be null for data-only savefile runners. */
+	explicit ZoombiniRunner(Zoombini2Engine *vm);
 	/** Release the retained movement path. */
 	~ZoombiniRunner();
+	/** Return a newly allocated inactive runner with the same engine, complete stored traits and fixed-size name. */
+	ZoombiniRunner *cloneForRoster() const;
 
 	/** Assign the four visible traits, refresh their hash, and leave the stored unused slot unchanged. */
 	void setTraits(const ZmbTrait &traits);
+	/** Replace all five stored trait bytes and refresh the visible-trait hash. */
+	void setStoredTraits(const ZmbTrait &traits);
 	/** Return the stored one-based trait record. */
 	const ZmbTrait &getTraits() const { return _traits; }
 	/** Return the packed cache derived from the four visible traits. */
 	uint16 getTraitHash() const { return _traitHash; }
 	/** Return the displayed name without reading beyond its fixed-size saved bytes. */
 	Common::String getName() const;
+	/** Return all fixed-size name bytes, including bytes after any NUL terminator. */
+	const char (&getNameBytes() const)[StorageRecord::kNameSize] { return _name; }
 	/** Replace the name while retaining the fixed-size storage buffer. */
 	void setName(const char *name) { Common::strlcpy(_name, name, sizeof(_name)); }
 	/** Copy complete fixed-size name bytes without assuming a NUL terminator. */
@@ -620,12 +679,18 @@ public:
 	int32 getHoveredDropTargetIndex() const { return _hoveredDropTargetIndex; }
 	/** Select the default borrowed sprite grid and its resting cell. */
 	void setDefaultAnimation(const ZoombiniAnimation *animation, int cellIndex = 33);
+	/** Select a previously loaded common grid as the default animation. */
+	void setDefaultAnimation(ZmbAnimationKind animKind, int cellIndex = 33) { setDefaultAnimation(getCommonAnimation(animKind), cellIndex); }
 	/** Replace only the active borrowed sprite grid while retaining the grid restored at reset. */
 	void setActiveAnimation(const ZoombiniAnimation *animation);
+	/** Replace the active grid with a previously loaded common grid. */
+	void setActiveAnimation(ZmbAnimationKind animKind) { setActiveAnimation(getCommonAnimation(animKind)); }
 	/** Return the borrowed sprite grid currently selected for drawing. */
 	const ZoombiniAnimation *getActiveAnimation() const { return _activeAnimation; }
 	/** Select the borrowed sprite grid restored when the current animation ends. */
 	void setSavedAnimation(const ZoombiniAnimation *animation) { _savedAnimation = animation; }
+	/** Select the common grid restored when the current animation ends. */
+	void setSavedAnimation(ZmbAnimationKind animKind) { setSavedAnimation(getCommonAnimation(animKind)); }
 	/** Return whether the common renderer may start an ambient idle animation. */
 	bool isIdleAnimationEnabled() const { return _idleAnimationEnabled; }
 	/** Select whether the common renderer may start an ambient idle animation. */
@@ -679,6 +744,10 @@ public:
 	/** Start a page-selected animation using the delay retained beside its borrowed grid. */
 	void startAnimation(const ZoombiniAnimation *animation, int cellIndex, uint32 tickCount,
 						AnimationCompletionPolicy completionPolicy = AnimationCompletionPolicy::kOrdinary00);
+	/** Start an animation using a previously loaded common grid. */
+	void startAnimation(ZmbAnimationKind animKind, int cellIndex, uint32 tickCount, AnimationCompletionPolicy completionPolicy = AnimationCompletionPolicy::kOrdinary00) {
+		startAnimation(getCommonAnimation(animKind), cellIndex, tickCount, completionPolicy);
+	}
 	/** Replace the separately retained one-shot animation completion callback. */
 	void setAnimationCompleteCallback(AnimationCompleteCallback callback, void *context = nullptr);
 	/** Stop and restore a callback-free ordinary animation at frame 11 instead of repeating it. */
@@ -687,8 +756,16 @@ public:
 	void startDirectionTrackedAnimation(uint32 tickCount);
 	/** Bank quota from @p elapsedMs and @p pacingHz, then run the original one-in-250 idle rolls owed. */
 	bool tryStartIdleAnimation(const ZoombiniAnimation *animation, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz);
+	/** Apply the idle roll to a previously loaded common grid. */
+	bool tryStartIdleAnimation(ZmbAnimationKind animKind, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz) {
+		return tryStartIdleAnimation(getCommonAnimation(animKind), randomSrc, tickCount, elapsedMs, pacingHz);
+	}
 	/** Bank quota from @p elapsedMs and @p pacingHz, then run the original one-in-20 celebrate rolls owed. */
 	bool tryStartCelebrationAnimation(const ZoombiniAnimation *animation, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz);
+	/** Apply the celebration roll to a previously loaded common grid. */
+	bool tryStartCelebrationAnimation(ZmbAnimationKind animKind, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz) {
+		return tryStartCelebrationAnimation(getCommonAnimation(animKind), randomSrc, tickCount, elapsedMs, pacingHz);
+	}
 	/** Restore the saved grid and cell 33 after an animation. */
 	void resetAnimation();
 	/** Schedule a due frame advance while preserving the frame drawn by the current render pass. */
@@ -699,21 +776,32 @@ public:
 	bool hitTest(const Common::Point32 &point) const;
 	/** Begin the common pointer-drag lifecycle if input and the pickup rectangle permit it. */
 	bool beginDrag(const Common::Point32 &pointerPos, const ZoombiniAnimation *pickupAnimation, uint32 tickCount);
+	/** Begin dragging with a previously loaded common pickup grid. */
+	bool beginDrag(const Common::Point32 &pointerPos, ZmbAnimationKind animKind, uint32 tickCount) {
+		return beginDrag(pointerPos, getCommonAnimation(animKind), tickCount);
+	}
 	/** Move an actively dragged Zoombini with the pointer. */
 	void updateDrag(const Common::Point32 &pointerPos);
 	/** Finish dragging and optionally retain the original grab point at the release position. */
 	void endDrag(bool applyGrabOffset);
 	/**
-	 * Apply the original release-driven click-to-carry lifecycle to one page roster.
+	 * Handle click-to-hold, mouse-follow and click-to-drop for one page roster.
 	 *
-	 * Pointer movement updates an existing carry even when @p clickReleased is false.
-	 * A release picks an eligible Zoombini up or attempts to drop the one already
-	 * held onto the first overlapping free release target, then onto the area mask.
+	 * @ref ZmbHoldDropInput::kMoveOnly updates the carried position and drop-target highlighting.
+	 * @ref ZmbHoldDropInput::kLeftButtonRelease picks up an eligible Zoombini or attempts to drop the one already held.
+	 * Drops try the first overlapping free target in @p dropTargets, then the marked region in @p areaMask.
+	 * Pickup animation timing is read from @p vm using its total play time.
+	 * Carrying continues without holding the mouse button; an invalid drop keeps the Zoombini held.
 	 */
-	static ZmbDropResult handlePointerInput(const Common::Array<ZoombiniRunner *> &zoombinis, const Common::Point32 &pointerPos,
-											bool clickReleased, const ZoombiniAnimation *pickupAnimation, uint32 tickCount,
-											Common::Array<ZmbDropTarget> *dropTargets = nullptr, const AreaMask *areaMask = nullptr,
-											int scrollX = 0, int backgroundWidth = AnimationRunner::kDefaultBackgroundWidth);
+	static ZmbDropResult handleHoldAndDrop(Zoombini2Engine *vm, const Common::Array<ZoombiniRunner *> &zoombinis, const Common::Point32 &pointerPos,
+										   ZmbHoldDropInput input, const ZoombiniAnimation *pickupAnimation,
+										   Common::Array<ZmbDropTarget> *dropTargets = nullptr, const AreaMask *areaMask = nullptr,
+										   int scrollX = 0, int backgroundWidth = AnimationRunner::kDefaultBackgroundWidth);
+	/** Handle the same hold-and-drop lifecycle with engine timing and a common pickup grid from the roster's graphics cache. */
+	static ZmbDropResult handleHoldAndDrop(Zoombini2Engine *vm, const Common::Array<ZoombiniRunner *> &zoombinis, const Common::Point32 &pointerPos,
+										   ZmbHoldDropInput input, ZmbAnimationKind animKind,
+										   Common::Array<ZmbDropTarget> *dropTargets = nullptr, const AreaMask *areaMask = nullptr,
+										   int scrollX = 0, int backgroundWidth = AnimationRunner::kDefaultBackgroundWidth);
 	/** Stably sort selected roster indices by their logical screen Y position. */
 	static void sortDrawOrderByY(const Common::Array<ZoombiniRunner *> &zoombinis, Common::Array<uint> &order);
 	/** Return the current drawing anchor after applying page scrolling or the active grab offset. */
@@ -761,8 +849,11 @@ private:
 	Common::Point32 _dragOffset = Common::Point32();
 
 private:
-	friend class GameState;
-	friend struct StorageRecord;
+	/** Return a previously loaded common grid through the live engine's graphics interface. */
+	const ZoombiniAnimation *getCommonAnimation(ZmbAnimationKind animKind) const;
+
+	/** Borrowed engine, or null for data-only savefile runners; never serialized or owned here. */
+	Zoombini2Engine *_vm;
 
 	/** Stored one-based trait record, including its serialized unused slot zero. */
 	ZmbTrait _traits = ZmbTrait();

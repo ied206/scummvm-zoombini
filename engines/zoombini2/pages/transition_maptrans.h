@@ -30,8 +30,6 @@
 
 namespace Zoombini2 {
 
-class ZoombiniAnimation;
-
 /** Transition page that walks the current party along a route on the mountain map. */
 class TransitionMapTrans : public TransitionBase {
 public:
@@ -60,12 +58,15 @@ public:
 	void init() override;
 	/** Start and advance staggered walkers until the transition completes. */
 	void onUpdate() override;
-	/** Draw the composited map and active walkers. */
+	/** Draw the composited route map beneath the walking party. */
 	void onRenderContent(ManagedSurface32 *screen) override;
+	/** Draw visible tiny walkers sorted by their screen Y coordinates. */
 	void onRenderActors(ManagedSurface32 *screen) override;
+	/** Advance visible tiny walkers' animation frames after drawing. */
 	void onActorsRendered() override;
 	/** Skip the remaining walking animation and enter the resolved destination on button release. */
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
+	/** Finish the transition on Space and pass other keys through. */
 	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
 	/** Return all named route edges and their count. */
 	static const RouteDest *getRouteDestinations(uint &count);
@@ -83,41 +84,63 @@ private:
 	static constexpr const char *kSpeechFormat = "sounds/%s.wav";
 	/** PAT route format for the source page's mountain-map travel path. */
 	static constexpr const char *kRouteFormat = "bmp/maptrans/%s";
-	/** Zoombini sprite grid used while the party walks along the mountain map. */
-	static constexpr const char *kZoombiniAnimationPath = "bmp/transition1/PitiZomb3.anm";
 	/** Background music played during map travel and queued travel speech. */
 	static constexpr const char *kMusicPath = "#sounds/music/ZMR-Transition.wav";
 	/** Path format for one map transition overlay. */
 	static constexpr const char *kMapTransitionOverlayPathFormat = "bmp/maptrans/%s.bmp";
 	/** Path format for the map transition background. */
 	static constexpr const char *kMapTransitionBackgroundPathFormat = "#bmp/maptrans/bigmap_background_%d";
-	/** Route segment sprite base names drawn over the map transition background. */
+	/** Sprite base name for the Zoombiniville-to-Crazy Turtle route overlay. */
 	static constexpr const char *kOverlaySegment01 = "bigmap_segment_01";
+	/** Sprite base name for the Crazy Turtle-to-Waterslide route overlay. */
 	static constexpr const char *kOverlaySegment02 = "bigmap_segment_02";
+	/** Sprite base name for the Waterslide-to-AquaCube and adjoining route overlay. */
 	static constexpr const char *kOverlaySegment03 = "bigmap_segment_03";
+	/** Sprite base name for the AquaCube-to-Rescue Site I route overlay. */
 	static constexpr const char *kOverlaySegment04 = "bigmap_segment_04";
+	/** Sprite base name for the Rescue Site I-to-Magic Wall route overlay. */
 	static constexpr const char *kOverlaySegment05a = "bigmap_segment_05a";
+	/** Sprite base name for the Rescue Site I-to-Mystic Marsh route overlay. */
 	static constexpr const char *kOverlaySegment05b = "bigmap_segment_05b";
+	/** Sprite base name for the Magic Wall-to-Chez Norf route overlay. */
 	static constexpr const char *kOverlaySegment06a = "bigmap_segment_06a";
+	/** Sprite base name for the Mystic Marsh-to-Wall of Fleens route overlay. */
 	static constexpr const char *kOverlaySegment06b = "bigmap_segment_06b";
+	/** Sprite base name for the Chez Norf-to-Rescue Site II route overlay. */
 	static constexpr const char *kOverlaySegment07a = "bigmap_segment_07a";
+	/** Sprite base name for the Wall of Fleens-to-Rescue Site II route overlay. */
 	static constexpr const char *kOverlaySegment07b = "bigmap_segment_07b";
+	/** Sprite base name for the Rescue Site II-to-Snowboard Gulch route overlay. */
 	static constexpr const char *kOverlaySegment08 = "bigmap_segment_08";
+	/** Sprite base name for the Snowboard Gulch-to-Boolie Boggle route overlay. */
 	static constexpr const char *kOverlaySegment09 = "bigmap_segment_09";
+	/** Sprite base name for the Boolie Boggle-to-Booliewood route overlay. */
 	static constexpr const char *kOverlaySegment10 = "bigmap_segment_10";
-	/** Route icon sprite base names drawn over the map transition background. */
+	/** Sprite base name for the Zoombiniville icon on the map transition. */
 	static constexpr const char *kOverlayIcon01 = "bigmap_icon_01";
+	/** Sprite base name for the Crazy Turtle icon on the map transition. */
 	static constexpr const char *kOverlayIcon02 = "bigmap_icon_02";
+	/** Sprite base name for the Waterslide icon on the map transition. */
 	static constexpr const char *kOverlayIcon03 = "bigmap_icon_03";
+	/** Sprite base name for the AquaCube icon on the map transition. */
 	static constexpr const char *kOverlayIcon04 = "bigmap_icon_04";
+	/** Sprite base name for the Rescue Site I icon on the map transition. */
 	static constexpr const char *kOverlayIcon05 = "bigmap_icon_05";
+	/** Sprite base name for the Magic Wall icon on the map transition. */
 	static constexpr const char *kOverlayIcon06a = "bigmap_icon_06a";
+	/** Sprite base name for the Mystic Marsh icon on the map transition. */
 	static constexpr const char *kOverlayIcon06b = "bigmap_icon_06b";
+	/** Sprite base name for the Chez Norf icon on the map transition. */
 	static constexpr const char *kOverlayIcon07a = "bigmap_icon_07a";
+	/** Sprite base name for the Wall of Fleens icon on the map transition. */
 	static constexpr const char *kOverlayIcon07b = "bigmap_icon_07b";
+	/** Sprite base name for the Rescue Site II icon on the map transition. */
 	static constexpr const char *kOverlayIcon08 = "bigmap_icon_08";
+	/** Sprite base name for the Snowboard Gulch icon on the map transition. */
 	static constexpr const char *kOverlayIcon09 = "bigmap_icon_09";
+	/** Sprite base name for the Boolie Boggle icon on the map transition. */
 	static constexpr const char *kOverlayIcon10 = "bigmap_icon_10";
+	/** Sprite base name for the Booliewood icon on the map transition. */
 	static constexpr const char *kOverlayIcon11 = "bigmap_icon_11";
 	/** First-visit speech queued when leaving Zoombiniville for Crazy Turtle. */
 	static constexpr const char *kSpeechTur11 = "tur11";
@@ -223,7 +246,7 @@ private:
 	uint _completedCount = 0;
 
 	/** Page whose entry follows this route. */
-	PageId _targetPageId = kPageNone;
+	PageId _targetPageId = PageId::kPageNone_M1;
 	/** Whether the destination page has already been requested. */
 	bool _transitionFinished = false;
 	/** Serial destination-speech handles in original enqueue order. */
@@ -232,9 +255,6 @@ private:
 	uint _nextSpeechIndex = 0;
 	/** Index of the currently playing speech handle, or -1. */
 	int _activeSpeechIndex = -1;
-
-	/** Borrowed immutable sprite grid retained in the engine cache. */
-	const ZoombiniAnimation *_zoombiniAnimation = nullptr;
 };
 
 } // End of namespace Zoombini2

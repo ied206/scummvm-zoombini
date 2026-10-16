@@ -53,40 +53,6 @@ enum class SoundCategory {
 	kSpeech02 = 2
 };
 
-/** Retains the path, playback policy, volume, and mixer handles for one sound. */
-struct SoundBuffer {
-private:
-	friend class SoundManager;
-
-	/** Number of simultaneous sample handles retained by one logical sound. */
-	static constexpr int kSampleSlotCount = 5;
-
-	/** Manager-assigned sound identifier. */
-	int id;
-	/** Original logical resource name, including any installed-root marker. */
-	Common::Path path;
-	/** Complete encoded file image retained for non-stream playback. */
-	Common::Array<byte> sampleData;
-	/** Whether the caller requested streaming playback. */
-	bool isStream;
-	/** Whether playback should restart after the final sample. */
-	bool loop;
-	/** Mixer category controlling this sound. */
-	SoundCategory category;
-	/** Game-facing volume in the inclusive range 0 through 100. */
-	int volume;
-	/** Whether the channel should use the complete volume of its mixer category. */
-	bool usesCategoryVolume;
-	/** Mixer handles reserved for overlapping sample playback. */
-	Audio::SoundHandle handles[kSampleSlotCount];
-	/** Whether each active sample handle is paused. */
-	bool handlesPaused[kSampleSlotCount] = {};
-	/** Mixer handle reserved for streamed playback. */
-	Audio::SoundHandle streamHandle;
-	/** Whether the active streamed handle is paused. */
-	bool streamPaused = false;
-};
-
 /**
  * Manages logical sound records and routes WAV playback through Audio::Mixer.
  *
@@ -98,14 +64,13 @@ private:
  * each logical sample. The limit belongs to one loaded sound rather than the
  * complete mixer. A streamed sound uses one handle instead.
  * Streamed sounds are opened and decoded on demand through the engine resource
- * resolver. Numbered installed-music paths may resolve to the extracted CD
- * sound-effects directory when that compatibility resource exists.
+ * resolver.
  */
 class SoundManager : public Common::NonCopyable {
 public:
 	/** Bind sound playback to the borrowed @p vm and @p mixer. */
 	SoundManager(Zoombini2Engine *vm, Audio::Mixer *mixer);
-	/** Stop playback and release every retained @ref SoundBuffer. */
+	/** Stop playback and release every retained @ref SoundManager::SoundBuffer. */
 	~SoundManager();
 
 	/** Record a streamed sound or retain a non-stream file image and return its manager-assigned identifier. */
@@ -170,6 +135,37 @@ public:
 	void setStereoOutputEnabled(bool enabled) { _stereoOutputEnabled = enabled; }
 
 private:
+	/** Retains the path, playback policy, volume, and mixer handles for one sound. */
+	struct SoundBuffer {
+		/** Number of simultaneous sample handles retained by one logical sound. */
+		static constexpr int kSampleSlotCount = 5;
+
+		/** Manager-assigned sound identifier. */
+		int id;
+		/** Original logical resource name, including any installed-root marker. */
+		Common::Path path;
+		/** Complete encoded file image retained for non-stream playback. */
+		Common::Array<byte> sampleData;
+		/** Whether the caller requested streaming playback. */
+		bool isStream;
+		/** Whether playback should restart after the final sample. */
+		bool loop;
+		/** Mixer category controlling this sound. */
+		SoundCategory category;
+		/** Game-facing volume in the inclusive range 0 through 100. */
+		int volume;
+		/** Whether the channel should use the complete volume of its mixer category. */
+		bool usesCategoryVolume;
+		/** Mixer handles reserved for overlapping sample playback. */
+		Audio::SoundHandle handles[kSampleSlotCount];
+		/** Whether each active sample handle is paused. */
+		bool handlesPaused[kSampleSlotCount] = {};
+		/** Mixer handle reserved for streamed playback. */
+		Audio::SoundHandle streamHandle;
+		/** Whether the active streamed handle is paused. */
+		bool streamPaused = false;
+	};
+
 	/** Global sound-effect volume in the inclusive range 0 through 100. */
 	int _volumeSFX = 100;
 	/** Global music volume in the inclusive range 0 through 100. */
@@ -178,12 +174,15 @@ private:
 	int _volumeSpeech = 100;
 
 	class MonoAudioStream;
-	static constexpr const char *kInstalledMusicPrefix = "#sounds/music/";
+	/** Normalized logical path prefix used to classify music tracks. */
 	static constexpr const char *kMusicPrefix = "sounds/music/";
+	/** Normalized logical path prefix used to classify sound effects. */
 	static constexpr const char *kFxPrefix = "sounds/fx/";
-	static constexpr const char *kFxPathFormat = "sounds/fx/%s";
+	/** UI blip resource classified as a sound effect outside the effects directory. */
 	static constexpr const char *kBlipPath = "sounds/blip.wav";
+	/** Normalized sound-tree prefix used to classify remaining sounds as speech. */
 	static constexpr const char *kSoundsPrefix = "sounds/";
+	/** Disc data-directory prefix removed before classifying a sound path. */
 	static constexpr const char *kDataPrefix = "Data/";
 
 	/** Borrowed vm that resolves original logical resource names. */
@@ -213,9 +212,7 @@ private:
 	void releasePlayback(SoundBuffer &buffer);
 	/** Decode a WAV while retaining only complete PCM sample frames. */
 	static Audio::RewindableAudioStream *makeAudioStream(Common::SeekableReadStream *stream, const Common::Path &path);
-	/** Select an optional extracted-data compatibility alternative without resolving a physical path. */
-	Common::Path resolveCompatibilityPath(const Common::Path &filename) const;
-	/** Classify @p filename before any music-path fallback is applied. */
+	/** Classify @p filename by its logical sound namespace. */
 	static SoundCategory classifySound(const Common::Path &filename);
 	/** Convert a logical sound category to its mixer sound type. */
 	static Audio::Mixer::SoundType getMixerSoundType(SoundCategory category);

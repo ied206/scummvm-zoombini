@@ -37,6 +37,12 @@ public:
 	PuzzleAquacube(Zoombini2Engine *vm);
 	/** Release movement paths, page runners, animations, and loaded audio. */
 	~PuzzleAquacube() override;
+	/** Return the puzzle name used by debug answer descriptions. */
+	const char *getPageName() const override { return kPageName; }
+	/** Return the 1-based route containing this puzzle. */
+	int getRouteNumber() const override { return kRouteNumber; }
+	/** Return the 1-based puzzle number within its route. */
+	int getRoutePuzzleIdx() const override { return kRoutePuzzleIdx; }
 	/** Load page resources and generate the current level's randomized board. */
 	void init() override;
 	/** Advance movement, warp, rescue, chase, departure, and bubble state. */
@@ -55,9 +61,9 @@ public:
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
 	/** Enable Go after at least one rescue and after any deferred departure finishes. */
 	bool canUseGoButton() const override;
-	/** Begin saved-game departure speech when enough unrescued actors remain. */
+	/** Begin journey departure speech when enough unrescued actors remain. */
 	bool onGoButtonPressed() override;
-	/** Describe the current generated graph, lever mapping, and warp behavior. */
+	/** Describe the lever mapping and verified strategy for the selected level. */
 	Common::String debugGetAnswer() const override;
 	/** Report completed moves against the current move allowance. */
 	PuzzleChanceInfo debugGetChances() const override;
@@ -69,7 +75,12 @@ public:
 	Common::String debugGetChanceDetails() const override;
 
 private:
-	static constexpr const char *kPuzzleName = "Aqua Cube";
+	/** Static puzzle name used by debug answer descriptions. */
+	static constexpr const char *kPageName = "Aqua Cube";
+	/** 1-based route number used by the puzzle console. */
+	static constexpr int kRouteNumber = 1;
+	/** 1-based puzzle number within the route used by the puzzle console. */
+	static constexpr int kRoutePuzzleIdx = 3;
 	/** Aqua Cube board background loaded into the first page layer. */
 	static constexpr const char *kBackgroundPath = "#bmp/aquacube/background";
 	/** Looping page soundtrack. */
@@ -135,7 +146,7 @@ private:
 		"sounds/8-E2.wav",
 		"sounds/8-E1.wav",
 	};
-	/** Departure speech used before a saved-game map transition. */
+	/** Departure speech used before a journey map transition. */
 	static constexpr const char *kRetreatPath = "sounds/DW-Zville.wav";
 
 	/** Occupancy state associated with one graph node. */
@@ -314,8 +325,6 @@ private:
 	void putFleen(int coordinates, int type);
 	/** Create and start one cubic movement path between two screen positions. */
 	PathObject *makePath(const Common::Point32 &start, const Common::Point32 &end, int speed);
-	/** Apply the optional safe-first-move axis remap before a direct lever move. */
-	void protectFirstDirectMoveFromFleen(int lever);
 	/** Start light movement along @p axis and update the current node immediately. */
 	void moveBall(int axis);
 	/** Consume a move and process rescue, Fleen, or final-move state at the light's node. */
@@ -339,8 +348,6 @@ private:
 	/** Allow the timer to execute its queued warp levers. */
 	static void onTimerComplete(void *context, AnimationRunner *runner);
 
-	/** Selected level table index. */
-	int _level = 1;
 	/** Number of active graph nodes for the selected board. */
 	int _numNodes = 8;
 	/** Number of active logical movement axes and levers. */
@@ -371,13 +378,13 @@ private:
 	bool _warpExecuting = false;
 	/** Whether the puzzle reached its move limit or completed roster processing. */
 	bool _finished = false;
-	/** Whether saved-game departure speech delays the map transition. */
+	/** Whether journey departure speech delays the map transition. */
 	bool _goPending = false;
 	/** Whether rescued actors still have active shore escape paths. */
 	bool _actorsEscaping = false;
 	/** Whether the first update must resolve the initial node without consuming a move. */
 	bool _pendingInitialArrival = false;
-	/** Active graph nodes: levels 1 and 2 use 8; level 3 and internal level 4 use 16. */
+	/** Active graph nodes: levels 1 and 2 use 8; level 3 and restored level 4 use 16. */
 	Common::Array<Node> _nodes;
 	/** Cosmetic bubbles updated and drawn independently of graph nodes. */
 	Bubble _bubbles[12];
@@ -402,11 +409,11 @@ private:
 	/** Timed runner that bounds warp-lever selection. */
 	AnimationRunner *_timer = nullptr;
 	/** First and second rescue flare runners. */
-	AnimationRunner *_flare[2] = {};
+	AnimationRunner *_flareRunners[2] = {};
 	/** One angry runner for each Fleen variant. */
-	AnimationRunner *_angry[4] = {};
+	AnimationRunner *_angryFleenRunners[4] = {};
 	/** One chase runner for each Fleen variant. */
-	AnimationRunner *_chase[4] = {};
+	AnimationRunner *_chaseFleenRunners[4] = {};
 	/** Frame data retained until the associated page runners have been released. */
 	Common::Array<Animation *> _animations;
 	/** Small Zoombini animation used for board placement and fleeing actors. */

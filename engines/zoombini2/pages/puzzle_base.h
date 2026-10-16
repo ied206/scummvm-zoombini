@@ -31,7 +31,6 @@ namespace Zoombini2 {
 
 struct StorageRecord;
 class ZoombiniRunner;
-class ZoombiniAnimation;
 
 /** Snapshot of the active puzzle's attempt or resource budget. */
 struct PuzzleChanceInfo {
@@ -80,6 +79,12 @@ public:
 	PuzzleBase(Zoombini2Engine *vm, PageId pageId);
 	/** Release shared puzzle resources. */
 	~PuzzleBase() override = default;
+	/** Return the puzzle name used by debug answer descriptions. */
+	virtual const char *getPageName() const = 0;
+	/** Return the 1-based route number containing this puzzle. */
+	virtual int getRouteNumber() const = 0;
+	/** Return the 1-based puzzle number within its route. */
+	virtual int getRoutePuzzleIdx() const = 0;
 	/** Return whether the shared sidebar is visible. */
 	bool hasSidebar() const override { return true; }
 
@@ -87,15 +92,13 @@ public:
 	void init() override;
 	/** Accept the whole current party and use the regular practice or adventure departure. */
 	void debugForceFinish();
-	/** Allow the active party to leave this puzzle through a debugger-requested route transition. */
-	void debugPrepareRouteDeparture() override;
 	/** Describe generated rules without changing puzzle state or consuming random numbers. */
 	virtual Common::String debugGetAnswer() const = 0;
 	/** Describe the page's actual opportunity model. */
 	virtual PuzzleChanceInfo debugGetChances() const { return PuzzleChanceInfo(PuzzleChanceInfo::Type::kInfinite); }
 	/** Whether the current state permits editing a finite budget. */
 	virtual bool debugCanSetChances() const { return false; }
-	/** Set a validated remaining budget, including its visual and completion state. */
+	/** Set a positive remaining budget and its display without changing completion or Go state. */
 	virtual bool debugSetChances(int remaining) {
 		(void)remaining;
 		return false;
@@ -104,17 +107,12 @@ public:
 	virtual Common::String debugGetChanceDetails() const { return Common::String(); }
 
 private:
-	/** Shared small-Zoombini sprite animation drawn for the party roster on every puzzle page. */
-	static constexpr const char *kZoombiniAnimationPath = "bmp/zombis/littleZomb.anm";
-
 protected:
-	/** Display name set by the concrete puzzle page. */
-	const char *_puzzleName = nullptr;
 	/** Background path set by the concrete puzzle page for shared initialization. */
 	const char *_initialBackgroundPath = nullptr;
 	/** Banner shared by all puzzle answer reports. */
 	Common::String debugAnswerHeader() const;
-	/** Print a roster entry using stable one-based indices and named traits. */
+	/** Describe a party member by displayed name and named traits for a debug answer. */
 	Common::String debugActorDescription(int index) const;
 	/** Whether a forced departure has already been requested. */
 	bool _debugFinishPending = false;
@@ -130,12 +128,10 @@ protected:
 	void drawPrimaryPageLayer(ManagedSurface32 *screen);
 	/** Render active roster entries in stable ascending logical-Y order, with the held entry last. */
 	void renderZoombinis(ManagedSurface32 *screen) const;
-	/** Selected level captured for this puzzle instance. */
+	/** Selected difficulty captured for this puzzle instance, clamped to the inclusive range 1 through 4. */
 	int _puzzleLevel;
 	/** Path of the first-layer background used by puzzle-specific redraws. */
 	Common::String _backgroundPath;
-	/** Borrowed immutable sprite grid retained by the engine cache. */
-	const ZoombiniAnimation *_zoombiniAnimation = nullptr;
 	/** Active party entries mirrored from the engine's roster for this puzzle. */
 	Common::Array<ZoombiniRunner *> _puzzleZoombinis;
 	/** Gameplay deadline used by the concrete puzzle state machine. */

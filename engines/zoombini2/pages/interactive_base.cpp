@@ -274,7 +274,7 @@ void Sidebar::onMapClick() {
 	PageBase *page = _vm->getCurrentPage();
 	if (page)
 		page->onMapButtonPressed();
-	if (!_vm->_isSavedGame) {
+	if (_vm->inPracticeMode()) {
 		returnToMap();
 		return;
 	}
@@ -298,21 +298,24 @@ void Sidebar::onGoClick() {
 		return;
 	if (!page->onGoButtonPressed())
 		return;
-	if (!_vm->_isSavedGame) {
+	if (_vm->inPracticeMode()) {
 		returnToMap();
 		return;
 	}
 	const PageId pageId = _vm->getCurrentPageId();
-	_vm->_mapTransitionSourcePageId = pageId;
-	_vm->requestPageChange(kPageMapTrans);
+	_vm->_mapTransitSrcPageId = pageId;
+	_vm->requestPageChange(PageId::kPageMapTrans_22);
 }
 
 void Sidebar::returnToMap() {
 	if (_vm->isDemo()) {
-		_vm->requestPageChange(kPageTitleScreen);
+		_vm->requestPageChange(PageId::kPageTitleScreen_24);
 		return;
 	}
-	_vm->requestPageChange(_vm->_isSavedGame ? kPageMenuLoad : kPageMenuPractice);
+	if (_vm->inJourneyMode())
+		_vm->requestPageChange(PageId::kPageMapJourney_M4);
+	else
+		_vm->requestPageChange(PageId::kPageMapPractice_M3);
 }
 
 void Sidebar::requestAbandonConfirmation() {

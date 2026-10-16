@@ -34,13 +34,15 @@ public:
 
 	/** Load the background, start music, and establish the timeout. */
 	void init() override;
-	/** Request the sign-in page after input or timeout. */
+	/** Dismiss the title when its automatic timeout expires. */
 	void onUpdate() override;
 	/** Draw the title background. */
 	void onRenderContent(ManagedSurface32 *screen) override;
-	/** Mark the title screen as dismissed by the player. */
+	/** Dismiss the retail title on button press; consume demo presses until release. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
+	/** Dismiss the demo title on button release; pass retail releases through. */
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
+	/** Dismiss the title screen on any key press. */
 	EventHandleResult onKeyDown(const Common::KeyState &key, bool repeat) override;
 
 private:
@@ -51,10 +53,11 @@ private:
 	/** Demo-specific title music. */
 	static constexpr const char *kDemoMusicPath = "sounds/music/I_BB1.wav";
 
+	/** Mark the title as dismissed and queue the retail sign-in menu or demo Waterslide page. */
 	EventHandleResult dismiss();
-	/** Whether the player clicked to dismiss the title screen. */
+	/** Whether input or timeout has already requested dismissal. */
 	bool _clicked = false;
-	/** Gameplay deadline for automatic dismissal. */
+	/** Gameplay deadline in milliseconds for automatic dismissal. */
 	uint32 _deadline = 0;
 };
 

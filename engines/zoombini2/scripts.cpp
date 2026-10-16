@@ -112,11 +112,16 @@ StringParser::Result StringParser::parseUnsignedInt(const char *text, uint32 &re
 AnimationRunner::AnimationRunner(Zoombini2Engine *vm, const Common::Point32 &position, AnimationRunnerMode mode)
 	: _vm(vm), _position(position), _mode(mode) {
 	const uint32 tickCount = _vm ? _vm->getFrameTickCount() : 0;
-	if (_mode == AnimationRunnerMode::kLoop01) {
+	switch (_mode) {
+	case AnimationRunnerMode::kLoop01:
 		_currentTimedEntryIndex = 0;
 		_cycleStartTime = tickCount;
-	} else if (_mode == AnimationRunnerMode::kRandomIdle05) {
+		break;
+	case AnimationRunnerMode::kRandomIdle05:
 		_randomIdleGateTime = tickCount + getRandomDelay(6999);
+		break;
+	default:
+		break;
 	}
 }
 
@@ -230,9 +235,9 @@ void AnimationRunner::advanceAfterDraw(uint32 tickCount) {
 
 	bool selectedTimedEntry = false;
 	const uint32 elapsed = tickCount - _cycleStartTime;
-	for (int index = static_cast<int>(_timedFrames.size()) - 1; 0 <= index; index -= 1) {
-		if (elapsed < _timedFrames[index].cumulativeEndMs) {
-			_currentTimedEntryIndex = index;
+	for (int i = static_cast<int>(_timedFrames.size()) - 1; 0 <= i; i -= 1) {
+		if (elapsed < _timedFrames[i].cumulativeEndMs) {
+			_currentTimedEntryIndex = i;
 			selectedTimedEntry = true;
 		}
 	}
@@ -306,10 +311,10 @@ uint32 AnimationRunner::getRandomDelay(uint32 maximumInclusive) const {
 }
 
 int AnimationRunner::getScrolledX(int scrollX, int backgroundWidth) const {
-	if (backgroundWidth == ManagedSurface32::kScreenSize.width)
+	if (backgroundWidth == Gfx::kScreenSize.width)
 		return _position.x;
 	int screenX = _position.x - scrollX;
-	if (backgroundWidth - ManagedSurface32::kScreenSize.width < scrollX)
+	if (backgroundWidth - Gfx::kScreenSize.width < scrollX)
 		screenX += backgroundWidth;
 	return screenX;
 }
@@ -393,8 +398,8 @@ void Fixed32::operator/=(const Fixed32 &right) {
 	*this = *this / right;
 }
 
-bool Fixed32::operator>(const Fixed32 &right) const {
-	return right._rawValue < _rawValue;
+bool Fixed32::operator<(const Fixed32 &right) const {
+	return _rawValue < right._rawValue;
 }
 
 bool Fixed32::operator==(const Fixed32 &right) const {
@@ -505,7 +510,7 @@ Common::String PointFixed32::toString() const {
 }
 
 uint64 PointFixed32::rawMagnitudeDifference(const Fixed32 &left, const Fixed32 &right) {
-	const int64 difference = static_cast<int64>(left._rawValue) - static_cast<int64>(right._rawValue);
+	const int64 difference = static_cast<int64>(left.getRawValue()) - static_cast<int64>(right.getRawValue());
 	if (difference < 0)
 		return static_cast<uint64>(-difference);
 	return static_cast<uint64>(difference);
@@ -525,18 +530,30 @@ PointFixed32 operator*(int32 left, const PointFixed32 &right) {
 
 class CubicBezierCurve::Evaluator {
 public:
+	/** Release an evaluator through its numeric-independent interface. */
 	virtual ~Evaluator() {}
+	/** Return an independently allocated copy of the evaluator and its playback state. */
 	virtual Evaluator *clone() const = 0;
+	/** Assign pixel control points, a raw Q10 step and an endpoint evaluation wait count. */
 	virtual void init(const Common::Point32 &start, const Common::Point32 &control0, const Common::Point32 &control1, const Common::Point32 &end,
 					  int stepValue, int waitInitial) = 0;
+	/** Derive the cubic coefficients and reset parameter and endpoint wait progress. */
 	virtual void computeCoeffs() = 0;
+	/** Write the point for the gameplay timestamp in milliseconds; return false after traversal and endpoint waits. */
 	virtual bool evaluate(uint32 tickCount, Common::Point32 &outPosition) = 0;
+	/** Return the latest evaluated point as integer pixel coordinates. */
 	virtual Common::Point32 getPosition() const = 0;
+	/** Set the gameplay timestamp in milliseconds from which curve progress is measured. */
 	virtual void setStartTime(uint32 tickCount) = 0;
+	/** Return the gameplay timestamp in milliseconds from which curve progress is measured. */
 	virtual uint32 getStartTime() const = 0;
+	/** Set the number of endpoint evaluations remaining after traversal. */
 	virtual void setWaitRemaining(int waitRemaining) = 0;
+	/** Return the number of endpoint evaluations remaining after traversal. */
 	virtual int getWaitRemaining() const = 0;
+	/** Set the dimensionless curve parameter from a native float. */
 	virtual void setParameter(Float32 parameter) = 0;
+	/** Return the dimensionless curve parameter as a native float. */
 	virtual Float32 getParameter() const = 0;
 };
 
@@ -544,39 +561,59 @@ struct CubicBezierCurve::FixedNumeric {
 	typedef Fixed32 Scalar;
 	typedef PointFixed32 Point;
 
+	/** Convert an integer coordinate to a Q10 scalar. */
 	static Scalar fromInt(int32 value) { return Fixed32::fromInt(value); }
+	/** Interpret an integer as a raw Q10 scalar. */
 	static Scalar fromRaw(int32 value) { return Fixed32::fromRaw(value); }
+	/** Convert a native float to a Q10 scalar. */
 	static Scalar fromFloat(Float32 value) { return Fixed32::fromFloat(value); }
+	/** Return the integer component of a Q10 scalar. */
 	static int32 toInt(const Scalar &value) { return value.toInt(); }
+	/** Convert a Q10 scalar to a native float. */
 	static Float32 toFloat(const Scalar &value) { return value.toFloat(); }
-	static bool greater(const Scalar &left, const Scalar &right) { return left > right; }
+	/** Return whether the left scalar is strictly greater than the right scalar. */
+	static bool greater(const Scalar &left, const Scalar &right) { return right < left; }
 };
 
 struct CubicBezierCurve::FloatNumeric {
 	typedef Float32 Scalar;
 
 	struct Point {
+		/** Horizontal curve coordinate in floating-point pixel units. */
 		Scalar x = 0.0f;
+		/** Vertical curve coordinate in floating-point pixel units. */
 		Scalar y = 0.0f;
 
+		/** Construct a floating-point point at the origin. */
 		Point() = default;
-		Point(Scalar xValue, Scalar yValue) : x(xValue), y(yValue) {}
+		/** Construct a point from floating-point pixel coordinates. */
+		Point(Scalar xValue, Scalar yValue)
+			: x(xValue), y(yValue) {}
 
+		/** Return the component-wise sum of two points. */
 		Point operator+(const Point &right) const { return Point(x + right.x, y + right.y); }
+		/** Return the component-wise difference of two points. */
 		Point operator-(const Point &right) const { return Point(x - right.x, y - right.y); }
+		/** Scale both point coordinates by the supplied scalar. */
 		Point operator*(Scalar right) const { return Point(x * right, y * right); }
 	};
 
+	/** Convert an integer coordinate to a floating-point scalar. */
 	static Scalar fromInt(int32 value) { return static_cast<Scalar>(value); }
+	/** Convert raw Q10 units to a floating-point scalar. */
 	static Scalar fromRaw(int32 value) { return static_cast<Scalar>(value) / 1024.0f; }
+	/** Retain a native float without conversion. */
 	static Scalar fromFloat(Float32 value) { return value; }
+	/** Round a floating-point coordinate down to an integer pixel coordinate. */
 	static int32 toInt(Scalar value) {
 		int32 result = static_cast<int32>(value);
 		if (value < static_cast<Scalar>(result))
 			result -= 1;
 		return result;
 	}
+	/** Return the native floating-point scalar. */
 	static Float32 toFloat(Scalar value) { return value; }
+	/** Return whether the left scalar is strictly greater than the right scalar. */
 	static bool greater(Scalar left, Scalar right) { return right < left; }
 };
 
@@ -586,12 +623,15 @@ public:
 	typedef typename Numeric::Scalar Scalar;
 	typedef typename Numeric::Point Point;
 
+	/** Construct an evaluator with zeroed control points, coefficients and playback state. */
 	TypedEvaluator() = default;
 
+	/** Return an independently allocated copy of the evaluator and its playback state. */
 	Evaluator *clone() const override {
 		return new TypedEvaluator<Numeric>(*this);
 	}
 
+	/** Assign pixel control points, a raw Q10 step and an endpoint evaluation wait count. */
 	void init(const Common::Point32 &start, const Common::Point32 &control0, const Common::Point32 &control1, const Common::Point32 &end,
 			  int stepValue, int waitInitial) override {
 		_start = Point(Numeric::fromInt(start.x), Numeric::fromInt(start.y));
@@ -609,6 +649,7 @@ public:
 		_startTime = 0;
 	}
 
+	/** Derive the cubic coefficients and reset parameter and endpoint wait progress. */
 	void computeCoeffs() override {
 		_parameter = Scalar();
 		const Scalar three = Numeric::fromInt(3);
@@ -618,6 +659,7 @@ public:
 		_waitRemaining = _waitInitial;
 	}
 
+	/** Write the point for the gameplay timestamp in milliseconds; return false after traversal and endpoint waits. */
 	bool evaluate(uint32 tickCount, Common::Point32 &outPosition) override {
 		const Scalar completionThreshold = Numeric::fromRaw(950);
 		if (!Numeric::greater(_parameter, completionThreshold)) {
@@ -638,35 +680,56 @@ public:
 		return false;
 	}
 
+	/** Return the latest evaluated point as integer pixel coordinates. */
 	Common::Point32 getPosition() const override {
 		return Common::Point32(Numeric::toInt(_position.x), Numeric::toInt(_position.y));
 	}
 
+	/** Set the gameplay timestamp in milliseconds from which curve progress is measured. */
 	void setStartTime(uint32 tickCount) override { _startTime = tickCount; }
+	/** Return the gameplay timestamp in milliseconds from which curve progress is measured. */
 	uint32 getStartTime() const override { return _startTime; }
+	/** Set the number of endpoint evaluations remaining after traversal. */
 	void setWaitRemaining(int waitRemaining) override { _waitRemaining = waitRemaining; }
+	/** Return the number of endpoint evaluations remaining after traversal. */
 	int getWaitRemaining() const override { return _waitRemaining; }
+	/** Set the dimensionless curve parameter from a native float. */
 	void setParameter(Float32 parameter) override {
 		_parameter = Numeric::fromFloat(parameter);
 		calculatePosition();
 	}
+	/** Return the dimensionless curve parameter as a native float. */
 	Float32 getParameter() const override { return Numeric::toFloat(_parameter); }
 
 private:
+	/** Start point in the selected numeric representation. */
 	Point _start = Point();
+	/** First control point in the selected numeric representation. */
 	Point _control0 = Point();
+	/** Second control point in the selected numeric representation. */
 	Point _control1 = Point();
+	/** End point in the selected numeric representation. */
 	Point _end = Point();
+	/** Coefficient of the cubic parameter term for both coordinates. */
 	Point _cubic = Point();
+	/** Coefficient of the quadratic parameter term for both coordinates. */
 	Point _quadratic = Point();
+	/** Coefficient of the linear parameter term for both coordinates. */
 	Point _linear = Point();
+	/** Current dimensionless curve parameter in the selected numeric representation. */
 	Scalar _parameter = Scalar();
+	/** Most recently evaluated point in the selected numeric representation. */
 	Point _position = Point();
+	/** Parameter increment per five-millisecond elapsed-time step. */
 	Scalar _step = Scalar();
+	/** Configured number of extra endpoint evaluations after traversal. */
 	int _waitInitial = 0;
+	/** Number of extra endpoint evaluations still to perform. */
 	int _waitRemaining = 0;
+	/** Gameplay timestamp in milliseconds from which curve progress is measured. */
 	uint32 _startTime = 0;
 
+	/** Evaluate the retained cubic polynomial at the current parameter. */
 	void calculatePosition() {
 		const Scalar squaredParameter = _parameter * _parameter;
 		const Scalar cubedParameter = squaredParameter * _parameter;
@@ -832,10 +895,6 @@ void PathObject::appendSegment(const Common::Point32 &start, const Common::Point
  * step and wait values.
  */
 PathObject *PathObject::loadFromPAT(Zoombini2Engine *vm, const Common::Path &path) {
-	return vm->loadPagePATPath(path);
-}
-
-PathObject *PathObject::loadUncachedPAT(Zoombini2Engine *vm, const Common::Path &path) {
 	Common::ScopedPtr<Common::SeekableReadStream> stream(vm->openResourceFile(path.toString('/')));
 	if (!stream) {
 		warning("PathObject: cannot open PAT '%s'", path.toString().c_str());
@@ -1013,7 +1072,7 @@ bool PathObject::advance(uint32 tickCount, Common::Point32 &outPos) {
 		return false;
 	}
 
-	if (currentSegment >= static_cast<int>(segments.size())) {
+	if (static_cast<int>(segments.size()) <= currentSegment) {
 		_finished = true;
 		outPos = endPos;
 		return false;
@@ -1054,11 +1113,29 @@ void PathObject::synchronizeNumericMode() {
 		segments[i]->setFloatingPointMode(useFloatingPoint);
 }
 
-ZoombiniRunner::ZoombiniRunner() {
+ZoombiniRunner::ZoombiniRunner(Zoombini2Engine *vm)
+	: _vm(vm) {
+}
+
+const ZoombiniAnimation *ZoombiniRunner::getCommonAnimation(ZmbAnimationKind animKind) const {
+	assert(_vm && _vm->_gfx);
+	return _vm->_gfx->getCommonZoombiniAnimation(animKind);
 }
 
 ZoombiniRunner::~ZoombiniRunner() {
 	clearMovement();
+}
+
+ZoombiniRunner *ZoombiniRunner::cloneForRoster() const {
+	ZoombiniRunner *copy = new ZoombiniRunner(_vm);
+	copy->setStoredTraits(getTraits());
+	copy->setNameBytes(getNameBytes());
+	return copy;
+}
+
+void ZoombiniRunner::setStoredTraits(const ZmbTrait &traits) {
+	_traits = traits;
+	_traitHash = _traits.calculateHash();
 }
 
 Common::String ZoombiniRunner::getName() const {
@@ -1147,7 +1224,7 @@ void ZoombiniRunner::startMovement(PathObject *path, uint32 tickCount) {
 }
 
 bool ZoombiniRunner::loadMovementPathFromPAT(Zoombini2Engine *vm, const Common::Path &path) {
-	PathObject *movementPath = PathObject::loadFromPAT(vm, path);
+	PathObject *movementPath = vm->loadPagePATPath(path);
 	if (!movementPath)
 		return false;
 	clearMovement();
@@ -1388,10 +1465,23 @@ int ZoombiniRunner::findReleaseDropTarget(const ZoombiniRunner &zoombini, const 
 	return -1;
 }
 
-ZmbDropResult ZoombiniRunner::handlePointerInput(const Common::Array<ZoombiniRunner *> &zoombinis, const Common::Point32 &pointerPos,
-												 bool clickReleased, const ZoombiniAnimation *pickupAnimation, uint32 tickCount,
-												 Common::Array<ZmbDropTarget> *dropTargets, const AreaMask *areaMask,
-												 int scrollX, int backgroundWidth) {
+ZmbDropResult ZoombiniRunner::handleHoldAndDrop(Zoombini2Engine *vm, const Common::Array<ZoombiniRunner *> &zoombinis, const Common::Point32 &cursorPos,
+												ZmbHoldDropInput input, ZmbAnimationKind animKind, Common::Array<ZmbDropTarget> *dropTargets,
+												const AreaMask *areaMask, int scrollX, int backgroundWidth) {
+	const ZoombiniAnimation *animation = nullptr;
+	for (uint i = 0; i < zoombinis.size(); i++) {
+		if (zoombinis[i]) {
+			animation = zoombinis[i]->getCommonAnimation(animKind);
+			break;
+		}
+	}
+	return handleHoldAndDrop(vm, zoombinis, cursorPos, input, animation, dropTargets, areaMask, scrollX, backgroundWidth);
+}
+
+ZmbDropResult ZoombiniRunner::handleHoldAndDrop(Zoombini2Engine *vm, const Common::Array<ZoombiniRunner *> &zoombinis, const Common::Point32 &cursorPos,
+												ZmbHoldDropInput input, const ZoombiniAnimation *pickupAnimation, Common::Array<ZmbDropTarget> *dropTargets,
+												const AreaMask *areaMask, int scrollX, int backgroundWidth) {
+	const uint32 tickCount = vm->getTotalPlayTime();
 	ZoombiniRunner *dragged = nullptr;
 	int draggedIndex = -1;
 	for (uint i = 0; i < zoombinis.size(); i++) {
@@ -1407,19 +1497,23 @@ ZmbDropResult ZoombiniRunner::handlePointerInput(const Common::Array<ZoombiniRun
 	}
 
 	if (dragged) {
-		dragged->updateDrag(pointerPos);
+		dragged->updateDrag(cursorPos);
 		dragged->_overDropTarget = false;
 		dragged->_hoveredDropTargetIndex = -1;
 		if (dropTargets) {
-			dragged->_hoveredDropTargetIndex = findHoveredDropTarget(*dragged, pointerPos, *dropTargets);
+			dragged->_hoveredDropTargetIndex = findHoveredDropTarget(*dragged, cursorPos, *dropTargets);
 			dragged->_overDropTarget = dragged->_hoveredDropTargetIndex != -1;
 		}
 
-		if (!clickReleased)
+		switch (input) {
+		case ZmbHoldDropInput::kMoveOnly:
 			return ZmbDropResult::kStillHeld04;
+		case ZmbHoldDropInput::kLeftButtonRelease:
+			break;
+		}
 		int targetIndex = -1;
 		if (dropTargets)
-			targetIndex = findReleaseDropTarget(*dragged, pointerPos, *dropTargets, scrollX, backgroundWidth);
+			targetIndex = findReleaseDropTarget(*dragged, cursorPos, *dropTargets, scrollX, backgroundWidth);
 		if (dropTargets && targetIndex != -1) {
 			ZmbDropTarget &target = (*dropTargets)[targetIndex];
 			dragged->endDrag(false);
@@ -1429,18 +1523,22 @@ ZmbDropResult ZoombiniRunner::handlePointerInput(const Common::Array<ZoombiniRun
 				target.callback(target.callbackContext, targetIndex, draggedIndex);
 			return ZmbDropResult::kDroppedOnTarget02;
 		}
-		if (areaMask && areaMask->hasMarkedByteAt(Common::Point32(pointerPos.x, pointerPos.y))) {
+		if (areaMask && areaMask->hasMarkedByteAt(Common::Point32(cursorPos.x, cursorPos.y))) {
 			dragged->endDrag(true);
 			return ZmbDropResult::kDroppedOnArea03;
 		}
 		return ZmbDropResult::kStillHeld04;
 	}
 
-	if (!clickReleased)
+	switch (input) {
+	case ZmbHoldDropInput::kMoveOnly:
 		return ZmbDropResult::kIgnored00;
+	case ZmbHoldDropInput::kLeftButtonRelease:
+		break;
+	}
 	for (uint i = 0; i < zoombinis.size(); i++) {
 		ZoombiniRunner *zoombini = zoombinis[i];
-		if (!zoombini || !zoombini->canBeginDrag(pointerPos))
+		if (!zoombini || !zoombini->canBeginDrag(cursorPos))
 			continue;
 		if (dropTargets) {
 			for (uint targetIndex = 0; targetIndex < dropTargets->size(); targetIndex++) {
@@ -1452,7 +1550,7 @@ ZmbDropResult ZoombiniRunner::handlePointerInput(const Common::Array<ZoombiniRun
 					target.callback(target.callbackContext, static_cast<int>(targetIndex), static_cast<int>(i));
 			}
 		}
-		zoombini->startDrag(pointerPos, pickupAnimation, tickCount);
+		zoombini->startDrag(cursorPos, pickupAnimation, tickCount);
 		return ZmbDropResult::kPickedUp01;
 	}
 	return ZmbDropResult::kIgnored00;

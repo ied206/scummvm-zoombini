@@ -41,6 +41,7 @@ class ManagedSurface32;
 class PageLayer : public Common::NonCopyable {
 public:
 	/** Initialize a layer with its horizontal scroll direction and optional bit-block background.
+	 * Layers without a background use @ref Gfx::kScreenSize.
 	 * @param backgroundPath Scrolling or fixed background bitmap for this layer, or empty for a backgroundless layer.
 	 */
 	PageLayer(Zoombini2Engine *vm, byte scrollDirection, const Common::Path &backgroundPath = Common::Path());
@@ -51,9 +52,7 @@ public:
 	 * @param path Bitmap resource used as this layer's background.
 	 */
 	bool loadBackground(const Common::Path &path);
-	/** Return the background dimensions copied from the first layer when this layer has no bitmap. */
-	const Size32 &getBackgroundSize() const { return _backgroundSize; }
-	/** Return whether this layer was created without a background bitmap. */
+	/** Return whether this layer has no background bitmap. */
 	bool isBackgroundless() const { return _backgroundless; }
 
 	/** Create and append one general-object animation runner. */
@@ -116,10 +115,6 @@ public:
 	void drawAndUpdate(ManagedSurface32 *screen, bool forceBackgroundRedraw = false);
 
 private:
-	friend class PageLayerStack;
-
-	/** Replace dimensions copied from the stack's first layer. */
-	void setBackgroundSize(const Size32 &size);
 	/** Convert a screen pointer X coordinate to the layer's background coordinate. */
 	int getWorldX(int screenX) const;
 	/** Apply the original single-step horizontal wrapping rules. */
@@ -129,13 +124,13 @@ private:
 	Zoombini2Engine *_vm;
 	/** Signed horizontal position applied to this layer. */
 	int16 _scrollX = 0;
-	/** Background dimensions retained locally or copied from the first stack layer. */
-	Size32 _backgroundSize = Size32();
+	/** Background bitmap dimensions, or the fixed screen size when no bitmap is loaded. */
+	Size32 _backgroundSize = Gfx::kScreenSize;
 	/** Multiplier applied by @ref PageLayer::scrollBy. */
 	int16 _scrollByMultiplier;
 	/** Animation runners released with this layer. */
 	Common::Array<AnimationRunner *> _animationRunners;
-	/** Whether this layer was created without a background bitmap. */
+	/** Whether this layer has no background bitmap. */
 	bool _backgroundless = true;
 	/** Whether a non-scrolling background has already been materialized. */
 	bool _backgroundDrawn = false;
@@ -161,7 +156,7 @@ public:
 	PageLayer *getLayer(int layerIndex) const;
 	/** Return the number of page layers. */
 	uint getLayerCount() const { return _layers.size(); }
-	/** Replace one layer's bit-block background and propagate first-layer dimensions to backgroundless followers.
+	/** Replace one layer's bit-block background.
 	 * @param path Bitmap resource used as the selected layer's background.
 	 */
 	bool loadLayerBackground(int layerIndex, const Common::Path &path);
@@ -187,9 +182,6 @@ public:
 	void drawFirstLayer(ManagedSurface32 *screen, bool forceBackgroundRedraw = false);
 
 private:
-	/** Copy the first layer dimensions into every backgroundless follower. */
-	void propagateFirstLayerDimensions();
-
 	/** Borrowed engine interface passed to page-layer resources. */
 	Zoombini2Engine *_vm;
 	/** Layers released with the current page. */
@@ -225,6 +217,7 @@ enum class EventHandleResult {
 /** Common ordered input dispatch for pages and their shared controls. */
 class PageEventHandler {
 public:
+	/** Release an input handler through its common dispatch interface. */
 	virtual ~PageEventHandler() {}
 	/** Dispatch one backend event to its typed callback. */
 	EventHandleResult handleEvent(const Common::Event &event);
@@ -309,8 +302,8 @@ public:
 	virtual bool canUseGoButton() const { return hasGoButton(); }
 	/** Apply page-local state that must be settled before Map saves or leaves the page. */
 	virtual void onMapButtonPressed() {}
-	/** Prepare page-local state before a debugger-requested route transition. */
-	virtual void debugPrepareRouteDeparture() {}
+	/** Return whether the page's selected travelers permit a debugger transfer. */
+	virtual bool debugCanDepart() const { return true; }
 	/** Handle page-local Go speech; return true to continue the shared transition. */
 	virtual bool onGoButtonPressed() { return true; }
 	/** Return whether page-local state prevents the sidebar from accepting pointer input. */
@@ -355,7 +348,7 @@ protected:
 	/** Category assigned to this page for lifecycle and UI policy. */
 	const PageCategory _pageCategory;
 	/** Numeric dispatcher identifier for this page. */
-	PageId _pageId = kPageNone;
+	PageId _pageId = PageId::kPageNone_M1;
 	/** Optional page-area mask released with this page. */
 	AreaMask *_areaMask = nullptr;
 

@@ -26,7 +26,7 @@
 
 namespace Zoombini2 {
 
-constexpr const char *PuzzleWaterslide::kPuzzleName;
+constexpr const char *PuzzleWaterslide::kPageName;
 constexpr const char *PuzzleWaterslide::kBackgroundPath;
 constexpr const char *PuzzleWaterslide::kMusicPath;
 constexpr const char *PuzzleWaterslide::kTraitFormat;
@@ -46,9 +46,6 @@ constexpr const char *PuzzleWaterslide::kTreePath;
 constexpr const char *PuzzleWaterslide::kValvePath;
 constexpr const char *PuzzleWaterslide::kCascadeFormat;
 constexpr const char *PuzzleWaterslide::kAreaPath;
-constexpr const char *PuzzleWaterslide::kPickupPath;
-constexpr const char *PuzzleWaterslide::kIdlePath;
-constexpr const char *PuzzleWaterslide::kAspirationPath;
 constexpr const char *PuzzleWaterslide::kSoundFormat;
 constexpr const char *PuzzleWaterslide::kPraisePath;
 constexpr const char *PuzzleWaterslide::kPartialPraisePath;
@@ -59,8 +56,8 @@ constexpr Common::Point32 PuzzleWaterslide::kWaitingPositions[16];
 constexpr int PuzzleWaterslide::kNeighbors[16][5];
 constexpr PuzzleWaterslide::GraphPlacement PuzzleWaterslide::kGraphPlacements[26];
 
-PuzzleWaterslide::PuzzleWaterslide(Zoombini2Engine *vm) : PuzzleBase(vm, kPageWaterslide) {
-	_puzzleName = kPuzzleName;
+PuzzleWaterslide::PuzzleWaterslide(Zoombini2Engine *vm)
+	: PuzzleBase(vm, PageId::kPageWaterslide_02) {
 	_initialBackgroundPath = kBackgroundPath;
 }
 
@@ -85,9 +82,8 @@ void PuzzleWaterslide::init() {
 	if (_vm->isDemo())
 		createDemoParty();
 	PuzzleBase::init();
-	_level = CLIP(_puzzleLevel, 1, 4);
 	const int count = _puzzleZoombinis.size();
-	const int slots = _level == 1 ? count : 16;
+	const int slots = _puzzleLevel == 1 ? count : 16;
 	_solution.resize(slots);
 	_eligible.resize(count);
 	for (int i = 0; i < slots; i++)
@@ -102,18 +98,23 @@ void PuzzleWaterslide::init() {
 		}
 	}
 	if (0 < count) {
-		if (_level == 1)
+		switch (_puzzleLevel) {
+		case 1:
 			generateEasy();
-		else if (_level == 2)
+			break;
+		case 2:
 			generateMedium();
-		else
+			break;
+		default:
 			generateHard();
+			break;
+		}
 	}
 	loadResources();
 	setupTargets();
 	for (int i = 0; i < count; i++) {
 		ZoombiniRunner *actor = _puzzleZoombinis[i];
-		actor->setDefaultAnimation(_zoombiniAnimation);
+		actor->setDefaultAnimation(ZmbAnimationKind::kBasic);
 		actor->resetAnimation();
 		actor->setPosition(kWaitingPositions[i]);
 		actor->setInputEnabled(true);
@@ -121,22 +122,22 @@ void PuzzleWaterslide::init() {
 		actor->setHidden(false);
 	}
 	startPageMusic(Common::Path(kMusicPath));
-	if (_vm->_isSavedGame)
-		_vm->_state->registerPageVisit(kPageWaterslide, 2);
+	if (_vm->inJourneyMode())
+		_vm->_state->registerPageVisit(PageId::kPageWaterslide_02, 1);
 }
 
 void PuzzleWaterslide::createDemoParty() {
-	_vm->_isSavedGame = false;
+	_vm->setGameMode(GameMode::kPracticeMode);
 	_vm->_state->_level = 1;
 	_puzzleLevel = 1;
 	_vm->_zoombiniWalkingFlag = false;
 	_vm->_state->clearActiveZoombinis();
-	for (int index = 0; index < 16; index++) {
+	for (int i = 0; i < 16; i++) {
 		const byte hair = static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1);
 		const byte eyes = static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1);
 		const byte nose = static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1);
 		const byte feet = static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1);
-		ZoombiniRunner *actor = new ZoombiniRunner();
+		ZoombiniRunner *actor = new ZoombiniRunner(_vm);
 		actor->setTraits(ZmbTrait(feet, nose, hair, eyes));
 		actor->setAnimationCell(33);
 		_vm->_state->_activeZoombinis.push_back(actor);
@@ -153,11 +154,11 @@ void PuzzleWaterslide::loadResources() {
 		gfx->loadPageRleBlock(Common::String::format(kTraitFormat, axis + 1));
 	gfx->loadPageRleBlock(kEdgePath);
 	gfx->loadPageRleBlock(kPastillePath);
-	for (int color = 0; color < 2; color++) {
+	for (int color = 0; color < ARRAYSIZE(kPipeColors); color++) {
 		const char *name = kPipeColors[color];
-		if (_level < 3) {
+		if (_puzzleLevel < 3) {
 			gfx->loadPageRleBlock(Common::String::format(kHorizontalFormat, name));
-			if (_level == 2)
+			if (_puzzleLevel == 2)
 				for (int arm = 0; arm < 5; arm++)
 					gfx->loadPageRleBlock(Common::String::format(kSelectorFormat, name, arm + 1));
 		} else {
@@ -165,8 +166,8 @@ void PuzzleWaterslide::loadResources() {
 				gfx->loadPageRleBlock(Common::String::format(kHardPipeFormat, kHardPipeColors[color], type + 1));
 		}
 	}
-	if (_level < 3) {
-		gfx->loadPageRleBlock(Common::String::format(kLargePipeFormat, _level));
+	if (_puzzleLevel < 3) {
+		gfx->loadPageRleBlock(Common::String::format(kLargePipeFormat, _puzzleLevel));
 		gfx->loadPageRleBlock(kMiniDiagonalPath);
 		gfx->loadPageRleBlock(kMiniHorizontalPath);
 	} else {
@@ -179,9 +180,9 @@ void PuzzleWaterslide::loadResources() {
 	_valve = new Animation(_vm);
 	_valve->loadFromFile(Common::Path(kValvePath));
 	_cascade = new Animation(_vm);
-	_cascade->loadFromFile(Common::Path(Common::String::format(kCascadeFormat, _level < 3 ? 1 : 2)));
-	_valvePos = _level < 3 ? Common::Point32(470, 139) : Common::Point32(660, 501);
-	_cascadePos = _level < 3 ? Common::Point32(505, 139) : Common::Point32(689, 505);
+	_cascade->loadFromFile(Common::Path(Common::String::format(kCascadeFormat, _puzzleLevel < 3 ? 1 : 2)));
+	_valvePos = _puzzleLevel < 3 ? Common::Point32(470, 139) : Common::Point32(660, 501);
+	_cascadePos = _puzzleLevel < 3 ? Common::Point32(505, 139) : Common::Point32(689, 505);
 	_valveRunner = new AnimationRunner(_vm, _valvePos, AnimationRunnerMode::kPlayOnceAndHide02);
 	_valveRunner->setAnimation(_valve);
 	_valveRunner->setHitRect(Common::Rect32(_valvePos.x, _valvePos.y, _valvePos.x + 55, _valvePos.y + 42));
@@ -194,10 +195,16 @@ void PuzzleWaterslide::loadResources() {
 		0,
 	};
 	int valveCycles = 1;
-	if (_level == 1)
+	switch (_puzzleLevel) {
+	case 1:
 		valveCycles = 4;
-	else if (_level == 2)
+		break;
+	case 2:
 		valveCycles = 2;
+		break;
+	default:
+		break;
+	}
 	for (int cycle = 0; cycle < valveCycles; cycle++) {
 		for (int frame : valveFrames)
 			_valveRunner->addTimedFrame(frame, 60);
@@ -217,9 +224,6 @@ void PuzzleWaterslide::loadResources() {
 		_fountainRunner->addTimedFrame(frame, 200);
 	}
 	_treeRunner->addTimedFrame(3, 2000);
-	_pickup = _vm->loadZoombiniAnimation(Common::Path(kPickupPath), 100);
-	_idle = _vm->loadZoombiniAnimation(Common::Path(kIdlePath), 50);
-	_aspiration = _vm->loadZoombiniAnimation(Common::Path(kAspirationPath), 50);
 	loadAreaMask(Common::Path(kAreaPath));
 	if (SoundManager *sound = _vm->getSoundManager()) {
 		static constexpr const char *ids[6] = {
@@ -230,7 +234,7 @@ void PuzzleWaterslide::loadResources() {
 			"02-BS04",
 			"02-BS05",
 		};
-		for (int i = 0; i < 6; i++)
+		for (int i = 0; i < ARRAYSIZE(_sounds); i++)
 			_sounds[i] = sound->load(false, Common::Path(Common::String::format(kSoundFormat, ids[i])), false);
 	}
 }
@@ -434,14 +438,14 @@ void PuzzleWaterslide::generateMedium() {
 		available.resize(count);
 		for (int i = 0; i < count; i++)
 			available[i] = true;
-		for (int layer = 0; layer < 3; layer++)
-			for (int arm = 0; arm < 5; arm++)
+		for (int layer = 0; layer < ARRAYSIZE(records); layer++)
+			for (int arm = 0; arm < ARRAYSIZE(records[layer]); arm++)
 				records[layer][arm] = Pair();
 		root = _vm->_rnd->getRandomNumber(count - 1);
 		available[root] = false;
 		int errors = 0;
 		int generated = 0;
-		for (int layer = 2; 0 <= layer; layer -= 1) {
+		for (int layer = ARRAYSIZE(records) - 1; 0 <= layer; layer -= 1) {
 			for (int arm = 0; arm < (count + 1) / 3 && generated < count; arm++) {
 				const int source = layer == 2 ? root : records[layer + 1][arm].a;
 				if (!findPair(source, available, records[layer][arm]))
@@ -453,8 +457,8 @@ void PuzzleWaterslide::generateMedium() {
 			break;
 	}
 	_solution[15] = _generationOrder[root];
-	for (int arm = 0; arm < 5; arm++) {
-		for (int depth = 0; depth < 3; depth++) {
+	for (int arm = 0; arm < ARRAYSIZE(records[0]); arm++) {
+		for (int depth = 0; depth < ARRAYSIZE(records); depth++) {
 			const int slot = arm + depth * 5;
 			if (count <= 1 + arm * 3 + depth)
 				continue;
@@ -464,6 +468,23 @@ void PuzzleWaterslide::generateMedium() {
 				_solution[slot] = _generationOrder[pair.a];
 		}
 	}
+	// Unlabeled branches accept the remaining actors without changing the generated constraints.
+	Common::Array<bool> assigned;
+	assigned.resize(count);
+	for (int actor : _solution)
+		if (0 <= actor)
+			assigned[actor] = true;
+	Common::Array<int> remaining;
+	for (int actor = 0; actor < count; actor++)
+		if (!assigned[actor])
+			remaining.push_back(actor);
+	uint next = 0;
+	for (const Edge &edge : _edges) {
+		if (0 <= _solution[edge.b])
+			continue;
+		_solution[edge.b] = remaining[next];
+		next += 1;
+	}
 }
 
 int PuzzleWaterslide::generateGraph(bool randomRoot) {
@@ -471,7 +492,7 @@ int PuzzleWaterslide::generateGraph(bool randomRoot) {
 	int nodes[16];
 	Common::Array<bool> available;
 	available.resize(count);
-	for (int i = 0; i < 16; i++) {
+	for (int i = 0; i < ARRAYSIZE(nodes); i++) {
 		nodes[i] = -1;
 		_solution[i] = -1;
 	}
@@ -487,7 +508,7 @@ int PuzzleWaterslide::generateGraph(bool randomRoot) {
 		for (int candidate = 0; candidate < count && !assigned; candidate++) {
 			if (!available[candidate])
 				continue;
-			for (int parent = 0; parent < 16 && !assigned; parent++) {
+			for (int parent = 0; parent < ARRAYSIZE(nodes) && !assigned; parent++) {
 				if (nodes[parent] < 0)
 					continue;
 				const int axis = sharedAxis(candidate, nodes[parent], false);
@@ -495,7 +516,7 @@ int PuzzleWaterslide::generateGraph(bool randomRoot) {
 					continue;
 				int tried = 0;
 				while (tried != 31) {
-					const int neighbor = _vm->_rnd->getRandomNumber(4);
+					const int neighbor = _vm->_rnd->getRandomNumber(ARRAYSIZE(kNeighbors[parent]) - 1);
 					tried |= 1 << neighbor;
 					const int slot = kNeighbors[parent][neighbor];
 					if (slot < 0 || 0 <= nodes[slot])
@@ -509,10 +530,10 @@ int PuzzleWaterslide::generateGraph(bool randomRoot) {
 			}
 		}
 		while (!assigned) {
-			const int slot = _vm->_rnd->getRandomNumber(15);
+			const int slot = _vm->_rnd->getRandomNumber(ARRAYSIZE(nodes) - 1);
 			if (0 <= nodes[slot])
 				continue;
-			for (int neighbor = 0; neighbor < 5; neighbor++) {
+			for (int neighbor = 0; neighbor < ARRAYSIZE(kNeighbors[slot]); neighbor++) {
 				const int parent = kNeighbors[slot][neighbor];
 				if (parent < 0 || nodes[parent] < 0)
 					continue;
@@ -528,7 +549,7 @@ int PuzzleWaterslide::generateGraph(bool randomRoot) {
 			}
 		}
 	}
-	for (int slot = 0; slot < 16; slot++)
+	for (int slot = 0; slot < ARRAYSIZE(nodes); slot++)
 		if (0 <= nodes[slot])
 			_solution[slot] = _generationOrder[nodes[slot]];
 	return errors;
@@ -573,12 +594,12 @@ void PuzzleWaterslide::generateHard() {
 		if (errors < bestErrors) {
 			bestErrors = errors;
 			best = _edges;
-			for (int i = 0; i < 16; i++)
+			for (int i = 0; i < ARRAYSIZE(bestSolution); i++)
 				bestSolution[i] = _solution[i];
 		}
 	}
 	_edges = best;
-	for (int i = 0; i < 16; i++)
+	for (int i = 0; i < ARRAYSIZE(bestSolution); i++)
 		_solution[i] = bestSolution[i];
 }
 
@@ -602,12 +623,13 @@ const PuzzleWaterslide::GraphPlacement *PuzzleWaterslide::graphPlacement(const E
 
 void PuzzleWaterslide::setupTargets() {
 	const int count = _puzzleZoombinis.size();
-	const int slots = _level == 1 ? count : 16;
+	const int slots = _puzzleLevel == 1 ? count : 16;
 	_targets.resize(slots);
 	_activeSlot.resize(slots);
 	for (int slot = 0; slot < slots; slot++) {
 		Common::Point32 pos;
-		if (_level == 1) {
+		switch (_puzzleLevel) {
+		case 1: {
 			const int rows = (count + 1) / 2;
 			const bool right = slot < rows;
 			int row = slot - rows;
@@ -620,18 +642,22 @@ void PuzzleWaterslide::setupTargets() {
 			}
 			pos = Common::Point32(baseX + row * 28, baseY + row * 60);
 			_activeSlot[slot] = true;
-		} else if (_level == 2) {
+			break;
+		}
+		case 2:
 			if (slot == 15)
 				pos = Common::Point32(254, 363);
 			else
 				pos = Common::Point32(333 + slot / 5 * 100 + slot % 5 * 28, 250 + slot % 5 * 60);
 			_activeSlot[slot] = slot == 15 || 1 + slot % 5 * 3 + slot / 5 < count;
-		} else {
+			break;
+		default:
 			pos = graphPosition(slot) + Common::Point32(163, 227);
 			_activeSlot[slot] = slot == 0;
 			for (const Edge &edge : _edges)
 				if (edge.a == slot || edge.b == slot)
 					_activeSlot[slot] = true;
+			break;
 		}
 		if (!_activeSlot[slot])
 			pos = Common::Point32(1000, 1000);
@@ -661,20 +687,20 @@ void PuzzleWaterslide::evaluateConnections() {
 	const int previous = _connectionCount;
 	_connectionCount = 0;
 	bool reached[16] = {};
-	const int root = _level == 2 ? 15 : 0;
+	const int root = _puzzleLevel == 2 ? 15 : 0;
 	if (!_targets.empty())
 		reached[root] = _targets[root].occupied;
 	for (Edge &edge : _edges)
 		edge.connected = matches(edge);
 	int mediumCount = 0;
-	if (_level == 2) {
+	if (_puzzleLevel == 2) {
 		bool valid[3][5] = {};
 		for (const Edge &edge : _edges) {
 			valid[edge.b / 5][edge.b % 5] = edge.connected;
 			if (edge.connected)
 				mediumCount += 1;
 		}
-		for (int arm = 0; arm < 5; arm++) {
+		for (int arm = 0; arm < ARRAYSIZE(valid[0]); arm++) {
 			if (!valid[0][arm] || !valid[1][arm]) {
 				if (_targets[arm + 10].occupied)
 					mediumCount -= 1;
@@ -689,8 +715,8 @@ void PuzzleWaterslide::evaluateConnections() {
 			}
 		}
 	}
-	if (1 < _level) {
-		for (int pass = 0; pass < 16; pass++) {
+	if (1 < _puzzleLevel) {
+		for (int pass = 0; pass < ARRAYSIZE(reached); pass++) {
 			for (const Edge &edge : _edges) {
 				if (edge.connected && (reached[edge.a] || reached[edge.b]))
 					reached[edge.a] = reached[edge.b] = true;
@@ -698,18 +724,18 @@ void PuzzleWaterslide::evaluateConnections() {
 		}
 	}
 	for (Edge &edge : _edges) {
-		edge.connected = edge.connected && (_level == 1 || reached[edge.a]);
+		edge.connected = edge.connected && (_puzzleLevel == 1 || reached[edge.a]);
 		if (edge.connected) {
 			_connectionCount += 1;
 			_eligible[_targets[edge.a].zoombiniIndex] = true;
 			_eligible[_targets[edge.b].zoombiniIndex] = true;
 		}
 	}
-	if (1 < _level && reached[root])
+	if (1 < _puzzleLevel && reached[root])
 		_eligible[_targets[root].zoombiniIndex] = true;
-	if (_level == 1 && _targets.size() % 2 && _targets[_targets.size() / 2].occupied)
+	if (_puzzleLevel == 1 && _targets.size() % 2 && _targets[_targets.size() / 2].occupied)
 		_eligible[_targets[_targets.size() / 2].zoombiniIndex] = true;
-	if (_level == 2)
+	if (_puzzleLevel == 2)
 		_connectionCount = mediumCount;
 	if (previous < _connectionCount)
 		playSound(_sounds[2]);
@@ -720,7 +746,7 @@ void PuzzleWaterslide::evaluateConnections() {
 void PuzzleWaterslide::onSlotChanged(void *context, int slot, int zoombini) {
 	PuzzleWaterslide *page = static_cast<PuzzleWaterslide *>(context);
 	const Common::Rect32 &rect = page->_targets[slot].rect;
-	const Common::Point32 offset = page->_level < 3 ? Common::Point32(-5, -32) : Common::Point32(9, -25);
+	const Common::Point32 offset = page->_puzzleLevel < 3 ? Common::Point32(-5, -32) : Common::Point32(9, -25);
 	page->_puzzleZoombinis[zoombini]->setPosition(Common::Point32(rect.left, rect.top) + offset);
 	page->evaluateConnections();
 }
@@ -756,28 +782,35 @@ void PuzzleWaterslide::dischargeNext() {
 		for (int slot = 0; slot < 16; slot++)
 			order[slot] = slot;
 		size = 16;
-	} else if (_level == 1) {
-		const int rows = (_targets.size() + 1) / 2;
-		for (int row = 0; row < rows; row++) {
-			order[size] = row;
-			size += 1;
-			if (rows + row < static_cast<int>(_targets.size())) {
-				order[size] = rows + row;
-				size += 1;
-			}
-		}
-	} else if (_level == 2) {
-		order[size] = 15;
-		size += 1;
-		for (int arm = 0; arm < 5; arm++)
-			for (int depth = 0; depth < 3; depth++) {
-				order[size] = arm + 5 * depth;
-				size += 1;
-			}
 	} else {
-		for (int i = 0; i < 16; i++)
-			order[i] = i;
-		size = 16;
+		switch (_puzzleLevel) {
+		case 1: {
+			const int rows = (_targets.size() + 1) / 2;
+			for (int row = 0; row < rows; row++) {
+				order[size] = row;
+				size += 1;
+				if (rows + row < static_cast<int>(_targets.size())) {
+					order[size] = rows + row;
+					size += 1;
+				}
+			}
+			break;
+		}
+		case 2:
+			order[size] = 15;
+			size += 1;
+			for (int arm = 0; arm < 5; arm++)
+				for (int depth = 0; depth < 3; depth++) {
+					order[size] = arm + 5 * depth;
+					size += 1;
+				}
+			break;
+		default:
+			for (int i = 0; i < 16; i++)
+				order[i] = i;
+			size = 16;
+			break;
+		}
 	}
 	for (int i = 0; i < size; i++) {
 		ZmbDropTarget &target = _targets[order[i]];
@@ -790,7 +823,7 @@ void PuzzleWaterslide::dischargeNext() {
 		ZoombiniRunner *actor = _puzzleZoombinis[_heldZoombini];
 		actor->setPosition(actor->getScreenPosition() - Common::Point32(1, 1));
 		_dischargeStart = _vm->getTotalPlayTime();
-		actor->startAnimation(_aspiration, 33, _dischargeStart);
+		actor->startAnimation(ZmbAnimationKind::kSuction, 33, _dischargeStart);
 		actor->setAnimationCompleteCallback(&onAspirationComplete, this);
 		_cascadeRunner->startAt(_cascadePos, _dischargeStart);
 		playSound(_sounds[1]);
@@ -818,8 +851,8 @@ void PuzzleWaterslide::onUpdate() {
 	const uint32 tick = _vm->getTotalPlayTime();
 	SoundManager *sound = _vm->getSoundManager();
 	if (_goPending && (!sound || !sound->hasPendingSpeech())) {
-		_vm->_mapTransitionSourcePageId = kPageWaterslide;
-		_vm->requestPageChange(kPageMapTrans);
+		_vm->_mapTransitSrcPageId = PageId::kPageWaterslide_02;
+		_vm->requestPageChange(PageId::kPageMapTrans_22);
 		return;
 	}
 	if (_phase == kValve01 && (_sounds[4] < 0 || !sound || !sound->isPlaying(_sounds[4]))) {
@@ -836,7 +869,7 @@ void PuzzleWaterslide::onUpdate() {
 	}
 	for (ZoombiniRunner *actor : _puzzleZoombinis) {
 		if (actor->canAdvanceFromPage() && !actor->isAnimationActive() && _vm->_rnd->getRandomNumber(19) == 1)
-			actor->startAnimation(_idle, 33, tick);
+			actor->startAnimation(ZmbAnimationKind::kCelebration, 33, tick);
 	}
 	for (ZoombiniRunner *actor : _puzzleZoombinis)
 		actor->updateAnimation(tick);
@@ -848,9 +881,10 @@ void PuzzleWaterslide::onRenderBackground(ManagedSurface32 *screen) {
 
 void PuzzleWaterslide::drawBoard(ManagedSurface32 *screen) const {
 	Gfx *gfx = _vm->_gfx;
-	if (_level == 1) {
+	switch (_puzzleLevel) {
+	case 1: {
 		const int rows = (_targets.size() + 1) / 2;
-		gfx->drawPageRleBlock(screen, Common::String::format(kLargePipeFormat, _level), Common::Point32(136, 102));
+		gfx->drawPageRleBlock(screen, Common::String::format(kLargePipeFormat, _puzzleLevel), Common::Point32(136, 102));
 		gfx->drawPageRleBlock(screen, Common::String::format(kHorizontalFormat, kPipeColors[1]), Common::Point32(418, 149));
 		for (int row = rows - 2; 0 <= row; row -= 1)
 			gfx->drawPageRleBlock(screen, kMiniDiagonalPath, Common::Point32(378 + 28 * row, 150 + 60 * row));
@@ -867,8 +901,10 @@ void PuzzleWaterslide::drawBoard(ManagedSurface32 *screen) const {
 				pipeColor = kPipeColors[1];
 			gfx->drawPageRleBlock(screen, Common::String::format(kHorizontalFormat, pipeColor), Common::Point32(268 + 28 * row, 148 + 60 * row));
 		}
-	} else if (_level == 2) {
-		gfx->drawPageRleBlock(screen, Common::String::format(kLargePipeFormat, _level), Common::Point32(116, 150));
+		break;
+	}
+	case 2:
+		gfx->drawPageRleBlock(screen, Common::String::format(kLargePipeFormat, _puzzleLevel), Common::Point32(116, 150));
 		for (const Edge &edge : _edges) {
 			const int arm = edge.b % 5;
 			const char *pipeColor = kPipeColors[0];
@@ -879,7 +915,8 @@ void PuzzleWaterslide::drawBoard(ManagedSurface32 *screen) const {
 			else
 				gfx->drawPageRleBlock(screen, Common::String::format(kHorizontalFormat, pipeColor), Common::Point32(345 + edge.a / 5 * 100 + arm * 30, 265 + arm * 60));
 		}
-	} else {
+		break;
+	default:
 		static constexpr int offsetX[4] = {
 			188,
 			191,
@@ -905,12 +942,14 @@ void PuzzleWaterslide::drawBoard(ManagedSurface32 *screen) const {
 		}
 		gfx->drawPageRleBlock(screen, Common::String::format(kHardPipeFormat, kHardPipeColors[1], 1), Common::Point32(625, 430));
 		gfx->drawPageRleBlock(screen, kOutletPath, Common::Point32(432, 517));
+		break;
 	}
 	for (uint slot = 0; slot < _targets.size(); slot++) {
 		if (!_activeSlot[slot])
 			continue;
 		Common::Point32 pos;
-		if (_level == 1) {
+		switch (_puzzleLevel) {
+		case 1: {
 			const int rows = (_targets.size() + 1) / 2;
 			int row = slot - rows;
 			int baseX = 248;
@@ -919,13 +958,17 @@ void PuzzleWaterslide::drawBoard(ManagedSurface32 *screen) const {
 				baseX = 348;
 			}
 			pos = Common::Point32(baseX + 28 * row, 137 + 60 * row);
-		} else if (_level == 2) {
+			break;
+		}
+		case 2:
 			if (slot == 15)
 				pos = Common::Point32(260, 370);
 			else
 				pos = Common::Point32(338 + slot / 5 * 100 + slot % 5 * 28, 257 + slot % 5 * 60);
-		} else {
+			break;
+		default:
 			pos = graphPosition(slot) + Common::Point32(183, 240);
+			break;
 		}
 		gfx->drawPageRleBlock(screen, kEdgePath, pos);
 	}
@@ -941,18 +984,23 @@ void PuzzleWaterslide::drawBoard(ManagedSurface32 *screen) const {
 		if (edge.axis < 0)
 			continue;
 		Common::Point32 pos;
-		if (_level == 1) {
+		switch (_puzzleLevel) {
+		case 1:
 			pos = Common::Point32(305 + 28 * i, 140 + 60 * i);
-		} else if (_level == 2) {
+			break;
+		case 2:
 			if (edge.a == 15)
 				pos = rootLabels[edge.b];
 			else
 				pos = Common::Point32(390 + edge.a / 5 * 100 + edge.b % 5 * 30, 260 + edge.b % 5 * 60);
-		} else {
+			break;
+		default: {
 			const GraphPlacement *placement = graphPlacement(edge);
 			if (!placement)
 				continue;
 			pos = Common::Point32(placement->labelX, placement->labelY);
+			break;
+		}
 		}
 		gfx->drawPageRleBlock(screen, kPastillePath, pos);
 		gfx->drawPageRleBlock(screen, Common::String::format(kTraitFormat, edge.axis + 1), pos);
@@ -961,16 +1009,16 @@ void PuzzleWaterslide::drawBoard(ManagedSurface32 *screen) const {
 
 void PuzzleWaterslide::drawDecorations(ManagedSurface32 *screen) {
 	const uint32 tick = _vm->getTotalPlayTime();
-	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _treeRunner, tick, 0, ManagedSurface32::kScreenSize.width);
-	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _fountainRunner, tick, 0, ManagedSurface32::kScreenSize.width);
+	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _treeRunner, tick, 0, Gfx::kScreenSize.width);
+	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _fountainRunner, tick, 0, Gfx::kScreenSize.width);
 	if (_cascadeRunner->isActive())
-		_vm->_gfx->drawAndUpdateAnimationRunner(screen, _cascadeRunner, tick, 0, ManagedSurface32::kScreenSize.width);
+		_vm->_gfx->drawAndUpdateAnimationRunner(screen, _cascadeRunner, tick, 0, Gfx::kScreenSize.width);
 	else
 		_vm->_gfx->drawAnimationFrame(screen, _cascade, 0, _cascadePos);
 	// The valve overlaps the cascade's left edge and must remain in front of it.
 	if (!_valveRunner->isActive())
 		_vm->_gfx->drawAnimationFrame(screen, _valve, 0, _valvePos);
-	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _valveRunner, tick, 0, ManagedSurface32::kScreenSize.width);
+	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _valveRunner, tick, 0, Gfx::kScreenSize.width);
 }
 
 void PuzzleWaterslide::onRenderContent(ManagedSurface32 *screen) {
@@ -1003,17 +1051,27 @@ EventHandleResult PuzzleWaterslide::onLButtonUp(const Common::Point &pos) {
 	if (_valveRunner->containsHitPoint(Common::Point32(pos.x, pos.y))) {
 		return EventHandleResult::kConsumed;
 	}
-	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), true,
-																	_pickup, _vm->getTotalPlayTime(), &_targets, getAreaMask());
-	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, Common::Point32(pos.x, pos.y), ZmbHoldDropInput::kLeftButtonRelease,
+																   ZmbAnimationKind::kPickup, &_targets, getAreaMask());
+	switch (result) {
+	case ZmbDropResult::kIgnored00:
+		return EventHandleResult::kPassthrough;
+	default:
+		return EventHandleResult::kConsumed;
+	}
 }
 
 EventHandleResult PuzzleWaterslide::onMouseMove(const Common::Point &pos) {
 	if (_phase != kInteractive00)
 		return EventHandleResult::kPassthrough;
-	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), false,
-																	_pickup, _vm->getTotalPlayTime(), &_targets, getAreaMask());
-	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, Common::Point32(pos.x, pos.y), ZmbHoldDropInput::kMoveOnly,
+																   ZmbAnimationKind::kPickup, &_targets, getAreaMask());
+	switch (result) {
+	case ZmbDropResult::kIgnored00:
+		return EventHandleResult::kPassthrough;
+	default:
+		return EventHandleResult::kConsumed;
+	}
 }
 
 int PuzzleWaterslide::countFreeZoombinis() const {
@@ -1033,7 +1091,7 @@ bool PuzzleWaterslide::onGoButtonPressed() {
 		_vm->quitGame();
 		return false;
 	}
-	if (!_vm->_isSavedGame)
+	if (_vm->inPracticeMode())
 		return true;
 	if (_goPending)
 		return false;
@@ -1051,117 +1109,54 @@ bool PuzzleWaterslide::onGoButtonPressed() {
 	return false;
 }
 
-bool PuzzleWaterslide::debugPlacementMatches(int slot, int actor, const Common::Array<int> &assignment) const {
-	for (const Edge &edge : _edges) {
-		if (edge.axis < 0 || (edge.a != slot && edge.b != slot))
-			continue;
-		const int other = assignment[edge.a == slot ? edge.b : edge.a];
-		if (other < 0)
-			continue;
-		const ZmbTrait::TraitKind axis = static_cast<ZmbTrait::TraitKind>(edge.axis);
-		if (_puzzleZoombinis[actor]->getTraits().getValue(axis) != _puzzleZoombinis[other]->getTraits().getValue(axis))
-			return false;
+int PuzzleWaterslide::debugCellSlot(int row, int column) const {
+	if (_puzzleLevel == 1) {
+		const int rows = (_targets.size() + 1) / 2;
+		return column == 0 ? rows + row : row;
 	}
-	return true;
-}
-
-bool PuzzleWaterslide::debugFindPlacement(Common::Array<int> &assignment, uint32 used, int &budget) const {
-	if (budget <= 0)
-		return false;
-	budget -= 1;
-	int bestSlot = -1;
-	int bestCount = 17;
-	uint32 bestCandidates = 0;
-	for (uint slot = 0; slot < assignment.size(); slot++) {
-		if (!_activeSlot[slot] || 0 <= assignment[slot])
-			continue;
-		int count = 0;
-		uint32 candidates = 0;
-		for (uint actor = 0; actor < _puzzleZoombinis.size(); actor++) {
-			if (!(used & (1U << actor)) && debugPlacementMatches(slot, actor, assignment)) {
-				candidates |= 1U << actor;
-				count += 1;
-			}
-		}
-		if (!count)
-			return false;
-		if (count < bestCount) {
-			bestSlot = slot;
-			bestCount = count;
-			bestCandidates = candidates;
-		}
+	if (_puzzleLevel == 2) {
+		if (column == 0)
+			return row == 2 ? 15 : -1;
+		return (column - 1) * 5 + row;
 	}
-	if (bestSlot < 0)
-		return true;
-	for (uint actor = 0; actor < _puzzleZoombinis.size(); actor++) {
-		if (!(bestCandidates & (1U << actor)))
-			continue;
-		assignment[bestSlot] = actor;
-		if (debugFindPlacement(assignment, used | (1U << actor), budget))
-			return true;
-		assignment[bestSlot] = -1;
-	}
-	return false;
+	const int group = 3 - column;
+	if (row % 2 != group % 2)
+		return -1;
+	return group * 4 + 3 - row / 2;
 }
 
 Common::String PuzzleWaterslide::debugGetAnswer() const {
 	Common::String answer = debugAnswerHeader();
 	answer += "\n";
-	Common::Array<int> assignment;
-	assignment.resize(_activeSlot.size());
-	uint32 used = 0;
-	bool generatedValid = true;
-	for (uint slot = 0; slot < assignment.size(); slot++) {
-		assignment[slot] = _activeSlot[slot] ? _solution[slot] : -1;
-		if (!_activeSlot[slot])
-			continue;
-		const int actor = assignment[slot];
-		if (actor < 0 || static_cast<int>(_puzzleZoombinis.size()) <= actor || (used & (1U << actor))) {
-			generatedValid = false;
-		} else {
-			used |= 1U << actor;
-		}
+	int rows = 8;
+	int columns = 4;
+	switch (_puzzleLevel) {
+	case 1:
+		rows = (_targets.size() + 1) / 2;
+		columns = 2;
+		break;
+	case 2:
+		rows = 5;
+		break;
+	default:
+		break;
 	}
-	if (generatedValid) {
-		for (uint slot = 0; slot < assignment.size(); slot++)
-			if (_activeSlot[slot] && !debugPlacementMatches(slot, assignment[slot], assignment))
-				generatedValid = false;
-	}
-	bool hasPlacement = generatedValid;
-	if (generatedValid) {
-		answer += "  Place Zoombinis at these pipe mouths (validated generation placement):\n";
-	} else {
-		for (uint slot = 0; slot < assignment.size(); slot++)
-			assignment[slot] = -1;
-		int budget = 200000;
-		hasPlacement = debugFindPlacement(assignment, 0, budget);
-		if (hasPlacement)
-			answer += "  Place Zoombinis at these pipe mouths (searched replacement):\n";
-		else
-			answer += "  No complete placement found within the debugger search limit.\n";
-	}
-	if (hasPlacement) {
-		for (uint slot = 0; slot < assignment.size(); slot++) {
-			if (!_activeSlot[slot])
+	answer += Common::String::format("  Cells: %d rows x %d columns (r = row, c = column; 1-based-index).\n", rows, columns);
+	answer += "\n  [*] Intended answer Zoombini placements:\n";
+	for (int row = 0; row < rows; row++) {
+		for (int column = 0; column < columns; column++) {
+			const int slot = debugCellSlot(row, column);
+			if (slot < 0 || static_cast<int>(_solution.size()) <= slot || !_activeSlot[slot])
 				continue;
-			const Common::Rect32 &rect = _targets[slot].rect;
-			answer += Common::String::format("    Near (%d, %d): %s\n", rect.left, rect.top, debugActorDescription(assignment[slot]).c_str());
+			answer += Common::String::format("    Cell (r%d, c%d): %s\n", row + 1, column + 1, debugActorDescription(_solution[slot]).c_str());
 		}
 	}
-	answer += "  Pipe connections (trait shared by both ends):\n";
-	for (const Edge &edge : _edges) {
-		const char *axis = "any trait";
-		if (0 <= edge.axis)
-			axis = ZmbTrait::debugTraitName(static_cast<ZmbTrait::TraitKind>(edge.axis));
-		const Common::Rect32 &first = _targets[edge.a].rect;
-		const Common::Rect32 &second = _targets[edge.b].rect;
-		answer += Common::String::format("    (%d, %d) <-> (%d, %d): %s\n", first.left, first.top, second.left, second.top, axis);
-	}
+	answer += "  After placing every Zoombinis, turn the valve to submit them.\n";
 	return answer;
 }
 
 Common::String PuzzleWaterslide::debugGetChanceDetails() const {
-	return Common::String::format("Placements are unlimited before releasing the valve. Connected: %d; phase: %d.\n", _connectionCount, _phase);
+	return "Placements are unlimited before releasing the valve.\n";
 }
 
 } // End of namespace Zoombini2
