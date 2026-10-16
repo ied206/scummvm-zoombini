@@ -35,6 +35,7 @@ class DialogBase : public PageBase {
 public:
 	/** Bind this modal overlay to @p vm. */
 	explicit DialogBase(Zoombini2Engine *vm) : PageBase(vm, PageCategory::kDialog) {}
+	/** Release a modal overlay through its common page interface. */
 	~DialogBase() override {}
 	/** Dialog setup is driven by the opener rather than the page dispatcher. */
 	void init() override {}

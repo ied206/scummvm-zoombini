@@ -35,11 +35,9 @@
 
 namespace Zoombini2 {
 
-constexpr int SoundBuffer::kSampleSlotCount;
-constexpr const char *SoundManager::kInstalledMusicPrefix;
+constexpr int SoundManager::SoundBuffer::kSampleSlotCount;
 constexpr const char *SoundManager::kMusicPrefix;
 constexpr const char *SoundManager::kFxPrefix;
-constexpr const char *SoundManager::kFxPathFormat;
 constexpr const char *SoundManager::kBlipPath;
 constexpr const char *SoundManager::kSoundsPrefix;
 constexpr const char *SoundManager::kDataPrefix;
@@ -47,13 +45,17 @@ constexpr const char *SoundManager::kDataPrefix;
 /** Convert stereo samples to one mono sample per source frame. */
 class SoundManager::MonoAudioStream : public Audio::AudioStream {
 public:
-	explicit MonoAudioStream(Audio::AudioStream *parent) : _parent(parent) {
+	/** Retain the source until adapter destruction and expose its samples as mono audio. */
+	explicit MonoAudioStream(Audio::AudioStream *parent)
+		: _parent(parent) {
 	}
 
+	/** Delete the retained source stream. */
 	~MonoAudioStream() override {
 		delete _parent;
 	}
 
+	/** Read mono samples, averaging each source stereo frame when necessary. */
 	int readBuffer(int16 *buffer, const int numSamples) override {
 		if (!_parent->isStereo())
 			return _parent->readBuffer(buffer, numSamples);
@@ -72,16 +74,22 @@ public:
 		return samplesRead;
 	}
 
+	/** Return false because this adapter always produces mono audio. */
 	bool isStereo() const override { return false; }
+	/** Return the source stream's sample rate. */
 	int getRate() const override { return _parent->getRate(); }
+	/** Return whether the source currently has no more samples. */
 	bool endOfData() const override { return _parent->endOfData(); }
+	/** Return whether the source has permanently reached its end. */
 	bool endOfStream() const override { return _parent->endOfStream(); }
 
 private:
+	/** Source stream mixed down to mono and deleted when this adapter is destroyed. */
 	Audio::AudioStream *_parent;
 };
 
-SoundManager::SoundManager(Zoombini2Engine *vm, Audio::Mixer *mixer) : _vm(vm), _mixer(mixer) {
+SoundManager::SoundManager(Zoombini2Engine *vm, Audio::Mixer *mixer)
+	: _vm(vm), _mixer(mixer) {
 }
 
 SoundManager::~SoundManager() {
@@ -92,7 +100,7 @@ int SoundManager::load(bool isStream, const Common::Path &filename, bool loop) {
 	SoundBuffer *buf = new SoundBuffer();
 	buf->id = _nextId;
 	_nextId += 1;
-	buf->path = resolveCompatibilityPath(filename);
+	buf->path = filename;
 	buf->isStream = isStream;
 	buf->loop = loop;
 	buf->category = classifySound(filename);
@@ -393,7 +401,7 @@ void SoundManager::setVolumeSettings(int music, int sfx, int speech) {
 	_volumeSpeech = CLIP(speech, 0, kMaxVolumePercent);
 }
 
-SoundBuffer *SoundManager::findBuffer(int id) const {
+SoundManager::SoundBuffer *SoundManager::findBuffer(int id) const {
 	for (uint i = 0; i < _buffers.size(); i++) {
 		if (_buffers[i]->id == id)
 			return _buffers[i];
@@ -486,26 +494,6 @@ Audio::RewindableAudioStream *SoundManager::makeAudioStream(Common::SeekableRead
 	const uint32 dataEnd = static_cast<uint32>(dataOffset + completeDataSize);
 	Common::SeekableReadStream *dataStream = new Common::SeekableSubReadStream(stream, dataStart, dataEnd, DisposeAfterUse::YES);
 	return Audio::makeRawStream(dataStream, rate, flags);
-}
-
-Common::Path SoundManager::resolveCompatibilityPath(const Common::Path &filename) const {
-	if (_vm->hasResource(filename.toString('/')))
-		return filename;
-
-	// Some extracted-data layouts retain the numbered background tracks in the CD sound-effects directory.
-	const Common::String str = filename.toString('/');
-	const Common::String installedMusicPrefix(kInstalledMusicPrefix);
-	if (str.hasPrefix(installedMusicPrefix)) {
-		const Common::String basename = str.substr(installedMusicPrefix.size());
-		// Check if this is a numeric-prefix BB file (e.g. "01-BB01.wav")
-		if (basename.size() > 6 && basename[2] == '-' && basename[3] == 'B' && basename[4] == 'B') {
-			const Common::Path fxPath(Common::String::format(kFxPathFormat, basename.c_str()));
-			if (_vm->hasResource(fxPath.toString('/')))
-				return fxPath;
-		}
-	}
-
-	return filename;
 }
 
 SoundCategory SoundManager::classifySound(const Common::Path &filename) {

@@ -41,6 +41,12 @@ public:
 	PuzzleCrazyTurtle(Zoombini2Engine *vm);
 	/** Release turtle, bridge, and trait resources. */
 	~PuzzleCrazyTurtle() override;
+	/** Return the puzzle name used by debug answer descriptions. */
+	const char *getPageName() const override { return kPageName; }
+	/** Return the 1-based route containing this puzzle. */
+	int getRouteNumber() const override { return kRouteNumber; }
+	/** Return the 1-based puzzle number within its route. */
+	int getRoutePuzzleIdx() const override { return kRoutePuzzleIdx; }
 
 	/** Load the dock and generate the level-selected ordering rules. */
 	void init() override;
@@ -62,18 +68,23 @@ public:
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
 	/** Report whether the shared Go button currently accepts input. */
 	bool canUseGoButton() const override;
-	/** Wait for departure speech before continuing the saved-game route. */
+	/** Wait for departure speech before continuing the journey route. */
 	bool onGoButtonPressed() override;
 	/** Advance the roster sprite animations after the actor pass. */
 	void onActorsRendered() override;
 
 private:
-	static constexpr const char *kPuzzleName = "Turtle Hurdle";
+	/** Static puzzle name used by debug answer descriptions. */
+	static constexpr const char *kPageName = "Turtle Hurdle";
+	/** 1-based route number used by the puzzle console. */
+	static constexpr int kRouteNumber = 1;
+	/** 1-based puzzle number within the route used by the puzzle console. */
+	static constexpr int kRoutePuzzleIdx = 1;
 	/** Turtle Hurdle board background loaded into the first page layer. */
 	static constexpr const char *kBackgroundPath = "#bmp/crazy_turtle/background";
 	/** Five randomized praise lines played when all Zoombinis leave Turtle Hurdle successfully. */
 	static constexpr const char *kGoSpeechFormat = "sounds/wld11.%d.wav";
-	/** Retreat line played before a saved-game departure with Zoombinis still waiting. */
+	/** Retreat line played before a journey departure with Zoombinis still waiting. */
 	static constexpr const char *kRetreatSpeech = "sounds/DW-Zville.wav";
 	/** Deferred Go transition flag. */
 	bool _goPending = false;
@@ -105,12 +116,6 @@ private:
 	static constexpr const char *kTraitFormat = "Bmp/mystic_marsh/TRAITS/%d-%d.RB";
 	/** One-bit drop-area mask used to accept or reject Zoombini placements. */
 	static constexpr const char *kAreaMaskPath = "bmp/crazy_turtle/area.bmt";
-	/** Shared idle and celebration animation used for waiting Zoombinis. */
-	static constexpr const char *kIdleZombAnimationPath = "bmp/zombis/attente/attenteZomb.anm";
-	/** Shared pick-up animation used while a Zoombini is held for placement. */
-	static constexpr const char *kPickupZombAnimationPath = "bmp/zombis/pris/pris.anm";
-	/** Shared tumbling animation played when a Zoombini falls from the dock. */
-	static constexpr const char *kTombeAnimationPath = "bmp/zombis/tombe/tombe.anm";
 	/** Sound played when an idle turtle becomes active. */
 	static constexpr const char *kTurtleIdleSoundPath = "sounds/fx/08-BS02.wav";
 	/** Sound played with the falling smoke animation. */
@@ -295,7 +300,7 @@ private:
 	/** Drop-target callback forwarding to @ref PuzzleCrazyTurtle::handleTurtleClick. */
 	static void onTurtleDrop(void *context, int targetIndex, int zoombiniIndex);
 	/** Matched-placement completion: settle and check the full board. */
-	static void onWalkComplete(void *context, ZoombiniRunner *zoombini);
+	static void onCelebrationComplete(void *context, ZoombiniRunner *zoombini);
 	/** Fall-animation completion: replay or finish the fall sequence. */
 	static void onTurtleFallComplete(void *context, ZoombiniRunner *zoombini);
 	/** Idle turtle spin completion: clear the active spin index. */
@@ -313,8 +318,6 @@ private:
 	/** Draw the mother turtle and feedback effects. */
 	void drawMother(ManagedSurface32 *screen) const;
 
-	/** Level in the range one through four. */
-	int _level = 1;
 	/** Feature index used by the primary ordering rule. */
 	int _primaryFeature = 0;
 	/** Feature index used by the secondary ordering rule. */
@@ -344,12 +347,6 @@ private:
 	Animation *_smokeAnimation = nullptr;
 	/** Whether the mother turtle has completed its neck animation. */
 	bool _motherFinished = false;
-	/** Zoombini grid for walking in place on a settled turtle. */
-	const ZoombiniAnimation *_idleZombAnimation = nullptr;
-	/** Zoombini grid used while a Zoombini is held. */
-	const ZoombiniAnimation *_pickupZombAnimation = nullptr;
-	/** Zoombini grid used while a Zoombini falls back to the dock. */
-	const ZoombiniAnimation *_tombeAnimation = nullptr;
 	/** One drop target per turtle. */
 	Common::Array<ZmbDropTarget> _turtleDropTargets;
 	/** Party index assigned to each turtle by the rule ordering. */
@@ -380,6 +377,10 @@ private:
 	int _lastFallZoombiniIndex = -1;
 	/** Mistake count used for the dock redraw, refreshed after each fall. */
 	int _mistakesMirror = 0;
+	/** Whether a page chance set is waiting for the placement reaction to end before updating the bridge. */
+	bool _debugChanceSetBridgeUpdatePending = false;
+	/** Apply the pending page chance set to the bridge after placement reactions end. */
+	void applyPendingDebugChanceSet();
 	/** Dock-damage smoke pending after the latest fall completes. */
 	bool _smokePending = false;
 	/** Idle-spin turtle runners indexed by turtle type. */

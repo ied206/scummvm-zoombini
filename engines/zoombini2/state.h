@@ -39,39 +39,44 @@ class SaveFileManager;
 namespace Zoombini2 {
 
 class ZoombiniRunner;
+class Zoombini2Engine;
 class Random;
 
+/** Runtime gameplay mode, independent of whether a savefile is attached. */
+enum class GameMode {
+	kPracticeMode, ///< Select and replay puzzles without recording journey progress.
+	kJourneyMode   ///< Advance a party along the route and retain its progress.
+};
+
 /** Numeric page identifiers accepted by the engine dispatcher. */
-enum PageId : int {
-	kPageMenuLoad = -4,         ///< Saved-adventure sign-in flow.
-	kPageMenuPractice = -3,     ///< Practice-map sign-in flow.
-	kPageMenuOptions = -2,      ///< Sign-in screen.
-	kPageNone = -1,             ///< No dispatched page.
-	kPageZombiniville = 0,      ///< Zoombiniville party-assembly shelter.
-	kPageCrazyTurtle = 1,       ///< Turtle Hurdle puzzle.
-	kPageWaterslide = 2,        ///< Pipes of Paloo puzzle.
-	kPageAquacube = 3,          ///< Aqua Cube puzzle.
-	kPageRescue1 = 4,           ///< First rescue-site shelter.
-	kPageMysticMarsh = 5,       ///< Bubble Bumpers puzzle.
-	kPageMagicWall = 6,         ///< Beetle Bug Alley puzzle.
-	kPageWallOfFleens = 7,      ///< Magic Mirrors puzzle.
-	kPageChezNorf = 8,          ///< Chez Norf puzzle.
-	kPageRescue2 = 9,           ///< Second rescue-site shelter.
-	kPageSnowboard = 10,        ///< Snowboard Gulch puzzle.
-	kPageBoolies = 11,          ///< Boolie Boggle puzzle.
-	kPageBooliewood = 12,       ///< Booliewood arrival shelter.
-	kPageCredits = 16,          ///< Credits transition.
-	kPageLogoTLC = 17,          ///< Splash video of The Learning Company
-	kPageCutsceneFirst = 18,    ///< First story video.
-	kPageCutsceneSecond = 20,   ///< Second story video.
-	kPageCutsceneThird = 21,    ///< Third story video.
-	kPageMapTrans = 22,         ///< Route-map travel transition
-	kPageFinal = 23,            ///< Booliewood final-celebration shelter
-	kPageTitleScreen = 24,      ///< Title screen
-	kPageLogoPolygon = 25,      ///< Splash video of Polygon Studio
-	kPageMapScreen = 30,        ///< ScummVM map-screen dispatcher alias
-	kPageMenuAlt = 40,          ///< Alternate sign-in route
-	kPageLogoArisuMedia = 1972, ///< (v1.1KR only) Splash video of ArisuMedia
+enum class PageId : int {
+	kPageMapJourney_M4 = -4,         ///< Journey map
+	kPageMapPractice_M3 = -3,        ///< Practice map
+	kPageMenuOptions_M2 = -2,        ///< Save-file creation and selection menu
+	kPageNone_M1 = -1,               ///< No page selected
+	kPageZombiniville_00 = 0,        ///< Zoombiniville shelter
+	kPageCrazyTurtle_01 = 1,         ///< Turtle Hurdle puzzle
+	kPageWaterslide_02 = 2,          ///< Pipes of Paloo puzzle
+	kPageAquacube_03 = 3,            ///< Aqua Cube puzzle
+	kPageRescue1_04 = 4,             ///< Rescue Site I shelter
+	kPageMysticMarsh_05 = 5,         ///< Bubble Bumpers puzzle
+	kPageMagicWall_06 = 6,           ///< Beetle Bug Alley puzzle
+	kPageWallOfFleens_07 = 7,        ///< Magic Mirrors puzzle
+	kPageChezNorf_08 = 8,            ///< Chez Norf puzzle
+	kPageRescue2_09 = 9,             ///< Rescue Site II shelter
+	kPageSnowboard_10 = 10,          ///< Snowboard Gulch puzzle
+	kPageBoolies_11 = 11,            ///< Boolie Boggle puzzle
+	kPageBooliewood_12 = 12,         ///< Booliewood shelter
+	kPageCredits_16 = 16,            ///< Credits transition
+	kPageLogoTLC_17 = 17,            ///< The Learning Company splash video
+	kPageCutsceneFirst_18 = 18,      ///< Story video to play before the first Zoombiniville visit
+	kPageCutsceneSecond_20 = 20,     ///< Story video to play before the first visit (once at least eight Zoombinis have arrived in total) on Rescue Site I
+	kPageCutsceneThird_21 = 21,      ///< Story video to play before the first visit on Rescue Site II
+	kPageMapTrans_22 = 22,           ///< Animated party travel between gameplay pages
+	kPageFinal_23 = 23,              ///< Booliewood celebration shelter, for finished savegame
+	kPageTitleScreen_24 = 24,        ///< Static title screen transition
+	kPageLogoPolygon_25 = 25,        ///< Polygon Studio splash video
+	kPageLogoArisuMedia_1972 = 1972, ///< ArisuMedia splash video (v1.1KR only)
 };
 
 /** Stored Zoombini traits with an unused slot zero followed by the four visible values. */
@@ -174,6 +179,7 @@ struct ZmbTrait {
 
 /** Population counts displayed for one saved game. */
 struct Zoombini2PopulationSummary {
+	/** Initialize all shelter and active-party population counts to zero. */
 	Zoombini2PopulationSummary() = default;
 
 	/** Zoombinis not yet recorded at either rescue site or Booliewood. */
@@ -190,6 +196,7 @@ struct Zoombini2PopulationSummary {
 
 /** Name, validation state, and population counts for one independent .mk savefile. */
 struct Zoombini2SavefileSummary {
+	/** Initialize an empty summary with no validated save state. */
 	Zoombini2SavefileSummary() = default;
 
 	/** Savefile name derived from the target-scoped .mk filename. */
@@ -255,6 +262,10 @@ struct StorageRecord {
 
 	/** Initialize the record to an empty name and unset stored traits. */
 	StorageRecord() = default;
+	/** Read the fixed-size name and complete trait tuple, returning false on an incomplete read. */
+	bool read(Common::ReadStream *stream);
+	/** Write the fixed-size name followed by the complete trait tuple. */
+	void write(Common::WriteStream *stream) const;
 	/** Copy the persistent fields from @p zoombini into this record. */
 	void store(const ZoombiniRunner &zoombini);
 	/** Return the complete fixed-size name bytes retained in this record. */
@@ -262,11 +273,9 @@ struct StorageRecord {
 	/** Return the complete trait tuple stored in this record. */
 	ZmbTrait getTraits() const;
 	/** Restore a newly allocated active Zoombini from this record. */
-	ZoombiniRunner *restore() const;
+	ZoombiniRunner *restore(Zoombini2Engine *vm) const;
 
 private:
-	friend class GameState;
-
 	/** Fixed-size character name copied from the active Zoombini. */
 	char _name[kNameSize] = {};
 	/** Unused slot zero followed by Feet, Nose, Hair, and Eyes. */
@@ -278,6 +287,19 @@ struct TraitComboTable {
 	/** Number of distinct Zoombinis represented by the four visible traits. */
 	static constexpr int kZoombiniCombinationCount = 625;
 
+	/** Restore the initial registered combination and clear all unused bytes. */
+	void reset();
+	/**
+	 * Read the aggregate counts, per-combination counts and unused tail without recomputing them.
+	 * Return false if the complete stored arrays cannot be read.
+	 */
+	bool read(Common::ReadStream *stream);
+	/** Write all counts and unused bytes in their saved-game order. */
+	void write(Common::WriteStream *stream) const;
+	/** Return the total number of accepted registrations, including repeated combinations. */
+	int32 getTotalCount() const { return _totalCount; }
+	/** Return the number of trait combinations registered exactly twice. */
+	int32 getTwiceRegisteredCombinationCount() const { return _twiceRegisteredCombinationCount; }
 	/** Return the table index for a validated trait combination, or -1. */
 	static int getComboIndex(const ZmbTrait &traits);
 	/** Return this table's count for @p traits, or zero for invalid values. */
@@ -290,8 +312,6 @@ struct TraitComboTable {
 	bool unregisterCombo(const ZmbTrait &traits);
 
 private:
-	friend class GameState;
-
 	/** Total accepted registrations, including repeated combinations. */
 	int32 _totalCount;
 	/** Number of distinct trait combinations registered at least once. */
@@ -327,8 +347,8 @@ public:
 
 	/** Generate a short name for a newly created Zoombini. */
 	static Common::String generateZoombiniName(Random &random);
-	/** Construct a fresh game state. */
-	GameState();
+	/** Construct a fresh state; @p vm is optional for data-only savefile operations. */
+	explicit GameState(Zoombini2Engine *vm = nullptr);
 	/** Release all storage records and local-roster entries. */
 	~GameState();
 
@@ -342,14 +362,18 @@ public:
 	bool load(Common::SeekableReadStream *stream);
 	/** Serialize this game state and the eligible active party to @p stream. */
 	bool save(Common::WriteStream *stream) const;
+	/** Copy all progress, storage and roster identities, with fresh runners ready for page initialization. */
+	GameState *cloneForPageEntry() const;
 	/** Delete and clear the live party retained by this game state. */
 	void clearActiveZoombinis();
 	/** Clone saved identities into live runners and delete the saved entries through @ref GameState::transferRoster. */
 	void restoreSavedZoombinis();
 	/** Clone live identities into the saved roster and delete the live runners on return to the map. */
 	void stashActiveZoombinis();
+	/** Restore retained travelers, return surplus members to the village, and expose required rescue shelters for a debugger route. */
+	void prepareDebugRouteParty(PageId pageId, uint partySize);
 	/** Retain puzzle leavers in the saved roster or @p storage, keep successful route members active, and record an eligible perfect clear. */
-	void finishPuzzleRoster(PageId pageId, StorageRecord **storage, bool advancing, bool savedGame, bool perfectClearEligible);
+	void finishPuzzleRoster(PageId pageId, StorageRecord **storage, bool advancing, GameMode gameMode, bool perfectClearEligible);
 	/** Retain a member in @p storage, or in the serialized roster when no storage cell is available. */
 	void retainRosterMember(StorageRecord **storage, ZoombiniRunner &zoombini);
 	/** Delete every record in @p storage and clear its cells. */
@@ -357,7 +381,7 @@ public:
 	/** Store @p zoombini in the first available cell of @p storage. */
 	static bool storeInStorage(StorageRecord **storage, ZoombiniRunner &zoombini);
 	/** Restore up to @p count Zoombinis from @p storage into @p roster. */
-	static void refillFromStorage(StorageRecord **storage, Common::Array<ZoombiniRunner *> &roster, uint count);
+	static void refillFromStorage(StorageRecord **storage, Common::Array<ZoombiniRunner *> &roster, uint count, Zoombini2Engine *vm);
 	/** Return the storage row used to initialize the shelter scroll position. */
 	static int findStorageScrollRow(StorageRecord *const *storage);
 	/** Return the four shelter-stage counts and serialized active-party count. */
@@ -371,17 +395,12 @@ public:
 	/** Apply one completed Booliewood trip to this game state and its active party. */
 	void recordBooliesCompletion();
 	/** Return whether this game state has accepted its 625th Zoombini registration. */
-	bool hasReachedZoombiniRegistrationLimit() const { return _traitComboTable._totalCount == TraitComboTable::kZoombiniCombinationCount; }
+	bool hasReachedZoombiniRegistrationLimit() const { return _traitComboTable.getTotalCount() == TraitComboTable::kZoombiniCombinationCount; }
 	/** Return whether accumulated progress has unlocked relaxed party trait limits. */
-	bool hasRelaxedPackTraitLimits() const { return 600 <= _traitComboTable._twiceRegisteredCombinationCount; }
+	bool hasRelaxedPackTraitLimits() const { return 600 <= _traitComboTable.getTwiceRegisteredCombinationCount(); }
 
 	/** Return whether @p pageId has any recorded visit. */
-	bool isPageVisited(PageId pageId) const {
-		const int pageIndex = static_cast<int>(pageId);
-		if (pageIndex < 0 || 100 <= pageIndex)
-			return false;
-		return _pageLevel[pageIndex] != 0;
-	}
+	bool isPageVisited(PageId pageId) const { return getPageLevel(pageId) != 0; }
 
 	/** Return the recorded count for one page and visit kind, or zero for invalid input. */
 	byte getPageVisitCount(PageId pageId, int visitKind = 1) const {
@@ -403,7 +422,11 @@ public:
 	void registerPageVisit(PageId pageId, int visitKind = 1);
 	/** Return the serialized level for @p pageId, or zero when the page ID is outside the state table. */
 	int getPageLevel(PageId pageId) const;
-	/** Select @p pageId's serialized level for the next saved-adventure puzzle, initializing an unvisited page to level one. */
+	/** Set the serialized level for @p pageId without changing the active level; ignore page IDs outside the state table. */
+	void setPageLevel(PageId pageId, int level);
+	/** Return the number of serialized page-level slots, including unused page IDs. */
+	int getPageLevelCount() const { return ARRAYSIZE(_pageLevel); }
+	/** Select @p pageId's serialized level for the next journey puzzle, initializing an unvisited page to level one. */
 	int activatePageLevel(PageId pageId);
 
 	/** Return whether the first rescue movie has already played. */
@@ -425,12 +448,14 @@ public:
 private:
 	/** Player name serialized in the savefile. */
 	Common::String _playerName;
+	/** Saved level for each page; a nonzero value also marks the page visited. */
+	int32 _pageLevel[100];
 
 public:
 	/** Runtime level selected for the active gameplay page. */
 	int _level;
 	/** Most recently initialized gameplay page. */
-	PageId _currentGameplayPageId = kPageZombiniville;
+	PageId _currentPage = PageId::kPageZombiniville_00;
 	/** Serialized compatibility flag with no other known Z2-v1.1KR consumer. */
 	byte _legacyStateFlag;
 	/** Whether the saved party has reached Rescue Site I. */
@@ -443,8 +468,6 @@ public:
 	StorageRecord *_rescue1Storage[kStorageSize] = {};
 	/** Rescue Site II sparse storage, including its unused sentinel row. */
 	StorageRecord *_rescue2Storage[kStorageSize] = {};
-	/** Saved level for each page; a nonzero value also marks the page visited. */
-	int32 _pageLevel[100];
 	/** Saturating visit counters indexed by `5 * pageId + visitKind`. */
 	byte _pageVisitCounts[500];
 	/** Per-page perfect-clear counts toward the next level increase; each count resets after three. */
@@ -475,6 +498,9 @@ public:
 	Common::Array<ZoombiniRunner *> _activeZoombinis;
 
 private:
+	/** Engine borrowed by runtime runners, or null for data-only savefile operations. */
+	Zoombini2Engine *_vm;
+
 	/** Disallow copying because this game state retains runner pointers. */
 	GameState(const GameState &) = delete;
 	/** Disallow assigning because this game state retains runner pointers. */
@@ -484,8 +510,6 @@ private:
 	void clearOwnedData();
 	/** Copy runner identity into another roster and release the source entries. */
 	static void transferRoster(Common::Array<ZoombiniRunner *> &src, Common::Array<ZoombiniRunner *> &dest);
-	/** Copy the persistent identity of one live runner into a new roster entry. */
-	static ZoombiniRunner *cloneRosterMember(const ZoombiniRunner &src);
 	/** Exchange storage pointers, both rosters, and all scalar state with @p other. */
 	void swapState(GameState &other);
 	/** Parse the complete state body from @p stream. */

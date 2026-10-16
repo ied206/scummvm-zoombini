@@ -35,9 +35,6 @@ constexpr const char *ShelterRescueSite2::kPorteSelectorPath;
 constexpr const char *ShelterRescueSite2::kScrollLeftPath;
 constexpr const char *ShelterRescueSite2::kScrollRightPath;
 constexpr const char *ShelterRescueSite2::kMusicPath;
-constexpr const char *ShelterRescueSite2::kLittleZombAnimationPath;
-constexpr const char *ShelterRescueSite2::kPickupZombAnimationPath;
-constexpr const char *ShelterRescueSite2::kIdleZombAnimationPath;
 constexpr const char *ShelterRescueSite2::kAreaMaskPath;
 constexpr const char *ShelterRescueSite2::kMissingArrivalsSpeechFormat;
 constexpr const char *ShelterRescueSite2::kReadyDepartureSpeechPath;
@@ -49,11 +46,13 @@ constexpr Common::Point32 ShelterRescueSite2::kRosterButtonDownPos;
 constexpr Common::Point32 ShelterRescueSite2::kSeatPositions[kDepartureSeatCount];
 constexpr Common::Point32 ShelterRescueSite2::kFloorPositions[kDepartureSeatCount];
 
-ShelterRescueSite2::ShelterRescueSite2(Zoombini2Engine *vm) : ShelterRescueSiteBase(vm) {
-	_pageId = kPageRescue2;
+ShelterRescueSite2::ShelterRescueSite2(Zoombini2Engine *vm)
+	: ShelterRescueSiteBase(vm) {
+	_pageId = PageId::kPageRescue2_09;
 }
 
 ShelterRescueSite2::~ShelterRescueSite2() {
+	releasePendingZoombini();
 	saveRescueRoster(getRescueStorage());
 
 	_vm->setCursor(Zoombini2Engine::CursorType::kDefault);
@@ -65,7 +64,7 @@ void ShelterRescueSite2::init() {
 	if (!_vm->_gfx->loadBackground(kBackgroundPath))
 		warning("ShelterRescueSite2: Failed to load background");
 	ManagedSurface32 *screen = _vm->_gfx->getScreen();
-	screen->fillRect(Common::Rect32(ManagedSurface32::kScreenSize.width, ManagedSurface32::kScreenSize.height), 0);
+	screen->fillRect(Common::Rect32(Gfx::kScreenSize.width, Gfx::kScreenSize.height), 0);
 	_vm->_gfx->drawBackground(screen, Common::Point32(0, 0));
 	configureRosterLayout(kRosterGridBasePos, _rosterScrollUpRect, _rosterScrollDownRect, kRosterButtonUpPos, kRosterButtonDownPos);
 	loadSelector(kSelectorPath);
@@ -75,21 +74,10 @@ void ShelterRescueSite2::init() {
 	resetRescueState();
 	initRescueRoster();
 
-	_littleZombAnimation = _vm->loadZoombiniAnimation(Common::Path(kLittleZombAnimationPath), 50);
-	if (!_littleZombAnimation)
-		warning("ShelterRescueSite2: Failed to load littleZomb.anm");
-	_pickupZombAnimation = _vm->loadZoombiniAnimation(Common::Path(kPickupZombAnimationPath), 100);
-	if (!_pickupZombAnimation)
-		warning("ShelterRescueSite2: Failed to load pris.anm");
-	_idleZombAnimation = _vm->loadZoombiniAnimation(Common::Path(kIdleZombAnimationPath), 50);
-	if (!_idleZombAnimation)
-		warning("ShelterRescueSite2: Failed to load attenteZomb2.anm");
-
 	loadAreaMask(Common::Path(kAreaMaskPath));
 
 	buildDropTargets();
 	refillBoardingRoster();
-	loadRosterAnimation();
 }
 
 void ShelterRescueSite2::initRescueRoster() {
@@ -97,9 +85,9 @@ void ShelterRescueSite2::initRescueRoster() {
 	StorageRecord **storage = state->_rescue2Storage;
 	prepareWaitingStorage(storage);
 	_scrollRow = GameState::findStorageScrollRow(storage);
-	if (_vm->_isSavedGame)
+	if (_vm->inJourneyMode())
 		state->_hasReachedRescue2 = 1;
-	state->registerPageVisit(kPageRescue2);
+	state->registerPageVisit(PageId::kPageRescue2_09);
 	const uint population = countStorageMembers(storage) + _vm->_state->_activeZoombinis.size();
 	if (population < 8)
 		enqueueSpeech(Common::String::format(kMissingArrivalsSpeechFormat, 8 - population));
@@ -108,7 +96,7 @@ void ShelterRescueSite2::initRescueRoster() {
 }
 
 void ShelterRescueSite2::refillBoardingRoster() {
-	GameState::refillFromStorage(getRescueStorage(), _vm->_state->_activeZoombinis, 8);
+	GameState::refillFromStorage(getRescueStorage(), _vm->_state->_activeZoombinis, 8, _vm);
 	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
 		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
 		zoombini->setCanAdvanceFromPage(false);
@@ -116,7 +104,7 @@ void ShelterRescueSite2::refillBoardingRoster() {
 		zoombini->setDragging(false);
 		zoombini->setIdleAnimationEnabled(true);
 		zoombini->setHidden(false);
-		zoombini->setDefaultAnimation(_littleZombAnimation, 33);
+		zoombini->setDefaultAnimation(ZmbAnimationKind::kBasic, 33);
 		if (i < kDepartureSeatCount) {
 			// Seated members stand 36 pixels above the seat-rect origin, matching the seat drop snap.
 			zoombini->setPosition(Common::Point32(kSeatPositions[i].x, kSeatPositions[i].y - 36));
@@ -237,7 +225,7 @@ void ShelterRescueSite2::captureToStorage(int recordIndex, int zoombiniIndex) {
 	storage[storageIndex] = new StorageRecord();
 	storage[storageIndex]->store(*zoombini);
 	for (uint record = 0; record < _dropTargets.size(); record++) {
-		if (_dropTargets[record].zoombiniIndex > zoombiniIndex)
+		if (zoombiniIndex < _dropTargets[record].zoombiniIndex)
 			_dropTargets[record].zoombiniIndex -= 1;
 	}
 	_pendingReleaseIndex = zoombiniIndex;
@@ -277,11 +265,11 @@ bool ShelterRescueSite2::materializeFromStorage(int gridCol, int gridRow, const 
 	if (storageIndex < 0 || GameState::kStorageRows * GameState::kStorageCols <= storageIndex || !storage[storageIndex])
 		return false;
 	const uint32 tick = _vm->getTotalPlayTime();
-	ZoombiniRunner *zoombini = new ZoombiniRunner();
+	ZoombiniRunner *zoombini = new ZoombiniRunner(_vm);
 	zoombini->setInputEnabled(true);
 	zoombini->setTraits(storage[storageIndex]->getTraits());
 	zoombini->setNameBytes(storage[storageIndex]->getNameBytes());
-	zoombini->setDefaultAnimation(_littleZombAnimation, 33);
+	zoombini->setDefaultAnimation(ZmbAnimationKind::kBasic, 33);
 	zoombini->setPosition(Common::Point32(kRosterGridBasePos.x + gridCol * 40 + 24, kRosterGridBasePos.y + gridRow * 57 + 30));
 	const Common::Point32 screenPosition = zoombini->getScreenPosition();
 	zoombini->setDragOrigin(screenPosition);
@@ -289,7 +277,7 @@ bool ShelterRescueSite2::materializeFromStorage(int gridCol, int gridRow, const 
 	zoombini->setDragOffset(dragOffset);
 	zoombini->setPosition(Common::Point32(screenPosition.x + dragOffset.x, screenPosition.y + dragOffset.y));
 	zoombini->setDragging(true);
-	zoombini->startAnimation(_pickupZombAnimation, 33, tick);
+	zoombini->startAnimation(ZmbAnimationKind::kPickup, 33, tick);
 	_vm->_state->_activeZoombinis.push_back(zoombini);
 	delete storage[storageIndex];
 	getRescueStorage()[storageIndex] = nullptr;
@@ -391,7 +379,7 @@ void ShelterRescueSite2::drawBoardingActives(ManagedSurface32 *screen) const {
 		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[order[i]];
 		if (zoombini->isHidden())
 			continue;
-		zoombini->tryStartIdleAnimation(_idleZombAnimation, *_vm->_rnd, _vm->getTotalPlayTime(), _vm->getFrameDeltaMs(), _vm->getLogicPacingHz());
+		zoombini->tryStartIdleAnimation(ZmbAnimationKind::kFidget, *_vm->_rnd, _vm->getTotalPlayTime(), _vm->getFrameDeltaMs(), _vm->getLogicPacingHz());
 		_vm->_gfx->drawZoombiniRunner(screen, zoombini);
 		zoombini->advanceAnimationAfterDraw();
 	}
@@ -402,7 +390,7 @@ void ShelterRescueSite2::drawBoardingActives(ManagedSurface32 *screen) const {
 }
 
 void ShelterRescueSite2::drawWaitingStorage(ManagedSurface32 *screen, int pixelShiftX) const {
-	if (!_littleZombAnimation)
+	if (!_vm->_gfx->getCommonZoombiniAnimation(ZmbAnimationKind::kBasic))
 		return;
 	StorageRecord *const *storage = getRescueStorage();
 	int startCol = -2;
@@ -411,17 +399,17 @@ void ShelterRescueSite2::drawWaitingStorage(ManagedSurface32 *screen, int pixelS
 	if (_scrollRow == 0)
 		startCol = 0;
 	int maxCol = 6;
-	if (_scrollRow + 5 >= GameState::kStorageRows)
+	if (GameState::kStorageRows <= _scrollRow + 5)
 		maxCol = 5;
-	if (_scrollRow + 4 >= GameState::kStorageRows)
+	if (GameState::kStorageRows <= _scrollRow + 4)
 		maxCol = 4;
-	const Common::Rect32 clip(kRosterGridBasePos.x, 0, kRosterGridBasePos.x + 223, ManagedSurface32::kScreenSize.height);
+	const Common::Rect32 clip(kRosterGridBasePos.x, 0, kRosterGridBasePos.x + 223, Gfx::kScreenSize.height);
 	for (int col = startCol; col < maxCol; col++) {
 		for (int row = 0; row < 5; row++) {
 			const int storageIndex = (_scrollRow + col) * GameState::kStorageCols + row;
 			if (storageIndex < 0 || GameState::kStorageRows * GameState::kStorageCols <= storageIndex || !storage[storageIndex])
 				continue;
-			_vm->_gfx->drawZoombini(screen, _littleZombAnimation, storage[storageIndex]->getTraits(),
+			_vm->_gfx->drawZoombini(screen, ZmbAnimationKind::kBasic, storage[storageIndex]->getTraits(),
 									Common::Point32(kRosterGridBasePos.x + col * 40 + 18 + pixelShiftX, kRosterGridBasePos.y + row * 57 + 30),
 									33, 0, &clip);
 		}
@@ -468,11 +456,14 @@ EventHandleResult ShelterRescueSite2::onLButtonDown(const Common::Point &) {
 
 EventHandleResult ShelterRescueSite2::onLButtonUp(const Common::Point &pos) {
 	refreshGridOccupancy();
-	const uint32 tick = _vm->getTotalPlayTime();
-	const ZmbDropResult inputResult = ZoombiniRunner::handlePointerInput(_vm->_state->_activeZoombinis, Common::Point32(pos.x, pos.y), true,
-																		 _pickupZombAnimation, tick, &_dropTargets, getAreaMask());
-	if (inputResult != ZmbDropResult::kIgnored00)
+	const ZmbDropResult inputResult = ZoombiniRunner::handleHoldAndDrop(_vm, _vm->_state->_activeZoombinis, Common::Point32(pos.x, pos.y),
+																		ZmbHoldDropInput::kLeftButtonRelease, ZmbAnimationKind::kPickup, &_dropTargets, getAreaMask());
+	switch (inputResult) {
+	case ZmbDropResult::kIgnored00:
+		break;
+	default:
 		return EventHandleResult::kConsumed;
+	}
 	if (_scrollPhase != kScrollIdle || getDraggedZoombini())
 		return EventHandleResult::kPassthrough;
 
@@ -503,9 +494,14 @@ EventHandleResult ShelterRescueSite2::onLButtonUp(const Common::Point &pos) {
 }
 
 EventHandleResult ShelterRescueSite2::onMouseMove(const Common::Point &pos) {
-	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_vm->_state->_activeZoombinis, Common::Point32(pos.x, pos.y), false,
-																	_pickupZombAnimation, _vm->getTotalPlayTime(), &_dropTargets, getAreaMask());
-	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _vm->_state->_activeZoombinis, Common::Point32(pos.x, pos.y),
+																   ZmbHoldDropInput::kMoveOnly, ZmbAnimationKind::kPickup, &_dropTargets, getAreaMask());
+	switch (result) {
+	case ZmbDropResult::kIgnored00:
+		return EventHandleResult::kPassthrough;
+	default:
+		return EventHandleResult::kConsumed;
+	}
 }
 
 } // End of namespace Zoombini2

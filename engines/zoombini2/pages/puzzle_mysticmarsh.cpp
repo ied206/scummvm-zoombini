@@ -28,6 +28,28 @@
 
 namespace Zoombini2 {
 
+constexpr byte MysticMarshGrid::kLayouts[9][kRows][kColumns];
+
+constexpr const char *PuzzleMysticMarsh::kPageName;
+constexpr const char *PuzzleMysticMarsh::kBackgroundPath;
+constexpr const char *PuzzleMysticMarsh::kMusicPath;
+constexpr const char *PuzzleMysticMarsh::kBackgroundFormat;
+constexpr const char *PuzzleMysticMarsh::kAreaFormat;
+constexpr const char *PuzzleMysticMarsh::kSymbolFormat;
+constexpr const char *PuzzleMysticMarsh::kTraitFormat;
+constexpr const char *PuzzleMysticMarsh::kCraterPath;
+constexpr const char *PuzzleMysticMarsh::kCraterAnimationPath;
+constexpr const char *PuzzleMysticMarsh::kWhirlpoolPath;
+constexpr const char *PuzzleMysticMarsh::kBubblePath;
+constexpr const char *PuzzleMysticMarsh::kSfxFormat;
+constexpr const char *PuzzleMysticMarsh::kGoSpeechFormat;
+constexpr const char *PuzzleMysticMarsh::kCaveSpeech;
+constexpr const char *PuzzleMysticMarsh::kCompleteSpeech;
+
+constexpr const char *PuzzleMysticMarsh::kSymbolNames[60];
+constexpr Common::Point32 PuzzleMysticMarsh::kStartingPositions[6][8];
+constexpr Common::Point32 PuzzleMysticMarsh::kExitPositions[6][8];
+
 int MysticMarshGrid::randomBelow(int count) {
 	assert(0 < count);
 	return _random->getRandomNumber(count - 1);
@@ -44,25 +66,25 @@ bool MysticMarshGrid::matches(int zoombini, Feature feature) const {
 }
 
 int MysticMarshGrid::background() const {
-	if (_layout < 2)
+	if (_layout < kGridL2LayoutA_02)
 		return _layout + 1;
-	if (_layout < 6)
+	if (_layout < kGridL3LayoutA_06)
 		return 3;
 	return _layout - 2;
 }
 
-void MysticMarshGrid::loadLayout(int layout) {
+void MysticMarshGrid::loadLayout(GridLayout layout) {
 	_layout = layout;
 	const Cell *templates = cellTemplates();
 	for (int col = 0; col < kColumns; col++) {
 		for (int row = 0; row < kRows; row++)
-			_cells[index(col, row)] = templates[kLayouts[layout][row][col]];
+			_cells[toCellIndex(col, row)] = templates[kLayouts[layout][row][col]];
 	}
 }
 
 void MysticMarshGrid::clearCell(int column, int row) {
-	Cell &target = _cells[index(column, row)];
-	target.type = 1;
+	Cell &target = _cells[toCellIndex(column, row)];
+	target.type = kCellFollowIncomingDirectionType01;
 	target.direction = 4;
 	target.trigger = 0;
 	target.trait = 0;
@@ -70,9 +92,26 @@ void MysticMarshGrid::clearCell(int column, int row) {
 }
 
 void MysticMarshGrid::setFeature(int column, int row, Feature feature) {
-	Cell &target = _cells[index(column, row)];
+	Cell &target = _cells[toCellIndex(column, row)];
 	target.trait = feature.trait;
 	target.value = feature.value;
+}
+
+void MysticMarshGrid::recordKeyActor(GenerationKeyRole role, int actor, int cell) {
+	if (0 <= actor && actor < static_cast<int>(_party.size()))
+		_generation.keys.push_back(GenerationKey(role, actor, cell));
+}
+
+void MysticMarshGrid::recordKeyMatches(GenerationKeyRole role, int column, int row) {
+	const int cell = toCellIndex(column, row);
+	const Cell &condition = _cells[cell];
+	if (condition.type < kCellSymbolCDiv1Type06 || kCellSymbolCDiv4Type09 < condition.type || condition.trait < 1 || 4 < condition.trait)
+		return;
+	const Feature feature(condition.trait, condition.value);
+	for (uint actor = 0; actor < _party.size(); actor++) {
+		if (matches(actor, feature))
+			recordKeyActor(role, actor, cell);
+	}
 }
 
 void MysticMarshGrid::tally(const Common::Array<int> &group, int counts[5][6]) const {
@@ -87,8 +126,8 @@ MysticMarshGrid::Feature MysticMarshGrid::singleton(const Common::Array<int> &gr
 	int counts[5][6];
 	tally(group, counts);
 	Feature result;
-	for (int f = 1; f <= 4; f++) {
-		for (int v = 1; v <= 5; v++) {
+	for (int f = 1; f < ARRAYSIZE(counts); f++) {
+		for (int v = 1; v < ARRAYSIZE(counts[f]); v++) {
 			if (counts[f][v] == 1)
 				result = Feature(f, v);
 		}
@@ -101,8 +140,8 @@ MysticMarshGrid::Feature MysticMarshGrid::popular(const Common::Array<int> &grou
 	tally(group, counts);
 	int best = 0;
 	Feature result;
-	for (int f = 1; f <= 4; f++) {
-		for (int v = 1; v <= 5; v++) {
+	for (int f = 1; f < ARRAYSIZE(counts); f++) {
+		for (int v = 1; v < ARRAYSIZE(counts[f]); v++) {
 			if (best < counts[f][v] && counts[f][v] < limit) {
 				best = counts[f][v];
 				result = Feature(f, v);
@@ -118,7 +157,7 @@ MysticMarshGrid::Feature MysticMarshGrid::unusedFeature(const Common::Array<int>
 	bool available[5][6] = {};
 	bool any = false;
 	for (uint i = 0; i < _party.size(); i++) {
-		for (int f = 1; f <= 4; f++) {
+		for (int f = 1; f < ARRAYSIZE(counts); f++) {
 			const int v = trait(i, f);
 			if (counts[f][v] == 0) {
 				available[f][v] = true;
@@ -171,41 +210,48 @@ void MysticMarshGrid::init(const Common::Array<ZmbTrait> &party, int level, Rand
 		_after[i] = Occupant();
 	}
 	if (party.empty()) {
-		loadLayout(0);
+		loadLayout(kGridL1LayoutA_00);
 		memcpy(_initialCells, _cells, sizeof(_cells));
 		return;
 	}
-	if (level == 1) {
-		const int layout = randomBelow(2);
-		Cell best[kCellCount];
-		GenerationInfo bestGeneration;
-		int bestScore = -1;
-		for (int attempt = 0; attempt < 30; attempt++) {
-			const int score = generateEasy(layout);
-			if (score == 12) {
-				memcpy(_initialCells, _cells, sizeof(_cells));
-				return;
-			}
-			if (attempt == 0 || bestScore < score) {
-				bestScore = score;
-				memcpy(best, _cells, sizeof(best));
-				bestGeneration = _generation;
-			}
-		}
-		memcpy(_cells, best, sizeof(best));
-		_generation = bestGeneration;
-	} else if (level == 2) {
-		generateMedium();
-	} else if (level == 3) {
-		generateHard();
-	} else {
-		generateL4();
+	switch (level) {
+	case 1:
+		generateL1Board();
+		break;
+	case 2:
+		generateL2Board();
+		break;
+	case 3:
+		generateL3Board();
+		break;
+	default:
+		generateL4Board();
 		correctL4Arrow();
+		break;
 	}
 	memcpy(_initialCells, _cells, sizeof(_cells));
 }
 
-int MysticMarshGrid::generateEasy(int layout) {
+void MysticMarshGrid::generateL1Board() {
+	const GridLayout layout = static_cast<GridLayout>(randomBelow(2));
+	Cell best[kCellCount];
+	GenerationInfo bestGeneration;
+	int bestScore = -1;
+	for (int attempt = 0; attempt < 30; attempt++) {
+		const int score = generateL1BoardCandidate(layout);
+		if (score == 12)
+			return;
+		if (attempt == 0 || bestScore < score) {
+			bestScore = score;
+			memcpy(best, _cells, sizeof(best));
+			bestGeneration = _generation;
+		}
+	}
+	memcpy(_cells, best, sizeof(best));
+	_generation = bestGeneration;
+}
+
+int MysticMarshGrid::generateL1BoardCandidate(GridLayout layout) {
 	_generation = GenerationInfo();
 	loadLayout(layout);
 	Common::Array<int> used;
@@ -216,7 +262,7 @@ int MysticMarshGrid::generateEasy(int layout) {
 	// Use false for those indeterminate values instead of reading unrelated stack memory.
 	bool available[5][6] = {};
 	for (uint i = 0; i < _party.size(); i++) {
-		for (int f = 1; f <= 4; f++) {
+		for (int f = 1; f < ARRAYSIZE(available); f++) {
 			if (trait(i, f) < 5)
 				available[f][trait(i, f)] = true;
 		}
@@ -226,8 +272,8 @@ int MysticMarshGrid::generateEasy(int layout) {
 	int score = 10;
 	for (;;) {
 		bool any = false;
-		for (int f = 1; f <= 4; f++) {
-			for (int v = 1; v <= 5; v++)
+		for (int f = 1; f < ARRAYSIZE(available); f++) {
+			for (int v = 1; v < ARRAYSIZE(available[f]); v++)
 				any = any || available[f][v];
 		}
 		if (!any) {
@@ -240,8 +286,8 @@ int MysticMarshGrid::generateEasy(int layout) {
 		} while (!available[upperFilter.trait][upperFilter.value]);
 		available[upperFilter.trait][upperFilter.value] = false;
 		any = false;
-		for (int f = 1; f <= 4; f++) {
-			for (int v = 1; v <= 5; v++)
+		for (int f = 1; f < ARRAYSIZE(available); f++) {
+			for (int v = 1; v < ARRAYSIZE(available[f]); v++)
 				any = any || available[f][v];
 		}
 		if (!any) {
@@ -270,9 +316,9 @@ int MysticMarshGrid::generateEasy(int layout) {
 	lowerCross.trait = randomBelow(4) + 1;
 	lowerCross.value = randomBelow(5) + 1;
 	int turn = randomBelow(2);
-	const int shift = layout == 0 ? 0 : -1;
-	Cell &entry = _cells[index(3 + shift, 5)];
-	entry.type = 12 + turn;
+	const int shift = layout == kGridL1LayoutA_00 ? 0 : -1;
+	Cell &entry = _cells[toCellIndex(3 + shift, 5)];
+	entry.type = kCellSymbolUdCyDiv2Type12 + turn;
 	entry.direction = 2 + turn;
 	entry.state = 1;
 	int assigned = 0;
@@ -367,13 +413,13 @@ int MysticMarshGrid::generateEasy(int layout) {
 		score -= 2;
 	}
 	if (special.trait == 0) {
-		_cells[index(7 + shift, 3)].type = 19;
-		_cells[index(7 + shift, 3)].direction = 3;
+		_cells[toCellIndex(7 + shift, 3)].type = kCellSymbolOtDiv4Type19;
+		_cells[toCellIndex(7 + shift, 3)].direction = 3;
 		score -= 2;
 	}
 	const int lowerCount = lower.size() + upperToLower - lowerToUpper;
 	const int upperCount = upper.size() + lowerToUpper - upperToLower;
-	if (layout == 0) {
+	if (layout == kGridL1LayoutA_00) {
 		if (4 < lowerCount || lowerCount <= 3)
 			clearCell(9, 3);
 		if (4 < lowerCount || lowerCount <= 2) {
@@ -395,8 +441,8 @@ int MysticMarshGrid::generateEasy(int layout) {
 	} else {
 		if (4 < lowerCount) {
 			clearCell(13, 3);
-			_cells[index(13, 3)].type = 5;
-			_cells[index(13, 3)].direction = 3;
+			_cells[toCellIndex(13, 3)].type = kCellSymbolSDiv4Type05;
+			_cells[toCellIndex(13, 3)].direction = 3;
 		}
 		if (lowerCount <= 3)
 			clearCell(9, 3);
@@ -409,8 +455,8 @@ int MysticMarshGrid::generateEasy(int layout) {
 		}
 		if (4 < upperCount) {
 			clearCell(12, 7);
-			_cells[index(12, 7)].type = 4;
-			_cells[index(12, 7)].direction = 2;
+			_cells[toCellIndex(12, 7)].type = kCellSymbolSDiv3Type04;
+			_cells[toCellIndex(12, 7)].direction = 2;
 		}
 		if (upperCount <= 3)
 			clearCell(9, 7);
@@ -425,10 +471,15 @@ int MysticMarshGrid::generateEasy(int layout) {
 		score -= 2;
 	if (upperCount == lowerCount)
 		score += 2;
+	recordKeyMatches(GenerationKeyRole::kRouteFilter, 4 + shift, 3);
+	recordKeyMatches(GenerationKeyRole::kRouteFilter, 4 + shift, 7);
+	recordKeyMatches(GenerationKeyRole::kCrossFilter, 5 + shift, 3);
+	recordKeyMatches(GenerationKeyRole::kCrossFilter, 6 + shift, 7);
+	recordKeyMatches(GenerationKeyRole::kSingleton, 7 + shift, 3);
 	return score;
 }
 
-void MysticMarshGrid::generateMedium() {
+void MysticMarshGrid::generateL2Board() {
 	const int count = _party.size();
 	const int half = (count + 1) / 2;
 	const int quarter = (count - half) / 2;
@@ -480,7 +531,7 @@ void MysticMarshGrid::generateMedium() {
 	_generation.group = group;
 	_generation.subset = subset;
 	const int variant = randomBelow(4);
-	loadLayout(variant + 2);
+	loadLayout(static_cast<GridLayout>(variant + kGridL2LayoutA_02));
 	setFeature(8, 6, first);
 	setFeature(variant < 2 ? 2 : 5, 3, second);
 	static constexpr int kThirdColumns[4] = {
@@ -492,11 +543,11 @@ void MysticMarshGrid::generateMedium() {
 	const int thirdColumn = kThirdColumns[variant];
 	const int thirdRow = variant < 2 ? 6 : 3;
 	setFeature(thirdColumn, thirdRow, third);
-	_cells[index(thirdColumn, thirdRow)].type = 7;
-	_cells[index(thirdColumn, thirdRow)].direction = 1;
-	_cells[index(4, 7)].type = 14;
-	_cells[index(4, 7)].direction = 0;
-	_cells[index(4, 7)].state = 1;
+	_cells[toCellIndex(thirdColumn, thirdRow)].type = kCellSymbolCDiv2Type07;
+	_cells[toCellIndex(thirdColumn, thirdRow)].direction = 1;
+	_cells[toCellIndex(4, 7)].type = kCellSymbolLrCyDiv2Type14;
+	_cells[toCellIndex(4, 7)].direction = 0;
+	_cells[toCellIndex(4, 7)].state = 1;
 	static constexpr int kRemovals[4][6][8] = {
 		{
 			{13, 4, 13, 5, -1, -1, -1, -1},
@@ -533,13 +584,16 @@ void MysticMarshGrid::generateMedium() {
 	};
 	for (int threshold = 7; 2 <= threshold; threshold -= 1) {
 		if (count <= threshold) {
-			for (int i = 0; i < 8; i += 2) {
+			for (int i = 0; i < ARRAYSIZE(kRemovals[variant][7 - threshold]); i += 2) {
 				const int *pair = &kRemovals[variant][7 - threshold][i];
 				if (0 <= pair[0])
 					clearCell(pair[0], pair[1]);
 			}
 		}
 	}
+	recordKeyMatches(GenerationKeyRole::kCondition, 8, 6);
+	recordKeyMatches(GenerationKeyRole::kCondition, variant < 2 ? 2 : 5, 3);
+	recordKeyMatches(GenerationKeyRole::kCondition, thirdColumn, thirdRow);
 }
 
 int MysticMarshGrid::pickUnique(Common::Array<int> &used) {
@@ -572,7 +626,7 @@ int MysticMarshGrid::pickDifferent(int first, Common::Array<int> &used, int mini
 	return pick(candidates, used);
 }
 
-void MysticMarshGrid::generateHard() {
+void MysticMarshGrid::generateL3Board() {
 	Common::Array<int> used;
 	Common::Array<int> tried;
 	Common::Array<int> visited;
@@ -631,7 +685,7 @@ void MysticMarshGrid::generateHard() {
 			2,
 		};
 		int found = 0;
-		for (int i = 0; i < 4 && found < 2; i++) {
+		for (int i = 0; i < ARRAYSIZE(kTraitOrder) && found < 2; i++) {
 			const int f = kTraitOrder[i];
 			if (trait(first, f) != trait(second, f)) {
 				feature[found] = f;
@@ -690,16 +744,16 @@ void MysticMarshGrid::generateHard() {
 		feature[3] = randomBelow(4) + 1;
 	} while (feature[0] == feature[2] || feature[0] == feature[3] || feature[1] == feature[2] ||
 			 feature[1] == feature[3] || feature[2] == feature[3]);
-	for (int i = 2; i < 4; i++) {
+	for (int i = 2; i < ARRAYSIZE(feature); i++) {
 		values[i][0] = trait(first, feature[i]);
 		const int other = trait(second, feature[i]);
 		if (other != values[i][0])
 			values[i][1] = other;
 	}
-	for (int f = 0; f < 4; f++) {
+	for (int f = 0; f < ARRAYSIZE(values); f++) {
 		if (values[f][0] == 0)
 			values[f][0] = randomBelow(5) + 1;
-		for (int v = 1; v < 5; v++) {
+		for (int v = 1; v < ARRAYSIZE(values[f]); v++) {
 			if (v == 1 && values[f][v] != 0)
 				continue;
 			bool distinct;
@@ -711,63 +765,63 @@ void MysticMarshGrid::generateHard() {
 			} while (!distinct);
 		}
 	}
-	loadLayout(randomBelow(2) + 6);
-	if (_layout == 6) {
-		_cells[index(3, 0)].state = 2;
-		_cells[index(2, 7)].state = 1;
+	loadLayout(static_cast<GridLayout>(randomBelow(2) + kGridL3LayoutA_06));
+	if (_layout == kGridL3LayoutA_06) {
+		_cells[toCellIndex(3, 0)].state = 2;
+		_cells[toCellIndex(2, 7)].state = 1;
 	} else {
-		_cells[index(1, 9)].state = 1;
-		_cells[index(2, 11)].state = 1;
+		_cells[toCellIndex(1, 9)].state = 1;
+		_cells[toCellIndex(2, 11)].state = 1;
 	}
-	static constexpr int kHardFeatures[2][18][5] = {
+	static constexpr int kL3Features[2][18][5] = {
 		{
-			{12, 4, 6, 0, 0},
-			{8, 3, 9, 0, 1},
-			{11, 2, 9, 0, 2},
-			{13, 4, 6, 0, 3},
-			{12, 7, 6, 0, 4},
-			{11, 3, 9, 1, 0},
-			{8, 2, 8, 1, 1},
-			{13, 7, 6, 1, 2},
-			{11, 8, 9, 1, 3},
-			{11, 9, 9, 1, 4},
-			{8, 8, 8, 2, 2},
-			{8, 9, 8, 2, 3},
-			{6, 7, 6, 2, 4},
-			{7, 7, 6, 3, 2},
-			{6, 4, 7, 3, 3},
-			{7, 4, 7, 3, 4},
-			{-1, 0, 0, 0, 0},
-			{-1, 0, 0, 0, 0},
+			{12, 4, kCellSymbolCDiv1Type06, 0, 0},
+			{8, 3, kCellSymbolCDiv4Type09, 0, 1},
+			{11, 2, kCellSymbolCDiv4Type09, 0, 2},
+			{13, 4, kCellSymbolCDiv1Type06, 0, 3},
+			{12, 7, kCellSymbolCDiv1Type06, 0, 4},
+			{11, 3, kCellSymbolCDiv4Type09, 1, 0},
+			{8, 2, kCellSymbolCDiv3Type08, 1, 1},
+			{13, 7, kCellSymbolCDiv1Type06, 1, 2},
+			{11, 8, kCellSymbolCDiv4Type09, 1, 3},
+			{11, 9, kCellSymbolCDiv4Type09, 1, 4},
+			{8, 8, kCellSymbolCDiv3Type08, 2, 2},
+			{8, 9, kCellSymbolCDiv3Type08, 2, 3},
+			{6, 7, kCellSymbolCDiv1Type06, 2, 4},
+			{7, 7, kCellSymbolCDiv1Type06, 3, 2},
+			{6, 4, kCellSymbolCDiv2Type07, 3, 3},
+			{7, 4, kCellSymbolCDiv2Type07, 3, 4},
+			{-1, 0, kCellEmptyType00, 0, 0},
+			{-1, 0, kCellEmptyType00, 0, 0},
 		},
 		{
-			{7, 2, 8, 0, 0},
-			{5, 6, 6, 0, 1},
-			{5, 3, 6, 0, 2},
-			{7, 1, 9, 0, 3},
-			{10, 2, 8, 0, 4},
-			{6, 3, 6, 1, 0},
-			{6, 6, 7, 1, 1},
-			{10, 1, 8, 1, 2},
-			{11, 3, 6, 1, 3},
-			{12, 3, 6, 1, 4},
-			{11, 6, 7, 2, 2},
-			{12, 6, 7, 2, 3},
-			{10, 8, 8, 2, 4},
-			{7, 7, 8, 3, 2},
-			{7, 8, 8, 3, 3},
-			{-1, 0, 0, 0, 0},
-			{-1, 0, 0, 0, 0},
-			{-1, 0, 0, 0, 0},
+			{7, 2, kCellSymbolCDiv3Type08, 0, 0},
+			{5, 6, kCellSymbolCDiv1Type06, 0, 1},
+			{5, 3, kCellSymbolCDiv1Type06, 0, 2},
+			{7, 1, kCellSymbolCDiv4Type09, 0, 3},
+			{10, 2, kCellSymbolCDiv3Type08, 0, 4},
+			{6, 3, kCellSymbolCDiv1Type06, 1, 0},
+			{6, 6, kCellSymbolCDiv2Type07, 1, 1},
+			{10, 1, kCellSymbolCDiv3Type08, 1, 2},
+			{11, 3, kCellSymbolCDiv1Type06, 1, 3},
+			{12, 3, kCellSymbolCDiv1Type06, 1, 4},
+			{11, 6, kCellSymbolCDiv2Type07, 2, 2},
+			{12, 6, kCellSymbolCDiv2Type07, 2, 3},
+			{10, 8, kCellSymbolCDiv3Type08, 2, 4},
+			{7, 7, kCellSymbolCDiv3Type08, 3, 2},
+			{7, 8, kCellSymbolCDiv3Type08, 3, 3},
+			{-1, 0, kCellEmptyType00, 0, 0},
+			{-1, 0, kCellEmptyType00, 0, 0},
+			{-1, 0, kCellEmptyType00, 0, 0},
 		},
 	};
-	for (int i = 0; i < 18; i++) {
-		const int *rule = kHardFeatures[_layout - 6][i];
+	for (int i = 0; i < ARRAYSIZE(kL3Features[_layout - kGridL3LayoutA_06]); i++) {
+		const int *rule = kL3Features[_layout - kGridL3LayoutA_06][i];
 		if (rule[0] < 0)
 			continue;
-		Cell &target = _cells[index(rule[0], rule[1])];
+		Cell &target = _cells[toCellIndex(rule[0], rule[1])];
 		target.type = rule[2];
-		target.direction = rule[2] - 6;
+		target.direction = rule[2] - kCellSymbolCDiv1Type06;
 		target.trait = feature[rule[3]];
 		target.value = values[rule[3]][rule[4]];
 	}
@@ -785,16 +839,24 @@ void MysticMarshGrid::generateHard() {
 			{1, 11},
 		},
 	};
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < ARRAYSIZE(kRemove[_layout - kGridL3LayoutA_06]); i++) {
 		if (static_cast<int>(_party.size()) <= 7 - i)
-			clearCell(kRemove[_layout - 6][i][0], kRemove[_layout - 6][i][1]);
+			clearCell(kRemove[_layout - kGridL3LayoutA_06][i][0], kRemove[_layout - kGridL3LayoutA_06][i][1]);
+	}
+	const int primaryCell = _layout == kGridL3LayoutA_06 ? toCellIndex(12, 4) : toCellIndex(7, 2);
+	const int secondaryCell = _layout == kGridL3LayoutA_06 ? toCellIndex(8, 3) : toCellIndex(5, 6);
+	recordKeyActor(GenerationKeyRole::kPrimaryReference, _generation.primaryFilterActors[0], primaryCell);
+	recordKeyActor(GenerationKeyRole::kSecondaryReference, _generation.primaryFilterActors[1], secondaryCell);
+	if (_generation.restoredFilterValues) {
+		recordKeyActor(GenerationKeyRole::kRemainingFiltersReference, first, -1);
+		recordKeyActor(GenerationKeyRole::kRemainingFiltersReference, second, -1);
 	}
 }
 
 int MysticMarshGrid::pickL4Singleton(Feature &feature) {
 	int available[5][6] = {};
 	for (uint actor = 0; actor < _party.size(); actor++) {
-		for (int axis = 1; axis <= 4; axis++)
+		for (int axis = 1; axis < ARRAYSIZE(available); axis++)
 			available[axis][trait(actor, axis)] = 1;
 	}
 	int selected = -1;
@@ -811,14 +873,14 @@ int MysticMarshGrid::pickL4Singleton(Feature &feature) {
 		if (count == 1)
 			return selected;
 		bool remaining = false;
-		for (int axis = 1; axis <= 4; axis++) {
-			for (int value = 1; value <= 5; value++)
+		for (int axis = 1; axis < ARRAYSIZE(available); axis++) {
+			for (int value = 1; value < ARRAYSIZE(available[axis]); value++)
 				remaining = remaining || available[axis][value] == 1;
 		}
 		if (!remaining)
 			return selected;
 	}
-	warning("Mystic Marsh: level 4 singleton sampling exhausted");
+	warning("MysticMarsh: level 4 singleton sampling exhausted");
 	return selected;
 }
 
@@ -827,7 +889,7 @@ bool MysticMarshGrid::pickL4Constrained(int excludedActor, Feature &feature) {
 	for (uint actor = 0; actor < _party.size(); actor++) {
 		if (static_cast<int>(actor) == excludedActor)
 			continue;
-		for (int axis = 1; axis <= 4; axis++)
+		for (int axis = 1; axis < ARRAYSIZE(available); axis++)
 			available[axis][trait(actor, axis)] = 1;
 	}
 	for (int wanted = 2; 1 <= wanted; wanted -= 1) {
@@ -851,8 +913,8 @@ bool MysticMarshGrid::pickL4Constrained(int excludedActor, Feature &feature) {
 			if (count == wanted)
 				return wanted == 2;
 			bool remaining = false;
-			for (int axis = 1; axis <= 4; axis++) {
-				for (int value = 1; value <= 5; value++)
+			for (int axis = 1; axis < ARRAYSIZE(available); axis++) {
+				for (int value = 1; value < ARRAYSIZE(available[axis]); value++)
 					remaining = remaining || available[axis][value] == 1;
 			}
 			if (!remaining)
@@ -861,7 +923,7 @@ bool MysticMarshGrid::pickL4Constrained(int excludedActor, Feature &feature) {
 		for (uint actor = 0; actor < _party.size(); actor++) {
 			if (static_cast<int>(actor) == excludedActor)
 				continue;
-			for (int axis = 1; axis <= 4; axis++)
+			for (int axis = 1; axis < ARRAYSIZE(available); axis++)
 				available[axis][trait(actor, axis)] = 1;
 		}
 	}
@@ -873,7 +935,7 @@ MysticMarshGrid::Feature MysticMarshGrid::pickL4Pair(Feature primary, Feature se
 	for (uint actor = 0; actor < _party.size(); actor++) {
 		if (static_cast<int>(actor) == excludedActor)
 			continue;
-		for (int axis = 1; axis <= 4; axis++)
+		for (int axis = 1; axis < ARRAYSIZE(available); axis++)
 			available[axis][trait(actor, axis)] = 1;
 	}
 	Feature candidates[2];
@@ -903,8 +965,8 @@ MysticMarshGrid::Feature MysticMarshGrid::pickL4Pair(Feature primary, Feature se
 				break;
 			}
 			bool remaining = false;
-			for (int axis = 1; axis <= 4; axis++) {
-				for (int value = 1; value <= 5; value++)
+			for (int axis = 1; axis < ARRAYSIZE(available); axis++) {
+				for (int value = 1; value < ARRAYSIZE(available[axis]); value++)
 					remaining = remaining || available[axis][value] == 1;
 			}
 			if (!remaining)
@@ -914,15 +976,15 @@ MysticMarshGrid::Feature MysticMarshGrid::pickL4Pair(Feature primary, Feature se
 		for (uint actor = 0; actor < _party.size(); actor++) {
 			if (static_cast<int>(actor) == excludedActor)
 				continue;
-			for (int axis = 1; axis <= 4; axis++)
+			for (int axis = 1; axis < ARRAYSIZE(available); axis++)
 				available[axis][trait(actor, axis)] = 1;
 		}
 	}
 	Feature empty;
 	bool absent[5][6] = {};
 	bool anyAbsent = false;
-	for (int axis = 1; axis <= 4; axis++) {
-		for (int value = 1; value <= 5; value++) {
+	for (int axis = 1; axis < ARRAYSIZE(absent); axis++) {
+		for (int value = 1; value < ARRAYSIZE(absent[axis]); value++) {
 			bool present = false;
 			for (uint actor = 0; actor < _party.size(); actor++)
 				present = present || trait(actor, axis) == value;
@@ -959,23 +1021,23 @@ void MysticMarshGrid::correctL4Arrow() {
 	// The original level 4 template sets direction 4, leaving matching Zoombinis in this cell.
 	// Correcting the generated cell is required to make its behavior match that intent.
 	// Keep the authored layout intact and apply the correction before the initial
-	// snapshot used by @ref MysticMarshGrid::findAnswer is retained.
-	Cell &arrow = _cells[index(7, 9)];
-	if (_layout == 8 && arrow.type == 7 && arrow.direction == 4) {
+	// snapshot used by @ref MysticMarshGrid::debugAnswerSolver is retained.
+	Cell &arrow = _cells[toCellIndex(7, 9)];
+	if (_layout == kGridL4LayoutA_08 && arrow.type == kCellSymbolCDiv2Type07 && arrow.direction == 4) {
 		arrow.direction = 1;
-		warning("Mystic Marsh: corrected level 4 arrow at column 8, row 10 (1-based) from direction 4 to right to prevent a trapped Zoombini");
+		warning("MysticMarsh: corrected level 4 arrow at column 8, row 10 (1-based) from direction 4 to right to prevent a trapped Zoombini");
 	}
 }
 
-void MysticMarshGrid::generateL4() {
-	loadLayout(8);
+void MysticMarshGrid::generateL4Board() {
+	loadLayout(kGridL4LayoutA_08);
 	if (_party.size() <= 6) {
-		_cells[index(13, 5)].type = 45;
-		_cells[index(13, 5)].direction = 1;
-		_cells[index(10, 7)].type = 49;
-		_cells[index(10, 7)].direction = 0;
-		_cells[index(8, 7)].type = 42;
-		_cells[index(8, 7)].direction = 0;
+		_cells[toCellIndex(13, 5)].type = kCellSymbolRrTcyDiv3Type45;
+		_cells[toCellIndex(13, 5)].direction = 1;
+		_cells[toCellIndex(10, 7)].type = kCellSymbolUlTcyDiv3Type49;
+		_cells[toCellIndex(10, 7)].direction = 0;
+		_cells[toCellIndex(8, 7)].type = kCellSymbolLlTcyDiv3Type42;
+		_cells[toCellIndex(8, 7)].direction = 0;
 		return;
 	}
 	if (_party.size() == 7) {
@@ -999,8 +1061,8 @@ void MysticMarshGrid::generateL4() {
 	if (constrained) {
 		setFeature(11, 3, secondary);
 	} else {
-		_cells[index(11, 3)].type = 16;
-		_cells[index(11, 3)].direction = 0;
+		_cells[toCellIndex(11, 3)].type = kCellSymbolOtDiv1Type16;
+		_cells[toCellIndex(11, 3)].direction = 0;
 	}
 	_generation.l4Features[0][0] = primary.trait;
 	_generation.l4Features[0][1] = primary.value;
@@ -1008,6 +1070,10 @@ void MysticMarshGrid::generateL4() {
 	_generation.l4Features[1][1] = constrained ? secondary.value : 0;
 	_generation.l4Features[2][0] = pair.trait;
 	_generation.l4Features[2][1] = pair.value;
+	recordKeyActor(GenerationKeyRole::kSingleton, singletonActor, toCellIndex(8, 1));
+	if (constrained)
+		recordKeyMatches(GenerationKeyRole::kConstrained, 11, 3);
+	recordKeyMatches(GenerationKeyRole::kPair, 4, 7);
 	Common::Array<int> order;
 	int remainingBeforePair = 0;
 	if (constrained) {
@@ -1107,26 +1173,32 @@ void MysticMarshGrid::generateL4() {
 			continue;
 		}
 		stage += 1;
-		if (_party.size() == 7 && stage == 2) {
-			stage = 3;
-		} else if (stage == 1) {
+		switch (stage) {
+		case 1:
 			firstCount += 1;
-		} else if (stage == 2) {
-			secondCount += 1;
+			break;
+		case 2:
+			if (_party.size() == 7)
+				stage = 3;
+			else
+				secondCount += 1;
+			break;
+		default:
+			break;
 		}
 	}
-	_cells[index(10, 7)].type = firstCount % 2 == 0 ? 40 : 41;
-	_cells[index(10, 7)].direction = firstCount % 2 == 0 ? 0 : 1;
-	_cells[index(13, 5)].type = secondCount % 3 == 0 ? 45 : 47;
-	_cells[index(13, 5)].direction = secondCount % 3 == 0 ? 1 : 3;
-	_cells[index(8, 7)].type = 44;
-	_cells[index(8, 7)].direction = 3;
+	_cells[toCellIndex(10, 7)].type = firstCount % 2 == 0 ? kCellSymbolLrTcyDiv2Type40 : kCellSymbolRlTcyDiv2Type41;
+	_cells[toCellIndex(10, 7)].direction = firstCount % 2 == 0 ? 0 : 1;
+	_cells[toCellIndex(13, 5)].type = secondCount % 3 == 0 ? kCellSymbolRrTcyDiv3Type45 : kCellSymbolRdTcyDiv3Type47;
+	_cells[toCellIndex(13, 5)].direction = secondCount % 3 == 0 ? 1 : 3;
+	_cells[toCellIndex(8, 7)].type = kCellSymbolLdTcyDiv3Type44;
+	_cells[toCellIndex(8, 7)].direction = 3;
 }
 
 bool MysticMarshGrid::place(int cellIndex, int zoombiniIndex) {
 	if (cellIndex < 0 || kCellCount <= cellIndex || zoombiniIndex < 0 || static_cast<int>(_party.size()) <= zoombiniIndex)
 		return false;
-	if (_cells[cellIndex].type != 60 && _cells[cellIndex].type != 61)
+	if (_cells[cellIndex].type != kCellSymbolEntry1Type60 && _cells[cellIndex].type != kCellSymbolEntry2Type61)
 		return false;
 	Occupant &target = _after[cellIndex];
 	if (target.index == -1)
@@ -1162,11 +1234,11 @@ void MysticMarshGrid::move(int cellIndex, int direction) {
 	_moved[source.index] = 1;
 	if (column < 0 || kColumns <= column || row < 0 || kRows <= row) {
 		if (!_answerSimulation)
-			warning("Mystic Marsh: route leaves the bounded grid at %d,%d", column, row);
+			warning("MysticMarsh: route leaves the bounded grid at %d,%d", column, row);
 		_lost.push_back(source.index);
 		return;
 	}
-	Occupant &target = _after[index(column, row)];
+	Occupant &target = _after[toCellIndex(column, row)];
 	if (target.index == -1)
 		target.index = source.index;
 	else
@@ -1185,49 +1257,57 @@ void MysticMarshGrid::removeCollision(int first, int second) {
 	}
 }
 
+bool MysticMarshGrid::isStarType(int type) {
+	return kCellSymbolTrigger1Type29 <= type && type <= kCellSymbolTrigger7Type35;
+}
+
+bool MysticMarshGrid::isMagnetType(int type) {
+	return kCellSymbolTsSpot1Type51 <= type && type <= kCellSymbolTsSpot7Type57;
+}
+
 void MysticMarshGrid::rotateCells(const bool triggers[7]) {
-	static constexpr int kNextType[41] = {
-		11,
-		10,
-		13,
-		12,
-		15,
-		14,
-		16,
-		17,
-		18,
-		19,
-		20,
-		21,
-		22,
-		23,
-		24,
-		25,
-		26,
-		27,
-		28,
-		29,
-		30,
-		31,
-		32,
-		33,
-		34,
-		35,
-		37,
-		36,
-		39,
-		38,
-		41,
-		40,
-		43,
-		44,
-		42,
-		47,
-		45,
-		46,
-		50,
-		48,
-		49,
+	static constexpr CellType kNextType[41] = {
+		kCellSymbolDrCyDiv2Type11,
+		kCellSymbolRdCyDiv2Type10,
+		kCellSymbolDuCyDiv2Type13,
+		kCellSymbolUdCyDiv2Type12,
+		kCellSymbolRlCyDiv2Type15,
+		kCellSymbolLrCyDiv2Type14,
+		kCellSymbolOtDiv1Type16,
+		kCellSymbolOtDiv2Type17,
+		kCellSymbolOtDiv3Type18,
+		kCellSymbolOtDiv4Type19,
+		kCellSymbolOldOtDiv1Type20,
+		kCellSymbolOldOtDiv2Type21,
+		kCellSymbolOldOtDiv3Type22,
+		kCellSymbolOldOtDiv4Type23,
+		kCellSymbolCcRotatorType24,
+		kCellSymbolCRotatorType25,
+		kCellSymbolLdElbowType26,
+		kCellSymbolLuElbowType27,
+		kCellSymbolLdConvergerType28,
+		kCellSymbolTrigger1Type29,
+		kCellSymbolTrigger2Type30,
+		kCellSymbolTrigger3Type31,
+		kCellSymbolTrigger4Type32,
+		kCellSymbolTrigger5Type33,
+		kCellSymbolTrigger6Type34,
+		kCellSymbolTrigger7Type35,
+		kCellSymbolRuTcyDiv2Type37,
+		kCellSymbolUrTcyDiv2Type36,
+		kCellSymbolDrTcyDiv2Type39,
+		kCellSymbolRdTcyDiv2Type38,
+		kCellSymbolRlTcyDiv2Type41,
+		kCellSymbolLrTcyDiv2Type40,
+		kCellSymbolLuTcyDiv3Type43,
+		kCellSymbolLdTcyDiv3Type44,
+		kCellSymbolLlTcyDiv3Type42,
+		kCellSymbolRdTcyDiv3Type47,
+		kCellSymbolRrTcyDiv3Type45,
+		kCellSymbolRuTcyDiv3Type46,
+		kCellSymbolUrTcyDiv3Type50,
+		kCellSymbolUuTcyDiv3Type48,
+		kCellSymbolUlTcyDiv3Type49,
 	};
 	static constexpr int kNextDirection[41] = {
 		3,
@@ -1274,12 +1354,13 @@ void MysticMarshGrid::rotateCells(const bool triggers[7]) {
 	};
 	for (int i = 0; i < kCellCount; i++) {
 		Cell &target = _cells[i];
-		const bool cyclic = 10 <= target.type && target.type <= 15 && _before[i].index != -1;
-		const bool linked = 36 <= target.type && target.type <= 50 && 29 <= target.trigger && target.trigger <= 35 && triggers[target.trigger - 29];
+		const bool cyclic = kCellSymbolRdCyDiv2Type10 <= target.type && target.type <= kCellSymbolRlCyDiv2Type15 && _before[i].index != -1;
+		const bool linked = kCellSymbolUrTcyDiv2Type36 <= target.type && target.type <= kCellSymbolUrTcyDiv3Type50 &&
+							isStarType(target.trigger) && triggers[target.trigger - kCellSymbolTrigger1Type29];
 		if (cyclic || linked) {
 			const int type = target.type;
-			target.type = kNextType[type - 10];
-			target.direction = kNextDirection[type - 10];
+			target.type = kNextType[type - kCellSymbolRdCyDiv2Type10];
+			target.direction = kNextDirection[type - kCellSymbolRdCyDiv2Type10];
 			_turned = true;
 		}
 	}
@@ -1307,50 +1388,59 @@ void MysticMarshGrid::tick() {
 		Cell &current = _cells[i];
 		const int type = current.type;
 		int direction = occupant.direction;
-		if (type == 1 || (20 <= type && type <= 23) || (29 <= type && type <= 35) || type == 60 || type == 61) {
+		if (type == kCellFollowIncomingDirectionType01 || (kCellSymbolOldOtDiv1Type20 <= type && type <= kCellSymbolOldOtDiv4Type23) ||
+			isStarType(type) || type == kCellSymbolEntry1Type60 || type == kCellSymbolEntry2Type61) {
 			move(i, direction);
-		} else if ((2 <= type && type <= 5) || (10 <= type && type <= 19) || (36 <= type && type <= 50)) {
+		} else if ((kCellSymbolSDiv1Type02 <= type && type <= kCellSymbolSDiv4Type05) ||
+				   (kCellSymbolRdCyDiv2Type10 <= type && type <= kCellSymbolOtDiv4Type19) ||
+				   (kCellSymbolUrTcyDiv2Type36 <= type && type <= kCellSymbolUrTcyDiv3Type50)) {
 			move(i, current.direction);
-			if (16 <= type && type <= 19) {
-				current.type += 4;
+			if (kCellSymbolOtDiv1Type16 <= type && type <= kCellSymbolOtDiv4Type19) {
+				current.type += kCellSymbolOldOtDiv1Type20 - kCellSymbolOtDiv1Type16;
 				current.direction = 4;
 			}
-		} else if (6 <= type && type <= 9) {
+		} else if (kCellSymbolCDiv1Type06 <= type && type <= kCellSymbolCDiv4Type09) {
 			if (trait(occupant.index, current.trait) == current.value)
 				direction = current.direction;
 			move(i, direction);
-		} else if (24 <= type && type <= 27 && 0 <= direction && direction < 4) {
+		} else if (kCellSymbolCcRotatorType24 <= type && type <= kCellSymbolLuElbowType27 && 0 <= direction && direction < 4) {
 			static constexpr int kTurns[4][4] = {
 				{2, 3, 1, 0},
 				{3, 2, 0, 1},
 				{2, 3, 0, 1},
 				{3, 2, 1, 0},
 			};
-			move(i, kTurns[type - 24][direction]);
-		} else if (type == 28) {
-			if (direction == 0)
+			move(i, kTurns[type - kCellSymbolCcRotatorType24][direction]);
+		} else if (type == kCellSymbolLdConvergerType28) {
+			switch (direction) {
+			case 0:
 				direction = 2;
-			else if (direction == 1)
+				break;
+			case 1:
 				direction = 3;
+				break;
+			default:
+				break;
+			}
 			move(i, direction);
 		}
 	}
 	for (int i = 0; i < kCellCount; i++) {
-		if (_before[i].index != -1 && 29 <= _cells[i].type && _cells[i].type <= 35)
-			triggers[_cells[i].type - 29] = true;
+		if (_before[i].index != -1 && isStarType(_cells[i].type))
+			triggers[_cells[i].type - kCellSymbolTrigger1Type29] = true;
 	}
 	bool released;
 	do {
 		released = false;
 		for (int i = 0; i < kCellCount; i++) {
 			const int z = _before[i].index;
-			if (z < 0 || static_cast<int>(_moved.size()) <= z || _moved[z] != 0 || _cells[i].type < 51 || 57 < _cells[i].type)
+			if (z < 0 || static_cast<int>(_moved.size()) <= z || _moved[z] != 0 || !isMagnetType(_cells[i].type))
 				continue;
 			const int trigger = _cells[i].trigger;
 			if (_after[i].index != -1) {
 				move(i, _after[i].direction);
 				released = true;
-			} else if (29 <= trigger && trigger <= 35 && triggers[trigger - 29]) {
+			} else if (isStarType(trigger) && triggers[trigger - kCellSymbolTrigger1Type29]) {
 				move(i, _before[i].direction);
 				released = true;
 			} else {
@@ -1363,9 +1453,9 @@ void MysticMarshGrid::tick() {
 		const int z = _before[i].index;
 		if (z == -1)
 			continue;
-		if (_cells[i].type == 62)
+		if (_cells[i].type == kCellExitType62)
 			_exits.push_back(z);
-		if (_cells[i].type == 58) {
+		if (_cells[i].type == kCellSymbolTourbiType58) {
 			if (1000 <= z) {
 				_lost.push_back(z % 1000);
 				_lost.push_back(z / 1000);
@@ -1376,7 +1466,7 @@ void MysticMarshGrid::tick() {
 	}
 	for (int i = 0; i < kCellCount; i++) {
 		const int z = _after[i].index;
-		if (1000 <= z && _cells[i].type != 58) {
+		if (1000 <= z && _cells[i].type != kCellSymbolTourbiType58) {
 			_after[i].index = -1;
 			removeCollision(z % 1000, z / 1000);
 		}
@@ -1395,12 +1485,12 @@ void MysticMarshGrid::tick() {
 	}
 	rotateCells(triggers);
 	for (int i = 0; i < kCellCount; i++) {
-		if (_cells[i].type == 62 || _cells[i].type == 58)
+		if (_cells[i].type == kCellExitType62 || _cells[i].type == kCellSymbolTourbiType58)
 			_before[i].index = -1;
 		const int z = _before[i].index;
 		if (0 <= z && z < static_cast<int>(_moved.size()) && _moved[z] == 0)
 			_after[i] = _before[i];
-		if (51 <= _cells[i].type && _cells[i].type <= 57 && _after[i].index != -1 && _before[i].index != _after[i].index)
+		if (isMagnetType(_cells[i].type) && _after[i].index != -1 && _before[i].index != _after[i].index)
 			_caught = true;
 	}
 	for (int i = 0; i < kCellCount; i++) {
@@ -1436,7 +1526,9 @@ bool MysticMarshGrid::sameAnswerState(const MysticMarshGrid &other) const {
 	return true;
 }
 
-bool MysticMarshGrid::settleAnswer(uint &exited, int &budget) {
+bool MysticMarshGrid::settleAnswer(uint &exited, int &budget, AnswerLaunch *explanation) {
+	bool seenStars[kCellCount] = {};
+	bool seenMagnets[kCellCount] = {};
 	for (int step = 0; step < 384 && 0 < budget; step++) {
 		MysticMarshGrid previous = *this;
 		budget -= 1;
@@ -1448,8 +1540,29 @@ bool MysticMarshGrid::settleAnswer(uint &exited, int &budget) {
 				return false;
 			exited |= 1U << actor;
 		}
-		if (sameAnswerState(previous))
+		if (explanation) {
+			explanation->crossed += _exits.size();
+			for (const Move &move : _moves) {
+				const int type = previous._cells[move.from].type;
+				if (isStarType(type) && !seenStars[move.from]) {
+					explanation->stars.push_back(move.from);
+					seenStars[move.from] = true;
+				}
+				if (isMagnetType(type) && move.from != move.to && !seenMagnets[move.from]) {
+					explanation->releasedMagnets.push_back(move.from);
+					seenMagnets[move.from] = true;
+				}
+			}
+		}
+		if (sameAnswerState(previous)) {
+			if (explanation) {
+				for (int i = 0; i < kCellCount; i++) {
+					if (_after[i].index != -1)
+						explanation->waiting.push_back(AnswerStop(_after[i].index, i));
+				}
+			}
 			return true;
+		}
 	}
 	return false;
 }
@@ -1465,7 +1578,8 @@ Common::String MysticMarshGrid::answerStateKey(uint used, uint exited) const {
 	appendAnswerValue(key, exited);
 	for (int i = 0; i < kCellCount; i++) {
 		const int type = _initialCells[i].type;
-		if ((10 <= type && type <= 23) || (36 <= type && type <= 50)) {
+		if ((kCellSymbolRdCyDiv2Type10 <= type && type <= kCellSymbolOldOtDiv4Type23) ||
+			(kCellSymbolUrTcyDiv2Type36 <= type && type <= kCellSymbolUrTcyDiv3Type50)) {
 			appendAnswerValue(key, _cells[i].type);
 			appendAnswerValue(key, _cells[i].direction);
 			appendAnswerValue(key, _cells[i].state);
@@ -1487,7 +1601,7 @@ bool MysticMarshGrid::equivalentAnswerActors(int first, int second) const {
 		return false;
 	for (int i = 0; i < kCellCount; i++) {
 		const Cell &cell = _initialCells[i];
-		if (6 <= cell.type && cell.type <= 9) {
+		if (kCellSymbolCDiv1Type06 <= cell.type && cell.type <= kCellSymbolCDiv4Type09) {
 			const Feature filter(cell.trait, cell.value);
 			if (matches(first, filter) != matches(second, filter))
 				return false;
@@ -1496,7 +1610,42 @@ bool MysticMarshGrid::equivalentAnswerActors(int first, int second) const {
 	return true;
 }
 
-bool MysticMarshGrid::searchAnswer(uint used, uint exited, const Common::Array<int> &order, Common::Array<AnswerLaunch> &answer, Common::HashMap<Common::String, bool> &visited, int &budget) const {
+Common::Array<int> MysticMarshGrid::answerActorOrder() const {
+	// Keep the generated reference actors available while ordinary actors traverse the earlier routes.
+	uint deferred = 0;
+	for (const GenerationKey &key : _generation.keys) {
+		if ((_layout <= kGridL1LayoutB_01 && key.role == GenerationKeyRole::kSingleton) ||
+			(kGridL2LayoutA_02 <= _layout && _layout <= kGridL2LayoutD_05) ||
+			(kGridL3LayoutA_06 <= _layout && _layout <= kGridL3LayoutB_07 &&
+			 (key.role == GenerationKeyRole::kPrimaryReference || key.role == GenerationKeyRole::kSecondaryReference)))
+			deferred |= 1U << key.actor;
+	}
+	Common::Array<int> candidates;
+	uint seen = 0;
+	const Common::Array<int> &construction = _layout == kGridL4LayoutA_08 ? _generation.l4Order : _generation.selectionOrder;
+	for (int actor : construction) {
+		if (0 <= actor && actor < static_cast<int>(_party.size()) && !((seen | deferred) & (1U << actor))) {
+			candidates.push_back(actor);
+			seen |= 1U << actor;
+		}
+	}
+	for (uint actor = 0; actor < _party.size(); actor++) {
+		if (!((seen | deferred) & (1U << actor))) {
+			candidates.push_back(actor);
+			seen |= 1U << actor;
+		}
+	}
+	for (const GenerationKey &key : _generation.keys) {
+		if (!(seen & (1U << key.actor))) {
+			candidates.push_back(key.actor);
+			seen |= 1U << key.actor;
+		}
+	}
+	return candidates;
+}
+
+bool MysticMarshGrid::searchAnswer(uint used, uint exited, const Common::Array<int> &order, const Common::Array<int> &candidates,
+								   Common::Array<AnswerLaunch> &answer, Common::HashMap<Common::String, bool> &visited, int &budget) const {
 	const uint all = (1U << _party.size()) - 1;
 	if (used == all)
 		return exited == all;
@@ -1512,14 +1661,16 @@ bool MysticMarshGrid::searchAnswer(uint used, uint exited, const Common::Array<i
 			break;
 		}
 	}
-	for (uint actor = 0; actor < _party.size() && 0 < budget; actor++) {
+	for (uint candidate = 0; candidate < candidates.size() && 0 < budget; candidate++) {
+		const int actor = candidates[candidate];
 		if (used & (1U << actor))
 			continue;
 		// Try one unused representative per filter signature only when no construction order constrains the actors.
 		bool equivalent = false;
 		if (order.empty()) {
-			for (uint earlier = 1; earlier < actor; earlier++) {
-				if (!(used & (1U << earlier)) && equivalentAnswerActors(earlier, actor)) {
+			for (uint earlier = 0; earlier < candidate; earlier++) {
+				const int previous = candidates[earlier];
+				if (!(used & (1U << previous)) && equivalentAnswerActors(previous, actor)) {
 					equivalent = true;
 					break;
 				}
@@ -1533,7 +1684,7 @@ bool MysticMarshGrid::searchAnswer(uint used, uint exited, const Common::Array<i
 		if (later)
 			continue;
 		for (int cell = 0; cell < kCellCount && 0 < budget; cell++) {
-			if ((_cells[cell].type != 60 && _cells[cell].type != 61) || _after[cell].index != -1)
+			if ((_cells[cell].type != kCellSymbolEntry1Type60 && _cells[cell].type != kCellSymbolEntry2Type61) || _after[cell].index != -1)
 				continue;
 			MysticMarshGrid trial = *this;
 			uint arrivals = exited;
@@ -1541,7 +1692,7 @@ bool MysticMarshGrid::searchAnswer(uint used, uint exited, const Common::Array<i
 			if (!trial.settleAnswer(arrivals, budget))
 				continue;
 			answer.push_back(AnswerLaunch(actor, cell));
-			if (trial.searchAnswer(used | (1U << actor), arrivals, order, answer, visited, budget))
+			if (trial.searchAnswer(used | (1U << actor), arrivals, order, candidates, answer, visited, budget))
 				return true;
 			answer.pop_back();
 		}
@@ -1549,7 +1700,7 @@ bool MysticMarshGrid::searchAnswer(uint used, uint exited, const Common::Array<i
 	return false;
 }
 
-bool MysticMarshGrid::findAnswer(Common::Array<AnswerLaunch> &answer, bool &fromGeneration) const {
+bool MysticMarshGrid::debugAnswerSolver(Common::Array<AnswerLaunch> &answer, bool &fromGeneration) const {
 	answer.clear();
 	fromGeneration = false;
 	if (_party.empty() || 8 < _party.size())
@@ -1557,9 +1708,9 @@ bool MysticMarshGrid::findAnswer(Common::Array<AnswerLaunch> &answer, bool &from
 	MysticMarshGrid initial = *this;
 	initial.resetAnswerState();
 	Common::Array<int> order;
-	if (_layout <= 1)
+	if (_layout <= kGridL1LayoutB_01)
 		order = _generation.selectionOrder;
-	else if (_layout == 8)
+	else if (_layout == kGridL4LayoutA_08)
 		order = _generation.l4Order;
 	uint seen = 0;
 	for (int actor : order) {
@@ -1571,29 +1722,30 @@ bool MysticMarshGrid::findAnswer(Common::Array<AnswerLaunch> &answer, bool &from
 	}
 	int budget = 100000;
 	Common::HashMap<Common::String, bool> visited;
+	const Common::Array<int> candidates = answerActorOrder();
 	if (!order.empty())
-		fromGeneration = initial.searchAnswer(0, 0, order, answer, visited, budget);
+		fromGeneration = initial.searchAnswer(0, 0, order, candidates, answer, visited, budget);
 	if (!fromGeneration && !order.empty()) {
 		Common::Array<int> reversed;
 		for (int i = static_cast<int>(order.size()) - 1; 0 <= i; i -= 1)
 			reversed.push_back(order[i]);
 		visited.clear();
 		budget = 100000;
-		fromGeneration = initial.searchAnswer(0, 0, reversed, answer, visited, budget);
+		fromGeneration = initial.searchAnswer(0, 0, reversed, candidates, answer, visited, budget);
 	}
 	if (!fromGeneration) {
 		order.clear();
 		answer.clear();
 		budget = 1000000;
 		visited.clear();
-		if (!initial.searchAnswer(0, 0, order, answer, visited, budget))
+		if (!initial.searchAnswer(0, 0, order, candidates, answer, visited, budget))
 			return false;
 	}
 	uint exited = 0;
 	uint launched = 0;
 	budget = 384 * 8;
-	for (const AnswerLaunch &launch : answer) {
-		if ((launched & (1U << launch.actor)) || !initial.place(launch.cell, launch.actor) || !initial.settleAnswer(exited, budget)) {
+	for (AnswerLaunch &launch : answer) {
+		if ((launched & (1U << launch.actor)) || !initial.place(launch.cell, launch.actor) || !initial.settleAnswer(exited, budget, &launch)) {
 			answer.clear();
 			fromGeneration = false;
 			return false;
@@ -1608,29 +1760,8 @@ bool MysticMarshGrid::findAnswer(Common::Array<AnswerLaunch> &answer, bool &from
 	return true;
 }
 
-constexpr byte MysticMarshGrid::kLayouts[9][kRows][kColumns];
-
-constexpr const char *PuzzleMysticMarsh::kPuzzleName;
-constexpr const char *PuzzleMysticMarsh::kBackgroundPath;
-constexpr const char *PuzzleMysticMarsh::kMusicPath;
-constexpr const char *PuzzleMysticMarsh::kBackgroundFormat;
-constexpr const char *PuzzleMysticMarsh::kAreaFormat;
-constexpr const char *PuzzleMysticMarsh::kSymbolFormat;
-constexpr const char *PuzzleMysticMarsh::kTraitFormat;
-constexpr const char *PuzzleMysticMarsh::kCraterPath;
-constexpr const char *PuzzleMysticMarsh::kCraterAnimationPath;
-constexpr const char *PuzzleMysticMarsh::kWhirlpoolPath;
-constexpr const char *PuzzleMysticMarsh::kBubblePath;
-constexpr const char *PuzzleMysticMarsh::kFloatPath;
-constexpr const char *PuzzleMysticMarsh::kPickupPath;
-constexpr const char *PuzzleMysticMarsh::kCelebratePath;
-constexpr const char *PuzzleMysticMarsh::kSfxFormat;
-constexpr const char *PuzzleMysticMarsh::kGoSpeechFormat;
-constexpr const char *PuzzleMysticMarsh::kCaveSpeech;
-constexpr const char *PuzzleMysticMarsh::kCompleteSpeech;
-
-PuzzleMysticMarsh::PuzzleMysticMarsh(Zoombini2Engine *vm) : PuzzleBase(vm, kPageMysticMarsh) {
-	_puzzleName = kPuzzleName;
+PuzzleMysticMarsh::PuzzleMysticMarsh(Zoombini2Engine *vm)
+	: PuzzleBase(vm, PageId::kPageMysticMarsh_05) {
 	_initialBackgroundPath = kBackgroundPath;
 }
 
@@ -1641,7 +1772,7 @@ PuzzleMysticMarsh::~PuzzleMysticMarsh() {
 	delete _craterAnimation;
 	delete _whirlpoolAnimation;
 	if (SoundManager *sound = _vm->getSoundManager()) {
-		for (int i = 0; i < 9; i++) {
+		for (int i = 0; i < ARRAYSIZE(_sounds); i++) {
 			if (0 <= _sounds[i])
 				sound->unload(_sounds[i]);
 		}
@@ -1661,14 +1792,14 @@ void PuzzleMysticMarsh::init() {
 	Common::Array<ZmbTrait> party;
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++)
 		party.push_back(_puzzleZoombinis[i]->getTraits());
-	_grid.init(party, CLIP(_puzzleLevel, 1, 4), *_vm->_rnd);
+	_grid.init(party, _puzzleLevel, *_vm->_rnd);
 	for (int i = 0; i < MysticMarshGrid::kCellCount; i++)
 		_drawCells[i] = _grid.cell(i);
 	_backgroundIndex = _grid.background();
 	int artworkIndex = _backgroundIndex;
 	if (_backgroundIndex == 6) {
 		artworkIndex = kL4FallbackBackgroundIndex;
-		warning("Mystic Marsh: background6 is missing; composing level 4 artwork from background%d", artworkIndex);
+		warning("MysticMarsh: background6 is missing; composing level 4 artwork from background%d", artworkIndex);
 	}
 	loadPrimaryLayerBackground(Common::Path(Common::String::format(kBackgroundFormat, artworkIndex)));
 	loadAreaMask(Common::Path(Common::String::format(kAreaFormat, _backgroundIndex)));
@@ -1678,7 +1809,7 @@ void PuzzleMysticMarsh::init() {
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
 		ZoombiniRunner *zoombini = _puzzleZoombinis[i];
 		zoombini->clearMovement();
-		zoombini->setDefaultAnimation(_zoombiniAnimation);
+		zoombini->setDefaultAnimation(ZmbAnimationKind::kBasic);
 		zoombini->setPosition(kStartingPositions[_backgroundIndex - 1][i % 8]);
 		zoombini->setInputEnabled(true);
 		zoombini->setCanAdvanceFromPage(false);
@@ -1687,7 +1818,7 @@ void PuzzleMysticMarsh::init() {
 	}
 	for (int i = 0; i < MysticMarshGrid::kCellCount; i++) {
 		const int type = _grid.cell(i).type;
-		if (type != 60 && type != 61)
+		if (type != MysticMarshGrid::kCellSymbolEntry1Type60 && type != MysticMarshGrid::kCellSymbolEntry2Type61)
 			continue;
 		Slot slot;
 		slot.cell = i;
@@ -1701,12 +1832,14 @@ void PuzzleMysticMarsh::init() {
 		_dropTargets.push_back(target);
 	}
 	_lastTick = _vm->getTotalPlayTime();
-	debug(1, "Mystic Marsh: level=%d layout=%d background=%d party=%u craters=%u", _puzzleLevel, _grid.layout(), _backgroundIndex,
+	debug(1, "MysticMarsh: level=%d layout=%d background=%d party=%u craters=%u", _puzzleLevel, _grid.layout(), _backgroundIndex,
 		  _puzzleZoombinis.size(), _slots.size());
+	if (_vm->inJourneyMode())
+		_vm->_state->registerPageVisit(_pageId, 1);
 }
 
 void PuzzleMysticMarsh::loadResources() {
-	for (int i = 0; i < 60; i++) {
+	for (int i = 0; i < ARRAYSIZE(kSymbolNames); i++) {
 		_vm->_gfx->loadPageRleBlock(Common::String::format(kSymbolFormat, kSymbolNames[i]));
 	}
 	for (int f = 0; f < 4; f++) {
@@ -1720,11 +1853,8 @@ void PuzzleMysticMarsh::loadResources() {
 	_craterAnimation->loadFromFile(Common::Path(kCraterAnimationPath));
 	_whirlpoolAnimation = new Animation(_vm);
 	_whirlpoolAnimation->loadFromFile(Common::Path(kWhirlpoolPath));
-	_floatAnimation = _vm->loadZoombiniAnimation(Common::Path(kFloatPath), 190);
-	_pickupAnimation = _vm->loadZoombiniAnimation(Common::Path(kPickupPath), 100);
-	_celebrateAnimation = _vm->loadZoombiniAnimation(Common::Path(kCelebratePath), 50);
 	if (SoundManager *sound = _vm->getSoundManager()) {
-		for (int i = 2; i <= 8; i++)
+		for (int i = 2; i < ARRAYSIZE(_sounds); i++)
 			_sounds[i] = sound->load(false, Common::Path(Common::String::format(kSfxFormat, i)), false);
 	}
 }
@@ -1778,7 +1908,7 @@ void PuzzleMysticMarsh::freeZoombini(int index, uint32 now) {
 	zoombini->setInputEnabled(false);
 	zoombini->setCanAdvanceFromPage(true);
 	_vm->_zoombiniWalkingFlag = true;
-	zoombini->setActiveAnimation(_zoombiniAnimation);
+	zoombini->setActiveAnimation(ZmbAnimationKind::kBasic);
 	zoombini->startMovement(createPath(zoombini->getScreenPosition(), kExitPositions[_backgroundIndex - 1][_freed % 8], 7), now);
 	zoombini->startDirectionTrackedAnimation(now);
 	_freed += 1;
@@ -1846,8 +1976,8 @@ void PuzzleMysticMarsh::onUpdate() {
 	SoundManager *sound = _vm->getSoundManager();
 	if (_goPending && (!sound || !sound->hasPendingSpeech())) {
 		_goPending = false;
-		_vm->_mapTransitionSourcePageId = kPageMysticMarsh;
-		_vm->requestPageChange(kPageMapTrans);
+		_vm->_mapTransitSrcPageId = PageId::kPageMysticMarsh_05;
+		_vm->requestPageChange(PageId::kPageMapTrans_22);
 	}
 	if (_unlockTime != 0 && _unlockTime < now) {
 		for (uint i = 0; i < _dropTargets.size(); i++)
@@ -1881,7 +2011,8 @@ void PuzzleMysticMarsh::onUpdate() {
 	if (!available && _vm->_zoombiniWalkingFlag) {
 		for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
 			ZoombiniRunner *zoombini = _puzzleZoombinis[i];
-			zoombini->tryStartCelebrationAnimation(_celebrateAnimation, *_vm->_rnd, now, _vm->getFrameDeltaMs(), _vm->getLogicPacingHz());
+			zoombini->tryStartCelebrationAnimation(ZmbAnimationKind::kCelebration, *_vm->_rnd, now, _vm->getFrameDeltaMs(),
+												   _vm->getLogicPacingHz());
 		}
 	}
 	if (_placingZoombini != -1) {
@@ -1889,8 +2020,8 @@ void PuzzleMysticMarsh::onUpdate() {
 			Bubble &bubble = _bubbles[_placingZoombini];
 			bubble.active = true;
 			bubble.position = _slots[_placingSlot].position;
-			_puzzleZoombinis[_placingZoombini]->setActiveAnimation(_floatAnimation);
-			_puzzleZoombinis[_placingZoombini]->startAnimation(_floatAnimation, 33, now);
+			_puzzleZoombinis[_placingZoombini]->setActiveAnimation(ZmbAnimationKind::kFloating);
+			_puzzleZoombinis[_placingZoombini]->startAnimation(ZmbAnimationKind::kFloating, 33, now);
 			_placingZoombini = -1;
 		} else {
 			ZoombiniRunner *zoombini = _puzzleZoombinis[_placingZoombini];
@@ -1928,7 +2059,7 @@ void PuzzleMysticMarsh::onRenderBackground(ManagedSurface32 *screen) {
 		return;
 	}
 	if (!_l4Background) {
-		_l4Background = new ManagedSurface32(ManagedSurface32::kScreenSize, screen->format);
+		_l4Background = new ManagedSurface32(Gfx::kScreenSize, screen->format);
 		_l4Background->fillRect(Common::Rect32(0, 0, screen->w, screen->h), Gfx::PredefinedColor::kBlack.toPixel(screen->format));
 		drawPrimaryPageLayer(_l4Background);
 		MysticMarshL4Background::compose(_l4Background);
@@ -1983,7 +2114,7 @@ void MysticMarshL4Background::eraseBakedGrid(ManagedSurface32 *surface) {
 	}
 	const int seed = 154 * width + 164;
 	if (!candidates[seed]) {
-		warning("Mystic Marsh: background1 baked-grid outline could not be identified");
+		warning("MysticMarsh: background1 baked-grid outline could not be identified");
 		return;
 	}
 	Common::Array<byte> core(pixelCount, 0);
@@ -2000,7 +2131,7 @@ void MysticMarshL4Background::eraseBakedGrid(ManagedSurface32 *surface) {
 		const int index = queue[cursor];
 		const int x = index % width;
 		const int y = index / width;
-		for (int direction = 0; direction < 4; direction++) {
+		for (int direction = 0; direction < ARRAYSIZE(kCardinalDirections); direction++) {
 			const int sampleX = x + kCardinalDirections[direction][0];
 			const int sampleY = y + kCardinalDirections[direction][1];
 			if (sampleX < 0 || width <= sampleX || sampleY < 0 || height <= sampleY)
@@ -2013,9 +2144,9 @@ void MysticMarshL4Background::eraseBakedGrid(ManagedSurface32 *surface) {
 		}
 	}
 	Common::Array<byte> mask(core);
-	for (uint index = 0; index < queue.size(); index++) {
-		const int x = queue[index] % width;
-		const int y = queue[index] / width;
+	for (uint i = 0; i < queue.size(); i++) {
+		const int x = queue[i] % width;
+		const int y = queue[i] / width;
 		for (int sampleY = MAX(0, y - 6); sampleY < MIN(height, y + 7); sampleY++) {
 			const uint32 *pixels = static_cast<const uint32 *>(surface->getBasePtr(0, sampleY));
 			for (int sampleX = MAX(0, x - 6); sampleX < MIN(width, x + 7); sampleX++) {
@@ -2045,12 +2176,12 @@ void MysticMarshL4Background::eraseBakedGrid(ManagedSurface32 *surface) {
 				continue;
 			const Common::Point32 position(x, y);
 			WaterNeighbor neighbors[8];
-			for (int direction = 0; direction < 8; direction++) {
+			for (int direction = 0; direction < ARRAYSIZE(neighbors); direction++) {
 				neighbors[direction] = findWaterNeighbor(surface, mask, position, kWaterDirections[direction]);
 			}
 			int bestAxis = -1;
 			int bestTotal = 1000000;
-			for (int axis = 0; axis < 4; axis++) {
+			for (int axis = 0; axis < ARRAYSIZE(neighbors) / 2; axis++) {
 				const WaterNeighbor &first = neighbors[axis * 2];
 				const WaterNeighbor &second = neighbors[axis * 2 + 1];
 				if (first.distance && second.distance && first.distance + second.distance < bestTotal) {
@@ -2069,7 +2200,7 @@ void MysticMarshL4Background::eraseBakedGrid(ManagedSurface32 *surface) {
 				blue = (first.blue * second.distance + second.blue * first.distance + bestTotal / 2) / bestTotal;
 			} else {
 				int nearest = -1;
-				for (int direction = 0; direction < 8; direction++) {
+				for (int direction = 0; direction < ARRAYSIZE(neighbors); direction++) {
 					if (neighbors[direction].distance && (nearest == -1 || neighbors[direction].distance < neighbors[nearest].distance))
 						nearest = direction;
 				}
@@ -2086,7 +2217,7 @@ void MysticMarshL4Background::eraseBakedGrid(ManagedSurface32 *surface) {
 
 void MysticMarshL4Background::antialiasUpperShore(ManagedSurface32 *surface) {
 	if (surface->w < 197 || surface->h < 291) {
-		warning("Mystic Marsh: level 4 shoreline anti-aliasing needs a full background surface");
+		warning("MysticMarsh: level 4 shoreline anti-aliasing needs a full background surface");
 		return;
 	}
 	static constexpr int kFirstRow = 198;
@@ -2102,8 +2233,11 @@ void MysticMarshL4Background::antialiasUpperShore(ManagedSurface32 *surface) {
 	};
 	static constexpr int kWeightSum = 104;
 	struct PixelUpdate {
+		/** Horizontal destination pixel in the composed background. */
 		int x;
+		/** Vertical destination pixel in the composed background. */
 		int y;
+		/** Replacement pixel packed in the background surface's format. */
 		uint32 color;
 	};
 	Common::Array<PixelUpdate> updates;
@@ -2140,10 +2274,10 @@ void MysticMarshL4Background::antialiasUpperShore(ManagedSurface32 *surface) {
 				continue;
 			const int x = edge + relativeX;
 			int blurSums[3] = {};
-			for (int sampleY = -3; sampleY <= 3; sampleY++) {
+			for (int sampleY = -3; sampleY < ARRAYSIZE(kGaussianWeights) - 3; sampleY++) {
 				const uint32 *sampleRow = static_cast<const uint32 *>(surface->getBasePtr(0, y + sampleY));
 				int rowSums[3] = {};
-				for (int sampleX = -3; sampleX <= 3; sampleX++) {
+				for (int sampleX = -3; sampleX < ARRAYSIZE(kGaussianWeights) - 3; sampleX++) {
 					uint8 red;
 					uint8 green;
 					uint8 blue;
@@ -2154,7 +2288,7 @@ void MysticMarshL4Background::antialiasUpperShore(ManagedSurface32 *surface) {
 					rowSums[2] += sampleWeight * blue;
 				}
 				const int sampleWeight = kGaussianWeights[sampleY + 3];
-				for (int channel = 0; channel < 3; channel++)
+				for (int channel = 0; channel < ARRAYSIZE(blurSums); channel++)
 					blurSums[channel] += sampleWeight * ((rowSums[channel] + kWeightSum / 2) / kWeightSum);
 			}
 			uint8 red;
@@ -2167,7 +2301,7 @@ void MysticMarshL4Background::antialiasUpperShore(ManagedSurface32 *surface) {
 				blue,
 			};
 			uint8 blended[3] = {};
-			for (int channel = 0; channel < 3; channel++) {
+			for (int channel = 0; channel < ARRAYSIZE(blended); channel++) {
 				const int softened = (blurSums[channel] + kWeightSum / 2) / kWeightSum;
 				const int numerator = original[channel] * (16 - weight) + softened * weight;
 				int value = numerator / 16;
@@ -2181,12 +2315,12 @@ void MysticMarshL4Background::antialiasUpperShore(ManagedSurface32 *surface) {
 		}
 	}
 	// Apply the narrow edge blend after sampling so every blur reads the unmodified background.
-	for (uint index = 0; index < updates.size(); index++) {
-		uint32 *pixel = static_cast<uint32 *>(surface->getBasePtr(updates[index].x, updates[index].y));
-		*pixel = updates[index].color;
+	for (uint i = 0; i < updates.size(); i++) {
+		uint32 *pixel = static_cast<uint32 *>(surface->getBasePtr(updates[i].x, updates[i].y));
+		*pixel = updates[i].color;
 	}
 	if (missingEdge)
-		warning("Mystic Marsh: level 4 shoreline anti-aliasing skipped rows without a water edge");
+		warning("MysticMarsh: level 4 shoreline anti-aliasing skipped rows without a water edge");
 }
 
 void MysticMarshL4Background::compose(ManagedSurface32 *surface) {
@@ -2206,7 +2340,7 @@ bool MysticMarshL4Background::isCellBorderVisible(int column, int row) {
 }
 
 bool MysticMarshL4Background::isPortalCellType(int type) {
-	return 60 <= type && type <= 62;
+	return MysticMarshGrid::kCellSymbolEntry1Type60 <= type && type <= MysticMarshGrid::kCellExitType62;
 }
 
 void MysticMarshL4Background::drawGridEdge(ManagedSurface32 *screen, const Common::Point32 &start, const Common::Point32 &end, uint32 lineColor) {
@@ -2221,7 +2355,7 @@ void MysticMarshL4Background::drawGrid(ManagedSurface32 *screen, const MysticMar
 	for (int column = 0; column < MysticMarshGrid::kColumns; column++) {
 		for (int row = 0; row < MysticMarshGrid::kRows; row++) {
 			const int cellIndex = column * MysticMarshGrid::kRows + row;
-			if (cells[cellIndex].type == 0 || isPortalCellType(cells[cellIndex].type) || !isCellBorderVisible(column, row))
+			if (cells[cellIndex].type == MysticMarshGrid::kCellEmptyType00 || isPortalCellType(cells[cellIndex].type) || !isCellBorderVisible(column, row))
 				continue;
 			const Common::Point32 position = cellPosition(cellIndex);
 			const Common::Point32 topLeft(position.x, position.y + 60);
@@ -2231,11 +2365,11 @@ void MysticMarshL4Background::drawGrid(ManagedSurface32 *screen, const MysticMar
 			drawGridEdge(screen, topLeft, topRight, lineColor);
 			drawGridEdge(screen, topLeft, bottomLeft, lineColor);
 			if (row + 1 == MysticMarshGrid::kRows ||
-				cells[cellIndex + 1].type == 0 || isPortalCellType(cells[cellIndex + 1].type) ||
+				cells[cellIndex + 1].type == MysticMarshGrid::kCellEmptyType00 || isPortalCellType(cells[cellIndex + 1].type) ||
 				!isCellBorderVisible(column, row + 1))
 				drawGridEdge(screen, bottomLeft, bottomRight, lineColor);
 			if (column + 1 == MysticMarshGrid::kColumns ||
-				cells[cellIndex + MysticMarshGrid::kRows].type == 0 ||
+				cells[cellIndex + MysticMarshGrid::kRows].type == MysticMarshGrid::kCellEmptyType00 ||
 				isPortalCellType(cells[cellIndex + MysticMarshGrid::kRows].type) || !isCellBorderVisible(column + 1, row))
 				drawGridEdge(screen, topRight, bottomRight, lineColor);
 		}
@@ -2245,15 +2379,16 @@ void MysticMarshL4Background::drawGrid(ManagedSurface32 *screen, const MysticMar
 void PuzzleMysticMarsh::onRenderContent(ManagedSurface32 *screen) {
 	if (_backgroundIndex == 6) {
 		const Common::Point32 position = MysticMarshL4Background::cellPosition(kL4RejectVisualCellIndex);
-		drawColorSymbol(screen, kRejectCellType - 2, Common::Point32(position.x + 3, position.y + 61));
+		drawColorSymbol(screen, kRejectCellType - MysticMarshGrid::kCellSymbolSDiv1Type02, Common::Point32(position.x + 3, position.y + 61));
 	}
 	for (int i = 0; i < MysticMarshGrid::kCellCount; i++) {
 		const MysticMarshGrid::Cell &cell = _drawCells[i];
-		if (cell.type < 2 || 60 <= cell.type)
+		if (cell.type < MysticMarshGrid::kCellSymbolSDiv1Type02 || MysticMarshGrid::kCellSymbolEntry1Type60 <= cell.type)
 			continue;
 		const Common::Point32 position = MysticMarshL4Background::cellPosition(i);
-		drawColorSymbol(screen, cell.type - 2, Common::Point32(position.x + 3, position.y + 61));
-		if (6 <= cell.type && cell.type <= 9 && 1 <= cell.trait && cell.trait <= 4 && 1 <= cell.value && cell.value <= 5) {
+		drawColorSymbol(screen, cell.type - MysticMarshGrid::kCellSymbolSDiv1Type02, Common::Point32(position.x + 3, position.y + 61));
+		if (MysticMarshGrid::kCellSymbolCDiv1Type06 <= cell.type && cell.type <= MysticMarshGrid::kCellSymbolCDiv4Type09 &&
+			1 <= cell.trait && cell.trait <= 4 && 1 <= cell.value && cell.value <= 5) {
 			if (cell.trait - 1 == static_cast<int>(ZmbTrait::TraitKind::kNose01))
 				_vm->_gfx->drawPageNoseTraitSprite(screen, Common::String::format(kTraitFormat, cell.trait, cell.value),
 												   Common::Point32(position.x + 9, position.y + 62), static_cast<byte>(cell.value));
@@ -2322,15 +2457,25 @@ void PuzzleMysticMarsh::onRenderForeground(ManagedSurface32 *screen) {
 }
 
 EventHandleResult PuzzleMysticMarsh::onLButtonUp(const Common::Point &pos) {
-	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), true,
-																	_pickupAnimation, _vm->getTotalPlayTime(), &_dropTargets, getAreaMask());
-	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, Common::Point32(pos.x, pos.y), ZmbHoldDropInput::kLeftButtonRelease,
+																   ZmbAnimationKind::kPickup, &_dropTargets, getAreaMask());
+	switch (result) {
+	case ZmbDropResult::kIgnored00:
+		return EventHandleResult::kPassthrough;
+	default:
+		return EventHandleResult::kConsumed;
+	}
 }
 
 EventHandleResult PuzzleMysticMarsh::onMouseMove(const Common::Point &pos) {
-	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), false,
-																	_pickupAnimation, _vm->getTotalPlayTime(), &_dropTargets, getAreaMask());
-	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, Common::Point32(pos.x, pos.y), ZmbHoldDropInput::kMoveOnly,
+																   ZmbAnimationKind::kPickup, &_dropTargets, getAreaMask());
+	switch (result) {
+	case ZmbDropResult::kIgnored00:
+		return EventHandleResult::kPassthrough;
+	default:
+		return EventHandleResult::kConsumed;
+	}
 }
 
 void PuzzleMysticMarsh::enqueueSpeech(const Common::String &name) {
@@ -2340,7 +2485,7 @@ void PuzzleMysticMarsh::enqueueSpeech(const Common::String &name) {
 }
 
 bool PuzzleMysticMarsh::onGoButtonPressed() {
-	if (!_vm->_isSavedGame)
+	if (_vm->inPracticeMode())
 		return true;
 	if (_goPending)
 		return true;
@@ -2365,30 +2510,109 @@ bool PuzzleMysticMarsh::canUseGoButton() const {
 	return _vm->_zoombiniWalkingFlag;
 }
 
+const char *PuzzleMysticMarsh::debugKeyRoleName(MysticMarshGrid::GenerationKeyRole role) {
+	switch (role) {
+	case MysticMarshGrid::GenerationKeyRole::kRouteFilter:
+		return "Route filter";
+	case MysticMarshGrid::GenerationKeyRole::kCrossFilter:
+		return "Cross-route filter";
+	case MysticMarshGrid::GenerationKeyRole::kSingleton:
+		return "Singleton redirect";
+	case MysticMarshGrid::GenerationKeyRole::kCondition:
+		return "Condition";
+	case MysticMarshGrid::GenerationKeyRole::kPrimaryReference:
+		return "Primary reference";
+	case MysticMarshGrid::GenerationKeyRole::kSecondaryReference:
+		return "Secondary reference";
+	case MysticMarshGrid::GenerationKeyRole::kRemainingFiltersReference:
+		return "Other-filter reference";
+	case MysticMarshGrid::GenerationKeyRole::kConstrained:
+		return "Constrained route";
+	case MysticMarshGrid::GenerationKeyRole::kPair:
+		return "Pair condition";
+	}
+	return "?";
+}
+
+Common::String PuzzleMysticMarsh::debugAnswerStrategy(const Common::Array<MysticMarshGrid::AnswerLaunch> &launches) const {
+	Common::String strategy = "\n  [*] Strategy\n";
+	switch (_grid.layout()) {
+	case MysticMarshGrid::kGridL1LayoutA_00:
+		strategy += "    L1: alternate the two routes and fill each magnet queue before releasing it.\n";
+		break;
+	case MysticMarshGrid::kGridL1LayoutB_01:
+		strategy += "    L1: alternate the two routes; early visitors consume one-use arrows for the later visitors.\n";
+		break;
+	case MysticMarshGrid::kGridL2LayoutA_02:
+	case MysticMarshGrid::kGridL2LayoutB_03:
+	case MysticMarshGrid::kGridL2LayoutC_04:
+	case MysticMarshGrid::kGridL2LayoutD_05:
+		strategy += "    L2: prepare the two magnet queues, then connect their release chains.\n";
+		break;
+	case MysticMarshGrid::kGridL3LayoutA_06:
+	case MysticMarshGrid::kGridL3LayoutB_07:
+		strategy += "    L3: prepare the holding queue while the maze visitors set the linked arrows for its release.\n";
+		break;
+	case MysticMarshGrid::kGridL4LayoutA_08:
+		if (_grid.generationInfo().keys.empty())
+			strategy += "    L4: follow the listed entrance routes and their remaining release links.\n";
+		else
+			strategy += "    L4: load the relay through both entrances, then clear it through the returning routes.\n";
+		break;
+	default:
+		break;
+	}
+	if (1 < launches.size() && !launches[launches.size() - 2].waiting.empty()) {
+		strategy += Common::String::format("    Save #%u for the final release; its chain brings the remaining %d Zoombinis across.\n",
+										   launches.size(), launches.back().crossed);
+	}
+	strategy += "    Launch one Zoombini at a time; wait until all bubbles have exited or stopped at magnets and the craters reopen.\n";
+	return strategy;
+}
+
 Common::String PuzzleMysticMarsh::debugGetAnswer() const {
 	if (!_initialAnswer.empty())
 		return _initialAnswer;
 	_initialAnswer = debugAnswerHeader();
-	_initialAnswer += "\n  This answer applies to the original, untouched board of this visit.\n";
-	_initialAnswer += "  It does not describe the current position after a launch.\n";
+	_initialAnswer += "\n  This answer applies to the clean board state of this visit.\n";
+	const Common::Array<MysticMarshGrid::GenerationKey> &keys = _grid.generationInfo().keys;
+	Common::String keyDescriptions;
+	if (!keys.empty()) {
+		keyDescriptions += "\n  [*] Key Zoombinis (generation roles):\n";
+		for (const MysticMarshGrid::GenerationKey &key : keys) {
+			const char *role = debugKeyRoleName(key.role);
+			if (0 <= key.cell) {
+				keyDescriptions += Common::String::format("    - %s, cell (r%d, c%d):\n", role,
+														  key.cell % MysticMarshGrid::kRows + 1, key.cell / MysticMarshGrid::kRows + 1);
+			} else {
+				keyDescriptions += Common::String::format("    - %s:\n", role);
+			}
+			keyDescriptions += Common::String::format("      - %s\n", debugActorDescription(key.actor).c_str());
+		}
+	}
 	Common::Array<MysticMarshGrid::AnswerLaunch> launches;
 	bool fromGeneration = false;
-	if (!_grid.findAnswer(launches, fromGeneration)) {
+	const bool found = _grid.debugAnswerSolver(launches, fromGeneration);
+	_initialAnswer += debugAnswerStrategy(launches);
+	if (!found) {
 		_initialAnswer += "  No complete answer found within the search limits; the puzzle may still be solvable.\n";
-		_initialAnswer += "  The search does not cover launches while another bubble is moving.\n";
+		_initialAnswer += keyDescriptions;
 		return _initialAnswer;
 	}
 	if (fromGeneration)
 		_initialAnswer += "  Source: verified generation-derived solution, completed from the initial board.\n";
 	else
 		_initialAnswer += "  Source: verified solution searched from the initial board.\n";
-	_initialAnswer += "  Launches (columns left to right; rows top to bottom):\n";
+	_initialAnswer += "\n  [*] Launches (rows top to bottom; columns left to right; 1-based index):\n";
 	for (uint i = 0; i < launches.size(); i++) {
 		const MysticMarshGrid::AnswerLaunch &launch = launches[i];
-		_initialAnswer += Common::String::format("    %u. %s\n", i + 1, debugActorDescription(launch.actor).c_str());
-		_initialAnswer += Common::String::format("       Crater: column %d, row %d\n", launch.cell / MysticMarshGrid::kRows + 1, launch.cell % MysticMarshGrid::kRows + 1);
+		const ZoombiniRunner *actor = _puzzleZoombinis[launch.actor];
+		_initialAnswer += Common::String::format("    %u. Zoombini (%s) to Crater (r%d, c%d): %s\n", i + 1, actor->getName().c_str(),
+												 launch.cell % MysticMarshGrid::kRows + 1, launch.cell / MysticMarshGrid::kRows + 1,
+												 actor->getTraits().toStr().c_str());
 	}
-	_initialAnswer += "  After each launch, wait for every bubble to exit or stop and for craters to reopen.\n";
+	_initialAnswer += "    Result: the whole party crosses.\n";
+	_initialAnswer += keyDescriptions;
 	return _initialAnswer;
 }
 Common::String PuzzleMysticMarsh::debugGetChanceDetails() const {
@@ -2400,13 +2624,7 @@ Common::String PuzzleMysticMarsh::debugGetChanceDetails() const {
 		if (_bubbles[i].active)
 			active += 1;
 	}
-	return Common::String::format("No separate retry counter. Waiting: %d; active bubbles: %d; freed: %d.\n", available, active, _freed);
+	return Common::String::format("No separate retry counter.\n  Waiting: %d; active bubbles: %d; crossed: %d.\n", available, active, _freed);
 }
-
-constexpr const char *PuzzleMysticMarsh::kSymbolNames[60];
-
-constexpr Common::Point32 PuzzleMysticMarsh::kStartingPositions[6][8];
-
-constexpr Common::Point32 PuzzleMysticMarsh::kExitPositions[6][8];
 
 } // End of namespace Zoombini2

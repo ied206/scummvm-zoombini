@@ -36,120 +36,45 @@ namespace Zoombini2 {
 
 Common::String GameState::generateZoombiniName(Random &random) {
 	static constexpr const char *kVowelPairs[30] = {
-		"a ",
-		"a ",
-		"a ",
-		"e ",
-		"e ",
-		"e ",
-		"e ",
-		"i ",
-		"i ",
-		"i ",
-		"o ",
-		"o ",
-		"o ",
-		"u ",
-		"u ",
-		"y ",
-		"ee",
-		"oo",
-		"yo",
-		"ya",
-		"ye",
-		"ei",
-		"ie",
-		"ai",
-		"ia",
-		"au",
-		"ua",
-		"uo",
-		"ou",
-		"ae",
-	};
+		"a ", "a ", "a ", "e ", "e ", "e ", "e ", "i ", "i ", "i ",
+		"o ", "o ", "o ", "u ", "u ", "y ", "ee", "oo", "yo", "ya",
+		"ye", "ei", "ie", "ai", "ia", "au", "ua", "uo", "ou", "ae"};
 	static constexpr char kSingleConsonants[] = "bbccdddfghjkkllmmnnprrssssttvwx";
 	static constexpr char kEndings[] = "aeiou";
 	static constexpr const char *kConsonantPairs[39] = {
-		"bl",
-		"br",
-		"ch",
-		"cl",
-		"cr",
-		"dr",
-		"dw",
-		"fl",
-		"fr",
-		"gh",
-		"gl",
-		"gr",
-		"kl",
-		"kn",
-		"kr",
-		"kw",
-		"ld",
-		"mp",
-		"nd",
-		"nh",
-		"nn",
-		"ph",
-		"pl",
-		"pr",
-		"qu",
-		"qu",
-		"rh",
-		"rn",
-		"sc",
-		"sl",
-		"sm",
-		"sn",
-		"sp",
-		"sr",
-		"st",
-		"sw",
-		"th",
-		"tr",
-		"tw",
-	};
+		"bl", "br", "ch", "cl", "cr", "dr", "dw", "fl", "fr", "gh",
+		"gl", "gr", "kl", "kn", "kr", "kw", "ld", "mp", "nd", "nh",
+		"nn", "ph", "pl", "pr", "qu", "qu", "rh", "rn", "sc", "sl",
+		"sm", "sn", "sp", "sr", "st", "sw", "th", "tr", "tw"};
 
-	char name[8] = {};
-	const int targetLength = random.getRandomNumber(1) + 4;
+	Common::String name;
+	const uint targetLength = random.getRandomNumber(1) + 4;
 	bool useVowelPair = random.getRandomNumber(98) + 1 < 40;
-	int length = 0;
-	while (length < targetLength) {
+	while (name.size() < targetLength) {
 		bool usedConsonantPair = false;
 		if (useVowelPair) {
 			useVowelPair = false;
 			const char *pair = kVowelPairs[random.getRandomNumber(29)];
-			if (pair[1] != ' ') {
-				name[length] = pair[0];
-				length += 1;
-				name[length] = pair[1];
-				length += 1;
-			} else {
-				name[length] = pair[0];
-				name[length] = pair[0];
-				length += 1;
-			}
+			name += pair[0];
+			if (pair[1] != ' ')
+				name += pair[1];
 		} else {
 			useVowelPair = true;
-			if (1 < length || random.getRandomNumber(98) + 1 <= 33) {
+			if (1 < name.size() || random.getRandomNumber(98) + 1 <= 33) {
 				const char *pair = kConsonantPairs[random.getRandomNumber(38)];
-				name[length] = pair[0];
-				length += 1;
-				name[length] = pair[1];
-				length += 1;
+				name += pair[0];
+				name += pair[1];
 				usedConsonantPair = true;
 			} else {
-				name[length] = kSingleConsonants[random.getRandomNumber(30)];
-				length += 1;
+				name += kSingleConsonants[random.getRandomNumber(30)];
 			}
 		}
-		if (usedConsonantPair && targetLength <= length)
-			name[length - 1] = kEndings[random.getRandomNumber(4)];
-		if (length == 2 && name[0] == name[1])
-			length = 1;
+		if (usedConsonantPair && targetLength <= name.size())
+			name.setChar(kEndings[random.getRandomNumber(4)], name.size() - 1);
+		if (name.size() == 2 && name[0] == name[1])
+			name.deleteLastChar();
 	}
-	return Common::String(name);
+	return name;
 }
 
 byte ZmbTrait::getValue(TraitKind index) const {
@@ -184,18 +109,40 @@ ZmbTrait ZmbTrait::fromHash(uint16 traitHash) {
 	return ZmbTrait(feet, nose, hair, eyes);
 }
 
+bool StorageRecord::read(Common::ReadStream *stream) {
+	if (stream->read(_name, sizeof(_name)) != sizeof(_name))
+		return false;
+	const byte unusedSlot0 = stream->readByte();
+	const byte feet = stream->readByte();
+	const byte nose = stream->readByte();
+	const byte hair = stream->readByte();
+	const byte eyes = stream->readByte();
+	_traits = ZmbTrait(feet, nose, hair, eyes);
+	_traits._unusedSlot0 = unusedSlot0;
+	return !stream->err() && !stream->eos();
+}
+
+void StorageRecord::write(Common::WriteStream *stream) const {
+	stream->write(_name, sizeof(_name));
+	stream->writeByte(_traits._unusedSlot0);
+	stream->writeByte(_traits._feet);
+	stream->writeByte(_traits._nose);
+	stream->writeByte(_traits._hair);
+	stream->writeByte(_traits._eyes);
+}
+
 void StorageRecord::store(const ZoombiniRunner &zoombini) {
-	memcpy(_name, zoombini._name, sizeof(_name));
-	_traits = zoombini._traits;
+	memcpy(_name, zoombini.getNameBytes(), sizeof(_name));
+	_traits = zoombini.getTraits();
 }
 
 ZmbTrait StorageRecord::getTraits() const {
 	return _traits;
 }
 
-ZoombiniRunner *StorageRecord::restore() const {
-	ZoombiniRunner *zoombini = new ZoombiniRunner();
-	memcpy(zoombini->_name, _name, sizeof(zoombini->_name));
+ZoombiniRunner *StorageRecord::restore(Zoombini2Engine *vm) const {
+	ZoombiniRunner *zoombini = new ZoombiniRunner(vm);
+	zoombini->setNameBytes(_name);
 	zoombini->setTraits(getTraits());
 	zoombini->setInputEnabled(true);
 	zoombini->setAnimationCell(33);
@@ -233,12 +180,12 @@ bool GameState::storeInStorage(StorageRecord **storage, ZoombiniRunner &zoombini
 	return false;
 }
 
-void GameState::refillFromStorage(StorageRecord **storage, Common::Array<ZoombiniRunner *> &roster, uint count) {
+void GameState::refillFromStorage(StorageRecord **storage, Common::Array<ZoombiniRunner *> &roster, uint count, Zoombini2Engine *vm) {
 	for (int col = 0; col < kStorageCols && roster.size() < count; col++) {
 		for (int row = 0; row < kStorageRows && roster.size() < count; row++) {
 			StorageRecord *&cell = storage[row * kStorageCols + col];
 			if (cell) {
-				roster.push_back(cell->restore());
+				roster.push_back(cell->restore(vm));
 				delete cell;
 				cell = nullptr;
 			}
@@ -256,6 +203,33 @@ int GameState::findStorageScrollRow(StorageRecord *const *storage) {
 		}
 	}
 	return 62;
+}
+
+void TraitComboTable::reset() {
+	_totalCount = 1;
+	_uniqueCombinationCount = 1;
+	_twiceRegisteredCombinationCount = 0;
+	memset(_combinationUseCounts, 0, sizeof(_combinationUseCounts));
+	memset(_unusedTail, 0, sizeof(_unusedTail));
+	// Seed the counter for the initial Feet 1, Nose 4, Hair 5, Eyes 5 combination.
+	const int initialCombinationIndex = getComboIndex(ZmbTrait(1, 4, 5, 5));
+	_combinationUseCounts[initialCombinationIndex] = 1;
+}
+
+bool TraitComboTable::read(Common::ReadStream *stream) {
+	_totalCount = stream->readSint32LE();
+	_uniqueCombinationCount = stream->readSint32LE();
+	_twiceRegisteredCombinationCount = stream->readSint32LE();
+	return stream->read(_combinationUseCounts, sizeof(_combinationUseCounts)) == sizeof(_combinationUseCounts) &&
+		   stream->read(_unusedTail, sizeof(_unusedTail)) == sizeof(_unusedTail);
+}
+
+void TraitComboTable::write(Common::WriteStream *stream) const {
+	stream->writeSint32LE(_totalCount);
+	stream->writeSint32LE(_uniqueCombinationCount);
+	stream->writeSint32LE(_twiceRegisteredCombinationCount);
+	stream->write(_combinationUseCounts, sizeof(_combinationUseCounts));
+	stream->write(_unusedTail, sizeof(_unusedTail));
 }
 
 int TraitComboTable::getComboIndex(const ZmbTrait &traits) {
@@ -322,7 +296,7 @@ bool GameState::recordCompletedZoombini(const ZoombiniRunner &zoombini) {
 	if (_completedZoombiniCount < 0)
 		return false;
 	if (_completedZoombiniCount < kCompletedTraitHashCount) {
-		_completedTraitHashes[_completedZoombiniCount] = zoombini._traitHash;
+		_completedTraitHashes[_completedZoombiniCount] = zoombini.getTraitHash();
 		_completedZoombiniCount += 1;
 		return true;
 	}
@@ -341,12 +315,46 @@ void GameState::recordBooliesCompletion() {
 	}
 }
 
-GameState::GameState() {
+GameState::GameState(Zoombini2Engine *vm)
+	: _vm(vm) {
 	init();
 }
 
 GameState::~GameState() {
 	clearOwnedData();
+}
+
+GameState *GameState::cloneForPageEntry() const {
+	GameState *copy = new GameState(_vm);
+	copy->_playerName = _playerName;
+	copy->_level = _level;
+	copy->_currentPage = _currentPage;
+	copy->_legacyStateFlag = _legacyStateFlag;
+	copy->_hasReachedRescue1 = _hasReachedRescue1;
+	copy->_hasReachedRescue2 = _hasReachedRescue2;
+	copy->_hasReachedBooliewood = _hasReachedBooliewood;
+	memcpy(copy->_pageLevel, _pageLevel, sizeof(_pageLevel));
+	memcpy(copy->_pageVisitCounts, _pageVisitCounts, sizeof(_pageVisitCounts));
+	memcpy(copy->_perfectClearCount, _perfectClearCount, sizeof(_perfectClearCount));
+	copy->_rescuedBoolieCount = _rescuedBoolieCount;
+	copy->_rescue1ArrivalCount = _rescue1ArrivalCount;
+	copy->_legacyStatistic = _legacyStatistic;
+	copy->_completedZoombiniCount = _completedZoombiniCount;
+	memcpy(copy->_completedTraitHashes, _completedTraitHashes, sizeof(_completedTraitHashes));
+	copy->_rescue1MoviePlayed = _rescue1MoviePlayed;
+	copy->_rescue2MoviePlayed = _rescue2MoviePlayed;
+	copy->_traitComboTable = _traitComboTable;
+	for (uint i = 0; i < ARRAYSIZE(_rescue1Storage); i++) {
+		if (_rescue1Storage[i])
+			copy->_rescue1Storage[i] = new StorageRecord(*_rescue1Storage[i]);
+		if (_rescue2Storage[i])
+			copy->_rescue2Storage[i] = new StorageRecord(*_rescue2Storage[i]);
+	}
+	for (const ZoombiniRunner *zoombini : _savedRoster)
+		copy->_savedRoster.push_back(zoombini->cloneForRoster());
+	for (const ZoombiniRunner *zoombini : _activeZoombinis)
+		copy->_activeZoombinis.push_back(zoombini->cloneForRoster());
+	return copy;
 }
 
 void GameState::clearActiveZoombinis() {
@@ -372,7 +380,7 @@ void GameState::init() {
 	clearOwnedData();
 	_playerName.clear();
 	_level = 0;
-	_currentGameplayPageId = kPageZombiniville;
+	_currentPage = PageId::kPageZombiniville_00;
 	_legacyStateFlag = 0;
 	_hasReachedRescue1 = 0;
 	_hasReachedRescue2 = 0;
@@ -387,20 +395,13 @@ void GameState::init() {
 	memset(_completedTraitHashes, 0, sizeof(_completedTraitHashes));
 	_rescue1MoviePlayed = 0;
 	_rescue2MoviePlayed = 0;
-	_traitComboTable._totalCount = 1;
-	_traitComboTable._uniqueCombinationCount = 1;
-	_traitComboTable._twiceRegisteredCombinationCount = 0;
-	memset(_traitComboTable._combinationUseCounts, 0, sizeof(_traitComboTable._combinationUseCounts));
-	memset(_traitComboTable._unusedTail, 0, sizeof(_traitComboTable._unusedTail));
-	// Seed the counter for the initial Feet 1, Nose 4, Hair 5, Eyes 5 combination.
-	const int initialCombinationIndex = TraitComboTable::getComboIndex(ZmbTrait(1, 4, 5, 5));
-	_traitComboTable._combinationUseCounts[initialCombinationIndex] = 1;
+	_traitComboTable.reset();
 }
 
 void GameState::swapState(GameState &other) {
 	SWAP(_playerName, other._playerName);
 	SWAP(_level, other._level);
-	SWAP(_currentGameplayPageId, other._currentGameplayPageId);
+	SWAP(_currentPage, other._currentPage);
 	SWAP(_legacyStateFlag, other._legacyStateFlag);
 	SWAP(_hasReachedRescue1, other._hasReachedRescue1);
 	SWAP(_hasReachedRescue2, other._hasReachedRescue2);
@@ -417,11 +418,7 @@ void GameState::swapState(GameState &other) {
 	swapArray(_completedTraitHashes, other._completedTraitHashes);
 	SWAP(_rescue1MoviePlayed, other._rescue1MoviePlayed);
 	SWAP(_rescue2MoviePlayed, other._rescue2MoviePlayed);
-	SWAP(_traitComboTable._totalCount, other._traitComboTable._totalCount);
-	SWAP(_traitComboTable._uniqueCombinationCount, other._traitComboTable._uniqueCombinationCount);
-	SWAP(_traitComboTable._twiceRegisteredCombinationCount, other._traitComboTable._twiceRegisteredCombinationCount);
-	swapArray(_traitComboTable._combinationUseCounts, other._traitComboTable._combinationUseCounts);
-	swapArray(_traitComboTable._unusedTail, other._traitComboTable._unusedTail);
+	SWAP(_traitComboTable, other._traitComboTable);
 	_savedRoster.swap(other._savedRoster);
 	_activeZoombinis.swap(other._activeZoombinis);
 }
@@ -435,7 +432,7 @@ bool GameState::canRead(Common::SeekableReadStream *stream, uint64 bytes) {
 }
 
 bool GameState::load(Common::SeekableReadStream *stream) {
-	GameState loaded;
+	GameState loaded(_vm);
 	if (!loaded.readState(stream))
 		return false;
 	swapState(loaded);
@@ -450,15 +447,42 @@ void GameState::stashActiveZoombinis() {
 	transferRoster(_activeZoombinis, _savedRoster);
 }
 
-void GameState::finishPuzzleRoster(PageId pageId, StorageRecord **storage, bool advancing, bool savedGame, bool perfectClearEligible) {
-	if (!savedGame) {
+void GameState::prepareDebugRouteParty(PageId pageId, uint partySize) {
+	if (_activeZoombinis.empty())
+		restoreSavedZoombinis();
+	while (partySize < _activeZoombinis.size()) {
+		ZoombiniRunner *zoombini = _activeZoombinis.back();
+		retainRosterMember(nullptr, *zoombini);
+		delete zoombini;
+		_activeZoombinis.pop_back();
+	}
+
+	// Later routes can return members to these shelters even when the jump skipped their first arrival.
+	if ((PageId::kPageMysticMarsh_05 <= pageId && pageId <= PageId::kPageBooliewood_12) || pageId == PageId::kPageFinal_23) {
+		_hasReachedRescue1 = 1;
+		if (!hasPageVisit(PageId::kPageRescue1_04))
+			registerPageVisit(PageId::kPageRescue1_04);
+		if (!isPageVisited(PageId::kPageRescue1_04))
+			setPageLevel(PageId::kPageRescue1_04, 1);
+	}
+	if ((PageId::kPageSnowboard_10 <= pageId && pageId <= PageId::kPageBooliewood_12) || pageId == PageId::kPageFinal_23) {
+		_hasReachedRescue2 = 1;
+		if (!hasPageVisit(PageId::kPageRescue2_09))
+			registerPageVisit(PageId::kPageRescue2_09);
+		if (!isPageVisited(PageId::kPageRescue2_09))
+			setPageLevel(PageId::kPageRescue2_09, 1);
+	}
+}
+
+void GameState::finishPuzzleRoster(PageId pageId, StorageRecord **storage, bool advancing, GameMode gameMode, bool perfectClearEligible) {
+	if (gameMode == GameMode::kPracticeMode) {
 		clearActiveZoombinis();
 		return;
 	}
 
 	const uint expectedPartySize = storage ? 8 : 16;
 	const int pageIndex = static_cast<int>(pageId);
-	if (perfectClearEligible && 0 <= pageIndex && pageIndex < 100 && _activeZoombinis.size() == expectedPartySize) {
+	if (perfectClearEligible && 0 <= pageIndex && pageIndex < ARRAYSIZE(_perfectClearCount) && _activeZoombinis.size() == expectedPartySize) {
 		bool allSucceeded = true;
 		for (uint i = 0; i < _activeZoombinis.size(); i++) {
 			if (!_activeZoombinis[i] || !_activeZoombinis[i]->canAdvanceFromPage()) {
@@ -493,22 +517,14 @@ void GameState::retainRosterMember(StorageRecord **storage, ZoombiniRunner &zoom
 		return;
 	if (storage)
 		warning("GameState: rescue storage is full; retaining Zoombini in the saved roster");
-	_savedRoster.push_back(cloneRosterMember(zoombini));
-}
-
-ZoombiniRunner *GameState::cloneRosterMember(const ZoombiniRunner &src) {
-	ZoombiniRunner *copy = new ZoombiniRunner();
-	copy->_traits = src._traits;
-	copy->_traitHash = copy->_traits.calculateHash();
-	memcpy(copy->_name, src._name, sizeof(copy->_name));
-	return copy;
+	_savedRoster.push_back(zoombini.cloneForRoster());
 }
 
 void GameState::transferRoster(Common::Array<ZoombiniRunner *> &src, Common::Array<ZoombiniRunner *> &dest) {
 	assert(&src != &dest);
 	for (uint i = 0; i < src.size(); i++) {
 		const ZoombiniRunner *previous = src[i];
-		dest.push_back(cloneRosterMember(*previous));
+		dest.push_back(previous->cloneForRoster());
 		delete previous;
 	}
 	src.clear();
@@ -529,16 +545,8 @@ bool GameState::readStorage(Common::SeekableReadStream *stream, StorageRecord **
 		if (storage[index])
 			return false;
 		storage[index] = new StorageRecord();
-		StorageRecord &record = *storage[index];
-		if (stream->read(record._name, sizeof(record._name)) != sizeof(record._name))
+		if (!storage[index]->read(stream))
 			return false;
-		const byte unusedSlot0 = stream->readByte();
-		const byte feet = stream->readByte();
-		const byte nose = stream->readByte();
-		const byte hair = stream->readByte();
-		const byte eyes = stream->readByte();
-		record._traits = ZmbTrait(feet, nose, hair, eyes);
-		record._traits._unusedSlot0 = unusedSlot0;
 	}
 	return !stream->err() && !stream->eos();
 }
@@ -560,9 +568,9 @@ bool GameState::readState(Common::SeekableReadStream *stream) {
 	if (stream->read(_pageVisitCounts, sizeof(_pageVisitCounts)) != sizeof(_pageVisitCounts))
 		return false;
 	_rescuedBoolieCount = stream->readSint32LE();
-	for (int i = 0; i < 100; i++)
+	for (int i = 0; i < ARRAYSIZE(_pageLevel); i++)
 		_pageLevel[i] = stream->readSint32LE();
-	for (int i = 0; i < 100; i++)
+	for (int i = 0; i < ARRAYSIZE(_perfectClearCount); i++)
 		_perfectClearCount[i] = stream->readSint32LE();
 	_hasReachedRescue1 = stream->readByte();
 	_hasReachedRescue2 = stream->readByte();
@@ -575,12 +583,7 @@ bool GameState::readState(Common::SeekableReadStream *stream) {
 		_completedTraitHashes[i] = stream->readSint32LE();
 	_rescue1MoviePlayed = stream->readByte();
 	_rescue2MoviePlayed = stream->readByte();
-	_traitComboTable._totalCount = stream->readSint32LE();
-	_traitComboTable._uniqueCombinationCount = stream->readSint32LE();
-	_traitComboTable._twiceRegisteredCombinationCount = stream->readSint32LE();
-	if (stream->read(_traitComboTable._combinationUseCounts, sizeof(_traitComboTable._combinationUseCounts)) !=
-			sizeof(_traitComboTable._combinationUseCounts) ||
-		stream->read(_traitComboTable._unusedTail, sizeof(_traitComboTable._unusedTail)) != sizeof(_traitComboTable._unusedTail))
+	if (!_traitComboTable.read(stream))
 		return false;
 
 	if (!readStorage(stream, _rescue1Storage) || !readStorage(stream, _rescue2Storage) || !canRead(stream, 4))
@@ -590,7 +593,7 @@ bool GameState::readState(Common::SeekableReadStream *stream) {
 		return false;
 	// The party is stored in two passes, unlike the interleaved sparse storage records.
 	for (int32 i = 0; i < count; i++) {
-		ZoombiniRunner *zoombini = new ZoombiniRunner();
+		ZoombiniRunner *zoombini = new ZoombiniRunner(_vm);
 		_savedRoster.push_back(zoombini);
 		const byte unusedSlot0 = stream->readByte();
 		const byte feet = stream->readByte();
@@ -599,12 +602,13 @@ bool GameState::readState(Common::SeekableReadStream *stream) {
 		const byte eyes = stream->readByte();
 		ZmbTrait traits(feet, nose, hair, eyes);
 		traits._unusedSlot0 = unusedSlot0;
-		zoombini->_traits = traits;
-		zoombini->_traitHash = traits.calculateHash();
+		zoombini->setStoredTraits(traits);
 	}
 	for (int32 i = 0; i < count; i++) {
-		if (stream->read(_savedRoster[i]->_name, sizeof(_savedRoster[i]->_name)) != sizeof(_savedRoster[i]->_name))
+		char nameBytes[StorageRecord::kNameSize];
+		if (stream->read(nameBytes, sizeof(nameBytes)) != sizeof(nameBytes))
 			return false;
+		_savedRoster[i]->setNameBytes(nameBytes);
 	}
 	return !stream->err() && !stream->eos();
 }
@@ -620,13 +624,7 @@ int GameState::writeStorage(Common::WriteStream *stream, StorageRecord *const *s
 		if (storage[i]) {
 			stream->writeSint32LE(i / kStorageCols);
 			stream->writeSint32LE(i % kStorageCols);
-			const StorageRecord &record = *storage[i];
-			stream->write(record._name, sizeof(record._name));
-			stream->writeByte(record._traits._unusedSlot0);
-			stream->writeByte(record._traits._feet);
-			stream->writeByte(record._traits._nose);
-			stream->writeByte(record._traits._hair);
-			stream->writeByte(record._traits._eyes);
+			storage[i]->write(stream);
 		}
 	}
 	return count;
@@ -654,7 +652,7 @@ Zoombini2PopulationSummary GameState::getPopulationSummary() const {
 bool GameState::save(Common::WriteStream *stream) const {
 	if (!stream || stream->err())
 		return false;
-	const uint32 activeCount = kPageZombiniville <= _currentGameplayPageId && _currentGameplayPageId <= kPageAquacube ? _activeZoombinis.size() : 0;
+	const uint32 activeCount = PageId::kPageZombiniville_00 <= _currentPage && _currentPage <= PageId::kPageAquacube_03 ? _activeZoombinis.size() : 0;
 	const uint64 count = static_cast<uint64>(_savedRoster.size()) + activeCount;
 	if (static_cast<uint64>(INT32_MAX) < count || static_cast<uint32>(INT32_MAX) <= _playerName.size())
 		return false;
@@ -665,9 +663,9 @@ bool GameState::save(Common::WriteStream *stream) const {
 	stream->write(_playerName.c_str(), nameLength);
 	stream->write(_pageVisitCounts, sizeof(_pageVisitCounts));
 	stream->writeSint32LE(_rescuedBoolieCount);
-	for (int i = 0; i < 100; i++)
+	for (int i = 0; i < ARRAYSIZE(_pageLevel); i++)
 		stream->writeSint32LE(_pageLevel[i]);
-	for (int i = 0; i < 100; i++)
+	for (int i = 0; i < ARRAYSIZE(_perfectClearCount); i++)
 		stream->writeSint32LE(_perfectClearCount[i]);
 	stream->writeByte(_hasReachedRescue1);
 	stream->writeByte(_hasReachedRescue2);
@@ -680,11 +678,7 @@ bool GameState::save(Common::WriteStream *stream) const {
 		stream->writeSint32LE(_completedTraitHashes[i]);
 	stream->writeByte(_rescue1MoviePlayed);
 	stream->writeByte(_rescue2MoviePlayed);
-	stream->writeSint32LE(_traitComboTable._totalCount);
-	stream->writeSint32LE(_traitComboTable._uniqueCombinationCount);
-	stream->writeSint32LE(_traitComboTable._twiceRegisteredCombinationCount);
-	stream->write(_traitComboTable._combinationUseCounts, sizeof(_traitComboTable._combinationUseCounts));
-	stream->write(_traitComboTable._unusedTail, sizeof(_traitComboTable._unusedTail));
+	_traitComboTable.write(stream);
 	const int rescue1StorageCount = writeStorage(stream, _rescue1Storage);
 	const int rescue2StorageCount = writeStorage(stream, _rescue2Storage);
 	stream->writeUint32LE(static_cast<uint32>(count));
@@ -696,7 +690,7 @@ bool GameState::save(Common::WriteStream *stream) const {
 			zoombini = _activeZoombinis[i - _savedRoster.size()];
 		if (!zoombini)
 			return false;
-		const ZmbTrait &traits = zoombini->_traits;
+		const ZmbTrait &traits = zoombini->getTraits();
 		stream->writeByte(traits._unusedSlot0);
 		stream->writeByte(traits._feet);
 		stream->writeByte(traits._nose);
@@ -709,7 +703,7 @@ bool GameState::save(Common::WriteStream *stream) const {
 			zoombini = _savedRoster[i];
 		else
 			zoombini = _activeZoombinis[i - _savedRoster.size()];
-		stream->write(zoombini->_name, sizeof(zoombini->_name));
+		stream->write(zoombini->getNameBytes(), sizeof(zoombini->getNameBytes()));
 	}
 	const int64 expectedSize = 2822 + static_cast<int64>(nameLength) + (rescue1StorageCount + rescue2StorageCount) * 28 + count * 20;
 	return !stream->err() && 0 <= startPosition && stream->pos() - startPosition == expectedSize;
@@ -726,14 +720,21 @@ void GameState::registerPageVisit(PageId pageId, int visitKind) {
 
 int GameState::getPageLevel(PageId pageId) const {
 	const int pageIndex = static_cast<int>(pageId);
-	if (pageIndex < 0 || 100 <= pageIndex)
+	if (pageIndex < 0 || getPageLevelCount() <= pageIndex)
 		return 0;
 	return _pageLevel[pageIndex];
 }
 
+void GameState::setPageLevel(PageId pageId, int level) {
+	const int pageIndex = static_cast<int>(pageId);
+	if (pageIndex < 0 || getPageLevelCount() <= pageIndex)
+		return;
+	_pageLevel[pageIndex] = level;
+}
+
 int GameState::activatePageLevel(PageId pageId) {
 	const int pageIndex = static_cast<int>(pageId);
-	if (pageIndex < 0 || 100 <= pageIndex)
+	if (pageIndex < 0 || getPageLevelCount() <= pageIndex)
 		return 0;
 
 	if (_pageLevel[pageIndex] == 0)
@@ -748,10 +749,16 @@ Zoombini2SavegameManager::Zoombini2SavegameManager(Common::SaveFileManager *save
 
 Common::String Zoombini2SavegameManager::makeSaveFileName(const Common::String &savefileName) const {
 	Common::String filesystemName = savefileName;
-	if (_language == Common::HE_ISR)
+	switch (_language) {
+	case Common::HE_ISR:
 		filesystemName = savefileName.decode(Common::kWindows1255).encode(Common::kUtf8);
-	else if (_language == Common::SV_SWE)
+		break;
+	case Common::SV_SWE:
 		filesystemName = savefileName.decode(Common::kWindows1252).encode(Common::kUtf8);
+		break;
+	default:
+		break;
+	}
 	return Common::String::format("%s-%s.mk", _target.c_str(), filesystemName.c_str());
 }
 
@@ -790,20 +797,29 @@ bool Zoombini2SavegameManager::isSafeStoredSavefileName(const Common::String &sa
 
 bool Zoombini2SavegameManager::encodeSavefileName(const Common::U32String &displayName, Common::String &savefileName) const {
 	Common::CodePage codePage = Common::kUtf8;
-	if (_language == Common::HE_ISR)
+	switch (_language) {
+	case Common::HE_ISR:
 		codePage = Common::kWindows1255;
-	else if (_language == Common::SV_SWE)
+		break;
+	case Common::SV_SWE:
 		codePage = Common::kWindows1252;
+		break;
+	default:
+		break;
+	}
 	savefileName = displayName.encode(codePage);
 	return savefileName.decode(codePage) == displayName;
 }
 
 Common::U32String Zoombini2SavegameManager::decodeSavefileName(const Common::String &savefileName) const {
-	if (_language == Common::HE_ISR)
+	switch (_language) {
+	case Common::HE_ISR:
 		return savefileName.decode(Common::kWindows1255);
-	if (_language == Common::SV_SWE)
+	case Common::SV_SWE:
 		return savefileName.decode(Common::kWindows1252);
-	return savefileName.decode(Common::kUtf8);
+	default:
+		return savefileName.decode(Common::kUtf8);
+	}
 }
 
 void Zoombini2SavegameManager::addSavefileSorted(Common::StringArray &savefiles, const Common::String &savefileName) {
@@ -832,10 +848,16 @@ Common::StringArray Zoombini2SavegameManager::listSavefiles() const {
 
 		const Common::String filesystemName = saveFileName.substr(prefix.size(), saveFileName.size() - prefix.size() - suffix.size());
 		Common::String savefileName = filesystemName;
-		if (_language == Common::HE_ISR)
+		switch (_language) {
+		case Common::HE_ISR:
 			savefileName = filesystemName.decode(Common::kUtf8).encode(Common::kWindows1255);
-		else if (_language == Common::SV_SWE)
+			break;
+		case Common::SV_SWE:
 			savefileName = filesystemName.decode(Common::kUtf8).encode(Common::kWindows1252);
+			break;
+		default:
+			break;
+		}
 		const bool invalidEncoding = (_language == Common::HE_ISR && savefileName.decode(Common::kWindows1255).encode(Common::kUtf8) != filesystemName) ||
 									 (_language == Common::SV_SWE && savefileName.decode(Common::kWindows1252).encode(Common::kUtf8) != filesystemName);
 		if (invalidEncoding || !isSafeStoredSavefileName(savefileName)) {

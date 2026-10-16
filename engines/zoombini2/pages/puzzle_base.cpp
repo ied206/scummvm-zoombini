@@ -20,6 +20,7 @@
  */
 
 #include "common/debug.h"
+#include "common/util.h"
 
 #include "zoombini2/graphics.h"
 #include "zoombini2/pages/puzzle_base.h"
@@ -29,19 +30,21 @@
 
 namespace Zoombini2 {
 
-constexpr const char *PuzzleBase::kZoombiniAnimationPath;
-
 PuzzleBase::PuzzleBase(Zoombini2Engine *vm, PageId pageId)
-	: InteractiveBase(vm, PageCategory::kPuzzle), _puzzleLevel(vm->_state->_level) {
+	: InteractiveBase(vm, PageCategory::kPuzzle), _puzzleLevel(CLIP(vm->_state->_level, 1, 4)) {
 	_pageId = pageId;
 }
 
 void PuzzleBase::finishPuzzleRoster(StorageRecord **storage, bool perfectClearEligible) {
-	_vm->_state->finishPuzzleRoster(_pageId, storage, _vm->isStartingMapTransition(), _vm->_isSavedGame, perfectClearEligible);
+	for (ZoombiniRunner *zoombini : _vm->_state->_activeZoombinis)
+		zoombini->setAnimationCompleteCallback(nullptr);
+	if (_vm->inJourneyMode() && _vm->isStartingMapTransition() && _vm->isDebugMapTransition())
+		return;
+	_vm->_state->finishPuzzleRoster(_pageId, storage, _vm->isStartingMapTransition(), _vm->getGameMode(), perfectClearEligible);
 }
 
 void PuzzleBase::init() {
-	debug(1, "Puzzle::init - %s (page %d)", _puzzleName, static_cast<int>(_pageId));
+	debug(1, "Puzzle::init - %s (page %d)", getPageName(), static_cast<int>(_pageId));
 
 	_vm->_gfx->getPageLayerStack()->clear();
 	_backgroundPath.clear();
@@ -49,13 +52,12 @@ void PuzzleBase::init() {
 	if (_initialBackgroundPath) {
 		const Common::Path bgPath(_initialBackgroundPath);
 		if (!loadPrimaryLayerBackground(bgPath)) {
-			debug(1, "Puzzle: Failed to load background for %s", _puzzleName);
+			debug(1, "Puzzle: Failed to load background for %s", getPageName());
 		}
 	}
 	_vm->_gfx->getPageLayerStack()->addLayer(1);
 
-	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path(kZoombiniAnimationPath), 50);
-	if (!_zoombiniAnimation)
+	if (!_vm->_gfx->getCommonZoombiniAnimation(ZmbAnimationKind::kBasic))
 		debug(1, "Puzzle: Failed to load zoombini graphics");
 
 	// Mirror the active party for puzzle rendering.
@@ -80,15 +82,15 @@ void PuzzleBase::drawPrimaryPageLayer(ManagedSurface32 *screen) {
 void PuzzleBase::renderZoombinis(ManagedSurface32 *screen) const {
 	Common::Array<uint> order;
 	const ZoombiniRunner *draggedZoombini = nullptr;
-	for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
-		const ZoombiniRunner *zoombini = _puzzleZoombinis[index];
+	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
+		const ZoombiniRunner *zoombini = _puzzleZoombinis[i];
 		if (!zoombini)
 			continue;
 		if (zoombini->isDragging()) {
 			draggedZoombini = zoombini;
 			continue;
 		}
-		order.push_back(index);
+		order.push_back(i);
 	}
 	ZoombiniRunner::sortDrawOrderByY(_puzzleZoombinis, order);
 	for (uint index : order)
@@ -114,15 +116,14 @@ const char *PuzzleChanceInfo::typeName(Type type) {
 }
 
 Common::String PuzzleBase::debugAnswerHeader() const {
-	return Common::String::format("%s (level %d, party %u)\n", _puzzleName, _puzzleLevel, _puzzleZoombinis.size());
+	return Common::String::format("%s L%d (Route%d-%d)\n", getPageName(), _puzzleLevel, getRouteNumber(), getRoutePuzzleIdx());
 }
 
 Common::String PuzzleBase::debugActorDescription(int index) const {
 	if (index < 0 || static_cast<int>(_puzzleZoombinis.size()) <= index)
 		return "(none)";
 	const ZoombiniRunner *actor = _puzzleZoombinis[index];
-	const Common::Point32 position = actor->getScreenPosition();
-	return Common::String::format("Zoombini near (%d, %d): %s", position.x, position.y, actor->getTraits().toStr().c_str());
+	return Common::String::format("Zoombini (%s): %s", actor->getName().c_str(), actor->getTraits().toStr().c_str());
 }
 
 void PuzzleBase::debugForceFinish() {
@@ -139,21 +140,11 @@ void PuzzleBase::debugForceFinish() {
 	}
 	applyDebugPuzzleCompletion();
 	_vm->_zoombiniWalkingFlag = true;
-	if (_vm->_isSavedGame) {
-		_vm->_mapTransitionSourcePageId = _pageId;
-		_vm->requestPageChange(kPageMapTrans);
+	if (_vm->inJourneyMode()) {
+		_vm->_mapTransitSrcPageId = _pageId;
+		_vm->requestPageChange(PageId::kPageMapTrans_22);
 	} else {
-		_vm->requestPageChange(kPageMenuPractice);
-	}
-}
-
-void PuzzleBase::debugPrepareRouteDeparture() {
-	if (!_vm->_state)
-		return;
-
-	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i += 1) {
-		if (_vm->_state->_activeZoombinis[i])
-			_vm->_state->_activeZoombinis[i]->setCanAdvanceFromPage(true);
+		_vm->requestPageChange(PageId::kPageMapPractice_M3);
 	}
 }
 

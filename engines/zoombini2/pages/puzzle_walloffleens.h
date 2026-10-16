@@ -35,6 +35,12 @@ public:
 	PuzzleWallOfFleens(Zoombini2Engine *vm);
 	/** Release projectile/rail paths and page-local animation resources. */
 	~PuzzleWallOfFleens() override;
+	/** Return the puzzle name used by debug answer descriptions. */
+	const char *getPageName() const override { return kPageName; }
+	/** Return the 1-based route containing this puzzle. */
+	int getRouteNumber() const override { return kRouteNumber; }
+	/** Return the 1-based puzzle number within its route. */
+	int getRoutePuzzleIdx() const override { return kRoutePuzzleIdx; }
 	/** Generate the selected board, load resources, and arrange the puzzle party. */
 	void init() override;
 	/** Advance cannon loading, projectile flight, mirror reactions, and speech. */
@@ -47,6 +53,7 @@ public:
 	void onRenderActors(ManagedSurface32 *screen) override;
 	/** Draw projectile and mirror reaction effects above the board. */
 	void onRenderForeground(ManagedSurface32 *screen) override;
+	/** Advance the party, Fleen and projectile animation frames after drawing. */
 	void onActorsRendered() override;
 	/** Fire the cannon or select a target mirror after a button release at @p pos. */
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
@@ -54,16 +61,28 @@ public:
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
 	/** Complete the current board for the puzzle-console command. */
 	void applyDebugPuzzleCompletion() override;
+	/** Return whether the engine's walking/departure gate currently enables Go. */
 	bool canUseGoButton() const override;
 	/** Return through retreat speech or the completed map transition. */
 	bool onGoButtonPressed() override;
 	/** Describe each target Fleen and its mirror status for the puzzle console. */
 	Common::String debugGetAnswer() const override;
-	PuzzleChanceInfo debugGetChances() const override { return PuzzleChanceInfo(PuzzleChanceInfo::Type::kAmorphous); }
+	/** Report remaining cannonballs as the puzzle's chance count. */
+	PuzzleChanceInfo debugGetChances() const override;
+	/** Explain cannonball exhaustion and the resulting loss of party members. */
 	Common::String debugGetChanceDetails() const override;
+	/** Return whether the current shot state permits changing the cannonball count. */
+	bool debugCanSetChances() const override;
+	/** Set remaining cannonballs and synchronize the loaded projectile and rail display. */
+	bool debugSetChances(int remaining) override;
 
 private:
-	static constexpr const char *kPuzzleName = "Magic Mirrors";
+	/** Static puzzle name used by debug answer descriptions. */
+	static constexpr const char *kPageName = "Magic Mirrors";
+	/** 1-based route number used by the puzzle console. */
+	static constexpr int kRouteNumber = 3;
+	/** 1-based puzzle number within the route used by the puzzle console. */
+	static constexpr int kRoutePuzzleIdx = 2;
 	/** Magic Mirrors board background loaded into the first page layer. */
 	static constexpr const char *kBackgroundPath = "#bmp/wall_of_fleens/background";
 	/** Loading and projectile movement run independently of mirror reactions. */
@@ -122,20 +141,29 @@ private:
 		/** Return Fleen feature names in hair, eyes, nose, feet order. */
 		Common::String toStr() const;
 	};
-	struct Cell {
-		/** Target-comparison traits, screen origin, score, and display flags for one mirror cell. */
+	struct MirrorCell {
+		/** Fleen traits compared with the current target's traits. */
 		FleenTrait traits;
+		/** Mirror cell's top-left anchor in page pixels. */
 		Common::Point32 pos;
+		/** Trait-match feedback score, or -1 before a shot is evaluated. */
 		int score = -1;
+		/** Whether this mirror cell has been tested by a shot. */
 		bool tried = false;
+		/** Whether this mirror's hidden contents are currently visible. */
 		bool revealed = false;
+		/** Whether this mirror now shows an empty passage. */
 		bool empty = false;
+		/** Bitmask selecting the primary and secondary scores shown on this mirror. */
 		byte scoreMask = kShowPrimaryScore01;
 	};
-	/** Departure animation cell and the white-nose frames whose artwork contains a stray streak. */
+	/** Sprite-grid cell used when a Fleen departs. */
 	static constexpr int kFleenDepartureCell = 56;
+	/** Fleen nose value whose departure artwork needs the streak correction. */
 	static constexpr int kWhiteNoseTrait = 2;
+	/** First departure frame containing the stray nose-art streak. */
 	static constexpr int kStreakFirstFrame = 2;
+	/** Last departure frame containing the stray nose-art streak. */
 	static constexpr int kStreakLastFrame = 5;
 	/** Background music played while the Magic Mirrors board is active. */
 	static constexpr const char *kMusicPath = "#sounds/music/05-BB01.wav";
@@ -181,10 +209,6 @@ private:
 	static constexpr const char *kVocif2Path = "bmp/fleens/vocif/vocif2.anm";
 	/** Zoombini animation grid for the runner loaded into the cannon. */
 	static constexpr const char *kCannonZombPath = "bmp/wall_of_fleens/cannon_zomb/cannon_zomb.anm";
-	/** Zoombini animation grid for the leap into the cannon on the final shot. */
-	static constexpr const char *kJumpAnimationPath = "bmp/zombis/saut/saut.anm";
-	/** Zoombini idle animation grid used for the board-completion celebration. */
-	static constexpr const char *kCelebratePath = "bmp/zombis/attente/attenteZomb.anm";
 	/** Sound effects in order: cannon aim, mirror rotation, reload, runner load, firing, impact, explosion, Fleen departure. */
 	static constexpr const char *kSoundPaths[8] = {
 		"sounds/fx/05-BB03.wav",
@@ -218,6 +242,7 @@ private:
 		{345, 229},
 		{508, 230},
 	};
+	/** Page-space mirror-grid origins indexed by board variant. */
 	static constexpr Common::Point32 kGridOrigins[5] = {
 		{0, 0},
 		{380, 200},
@@ -225,6 +250,7 @@ private:
 		{100, 7},
 		{95, 7},
 	};
+	/** Projectile launch anchors in page pixels, indexed by cannon aim angle. */
 	static constexpr Common::Point32 kMuzzles[9] = {
 		{500, 432},
 		{500, 432},
@@ -1103,89 +1129,134 @@ private:
 
 	/** Load board art, runner grids, paths, effects, and music. */
 	void loadResources();
+	/** Convert a row-major cell index to zero-based grid coordinates (x = column, y = row). */
+	Common::Point32 toCellCoordinates(int cellIndex) const;
 	/** Construct the selected level grid and its easy-mode panel sequence. */
 	void buildGrid();
+	/** Generate the next six-mirror panel for level 1. */
 	void generateEasyPanel();
-	/** Shuffle candidate values and compare a cell's four target traits. */
+	/** Shuffle the supplied candidate array using the puzzle's random stream. */
 	void permute(int *values, int count);
+	/** Return how many of the four traits match between the two mirror cells. */
 	int compareTraits(int first, int second) const;
-	/** Load/fire the next projectile and advance hit, catch, or retreat outcomes. */
+	/** Load the next cannonball or party member as the projectile. */
 	void loadNextProjectile();
+	/** Replace and start the projectile's straight path between page-pixel anchors. */
 	void startFlight(const Common::Point32 &start, const Common::Point32 &end, int step);
+	/** Resolve a completed shot and prepare the next projectile when play continues. */
 	void finishShot();
+	/** Commit the caught target and advance to the next panel, target or puzzle completion. */
 	void finishCatch();
+	/** Begin the retreat sequence after ammunition and expendable party members are exhausted. */
 	void startRetreat();
-	/** Play effects, queue engine-lifetime speech, and draw each mirror cell. */
+	/** Play the indexed loaded sound effect. */
 	void playEffect(int index);
+	/** Append a speech resource to the engine's serialized narration queue. */
 	void queueSpeech(const Common::String &path);
-	void drawCell(ManagedSurface32 *screen, const Cell &cell, bool active) const;
+	/** Draw one mirror's revealed traits, score and active-selection state. */
+	void drawCell(ManagedSurface32 *screen, const MirrorCell &cell, bool active) const;
+	/** Update the cursor for the mirror or control under the page-pixel pointer. */
 	void updateHoverCursor(const Common::Point32 &pos);
-	/** Convert a rail vector to an animation direction, clear Fleen completion, or make a line path. */
+	/** Quantize a page-space movement vector to one of the supplied direction sectors. */
 	static int direction(const Common::Point32 &start, const Common::Point32 &end, int sectors);
+	/** Return the adjacent aim code toward a distinct target angle. */
 	static CannonAimAngle stepCannonAimAngle(CannonAimAngle current, CannonAimAngle target);
+	/** Advance the Fleen shout/departure chain or finalize its capture. */
 	static void onFleenAnimationDone(void *context, ZoombiniRunner *runner);
+	/** Allocate a straight path between page-pixel anchors using the supplied raw Q10 step. */
 	PathObject *makeLine(const Common::Point32 &start, const Common::Point32 &end, int step);
 
-	/** Live cells: level 1 uses 6, level 2 uses 54, and level 3 and internal level 4 use 72. */
-	Common::Array<Cell> _cells;
+	/** Live cells: L1 uses 6, L2 uses 54, and L3/L4 use 72. */
+	Common::Array<MirrorCell> _cells;
 	/** Completed level-1 panels retain 0 to 30 cells in groups of 6; other levels retain none. */
-	Common::Array<Cell> _easyHistory;
-	/** Level/grid dimensions, active panel/targets, player input, and ammunition state. */
-	int _level = 1;
+	Common::Array<MirrorCell> _easyHistory;
+	/** Number of mirror columns in the current board. */
 	int _columns = 3;
+	/** Number of active mirrors in the current board. */
 	int _cellCount = 6;
+	/** Current level-1 panel index from zero through five. */
 	int _panel = 0;
+	/** Mirror index containing the primary target Fleen. */
 	int _target = 0;
+	/** Mirror index containing the secondary target Fleen, when used. */
 	int _alternateTarget = 0;
+	/** Number of mirror selections made on the current board. */
 	int _clickCount = 0;
+	/** Currently selected mirror index, or -1 when none is selected. */
 	int _selected = -1;
+	/** Cannonballs remaining before shots must use party members. */
 	int _ballsLeft = 0;
+	/** Cannonball allowance selected for the current puzzle level. */
+	int _initialBallCount = 0;
+	/** Party size retained at puzzle entry for progress and shot accounting. */
 	int _initialPartyCount = 0;
 	/** Loaded party member and cannon/projectile orientation/image state. */
 	int _loadedRunner = -1;
+	/** Cannon angle currently shown on screen. */
 	CannonAimAngle _angle = CannonAimAngle::kCenter04;
+	/** Cannon angle toward which the aiming animation is moving. */
 	CannonAimAngle _targetAngle = CannonAimAngle::kCenter04;
+	/** Sprite-grid cell selected for the current projectile presentation. */
 	int _projectileCell = 4;
+	/** Current projectile image or frame selection. */
 	int _projectileImage = 1;
 	/** Found targets, reset/finish/retreat flags, and the projectile-consumption outcome. */
 	int _caughtTargets = 0;
+	/** Number of Fleen shouts performed in the current reaction sequence. */
 	int _shoutCount = 0;
+	/** Whether a new board is being prepared after the prior one. */
 	bool _resetting = false;
+	/** Whether the required Fleen targets have been found. */
 	bool _finished = false;
 	/** Whether at least one Fleen catch makes this visit eligible for perfect-clear progression. */
 	bool _perfectClearEligible = false;
+	/** Whether the current departure sequence is retreating. */
 	bool _retreating = false;
+	/** Whether the current shot has already consumed its projectile. */
 	bool _shotConsumed = true;
+	/** Whether the primary target Fleen has been found. */
 	bool _foundPrimary = false;
+	/** Whether the secondary target Fleen has been found. */
 	bool _foundSecondary = false;
+	/** Whether the Go departure must wait for the current presentation. */
 	bool _goTransitionPending = false;
 	/** Current cannon and mirror state with their animation/ambient scheduling ticks. */
 	ShotPhase _shotPhase = ShotPhase::kStopped05;
+	/** Current mirror opening, feedback or closing stage. */
 	MirrorPhase _mirrorPhase = MirrorPhase::kNone00;
+	/** Gameplay tick in milliseconds used to pace cannon aiming. */
 	uint32 _aimTick = 0;
+	/** Gameplay tick in milliseconds used to pace mirror reactions. */
 	uint32 _mirrorTick = 0;
+	/** Gameplay tick in milliseconds when another ambient sound may start. */
 	uint32 _nextAmbientTick = 0;
 	/** Active projectile path and the per-direction cannon rail paths/positions. */
 	PathObject *_projectilePath = nullptr;
-	/** Initial rail entries: level 1 uses 12, level 2 uses 8, level 3 uses 6, and internal level 4 uses 8. */
+	/** Initial rail entries: L1 uses 12, L2 uses 8, L3 uses 6, and L4 uses 8. */
 	Common::Array<PathObject *> _railPaths;
-	/** Initial rail positions: level 1 uses 12, level 2 uses 8, level 3 uses 6, and internal level 4 uses 8. */
+	/** Initial rail positions: L1 uses 12, L2 uses 8, L3 uses 6, and L4 uses 8. */
 	Common::Array<Common::Point32> _railPositions;
+	/** Current projectile anchor in page pixels. */
 	Common::Point32 _projectilePos;
 	/** Fleen/projectile runners and their animation grids. */
 	ZoombiniRunner _fleensRunner;
+	/** Runner used to animate a Zoombini fired from the cannon. */
 	ZoombiniRunner _projectileRunner;
+	/** Borrowed cached grid for the ordinary Fleen presentation. */
 	const ZoombiniAnimation *_fleensAnimation = nullptr;
+	/** Borrowed cached grid for the first Fleen shouting motion. */
 	const ZoombiniAnimation *_vocif1 = nullptr;
+	/** Borrowed cached grid for the second Fleen shouting motion. */
 	const ZoombiniAnimation *_vocif2 = nullptr;
+	/** Borrowed cached grid for the Zoombini cannon-entry motion. */
 	const ZoombiniAnimation *_cannonAnimation = nullptr;
-	const ZoombiniAnimation *_jumpAnimation = nullptr;
-	const ZoombiniAnimation *_celebrationAnimation = nullptr;
 	/** Mirror-reaction animation resources. */
 	Animation *_rotate = nullptr;
+	/** Mirror-break animation released with the page. */
 	Animation *_explode = nullptr;
 	/** Indexed effects and randomized ambient handles. */
 	int _sounds[8];
+	/** Loaded ambient shout handles indexed by the three sound variants. */
 	int _ambientSounds[3];
 };
 

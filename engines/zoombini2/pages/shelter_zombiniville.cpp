@@ -41,9 +41,6 @@ constexpr const char *ShelterZombiniville::kOneRandomButtonPath;
 constexpr const char *ShelterZombiniville::kAllRandomButtonPath;
 constexpr const char *ShelterZombiniville::kCreateButtonPath;
 constexpr const char *ShelterZombiniville::kBigZombAnimationPath;
-constexpr const char *ShelterZombiniville::kLittleZombAnimationPath;
-constexpr const char *ShelterZombiniville::kPickupZombAnimationPath;
-constexpr const char *ShelterZombiniville::kIdleZombAnimationPath;
 constexpr const char *ShelterZombiniville::kMusicPath;
 constexpr const char *ShelterZombiniville::kFeatureSelectSoundPath;
 constexpr const char *ShelterZombiniville::kOneRandomSoundPath;
@@ -53,7 +50,7 @@ constexpr const char *ShelterZombiniville::kWrongZoombiniSoundPath;
 
 ShelterZombiniville::ShelterZombiniville(Zoombini2Engine *vm)
 	: ShelterBase(vm) {
-	_pageId = kPageZombiniville;
+	_pageId = PageId::kPageZombiniville_00;
 }
 
 ShelterZombiniville::~ShelterZombiniville() {
@@ -201,7 +198,7 @@ void ShelterZombiniville::init() {
 	for (int slotIndex = 0; slotIndex < kBoardingSlotCount; slotIndex++)
 		_boardingSlots[slotIndex].occupied = false;
 	GameState *gameState = _vm->_state;
-	if (_vm->_isSavedGame)
+	if (_vm->inJourneyMode())
 		gameState->restoreSavedZoombinis();
 	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
 		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
@@ -218,7 +215,7 @@ void ShelterZombiniville::init() {
 		_boardingZoombinis.push_back(zoombini);
 	}
 	refreshFeatureCounts();
-	gameState->registerPageVisit(kPageZombiniville);
+	gameState->registerPageVisit(PageId::kPageZombiniville_00);
 
 	if (!_vm->_gfx->loadBackground(kBackgroundPath))
 		warning("ShelterZombiniville: Failed to load background");
@@ -240,20 +237,11 @@ void ShelterZombiniville::init() {
 	_createButton = new Animation(_vm);
 	_createButton->loadFromFile(Common::Path(kCreateButtonPath));
 
-	_bigZombAnimation = _vm->loadZoombiniAnimation(Common::Path(kBigZombAnimationPath), 0);
+	_bigZombAnimation = _vm->_gfx->loadZoombiniAnimation(Common::Path(kBigZombAnimationPath), 0);
 	if (!_bigZombAnimation)
 		warning("ShelterZombiniville: Failed to load BigZomb.anm");
-	_littleZombAnimation = _vm->loadZoombiniAnimation(Common::Path(kLittleZombAnimationPath), 50);
-	if (!_littleZombAnimation)
-		warning("ShelterZombiniville: Failed to load littleZomb.anm");
-	_pickupZombAnimation = _vm->loadZoombiniAnimation(Common::Path(kPickupZombAnimationPath), 100);
-	if (!_pickupZombAnimation)
-		warning("ShelterZombiniville: Failed to load pris.anm");
-	_idleZombAnimation = _vm->loadZoombiniAnimation(Common::Path(kIdleZombAnimationPath), 50);
-	if (!_idleZombAnimation)
-		warning("ShelterZombiniville: Failed to load attenteZomb2.anm");
 	for (uint i = 0; i < _boardingZoombinis.size(); i++)
-		_boardingZoombinis[i]->setDefaultAnimation(_littleZombAnimation, 33);
+		_boardingZoombinis[i]->setDefaultAnimation(ZmbAnimationKind::kBasic, 33);
 
 	setupHoverRunners();
 	_vm->_gfx->getPageLayerStack()->setScrollLocked(true);
@@ -285,7 +273,7 @@ void ShelterZombiniville::refreshFeatureCounts() {
 void ShelterZombiniville::resetSelectedFeatures() {
 	for (int traitIdx = 0; traitIdx < ZmbTrait::kTraitKindCount; traitIdx++) {
 		_stations[traitIdx].selectedValue = 0;
-		_vm->_selectedFeatures[traitIdx] = -1;
+		_vm->_pickerSelectedTraits[traitIdx] = -1;
 	}
 }
 
@@ -293,7 +281,7 @@ void ShelterZombiniville::randomizeSelectedFeatures() {
 	for (int traitIdx = 0; traitIdx < ZmbTrait::kTraitKindCount; traitIdx++) {
 		const byte traitVal = static_cast<byte>(_vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
 		_stations[traitIdx].selectedValue = traitVal;
-		_vm->_selectedFeatures[traitIdx] = traitVal;
+		_vm->_pickerSelectedTraits[traitIdx] = traitVal;
 	}
 }
 
@@ -520,7 +508,7 @@ void ShelterZombiniville::restoreSelectedFeatures(const ZoombiniRunner &zoombini
 		const ZmbTrait::TraitKind traitKind = static_cast<ZmbTrait::TraitKind>(traitIdx);
 		const byte traitVal = zoombini.getTraits().getValue(traitKind);
 		_stations[traitIdx].selectedValue = traitVal;
-		_vm->_selectedFeatures[traitIdx] = traitVal;
+		_vm->_pickerSelectedTraits[traitIdx] = traitVal;
 	}
 }
 
@@ -611,12 +599,12 @@ bool ShelterZombiniville::createZoombini(bool allowConcurrentEntrances) {
 		return false;
 
 	const Common::Point32 dest = getSlotPosition(slotIndex);
-	ZoombiniRunner *zoombini = new ZoombiniRunner();
+	ZoombiniRunner *zoombini = new ZoombiniRunner(_vm);
 	zoombini->setTraits(traits);
 	_currentName = generateName();
 	zoombini->setName(_currentName.c_str());
 	zoombini->setPosition(dest);
-	zoombini->setDefaultAnimation(_littleZombAnimation, 33);
+	zoombini->setDefaultAnimation(ZmbAnimationKind::kBasic, 33);
 	zoombini->setInputEnabled(false);
 	zoombini->setPlacementIndex(slotIndex);
 	zoombini->setTracksMovementDirection(true);
@@ -711,7 +699,7 @@ void ShelterZombiniville::onActorsRendered() {
 		ZoombiniRunner *zoombini = _boardingZoombinis[order[i]];
 		if (zoombini->isHidden())
 			continue;
-		zoombini->tryStartIdleAnimation(_idleZombAnimation, *_vm->_rnd, tick, _vm->getFrameDeltaMs(), _vm->getLogicPacingHz());
+		zoombini->tryStartIdleAnimation(ZmbAnimationKind::kFidget, *_vm->_rnd, tick, _vm->getFrameDeltaMs(), _vm->getLogicPacingHz());
 		zoombini->advanceAnimationAfterDraw();
 	}
 }
@@ -738,15 +726,15 @@ void ShelterZombiniville::drawHoverRunners(ManagedSurface32 *screen) {
 	for (byte traitIdx = 0; traitIdx < ZmbTrait::kTraitKindCount; traitIdx++) {
 		const ZmbTrait::TraitKind traitKind = static_cast<ZmbTrait::TraitKind>(traitIdx);
 		for (byte traitVal = 1; traitVal <= ZmbTrait::kTraitValueCount; traitVal++) {
-			_vm->_gfx->drawAndUpdateAnimationRunner(screen, _featureButtonRunners[traitIdx][traitVal - 1], tick, 0, ManagedSurface32::kScreenSize.width);
+			_vm->_gfx->drawAndUpdateAnimationRunner(screen, _featureButtonRunners[traitIdx][traitVal - 1], tick, 0, Gfx::kScreenSize.width);
 			if (traitKind == ZmbTrait::TraitKind::kNose01) {
 				recolorPickerNose(screen, traitVal + 1);
 			}
 		}
 	}
-	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _oneRandomButtonRunner, tick, 0, ManagedSurface32::kScreenSize.width);
-	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _allRandomButtonRunner, tick, 0, ManagedSurface32::kScreenSize.width);
-	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _createButtonRunner, tick, 0, ManagedSurface32::kScreenSize.width);
+	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _oneRandomButtonRunner, tick, 0, Gfx::kScreenSize.width);
+	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _allRandomButtonRunner, tick, 0, Gfx::kScreenSize.width);
+	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _createButtonRunner, tick, 0, Gfx::kScreenSize.width);
 }
 
 void ShelterZombiniville::recolorPickerNose(ManagedSurface32 *screen, byte noseVal) const {
@@ -772,12 +760,19 @@ void ShelterZombiniville::recolorPickerNose(ManagedSurface32 *screen, byte noseV
 			RGBColor srcColor;
 			screen->format.colorToARGB(READ_UINT32(pixel), alpha, srcColor.r, srcColor.g, srcColor.b);
 			bool matchingColor = false;
-			if (noseVal == 3)
+			switch (noseVal) {
+			case 3:
 				matchingColor = srcColor.r + 12 < srcColor.g && srcColor.b + 12 < srcColor.g;
-			else if (noseVal == 4)
+				break;
+			case 4:
 				matchingColor = srcColor.r + 20 < srcColor.b && srcColor.g + 20 < srcColor.b;
-			else if (noseVal == 5)
+				break;
+			case 5:
 				matchingColor = srcColor.g + 15 < srcColor.r && srcColor.g + 15 < srcColor.b;
+				break;
+			default:
+				break;
+			}
 			if (!matchingColor)
 				continue;
 			const RGBColor adjustedColor = Gfx::recolorNoseGradientRGB(srcColor, targetColor);
@@ -829,7 +824,7 @@ EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
 					return EventHandleResult::kConsumed;
 				const byte selectedValue = static_cast<byte>(traitVal + 1);
 				_stations[traitIdx].selectedValue = selectedValue;
-				_vm->_selectedFeatures[traitIdx] = selectedValue;
+				_vm->_pickerSelectedTraits[traitIdx] = selectedValue;
 				if (0 <= _sndFeatureSelect)
 					_vm->getSoundManager()->playWithVolume(_sndFeatureSelect, _vm->getSoundManager()->getSfxVolume());
 				return EventHandleResult::kConsumed;
@@ -892,7 +887,7 @@ EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
 					const ZmbTrait::TraitKind traitKind = static_cast<ZmbTrait::TraitKind>(traitIdx);
 					const byte traitVal = last->getTraits().getValue(traitKind);
 					_stations[traitIdx].selectedValue = traitVal;
-					_vm->_selectedFeatures[traitIdx] = traitVal;
+					_vm->_pickerSelectedTraits[traitIdx] = traitVal;
 				}
 			}
 			_vm->restartGoBlink();
@@ -903,15 +898,25 @@ EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
 }
 
 EventHandleResult ShelterZombiniville::onLButtonUp(const Common::Point &pos) {
-	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_boardingZoombinis, Common::Point32(pos.x, pos.y), true,
-																	_pickupZombAnimation, _vm->getTotalPlayTime(), nullptr, getAreaMask());
-	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _boardingZoombinis, Common::Point32(pos.x, pos.y), ZmbHoldDropInput::kLeftButtonRelease,
+																   ZmbAnimationKind::kPickup, nullptr, getAreaMask());
+	switch (result) {
+	case ZmbDropResult::kIgnored00:
+		return EventHandleResult::kPassthrough;
+	default:
+		return EventHandleResult::kConsumed;
+	}
 }
 
 EventHandleResult ShelterZombiniville::onMouseMove(const Common::Point &pos) {
-	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_boardingZoombinis, Common::Point32(pos.x, pos.y), false,
-																	_pickupZombAnimation, _vm->getTotalPlayTime(), nullptr, getAreaMask());
-	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _boardingZoombinis, Common::Point32(pos.x, pos.y), ZmbHoldDropInput::kMoveOnly,
+																   ZmbAnimationKind::kPickup, nullptr, getAreaMask());
+	switch (result) {
+	case ZmbDropResult::kIgnored00:
+		return EventHandleResult::kPassthrough;
+	default:
+		return EventHandleResult::kConsumed;
+	}
 }
 
 EventHandleResult ShelterZombiniville::onKeyDown(const Common::KeyState &key, bool repeat) {

@@ -37,6 +37,12 @@ public:
 	PuzzleChezNorf(Zoombini2Engine *vm);
 	/** Release active tray paths and animation runners. */
 	~PuzzleChezNorf() override;
+	/** Return the puzzle name used by debug answer descriptions. */
+	const char *getPageName() const override { return kPageName; }
+	/** Return the 1-based route containing this puzzle. */
+	int getRouteNumber() const override { return kRouteNumber; }
+	/** Return the 1-based puzzle number within its route. */
+	int getRoutePuzzleIdx() const override { return kRoutePuzzleIdx; }
 	/** Select a level layout, load art, and arrange the waiting Zoombinis. */
 	void init() override;
 	/** Begin or continue the click selected at @p pos. */
@@ -63,7 +69,12 @@ public:
 	Common::String debugGetChanceDetails() const override;
 
 private:
-	static constexpr const char *kPuzzleName = "Chez Norf";
+	/** Static puzzle name used by debug answer descriptions. */
+	static constexpr const char *kPageName = "Chez Norf";
+	/** 1-based route number used by the puzzle console. */
+	static constexpr int kRouteNumber = 2;
+	/** 1-based puzzle number within the route used by the puzzle console. */
+	static constexpr int kRoutePuzzleIdx = 2;
 	/** Chez Norf dining-room background loaded into the first page layer. */
 	static constexpr const char *kBackgroundPath = "#bmp/chez_norf/baquegund";
 	/** Path format for the food, note-symbol, and level-specific order-panel RLE sprites. */
@@ -120,7 +131,7 @@ private:
 	static constexpr const char *kFeedbackFormat = "sounds/7-N%d-G%02d.wav";
 	/** Shared completion speech queued when the rescued party departs the restaurant. */
 	static constexpr const char *kCompleteSpeechPath = "sounds/CZN31.wav";
-	/** Retreat speech played before a saved-game return to the map. */
+	/** Retreat speech played before a journey return to the map. */
 	static constexpr const char *kRetreatSpeechPath = "sounds/DW-Cave.wav";
 
 	/** Indices in the paired body/cap animation bank. */
@@ -182,18 +193,22 @@ private:
 		int gesture[2] = {};
 		/** Whether this Norf has accepted a meal and released a cohort. */
 		bool served = false;
-		/** Temporary flags consumed by the corresponding motion-complete callback. */
+		/** Whether the accepted-tray motion is awaiting its completion callback. */
 		bool acceptedTray = false;
+		/** Whether the rejected-tray motion is awaiting its completion callback. */
 		bool rejectedTray = false;
-		/** Last accepted and rejected meals retained for feedback rendering. */
+		/** Last accepted meal retained for feedback rendering. */
 		Meal accepted;
+		/** Last rejected meal retained for feedback rendering. */
 		Meal rejected;
 	};
 	/** One level-layout variant encoded in food, clue, and gesture indices. */
 	struct Layout {
-		/** Required meals, spoken clues, and directional gestures for up to six tables. */
+		/** Required meals indexed by Norf and food category. */
 		byte answers[6][3];
+		/** Food clue codes indexed by Norf and the three clue slots. */
 		byte clues[6][3];
+		/** Directional gesture codes indexed by Norf and gesture slot. */
 		byte gestures[6][2];
 	};
 	/** Four release-matched variants for each of the three selectable levels. */
@@ -272,11 +287,16 @@ private:
 		},
 	};
 	struct L4Layout {
+		/** Food clue codes indexed by Norf and the three clue slots. */
 		byte clues[6][3];
+		/** Directional gesture codes indexed by Norf and gesture slot. */
 		byte gestures[6][2];
+		/** First branch index in the shared level 4 answer table. */
 		int firstAnswer;
+		/** Number of level 4 answer branches available to this layout. */
 		int answerCount;
 	};
+	/** Four restored level 4 layouts and their answer-table slices. */
 	static constexpr L4Layout kL4Layouts[4] = {
 		{
 			// Layout 41
@@ -363,6 +383,7 @@ private:
 			16,
 		},
 	};
+	/** Restored level 4 required meals indexed by answer branch, Norf and food category. */
 	static constexpr byte kL4Answers[48][6][3] = {
 		{
 			// Layout 41, branch 0
@@ -810,6 +831,7 @@ private:
 		{150, 494},
 		{91, 496},
 	};
+	/** Per-food drawing offsets in pixels from the tray anchor. */
 	static constexpr Common::Point32 kFoodOffsets[9] = {
 		{45, 34},
 		{43, 33},
@@ -874,11 +896,16 @@ private:
 	void drawClueSubtitle(ManagedSurface32 *screen);
 	/** Original selection key and retained English sentence for a Chez Norf clue. */
 	struct ClueTextEntry {
+		/** Decimal layout code used to select the matching clue sentence. */
 		int layout;
+		/** One-based Norf number within the selected layout. */
 		int norf;
+		/** Three food clue codes that select this exact sentence. */
 		int clue[3];
+		/** Borrowed English caption for this layout, Norf and clue combination. */
 		const char *text;
 	};
+	/** English captions keyed by layout code, one-based Norf number and clue tuple. */
 	static constexpr ClueTextEntry kClueTextEntries[401] = {
 		{11, 1, {0, 9, 9}, "I'm the only one who wants a sandwich"},
 		{11, 1, {1, 9, 9}, "I'm the only one who wants fish"},
@@ -1294,21 +1321,26 @@ private:
 	bool speechPlaying() const;
 	/** Return whether @p pos lies inside a page-space rectangle. */
 	static bool inside(const Common::Point32 &pos, int x, int y, int width, int height);
-	/** Return the food, tray, or Norf index under @p pos, or -1 when absent. */
+	/** Return the food choice under the page-pixel point, or -1 when none is hit. */
 	int foodAt(const Common::Point32 &pos) const;
+	/** Return the tray slot under the page-pixel point, or -1 when none is hit. */
 	int trayAt(const Common::Point32 &pos) const;
+	/** Return the Norf under the page-pixel point, or -1 when none is hit. */
 	int norfAt(const Common::Point32 &pos) const;
+	/** Return the page-pixel position for a table column at the supplied Y coordinate. */
 	static Common::Point32 tablePosition(int index, int y);
 
-	/** Selected level, active table count, and chosen layout identifier. */
-	int _level = 1;
+	/** Number of active Norf tables in the selected layout. */
 	int _tableCount = 4;
+	/** Selected decimal layout code, combining difficulty and variant. */
 	int _layout = 11;
-	/** Restored level 4 ends when its original tray supply is exhausted. */
+	/** Total submissions available from the initial reusable trays and spare supply. */
 	int _submissionLimit = 8;
-	/** Food-category lookup plus all active Norf rules and source trays. */
+	/** Category lookup for the food codes used by clues and tray contents. */
 	int _foodValues[10] = {};
+	/** Rule, clue and service state indexed by table. */
 	Norf _norfs[6];
+	/** Current food selections indexed by tray slot. */
 	Meal _trays[6];
 	/** Whether each table still supplies a reusable tray. */
 	bool _trayAvailable[6] = {
@@ -1321,37 +1353,55 @@ private:
 	};
 	/** Player marks by category, food value, and table. */
 	byte _notes[3][3][6] = {};
-	/** Remaining reusable trays, submitted meals, released cohorts, and waiting Zoombinis. */
+	/** Number of replacement trays still available. */
 	int _traySupply = 5;
+	/** Number of submitted trays processed by the page. */
 	int _submissions = 0;
+	/** Number of Norfs that have accepted their required meal. */
 	int _successCount = 0;
+	/** Number of Zoombinis still waiting to be served and released. */
 	int _remaining = 0;
-	/** Food, tray, Norf, animation, idle-Norf, and chained-gesture selection state. */
+	/** Food code currently held by the pointer, or -1 when none is held. */
 	int _selectedFood = -1;
+	/** Tray currently held by the pointer, or -1 when none is held. */
 	int _selectedTray = -1;
+	/** Norf receiving the currently animated tray, or -1 when none is selected. */
 	int _recipient = -1;
+	/** Norf whose meal reaction is currently animated. */
 	int _animatedNorf = -1;
+	/** Norf selected for the current idle gesture, or -1 when none is active. */
 	int _idleNorf = -1;
+	/** Queued second directional gesture code, or zero when none is pending. */
 	int _nextGesture = 0;
-	/** Current service phase and the meal, position, and path of its flying tray. */
+	/** Current stage of tray submission and Norf feedback. */
 	Phase _phase = kReady00;
+	/** Food selections retained for the moving tray. */
 	Meal _flyingMeal;
+	/** Current moving-tray anchor in page pixels. */
 	Common::Point32 _flyingPosition;
+	/** Tray path deleted when movement finishes or the page closes; nullptr while stationary. */
 	PathObject *_trayPath = nullptr;
-	/** Latest pointer/click positions and input arming state. */
+	/** Latest pointer location in page pixels. */
 	Common::Point32 _pointer;
+	/** Page-space pointer location retained for deferred click processing. */
 	Common::Point32 _click;
+	/** Whether the current pointer press can produce a release action. */
 	bool _buttonArmed = false;
+	/** Whether a pointer release awaits processing by the page state machine. */
 	bool _clickPending = false;
-	/** Go availability and deferred transitions waiting on speech or animation. */
+	/** Whether the page currently allows the Go action. */
 	bool _canDepart = false;
+	/** Whether Go is waiting for retreat narration to complete. */
 	bool _departAfterSpeech = false;
+	/** Whether the current Norf's dismissal reaction is pending. */
 	bool _dismissPending = false;
+	/** Whether an accepted meal still needs to release its Zoombini cohort. */
 	bool _releasePending = false;
-	/** Interruptible clue speech and indexed service-effect handles. */
+	/** Interruptible clue speech handle, or -1 when no direct clue is playing. */
 	int _clueSpeechSound = -1;
-	/** Page-owned original text cache and current caption lines. */
+	/** Wrapped caption lines for the currently playing clue. */
 	Common::Array<Common::U32String> _clueSubtitleLines;
+	/** Loaded sound handles indexed by the page's event sound slots. */
 	int _sounds[8] = {
 		-1,
 		-1,
@@ -1362,10 +1412,13 @@ private:
 		-1,
 		-1,
 	};
-	/** Shared body/cap animation resources and their active runners, indexed by motion and cap. */
+	/** Body animation data indexed by motion and released with the page. */
 	Animation *_bodyAnimations[7] = {};
+	/** Head animation data indexed by cap variant and motion, released with the page. */
 	Animation *_capAnimations[6][7] = {};
+	/** Body animation playback state indexed by scene animation slot. */
 	AnimationRunner *_bodyRunners[7] = {};
+	/** Head playback state indexed by cap variant and motion. */
 	AnimationRunner *_capRunners[6][7] = {};
 };
 

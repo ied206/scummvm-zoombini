@@ -32,6 +32,35 @@
 
 namespace Zoombini2 {
 
+constexpr const char *PuzzleMagicWall::kPageName;
+constexpr const char *PuzzleMagicWall::kBackgroundPath;
+constexpr const char *PuzzleMagicWall::kLayoutPath;
+constexpr const char *PuzzleMagicWall::kMusicPath;
+constexpr const char *PuzzleMagicWall::kDotFormat;
+constexpr const char *PuzzleMagicWall::kBugFormat;
+constexpr const char *PuzzleMagicWall::kDirectionFormat;
+constexpr const char *PuzzleMagicWall::kLightFormat;
+constexpr const char *PuzzleMagicWall::kTabletPath;
+constexpr const char *PuzzleMagicWall::kTabletDotPath;
+constexpr const char *PuzzleMagicWall::kLeverPath;
+constexpr const char *PuzzleMagicWall::kLeverGlowPath;
+constexpr const char *PuzzleMagicWall::kGateFormat;
+constexpr const char *PuzzleMagicWall::kGateBackFormat;
+constexpr const char *PuzzleMagicWall::kExitFormat;
+constexpr const char *PuzzleMagicWall::kMoveFormat;
+constexpr const char *PuzzleMagicWall::kBugLoopPath;
+constexpr const char *PuzzleMagicWall::kGateSoundPath;
+constexpr const char *PuzzleMagicWall::kLeverSoundPath;
+constexpr const char *PuzzleMagicWall::kRetreatSpeechPath;
+constexpr const char *PuzzleMagicWall::kPerfectSpeechFormat;
+constexpr const char *PuzzleMagicWall::kColors[11];
+constexpr byte PuzzleMagicWall::kDotSourceBrightness[10];
+constexpr byte PuzzleMagicWall::kBugSourceBrightness[10];
+constexpr Common::Point32 PuzzleMagicWall::kTabletPositions[5];
+constexpr Common::Point32 PuzzleMagicWall::kGatePositions[4];
+constexpr Common::Point32 PuzzleMagicWall::kRosterPositions[8];
+constexpr Common::Point32 PuzzleMagicWall::kLightPositions[10];
+
 bool MagicWallMaze::readCount(Common::SeekableReadStream &stream, int &count, int maximum) {
 	if (stream.size() - stream.pos() < 2)
 		return false;
@@ -50,7 +79,7 @@ bool MagicWallMaze::readLayout(Common::SeekableReadStream &stream, Layout &layou
 		const int y = stream.readSint16LE();
 		layout.points.push_back(Common::Point32(x, y));
 	}
-	for (int group = 0; group < 3; group++) {
+	for (int group = 0; group < ARRAYSIZE(layout.groups); group++) {
 		int variants;
 		if (!readCount(stream, variants, 32767) || variants == 0)
 			return false;
@@ -183,7 +212,7 @@ bool MagicWallMaze::generate(int level, Random &random) {
 	}
 	const Layout &selected = layout();
 	_rules.clear();
-	for (int group = 0; group < 3; group++) {
+	for (int group = 0; group < ARRAYSIZE(selected.groups); group++) {
 		const Common::Array<Variant> &variants = selected.groups[group];
 		const int variantIndex = random.getRandomNumber(variants.size() - 1);
 		const Variant &variant = variants[variantIndex];
@@ -238,65 +267,349 @@ bool MagicWallMaze::gateMatched(int gate) const {
 	return matched(gate) && matched(gate + 4) && matched(gate + 8);
 }
 
-bool MagicWallMaze::debugSolve(const Common::Array<int> &positions, int depth, int &budget, Common::Array<int> &sequence) const {
-	if (isIdentity(positions))
-		return true;
-	if (!depth || budget <= 0)
+bool MagicWallMaze::debugEncodePositions(const Common::Array<int> &positions, uint64 &state) {
+	state = 0;
+	if (positions.empty() || 10 < positions.size())
 		return false;
-	budget -= 1;
-	for (uint rule = 0; rule < _rules.size(); rule++) {
-		Common::Array<int> next = positions;
-		applyRule(_rules[rule], next, true);
-		if (next == positions)
-			continue;
-		sequence.push_back(rule);
-		if (debugSolve(next, depth - 1, budget, sequence))
-			return true;
-		sequence.pop_back();
+	uint used = 0;
+	for (uint i = 0; i < positions.size(); i++) {
+		const int point = positions[i];
+		if (point < 0 || positions.size() <= static_cast<uint>(point) || (used & (1U << point)))
+			return false;
+		used |= 1U << point;
+		state |= static_cast<uint64>(point) << (4 * i);
 	}
-	return false;
+	return true;
 }
 
-bool MagicWallMaze::debugSolution(Common::Array<int> &sequence) const {
-	sequence.clear();
-	int budget = 200000;
-	for (int depth = 0; depth <= 8 && 0 < budget; depth++)
-		if (debugSolve(_positions, depth, budget, sequence))
+uint MagicWallMaze::debugPermutationRank(uint64 state, uint count) {
+	uint rank = 0;
+	uint used = 0;
+	for (uint i = 0; i < count; i++) {
+		const uint point = (state >> (4 * i)) & 15;
+		uint smaller = 0;
+		for (uint previous = 0; previous < point; previous++)
+			if (!(used & (1U << previous)))
+				smaller += 1;
+		rank = rank * (count - i) + smaller;
+		used |= 1U << point;
+	}
+	return rank;
+}
+
+Common::Array<int> MagicWallMaze::debugRuleMapping(uint rule) const {
+	Common::Array<int> mapping;
+	for (uint i = 0; i < _positions.size(); i++)
+		mapping.push_back(i);
+	applyRule(_rules[rule], mapping, true);
+	return mapping;
+}
+
+Common::Array<Common::Array<int>> MagicWallMaze::debugTabletPaths(uint rule) const {
+	Common::Array<Common::Array<int>> paths;
+	const Common::Array<int> mapping = debugRuleMapping(rule);
+	uint64 encoded;
+	if (!debugEncodePositions(mapping, encoded))
+		return paths;
+	bool seen[10] = {};
+	for (uint point = 0; point < mapping.size(); point++) {
+		if (seen[point] || mapping[point] == static_cast<int>(point))
+			continue;
+		Common::Array<int> path;
+		int next = point;
+		while (!seen[next]) {
+			seen[next] = true;
+			path.push_back(next);
+			next = mapping[next];
+		}
+		paths.push_back(path);
+	}
+	return paths;
+}
+
+bool MagicWallMaze::debugCrossesGroup(const Common::Array<int> &mapping, uint group) {
+	for (uint point = 0; point < mapping.size(); point++)
+		if (static_cast<bool>(group & (1U << point)) != static_cast<bool>(group & (1U << mapping[point])))
 			return true;
 	return false;
 }
 
-constexpr const char *PuzzleMagicWall::kPuzzleName;
-constexpr const char *PuzzleMagicWall::kBackgroundPath;
-constexpr const char *PuzzleMagicWall::kLayoutPath;
-constexpr const char *PuzzleMagicWall::kMusicPath;
-constexpr const char *PuzzleMagicWall::kDotFormat;
-constexpr const char *PuzzleMagicWall::kBugFormat;
-constexpr const char *PuzzleMagicWall::kDirectionFormat;
-constexpr const char *PuzzleMagicWall::kLightFormat;
-constexpr const char *PuzzleMagicWall::kTabletPath;
-constexpr const char *PuzzleMagicWall::kTabletDotPath;
-constexpr const char *PuzzleMagicWall::kLeverPath;
-constexpr const char *PuzzleMagicWall::kLeverGlowPath;
-constexpr const char *PuzzleMagicWall::kGateFormat;
-constexpr const char *PuzzleMagicWall::kGateBackFormat;
-constexpr const char *PuzzleMagicWall::kExitFormat;
-constexpr const char *PuzzleMagicWall::kMoveFormat;
-constexpr const char *PuzzleMagicWall::kBugLoopPath;
-constexpr const char *PuzzleMagicWall::kGateSoundPath;
-constexpr const char *PuzzleMagicWall::kLeverSoundPath;
-constexpr const char *PuzzleMagicWall::kRetreatSpeechPath;
-constexpr const char *PuzzleMagicWall::kPerfectSpeechFormat;
-constexpr const char *PuzzleMagicWall::kColors[11];
-constexpr byte PuzzleMagicWall::kDotSourceBrightness[10];
-constexpr byte PuzzleMagicWall::kBugSourceBrightness[10];
-constexpr Common::Point32 PuzzleMagicWall::kTabletPositions[5];
-constexpr Common::Point32 PuzzleMagicWall::kGatePositions[4];
-constexpr Common::Point32 PuzzleMagicWall::kRosterPositions[8];
-constexpr Common::Point32 PuzzleMagicWall::kLightPositions[10];
+const char *MagicWallMaze::debugTabletRole(uint rule) const {
+	const Common::Array<int> mapping = debugRuleMapping(rule);
+	uint moved = 0;
+	for (uint point = 0; point < mapping.size(); point++)
+		if (mapping[point] != static_cast<int>(point))
+			moved |= 1U << point;
+	static constexpr uint kLeftSquare = (1U << 0) | (1U << 1) | (1U << 2) | (1U << 3);
+	static constexpr uint kInnerSquare = (1U << 2) | (1U << 3) | (1U << 4) | (1U << 5);
+	static constexpr uint kOuterSquare = (1U << 0) | (1U << 1) | (1U << 6) | (1U << 7);
+	switch (_layoutIndex) {
+	case 0:
+	case 1:
+		return "exchanges the beetles at the two vertices of one edge";
+	case 2:
+		if (rule == 0)
+			return "rotates the left four-vertex cycle toward the bridge";
+		if (moved & kLeftSquare)
+			return "exchanges a pair across the bridge between the left cycle and right group";
+		return "selects the returning beetle by exchanging a pair within the right group";
+	case 3:
+		if (rule == 0)
+			return "rotates the left triangle toward its upper holding-vertex exchange";
+		if (rule == 1)
+			return "rotates the right triangle toward its upper holding-vertex exchange";
+		if (rule == 2)
+			return "exchanges the left triangle with its upper holding vertex";
+		if (rule == 3)
+			return "exchanges the right triangle with its upper holding vertex";
+		return "exchanges the upper holding vertices to transfer beetles between sides";
+	case 4:
+		if (rule == 0)
+			return "rotates the outer ring toward the central exchange";
+		if (rule == 1)
+			return "exchanges the outer ring with the central holding vertex";
+		return "reorders the outer ring and central holding vertex together";
+	case 5:
+	case 9:
+	case 10:
+	case 13:
+		if (rule == 0)
+			return "rotates the full ring to position a correction";
+		return "changes relative order within the ring after positioning";
+	case 6:
+		if (rule == 0)
+			return "rotates the inner square toward its outer holding-vertex exchanges";
+		if (moved & kInnerSquare)
+			return "exchanges the inner square with an outer holding vertex";
+		return "exchanges outer holding vertices to select a returning beetle";
+	case 7:
+		if (rule == 0)
+			return "rotates triangle 1 toward the bridge";
+		if (rule == 1)
+			return "rotates triangle 2 toward the bridge";
+		return "exchanges a pair between triangles 1 and 2";
+	case 8:
+		if (rule == 0)
+			return "rotates the outer ring toward the bridge";
+		if (rule == 1)
+			return "rotates the inner ring toward the bridge";
+		return "exchanges a pair between the outer and inner rings";
+	case 11:
+		if (rule == 0)
+			return "rotates the left triangle and exchanges the upper holding vertices";
+		if (rule == 1)
+			return "rotates the right triangle and exchanges the left triangle with its holding vertex";
+		return "exchanges the right triangle with its upper holding vertex";
+	case 12:
+		if (rule == 0)
+			return "rotates the square and triangle together; repeat to isolate either group";
+		return "transfers beetles between the square and triangle and corrects their order";
+	case 14:
+		if (rule == 0)
+			return moved & kOuterSquare ? "rotates the outer ring for positioning" : "rotates the inner ring for positioning";
+		if (rule == 1)
+			return "exchanges all four pairs between the outer and inner rings";
+		if ((moved & kOuterSquare) && (moved & kInnerSquare))
+			return "exchanges one pair between the outer and inner rings";
+		return moved & kOuterSquare ? "corrects relative order within the outer ring" : "corrects relative order within the inner ring";
+	case 15:
+		if (rule == 0)
+			return "rotates the upper triangle through its shared vertices";
+		if (rule == 1)
+			return "rotates the lower-left triangle through its shared vertices";
+		if (rule == 2)
+			return "rotates the lower-right triangle through its shared vertices";
+		return "changes the relative order preserved by the three triangle rotations";
+	case 16:
+		if (rule == 0)
+			return "rotates the upper-left square through its shared middle vertices";
+		if (rule == 1)
+			return "rotates the upper-right square through its shared middle vertices";
+		if (rule == 2)
+			return "rotates the lower-left square through its shared middle vertices";
+		if (rule == 3)
+			return "rotates the lower-right square through its shared middle vertices";
+		return "corrects relative order with the extra local exchange";
+	case 17:
+		if (rule == 0)
+			return "rotates the square and five-vertex ring together; repeat to isolate either group";
+		if (debugCrossesGroup(mapping, kLeftSquare))
+			return "transfers beetles between the square and five-vertex ring";
+		return "corrects order within the square and five-vertex ring without exchanging groups";
+	case 18:
+		if (rule == 0)
+			return "rotates the five-vertex ring and triangle together; repeat to isolate either group";
+		if (debugCrossesGroup(mapping, kLeftSquare | (1U << 4)))
+			return "transfers beetles between the five-vertex ring and triangle";
+		return "corrects order within the five-vertex ring and triangle without exchanging groups";
+	case 19:
+		if (rule == 0)
+			return "exchanges columns 1 and 2 to position a correction";
+		if (rule == 1)
+			return "exchanges columns 2 and 3 to position a correction";
+		if (rule == 2)
+			return "exchanges rows 1 and 2 to position a correction";
+		if (rule == 3)
+			return "exchanges rows 2 and 3 to position a correction";
+		return "corrects relative order beyond whole-row and whole-column exchanges";
+	case 20:
+		if (rule < 3)
+			return "repositions beetles with a whole-cube pair flip";
+		if (rule == 3)
+			return "corrects relative order with the local pair exchange";
+		return "combines a local three-cycle and pair exchange; repeat to isolate either action";
+	case 21:
+		if (rule == 0)
+			return "rotates all three triangles together without changing group membership";
+		return "transfers beetles between the triangles to break their coupled order";
+	default:
+		return "positions or exchanges beetles within the connected group";
+	}
+}
 
-PuzzleMagicWall::PuzzleMagicWall(Zoombini2Engine *vm) : PuzzleBase(vm, kPageMagicWall) {
-	_puzzleName = kPuzzleName;
+MagicWallMaze::SolutionResult MagicWallMaze::debugAnswerSolver(Common::Array<int> &sequence, uint &visited) const {
+	static constexpr uint kMaxStates = 500000;
+	sequence.clear();
+	visited = 0;
+	uint64 start;
+	if (!debugEncodePositions(_positions, start))
+		return SolutionResult::kInvalid;
+	const uint count = _positions.size();
+	Common::Array<int> identity;
+	uint stateCount = 1;
+	for (uint i = 0; i < count; i++) {
+		identity.push_back(i);
+		stateCount *= i + 1;
+	}
+	uint64 goal;
+	debugEncodePositions(identity, goal);
+	if (start == goal)
+		return SolutionResult::kSolved;
+	Common::Array<Common::Array<int>> maps;
+	for (uint rule = 0; rule < _rules.size(); rule++) {
+		Common::Array<int> mapping = debugRuleMapping(rule);
+		uint64 encoded;
+		if (!debugEncodePositions(mapping, encoded))
+			return SolutionResult::kInvalid;
+		maps.push_back(mapping);
+	}
+	Common::Array<int> parents(stateCount, -1);
+	Common::Array<uint> tablets(stateCount, 0);
+	Common::Array<uint64> queue;
+	queue.push_back(start);
+	const uint startRank = debugPermutationRank(start, count);
+	parents[startRank] = startRank;
+	bool solved = false;
+	for (uint head = 0; head < queue.size() && !solved; head++) {
+		const uint64 current = queue[head];
+		const uint currentRank = debugPermutationRank(current, count);
+		visited += 1;
+		for (uint rule = 0; rule < maps.size(); rule++) {
+			uint64 next = 0;
+			for (uint actor = 0; actor < count; actor++) {
+				const uint point = (current >> (4 * actor)) & 15;
+				next |= static_cast<uint64>(maps[rule][point]) << (4 * actor);
+			}
+			const uint nextRank = debugPermutationRank(next, count);
+			if (0 <= parents[nextRank])
+				continue;
+			parents[nextRank] = currentRank;
+			tablets[nextRank] = rule;
+			if (next == goal) {
+				solved = true;
+				break;
+			}
+			if (kMaxStates <= queue.size())
+				return SolutionResult::kLimit;
+			queue.push_back(next);
+		}
+	}
+	if (!solved)
+		return SolutionResult::kUnreachable;
+	for (uint rank = 0; rank != startRank; rank = parents[rank])
+		sequence.push_back(tablets[rank]);
+	for (uint i = 0; i < sequence.size() / 2; i++)
+		SWAP(sequence[i], sequence[sequence.size() - 1 - i]);
+	Common::Array<int> replay = _positions;
+	for (int rule : sequence)
+		applyRule(_rules[rule], replay, true);
+	if (!isIdentity(replay)) {
+		sequence.clear();
+		return SolutionResult::kInvalid;
+	}
+	return SolutionResult::kSolved;
+}
+
+const char *MagicWallMaze::debugLayoutAdvice() const {
+	static constexpr const char *kAdvice[] = {
+		"- Two rows, pair exchanges: each tablet swaps beetles across one edge.\n"
+		"    - To swap distant beetles and restore intermediate ones, press tablets along a path, "
+		"then retrace it without repeating the final edge.",
+		"- Five vertices, pair exchanges: rearrange beetles using the exchange edges.\n"
+		"    - Press tablets along a path, then retrace it without repeating the final edge "
+		"to swap endpoint beetles and restore intermediate ones.",
+		"- Left four-vertex cycle and right three-vertex exchange group: rotate a misplaced left beetle to the bridge, "
+		"swap it with the right group, then undo the rotation.\n"
+		"    - Use right-side swaps to choose the returning beetle.",
+		"- Two lower triangles with upper holding vertices: rotate each triangle to its upper exchange vertex.\n"
+		"    - The upper vertices bridge the groups.\n"
+		"    - Move beetles to the correct side, then sort each triangle and its holding vertex.",
+		"- Five-vertex outer cycle with a central holding vertex: rotate an outer beetle to the central exchange, swap, then undo the rotation.\n"
+		"    - Use the center as a buffer to reorder the ring; restore the center's beetle once the ring is sorted.",
+		"- Five-vertex ring with a pair exchange: rotate to choose the beetles to swap; swaps change their circular order.\n"
+		"    - Undo the rotation after each correction, then align the sorted ring with its colored vertices.",
+		"- Inner square and outer holding vertices: rotate the square to reach exchanges, "
+		"use outer vertices as buffers, then undo the rotation.\n"
+		"    - Some variants leave an outer vertex untouched; preserve it while sorting the connected group.",
+		"- Two three-vertex cycles joined by an exchange: rotate both to bring the desired pair to the bridge, swap, then undo the rotations.\n"
+		"    - Change group membership and circular order this way, then align both cycles.",
+		"- Inner and outer four-vertex cycles: rotate each ring independently to the bridge.\n"
+		"    - Swap a pair, then undo the rotations to restore other beetles.\n"
+		"    - Correct group membership and circular order before final alignment.",
+		"- Five-vertex ring with an extra exchange or partial cycle: full rotation only changes alignment.\n"
+		"    - Rotate misplaced beetles onto the smaller operation's vertices, apply it, then rotate back.\n"
+		"    - Account for every cycle on that tablet.",
+		"- Seven-vertex ring with a smaller operation: rotate the desired beetles to its exchange or partial-cycle vertices, "
+		"apply it, then rotate back.\n"
+		"    - Rotating the whole ring alone cannot change relative order.",
+		"- Two triangles with coupled exchanges: the first two tablets each combine a three-cycle with a separate swap.\n"
+		"    - Three presses isolate the swap; two isolate the reverse three-cycle.\n"
+		"    - Use these actions to transfer and sort beetles.",
+		"- Coupled four-vertex and three-vertex cycles: three presses of tablet 1 move only the square; four move only the triangle.\n"
+		"    - Use other tablets to transfer beetles between the groups and correct their order.\n"
+		"    - Twelve presses restore both.",
+		"- Five-vertex ring with partial cycles and exchanges: rotate to position a correction, apply a smaller operation, then rotate back.\n"
+		"    - This layout is not selected in normal play.",
+		"- Nested squares: one tablet rotates a ring; another swaps all four pairs between rings.\n"
+		"    - Swap rings, rotate, then swap back to act on the other ring.\n"
+		"    - Use the small pair exchange to correct relative order, then undo positioning moves.",
+		"- Three overlapping triangles: shared vertices let beetles move between cycles.\n"
+		"    - Rotate a beetle to a shared vertex, move it into the next triangle, then undo the first rotation.\n"
+		"    - The extra swap changes the order that three-cycles alone preserve.",
+		"- Three-by-three grid of overlapping square rotations: pass beetles between squares through shared middle vertices.\n"
+		"    - Position a local correction, apply it, then undo positioning moves; matched beetles may need to move temporarily.",
+		"- Coupled four-vertex and five-vertex cycles: five presses of tablet 1 move only the square; four move only the five-vertex ring.\n"
+		"    - Use other tablets to transfer beetles between the groups.\n"
+		"    - Twenty presses restore both.",
+		"- Coupled five-vertex and three-vertex cycles: three presses of tablet 1 move only the ring; five move only the triangle.\n"
+		"    - Use other operations to transfer beetles and reorder them.\n"
+		"    - Fifteen presses restore both.",
+		"- Three-by-three grid with whole-row and whole-column swaps: these preserve row/column structure; "
+		"use the extra local operation for arbitrary corrections.\n"
+		"    - Position a correction for the local operation, apply it, then undo the row/column swaps.",
+		"- Cube with three whole-cube pair flips: press any flip again to undo it.\n"
+		"    - Use flips to bring a pair to the local exchange, swap, then undo the flips.\n"
+		"    - Separate a bundled three-cycle and swap with two or three presses.",
+		"- Three coupled triangles: tablet 1 moves all groups together; three presses restore all, so repetition cannot isolate one group.\n"
+		"    - Use other tablets to transfer beetles or break the coupling, then undo positioning moves.",
+	};
+	if (_layoutIndex < 0 || ARRAYSIZE(kAdvice) <= static_cast<uint>(_layoutIndex))
+		return "- Use cycle rotations to position exchanges, then undo the positioning rotations.";
+	return kAdvice[_layoutIndex];
+}
+
+PuzzleMagicWall::PuzzleMagicWall(Zoombini2Engine *vm)
+	: PuzzleBase(vm, PageId::kPageMagicWall_06) {
 	_initialBackgroundPath = kBackgroundPath;
 }
 
@@ -304,7 +617,7 @@ PuzzleMagicWall::~PuzzleMagicWall() {
 	_vm->setCursor(Zoombini2Engine::CursorType::kDefault);
 	for (Beetle &beetle : _beetles)
 		delete beetle.path;
-	for (int i = 0; i < 4; i++)
+	for (int i = 0; i < ARRAYSIZE(_gateAnimations); i++)
 		delete _gateAnimations[i];
 	delete _leverAnimation;
 	if (SoundManager *sound = _vm->getSoundManager()) {
@@ -319,11 +632,11 @@ PuzzleMagicWall::~PuzzleMagicWall() {
 
 void PuzzleMagicWall::loadResources() {
 	Gfx *gfx = _vm->_gfx;
-	for (int i = 0; i < 10; i++) {
+	for (int i = 0; i < ARRAYSIZE(kColors) - 1; i++) {
 		gfx->loadPageRleBlock(Common::String::format(kDotFormat, kColors[i]));
 		gfx->loadPageRleBlock(Common::String::format(kBugFormat, kColors[i]));
 	}
-	for (int i = 0; i < 11; i++)
+	for (int i = 0; i < ARRAYSIZE(kColors); i++)
 		gfx->loadPageRleBlock(Common::String::format(kLightFormat, kColors[i]));
 	for (int i = 0; i < 8; i++)
 		gfx->loadPageRleBlock(Common::String::format(kDirectionFormat, i + 1));
@@ -331,7 +644,7 @@ void PuzzleMagicWall::loadResources() {
 	gfx->loadPageRleBlock(kTabletDotPath);
 	gfx->loadPageBitBlock(kLeverGlowPath);
 	PageLayer *foreground = gfx->getPageLayerStack()->getLayer(1);
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < ARRAYSIZE(_gateAnimations); i++) {
 		gfx->loadPageBitBlock(Common::String::format(kGateBackFormat, 'A' + i));
 		_gateAnimations[i] = new Animation(_vm);
 		_gateAnimations[i]->loadFromFile(Common::Path(Common::String::format(kGateFormat, 'A' + i)));
@@ -372,7 +685,7 @@ void PuzzleMagicWall::init() {
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
 		ZoombiniRunner *runner = _puzzleZoombinis[i];
 		runner->clearMovement();
-		runner->setDefaultAnimation(_zoombiniAnimation);
+		runner->setDefaultAnimation(ZmbAnimationKind::kBasic);
 		runner->resetAnimation();
 		runner->setPosition(kRosterPositions[MIN<uint>(i, 7)]);
 		runner->setInputEnabled(false);
@@ -385,6 +698,8 @@ void PuzzleMagicWall::init() {
 	if (!loaded)
 		error("MagicWall: no bounded puzzle layouts in %s", kLayoutPath);
 	newPuzzle();
+	if (_vm->inJourneyMode())
+		_vm->_state->registerPageVisit(_pageId, 1);
 }
 
 void PuzzleMagicWall::newPuzzle() {
@@ -396,7 +711,7 @@ void PuzzleMagicWall::newPuzzle() {
 	_beetles.clear();
 	_beetles.resize(_maze.positions().size());
 	for (uint i = 0; i < _maze.positions().size(); i++) {
-		_beetles[i].position = dotPosition(_maze.positions()[i]) + Common::Point32(5, 8);
+		_beetles[i].position = vertexPosition(_maze.positions()[i]) + Common::Point32(5, 8);
 		_beetles[i].direction = 0;
 	}
 	_movingRule = -1;
@@ -411,7 +726,7 @@ void PuzzleMagicWall::newPuzzle() {
 	}
 }
 
-Common::Point32 PuzzleMagicWall::dotPosition(int index) const {
+Common::Point32 PuzzleMagicWall::vertexPosition(int index) const {
 	const Common::Point32 &point = _maze.layout().points[index];
 	return Common::Point32(300 + 40 * point.x, -15 + 40 * point.y);
 }
@@ -433,7 +748,7 @@ bool PuzzleMagicWall::runnersMoving() const {
 }
 
 bool PuzzleMagicWall::gatesActive() const {
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < ARRAYSIZE(_gateRunners); i++) {
 		if (_gateRunners[i] && _gateRunners[i]->isActive())
 			return true;
 	}
@@ -461,7 +776,7 @@ void PuzzleMagicWall::startRule(int index) {
 		if (before[i] == _maze.positions()[i])
 			continue;
 		Beetle &beetle = _beetles[i];
-		const Common::Point32 end = dotPosition(_maze.positions()[i]);
+		const Common::Point32 end = vertexPosition(_maze.positions()[i]);
 		const Common::Point32 third((end.x - beetle.position.x) / 3, (end.y - beetle.position.y) / 3);
 		beetle.path = new PathObject(_vm);
 		beetle.path->appendSegment(beetle.position, beetle.position + third, end - third, end, 10, 0);
@@ -478,7 +793,7 @@ void PuzzleMagicWall::startRunnerPath(int index, int gate, bool exit) {
 	if (index < 0 || 8 <= index || static_cast<int>(_puzzleZoombinis.size()) <= index || _exited[index])
 		return;
 	const Common::Path path(Common::String::format(exit ? kExitFormat : kMoveFormat, gate + 1));
-	PathObject *movement = PathObject::loadFromPAT(_vm, path);
+	PathObject *movement = _vm->loadPagePATPath(path);
 	if (!movement)
 		error("MagicWall: required roster path is unavailable");
 	movement->setStepValueForAllSegments(4);
@@ -499,7 +814,7 @@ void PuzzleMagicWall::submit() {
 	if (sound)
 		sound->play(_leverSound);
 	bool accepted = false;
-	for (int gate = 0; gate < 4; gate++) {
+	for (int gate = 0; gate < ARRAYSIZE(_gateRunners); gate++) {
 		if (!_maze.gateMatched(gate))
 			continue;
 		const int index = _exited[gate] ? gate + 4 : gate;
@@ -536,8 +851,8 @@ void PuzzleMagicWall::onUpdate() {
 		SoundManager *sound = _vm->getSoundManager();
 		if (!sound || !sound->hasPendingSpeech()) {
 			_speechPending = false;
-			_vm->_mapTransitionSourcePageId = kPageMagicWall;
-			_vm->requestPageChange(kPageMapTrans);
+			_vm->_mapTransitSrcPageId = PageId::kPageMagicWall_06;
+			_vm->requestPageChange(PageId::kPageMapTrans_22);
 		}
 	}
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
@@ -648,8 +963,8 @@ void PuzzleMagicWall::drawConnections(ManagedSurface32 *screen, int index) {
 	if (index < 0 || static_cast<int>(_maze.rules().size()) <= index)
 		return;
 	for (const MagicWallMaze::Edge &edge : _maze.rules()[index]) {
-		Common::Point32 from = dotPosition(edge.from) + Common::Point32(25, 25);
-		Common::Point32 to = dotPosition(edge.to) + Common::Point32(25, 25);
+		Common::Point32 from = vertexPosition(edge.from) + Common::Point32(25, 25);
+		Common::Point32 to = vertexPosition(edge.to) + Common::Point32(25, 25);
 		if (!edge.swap) {
 			drawRipple(screen, from, to, _ripplePhase);
 			continue;
@@ -741,10 +1056,10 @@ void PuzzleMagicWall::onRenderContent(ManagedSurface32 *screen) {
 		if (!_nextPuzzlePending)
 			drawConnections(screen, beetlesMoving() ? _movingRule : _hoveredTablet);
 		for (uint i = 0; i < _maze.positions().size(); i++) {
-			const Common::Point32 pos = dotPosition(i);
+			const Common::Point32 pos = vertexPosition(i);
 			if (!_backgroundPath.empty())
 				_vm->_gfx->drawPageBitBlockSubRect(screen, _backgroundPath, pos, Common::Rect(pos.x, pos.y, pos.x + 50, pos.y + 50));
-			drawColorSprite(screen, kDotFormat, i, dotPosition(i), kDotSourceBrightness[i]);
+			drawColorSprite(screen, kDotFormat, i, vertexPosition(i), kDotSourceBrightness[i]);
 		}
 		drawBeetles(screen);
 	}
@@ -760,7 +1075,7 @@ void PuzzleMagicWall::onRenderContent(ManagedSurface32 *screen) {
 	}
 	if (allMatched && _phase != Phase::kFinished && !_leverRunner->isActive())
 		_vm->_gfx->drawPageBitBlock(screen, kLeverGlowPath, Common::Point32(279, 362));
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < ARRAYSIZE(_gateRunners); i++) {
 		if (_gateRunners[i]->isActive())
 			_vm->_gfx->drawPageBitBlock(screen, Common::String::format(kGateBackFormat, 'A' + i), kGatePositions[i]);
 	}
@@ -830,7 +1145,7 @@ bool PuzzleMagicWall::canUseGoButton() const {
 bool PuzzleMagicWall::onGoButtonPressed() {
 	if (_speechPending)
 		return false;
-	if (!_vm->_isSavedGame)
+	if (_vm->inPracticeMode())
 		return true;
 	int remaining = 0;
 	for (const ZoombiniRunner *runner : _puzzleZoombinis) {
@@ -856,42 +1171,70 @@ Common::String PuzzleMagicWall::debugGetAnswer() const {
 	Common::String answer = debugAnswerHeader();
 	if (!_ready)
 		return answer + "\n  Board resources are unavailable.\n";
-	answer += "\n  Goal: move each beetle onto the dot of its own color.\n";
-	Common::Array<int> sequence;
-	if (_maze.debugSolution(sequence)) {
-		answer += "  Solution from the current board:\n";
-		if (sequence.empty()) {
-			answer += "    The beetles already match their dots; pull the lever.\n";
-		} else {
-			answer += "    Press tablets (numbered left to right):";
-			for (int tablet : sequence)
-				answer += Common::String::format(" %d", tablet + 1);
-			answer += "\n    Then pull the lever.\n";
-		}
-	} else {
-		answer += "  No full solution found within 8 presses / 200000 search nodes.\n";
-		answer += "  Tablet mappings:\n";
-		for (uint rule = 0; rule < _maze.rules().size(); rule++)
-			for (const MagicWallMaze::Edge &edge : _maze.rules()[rule]) {
-				const char *arrow = "->";
-				if (edge.swap)
-					arrow = "<->";
-				answer += Common::String::format("    Tablet %u: %s %s %s\n", rule + 1, kColors[edge.from], arrow, kColors[edge.to]);
-			}
+	answer += "\n  Goal: move each beetle onto the vertex of its own color.\n";
+	uint layoutNumber = 0;
+	uint layoutCount = 0;
+	for (uint i = 0; i < _maze.layouts().size(); i++) {
+		const MagicWallMaze::Layout &layout = _maze.layouts()[i];
+		if (layout.level != _maze.layout().level || layout.weight == 0)
+			continue;
+		layoutCount += 1;
+		if (static_cast<int>(i) == _maze.layoutIndex())
+			layoutNumber = layoutCount;
 	}
-	answer += "  Current beetle positions:\n";
-	for (uint color = 0; color < _maze.positions().size(); color++)
-		answer += Common::String::format("    %s beetle: %s dot (started on %s dot)\n", kColors[color],
-										 kColors[_maze.positions()[color]], kColors[_maze.initialPositions()[color]]);
-	answer += "  Construction history (sequential rules, not a player solution):";
-	for (int tablet : _maze.generationSequence())
-		answer += Common::String::format(" %d", tablet + 1);
-	answer += "\n  Player presses move beetles simultaneously, so reversing that history may fail.\n";
+	answer += Common::String::format("\n  [*] Layout (%02u/%02u) strategy\n    %s\n", layoutNumber, layoutCount, _maze.debugLayoutAdvice());
+	if (_phase == Phase::kFinished)
+		return answer + "  Both boards are complete; use Go.\n";
+	if (_nextPuzzlePending || gatesActive() || runnersMoving() || beetlesMoving())
+		return answer + "  Wait for the current movement or board change, then request the answer again.\n";
+	Common::Array<int> sequence;
+	uint visited = 0;
+	const MagicWallMaze::SolutionResult result = _maze.debugAnswerSolver(sequence, visited);
+	switch (result) {
+	case MagicWallMaze::SolutionResult::kSolved:
+		if (sequence.empty()) {
+			answer += "    The beetles already match their vertices.\n";
+		} else {
+			answer += Common::String::format("\n  [*] Searched solution of the current board (%u presses):\n", sequence.size());
+			answer += "    Press tablets (left to right, 1-based-index):\n";
+			answer += "    - ";
+			for (uint step = 0; step < sequence.size(); step++) {
+				if (0 < step)
+					answer += ", ";
+				answer += Common::String::format("%d", sequence[step] + 1);
+			}
+			answer += "\n";
+		}
+		break;
+	case MagicWallMaze::SolutionResult::kUnreachable:
+		answer += "  No solution is reachable from this board setup.\n";
+		break;
+	case MagicWallMaze::SolutionResult::kLimit:
+		answer += "  The search reached its budget limit; this does not prove the board unsolvable.\n";
+		break;
+	default:
+		return answer + "  The board or a tablet is not a valid permutation; no solution can be certified.\n";
+	}
+	answer += "\n  [*] Tablet Paths (left-to-right):\n";
+	uint pathIndex = 0;
+	for (uint rule = 0; rule < _maze.rules().size(); rule++) {
+		answer += Common::String::format("    Tablet %u: %s\n", rule + 1, _maze.debugTabletRole(rule));
+		for (const Common::Array<int> &path : _maze.debugTabletPaths(rule)) {
+			answer += Common::String::format("      Path %c (", static_cast<char>('A' + pathIndex));
+			for (uint vertex = 0; vertex < path.size(); vertex++) {
+				if (0 < vertex)
+					answer += "-";
+				answer += Common::String::format("%02d", path[vertex]);
+			}
+			answer += Common::String::format("): %u-press cycle\n", path.size());
+			pathIndex += 1;
+		}
+	}
 	return answer;
 }
 
 Common::String PuzzleMagicWall::debugGetChanceDetails() const {
-	return Common::String::format("Tablet presses and rejected submissions are unlimited. Accepted rounds: %d/2.\n", static_cast<int>(_phase));
+	return "Tablet presses and rejected submissions are unlimited.\n";
 }
 
 } // End of namespace Zoombini2

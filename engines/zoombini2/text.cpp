@@ -30,11 +30,46 @@ namespace Zoombini2 {
 
 constexpr const char *Text::kTextFontPath;
 
-Text::Text(Zoombini2Engine *vm) : _vm(vm) {
+Text::Text(Zoombini2Engine *vm)
+	: _vm(vm) {
+	static const LocalizedStringMap strings = createLocalizedStrings();
+	const Common::Language language = _vm->getLanguage();
+	for (LocalizedStringMap::const_iterator entry = strings.begin(); entry != strings.end(); entry++) {
+		const LanguageStrings &translations = entry->_value;
+		const LanguageStrings::const_iterator text = translations.find(language);
+		if (text != translations.end())
+			_strMap[entry->_key] = text->_value;
+		else
+			_strMap[entry->_key] = translations[Common::EN_USA];
+	}
 }
 
 Text::~Text() {
 	delete _bmtFont;
+}
+
+Text::LocalizedStringMap Text::createLocalizedStrings() {
+	LocalizedStringMap strings;
+	strings[kRestoredLevelLabel][Common::EN_USA] = U"VERY, VERY HARD";
+	strings[kRestoredLevelLabel][Common::KO_KOR] = U"삭제되었던 4단계";
+
+	strings[kMissingLevel4Help][Common::EN_USA] = U"No help resource is available for level 4.";
+	strings[kMissingLevel4Help][Common::KO_KOR] = U"4단계는 도움말 리소스가 없습니다.";
+
+	strings[kConfirmCaseCollision][Common::EN_USA] =
+		U"A save that differs only in letter case exists.\nThe new save will overwrite it.\nAre you sure to overwrite?";
+	strings[kConfirmCaseCollision][Common::KO_KOR] =
+		U"대소문자만 다른 저장파일 이름이 있습니다.\n새 파일은 기존 저장파일을 덮어씁니다.\n덮어쓸까요?";
+
+	strings[kConfirmReadOnlyLoad][Common::EN_USA] =
+		U"This saved game will open in read-only mode.\nProgress will not be saved.\nContinue?";
+	strings[kConfirmReadOnlyLoad][Common::KO_KOR] =
+		U"이 저장파일은 읽기 전용 모드로 열립니다.\n진행 상황은 저장되지 않습니다.\n계속할까요?";
+	return strings;
+}
+
+const Common::U32String &Text::getLocalizedString(Key key) const {
+	return _strMap[key];
 }
 
 Common::CodePage Text::gameCodePage(Common::Language language) {

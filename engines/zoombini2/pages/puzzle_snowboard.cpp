@@ -33,7 +33,7 @@
 
 namespace Zoombini2 {
 
-constexpr const char *PuzzleSnowboard::kPuzzleName;
+constexpr const char *PuzzleSnowboard::kPageName;
 constexpr const char *PuzzleSnowboard::kBackgroundPath;
 constexpr const char *PuzzleSnowboard::kMusicPath;
 constexpr const char *PuzzleSnowboard::kTraitFormat;
@@ -58,8 +58,6 @@ constexpr const char *PuzzleSnowboard::kSuccessSpeechPath;
 constexpr const char *PuzzleSnowboard::kFailureSpeechPath;
 constexpr const char *PuzzleSnowboard::kPerfectGoSpeechFormat;
 constexpr const char *PuzzleSnowboard::kCaveGoSpeechPath;
-constexpr const char *PuzzleSnowboard::kPickupAnimationPath;
-constexpr const char *PuzzleSnowboard::kCelebrationAnimationPath;
 
 constexpr Common::Point32 PuzzleSnowboard::kStartPositions[8];
 
@@ -74,8 +72,8 @@ constexpr Common::Point32 PuzzleSnowboard::kEasyHints[3];
 constexpr Common::Point32 PuzzleSnowboard::kHardHints[4];
 constexpr Common::Point32 PuzzleSnowboard::kL4Hints[6];
 
-PuzzleSnowboard::PuzzleSnowboard(Zoombini2Engine *vm) : PuzzleBase(vm, kPageSnowboard) {
-	_puzzleName = kPuzzleName;
+PuzzleSnowboard::PuzzleSnowboard(Zoombini2Engine *vm)
+	: PuzzleBase(vm, PageId::kPageSnowboard_10) {
 	_initialBackgroundPath = kBackgroundPath;
 }
 
@@ -90,8 +88,8 @@ PuzzleSnowboard::~PuzzleSnowboard() {
 	}
 	delete _boardAnim;
 	delete _engineAnim;
-	for (int index = 0; index < 5; index++)
-		delete _obstacleAnims[index];
+	for (int i = 0; i < ARRAYSIZE(_obstacleAnims); i++)
+		delete _obstacleAnims[i];
 	finishPuzzleRoster(_vm->_state->_rescue2Storage);
 }
 
@@ -120,16 +118,16 @@ void PuzzleSnowboard::loadGraphics() {
 		5,
 		6,
 	};
-	for (int index = 0; index < 5; index++) {
-		_obstacleAnims[index] = new Animation(_vm);
-		const Common::Path path(Common::String::format(kDecorFormat, kDecorIds[index]));
-		if (!_obstacleAnims[index]->loadFromFile(path)) {
-			delete _obstacleAnims[index];
-			_obstacleAnims[index] = nullptr;
+	for (int i = 0; i < ARRAYSIZE(_obstacleAnims); i++) {
+		_obstacleAnims[i] = new Animation(_vm);
+		const Common::Path path(Common::String::format(kDecorFormat, kDecorIds[i]));
+		if (!_obstacleAnims[i]->loadFromFile(path)) {
+			delete _obstacleAnims[i];
+			_obstacleAnims[i] = nullptr;
 		}
 	}
-	for (int index = 0; index < 9; index++) {
-		const Common::String path = Common::String::format(kSurfFormat, kSurfIds[index]);
+	for (int i = 0; i < ARRAYSIZE(kSurfIds); i++) {
+		const Common::String path = Common::String::format(kSurfFormat, kSurfIds[i]);
 		if (!_vm->_gfx->loadPageRleBlock(path))
 			warning("Snowboard: missing rider board '%s'", path.c_str());
 	}
@@ -147,7 +145,7 @@ void PuzzleSnowboard::drawL4Trail(ManagedSurface32 *screen) {
 		const uint32 trailColor = screen->format.ARGBToColor(128, 255, 255, 255);
 		for (int lane = 0; lane < kL4LaneCount; lane++) {
 			const Common::Path filename(Common::String::format(kL4PatFormat, lane + kMaxRuleCount));
-			Common::ScopedPtr<PathObject> path(PathObject::loadFromPAT(_vm, filename));
+			Common::ScopedPtr<PathObject> path(_vm->loadPagePATPath(filename));
 			if (!path)
 				continue;
 			for (uint sIdx = 0; sIdx < path->segments.size(); sIdx++)
@@ -171,8 +169,8 @@ void PuzzleSnowboard::drawL4Legend(ManagedSurface32 *screen) const {
 byte PuzzleSnowboard::pickPresentValue(ZmbTrait::TraitKind traitIndex) {
 	for (;;) {
 		const byte value = static_cast<byte>(_vm->_rnd->getRandomNumber(ZmbTrait::kTraitValueCount - 1) + 1);
-		for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
-			if (_puzzleZoombinis[index] && _puzzleZoombinis[index]->getTraits().getValue(traitIndex) == value)
+		for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
+			if (_puzzleZoombinis[i] && _puzzleZoombinis[i]->getTraits().getValue(traitIndex) == value)
 				return value;
 		}
 	}
@@ -194,8 +192,8 @@ void PuzzleSnowboard::countLanes(Common::Array<byte> &counts) const {
 	counts.resize(_laneCount);
 	for (int lane = 0; lane < _laneCount; lane++)
 		counts[lane] = 0;
-	for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
-		const ZoombiniRunner *zoombini = _puzzleZoombinis[index];
+	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
+		const ZoombiniRunner *zoombini = _puzzleZoombinis[i];
 		if (zoombini && zoombini->isInputEnabled())
 			counts[classifyZoombini(zoombini)] += 1;
 	}
@@ -230,12 +228,18 @@ void PuzzleSnowboard::generateTree() {
 		countLanes(laneCounts);
 		int score = 10;
 		for (int lane = 0; lane < kLaneCount; lane++) {
-			if (laneCounts[lane] == 0)
+			switch (laneCounts[lane]) {
+			case 0:
 				score -= 3;
-			else if (laneCounts[lane] == 1)
+				break;
+			case 1:
 				score -= 1;
-			else if (5 < laneCounts[lane])
-				score += 5 - laneCounts[lane];
+				break;
+			default:
+				if (5 < laneCounts[lane])
+					score += 5 - laneCounts[lane];
+				break;
+			}
 		}
 		if (7 <= score)
 			break;
@@ -264,8 +268,8 @@ void PuzzleSnowboard::generateL4Candidate() {
 			} while (node.traitIndex == node.alternateTraitIndex);
 		}
 		_tree[2] = _tree[1];
-		for (int index = 4; index < kMaxRuleCount; index++)
-			_tree[index] = _tree[3];
+		for (int i = 4; i < kMaxRuleCount; i++)
+			_tree[i] = _tree[3];
 	} while (hasRepeatedL4Rule());
 }
 
@@ -284,23 +288,29 @@ void PuzzleSnowboard::generateL4Tree() {
 		countLanes(laneCounts);
 		int score = 10;
 		for (int lane = 0; lane < _laneCount; lane++) {
-			if (laneCounts[lane] == 0)
+			switch (laneCounts[lane]) {
+			case 0:
 				score -= 3;
-			else if (laneCounts[lane] == 1)
+				break;
+			case 1:
 				score -= 1;
-			else if (5 < laneCounts[lane])
-				score += 5 - laneCounts[lane];
+				break;
+			default:
+				if (5 < laneCounts[lane])
+					score += 5 - laneCounts[lane];
+				break;
+			}
 		}
 		if (bestScore < score) {
 			bestScore = score;
-			for (int index = 0; index < _ruleCount; index++)
-				best[index] = _tree[index];
+			for (int i = 0; i < _ruleCount; i++)
+				best[i] = _tree[i];
 		}
 		if (maximumScore <= score)
 			break;
 	}
-	for (int index = 0; index < _ruleCount; index++)
-		_tree[index] = best[index];
+	for (int i = 0; i < _ruleCount; i++)
+		_tree[i] = best[i];
 }
 
 const Common::Point32 &PuzzleSnowboard::obstaclePosition(int lane) const {
@@ -327,16 +337,9 @@ void PuzzleSnowboard::init() {
 		_obstacleHideStart[lane] = 0;
 		_obstacleHitStart[lane] = 0;
 	}
-	if (_puzzleLevel < 1 || 4 < _puzzleLevel) {
-		warning("Snowboard: unsupported level %d for this page", _puzzleLevel);
-		_finished = true;
-		return;
-	}
 	_ruleCount = _puzzleLevel == 4 ? kMaxRuleCount : kRuleCount;
 	_collisionQuota = _puzzleLevel == 1 ? 2 : 4;
 	loadGraphics();
-	_pickupAnimation = _vm->loadZoombiniAnimation(Common::Path(kPickupAnimationPath), 100);
-	_celebrationAnimation = _vm->loadZoombiniAnimation(Common::Path(kCelebrationAnimationPath), 50);
 	loadAreaMask(Common::Path(kAreaMaskPath));
 	if (SoundManager *sound = _vm->getSoundManager()) {
 		_boardReadySound = sound->load(false, Common::Path(kBoardReadySoundPath), false);
@@ -345,21 +348,23 @@ void PuzzleSnowboard::init() {
 		_obstacleRevealSound = sound->load(false, Common::Path(kObstacleRevealSoundPath), false);
 		_obstacleHideSound = sound->load(false, Common::Path(kObstacleHideSoundPath), false);
 	}
-	for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
-		ZoombiniRunner *zoombini = _puzzleZoombinis[index];
+	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
+		ZoombiniRunner *zoombini = _puzzleZoombinis[i];
 		if (!zoombini)
 			continue;
-		zoombini->setDefaultAnimation(_zoombiniAnimation);
-		zoombini->setPosition(kStartPositions[index % 8]);
+		zoombini->setDefaultAnimation(ZmbAnimationKind::kBasic);
+		zoombini->setPosition(kStartPositions[i % 8]);
 		zoombini->setInputEnabled(true);
 		zoombini->setHidden(false);
 		zoombini->setCanAdvanceFromPage(false);
 	}
 	generateTree();
+	if (_vm->inJourneyMode())
+		_vm->_state->registerPageVisit(_pageId, 1);
 	debug(1, "Snowboard: level=%d lanes=%d nodes=%d", _puzzleLevel, _laneCount, _ruleCount);
-	for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
-		if (_puzzleZoombinis[index])
-			debug(1, "Snowboard: waiting rider=%u lane=%d", index, classifyZoombini(_puzzleZoombinis[index]) + 1);
+	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
+		if (_puzzleZoombinis[i])
+			debug(1, "Snowboard: waiting rider=%u lane=%d", i, classifyZoombini(_puzzleZoombinis[i]) + 1);
 	}
 	ZmbDropTarget boardTarget;
 	boardTarget.rect = Common::Rect32(290, 5, 670, 85);
@@ -399,8 +404,8 @@ void PuzzleSnowboard::captureZoombini(int zoombiniIndex) {
 	zoombini->startMovement(now);
 	zoombini->resetAnimation();
 	bool hasSelectableRider = false;
-	for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
-		if (_puzzleZoombinis[index] && _puzzleZoombinis[index]->isInputEnabled()) {
+	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
+		if (_puzzleZoombinis[i] && _puzzleZoombinis[i]->isInputEnabled()) {
 			hasSelectableRider = true;
 			break;
 		}
@@ -518,12 +523,12 @@ void PuzzleSnowboard::startExitPath(ZoombiniRunner *zoombini) {
 	_generatorActive = true;
 	const PathPoint *points = _puzzleLevel == 4 ? kL4ExitPoints : kExitPoints;
 	const int pointCount = _puzzleLevel == 4 ? kL4EndpointCount : kEndpointCount;
-	for (int index = 0; index < pointCount; index++) {
-		if (_usedExitPoint[index] || points[index].routeCode != _targetRouteCode)
+	for (int i = 0; i < pointCount; i++) {
+		if (_usedExitPoint[i] || points[i].routeCode != _targetRouteCode)
 			continue;
-		_usedExitPoint[index] = true;
+		_usedExitPoint[i] = true;
 		const Common::Point32 start = zoombini->getScreenPosition();
-		const Common::Point32 end(points[index].x, points[index].y);
+		const Common::Point32 end(points[i].x, points[i].y);
 		const int dx = end.x - start.x;
 		const int dy = end.y - start.y;
 		PathObject *path = new PathObject(_vm);
@@ -549,12 +554,12 @@ void PuzzleSnowboard::finishRide(ZoombiniRunner *zoombini) {
 	_ridesCompleted += 1;
 	int remaining = 0;
 	int successful = 0;
-	for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
-		if (!_puzzleZoombinis[index])
+	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
+		if (!_puzzleZoombinis[i])
 			continue;
-		if (!_puzzleZoombinis[index]->canAdvanceFromPage())
+		if (!_puzzleZoombinis[i]->canAdvanceFromPage())
 			remaining += 1;
-		else if (_puzzleZoombinis[index]->canAdvanceFromPage())
+		else if (_puzzleZoombinis[i]->canAdvanceFromPage())
 			successful += 1;
 	}
 	if (remaining == 0 || _collisionQuota < _collisionCount) {
@@ -577,8 +582,8 @@ void PuzzleSnowboard::onUpdate() {
 		_collisionSpeechPending = false;
 	if (_goTransitionPending && (!sound || !sound->hasPendingSpeech())) {
 		_goTransitionPending = false;
-		_vm->_mapTransitionSourcePageId = kPageSnowboard;
-		_vm->requestPageChange(kPageMapTrans);
+		_vm->_mapTransitSrcPageId = PageId::kPageSnowboard_10;
+		_vm->requestPageChange(PageId::kPageMapTrans_22);
 	}
 	if (_boardCoverActive && _boardAnim && static_cast<uint32>(_boardAnim->getFrameCount() * 100) <= now - _boardCoverAnimationStart)
 		_boardCoverActive = false;
@@ -589,15 +594,16 @@ void PuzzleSnowboard::onUpdate() {
 	if (_obstacleChangePending && !_finished && !_collisionSpeechPending && !hasActiveHitAnimation(now))
 		chooseOpenLane();
 	if (_finished) {
-		for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
-			ZoombiniRunner *zoombini = _puzzleZoombinis[index];
+		for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
+			ZoombiniRunner *zoombini = _puzzleZoombinis[i];
 			if (zoombini)
-				zoombini->tryStartCelebrationAnimation(_celebrationAnimation, *_vm->_rnd, now, _vm->getFrameDeltaMs(), _vm->getLogicPacingHz());
+				zoombini->tryStartCelebrationAnimation(ZmbAnimationKind::kCelebration, *_vm->_rnd, now, _vm->getFrameDeltaMs(),
+													   _vm->getLogicPacingHz());
 		}
 	}
-	for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
-		if (_puzzleZoombinis[index])
-			_puzzleZoombinis[index]->updateAnimation(now);
+	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
+		if (_puzzleZoombinis[i])
+			_puzzleZoombinis[i]->updateAnimation(now);
 	}
 	if (_activeRunnerIndex == -1 || _puzzleZoombinis.size() <= static_cast<uint>(_activeRunnerIndex)) {
 		if (!_dropTargets.empty())
@@ -725,10 +731,12 @@ void PuzzleSnowboard::onRenderContent(ManagedSurface32 *screen) {
 	}
 	if (_boardReady)
 		_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kSurfFormat, kSurfIds[0]), Common::Point32(300, 1));
-	if (_puzzleLevel == 4) {
+	switch (_puzzleLevel) {
+	case 4:
 		if (_finished)
 			drawL4Legend(screen);
-	} else if (_puzzleLevel == 3) {
+		break;
+	case 3:
 		drawTraitHint(screen, _tree[0], false, kHardHints[0]);
 		drawTraitHint(screen, _tree[0], true, kHardHints[1]);
 		for (int branch = 0; branch < 2; branch++) {
@@ -736,10 +744,12 @@ void PuzzleSnowboard::onRenderContent(ManagedSurface32 *screen) {
 			drawTraitHint(screen, _tree[1], false, kHardHints[2] + offset);
 			drawTraitHint(screen, _tree[1], true, kHardHints[3] + offset);
 		}
-	} else {
+		break;
+	default:
 		drawTraitHint(screen, _tree[0], false, kEasyHints[0]);
 		drawTraitHint(screen, _tree[1], false, kEasyHints[1]);
 		drawTraitHint(screen, _tree[1], false, kEasyHints[2]);
+		break;
 	}
 	if (_puzzleLevel != 1 && !_finished)
 		_vm->_gfx->drawPageRleBlock(screen, kBoardPath, Common::Point32(580, 58));
@@ -758,7 +768,7 @@ void PuzzleSnowboard::onRenderContent(ManagedSurface32 *screen) {
 }
 
 void PuzzleSnowboard::onRenderActors(ManagedSurface32 *screen) {
-	if (_activeRunnerIndex != -1 && _puzzleZoombinis.size() > static_cast<uint>(_activeRunnerIndex) && !_onExitPath) {
+	if (_activeRunnerIndex != -1 && static_cast<uint>(_activeRunnerIndex) < _puzzleZoombinis.size() && !_onExitPath) {
 		const ZoombiniRunner *zoombini = _puzzleZoombinis[_activeRunnerIndex];
 		if (zoombini) {
 			_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kSurfFormat, kSurfIds[8 - _boardFacingSector]),
@@ -773,13 +783,13 @@ bool PuzzleSnowboard::canUseGoButton() const {
 }
 
 bool PuzzleSnowboard::onGoButtonPressed() {
-	if (!_vm->_isSavedGame)
+	if (_vm->inPracticeMode())
 		return true;
 	if (_goTransitionPending)
 		return false;
 	int freeCount = 0;
-	for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
-		if (_puzzleZoombinis[index] && !_puzzleZoombinis[index]->canAdvanceFromPage())
+	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
+		if (_puzzleZoombinis[i] && !_puzzleZoombinis[i]->canAdvanceFromPage())
 			freeCount += 1;
 	}
 	if (freeCount == 0) {
@@ -795,50 +805,59 @@ bool PuzzleSnowboard::onGoButtonPressed() {
 }
 
 void PuzzleSnowboard::onActorsRendered() {
-	for (uint index = 0; index < _puzzleZoombinis.size(); index++) {
-		if (_puzzleZoombinis[index])
-			_puzzleZoombinis[index]->advanceAnimationAfterDraw();
+	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
+		if (_puzzleZoombinis[i])
+			_puzzleZoombinis[i]->advanceAnimationAfterDraw();
 	}
 }
 
 EventHandleResult PuzzleSnowboard::onLButtonUp(const Common::Point &pos) {
-	const bool acceptRelease = !_finished && _activeRunnerIndex == -1;
-	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y),
-																	acceptRelease, _pickupAnimation, _vm->getTotalPlayTime(), &_dropTargets, getAreaMask());
-	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+	ZmbHoldDropInput input;
+	if (!_finished && _activeRunnerIndex == -1)
+		input = ZmbHoldDropInput::kLeftButtonRelease;
+	else
+		input = ZmbHoldDropInput::kMoveOnly;
+	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, Common::Point32(pos.x, pos.y),
+																   input, ZmbAnimationKind::kPickup, &_dropTargets, getAreaMask());
+	switch (result) {
+	case ZmbDropResult::kIgnored00:
+		return EventHandleResult::kPassthrough;
+	default:
+		return EventHandleResult::kConsumed;
+	}
 }
 
 EventHandleResult PuzzleSnowboard::onMouseMove(const Common::Point &pos) {
-	const ZmbDropResult result = ZoombiniRunner::handlePointerInput(_puzzleZoombinis, Common::Point32(pos.x, pos.y), false,
-																	_pickupAnimation, _vm->getTotalPlayTime(), &_dropTargets, getAreaMask());
-	return result == ZmbDropResult::kIgnored00 ? EventHandleResult::kPassthrough : EventHandleResult::kConsumed;
+	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, Common::Point32(pos.x, pos.y), ZmbHoldDropInput::kMoveOnly,
+																   ZmbAnimationKind::kPickup, &_dropTargets, getAreaMask());
+	switch (result) {
+	case ZmbDropResult::kIgnored00:
+		return EventHandleResult::kPassthrough;
+	default:
+		return EventHandleResult::kConsumed;
+	}
 }
 
 Common::String PuzzleSnowboard::debugGetAnswer() const {
+	static constexpr const char *kForkNames[] = {
+		"First",
+		"Second",
+		"Third",
+	};
 	Common::String answer = debugAnswerHeader();
-	answer += "\n  Lanes (left to right):\n";
-	for (int lane = 0; lane < _laneCount; lane++) {
-		const Common::Point32 &position = obstaclePosition(lane);
-		answer += Common::String::format("    Lane %d near (%d, %d): %s\n", lane + 1, position.x, position.y,
-										 _obstacleVisible[lane] ? "blocked" : "open");
-	}
-	for (int blocked = 0; blocked < 2; blocked++) {
-		answer += blocked ? "  Waiting for a lane change:\n" : "  Safe to send now:\n";
-		bool found = false;
-		for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
-			const ZoombiniRunner *actor = _puzzleZoombinis[i];
-			if (!actor->isInputEnabled())
-				continue;
-			const int lane = classifyZoombini(actor);
-			if (_obstacleVisible[lane] != static_cast<bool>(blocked))
-				continue;
-			found = true;
-			answer += Common::String::format("    %s -> lane %d\n", debugActorDescription(i).c_str(), lane + 1);
+	answer += "\n  [*] Fork rules (top to bottom):\n";
+	for (int depth = 0; (1 << depth) - 1 < _ruleCount; depth++) {
+		const TreeNode &rule = _tree[(1 << depth) - 1];
+		answer += Common::String::format("    %-6s fork: LEFT if any trait matches:\n", kForkNames[depth]);
+		answer += Common::String::format("      - %s: %s\n", ZmbTrait::debugTraitName(rule.traitIndex),
+										 ZmbTrait::debugTraitValueName(rule.traitIndex, rule.primaryValue));
+		if (3 <= _puzzleLevel) {
+			const ZmbTrait::TraitKind alternate = _puzzleLevel == 4 ? rule.alternateTraitIndex : rule.traitIndex;
+			answer += Common::String::format("      - %s: %s\n", ZmbTrait::debugTraitName(alternate),
+											 ZmbTrait::debugTraitValueName(alternate, rule.alternateValue));
 		}
-		if (!found)
-			answer += "    (none)\n";
 	}
-	return answer + "  Recheck after a lane change.\n";
+	return answer;
 }
 
 PuzzleChanceInfo PuzzleSnowboard::debugGetChances() const {
@@ -846,21 +865,19 @@ PuzzleChanceInfo PuzzleSnowboard::debugGetChances() const {
 }
 
 bool PuzzleSnowboard::debugCanSetChances() const {
-	return !_debugFinishPending && !_finished && !_goTransitionPending && _activeRunnerIndex == -1 && !_collisionSpeechPending;
+	if (_debugFinishPending || _finished || _goTransitionPending || _collisionQuota < _collisionCount)
+		return false;
+	for (const ZoombiniRunner *zoombini : _puzzleZoombinis) {
+		if (zoombini && !zoombini->canAdvanceFromPage())
+			return true;
+	}
+	return false;
 }
 
 bool PuzzleSnowboard::debugSetChances(int remaining) {
-	if (!debugCanSetChances() || remaining < 0 || _collisionQuota + 1 < remaining)
+	if (!debugCanSetChances() || remaining < 1 || _collisionQuota + 1 < remaining)
 		return false;
 	_collisionCount = _collisionQuota + 1 - remaining;
-	if (!remaining) {
-		_finished = true;
-		_boardCoverActive = false;
-		_obstacleChangePending = false;
-		_finishAnimationStart = _vm->getTotalPlayTime();
-		enqueueSpeech(kFailureSpeechPath, false);
-		_vm->restartGoBlink();
-	}
 	return true;
 }
 

@@ -86,12 +86,11 @@ private:
 	static constexpr const char *kRightArrowEmptyPath = "Bmp/MENU/help_screen_rightarro_empty.bb";
 	/** Format for page help-sheet paths: page ID, level suffix, and one-based sheet number. */
 	static constexpr const char *kHelpPageFormat = "Bmp/help/%02d_help_%s_%02d.bb";
-	/** Localized notices added by ScummVM; the original engine provides no level 4 help message or help sheet. */
-	static constexpr const char *kMissingHelpTextEnglish = "No help resource is available for level 4.";
-	static constexpr const char *kMissingHelpTextKorean = u8"4단계는 도움말 리소스가 없습니다.";
 	/** Layout values added by ScummVM to center its level 4 notice in the otherwise empty help frame. */
 	static constexpr int kMissingHelpTextX = 135;
+	/** Maximum fallback-message width in page pixels. */
 	static constexpr int kMissingHelpTextWidth = 530;
+	/** Vertical center of the fallback-message area in page pixels. */
 	static constexpr int kMissingHelpTextCenterY = 285;
 
 	/** Replace the active help-sheet path with the requested sheet. */
@@ -106,7 +105,7 @@ private:
 	/** Whether the help overlay is active. */
 	bool _isActive = false;
 	/** Page identifier used to resolve the active help resource. */
-	PageId _currentPageId = kPageNone;
+	PageId _currentPageId = PageId::kPageNone_M1;
 	/** Level used to resolve the active help resource. */
 	int _currentLevel = -1;
 	/** One-based help sheet currently displayed. */

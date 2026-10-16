@@ -34,7 +34,7 @@ constexpr const char *TransitionTitle::kDemoMusicPath;
 
 TransitionTitle::TransitionTitle(Zoombini2Engine *vm)
 	: TransitionBase(vm) {
-	_pageId = kPageTitleScreen;
+	_pageId = PageId::kPageTitleScreen_24;
 }
 
 void TransitionTitle::init() {
@@ -84,7 +84,10 @@ EventHandleResult TransitionTitle::onKeyDown(const Common::KeyState &key, bool r
 
 EventHandleResult TransitionTitle::dismiss() {
 	_clicked = true;
-	_vm->requestPageChange(_vm->isDemo() ? kPageWaterslide : kPageMenuOptions);
+	if (_vm->isDemo())
+		_vm->requestPageChange(PageId::kPageWaterslide_02);
+	else
+		_vm->requestPageChange(PageId::kPageMenuOptions_M2);
 	return EventHandleResult::kConsumed;
 }
 

@@ -39,8 +39,6 @@ constexpr const char *ShelterFinal::kBoolDancePath;
 constexpr const char *ShelterFinal::kRevealFlare1Path;
 constexpr const char *ShelterFinal::kRevealFlare2Path;
 constexpr const char *ShelterFinal::kFireworkPaths[kFireworkCount];
-constexpr const char *ShelterFinal::kZoombiniAnimationPath;
-constexpr const char *ShelterFinal::kWalkingZoombiniAnimationPath;
 constexpr const char *ShelterFinal::kMusicPath;
 constexpr const char *ShelterFinal::kOpeningSpeechPath;
 constexpr const char *ShelterFinal::kClosingSpeechPath;
@@ -53,7 +51,7 @@ constexpr int ShelterFinal::kDecorativeZoombiniCells[kDecorativeZoombiniCount];
 
 ShelterFinal::ShelterFinal(Zoombini2Engine *vm)
 	: ShelterBase(vm) {
-	_pageId = kPageFinal;
+	_pageId = PageId::kPageFinal_23;
 }
 
 ShelterFinal::~ShelterFinal() {
@@ -81,6 +79,10 @@ ShelterFinal::~ShelterFinal() {
 	GameState *state = _vm->_state;
 	if (state)
 		_vm->writeGameSave(state->getPlayerName());
+}
+
+bool ShelterFinal::debugCanDepart() const {
+	return !_vm->_state->_savedRoster.empty();
 }
 
 void ShelterFinal::init() {
@@ -129,12 +131,6 @@ void ShelterFinal::init() {
 		firework.nextFrameTime = now + 40;
 	}
 
-	_zoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path(kZoombiniAnimationPath), 50);
-	if (!_zoombiniAnimation)
-		warning("BooliewoodFinalPage: Failed to load littleZomb.anm");
-	_walkingZoombiniAnimation = _vm->loadZoombiniAnimation(Common::Path(kWalkingZoombiniAnimationPath), 50);
-	if (!_walkingZoombiniAnimation)
-		warning("BooliewoodFinalPage: Failed to load attenteZomb.anm");
 	createDecorativeZoombinis();
 
 	_animationStartTime = now;
@@ -219,20 +215,20 @@ void ShelterFinal::onActorsRendered() {
 
 EventHandleResult ShelterFinal::onLButtonDown(const Common::Point &pos) {
 	(void)pos;
-	_vm->requestPageChange(kPageMenuOptions);
+	_vm->requestPageChange(PageId::kPageMenuOptions_M2);
 	return EventHandleResult::kConsumed;
 }
 
 void ShelterFinal::createDecorativeZoombinis() {
 	for (uint i = 0; i < kDecorativeZoombiniCount; i++) {
-		ZoombiniRunner *zoombini = new ZoombiniRunner();
+		ZoombiniRunner *zoombini = new ZoombiniRunner(_vm);
 		const byte nose = static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1);
 		const byte eyes = static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1);
 		const byte hair = static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1);
 		const byte feet = static_cast<byte>(_vm->_rnd->getRandomNumber(4) + 1);
 		zoombini->setTraits(ZmbTrait(feet, nose, hair, eyes));
 		zoombini->setPosition(kDecorativeZoombiniPos[i]);
-		zoombini->setDefaultAnimation(_zoombiniAnimation, kDecorativeZoombiniCells[i]);
+		zoombini->setDefaultAnimation(ZmbAnimationKind::kBasic, kDecorativeZoombiniCells[i]);
 		zoombini->setInputEnabled(false);
 		_vm->_state->_activeZoombinis.push_back(zoombini);
 	}
@@ -247,7 +243,7 @@ void ShelterFinal::updateDecorativeZoombiniRunnersAfterDraw(uint32 now) {
 	for (uint i = 0; i < kDecorativeZoombiniCount && i < _vm->_state->_activeZoombinis.size(); i++) {
 		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
 		if (!zoombini->isAnimationActive() && _vm->_rnd->getRandomNumber(99) == 10)
-			zoombini->startAnimation(_walkingZoombiniAnimation, 33, now);
+			zoombini->startAnimation(ZmbAnimationKind::kCelebration, 33, now);
 		if (zoombini->isAnimationActive() && _vm->_rnd->getRandomNumber(49) == 10) {
 			zoombini->resetAnimation();
 			zoombini->setAnimationCell(kDecorativeZoombiniCells[i]);
@@ -327,14 +323,14 @@ bool ShelterFinal::isFireworkPositionFree(const Common::Point32 &pos) const {
 	};
 	for (int i = 0; i < kFireworkCount; i++) {
 		const Common::Rect &rect = _fireworks[i].collisionRect;
-		for (int corner = 0; corner < 4; corner++) {
+		for (int corner = 0; corner < ARRAYSIZE(corners); corner++) {
 			if (pointInsidePaddedRect(corners[corner], rect))
 				return false;
 		}
 	}
-	for (int i = 0; i < 2; i++) {
+	for (int i = 0; i < ARRAYSIZE(fixedRects); i++) {
 		const Common::Rect &rect = fixedRects[i];
-		for (int corner = 0; corner < 4; corner++) {
+		for (int corner = 0; corner < ARRAYSIZE(corners); corner++) {
 			if (pointInsidePaddedRect(corners[corner], rect))
 				return false;
 		}

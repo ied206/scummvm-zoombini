@@ -28,6 +28,7 @@
 #include "zoombini2/pages/interactive_menu.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
+#include "zoombini2/text.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
@@ -58,10 +59,6 @@ constexpr const char *InteractiveMenu::kQuitNormalPath;
 constexpr const char *InteractiveMenu::kQuitHighlightPath;
 constexpr const char *InteractiveMenu::kDeleteConfirmationPath;
 constexpr const char *InteractiveMenu::kQuitConfirmationPath;
-constexpr const char *InteractiveMenu::kCaseCollisionConfirmationEnglish;
-constexpr const char *InteractiveMenu::kCaseCollisionConfirmationKorean;
-constexpr const char *InteractiveMenu::kReadOnlyLoadConfirmationEnglish;
-constexpr const char *InteractiveMenu::kReadOnlyLoadConfirmationKorean;
 
 constexpr Common::Point32 InteractiveMenu::kFileListPos;
 constexpr Size32 InteractiveMenu::kSelectorSize;
@@ -71,7 +68,7 @@ constexpr const char *InteractiveMenu::kHebrewValidNameCharacters;
 
 InteractiveMenu::InteractiveMenu(Zoombini2Engine *vm)
 	: InteractiveBase(vm) {
-	_pageId = kPageMenuOptions;
+	_pageId = PageId::kPageMenuOptions_M2;
 }
 
 InteractiveMenu::~InteractiveMenu() {
@@ -127,11 +124,17 @@ void InteractiveMenu::loadResources() {
 
 void InteractiveMenu::loadButtons() {
 	struct ButtonDefinition {
+		/** Resource path for this menu button's normal appearance. */
 		const char *normalPath;
+		/** Resource path for this menu button's hover appearance. */
 		const char *hoverPath;
+		/** Resource path for this menu button's disabled appearance, when available. */
 		const char *disabledPath;
+		/** Resource path for the button's transparency mask, when required. */
 		const char *maskPath;
+		/** Top-left button anchor in menu-page pixels. */
 		Common::Point32 pos;
+		/** Button width and height in menu-page pixels. */
 		Size32 size;
 	};
 
@@ -195,13 +198,19 @@ EventHandleResult InteractiveMenu::handleVolumePanelInput(const Common::Point &p
 	if (!_volumePanel)
 		return EventHandleResult::kPassthrough;
 	const VolumePanelResult result = _volumePanel->handleMouseInput(Common::Point32(pos), _volumePanelMouseDown, mouseReleased);
-	if (result == kVolumePanelChanged) {
+	switch (result) {
+	case kVolumePanelChanged:
 		applyOptionVolumes(true, false);
 		_volumePanel->playPreviewSound();
-	} else if (result == kVolumePanelApply) {
+		break;
+	case kVolumePanelApply:
 		closeOptionsDialog(true);
-	} else if (result == kVolumePanelCancel) {
+		break;
+	case kVolumePanelCancel:
 		closeOptionsDialog(false);
+		break;
+	default:
+		break;
 	}
 	return EventHandleResult::kConsumed;
 }
@@ -318,7 +327,7 @@ void InteractiveMenu::handleButtonClick(int buttonId) {
 		_fileList->beginOrConfirmNewEntry();
 		break;
 	case kMenuButtonPractice:
-		_vm->requestPageChange(kPageMenuPractice);
+		_vm->requestPageChange(PageId::kPageMapPractice_M3);
 		break;
 	case kMenuButtonQuit:
 		requestQuitConfirmation();
@@ -338,10 +347,16 @@ void InteractiveMenu::handleKeyInput(uint32 keyCode) {
 	}
 	if (isNameCharacter) {
 		const SaveFileList::TextInputResult result = _fileList->handleCharacter(static_cast<char>(keyCode));
-		if (result == SaveFileList::kTextAccepted01)
+		switch (result) {
+		case SaveFileList::kTextAccepted01:
 			playSound(_typeSoundId);
-		else if (result == SaveFileList::kTextListFull02)
+			break;
+		case SaveFileList::kTextListFull02:
 			warning("MenuScreenPage: Save list is full");
+			break;
+		default:
+			break;
+		}
 		return;
 	}
 
@@ -424,10 +439,10 @@ void InteractiveMenu::startNewSave(const Common::String &playerName, const Commo
 
 void InteractiveMenu::continueSelectedSave() {
 	GameState *gameState = _vm->_state;
-	if (gameState->hasPageVisit(kPageZombiniville, 1))
-		_vm->requestPageChange(kPageMenuLoad);
+	if (gameState->hasPageVisit(PageId::kPageZombiniville_00, 1))
+		_vm->requestPageChange(PageId::kPageMapJourney_M4);
 	else
-		_vm->requestPageChange(kPageCutsceneFirst);
+		_vm->requestPageChange(PageId::kPageCutsceneFirst_18);
 }
 
 void InteractiveMenu::requestDeleteConfirmation() {
@@ -445,7 +460,8 @@ void InteractiveMenu::requestCaseCollisionConfirmation(const Common::String &pla
 	_pendingCaseCollisionSavefileName = savefileName;
 	Common::BaseCallback<DialogMsgBoxButton> *callback =
 		new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleCaseCollisionConfirmation);
-	if (!_vm->requestUiTextMsgBox(getCaseCollisionConfirmationText(), callback)) {
+	const Common::U32String &message = _vm->_text->getLocalizedString(Text::kConfirmCaseCollision);
+	if (!_vm->requestUiTextMsgBox(message, callback)) {
 		_pendingCaseCollisionPlayerName.clear();
 		_pendingCaseCollisionSavefileName.clear();
 	}
@@ -455,7 +471,8 @@ void InteractiveMenu::requestReadOnlyLoadConfirmation(const Common::String &save
 	_pendingReadOnlySavefileName = savefileName;
 	Common::BaseCallback<DialogMsgBoxButton> *callback =
 		new Common::Callback<InteractiveMenu, DialogMsgBoxButton>(this, &InteractiveMenu::handleReadOnlyLoadConfirmation);
-	if (!_vm->requestUiTextMsgBox(getReadOnlyLoadConfirmationText(), callback))
+	const Common::U32String &message = _vm->_text->getLocalizedString(Text::kConfirmReadOnlyLoad);
+	if (!_vm->requestUiTextMsgBox(message, callback))
 		_pendingReadOnlySavefileName.clear();
 }
 
@@ -487,17 +504,7 @@ void InteractiveMenu::handleReadOnlyLoadConfirmation(DialogMsgBoxButton button) 
 
 void InteractiveMenu::handleQuitConfirmation(DialogMsgBoxButton button) {
 	if (button == DialogMsgBoxButton::kOkay01)
-		_vm->requestPageChange(kPageCredits);
-}
-
-Common::U32String InteractiveMenu::getCaseCollisionConfirmationText() const {
-	const char *text = _vm->isKorean() ? kCaseCollisionConfirmationKorean : kCaseCollisionConfirmationEnglish;
-	return Common::U32String(text, Common::kUtf8);
-}
-
-Common::U32String InteractiveMenu::getReadOnlyLoadConfirmationText() const {
-	const char *text = _vm->isKorean() ? kReadOnlyLoadConfirmationKorean : kReadOnlyLoadConfirmationEnglish;
-	return Common::U32String(text, Common::kUtf8);
+		_vm->requestPageChange(PageId::kPageCredits_16);
 }
 
 void InteractiveMenu::openOptionsDialog() {
@@ -554,7 +561,7 @@ void InteractiveMenu::SaveFileList::clear() {
 	_items.clear();
 	_readOnly.clear();
 	_editBuffer.clear();
-	_editState = kEditIdle00;
+	_textInputState = kInputIdle00;
 	_selectedIndex = 0;
 	_scrollOffset = 0;
 	_validSelection = false;
@@ -586,10 +593,20 @@ void InteractiveMenu::SaveFileList::draw(ManagedSurface32 *screen) const {
 		uint32 color = Gfx::PredefinedColor::kDark00.toPixel(screen->format);
 		if (readOnly)
 			color = Gfx::PredefinedColor::kRed04.toPixel(screen->format);
-		if (selected && kEditProvisional02 <= _editState)
-			color = Gfx::PredefinedColor::kGreen02.toPixel(screen->format);
-		else if (!readOnly && selected && _editState == kEditPrefixMatch01)
-			color = Gfx::PredefinedColor::kBlue01.toPixel(screen->format);
+		if (selected) {
+			switch (_textInputState) {
+			case kInputSearchMatch01:
+				if (!readOnly)
+					color = Gfx::PredefinedColor::kBlue01.toPixel(screen->format);
+				break;
+			case kInputSearchNewEntry02:
+			case kInputTextEntry03:
+				color = Gfx::PredefinedColor::kGreen02.toPixel(screen->format);
+				break;
+			default:
+				break;
+			}
+		}
 
 		const Common::Point32 textPos(_pos.x + kSelectionOffsetX + kTextOffsetX, _pos.y + kSelectionOffsetY + kTextOffsetY + row * kRowStride);
 		Gfx::TextConf conf;
@@ -600,7 +617,7 @@ void InteractiveMenu::SaveFileList::draw(ManagedSurface32 *screen) const {
 }
 
 bool InteractiveMenu::SaveFileList::handleClick(const Common::Point &pos) {
-	if (kEditPrefixMatch01 < _editState)
+	if (kInputSearchMatch01 < _textInputState)
 		return false;
 
 	const int left = _pos.x + kSelectionOffsetX;
@@ -619,7 +636,7 @@ bool InteractiveMenu::SaveFileList::handleClick(const Common::Point &pos) {
 
 	_selectedIndex = itemIndex;
 	_editBuffer.clear();
-	_editState = kEditIdle00;
+	_textInputState = kInputIdle00;
 	_validSelection = true;
 	return true;
 }
@@ -631,11 +648,13 @@ InteractiveMenu::SaveFileList::TextInputResult InteractiveMenu::SaveFileList::ha
 	c = normalizeCharacter(c);
 	_editBuffer += c;
 
-	if (_editState <= kEditPrefixMatch01) {
+	switch (_textInputState) {
+	case kInputIdle00:
+	case kInputSearchMatch01: {
 		const int matchingIndex = findPrefix(_editBuffer);
 		if (0 <= matchingIndex) {
 			_selectedIndex = matchingIndex;
-			_editState = kEditPrefixMatch01;
+			_textInputState = kInputSearchMatch01;
 		} else {
 			if (kMaximumItems <= static_cast<int>(_items.size())) {
 				_editBuffer.deleteLastChar();
@@ -644,15 +663,19 @@ InteractiveMenu::SaveFileList::TextInputResult InteractiveMenu::SaveFileList::ha
 
 			_selectedIndex = findInsertionPoint(_editBuffer);
 			insertItem(_selectedIndex, _editBuffer);
-			_editState = kEditProvisional02;
+			_textInputState = kInputSearchNewEntry02;
 		}
 		_validSelection = true;
-	} else if (_editState == kEditProvisional02) {
+		break;
+	}
+	case kInputSearchNewEntry02:
 		_items[_selectedIndex] = _editBuffer;
 		_validSelection = true;
-	} else {
+		break;
+	default:
 		_items[_selectedIndex] = _editBuffer;
 		_validSelection = !isDuplicate(_editBuffer, _selectedIndex);
+		break;
 	}
 
 	revealSelection();
@@ -660,11 +683,11 @@ InteractiveMenu::SaveFileList::TextInputResult InteractiveMenu::SaveFileList::ha
 }
 
 bool InteractiveMenu::SaveFileList::handleBackspace() {
-	if (_editBuffer.empty() && _editState != kEditExplicit03)
+	if (_editBuffer.empty() && _textInputState != kInputTextEntry03)
 		return false;
 	if (_editBuffer.empty()) {
 		removeItem(_selectedIndex);
-		_editState = kEditIdle00;
+		_textInputState = kInputIdle00;
 		clampSelection();
 		_validSelection = !_items.empty();
 		revealSelection();
@@ -673,9 +696,10 @@ bool InteractiveMenu::SaveFileList::handleBackspace() {
 
 	_editBuffer.deleteLastChar();
 
-	if (_editState == kEditPrefixMatch01) {
+	switch (_textInputState) {
+	case kInputSearchMatch01:
 		if (_editBuffer.empty()) {
-			_editState = kEditIdle00;
+			_textInputState = kInputIdle00;
 			_validSelection = !_items.empty();
 		} else {
 			const int matchingIndex = findPrefix(_editBuffer);
@@ -683,37 +707,42 @@ bool InteractiveMenu::SaveFileList::handleBackspace() {
 				_selectedIndex = matchingIndex;
 			_validSelection = 0 <= matchingIndex;
 		}
-	} else if (_editState == kEditProvisional02) {
+		break;
+	case kInputSearchNewEntry02:
 		if (_editBuffer.empty()) {
 			removeItem(_selectedIndex);
-			_editState = kEditIdle00;
+			_textInputState = kInputIdle00;
 			_selectedIndex = 0;
 			_scrollOffset = 0;
 			_validSelection = !_items.empty();
 		} else {
-			const int provisionalIndex = _selectedIndex;
-			const int matchingIndex = findPrefix(_editBuffer, provisionalIndex);
+			const int newEntryIndex = _selectedIndex;
+			const int matchingIndex = findPrefix(_editBuffer, newEntryIndex);
 			if (0 <= matchingIndex) {
-				removeItem(provisionalIndex);
+				removeItem(newEntryIndex);
 				_selectedIndex = matchingIndex;
-				if (provisionalIndex < matchingIndex)
+				if (newEntryIndex < matchingIndex)
 					_selectedIndex -= 1;
-				_editState = kEditPrefixMatch01;
+				_textInputState = kInputSearchMatch01;
 			} else {
 				_items[_selectedIndex] = _editBuffer;
 			}
 			_validSelection = true;
 		}
-	} else if (_editState == kEditExplicit03) {
+		break;
+	case kInputTextEntry03:
 		if (_editBuffer.empty()) {
 			removeItem(_selectedIndex);
-			_editState = kEditIdle00;
+			_textInputState = kInputIdle00;
 			clampSelection();
 			_validSelection = !_items.empty();
 		} else {
 			_items[_selectedIndex] = _editBuffer;
 			_validSelection = !isDuplicate(_editBuffer, _selectedIndex);
 		}
+		break;
+	default:
+		break;
 	}
 
 	revealSelection();
@@ -724,20 +753,26 @@ void InteractiveMenu::SaveFileList::beginOrConfirmNewEntry() {
 	if (!canBeginNewEntry())
 		return;
 
-	if (_editState == kEditIdle00) {
+	switch (_textInputState) {
+	case kInputIdle00:
 		insertItem(0, Common::String());
 		_selectedIndex = 0;
 		_scrollOffset = 0;
 		_editBuffer.clear();
-		_editState = kEditExplicit03;
+		_textInputState = kInputTextEntry03;
 		_validSelection = false;
-	} else if (_editState == kEditPrefixMatch01) {
+		break;
+	case kInputSearchMatch01:
 		insertItem(_selectedIndex, _editBuffer);
-		_editState = kEditExplicit03;
+		_textInputState = kInputTextEntry03;
 		_validSelection = !isDuplicate(_editBuffer, _selectedIndex);
-	} else if (_editState == kEditProvisional02) {
-		_editState = kEditExplicit03;
+		break;
+	case kInputSearchNewEntry02:
+		_textInputState = kInputTextEntry03;
 		_validSelection = !isDuplicate(_editBuffer, _selectedIndex);
+		break;
+	default:
+		break;
 	}
 
 	revealSelection();
@@ -777,19 +812,19 @@ void InteractiveMenu::SaveFileList::scrollPageDown() {
 }
 
 bool InteractiveMenu::SaveFileList::canMoveUp() const {
-	return _editState == kEditIdle00 && 0 < _selectedIndex;
+	return _textInputState == kInputIdle00 && 0 < _selectedIndex;
 }
 
 bool InteractiveMenu::SaveFileList::canMoveDown() const {
-	return _editState == kEditIdle00 && _selectedIndex + 1 < static_cast<int>(_items.size());
+	return _textInputState == kInputIdle00 && _selectedIndex + 1 < static_cast<int>(_items.size());
 }
 
 bool InteractiveMenu::SaveFileList::canPageUp() const {
-	return _editState == kEditIdle00 && 0 < _scrollOffset;
+	return _textInputState == kInputIdle00 && 0 < _scrollOffset;
 }
 
 bool InteractiveMenu::SaveFileList::canPageDown() const {
-	return _editState == kEditIdle00 && _scrollOffset + kVisibleRows < static_cast<int>(_items.size());
+	return _textInputState == kInputIdle00 && _scrollOffset + kVisibleRows < static_cast<int>(_items.size());
 }
 
 bool InteractiveMenu::SaveFileList::canBeginNewEntry() const {
@@ -829,7 +864,7 @@ void InteractiveMenu::SaveFileList::deleteSelected() {
 
 	removeItem(_selectedIndex);
 	_editBuffer.clear();
-	_editState = kEditIdle00;
+	_textInputState = kInputIdle00;
 	clampSelection();
 	_validSelection = !_items.empty();
 }

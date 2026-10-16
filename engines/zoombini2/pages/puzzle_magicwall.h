@@ -44,8 +44,9 @@ class Random;
 class MagicWallMaze {
 public:
 	struct Edge {
-		/** Source and destination point indices in one tablet rule. */
+		/** Source vertex index in one tablet rule. */
 		int from = 0;
+		/** Destination vertex index in one tablet rule. */
 		int to = 0;
 		/** Whether applying this edge exchanges the beetles at both endpoints. */
 		bool swap = false;
@@ -55,11 +56,13 @@ public:
 	typedef Common::Array<Rule> Variant;
 	/** One resource-defined board layout and the rules offered on its tablets. */
 	struct Layout {
-		/** Level branch and weighted random-selection value. */
+		/** Difficulty branch for which this layout is eligible. */
 		int level = 0;
+		/** Relative selection weight among layouts eligible for the requested level. */
 		int weight = 0;
-		/** Beetle point locations and the three rule groups read from the layout resource. */
+		/** Beetle vertex locations in the layout's local coordinate system. */
 		Common::Array<Common::Point32> points;
+		/** Resource-defined tablet variants, indexed by the three rule groups. */
 		Common::Array<Variant> groups[3];
 	};
 	/** Read bounded layout records, retaining complete records before damaged trailing data. */
@@ -68,20 +71,45 @@ public:
 	bool generate(int level, Random &random);
 	/** Apply the player's selected tablet rule to the current beetle positions. */
 	void apply(int ruleIndex);
-	/** Return whether the beetle of @p color occupies its matching endpoint. */
+	/** Return whether the beetle of @p color occupies its matching vertex. */
 	bool matched(int color) const;
-	/** Return whether every beetle needed by @p gate is at its matching endpoint. */
+	/** Return whether every beetle needed by @p gate is at its matching vertex. */
 	bool gateMatched(int gate) const;
-	/** Return the selected resource layout and its available rule groups. */
+	/** Return the selected resource layout index. */
 	int layoutIndex() const { return _layoutIndex; }
+	/** Return the selected gate and tablet layout. */
 	const Layout &layout() const { return _layouts[_layoutIndex]; }
+	/** Return all layouts loaded from the maze resource. */
 	const Common::Array<Layout> &layouts() const { return _layouts; }
+	/** Return the selected logical gate and tablet rules. */
 	const Variant &rules() const { return _rules; }
+	/** Return the current vertex occupied by each beetle. */
 	const Common::Array<int> &positions() const { return _positions; }
+	/** Return the initial vertex occupied by each beetle after board generation. */
 	const Common::Array<int> &initialPositions() const { return _initialPositions; }
+	/** Return the retained sequence of tablet moves used during generation. */
 	const Common::Array<int> &generationSequence() const { return _generationSequence; }
-	/** Find a bounded player-rule sequence to solve the current board for the console. */
-	bool debugSolution(Common::Array<int> &sequence) const;
+	/** Distinguish an exhausted reachable state space from an interrupted search. */
+	enum class SolutionResult {
+		/** A solution sequence was found. */
+		kSolved,
+		/** The reachable state space contains no solution. */
+		kUnreachable,
+		/** The search limit was reached before the state space was exhausted. */
+		kLimit,
+		/** The starting board is not a valid permutation. */
+		kInvalid,
+	};
+	/** Find a shortest player-rule sequence from the current board without changing it. */
+	SolutionResult debugAnswerSolver(Common::Array<int> &sequence, uint &visited) const;
+	/** Describe the selected layout's cycle and exchange strategy. */
+	const char *debugLayoutAdvice() const;
+	/** Describe the selected tablet's role in the layout strategy. */
+	const char *debugTabletRole(uint rule) const;
+	/** Return the nontrivial cycles of one tablet in vertex-index order, following its actual movement direction. */
+	Common::Array<Common::Array<int>> debugTabletPaths(uint rule) const;
+	/** Return where each vertex's beetle goes after one simultaneous tablet press. */
+	Common::Array<int> debugRuleMapping(uint rule) const;
 
 private:
 	/** Read a count only when it fits @p maximum and the resource's trusted bounds. */
@@ -94,14 +122,21 @@ private:
 	static bool isIdentity(const Common::Array<int> &positions);
 	/** Search the internal construction space for a non-identity scramble. */
 	int solve(const Common::Array<int> &positions, int depth) const;
-	/** Search player-rule moves within @p budget and append a solution to @p sequence. */
-	bool debugSolve(const Common::Array<int> &positions, int depth, int &budget, Common::Array<int> &sequence) const;
+	/** Pack a permutation and reject repeated or out-of-range vertex indices. */
+	static bool debugEncodePositions(const Common::Array<int> &positions, uint64 &state);
+	/** Return the dense permutation index of a packed board. */
+	static uint debugPermutationRank(uint64 state, uint count);
+	/** Return whether a tablet transfers beetles between the selected vertex group and its complement. */
+	static bool debugCrossesGroup(const Common::Array<int> &mapping, uint group);
 	/** Build an initial board by applying selected rules sequentially. */
 	void scramble(Random &random);
 	/** All decoded layouts, selected layout index, active rules, and current beetle positions. */
 	Common::Array<Layout> _layouts;
+	/** Index of the selected resource layout, or -1 before generation. */
 	int _layoutIndex = -1;
+	/** Tablet operations selected for the current board. */
 	Variant _rules;
+	/** Current vertex occupied by each beetle color. */
 	Common::Array<int> _positions;
 	/** Sequential construction operations for the selected initial board, not a player solution. */
 	Common::Array<int> _generationSequence;
@@ -116,6 +151,12 @@ public:
 	explicit PuzzleMagicWall(Zoombini2Engine *vm);
 	/** Release transient beetle paths and animation runners. */
 	~PuzzleMagicWall() override;
+	/** Return the puzzle name used by debug answer descriptions. */
+	const char *getPageName() const override { return kPageName; }
+	/** Return the 1-based route containing this puzzle. */
+	int getRouteNumber() const override { return kRouteNumber; }
+	/** Return the 1-based puzzle number within its route. */
+	int getRoutePuzzleIdx() const override { return kRoutePuzzleIdx; }
 	/** Load resources, generate a beetle board, and arrange the puzzle roster. */
 	void init() override;
 	/** Advance tablet, gate, beetle, runner, and speech transitions. */
@@ -148,16 +189,21 @@ public:
 	Common::String debugGetChanceDetails() const override;
 
 private:
-	static constexpr const char *kPuzzleName = "Beetle Bug Alley";
+	/** Static puzzle name used by debug answer descriptions. */
+	static constexpr const char *kPageName = "Beetle Bug Alley";
+	/** 1-based route number used by the puzzle console. */
+	static constexpr int kRouteNumber = 2;
+	/** 1-based puzzle number within the route used by the puzzle console. */
+	static constexpr int kRoutePuzzleIdx = 1;
 	/** Beetle Bug Alley board background loaded into the first page layer. */
 	static constexpr const char *kBackgroundPath = "#bmp/magic_wall/magic wall";
 	/** ZTL board data containing weighted layouts, tablet points, and rule variants. */
 	static constexpr const char *kLayoutPath = "bmp/magic_wall/default.ztl";
 	/** Looping Beetle Bug Alley soundtrack. */
 	static constexpr const char *kMusicPath = "#sounds/music/06-BB01.wav";
-	/** Path format for colored endpoint markers on the board and tablets. */
+	/** Path format for colored vertex markers on the board and tablets. */
 	static constexpr const char *kDotFormat = "bmp/magic_wall/DOT-%s";
-	/** Path format for the colored beetle sprite assigned to each endpoint color. */
+	/** Path format for the colored beetle sprite assigned to each vertex color. */
 	static constexpr const char *kBugFormat = "bmp/magic_wall/bug_c_%s";
 	/** Path format for one of eight beetle-facing direction overlays. */
 	static constexpr const char *kDirectionFormat = "bmp/magic_wall/bug_%d";
@@ -165,11 +211,11 @@ private:
 	static constexpr const char *kLightFormat = "bmp/magic_wall/mini-light-%s";
 	/** RLE image drawn as the frame for each rule tablet. */
 	static constexpr const char *kTabletPath = "bmp/magic_wall/mini-map";
-	/** RLE point marker drawn at each node on a rule tablet. */
+	/** RLE vertex marker drawn on a rule tablet. */
 	static constexpr const char *kTabletDotPath = "bmp/magic_wall/mini-map-dot";
 	/** Lever animation played when the player submits the current beetle positions. */
 	static constexpr const char *kLeverPath = "bmp/magic_wall/le_vier";
-	/** BitBlock glow drawn over the lever when every beetle matches its endpoint. */
+	/** BitBlock glow drawn over the lever when every beetle matches its vertex. */
 	static constexpr const char *kLeverGlowPath = "bmp/magic_wall/le_vier_luisant";
 	/** Animation path format for the four lettered gates opening and closing. */
 	static constexpr const char *kGateFormat = "bmp/magic_wall/porte-%c";
@@ -189,7 +235,7 @@ private:
 	static constexpr const char *kRetreatSpeechPath = "sounds/DW-Cave.wav";
 	/** One of four randomized praise lines played after all Zoombinis are rescued. */
 	static constexpr const char *kPerfectSpeechFormat = "sounds/wld11.%d.wav";
-	/** Resource color suffixes for ten beetles plus the neutral stone lamp used for unmatched endpoints. */
+	/** Resource color suffixes for ten beetles plus the neutral stone lamp used for unmatched vertices. */
 	static constexpr const char *kColors[11] = {
 		"blue",
 		"green",
@@ -203,11 +249,11 @@ private:
 		"yellow",
 		"pierre",
 	};
-	/** Upper-range channels of the shaded endpoint discs, avoiding clipped highlights after recoloring. */
+	/** Upper-range channels of the shaded vertex discs, avoiding clipped highlights after recoloring. */
 	static constexpr byte kDotSourceBrightness[10] = {164, 154, 168, 154, 156, 220, 172, 140, 126, 128};
 	/** Peak channels at the centers of the ten source beetle sprites. */
 	static constexpr byte kBugSourceBrightness[10] = {228, 180, 130, 208, 157, 201, 197, 200, 213, 208};
-	/** Select a display color for one beetle and its matching endpoint. */
+	/** Select a display color for one beetle and its matching vertex. */
 	static bool colorAssistRGB(Zoombini2MetaEngine::ColorAssistMode mode, uint color, RGBColor &displayColor);
 	/** Draw one identity-colored RLE resource with the current display palette. */
 	void drawColorSprite(ManagedSurface32 *screen, const char *format, uint color, const Common::Point32 &pos, byte sourceBrightness) const;
@@ -219,12 +265,14 @@ private:
 		{553, 440},
 		{616, 455},
 	};
+	/** Page-space anchors in pixels for the four gate animations. */
 	static constexpr Common::Point32 kGatePositions[4] = {
 		{76, 290},
 		{129, 288},
 		{180, 288},
 		{228, 285},
 	};
+	/** Waiting Zoombini anchors in page pixels, indexed by party slot. */
 	static constexpr Common::Point32 kRosterPositions[8] = {
 		{31, 442},
 		{77, 458},
@@ -235,6 +283,7 @@ private:
 		{109, 515},
 		{158, 524},
 	};
+	/** Page-space anchors in pixels for the gate indicator artwork. */
 	static constexpr Common::Point32 kLightPositions[10] = {
 		{82, 346},
 		{130, 335},
@@ -249,8 +298,9 @@ private:
 	};
 
 	struct Beetle {
-		/** Current point-derived screen position and active movement path. */
+		/** Current beetle anchor in page pixels. */
 		Common::Point32 position;
+		/** Beetle movement path released on replacement or page teardown; nullptr while stationary. */
 		PathObject *path = nullptr;
 		/** Facing frame selected from the prior and next tablet points. */
 		int direction = 0;
@@ -274,13 +324,17 @@ private:
 	bool beetlesMoving() const;
 	/** Return the tablet index under @p pos, or -1. */
 	int tabletAt(const Common::Point &pos) const;
-	/** Convert a layout point or tablet-local point to page-space coordinates. */
-	Common::Point32 dotPosition(int index) const;
+	/** Convert a layout vertex to page-space coordinates. */
+	Common::Point32 vertexPosition(int index) const;
+	/** Convert a layout vertex to an inset position on the selected tablet. */
 	Common::Point32 tabletPoint(int tablet, int point, int inset) const;
-	/** Draw tablet art, rule connections, moving beetles, and their ripple. */
+	/** Draw each tablet's background and inset rule diagram. */
 	void drawTablets(ManagedSurface32 *screen);
+	/** Draw the connection ripples belonging to the selected tablet rule. */
 	void drawConnections(ManagedSurface32 *screen, int index);
+	/** Draw colored beetles and their facing indicators at their current maze positions. */
 	void drawBeetles(ManagedSurface32 *screen);
+	/** Draw the animated connection ripple between page-pixel anchors at the supplied phase. */
 	void drawRipple(ManagedSurface32 *screen, Common::Point32 from, const Common::Point32 &to, int phase);
 	/** Select a beetle direction frame from a point-to-point movement vector. */
 	static int directionIndex(const Common::Point32 &from, const Common::Point32 &to);
@@ -289,13 +343,17 @@ private:
 	/** Clear the active gate runner after its opening animation completes. */
 	static void gateDone(void *context, AnimationRunner *runner);
 
-	/** Resource-defined board, displayed beetles, and gate/lever animation state. */
+	/** Resource-defined board, tablet rules and current beetle permutation. */
 	MagicWallMaze _maze;
-	/** KR layout beetles: levels 1 and 2 use 5-8, level 3 uses 6-9, and internal level 4 uses 8-9. */
+	/** Beetles on the current board, one per layout vertex: L1/L2 use 5-8, L3 uses 6-9, and L4 uses 8-9. */
 	Common::Array<Beetle> _beetles;
+	/** Animation data for the four exit gates, released with the page. */
 	Animation *_gateAnimations[4] = {};
+	/** Submission-lever animation data released with the page. */
 	Animation *_leverAnimation = nullptr;
+	/** Gate playback state, indexed by gate. */
 	AnimationRunner *_gateRunners[4] = {};
+	/** Playback state for the submission lever. */
 	AnimationRunner *_leverRunner = nullptr;
 
 	/** A runner is retired only after its exit path reaches the upper side of the gate. */
@@ -306,22 +364,31 @@ private:
 		kSecondBoard,
 		kFinished
 	};
-	/** Board readiness, deferred refresh, Go availability, and mouse-button state. */
+	/** Whether the current board has finished initializing. */
 	bool _ready = false;
+	/** Whether the first board has succeeded and a replacement board is due. */
 	bool _nextPuzzlePending = false;
+	/** Whether the current page state permits departure through Go. */
 	bool _canDepart = false;
+	/** Whether a tablet press is armed for the current pointer gesture. */
 	bool _buttonArmed = false;
+	/** Whether departure is waiting for queued narration. */
 	bool _speechPending = false;
+	/** Current board and departure stage. */
 	Phase _phase = Phase::kFirstBoard;
-	/** Hovered tablet, currently animating rule, and ripple animation frame. */
+	/** Tablet under the pointer, or -1 when no tablet is hovered. */
 	int _hoveredTablet = -1;
+	/** Tablet rule currently being animated, or -1 when none is active. */
 	int _movingRule = -1;
+	/** Current ripple presentation phase around the rule animation. */
 	int _ripplePhase = 0;
 	/** Latest pointer location used for tablet hover feedback. */
 	Common::Point _pointer;
-	/** Looping beetle, gate, and lever mixer handles. */
+	/** Loaded looping beetle sound handle, or -1 when unavailable. */
 	int _bugSound = -1;
+	/** Loaded gate sound handle, or -1 when unavailable. */
 	int _gateSound = -1;
+	/** Loaded lever sound handle, or -1 when unavailable. */
 	int _leverSound = -1;
 };
 
