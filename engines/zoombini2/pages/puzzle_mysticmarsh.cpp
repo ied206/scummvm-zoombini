@@ -65,12 +65,12 @@ bool MysticMarshGrid::matches(int zoombini, Feature feature) const {
 	return trait(zoombini, feature.trait) == feature.value;
 }
 
-int MysticMarshGrid::background() const {
+MysticMarshGrid::BackgroundKind MysticMarshGrid::background() const {
 	if (_layout < kGridL2LayoutA_02)
-		return _layout + 1;
+		return static_cast<BackgroundKind>(_layout + 1);
 	if (_layout < kGridL3LayoutA_06)
-		return 3;
-	return _layout - 2;
+		return kBackgroundL2Layouts_03;
+	return static_cast<BackgroundKind>(_layout - 2);
 }
 
 void MysticMarshGrid::loadLayout(GridLayout layout) {
@@ -1766,7 +1766,6 @@ PuzzleMysticMarsh::PuzzleMysticMarsh(Zoombini2Engine *vm)
 }
 
 PuzzleMysticMarsh::~PuzzleMysticMarsh() {
-	delete _l4Background;
 	for (uint i = 0; i < _bubbles.size(); i++)
 		delete _bubbles[i].path;
 	delete _craterAnimation;
@@ -1787,22 +1786,25 @@ Common::Point32 MysticMarshL4Background::cellPosition(int index) {
 void PuzzleMysticMarsh::init() {
 	_initialAnswer.clear();
 	PuzzleBase::init();
-	delete _l4Background;
-	_l4Background = nullptr;
 	Common::Array<ZmbTrait> party;
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++)
 		party.push_back(_puzzleZoombinis[i]->getTraits());
 	_grid.init(party, _puzzleLevel, *_vm->_rnd);
 	for (int i = 0; i < MysticMarshGrid::kCellCount; i++)
 		_drawCells[i] = _grid.cell(i);
-	_backgroundIndex = _grid.background();
-	int artworkIndex = _backgroundIndex;
-	if (_backgroundIndex == 6) {
+	_bgKind = _grid.background();
+	MysticMarshGrid::BackgroundKind artworkIndex = _bgKind;
+	if (_bgKind == MysticMarshGrid::kBackgroundL4LayoutA_06) {
 		artworkIndex = kL4FallbackBackgroundIndex;
-		warning("MysticMarsh: background6 is missing; composing level 4 artwork from background%d", artworkIndex);
+		warning("MysticMarsh: background6 is missing; composing level 4 artwork from background%d", static_cast<int>(artworkIndex));
 	}
-	loadPrimaryLayerBackground(Common::Path(Common::String::format(kBackgroundFormat, artworkIndex)));
-	loadAreaMask(Common::Path(Common::String::format(kAreaFormat, _backgroundIndex)));
+	loadPrimaryLayerBackground(Common::Path(Common::String::format(kBackgroundFormat, static_cast<int>(artworkIndex))));
+	if (_bgKind == MysticMarshGrid::kBackgroundL4LayoutA_06) {
+		ManagedSurface32 *background = _vm->_gfx->getBackgroundSurface();
+		if (background)
+			MysticMarshL4Background::compose(background, _drawCells, *_vm->_gfx);
+	}
+	loadAreaMask(Common::Path(Common::String::format(kAreaFormat, static_cast<int>(_bgKind))));
 	loadResources();
 	startPageMusic(Common::Path(kMusicPath));
 	_bubbles.resize(party.size());
@@ -1810,7 +1812,7 @@ void PuzzleMysticMarsh::init() {
 		ZoombiniRunner *zoombini = _puzzleZoombinis[i];
 		zoombini->clearMovement();
 		zoombini->setDefaultAnimation(ZmbAnimationKind::kBasic);
-		zoombini->setPosition(kStartingPositions[_backgroundIndex - 1][i % 8]);
+		zoombini->setPosition(kStartingPositions[static_cast<int>(_bgKind) - 1][i % 8]);
 		zoombini->setInputEnabled(true);
 		zoombini->setCanAdvanceFromPage(false);
 		zoombini->setHidden(false);
@@ -1832,7 +1834,7 @@ void PuzzleMysticMarsh::init() {
 		_dropTargets.push_back(target);
 	}
 	_lastTick = _vm->getTotalPlayTime();
-	debug(1, "MysticMarsh: level=%d layout=%d background=%d party=%u craters=%u", _puzzleLevel, _grid.layout(), _backgroundIndex,
+	debug(1, "MysticMarsh: level=%d layout=%d background=%d party=%u craters=%u", _puzzleLevel, _grid.layout(), static_cast<int>(_bgKind),
 		  _puzzleZoombinis.size(), _slots.size());
 	if (_vm->inJourneyMode())
 		_vm->_state->registerPageVisit(_pageId, 1);
@@ -1909,7 +1911,7 @@ void PuzzleMysticMarsh::freeZoombini(int index, uint32 now) {
 	zoombini->setCanAdvanceFromPage(true);
 	_vm->_zoombiniWalkingFlag = true;
 	zoombini->setActiveAnimation(ZmbAnimationKind::kBasic);
-	zoombini->startMovement(createPath(zoombini->getScreenPosition(), kExitPositions[_backgroundIndex - 1][_freed % 8], 7), now);
+	zoombini->startMovement(createPath(zoombini->getScreenPosition(), kExitPositions[static_cast<int>(_bgKind) - 1][_freed % 8], 7), now);
 	zoombini->startDirectionTrackedAnimation(now);
 	_freed += 1;
 	playSfx(4);
@@ -2054,18 +2056,7 @@ void PuzzleMysticMarsh::onUpdate() {
 }
 
 void PuzzleMysticMarsh::onRenderBackground(ManagedSurface32 *screen) {
-	if (_backgroundIndex != 6) {
-		drawPrimaryPageLayer(screen);
-		return;
-	}
-	if (!_l4Background) {
-		_l4Background = new ManagedSurface32(Gfx::kScreenSize, screen->format);
-		_l4Background->fillRect(Common::Rect32(0, 0, screen->w, screen->h), Gfx::PredefinedColor::kBlack.toPixel(screen->format));
-		drawPrimaryPageLayer(_l4Background);
-		MysticMarshL4Background::compose(_l4Background);
-	}
-	screen->blitFrom(*_l4Background);
-	MysticMarshL4Background::drawGrid(screen, _drawCells);
+	drawPrimaryPageLayer(screen);
 }
 
 bool MysticMarshL4Background::isWaterPixel(uint8 red, uint8 blue) {
@@ -2099,6 +2090,10 @@ MysticMarshL4Background::WaterNeighbor MysticMarshL4Background::findWaterNeighbo
 void MysticMarshL4Background::eraseBakedGrid(ManagedSurface32 *surface) {
 	const int width = surface->w;
 	const int height = surface->h;
+	if (width < 720 || height < 350) {
+		warning("MysticMarsh: restored level 4 grid cleanup needs the complete grid artwork region");
+		return;
+	}
 	const int pixelCount = width * height;
 	Common::Array<byte> candidates(pixelCount, 0);
 	for (int y = 145; y < 350; y++) {
@@ -2323,9 +2318,10 @@ void MysticMarshL4Background::antialiasUpperShore(ManagedSurface32 *surface) {
 		warning("MysticMarsh: level 4 shoreline anti-aliasing skipped rows without a water edge");
 }
 
-void MysticMarshL4Background::compose(ManagedSurface32 *surface) {
+void MysticMarshL4Background::compose(ManagedSurface32 *surface, const MysticMarshGrid::Cell *cells, const Gfx &gfx) {
 	eraseBakedGrid(surface);
 	antialiasUpperShore(surface);
+	drawGrid(surface, cells, gfx);
 }
 
 bool MysticMarshL4Background::isCellBorderVisible(int column, int row) {
@@ -2343,50 +2339,46 @@ bool MysticMarshL4Background::isPortalCellType(int type) {
 	return MysticMarshGrid::kCellSymbolEntry1Type60 <= type && type <= MysticMarshGrid::kCellExitType62;
 }
 
-void MysticMarshL4Background::drawGridEdge(ManagedSurface32 *screen, const Common::Point32 &start, const Common::Point32 &end, uint32 lineColor) {
-	const int xOffset = start.y == end.y ? 0 : 1;
-	const int yOffset = start.y == end.y ? 1 : 0;
-	screen->drawLine(start.x, start.y, end.x, end.y, lineColor);
-	screen->drawLine(start.x + xOffset, start.y + yOffset, end.x + xOffset, end.y + yOffset, lineColor);
-}
-
-void MysticMarshL4Background::drawGrid(ManagedSurface32 *screen, const MysticMarshGrid::Cell *cells) {
-	const uint32 lineColor = Gfx::PredefinedColor::kWhite03.toPixel(screen->format);
+void MysticMarshL4Background::drawGrid(ManagedSurface32 *surface, const MysticMarshGrid::Cell *cells, const Gfx &gfx) {
+	Common::Array<Gfx::LineSegment> lines;
 	for (int column = 0; column < MysticMarshGrid::kColumns; column++) {
 		for (int row = 0; row < MysticMarshGrid::kRows; row++) {
-			const int cellIndex = column * MysticMarshGrid::kRows + row;
-			if (cells[cellIndex].type == MysticMarshGrid::kCellEmptyType00 || isPortalCellType(cells[cellIndex].type) || !isCellBorderVisible(column, row))
+			const int cellIdx = column * MysticMarshGrid::kRows + row;
+			if (cells[cellIdx].type == MysticMarshGrid::kCellEmptyType00 || isPortalCellType(cells[cellIdx].type) || !isCellBorderVisible(column, row))
 				continue;
-			const Common::Point32 position = cellPosition(cellIndex);
-			const Common::Point32 topLeft(position.x, position.y + 60);
-			const Common::Point32 topRight(position.x + 44, position.y + 60);
-			const Common::Point32 bottomLeft(position.x + 10, position.y + 91);
-			const Common::Point32 bottomRight(position.x + 54, position.y + 91);
-			drawGridEdge(screen, topLeft, topRight, lineColor);
-			drawGridEdge(screen, topLeft, bottomLeft, lineColor);
-			if (row + 1 == MysticMarshGrid::kRows ||
-				cells[cellIndex + 1].type == MysticMarshGrid::kCellEmptyType00 || isPortalCellType(cells[cellIndex + 1].type) ||
-				!isCellBorderVisible(column, row + 1))
-				drawGridEdge(screen, bottomLeft, bottomRight, lineColor);
+			const Common::Point32 pos = cellPosition(cellIdx);
+			const Common::Point32 topLeft(pos.x, pos.y + 60);
+			const Common::Point32 topRight(pos.x + 44, pos.y + 60);
+			const Common::Point32 bottomLeft(pos.x + 10, pos.y + 91);
+			const Common::Point32 bottomRight(pos.x + 54, pos.y + 91);
+			lines.push_back({topLeft, topRight});
+			lines.push_back({topLeft, bottomLeft});
+			if (row + 1 == MysticMarshGrid::kRows || cells[cellIdx + 1].type == MysticMarshGrid::kCellEmptyType00 ||
+				isPortalCellType(cells[cellIdx + 1].type) || !isCellBorderVisible(column, row + 1)) {
+				lines.push_back({bottomLeft, bottomRight});
+			}
 			if (column + 1 == MysticMarshGrid::kColumns ||
-				cells[cellIndex + MysticMarshGrid::kRows].type == MysticMarshGrid::kCellEmptyType00 ||
-				isPortalCellType(cells[cellIndex + MysticMarshGrid::kRows].type) || !isCellBorderVisible(column + 1, row))
-				drawGridEdge(screen, topRight, bottomRight, lineColor);
+				cells[cellIdx + MysticMarshGrid::kRows].type == MysticMarshGrid::kCellEmptyType00 ||
+				isPortalCellType(cells[cellIdx + MysticMarshGrid::kRows].type) || !isCellBorderVisible(column + 1, row)) {
+				lines.push_back({topRight, bottomRight});
+			}
 		}
 	}
+	const uint32 white = Gfx::PredefinedColor::kWhite03.toPixel(surface->format);
+	gfx.drawLines(surface, lines, white, 2, true);
 }
 
 void PuzzleMysticMarsh::onRenderContent(ManagedSurface32 *screen) {
-	if (_backgroundIndex == 6) {
-		const Common::Point32 position = MysticMarshL4Background::cellPosition(kL4RejectVisualCellIndex);
-		drawColorSymbol(screen, kRejectCellType - MysticMarshGrid::kCellSymbolSDiv1Type02, Common::Point32(position.x + 3, position.y + 61));
-	}
 	for (int i = 0; i < MysticMarshGrid::kCellCount; i++) {
 		const MysticMarshGrid::Cell &cell = _drawCells[i];
-		if (cell.type < MysticMarshGrid::kCellSymbolSDiv1Type02 || MysticMarshGrid::kCellSymbolEntry1Type60 <= cell.type)
+		int symbolType = cell.type;
+		// Mark the restored L4 upper-edge loss route without changing the cell's routing.
+		if (_bgKind == MysticMarshGrid::kBackgroundL4LayoutA_06 && i == kL4RejectVisualCellIdx)
+			symbolType = kRejectCellType;
+		if (symbolType < MysticMarshGrid::kCellSymbolSDiv1Type02 || MysticMarshGrid::kCellSymbolEntry1Type60 <= symbolType)
 			continue;
 		const Common::Point32 position = MysticMarshL4Background::cellPosition(i);
-		drawColorSymbol(screen, cell.type - MysticMarshGrid::kCellSymbolSDiv1Type02, Common::Point32(position.x + 3, position.y + 61));
+		drawColorSymbol(screen, symbolType - MysticMarshGrid::kCellSymbolSDiv1Type02, Common::Point32(position.x + 3, position.y + 61));
 		if (MysticMarshGrid::kCellSymbolCDiv1Type06 <= cell.type && cell.type <= MysticMarshGrid::kCellSymbolCDiv4Type09 &&
 			1 <= cell.trait && cell.trait <= 4 && 1 <= cell.value && cell.value <= 5) {
 			if (cell.trait - 1 == static_cast<int>(ZmbTrait::TraitKind::kNose01))

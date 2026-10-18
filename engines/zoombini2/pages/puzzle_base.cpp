@@ -47,7 +47,6 @@ void PuzzleBase::init() {
 	debug(1, "Puzzle::init - %s (page %d)", getPageName(), static_cast<int>(_pageId));
 
 	_vm->_gfx->getPageLayerStack()->clear();
-	_backgroundPath.clear();
 	_vm->_gfx->getPageLayerStack()->addLayer(1);
 	if (_initialBackgroundPath) {
 		const Common::Path bgPath(_initialBackgroundPath);
@@ -70,9 +69,7 @@ void PuzzleBase::init() {
 }
 
 bool PuzzleBase::loadPrimaryLayerBackground(const Common::Path &path) {
-	const bool loaded = _vm->_gfx->getPageLayerStack()->loadLayerBackground(0, path);
-	_backgroundPath = loaded ? path.toString('/') : Common::String();
-	return loaded;
+	return _vm->_gfx->getPageLayerStack()->loadLayerBackground(0, path);
 }
 
 void PuzzleBase::drawPrimaryPageLayer(ManagedSurface32 *screen) {

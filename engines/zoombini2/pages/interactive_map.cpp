@@ -26,12 +26,12 @@
 
 #include "graphics/font.h"
 #include "zoombini2/graphics.h"
-#include "zoombini2/text_manager.h"
 #include "zoombini2/pages/dialog_msgbox.h"
 #include "zoombini2/pages/interactive_map.h"
 #include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
+#include "zoombini2/text_manager.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
@@ -672,20 +672,18 @@ void InteractiveMap::drawL4Legend(ManagedSurface32 *screen) const {
 	const uint32 fillColor = kL4Color.toPixel(screen->format);
 	const uint32 outlineColor = screen->format.ARGBToColor(255, 255, 242, 0); // #FFF200
 
-	// Draw a slanted rect to be clicked on.
-	for (int y = kL4TabTop; y < kL4TabBottom; y++) {
-		// Graphics::Surface does not support filling of a slanted rect.
-		// Draw line by line to mitigate this limitation, think as a HDMA trick on 2D game consoles.
-		const int slant = (y - kL4TabTop) * kL4TabSlant / (kL4TabBottom - kL4TabTop);
-		screen->fillRect(Common::Rect32(kL4TabLeft - slant, y, kL4TabRight - slant, y + 1), fillColor);
-	}
+	_vm->_gfx->fillSlantedRect(screen, Common::Rect32(kL4TabLeft, kL4TabTop, kL4TabRight, kL4TabBottom), -kL4TabSlant, fillColor, true);
 
 	// Frame a slanted rect on hover.
 	if (_hoveredLegendTab == 4) {
-		_vm->_gfx->drawLine(screen, Common::Point32(kL4TabLeft, kL4TabTop), Common::Point32(kL4TabRight, kL4TabTop), outlineColor, kL4TabBorderThickness);
-		_vm->_gfx->drawLine(screen, Common::Point32(kL4TabLeft - kL4TabSlant, kL4TabBottom), Common::Point32(kL4TabRight - kL4TabSlant, kL4TabBottom), outlineColor, kL4TabBorderThickness);
-		_vm->_gfx->drawLine(screen, Common::Point32(kL4TabLeft, kL4TabTop), Common::Point32(kL4TabLeft - kL4TabSlant, kL4TabBottom), outlineColor, kL4TabBorderThickness);
-		_vm->_gfx->drawLine(screen, Common::Point32(kL4TabRight, kL4TabTop), Common::Point32(kL4TabRight - kL4TabSlant, kL4TabBottom), outlineColor, kL4TabBorderThickness);
+		_vm->_gfx->drawLine(screen, Common::Point32(kL4TabLeft, kL4TabTop), Common::Point32(kL4TabRight, kL4TabTop),
+							outlineColor, kL4TabBorderThickness, true);
+		_vm->_gfx->drawLine(screen, Common::Point32(kL4TabLeft - kL4TabSlant, kL4TabBottom), Common::Point32(kL4TabRight - kL4TabSlant, kL4TabBottom),
+							outlineColor, kL4TabBorderThickness, true);
+		_vm->_gfx->drawLine(screen, Common::Point32(kL4TabLeft, kL4TabTop), Common::Point32(kL4TabLeft - kL4TabSlant, kL4TabBottom),
+							outlineColor, kL4TabBorderThickness, true);
+		_vm->_gfx->drawLine(screen, Common::Point32(kL4TabRight, kL4TabTop), Common::Point32(kL4TabRight - kL4TabSlant, kL4TabBottom),
+							outlineColor, kL4TabBorderThickness, true);
 	}
 
 	// Draw a label explaining restoration of cut level - Level4.

@@ -345,10 +345,10 @@ Fixed32 Fixed32::fromInt(int32 value) {
 	return fromRawBits(static_cast<uint32>(value) << kFractionalBits);
 }
 
-Fixed32 Fixed32::fromFloat(Float32 value) {
-	static constexpr Float32 kMinimum = -2097152.0f;
-	static constexpr Float32 kMaximumExclusive = 2097152.0f;
-	static constexpr Float32 kScale = 1 << kFractionalBits;
+Fixed32 Fixed32::fromFloat(float value) {
+	static constexpr float kMinimum = -2097152.0f;
+	static constexpr float kMaximumExclusive = 2097152.0f;
+	static constexpr float kScale = 1 << kFractionalBits;
 	assert(kMinimum <= value && value < kMaximumExclusive);
 	return Fixed32(static_cast<int32>(value * kScale));
 }
@@ -357,9 +357,9 @@ int32 Fixed32::toInt() const {
 	return arithmeticShiftRight(static_cast<uint32>(_rawValue));
 }
 
-Float32 Fixed32::toFloat() const {
-	static constexpr Float32 kScale = 1 << kFractionalBits;
-	return static_cast<Float32>(_rawValue) / kScale;
+float Fixed32::toFloat() const {
+	static constexpr float kScale = 1 << kFractionalBits;
+	return static_cast<float>(_rawValue) / kScale;
 }
 
 Fixed32 Fixed32::operator*(const Fixed32 &right) const {
@@ -543,6 +543,8 @@ public:
 	virtual bool evaluate(uint32 tickCount, Common::Point32 &outPosition) = 0;
 	/** Return the latest evaluated point as integer pixel coordinates. */
 	virtual Common::Point32 getPosition() const = 0;
+	/** Return the latest evaluated coordinate as float without advancing playback. */
+	virtual void getSubpixelPosition(float &x, float &y) const = 0;
 	/** Set the gameplay timestamp in milliseconds from which curve progress is measured. */
 	virtual void setStartTime(uint32 tickCount) = 0;
 	/** Return the gameplay timestamp in milliseconds from which curve progress is measured. */
@@ -552,9 +554,9 @@ public:
 	/** Return the number of endpoint evaluations remaining after traversal. */
 	virtual int getWaitRemaining() const = 0;
 	/** Set the dimensionless curve parameter from a native float. */
-	virtual void setParameter(Float32 parameter) = 0;
+	virtual void setParameter(float parameter) = 0;
 	/** Return the dimensionless curve parameter as a native float. */
-	virtual Float32 getParameter() const = 0;
+	virtual float getParameter() const = 0;
 };
 
 struct CubicBezierCurve::FixedNumeric {
@@ -566,17 +568,17 @@ struct CubicBezierCurve::FixedNumeric {
 	/** Interpret an integer as a raw Q10 scalar. */
 	static Scalar fromRaw(int32 value) { return Fixed32::fromRaw(value); }
 	/** Convert a native float to a Q10 scalar. */
-	static Scalar fromFloat(Float32 value) { return Fixed32::fromFloat(value); }
+	static Scalar fromFloat(float value) { return Fixed32::fromFloat(value); }
 	/** Return the integer component of a Q10 scalar. */
 	static int32 toInt(const Scalar &value) { return value.toInt(); }
 	/** Convert a Q10 scalar to a native float. */
-	static Float32 toFloat(const Scalar &value) { return value.toFloat(); }
+	static float toFloat(const Scalar &value) { return value.toFloat(); }
 	/** Return whether the left scalar is strictly greater than the right scalar. */
 	static bool greater(const Scalar &left, const Scalar &right) { return right < left; }
 };
 
 struct CubicBezierCurve::FloatNumeric {
-	typedef Float32 Scalar;
+	typedef float Scalar;
 
 	struct Point {
 		/** Horizontal curve coordinate in floating-point pixel units. */
@@ -603,7 +605,7 @@ struct CubicBezierCurve::FloatNumeric {
 	/** Convert raw Q10 units to a floating-point scalar. */
 	static Scalar fromRaw(int32 value) { return static_cast<Scalar>(value) / 1024.0f; }
 	/** Retain a native float without conversion. */
-	static Scalar fromFloat(Float32 value) { return value; }
+	static Scalar fromFloat(float value) { return value; }
 	/** Round a floating-point coordinate down to an integer pixel coordinate. */
 	static int32 toInt(Scalar value) {
 		int32 result = static_cast<int32>(value);
@@ -612,7 +614,7 @@ struct CubicBezierCurve::FloatNumeric {
 		return result;
 	}
 	/** Return the native floating-point scalar. */
-	static Float32 toFloat(Scalar value) { return value; }
+	static float toFloat(Scalar value) { return value; }
 	/** Return whether the left scalar is strictly greater than the right scalar. */
 	static bool greater(Scalar left, Scalar right) { return right < left; }
 };
@@ -685,6 +687,12 @@ public:
 		return Common::Point32(Numeric::toInt(_position.x), Numeric::toInt(_position.y));
 	}
 
+	/** Export the current coordinate as float without advancing playback. */
+	void getSubpixelPosition(float &x, float &y) const override {
+		x = Numeric::toFloat(_position.x);
+		y = Numeric::toFloat(_position.y);
+	}
+
 	/** Set the gameplay timestamp in milliseconds from which curve progress is measured. */
 	void setStartTime(uint32 tickCount) override { _startTime = tickCount; }
 	/** Return the gameplay timestamp in milliseconds from which curve progress is measured. */
@@ -694,12 +702,12 @@ public:
 	/** Return the number of endpoint evaluations remaining after traversal. */
 	int getWaitRemaining() const override { return _waitRemaining; }
 	/** Set the dimensionless curve parameter from a native float. */
-	void setParameter(Float32 parameter) override {
+	void setParameter(float parameter) override {
 		_parameter = Numeric::fromFloat(parameter);
 		calculatePosition();
 	}
 	/** Return the dimensionless curve parameter as a native float. */
-	Float32 getParameter() const override { return Numeric::toFloat(_parameter); }
+	float getParameter() const override { return Numeric::toFloat(_parameter); }
 
 private:
 	/** Start point in the selected numeric representation. */
@@ -805,6 +813,15 @@ Common::Point32 CubicBezierCurve::getPosition() const {
 	return _initialized ? _evaluator->getPosition() : Common::Point32();
 }
 
+void CubicBezierCurve::getSubpixelPosition(float &x, float &y) const {
+	if (_initialized) {
+		_evaluator->getSubpixelPosition(x, y);
+	} else {
+		x = 0.0f;
+		y = 0.0f;
+	}
+}
+
 void CubicBezierCurve::setStartTime(uint32 tickCount) {
 	_evaluator->setStartTime(tickCount);
 }
@@ -836,7 +853,7 @@ CubicBezierCurve::Evaluator *CubicBezierCurve::createEvaluator(BezierCurveDataTy
 void CubicBezierCurve::rebuildEvaluator() {
 	const uint32 previousStartTime = _evaluator->getStartTime();
 	const int previousWaitRemaining = _evaluator->getWaitRemaining();
-	const Float32 previousParameter = _evaluator->getParameter();
+	const float previousParameter = _evaluator->getParameter();
 
 	delete _evaluator;
 	_evaluator = createEvaluator(_dataType);
