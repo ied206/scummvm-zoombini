@@ -19,6 +19,8 @@
  *
  */
 
+#include <math.h>
+
 #include "common/debug.h"
 #include "common/endian.h"
 #include "common/ptr.h"
@@ -41,6 +43,7 @@
 namespace Zoombini2 {
 
 constexpr Size32 Gfx::kScreenSize;
+constexpr Graphics::PixelFormat Gfx::kScreenFormat;
 constexpr int Gfx::kNoMaxWidth;
 constexpr const char *Gfx::kBasicZoombiniAnimationPath;
 constexpr const char *Gfx::kCelebrationZoombiniAnimationPath;
@@ -1054,9 +1057,8 @@ void RleBlock::drawToScreenInternal(ManagedSurface32 *destSurface, const Common:
 
 Gfx::Gfx(Zoombini2Engine *vm)
 	: _vm(vm) {
-	static constexpr Graphics::PixelFormat bgra32 = Graphics::PixelFormat::createFormatBGRA32();
-	initGraphics(Gfx::kScreenSize.width, Gfx::kScreenSize.height, &bgra32);
-	_screen = new ManagedSurface32(Gfx::kScreenSize, bgra32);
+	initGraphics(Gfx::kScreenSize.width, Gfx::kScreenSize.height, &kScreenFormat);
+	_screen = new ManagedSurface32(Gfx::kScreenSize, kScreenFormat);
 	_pageLayerStack = new PageLayerStack(vm);
 	_dropTargetGlowSprite = loadSharedRleBlock(kDropTargetGlowPath);
 	if (!_dropTargetGlowSprite)
@@ -1220,7 +1222,7 @@ void Gfx::clearBitBlockCache(BitBlockCache &cache) {
 }
 
 void Gfx::clearPageBitmapCache() {
-	_background = nullptr;
+	clearBackground();
 	clearRleBlockCache(_pageRleBlocks);
 	clearBitBlockCache(_pageBitBlocks);
 	for (uint i = 0; i < _pageMaskedBitBlocks.size(); i++)
@@ -1271,26 +1273,31 @@ void Gfx::drawBitBlockSubRect(ManagedSurface32 *destSurface, const BitBlock *bit
 }
 
 bool Gfx::loadBackground(const Common::String &key) {
-	BitBlock *background = loadPageBitBlock(key);
-	if (!background)
+	BitBlock bitmap(_vm);
+	if (!bitmap.load(Common::Path(key)))
 		return false;
 
-	_background = background;
+	ManagedSurface32 *bgSurface = createSurface(bitmap.getSize());
+	bitmap.drawToSurface(bgSurface, Common::Point32(0, 0));
+	bitmap.recordPageCacheUse();
+	clearBackground();
+	_backSurface = bgSurface;
 	return true;
 }
 
 void Gfx::clearBackground() {
-	_background = nullptr;
+	delete _backSurface;
+	_backSurface = nullptr;
 }
 
 void Gfx::drawBackground(ManagedSurface32 *destSurface, const Common::Point32 &pos) const {
-	if (destSurface && _background)
-		_background->drawToSurface(destSurface, pos);
+	if (destSurface && _backSurface)
+		destSurface->blitFrom(*_backSurface, pos);
 }
 
 void Gfx::drawBackgroundSubRect(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect &srcRect) const {
-	if (destSurface && _background)
-		_background->drawSubRect(destSurface, pos, srcRect);
+	if (destSurface && _backSurface)
+		destSurface->copyRectToSurface(_backSurface->rawSurface(), pos.x, pos.y, Common::Rect32(srcRect.left, srcRect.top, srcRect.right, srcRect.bottom));
 }
 
 void Gfx::drawRleBlock(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos) const {
@@ -1566,54 +1573,434 @@ void Gfx::fillRect(ManagedSurface32 *destSurface, const Common::Rect &rect, uint
 		destSurface->fillRect(rect, color);
 }
 
+void Gfx::fillSlantedRect(ManagedSurface32 *destSurface, const Common::Rect32 &rect, int slant, uint32 color, bool antialias) const {
+	if (!destSurface || rect.width() <= 0 || rect.height() <= 0)
+		return;
+
+	// Determine Y range to draw.
+	const int firstY = MAX(0, rect.top);
+	const int endY = MIN<int>(destSurface->h, rect.bottom);
+	if (endY <= firstY)
+		return;
+
+	// [*] Non-AA path: Simplely draw a line by scanline.
+	if (!antialias) {
+		for (int y = firstY; y < endY; y++) {
+			const int offset = static_cast<int>((static_cast<int64>(y) - rect.top) * slant / rect.height());
+			destSurface->hLine(rect.left + offset, y, rect.right + offset - 1, color);
+		}
+		return;
+	}
+
+	// [*] AA path: Find the leftmost/rightmost X coordinates with subpixel precision, by scanline.
+	// Calculate the size of a temporary surface for per-pixel geometric coverage.
+	// The shift varies linearly, so checking the first and last rows is enough.
+	// Measure shifts from rect.top before clipping, to preserve the original slant regardless of clipping.
+	const float firstRowShiftX = (firstY - rect.top) * slant / static_cast<float>(rect.height());
+	const float lastRowShiftX = (endY - 1 - rect.top) * slant / static_cast<float>(rect.height());
+	const float leftmostX = rect.left + MIN(firstRowShiftX, lastRowShiftX);
+	const float rightmostX = rect.right + MAX(firstRowShiftX, lastRowShiftX);
+	const int firstX = static_cast<int>(floorf(CLIP(leftmostX, 0.0f, static_cast<float>(destSurface->w))));
+	const int endX = static_cast<int>(ceilf(CLIP(rightmostX, 0.0f, static_cast<float>(destSurface->w))));
+	const int width = endX - firstX;
+	const int height = endY - firstY;
+	if (width <= 0)
+		return;
+	// A surface holds a pixel coverage in a range of 0 ~ 255.
+	// For a subpixel granularity, partially covered pixels are represented as partial transparency.
+	Graphics::ManagedSurface coverage(width, height, Graphics::PixelFormat::createFormatCLUT8());
+
+	// Draw each scanline with subpixel X granularity.
+	for (int y = firstY; y < endY; y++) {
+		const float shiftX = (y - rect.top) * slant / static_cast<float>(rect.height());
+		const float rawLeftX = rect.left + shiftX;
+		const float rawRightX = rect.right + shiftX;
+		hLineAA(coverage.surfacePtr(), rawLeftX - firstX, y - firstY, rawRightX - firstX);
+	}
+	blitColorWithCoverage(destSurface, coverage.surfacePtr(), Common::Point32(firstX, firstY), color);
+}
+
 void Gfx::frameRect(ManagedSurface32 *destSurface, const Common::Rect &rect, uint32 color) const {
 	if (destSurface)
 		destSurface->frameRect(rect, color);
 }
 
-void Gfx::drawLine(ManagedSurface32 *destSurface, const Common::Point32 &start, const Common::Point32 &end, uint32 color, int thickness) const {
+void Gfx::drawLine(ManagedSurface32 *destSurface, const Common::Point32 &start, const Common::Point32 &end, uint32 color, int thickness, bool antialias) const {
 	if (!destSurface || thickness <= 0)
 		return;
 
+	// [*] AA path
+	if (antialias) {
+		drawLineAA(destSurface, start, end, color, thickness);
+		return;
+	}
+
+	// [*] Non-AA path
 	if (thickness <= 1)
 		destSurface->drawLine(start.x, start.y, end.x, end.y, color);
 	else
 		destSurface->drawThickLine(start.x, start.y, end.x, end.y, thickness, thickness, color);
 }
 
-void Gfx::drawCubicBezierCurve(ManagedSurface32 *destSurface, CubicBezierCurve &curve, uint32 color, int thickness) const {
-	if (!destSurface)
+void Gfx::drawLines(ManagedSurface32 *destSurface, const Common::Array<LineSegment> &lines, uint32 color, int thickness, bool antialias) const {
+	if (!destSurface || thickness <= 0 || lines.empty())
 		return;
-	const Common::Rect32 sampleBounds(0, 0, destSurface->w, destSurface->h);
-	drawCubicBezierCurve(destSurface, curve, color, thickness, sampleBounds);
+
+	// [*] AA path
+	if (antialias) {
+		drawLinesAA(destSurface, lines, color, thickness);
+		return;
+	}
+
+	// [*] Non-AA path
+	for (const LineSegment &line : lines)
+		drawLine(destSurface, line.start, line.end, color, thickness);
 }
 
-void Gfx::drawCubicBezierCurve(ManagedSurface32 *destSurface, CubicBezierCurve &curve, uint32 color, int thickness, const Common::Rect32 &sampleBounds) const {
-	if (!destSurface || thickness <= 0)
+void Gfx::hLineAA(Graphics::Surface *coverage, float left, int y, float right) {
+	assert(coverage && coverage->format.isCLUT8());
+	if (y < 0 || coverage->h <= y || right <= left)
 		return;
 
+	// Calculate the size of a target area for per-pixel geometric coverage.
+	const int firstX = static_cast<int>(floorf(CLIP(left, 0.0f, static_cast<float>(coverage->w))));
+	const int endX = static_cast<int>(ceilf(CLIP(right, 0.0f, static_cast<float>(coverage->w))));
+	if (endX <= firstX)
+		return;
+
+	// Fill only interior pixels to 255; merge the two boundary pixels with their existing coverage below.
+	if (firstX + 2 < endX)
+		coverage->hLine(firstX + 1, y, endX - 2, 255);
+
+	// Adding 0.5f rounds nonnegative coverage to the nearest byte value before the cast truncates it.
+	const float firstCoverage = MIN(right, static_cast<float>(firstX + 1)) - MAX(left, static_cast<float>(firstX));
+	const uint32 firstValue = static_cast<byte>(CLIP(firstCoverage, 0.0f, 1.0f) * 255.0f + 0.5f);
+	coverage->setPixel(firstX, y, MAX(coverage->getPixel(firstX, y), firstValue));
+	if (firstX + 1 < endX) {
+		const float lastCoverage = MIN(right, static_cast<float>(endX)) - MAX(left, static_cast<float>(endX - 1));
+		// Adding 0.5f rounds nonnegative coverage to the nearest byte value before the cast truncates it.
+		const uint32 lastValue = static_cast<byte>(CLIP(lastCoverage, 0.0f, 1.0f) * 255.0f + 0.5f);
+		coverage->setPixel(endX - 1, y, MAX(coverage->getPixel(endX - 1, y), lastValue));
+	}
+}
+
+void Gfx::vLineAA(Graphics::Surface *coverage, int x, float top, float bottom) {
+	assert(coverage && coverage->format.isCLUT8());
+	if (x < 0 || coverage->w <= x || bottom <= top)
+		return;
+
+	// Calculate the size of a target area for per-pixel geometric coverage.
+	const int firstY = static_cast<int>(floorf(CLIP(top, 0.0f, static_cast<float>(coverage->h))));
+	const int endY = static_cast<int>(ceilf(CLIP(bottom, 0.0f, static_cast<float>(coverage->h))));
+	if (endY <= firstY)
+		return;
+
+	// Fill only interior pixels to 255; merge the two boundary pixels with their existing coverage below.
+	if (firstY + 2 < endY)
+		coverage->vLine(x, firstY + 1, endY - 2, 255);
+
+	// Adding 0.5f rounds nonnegative coverage to the nearest byte value before the cast truncates it.
+	const float firstCoverage = MIN(bottom, static_cast<float>(firstY + 1)) - MAX(top, static_cast<float>(firstY));
+	const uint32 firstValue = static_cast<byte>(CLIP(firstCoverage, 0.0f, 1.0f) * 255.0f + 0.5f);
+	coverage->setPixel(x, firstY, MAX(coverage->getPixel(x, firstY), firstValue));
+	if (firstY + 1 < endY) {
+		const float lastCoverage = MIN(bottom, static_cast<float>(endY)) - MAX(top, static_cast<float>(endY - 1));
+		// Adding 0.5f rounds nonnegative coverage to the nearest byte value before the cast truncates it.
+		const uint32 lastValue = static_cast<byte>(CLIP(lastCoverage, 0.0f, 1.0f) * 255.0f + 0.5f);
+		coverage->setPixel(x, endY - 1, MAX(coverage->getPixel(x, endY - 1), lastValue));
+	}
+}
+
+void Gfx::blitColorWithCoverage(ManagedSurface32 *destSurface, const Graphics::Surface *coverage, const Common::Point32 &pos, uint32 color) {
+	assert(coverage && coverage->format.isCLUT8());
+
+	byte srcAlpha = 0;
+	byte srcRed = 0;
+	byte srcGreen = 0;
+	byte srcBlue = 0;
+	destSurface->format.colorToARGB(color, srcAlpha, srcRed, srcGreen, srcBlue);
+
+	// Keep coverage in an alpha-capable BGRA32 format, regardless of the dest format.
+	ManagedSurface32 coloredCoverage(Size32(coverage->w, coverage->h), kScreenFormat);
+
+	// crossBlitMap() uses this table to map each coverage byte to a colored pixel with effective alpha.
+	// This conversion table is separate from the coverage surface's palette; no palette is assigned to that surface.
+	uint32 colorMap[256] = {};
+	for (uint i = 0; i < ARRAYSIZE(colorMap); i++) {
+		// Effective srcAlpha = colorAlpha * coverage / 255; RGB stays unchanged.
+		// i is coverage (0..255); adding 127 rounds alpha * i / 255 to the nearest integer.
+		const byte pixelAlpha = static_cast<byte>((srcAlpha * i + 127) / 255);
+		colorMap[i] = coloredCoverage.format.ARGBToColor(pixelAlpha, srcRed, srcGreen, srcBlue);
+	}
+
+	// Map each coverage byte to its color and effective alpha using the shared converter.
+	Graphics::crossBlitMap(static_cast<byte *>(coloredCoverage.getPixels()), static_cast<const byte *>(coverage->getPixels()),
+						   coloredCoverage.pitch, coverage->pitch, coverage->w, coverage->h, coloredCoverage.format.bytesPerPixel, colorMap);
+
+	// Combine the final image to destSurface.
+	destSurface->blitFrom(coloredCoverage, pos);
+}
+
+void Gfx::drawLineAA(ManagedSurface32 *destSurface, const Common::Point32 &start, const Common::Point32 &end, uint32 color, int thickness) {
+	const Common::Array<LineSegment> lines = {LineSegment{start, end}};
+	drawLinesAA(destSurface, lines, color, thickness);
+}
+
+void Gfx::drawLinesAA(ManagedSurface32 *destSurface, const Common::Array<LineSegment> &lines, uint32 color, int thickness) {
+	int32 left = destSurface->w;
+	int32 top = destSurface->h;
+	int32 right = 0;
+	int32 bottom = 0;
+	for (const LineSegment &line : lines) {
+		left = MIN(left, MIN(line.start.x, line.end.x));
+		top = MIN(top, MIN(line.start.y, line.end.y));
+		right = MAX(right, MAX(line.start.x, line.end.x) + thickness);
+		bottom = MAX(bottom, MAX(line.start.y, line.end.y) + thickness);
+	}
+	const int32 firstX = MAX(0, left);
+	const int32 firstY = MAX(0, top);
+	const int32 endX = MIN<int32>(destSurface->w, right);
+	const int32 endY = MIN<int32>(destSurface->h, bottom);
+	const int32 width = endX - firstX;
+	const int32 height = endY - firstY;
+	if (width <= 0 || height <= 0)
+		return;
+
+	// Every segment contributes to this shared mask; overlaps are blended only once.
+	Graphics::ManagedSurface coverage(width, height, Graphics::PixelFormat::createFormatCLUT8());
+	const Common::Point32 origin(firstX, firstY);
+	for (const LineSegment &line : lines) {
+		// Convert one integer segment to coverage-local float coordinates for the shared area calculation.
+		const SubpixelLineSegment localSegment = {
+			static_cast<float>(line.start.x - firstX),
+			static_cast<float>(line.start.y - firstY),
+			static_cast<float>(line.end.x - firstX),
+			static_cast<float>(line.end.y - firstY),
+		};
+		rasterizeLineAA(coverage.surfacePtr(), localSegment, thickness);
+	}
+	blitColorWithCoverage(destSurface, coverage.surfacePtr(), origin, color);
+}
+
+float Gfx::integrateClampedCoverage(float start, float end) {
+	if (end < start)
+		SWAP(start, end);
+	if (end <= 0.0f)
+		return 0.0f;
+	if (1.0f <= start)
+		return 1.0f;
+	// Without clipping, the ramp's mean is the average of its endpoint heights.
+	if (0.0f <= start && end <= 1.0f)
+		return (start + end) * 0.5f;
+	const float span = end - start;
+	if (start < 0.0f) {
+		// Crossing zero leaves a triangle; crossing both limits also adds a height-one plateau.
+		if (end <= 1.0f)
+			return (end / span) * end * 0.5f;
+		return (end - 0.5f) / span;
+	}
+	// Crossing only the upper limit removes a triangle from full coverage.
+	const float tail = 1.0f - start;
+	return 1.0f - (tail / span) * tail * 0.5f;
+}
+
+void Gfx::rasterizeLineAA(Graphics::Surface *coverage, SubpixelLineSegment segment, float thickness) {
+	assert(coverage && coverage->format.isCLUT8());
+	// Sweep a square pen whose top-left corner follows the straight segment, extending toward +x and +y.
+	// steep is true when the absolute Y change exceeds X: swap axes to scan along Y.
+	// Otherwise (including equal changes), scan along X; restore the original axes when writing pixels.
+	const bool steep = ABS(segment.endX - segment.startX) < ABS(segment.endY - segment.startY);
+	if (steep) {
+		SWAP(segment.startX, segment.startY);
+		SWAP(segment.endX, segment.endY);
+	}
+	if (segment.endX < segment.startX) {
+		SWAP(segment.startX, segment.endX);
+		SWAP(segment.startY, segment.endY);
+	}
+	// major is the scan axis (Y when steep, X otherwise); slope is minor-axis change per major-axis pixel.
+	const int majorSize = steep ? coverage->h : coverage->w;
+	const int minorSize = steep ? coverage->w : coverage->h;
+	const float length = segment.endX - segment.startX;
+	const float slope = 0.0f < length ? (segment.endY - segment.startY) / length : 0.0f;
+	// Include pen thickness, clip to the coverage surface, then round outwards; majorEnd is exclusive.
+	const int majorBegin = static_cast<int>(floorf(CLIP(segment.startX, 0.0f, static_cast<float>(majorSize))));
+	const int majorEnd = static_cast<int>(ceilf(CLIP(segment.endX + thickness, 0.0f, static_cast<float>(majorSize))));
+	for (int major = majorBegin; major < majorEnd; major++) {
+		// Only integrate the part of this pixel column touched by the swept pen.
+		const float first = MAX(segment.startX, static_cast<float>(major));
+		const float last = MIN(segment.endX + thickness, static_cast<float>(major + 1));
+		const float columnWidth = last - first;
+		const float firstCorner = CLIP(segment.endX, first, last);
+		const float secondCorner = CLIP(segment.startX + thickness, first, last);
+		// At the segment's endX and startX + thickness, a boundary switches between an endpoint cap and the sloping segment.
+		// Split here so both span boundaries remain linear within each slice.
+		float cuts[] = {
+			first,
+			MIN(firstCorner, secondCorner),
+			MAX(firstCorner, secondCorner),
+			last,
+		};
+		// Clipped corners often coincide with first or last; discard duplicate cuts before evaluating boundaries.
+		uint cutCount = 1;
+		for (uint i = 1; i < ARRAYSIZE(cuts); i++) {
+			if (cuts[cutCount - 1] < cuts[i]) {
+				cuts[cutCount] = cuts[i];
+				cutCount += 1;
+			}
+		}
+		float low[ARRAYSIZE(cuts)] = {};
+		float high[ARRAYSIZE(cuts)] = {};
+		for (uint i = 0; i < cutCount; i++) {
+			// Find the line positions reached by the two major-axis pen edges at this cut.
+			// Their order depends on the slope; adding thickness gives the larger minor-coordinate boundary.
+			const float firstMinor = segment.startY + MAX(0.0f, cuts[i] - segment.startX - thickness) * slope;
+			const float lastMinor = segment.startY + MIN(length, cuts[i] - segment.startX) * slope;
+			low[i] = MIN(firstMinor, lastMinor);
+			high[i] = MAX(firstMinor, lastMinor) + thickness;
+		}
+		// Each boundary moves in only one direction, so its endpoint extremes bound all touched rows.
+		// Inner bounds identify rows covered over the entire [first,last] interval.
+		const float outerLow = MIN(low[0], low[cutCount - 1]);
+		const float outerHigh = MAX(high[0], high[cutCount - 1]);
+		const float innerLow = MAX(low[0], low[cutCount - 1]);
+		const float innerHigh = MIN(high[0], high[cutCount - 1]);
+		const int minorBegin = static_cast<int>(floorf(CLIP(outerLow, 0.0f, static_cast<float>(minorSize))));
+		const int minorEnd = static_cast<int>(ceilf(CLIP(outerHigh, 0.0f, static_cast<float>(minorSize))));
+		const int solidBegin = static_cast<int>(ceilf(CLIP(innerLow, 0.0f, static_cast<float>(minorSize))));
+		const int solidEnd = static_cast<int>(floorf(CLIP(innerHigh, 0.0f, static_cast<float>(minorSize))));
+		for (int minor = minorBegin; minor < minorEnd; minor++) {
+			// Full coverage requires the entire pixel in both axes; writing 255 also preserves MAX merging.
+			if (columnWidth == 1.0f && minor == solidBegin && minor < solidEnd) {
+				if (steep)
+					coverage->hLine(solidBegin, major, solidEnd - 1, 255);
+				else
+					coverage->vLine(major, solidBegin, solidEnd - 1, 255);
+				// Skip the whole span that was just filled; only its surrounding edge pixels need individual work.
+				minor = solidEnd - 1;
+				continue;
+			}
+			const int x = steep ? minor : major;
+			const int y = steep ? major : minor;
+			byte &pixel = *static_cast<byte *>(coverage->getBasePtr(x, y));
+			if (pixel == 255)
+				continue;
+			// A row inside the inner bounds needs only the major-axis overlap as its area.
+			float area = columnWidth;
+			if (minor < innerLow || innerHigh < minor + 1) {
+				area = 0.0f;
+				for (uint i = 0; i + 1 < cutCount; i++) {
+					// Clamped upper minus lower ramp means give the average height inside this pixel.
+					// Multiply by the slice width and sum to integrate its covered area.
+					const float upper = integrateClampedCoverage(high[i] - minor, high[i + 1] - minor);
+					const float lower = integrateClampedCoverage(low[i] - minor, low[i + 1] - minor);
+					area += (cuts[i + 1] - cuts[i]) * (upper - lower);
+				}
+			}
+			// Keep the strongest segment coverage; summing would make overlaps and joins more opaque.
+			// Adding 0.5f rounds nonnegative coverage to the nearest byte value before the cast truncates it.
+			pixel = MAX(pixel, static_cast<byte>(CLIP(area, 0.0f, 1.0f) * 255.0f + 0.5f));
+		}
+	}
+}
+
+void Gfx::drawCurveLineSegmentsAA(ManagedSurface32 *surface, const Common::Array<SubpixelLineSegment> &lineSegments, uint32 color, int thickness) {
+	if (lineSegments.empty())
+		return;
+	// The pen extends each endpoint toward +x and +y by thickness pixels.
+	float left = surface->w;
+	float top = surface->h;
+	float right = 0.0f;
+	float bottom = 0.0f;
+	for (const SubpixelLineSegment &segment : lineSegments) {
+		left = MIN(left, MIN(segment.startX, segment.endX));
+		top = MIN(top, MIN(segment.startY, segment.endY));
+		right = MAX(right, MAX(segment.startX, segment.endX) + thickness);
+		bottom = MAX(bottom, MAX(segment.startY, segment.endY) + thickness);
+	}
+	// Round outwards and clip to the destination before allocating a one-byte coverage mask.
+	const int firstX = static_cast<int>(floorf(CLIP(left, 0.0f, static_cast<float>(surface->w))));
+	const int firstY = static_cast<int>(floorf(CLIP(top, 0.0f, static_cast<float>(surface->h))));
+	const int endX = static_cast<int>(ceilf(CLIP(right, 0.0f, static_cast<float>(surface->w))));
+	const int endY = static_cast<int>(ceilf(CLIP(bottom, 0.0f, static_cast<float>(surface->h))));
+	const int width = endX - firstX;
+	const int height = endY - firstY;
+	if (width <= 0 || height <= 0)
+		return;
+	Graphics::ManagedSurface coverage(width, height, Graphics::PixelFormat::createFormatCLUT8());
+	// The mask's (0,0) corresponds to destination pixel (firstX,firstY).
+	// Subtract that origin here and add it back when compositing the mask onto the destination.
+	for (const SubpixelLineSegment &segment : lineSegments) {
+		const SubpixelLineSegment localSegment = {
+			segment.startX - firstX,
+			segment.startY - firstY,
+			segment.endX - firstX,
+			segment.endY - firstY,
+		};
+		rasterizeLineAA(coverage.surfacePtr(), localSegment, thickness);
+	}
+	// Composite the merged coverage once so shared pixels and joins retain the stroke's opacity.
+	blitColorWithCoverage(surface, coverage.surfacePtr(), Common::Point32(firstX, firstY), color);
+}
+
+void Gfx::drawCubicBezierCurve(ManagedSurface32 *destSurface, CubicBezierCurve &curve, uint32 color, int thickness, bool antialias) const {
+	if (!destSurface)
+		return;
+	const Common::Rect32 sampleBounds = Common::Rect32(0, 0, destSurface->w, destSurface->h);
+	drawCubicBezierCurve(destSurface, curve, color, thickness, sampleBounds, antialias);
+}
+
+void Gfx::drawCubicBezierCurve(ManagedSurface32 *destSurface, CubicBezierCurve &curve, uint32 color, int thickness, const Common::Rect32 &sampleBounds, bool antialias) const {
+	if (!destSurface || thickness <= 0)
+		return;
+	// Sample on the evaluator's five-millisecond tick, with a cap on work for one draw.
 	static constexpr uint32 kEvaluationInterval = 5;
 	static constexpr uint32 kMaxEvaluationCount = 1024;
 	curve.computeCoeffs();
 	curve.setStartTime(0);
-	Common::Point32 previous = curve.getStartPosition();
+	// Capture straight segments from evaluated positions; the curve keeps its control points and playback state.
+	Common::Array<SubpixelLineSegment> lineSegments;
+	// Integer positions decide which endpoint pairs pass the bounds check; floats retain AA geometry.
+	Common::Point32 prevIntPos = curve.getStartPosition();
+	float prevX = prevIntPos.x;
+	float prevY = prevIntPos.y;
 	bool completed = false;
 	for (uint32 sample = 0; sample < kMaxEvaluationCount; sample++) {
 		Common::Point32 current;
-		const uint32 tickCount = sample * kEvaluationInterval;
-		if (!curve.evaluate(tickCount, current)) {
+		if (!curve.evaluate(sample * kEvaluationInterval, current)) {
 			completed = true;
 			break;
 		}
-		if (sampleBounds.contains(previous) && sampleBounds.contains(current))
-			drawLine(destSurface, previous, current, color, thickness);
-		previous = current;
+		float currentX = 0.0f;
+		float currentY = 0.0f;
+		if (antialias)
+			curve.getSubpixelPosition(currentX, currentY);
+		// Accept the same endpoint pairs as integer drawing; clipping happens later in the rasterizer.
+		if (sampleBounds.contains(prevIntPos) && sampleBounds.contains(current)) {
+			if (antialias) {
+				lineSegments.push_back({prevX, prevY, currentX, currentY});
+			} else {
+				drawLine(destSurface, prevIntPos, current, color, thickness);
+			}
+		}
+		prevIntPos = current;
+		prevX = currentX;
+		prevY = currentY;
 	}
+	// Sampling need not land on the authored endpoint, so finish with it after playback completes.
+	// Do not append it when sampling stopped at the iteration limit.
 	if (completed) {
 		const Common::Point32 end = curve.getEndPosition();
-		if (sampleBounds.contains(previous) && sampleBounds.contains(end))
-			drawLine(destSurface, previous, end, color, thickness);
+		if (sampleBounds.contains(prevIntPos) && sampleBounds.contains(end)) {
+			if (antialias) {
+				lineSegments.push_back(SubpixelLineSegment{prevX, prevY, static_cast<float>(end.x), static_cast<float>(end.y)});
+			} else {
+				drawLine(destSurface, prevIntPos, end, color, thickness);
+			}
+		}
 	}
+	if (antialias)
+		drawCurveLineSegmentsAA(destSurface, lineSegments, color, thickness);
 }
 
 void Gfx::drawString(ManagedSurface32 *destSurface, const Common::U32String &text, const Common::Point32 &pos, int maxWidth, const TextConf &conf) const {

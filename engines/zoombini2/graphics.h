@@ -232,6 +232,16 @@ class Gfx : public Common::NonCopyable {
 public:
 	/** Dimensions of the fixed internal game screen. */
 	static constexpr Size32 kScreenSize = Size32(800, 600);
+	/** BGRA32 format with eight-bit alpha for the game screen and temporary color surfaces. */
+	static constexpr Graphics::PixelFormat kScreenFormat = Graphics::PixelFormat::createFormatBGRA32();
+
+	/** Two destination-pixel endpoints defining one independent line segment. */
+	struct LineSegment {
+		/** First endpoint in destination pixels. */
+		Common::Point32 start;
+		/** Last endpoint in destination pixels. */
+		Common::Point32 end;
+	};
 
 	/** Sentinel for drawing text without a caller-specified width limit. */
 	static constexpr int kNoMaxWidth = -1;
@@ -303,12 +313,14 @@ public:
 		if (destSurface)
 			drawBitBlockSubRect(destSurface, loadPageBitBlock(key), pos, srcRect);
 	}
-	/** Load the active page background, replacing any previous one. */
+	/** Decode the active page background into a screen-format surface without retaining a bitmap-cache entry. */
 	bool loadBackground(const Common::String &key);
-	/** Forget the active page background; its bitmap remains in the page cache. */
+	/** Release the active page background surface. */
 	void clearBackground();
 	/** Return whether a page background is loaded. */
-	bool hasBackground() const { return _background != nullptr; }
+	bool hasBackground() const { return _backSurface != nullptr; }
+	/** Borrow the active background for page-specific composition until it is replaced or cleared. */
+	ManagedSurface32 *getBackgroundSurface() const { return _backSurface; }
 	/** Draw the loaded page background at @p pos. */
 	void drawBackground(ManagedSurface32 *destSurface, const Common::Point32 &pos) const;
 	/** Draw a sub-rectangle of the loaded page background at @p pos. */
@@ -390,14 +402,58 @@ public:
 	void fillRect(ManagedSurface32 *destSurface, const Common::Rect32 &rect, uint32 color) const;
 	/** Fill a clipped rectangle. */
 	void fillRect(ManagedSurface32 *destSurface, const Common::Rect &rect, uint32 color) const;
+	/**
+	 * Fill a rectangle whose horizontal spans shift linearly from top to bottom.
+	 *
+	 * @param[in,out] destSurface Destination surface; nullptr draws nothing.
+	 * @param[in] rect Unslanted rectangle in destination pixels, constructed as (left, top, right, bottom).
+	 *                 Its top edge and height define the shape; right and bottom are exclusive.
+	 *                 The slanted shape can extend outside this rectangle. Nonpositive width or height draws nothing.
+	 * @param[in] slant Total horizontal shift in pixels at the bottom boundary: positive shifts right,
+	 *                  negative shifts left, and zero leaves an ordinary rectangle. The width stays constant.
+	 * @param[in] color Fill color encoded in the destination pixel format.
+	 * @param[in] antialias Blend fractional left/right edge coverage when true; otherwise fill integer spans.
+	 *
+	 * At row y, add (y - rect.top) * slant / rect.height() to both rect.left and rect.right.
+	 * AA retains the fractional shift; non-AA integer division truncates toward zero.
+	 * Drawing is clipped to the destination without changing this interpolation.
+	 *
+	 * Example: a 60-by-40 rectangle with its top edge from (100, 50) to (160, 50).
+	 * The following calls are alternative ways to fill it:
+	 * @code
+	 * const Common::Rect32 rect(100, 50, 160, 90);
+	 * fillSlantedRect(destSurface, rect, 20, color, true);  // Bottom boundary at y = 90: [120, 180).
+	 * fillSlantedRect(destSurface, rect, -20, color, true); // Bottom boundary at y = 90: [80, 140).
+	 * fillSlantedRect(destSurface, rect, 0, color, true);   // Every row: [100, 160).
+	 * @endcode
+	 * With slant = 20 and AA enabled, row y = 50 fills [100, 160), row y = 70 fills [110, 170),
+	 * and the last row y = 89 fills [119.5, 179.5). The bottom boundary y = 90 is excluded,
+	 * so the last drawn row has slightly less than the full 20-pixel shift.
+	 */
+	void fillSlantedRect(ManagedSurface32 *destSurface, const Common::Rect32 &rect, int slant, uint32 color, bool antialias = false) const;
 	/** Draw a rectangle outline, clipping its edges to the destination surface. */
 	void frameRect(ManagedSurface32 *destSurface, const Common::Rect &rect, uint32 color) const;
-	/** Draw a line with a square pen of @p thickness pixels. */
-	void drawLine(ManagedSurface32 *destSurface, const Common::Point32 &start, const Common::Point32 &end, uint32 color, int thickness = 1) const;
-	/** Evaluate @p curve in five-millisecond steps, drawing chords inside the destination surface. */
-	void drawCubicBezierCurve(ManagedSurface32 *destSurface, CubicBezierCurve &curve, uint32 color, int thickness = 1) const;
-	/** Evaluate @p curve in five-millisecond steps, drawing chords inside @p sampleBounds. */
-	void drawCubicBezierCurve(ManagedSurface32 *destSurface, CubicBezierCurve &curve, uint32 color, int thickness, const Common::Rect32 &sampleBounds) const;
+	/** Draw a line with a square pen of @p thickness pixels, optionally blending subpixel edge coverage. */
+	void drawLine(ManagedSurface32 *destSurface, const Common::Point32 &start, const Common::Point32 &end, uint32 color,
+				  int thickness = 1, bool antialias = false) const;
+	/**
+	 * Draw independent line segments with one color and square-pen thickness.
+	 * AA merges coverage by maximum before one composite, so overlaps retain the drawing color's opacity.
+	 *
+	 * @param[in,out] destSurface Destination surface; nullptr draws nothing.
+	 * @param[in] lines Independent line segments; adjacent entries are not implicitly connected.
+	 * @param[in] color Drawing color encoded in the destination pixel format.
+	 * @param[in] thickness Square pen size in pixels; nonpositive values draw nothing.
+	 * @param[in] antialias Merge fractional coverage and composite once when true; otherwise draw each integer segment.
+	 */
+	void drawLines(ManagedSurface32 *destSurface, const Common::Array<LineSegment> &lines, uint32 color,
+				   int thickness = 1, bool antialias = false) const;
+	/** Evaluate @p curve in five-millisecond steps, optionally integrating subpixel coverage at destination resolution. */
+	void drawCubicBezierCurve(ManagedSurface32 *destSurface, CubicBezierCurve &curve, uint32 color,
+							  int thickness = 1, bool antialias = false) const;
+	/** Draw sampled line segments whose endpoints lie inside @p sampleBounds, optionally antialiasing their union. */
+	void drawCubicBezierCurve(ManagedSurface32 *destSurface, CubicBezierCurve &curve, uint32 color,
+							  int thickness, const Common::Rect32 &sampleBounds, bool antialias = false) const;
 	/**
 	 * Bundles the settings for one @ref Gfx::drawString call.
 	 * Mirrors the Z1 TextConf pattern: the font family travels as an enum and @ref Gfx resolves the object.
@@ -482,6 +538,105 @@ public:
 	void wordWrapText(const Common::U32String &text, int maxWidth, Common::Array<Common::U32String> &lines, const TextConf &conf) const;
 
 private:
+	/**
+	 * Write geometric coverage for the horizontal interval [left, right) on row y, clipped to the surface.
+	 * Merge by maximum with existing coverage; pixels outside the span remain unchanged.
+	 *
+	 * @param[in,out] coverage Non-null CLUT8 surface storing geometric coverage from 0 (uncovered) to 255 (fully covered).
+	 * @param[in] left Inclusive left boundary in coverage-surface pixels, retaining its fractional part.
+	 * @param[in] y Row in the coverage surface; an out-of-bounds row draws nothing.
+	 * @param[in] right Exclusive right boundary; an empty or reversed interval draws nothing.
+	 */
+	static void hLineAA(Graphics::Surface *coverage, float left, int y, float right);
+	/**
+	 * Write geometric coverage for the vertical interval [top, bottom) on column x, clipped to the surface.
+	 * Merge by maximum with existing coverage; pixels outside the span remain unchanged.
+	 *
+	 * @param[in,out] coverage Non-null CLUT8 surface storing geometric coverage from 0 (uncovered) to 255 (fully covered).
+	 * @param[in] x Column in the coverage surface; an out-of-bounds column draws nothing.
+	 * @param[in] top Inclusive top boundary in coverage-surface pixels, retaining its fractional part.
+	 * @param[in] bottom Exclusive bottom boundary; an empty or reversed interval draws nothing.
+	 */
+	static void vLineAA(Graphics::Surface *coverage, int x, float top, float bottom);
+	/**
+	 * Apply color to the per-pixel covered area computed by antialiasing, then composite the result onto the destination surface.
+	 *
+	 * This helper is the final rendering step shared by AA line, fill and curve renderers.
+	 * Curve callers merge line-segment coverage before this call so overlapping segments are blended once.
+	 *
+	 * @param[in,out] destSurface Non-null destination surface receiving the composited pixels.
+	 * @param[in] coverage Non-null CLUT8 surface storing how much of each pixel the shape covers: 0 = uncovered, 255 = fully covered.
+	 *                     Coverage is independent of the drawing color's opacity.
+	 *                     No color palette is needed.
+	 * @param[in] pos Destination pixel position corresponding to coverage pixel (0, 0).
+	 * @param[in] color Color encoded in the destination pixel format; its alpha is multiplied by coverage / 255.
+	 */
+	static void blitColorWithCoverage(ManagedSurface32 *destSurface, const Graphics::Surface *coverage, const Common::Point32 &pos, uint32 color);
+	/**
+	 * Draw one antialiased square-pen line through the shared line-batch renderer.
+	 *
+	 * @param[in,out] destSurface Non-null destination surface receiving the line.
+	 * @param[in] start First endpoint in destination pixels.
+	 * @param[in] end Last endpoint in destination pixels.
+	 * @param[in] color Drawing color encoded in the destination pixel format.
+	 * @param[in] thickness Positive square pen size in pixels.
+	 */
+	static void drawLineAA(ManagedSurface32 *destSurface, const Common::Point32 &start, const Common::Point32 &end, uint32 color, int thickness);
+	/**
+	 * Merge independent square-pen segments into one clipped mask and composite once.
+	 *
+	 * @param[in,out] destSurface Non-null destination surface receiving the merged drawing.
+	 * @param[in] lines Independent line segments with endpoints in destination pixels.
+	 * @param[in] color Drawing color encoded in the destination pixel format.
+	 * @param[in] thickness Positive square pen size in pixels.
+	 */
+	static void drawLinesAA(ManagedSurface32 *destSurface, const Common::Array<LineSegment> &lines, uint32 color, int thickness);
+	/**
+	 * Straight line endpoints retaining fractional pixel coordinates for AA drawing.
+	 * A segment captured between two sampled curve positions is called a chord;
+	 * @ref CubicBezierCurve retains the curved path and playback state separately.
+	 */
+	struct SubpixelLineSegment {
+		/** First endpoint's horizontal coordinate in pixels, retaining its fractional part. */
+		float startX;
+		/** First endpoint's vertical coordinate in pixels, retaining its fractional part. */
+		float startY;
+		/** Last endpoint's horizontal coordinate in pixels, retaining its fractional part. */
+		float endX;
+		/** Last endpoint's vertical coordinate in pixels, retaining its fractional part. */
+		float endY;
+	};
+
+	/**
+	 * Return the average height reached by a stroke boundary as it crosses a pixel slice.
+	 * Clamp the linearly varying boundary height to the pixel's [0, 1] range before averaging.
+	 * The caller subtracts the lower boundary's mean from the upper boundary's mean, then
+	 * multiplies by slice width to obtain the area covered by the stroke within the pixel.
+	 *
+	 * @param[in] start Boundary height at the start of the slice; the pixel spans heights [0, 1].
+	 * @param[in] end Boundary height at the end of the slice, in the same pixel-relative coordinates.
+	 * @return Mean clamped boundary height in [0, 1].
+	 */
+	static float integrateClampedCoverage(float start, float end);
+	/**
+	 * Merge a straight segment's square-pen pixel areas into the clipped coverage surface.
+	 * Shared by integer lines and sampled curve segments; allocates no surfaces and performs no compositing.
+	 *
+	 * @param[in,out] coverage Non-null CLUT8 surface receiving the maximum of old and new coverage.
+	 * @param[in] segment Endpoints in coverage-surface pixels; copied to normalize its drawing direction.
+	 * @param[in] thickness Positive square pen size in pixels.
+	 */
+	static void rasterizeLineAA(Graphics::Surface *coverage, SubpixelLineSegment segment, float thickness);
+	/**
+	 * Merge sampled straight segments into one coverage surface and composite once.
+	 *
+	 * @param[in,out] surface Non-null destination surface receiving the drawing.
+	 * @param[in] lineSegments Captured float endpoints in destination pixels, not curve evaluators or control points.
+	 * @param[in] color Drawing color encoded in the destination pixel format.
+	 * @param[in] thickness Positive square pen size in pixels.
+	 */
+	static void drawCurveLineSegmentsAA(ManagedSurface32 *surface, const Common::Array<SubpixelLineSegment> &lineSegments, uint32 color, int thickness);
+
 	typedef Common::HashMap<Common::Path, ZoombiniAnimation *, Common::Path::IgnoreCase_Hash, Common::Path::IgnoreCase_EqualTo> ZoombiniAnimationCache;
 
 	struct ZmbAnimationKindHash {
@@ -543,8 +698,8 @@ private:
 	RleBlock *_nameBoxSprite = nullptr;
 	/** Shared drop-target glow retained for the game instance. */
 	RleBlock *_dropTargetGlowSprite = nullptr;
-	/** Active page background borrowed from the page bitmap cache. */
-	BitBlock *_background = nullptr;
+	/** Mutable page background retained in the screen pixel format until replacement or page cleanup. */
+	ManagedSurface32 *_backSurface = nullptr;
 	/** RLE sprites released when the page cache is cleared. */
 	RleBlockCache _pageRleBlocks;
 	/** Uncompressed bitmaps released when the page cache is cleared. */

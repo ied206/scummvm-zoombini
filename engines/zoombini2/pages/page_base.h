@@ -40,7 +40,7 @@ class ManagedSurface32;
 /** One background and its page-managed general-object animation runners. */
 class PageLayer : public Common::NonCopyable {
 public:
-	/** Initialize a layer with its horizontal scroll direction and optional bit-block background.
+	/** Initialize a layer with its horizontal scroll direction and optional page background.
 	 * Layers without a background use @ref Gfx::kScreenSize.
 	 * @param backgroundPath Scrolling or fixed background bitmap for this layer, or empty for a backgroundless layer.
 	 */
@@ -48,7 +48,8 @@ public:
 	/** Release every animation runner registered with this layer. */
 	~PageLayer();
 
-	/** Replace the bit-block background and refresh its dimensions.
+	/** Replace the graphics background surface.
+	 * @remark Also refreshs this layer's dimensions.
 	 * @param path Bitmap resource used as this layer's background.
 	 */
 	bool loadBackground(const Common::Path &path);
@@ -134,8 +135,6 @@ private:
 	bool _backgroundless = true;
 	/** Whether a non-scrolling background has already been materialized. */
 	bool _backgroundDrawn = false;
-	/** Path of the current background in the graphics page cache. */
-	Common::String _backgroundPath;
 };
 
 /** Page-level collection that coordinates backgrounds, pointer input, scrolling, and animation runners. */

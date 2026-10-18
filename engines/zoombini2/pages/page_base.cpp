@@ -38,13 +38,11 @@ PageLayer::~PageLayer() {
 }
 
 bool PageLayer::loadBackground(const Common::Path &path) {
-	const Common::String key = path.toString('/');
-	const Size32 backgroundSize = _vm->_gfx->getPageBitBlockSize(key);
-	if (backgroundSize.width == 0 || backgroundSize.height == 0)
+	if (!_vm->_gfx->loadBackground(path.toString('/')))
 		return false;
 
-	_backgroundPath = key;
-	_backgroundSize = backgroundSize;
+	const ManagedSurface32 *background = _vm->_gfx->getBackgroundSurface();
+	_backgroundSize = Size32(background->w, background->h);
 	_backgroundless = false;
 	_backgroundDrawn = false;
 	wrapScrollX();
@@ -199,7 +197,7 @@ void PageLayer::drawBackgroundRegion(ManagedSurface32 *screen, int srcX, int src
 	if (_backgroundless || !screen)
 		return;
 	const Common::Rect srcRect(srcX, srcY, srcX + Gfx::kScreenSize.width, srcY + Gfx::kScreenSize.height);
-	_vm->_gfx->drawPageBitBlockSubRect(screen, _backgroundPath, Common::Point32(0, 0), srcRect);
+	_vm->_gfx->drawBackgroundSubRect(screen, Common::Point32(0, 0), srcRect);
 }
 
 void PageLayer::drawAndUpdate(ManagedSurface32 *screen, bool forceBackgroundRedraw) {
@@ -217,13 +215,13 @@ void PageLayer::drawAndUpdate(ManagedSurface32 *screen, bool forceBackgroundRedr
 				drawBackgroundRegion(screen, _scrollX, 0);
 			} else if (0 < _scrollX) {
 				const int tailWidth = _backgroundSize.width - _scrollX;
-				_vm->_gfx->drawPageBitBlockSubRect(screen, _backgroundPath, Common::Point32(0, 0), Common::Rect(_scrollX, 0, _backgroundSize.width, Gfx::kScreenSize.height));
-				_vm->_gfx->drawPageBitBlockSubRect(screen, _backgroundPath, Common::Point32(tailWidth, 0), Common::Rect(0, 0, Gfx::kScreenSize.width - tailWidth, Gfx::kScreenSize.height));
+				_vm->_gfx->drawBackgroundSubRect(screen, Common::Point32(0, 0), Common::Rect(_scrollX, 0, _backgroundSize.width, Gfx::kScreenSize.height));
+				_vm->_gfx->drawBackgroundSubRect(screen, Common::Point32(tailWidth, 0), Common::Rect(0, 0, Gfx::kScreenSize.width - tailWidth, Gfx::kScreenSize.height));
 			} else {
 				const int tailStart = _backgroundSize.width + _scrollX;
 				const int tailWidth = -_scrollX;
-				_vm->_gfx->drawPageBitBlockSubRect(screen, _backgroundPath, Common::Point32(0, 0), Common::Rect(tailStart, 0, _backgroundSize.width, Gfx::kScreenSize.height));
-				_vm->_gfx->drawPageBitBlockSubRect(screen, _backgroundPath, Common::Point32(tailWidth, 0), Common::Rect(0, 0, Gfx::kScreenSize.width - tailWidth, Gfx::kScreenSize.height));
+				_vm->_gfx->drawBackgroundSubRect(screen, Common::Point32(0, 0), Common::Rect(tailStart, 0, _backgroundSize.width, Gfx::kScreenSize.height));
+				_vm->_gfx->drawBackgroundSubRect(screen, Common::Point32(tailWidth, 0), Common::Rect(0, 0, Gfx::kScreenSize.width - tailWidth, Gfx::kScreenSize.height));
 			}
 		}
 	}

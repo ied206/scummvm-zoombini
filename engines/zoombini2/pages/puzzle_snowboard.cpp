@@ -78,7 +78,6 @@ PuzzleSnowboard::PuzzleSnowboard(Zoombini2Engine *vm)
 }
 
 PuzzleSnowboard::~PuzzleSnowboard() {
-	delete _l4TrailOverlay;
 	if (SoundManager *sound = _vm->getSoundManager()) {
 		sound->unload(_boardReadySound);
 		sound->unload(_rideSound);
@@ -133,28 +132,28 @@ void PuzzleSnowboard::loadGraphics() {
 	}
 }
 
-void PuzzleSnowboard::drawL4Trail(ManagedSurface32 *screen) {
-	if (!_l4TrailOverlay) {
-		_l4TrailOverlay = new ManagedSurface32(Size32(screen->w, screen->h), screen->format);
+void PuzzleSnowboard::bakeL4Trail() {
+	ManagedSurface32 *background = _vm->_gfx->getBackgroundSurface();
+	if (!background || background->h <= 70)
+		return;
+	warning("Snowboard: HARD background is missing; emulating it with curve paths over the EASY background");
+	ManagedSurface32 trailOverlay(Size32(background->w, background->h), background->format);
+	const uint32 transparentKey = background->format.ARGBToColor(0, 0, 0, 0);
+	trailOverlay.fillRect(Common::Rect32(0, 0, trailOverlay.w, trailOverlay.h), transparentKey);
 
-		const uint32 transparentKey = screen->format.ARGBToColor(0, 0, 0, 0);
-		_l4TrailOverlay->fillRect(Common::Rect32(0, 0, _l4TrailOverlay->w, _l4TrailOverlay->h), transparentKey);
-
-		// Omit the upper approach in the HARD PAT routes and draw only the slope below y=70.
-		const Common::Rect32 sampleBounds(0, 70, _l4TrailOverlay->w, _l4TrailOverlay->h);
-		const uint32 trailColor = screen->format.ARGBToColor(128, 255, 255, 255);
-		for (int lane = 0; lane < kL4LaneCount; lane++) {
-			const Common::Path filename(Common::String::format(kL4PatFormat, lane + kMaxRuleCount));
-			Common::ScopedPtr<PathObject> path(_vm->loadPagePATPath(filename));
-			if (!path)
-				continue;
-			for (uint sIdx = 0; sIdx < path->segments.size(); sIdx++)
-				_vm->_gfx->drawCubicBezierCurve(_l4TrailOverlay, *path->segments[sIdx], trailColor, 5, sampleBounds);
-		}
+	// Omit the upper approach in the HARD PAT routes and draw only the slope below y=70.
+	const Common::Rect32 sampleBounds(0, 70, trailOverlay.w, trailOverlay.h);
+	const uint32 trailColor = background->format.ARGBToColor(255, 255, 255, 255);
+	for (int lane = 0; lane < kL4LaneCount; lane++) {
+		const Common::Path filename(Common::String::format(kL4PatFormat, lane + kMaxRuleCount));
+		Common::ScopedPtr<PathObject> path(_vm->loadPagePATPath(filename));
+		if (!path)
+			continue;
+		for (uint sIdx = 0; sIdx < path->segments.size(); sIdx++)
+			_vm->_gfx->drawCubicBezierCurve(&trailOverlay, *path->segments[sIdx], trailColor, 7, sampleBounds, true);
 	}
-	// The sentinel disables color-key matching; the overlay's alpha channel controls transparency.
-	const uint32 transBlitKey = screen->format.ARGBToColor(255, 255, 255, 255);
-	screen->transBlitFrom(*_l4TrailOverlay, transBlitKey, false, 255);
+	// Apply opacity once so overlapping segments and routes stay equally bright.
+	background->transBlitFrom(trailOverlay, transparentKey, false, 128);
 }
 
 void PuzzleSnowboard::drawL4Legend(ManagedSurface32 *screen) const {
@@ -319,6 +318,8 @@ const Common::Point32 &PuzzleSnowboard::obstaclePosition(int lane) const {
 
 void PuzzleSnowboard::init() {
 	PuzzleBase::init();
+	if (_puzzleLevel == 4)
+		bakeL4Trail();
 	startPageMusic(Common::Path(kMusicPath));
 	_laneCount = _puzzleLevel == 4 ? kL4LaneCount : kLaneCount;
 	_obstacleVisible.resize(_laneCount);
@@ -628,8 +629,6 @@ void PuzzleSnowboard::onUpdate() {
 
 void PuzzleSnowboard::onRenderBackground(ManagedSurface32 *screen) {
 	drawPrimaryPageLayer(screen);
-	if (_puzzleLevel == 4)
-		drawL4Trail(screen);
 }
 
 void PuzzleSnowboard::drawTraitHint(ManagedSurface32 *screen, const TreeNode &node, bool alternate, const Common::Point32 &pos) const {

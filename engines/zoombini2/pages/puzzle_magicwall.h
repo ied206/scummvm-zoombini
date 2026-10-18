@@ -175,7 +175,7 @@ class PuzzleMagicWall : public PuzzleBase {
 public:
 	/** Construct Beetle Bug Alley for @p vm. */
 	explicit PuzzleMagicWall(Zoombini2Engine *vm);
-	/** Release transient beetle paths and animation runners. */
+	/** Release the vertex surface, beetle paths, page animations, and loaded sounds. */
 	~PuzzleMagicWall() override;
 	/** Return the puzzle name used by debug answer descriptions. */
 	const char *getPageName() const override { return kPageName; }
@@ -189,7 +189,7 @@ public:
 	void onUpdate() override;
 	/** Restore the puzzle's primary background layer. */
 	void onRenderBackground(ManagedSurface32 *screen) override;
-	/** Draw tablets, connections, beetles, lights, and gates. */
+	/** Draw tablets, connections, the vertex surface, beetles, lights, and gates. */
 	void onRenderContent(ManagedSurface32 *screen) override;
 	/** Draw runners travelling through opened gates. */
 	void onRenderActors(ManagedSurface32 *screen) override;
@@ -353,6 +353,10 @@ private:
 	Common::Point32 vertexPosition(int index) const;
 	/** Convert a layout vertex to an inset position on the selected tablet. */
 	Common::Point32 tabletPoint(int tablet, int point, int inset) const;
+	/** Clear and redraw the current layout's vertex patches without changing the background surface. */
+	void rebuildVertexSurface();
+	/** Composite the cached vertex patches above connections and below beetles, refreshing changed display colors. */
+	void drawVertices(ManagedSurface32 *screen);
 	/** Draw each tablet's background and inset rule diagram. */
 	void drawTablets(ManagedSurface32 *screen);
 	/** Draw the connection ripples belonging to the selected tablet rule. */
@@ -372,6 +376,10 @@ private:
 	MagicWallBoard _board;
 	/** Beetles on the current board, one per layout vertex: L1/L2 use 5-8, L3 uses 6-9, and L4 uses 8-9. */
 	Common::Array<Beetle> _beetles;
+	/** Transparent page-sized vertex patches that mask connections, released with the page and rebuilt for each layout. */
+	ManagedSurface32 *_vertexSurface = nullptr;
+	/** Color assistance mode represented by the cached vertex surface. */
+	ColorAssistMode _vertexSurfaceColorAssistMode = ColorAssistMode::kOriginal;
 	/** Animation data for the four exit gates, released with the page. */
 	Animation *_gateAnimations[4] = {};
 	/** Submission-lever animation data released with the page. */
