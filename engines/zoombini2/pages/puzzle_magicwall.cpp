@@ -546,65 +546,78 @@ MagicWallBoard::SolutionResult MagicWallBoard::debugAnswerSolver(Common::Array<i
 
 const char *MagicWallBoard::debugLayoutAdvice() const {
 	static constexpr const char *kAdvice[] = {
-		"- Two rows, pair exchanges: each tablet swaps beetles across one edge.\n"
+		"- The vertices form two rows. Each tablet swaps the beetles at the two ends of one edge.\n"
 		"    - To swap distant beetles and restore intermediate ones, press tablets along a path, "
 		"then retrace it without repeating the final edge.",
-		"- Five vertices, pair exchanges: rearrange beetles using the exchange edges.\n"
+		"- The layout has five vertices. Each tablet swaps the beetles at the two ends of one edge.\n"
 		"    - Press tablets along a path, then retrace it without repeating the final edge "
 		"to swap endpoint beetles and restore intermediate ones.",
-		"- Left four-vertex cycle and right three-vertex exchange group: rotate a misplaced left beetle to the bridge, "
+		"- The layout has a four-vertex cycle on the left and a three-vertex exchange group on the right.\n"
+		"    - Rotate a misplaced left beetle to the bridge, "
 		"swap it with the right group, then undo the rotation.\n"
 		"    - Use right-side swaps to choose the returning beetle.",
-		"- Two lower triangles with upper holding vertices: rotate each triangle to its upper exchange vertex.\n"
+		"- The layout has two lower triangles, each with an upper holding vertex.\n"
+		"    - Rotate each triangle to bring a beetle to its upper exchange vertex.\n"
 		"    - The upper vertices bridge the groups.\n"
 		"    - Move beetles to the correct side, then sort each triangle and its holding vertex.",
-		"- Five-vertex outer cycle with a central holding vertex: rotate an outer beetle to the central exchange, swap, then undo the rotation.\n"
+		"- The layout has a five-vertex outer cycle and a central holding vertex.\n"
+		"    - Rotate an outer beetle to the central exchange, swap, then undo the rotation.\n"
 		"    - Use the center as a buffer to reorder the ring; restore the center's beetle once the ring is sorted.",
-		"- Five-vertex ring with a pair exchange: rotate to choose the beetles to swap; swaps change their circular order.\n"
+		"- The layout has a five-vertex ring and a tablet that swaps a pair on the ring.\n"
+		"    - Rotate the ring to choose the beetles to swap. Swaps change their circular order.\n"
 		"    - Undo the rotation after each correction, then align the sorted ring with its colored vertices.",
-		"- Inner square and outer holding vertices: rotate the square to reach exchanges, "
+		"- The layout has an inner square and outer holding vertices. Rotate the square to reach exchanges, "
 		"use outer vertices as buffers, then undo the rotation.\n"
 		"    - Some variants leave an outer vertex untouched; preserve it while sorting the connected group.",
-		"- Two three-vertex cycles joined by an exchange: rotate both to bring the desired pair to the bridge, swap, then undo the rotations.\n"
+		"- The layout has two three-vertex cycles connected by a pair exchange.\n"
+		"    - Rotate both cycles to bring the desired pair to the bridge, swap, then undo the rotations.\n"
 		"    - Change group membership and circular order this way, then align both cycles.",
-		"- Inner and outer four-vertex cycles: rotate each ring independently to the bridge.\n"
+		"- The layout has inner and outer four-vertex cycles. Rotate each ring independently to the bridge.\n"
 		"    - Swap a pair, then undo the rotations to restore other beetles.\n"
 		"    - Correct group membership and circular order before final alignment.",
-		"- Five-vertex ring with an extra exchange or partial cycle: full rotation only changes alignment.\n"
+		"- The layout has a five-vertex ring with an extra exchange or partial cycle. Rotating the whole ring only changes alignment.\n"
 		"    - Rotate misplaced beetles onto the smaller operation's vertices, apply it, then rotate back.\n"
 		"    - Account for every cycle on that tablet.",
-		"- Seven-vertex ring with a smaller operation: rotate the desired beetles to its exchange or partial-cycle vertices, "
+		"- The layout has a seven-vertex ring and an operation that moves a smaller group.\n"
+		"    - Rotate the desired beetles to that operation's exchange or partial-cycle vertices, "
 		"apply it, then rotate back.\n"
 		"    - Rotating the whole ring alone cannot change relative order.",
-		"- Two triangles with coupled exchanges: the first two tablets each combine a three-cycle with a separate swap.\n"
-		"    - Three presses isolate the swap; two isolate the reverse three-cycle.\n"
+		"- The layout has two triangles. Each of the first two tablets rotates one triangle and swaps a separate pair at the same time.\n"
+		"    - Press one of these tablets three times to swap only the pair, or twice to rotate only its triangle in reverse.\n"
 		"    - Use these actions to transfer and sort beetles.",
-		"- Coupled four-vertex and three-vertex cycles: three presses of tablet 1 move only the square; four move only the triangle.\n"
+		"- Tablet 1 rotates a four-vertex square and a three-vertex triangle at the same time.\n"
+		"    - Press tablet 1 three times to move only the square, or four times to move only the triangle.\n"
 		"    - Use other tablets to transfer beetles between the groups and correct their order.\n"
-		"    - Twelve presses restore both.",
-		"- Five-vertex ring with partial cycles and exchanges: rotate to position a correction, apply a smaller operation, then rotate back.\n"
+		"    - Pressing tablet 1 twelve times restores both groups.",
+		"- The layout has a five-vertex ring with partial cycles and exchanges.\n"
+		"    - Rotate the ring to position a correction, apply a smaller operation, then rotate back.\n"
 		"    - This layout is not selected in normal play.",
-		"- Nested squares: one tablet rotates a ring; another swaps all four pairs between rings.\n"
+		"- The layout has nested squares. One tablet rotates a ring; another swaps all four pairs between the rings.\n"
 		"    - Swap rings, rotate, then swap back to act on the other ring.\n"
 		"    - Use the small pair exchange to correct relative order, then undo positioning moves.",
-		"- Three overlapping triangles: shared vertices let beetles move between cycles.\n"
+		"- The layout has three overlapping triangles. Their shared vertices let beetles move between cycles.\n"
 		"    - Rotate a beetle to a shared vertex, move it into the next triangle, then undo the first rotation.\n"
 		"    - The extra swap changes the order that three-cycles alone preserve.",
-		"- Three-by-three grid of overlapping square rotations: pass beetles between squares through shared middle vertices.\n"
+		"- The vertices form a three-by-three grid with overlapping square rotations.\n"
+		"    - Pass beetles between squares through their shared middle vertices.\n"
 		"    - Position a local correction, apply it, then undo positioning moves; matched beetles may need to move temporarily.",
-		"- Coupled four-vertex and five-vertex cycles: five presses of tablet 1 move only the square; four move only the five-vertex ring.\n"
+		"- Tablet 1 rotates a four-vertex square and a five-vertex ring at the same time.\n"
+		"    - Press tablet 1 five times to move only the square, or four times to move only the five-vertex ring.\n"
 		"    - Use other tablets to transfer beetles between the groups.\n"
-		"    - Twenty presses restore both.",
-		"- Coupled five-vertex and three-vertex cycles: three presses of tablet 1 move only the ring; five move only the triangle.\n"
+		"    - Pressing tablet 1 twenty times restores both groups.",
+		"- Tablet 1 rotates a five-vertex ring and a three-vertex triangle at the same time.\n"
+		"    - Press tablet 1 three times to move only the ring, or five times to move only the triangle.\n"
 		"    - Use other operations to transfer beetles and reorder them.\n"
-		"    - Fifteen presses restore both.",
-		"- Three-by-three grid with whole-row and whole-column swaps: these preserve row/column structure; "
+		"    - Pressing tablet 1 fifteen times restores both groups.",
+		"- The vertices form a three-by-three grid. Swapping whole rows or columns preserves the row/column structure; "
 		"use the extra local operation for arbitrary corrections.\n"
 		"    - Position a correction for the local operation, apply it, then undo the row/column swaps.",
-		"- Cube with three whole-cube pair flips: press any flip again to undo it.\n"
+		"- The layout is a cube with three tablets that flip pairs across the whole cube. Press the same tablet again to undo its flips.\n"
 		"    - Use flips to bring a pair to the local exchange, swap, then undo the flips.\n"
-		"    - Separate a bundled three-cycle and swap with two or three presses.",
-		"- Three coupled triangles: tablet 1 moves all groups together; three presses restore all, so repetition cannot isolate one group.\n"
+		"    - If a tablet combines a three-cycle and a separate swap, press it twice to isolate the reverse three-cycle, "
+		"or three times to isolate the swap.",
+		"- The layout has three triangles. Tablet 1 rotates all three at the same time.\n"
+		"    - Pressing tablet 1 three times restores all groups, so repeating that tablet cannot move just one group.\n"
 		"    - Use other tablets to transfer beetles or break the coupling, then undo positioning moves.",
 	};
 	if (_layoutIndex < 0 || ARRAYSIZE(kAdvice) <= static_cast<uint>(_layoutIndex))
@@ -619,6 +632,7 @@ PuzzleMagicWall::PuzzleMagicWall(Zoombini2Engine *vm)
 
 PuzzleMagicWall::~PuzzleMagicWall() {
 	_vm->setCursor(Zoombini2Engine::CursorType::kDefault);
+	delete _vertexSurface;
 	for (Beetle &beetle : _beetles)
 		delete beetle.path;
 	for (int i = 0; i < ARRAYSIZE(_gateAnimations); i++)
@@ -727,6 +741,7 @@ void PuzzleMagicWall::newPuzzle() {
 	}
 	_movingRule = -1;
 	_hoveredTablet = -1;
+	rebuildVertexSurface();
 	debug(1, "MagicWall: phase=%d level=%d layout=%d points=%u tablets=%u", static_cast<int>(_phase), _puzzleLevel,
 		  _board.layoutIndex(), _board.positions().size(), _board.rules().size());
 	for (uint i = 0; i < _board.positions().size(); i++)
@@ -918,6 +933,29 @@ void PuzzleMagicWall::onRenderBackground(ManagedSurface32 *screen) {
 	drawPrimaryPageLayer(screen);
 }
 
+void PuzzleMagicWall::rebuildVertexSurface() {
+	if (!_vertexSurface)
+		_vertexSurface = _vm->_gfx->createSurface(Gfx::kScreenSize);
+	const uint32 transparentKey = _vertexSurface->format.ARGBToColor(0, 0, 0, 0);
+	_vertexSurface->fillRect(Common::Rect32(0, 0, _vertexSurface->w, _vertexSurface->h), transparentKey);
+	for (uint i = 0; i < _board.positions().size(); i++) {
+		const MagicWallBoard::VertexColor vertexColor = static_cast<MagicWallBoard::VertexColor>(i);
+		const Common::Point32 pos = vertexPosition(i);
+		// Keep the background under each disc to mask connections and retain the RLE edge blend.
+		_vm->_gfx->drawBackgroundSubRect(_vertexSurface, pos, Common::Rect(pos.x, pos.y, pos.x + 50, pos.y + 50));
+		drawVertexColorSprite(_vertexSurface, kDotFormat, vertexColor, pos, kDotSourceBrightness[vertexColor]);
+	}
+	_vertexSurfaceColorAssistMode = _vm->getColorAssistMode();
+}
+
+void PuzzleMagicWall::drawVertices(ManagedSurface32 *screen) {
+	if (!_vertexSurface || _vertexSurfaceColorAssistMode != _vm->getColorAssistMode())
+		rebuildVertexSurface();
+	// The sentinel disables color-key matching; the surface alpha channel controls transparency.
+	const uint32 transBlitKey = screen->format.ARGBToColor(255, 255, 255, 255);
+	screen->transBlitFrom(*_vertexSurface, transBlitKey, false, 255);
+}
+
 Common::Point32 PuzzleMagicWall::tabletPoint(int tablet, int point, int inset) const {
 	const Common::Point32 &p = _board.layout().vertexCoords[point];
 	const int firstX = _board.layout().vertexCoords[0].x;
@@ -1105,13 +1143,7 @@ void PuzzleMagicWall::onRenderContent(ManagedSurface32 *screen) {
 		drawTablets(screen);
 		if (!_nextPuzzlePending)
 			drawConnections(screen, beetlesMoving() ? _movingRule : _hoveredTablet);
-		for (uint i = 0; i < _board.positions().size(); i++) {
-			const MagicWallBoard::VertexColor vertexColor = static_cast<MagicWallBoard::VertexColor>(i);
-			const Common::Point32 pos = vertexPosition(i);
-			if (!_backgroundPath.empty())
-				_vm->_gfx->drawPageBitBlockSubRect(screen, _backgroundPath, pos, Common::Rect(pos.x, pos.y, pos.x + 50, pos.y + 50));
-			drawVertexColorSprite(screen, kDotFormat, vertexColor, vertexPosition(i), kDotSourceBrightness[vertexColor]);
-		}
+		drawVertices(screen);
 		drawBeetles(screen);
 	}
 	bool allMatched = true;

@@ -32,6 +32,7 @@
 namespace Zoombini2 {
 
 class Random;
+class Gfx;
 
 /** Rules and simultaneous bubble movement for Mystic Marsh. */
 class MysticMarshGrid {
@@ -47,6 +48,16 @@ public:
 		kGridL3LayoutA_06 = 6, ///< First L3 board template.
 		kGridL3LayoutB_07 = 7, ///< Second L3 board template.
 		kGridL4LayoutA_08 = 8  ///< Restored L4 board template.
+	};
+
+	/** One-based background and matching area-mask resource identities. */
+	enum BackgroundKind : int {
+		kBackgroundL1LayoutA_01 = 1, ///< L1 layout A background and area mask.
+		kBackgroundL1LayoutB_02 = 2, ///< L1 layout B background and area mask.
+		kBackgroundL2Layouts_03 = 3, ///< Shared background and area mask for L2 layouts A-D.
+		kBackgroundL3LayoutA_04 = 4, ///< L3 layout A background and area mask.
+		kBackgroundL3LayoutB_05 = 5, ///< L3 layout B background and area mask.
+		kBackgroundL4LayoutA_06 = 6  ///< Restored L4 layout A; its background artwork is missing.
 	};
 
 	/**
@@ -240,7 +251,7 @@ public:
 	/** Return the selected grid layout, including the L4 template. */
 	GridLayout layout() const { return _layout; }
 	/** Return the background resource index corresponding to the selected layout. */
-	int background() const;
+	BackgroundKind background() const;
 	/** Return source/destination movements produced by the last simultaneous grid tick. */
 	const Common::Array<Move> &moves() const { return _moves; }
 	/** Return roster indices that reached an exit during the last grid tick. */
@@ -602,13 +613,24 @@ private:
 	bool _released = false;
 };
 
-/** Compose and draw the level 4 Mystic Marsh background and cell outlines. */
+/**
+ * Draw L4 background artwork and cell outlines into a background surface.
+ *
+ * Background resource for MysticMarsh L4 is deleted form the final release.
+ * - The maze layout logic is intact, so we derive a maze grid from it.
+ * - Compose a hypothetical background for L4 based on a maze grid.
+ */
 class MysticMarshL4Background {
 public:
-	/** Erase the baked grid and smooth the upper shoreline in the L4 background. */
-	static void compose(ManagedSurface32 *surface);
-	/** Draw visible level 4 cell outlines around the supplied device states. */
-	static void drawGrid(ManagedSurface32 *screen, const MysticMarshGrid::Cell *cells);
+	/**
+	 * Resonstruct L4 background from a L1 layout resource.
+	 * Erase the baked grid, smooth the upper shoreline, and bake new grid edges.
+	 *
+	 * @param[in,out] surface Background surface receiving the restored artwork.
+	 * @param[in] cells Generated grid cells used to select visible outlines.
+	 * @param[in] gfx Graphics interface used to draw the outlines as one AA line batch.
+	 */
+	static void compose(ManagedSurface32 *surface, const MysticMarshGrid::Cell *cells, const Gfx &gfx);
 	/** Return the page-pixel anchor for a column-major grid cell index. */
 	static Common::Point32 cellPosition(int index);
 
@@ -635,8 +657,14 @@ private:
 	static bool isCellBorderVisible(int column, int row);
 	/** Return whether the device type is a grid entry or exit portal. */
 	static bool isPortalCellType(int type);
-	/** Draw one cell-outline edge in screen pixels using the supplied packed color. */
-	static void drawGridEdge(ManagedSurface32 *screen, const Common::Point32 &start, const Common::Point32 &end, uint32 lineColor);
+	/**
+	 * Bake white outlines for the restored L4 layout using the common two-pixel square pen.
+	 *
+	 * @param[in,out] surface Background surface receiving the composited outlines.
+	 * @param[in] cells Generated grid cells used to select visible outlines.
+	 * @param[in] gfx Graphics interface that merges line coverage and composites once.
+	 */
+	static void drawGrid(ManagedSurface32 *surface, const MysticMarshGrid::Cell *cells, const Gfx &gfx);
 };
 
 /** Bubble Bumpers: simultaneous bubble paths through a mutable device grid. */
@@ -672,10 +700,10 @@ public:
 protected:
 	/** Advance grid ticks, bubble paths, effects, speech, and completion state. */
 	void onUpdate() override;
-	/** Draw the selected background, composing and outlining the L4 board when needed. */
+	/** Restore the selected background, including the baked restored L4 artwork and grid. */
 	void onRenderBackground(ManagedSurface32 *screen) override;
-	/** Return whether the composed level 4 background requires clearing the previous frame. */
-	bool needsScreenClear() const override { return _backgroundIndex == 6; }
+	/** Clear uncovered pixels when restored L4 background artwork is incomplete. */
+	bool needsScreenClear() const override { return _bgKind == MysticMarshGrid::kBackgroundL4LayoutA_06; }
 	/** Draw grid devices, matching symbols and short-lived crater or whirlpool effects. */
 	void onRenderContent(ManagedSurface32 *screen) override;
 	/** Draw the puzzle roster in its current waiting or travelling states. */
@@ -699,10 +727,10 @@ private:
 	/** Path format for the board backdrop selected by the generated layout. */
 	static constexpr const char *kBackgroundFormat = "#bmp/mystic_marsh/background%d";
 	/** Existing backdrop used when the L4 layout selects missing background 6. */
-	static constexpr int kL4FallbackBackgroundIndex = 1;
-	/** Column-major cell index whose corrected level 4 device needs replacement artwork. */
-	static constexpr int kL4RejectVisualCellIndex = 8 * MysticMarshGrid::kRows;
-	/** Whirlpool cell code used by the corrected level 4 rejection device. */
+	static constexpr MysticMarshGrid::BackgroundKind kL4FallbackBackgroundIndex = MysticMarshGrid::kBackgroundL1LayoutA_01;
+	/** Column-major cell index where a whirlpool symbol marks the restored L4 upper-edge loss route. */
+	static constexpr int kL4RejectVisualCellIdx = 8 * MysticMarshGrid::kRows;
+	/** Displayed whirlpool symbol type; the marked cell retains its logical type. */
 	static constexpr int kRejectCellType = MysticMarshGrid::kCellSymbolTourbiType58;
 	/** Path format for the drop-area mask corresponding to the generated background index. */
 	static constexpr const char *kAreaFormat = "bmp/mystic_marsh/area%d.bmt";
@@ -870,9 +898,7 @@ private:
 	/** Active crater and whirlpool effects with their presentation start times. */
 	Common::Array<Effect> _effects;
 	/** One-based background variant selected by the generated layout. */
-	int _backgroundIndex = 1;
-	/** Composed background for the L4 layout, released with the page. */
-	ManagedSurface32 *_l4Background = nullptr;
+	MysticMarshGrid::BackgroundKind _bgKind = MysticMarshGrid::kBackgroundL1LayoutA_01;
 	/** Number of Zoombinis that have reached the far side of the marsh. */
 	int _freed = 0;
 	/** Roster index currently walking into a crater, or -1 when no placement is active. */

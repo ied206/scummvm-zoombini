@@ -41,7 +41,7 @@ class PuzzleSnowboard : public PuzzleBase {
 public:
 	/** Construct Snowboard Gulch for @p vm. */
 	PuzzleSnowboard(Zoombini2Engine *vm);
-	/** Release the cached trail overlay, loaded sounds, and page-owned animations. */
+	/** Release loaded sounds and page-managed animations. */
 	~PuzzleSnowboard() override;
 	/** Return the puzzle name used by debug answer descriptions. */
 	const char *getPageName() const override { return kPageName; }
@@ -54,7 +54,7 @@ public:
 	void init() override;
 	/** Advance the current ride, obstacle checks, and exit path. */
 	void onUpdate() override;
-	/** Restore the primary page layer before drawing the trail. */
+	/** Restore the primary page layer, including the baked restored L4 trails. */
 	void onRenderBackground(ManagedSurface32 *screen) override;
 	/** Draw the board, scenery, decision hints, and visible obstacles. */
 	void onRenderContent(ManagedSurface32 *screen) override;
@@ -339,15 +339,12 @@ private:
 	/** Load trait icons, board visuals, scenery, and obstacle animations. */
 	void loadGraphics();
 	/**
-	 * Draw the eight L4 trails over the available slope background.
+	 * Bake the eight restored L4 trails into the available slope background during initialization.
 	 *
-	 * @remark The demo executable shows that L4 uses 8 lanes, while L1-L3 use four.
-	 * L1-L3 use @c snowboard-EASY.bb; the corresponding HARD background bitmap is missing.
-	 * Unlike MysticMarsh, reconstructing it is nearly impossible without any serious photo editing,
-	 * which ScummVM project does not aim to.
-	 * Instead, draw trails to provide a best-effort visual guide to the L4 routes.
+	 * The HARD background bitmap is missing, so the trails provide a visual guide over the EASY artwork.
+	 * A temporary transparent surface keeps overlapping routes at a uniform opacity before composition.
 	 */
-	void drawL4Trail(ManagedSurface32 *screen);
+	void bakeL4Trail();
 	/** Draw the six full-size depth hints at the retained demo positions. */
 	void drawL4Legend(ManagedSurface32 *screen) const;
 	/** Generate the decision tree for the selected level. */
@@ -389,8 +386,6 @@ private:
 
 	/** Generated root and child trait tests for the current party. */
 	TreeNode _tree[kMaxRuleCount] = {};
-	/** Cached surface of L4 trail drawings. */
-	ManagedSurface32 *_l4TrailOverlay = nullptr;
 	/** Number of lanes enabled by the current difficulty. */
 	int _laneCount = kLaneCount;
 	/** Number of active trait-test nodes for the current difficulty. */

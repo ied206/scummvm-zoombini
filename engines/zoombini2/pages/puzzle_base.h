@@ -118,7 +118,7 @@ protected:
 	bool _debugFinishPending = false;
 	/** Finish this puzzle's roster using the selected storage and its page-specific perfect-clear eligibility. */
 	void finishPuzzleRoster(StorageRecord **storage, bool perfectClearEligible = true);
-	/** Replace the first page layer's background and refresh the borrowed compatibility pointer. */
+	/** Replace the first page layer's mutable background surface. */
 	bool loadPrimaryLayerBackground(const Common::Path &path);
 	/**
 	 * Restore the primary background on every call, then draw and advance its general-object animation runners.
@@ -130,8 +130,6 @@ protected:
 	void renderZoombinis(ManagedSurface32 *screen) const;
 	/** Selected difficulty captured for this puzzle instance, clamped to the inclusive range 1 through 4. */
 	int _puzzleLevel;
-	/** Path of the first-layer background used by puzzle-specific redraws. */
-	Common::String _backgroundPath;
 	/** Active party entries mirrored from the engine's roster for this puzzle. */
 	Common::Array<ZoombiniRunner *> _puzzleZoombinis;
 	/** Gameplay deadline used by the concrete puzzle state machine. */

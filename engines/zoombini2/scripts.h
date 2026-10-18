@@ -280,10 +280,6 @@ private:
 	void saveBackground(ManagedSurface32 *screen, const Common::Point32 &drawPosition);
 };
 
-/** Native 32-bit floating-point scalar used by the optional path evaluator. */
-typedef float Float32;
-static_assert(sizeof(Float32) == 4, "Float32 must use four-byte native float storage.");
-
 /**
  * Q10 fixed point type
  *
@@ -347,11 +343,11 @@ public:
 	/** Convert an integer to Q10, wrapping inputs outside `-2097152` through `2097151`. */
 	static Fixed32 fromInt(int32 value);
 	/** Quantize a finite in-range floating-point value to Q10 by truncating its scaled raw value toward zero. */
-	static Fixed32 fromFloat(Float32 value);
+	static Fixed32 fromFloat(float value);
 	/** Convert to an integer with an arithmetic right shift toward negative infinity. */
 	int32 toInt() const;
 	/** Convert the exact Q10 value to native 32-bit floating point. */
-	Float32 toFloat() const;
+	float toFloat() const;
 
 	/** Multiply by @p right, retain the low 32 product bits, and shift by 10. */
 	Fixed32 operator*(const Fixed32 &right) const;
@@ -451,8 +447,12 @@ PointFixed32 operator*(int32 left, const PointFixed32 &right);
  *
  * The original-compatible evaluator stores all scalar state in @ref Fixed32.
  * The optional gameplay-improvement evaluator instantiates the same template
- * with @ref Float32. @ref CubicBezierCurve::evaluate advances either evaluator from
+ * with float. @ref CubicBezierCurve::evaluate advances either evaluator from
  * the stored start tick, step, and optional initial wait.
+ *
+ * This object retains four control points plus timing and playback state for a curved path.
+ * For AA drawing, @ref Gfx samples this evaluator and captures straight line segments between evaluated positions.
+ * Each captured segment is a chord of the curve; it contains only endpoint coordinates, not this curve's control points or state.
  */
 class CubicBezierCurve {
 public:
@@ -476,6 +476,12 @@ public:
 	Common::Point32 getEndPosition() const;
 	/** Return the most recently evaluated coordinate in screen pixels. */
 	Common::Point32 getPosition() const;
+	/**
+	 * Return the most recently evaluated coordinate without rounding to whole pixels.
+	 * Always output float coordinates, whether evaluation uses @ref Fixed32 or float.
+	 * Return zero coordinates if the curve has not been initialized.
+	 */
+	void getSubpixelPosition(float &x, float &y) const;
 	/** Set the gameplay tick from which parameter advancement is measured. */
 	void setStartTime(uint32 tickCount);
 	/** Replace the raw Q10 step value retained by this segment. */
