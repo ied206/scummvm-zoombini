@@ -633,8 +633,9 @@ enum class ZmbDropResult {
  * `feet + 8 * (nose + 8 * (eyes + 8 * hair))`.
  * Save files persist the complete five-byte @ref ZoombiniRunner::_traits record
  * and the NUL-terminated @ref ZoombiniRunner::_name buffer. The remaining fields
- * implement the common movement, dragging, animation, and page-placement
- * lifecycle shared by active Zoombinis.
+ * implement the common movement, holding, animation, and page-placement
+ * lifecycle shared by active Zoombinis. A click picks up a Zoombini, which
+ * remains held after the mouse button is released until a later drop click.
  */
 class ZoombiniRunner : public Common::NonCopyable {
 public:
@@ -689,9 +690,9 @@ public:
 	/** Select whether the page suppresses drawing this Zoombini. */
 	void setHidden(bool hidden) { _hidden = hidden; }
 	/** Return whether the common pointer lifecycle currently holds this Zoombini. */
-	bool isDragging() const { return _dragging; }
+	bool isHeld() const { return _held; }
 	/** Set the held state used by page-managed storage interactions. */
-	void setDragging(bool dragging) { _dragging = dragging; }
+	void setHeld(bool held) { _held = held; }
 	/** Return the shelter or puzzle placement index assigned to this Zoombini. */
 	int32 getPlacementIndex() const { return _placementIndex; }
 	/** Assign the shelter or puzzle placement index. */
@@ -704,7 +705,7 @@ public:
 	bool isExitComplete() const { return _exitComplete; }
 	/** Record whether this Zoombini has completed its page exit sequence. */
 	void setExitComplete(bool exitComplete) { _exitComplete = exitComplete; }
-	/** Return the available drop target currently under the dragged Zoombini, or -1. */
+	/** Return the available drop target currently under the held Zoombini, or -1. */
 	int32 getHoveredDropTargetIndex() const { return _hoveredDropTargetIndex; }
 	/** Select the default borrowed sprite grid and its resting cell. */
 	void setDefaultAnimation(const ZoombiniAnimation *animation, int cellIndex = 33);
@@ -744,14 +745,14 @@ public:
 	Common::Point32 getScreenPosition() const { return _screenPos; }
 	/** Store a page-selected position without changing the previous position or directional cell. */
 	void setScreenPositionWithoutTracking(const Common::Point32 &position) { _screenPos = position; }
-	/** Store the drag origin used when the current pointer hold ends. */
-	void setDragOrigin(const Common::Point32 &position) { _dragOrigin = position; }
-	/** Return the screen position saved when the current drag began. */
-	Common::Point32 getDragOrigin() const { return _dragOrigin; }
-	/** Store the pointer-to-sprite offset preserved during the active drag. */
-	void setDragOffset(const Common::Point32 &offset) { _dragOffset = offset; }
-	/** Return the pointer-to-sprite offset preserved during the active drag. */
-	Common::Point32 getDragOffset() const { return _dragOffset; }
+	/** Store the hold origin used when the current pointer hold ends. */
+	void setHoldOrigin(const Common::Point32 &position) { _holdOrigin = position; }
+	/** Return the screen position saved when the current hold began. */
+	Common::Point32 getHoldOrigin() const { return _holdOrigin; }
+	/** Store the pointer-to-sprite offset preserved during the active hold. */
+	void setHoldOffset(const Common::Point32 &offset) { _holdOffset = offset; }
+	/** Return the pointer-to-sprite offset preserved during the active hold. */
+	Common::Point32 getHoldOffset() const { return _holdOffset; }
 	/** Replace the retained path and begin evaluating it at @p tickCount. */
 	void startMovement(PathObject *path, uint32 tickCount);
 	/** Load @p path as a PAT resource and retain it; leave the current path unchanged on failure. */
@@ -803,16 +804,16 @@ public:
 	void advanceAnimationAfterDraw();
 	/** Return whether @p point lies inside the original fixed Zoombini pickup rectangle. */
 	bool hitTest(const Common::Point32 &point) const;
-	/** Begin the common pointer-drag lifecycle if input and the pickup rectangle permit it. */
-	bool beginDrag(const Common::Point32 &pointerPos, const ZoombiniAnimation *pickupAnimation, uint32 tickCount);
-	/** Begin dragging with a previously loaded common pickup grid. */
-	bool beginDrag(const Common::Point32 &pointerPos, ZmbAnimationKind animKind, uint32 tickCount) {
-		return beginDrag(pointerPos, getCommonAnimation(animKind), tickCount);
+	/** Begin the common click-to-hold lifecycle if input and the pickup rectangle permit it. */
+	bool beginHold(const Common::Point32 &pointerPos, const ZoombiniAnimation *pickupAnimation, uint32 tickCount);
+	/** Begin holding with a previously loaded common pickup grid. */
+	bool beginHold(const Common::Point32 &pointerPos, ZmbAnimationKind animKind, uint32 tickCount) {
+		return beginHold(pointerPos, getCommonAnimation(animKind), tickCount);
 	}
-	/** Move an actively dragged Zoombini with the pointer. */
-	void updateDrag(const Common::Point32 &pointerPos);
-	/** Finish dragging and optionally retain the original grab point at the release position. */
-	void endDrag(bool applyGrabOffset);
+	/** Move the held Zoombini with the pointer. */
+	void updateHold(const Common::Point32 &pointerPos);
+	/** End the hold and optionally retain the original grab point at the release position. */
+	void endHold(bool applyGrabOffset);
 	/**
 	 * Handle click-to-hold, mouse-follow and click-to-drop for one page roster.
 	 *
@@ -852,8 +853,8 @@ private:
 	Size16 _spriteSize = Size16();
 	/** Current movement path held by this Zoombini until movement ends. */
 	PathObject *_movementPath = nullptr;
-	/** Screen position saved when the current drag began. */
-	Common::Point32 _dragOrigin = Common::Point32();
+	/** Screen position saved when the current hold began. */
+	Common::Point32 _holdOrigin = Common::Point32();
 	/** Borrowed sprite grid currently used to draw this Zoombini. */
 	const ZoombiniAnimation *_activeAnimation = nullptr;
 	/** Borrowed sprite grid restored when the current animation ends. */
@@ -874,8 +875,8 @@ private:
 	/** Current frame in the selected animation cell. */
 	int32 _animationFrame = 0;
 
-	/** Pointer-to-sprite offset preserved during the active drag. */
-	Common::Point32 _dragOffset = Common::Point32();
+	/** Pointer-to-sprite offset preserved during the active hold. */
+	Common::Point32 _holdOffset = Common::Point32();
 
 private:
 	/** Return a previously loaded common grid through the live engine's graphics interface. */
@@ -895,16 +896,16 @@ private:
 	/** Whether the current page allows this Zoombini to receive input. */
 	bool _inputEnabled = false;
 	/** Whether the common input lifecycle currently holds this Zoombini. */
-	bool _dragging = false;
+	bool _held = false;
 	/** Slot, route, table, or maze placement index assigned by the active page. */
 	int32 _placementIndex = -1;
 	/** Number of rescued Boolies credited to this Zoombini. */
 	int32 _rescuedBooliesPerZoombini = 0;
 	/** Whether this Zoombini completed the active puzzle's exit sequence. */
 	bool _exitComplete = false;
-	/** Whether the dragged Zoombini currently overlaps an available drop target. */
+	/** Whether the held Zoombini currently overlaps an available drop target. */
 	bool _overDropTarget = false;
-	/** Index of the available drop target under the dragged Zoombini, or `-1`. */
+	/** Index of the available drop target under the held Zoombini, or `-1`. */
 	int32 _hoveredDropTargetIndex = -1;
 	/** Whether drawing is suppressed while page logic retains this Zoombini. */
 	bool _hidden = false;
@@ -928,9 +929,9 @@ private:
 	/** Return whether @p point lies strictly inside @p rect. */
 	static bool isStrictlyInside(const Common::Point32 &point, const Common::Rect32 &rect);
 	/** Return whether common input may pick this Zoombini up at @p pointerPos. */
-	bool canBeginDrag(const Common::Point32 &pointerPos) const;
+	bool canBeginHold(const Common::Point32 &pointerPos) const;
 	/** Enter the held state after page target-removal callbacks have run. */
-	void startDrag(const Common::Point32 &pointerPos, const ZoombiniAnimation *pickupAnimation, uint32 tickCount);
+	void startHold(const Common::Point32 &pointerPos, const ZoombiniAnimation *pickupAnimation, uint32 tickCount);
 	/** Return the last free target containing the unscrolled held foot point, or -1. */
 	static int findHoveredDropTarget(const ZoombiniRunner &zoombini, const Common::Point32 &pointerPos,
 									 const Common::Array<ZmbDropTarget> &targets);

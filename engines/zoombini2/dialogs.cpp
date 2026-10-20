@@ -619,9 +619,15 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	_enhancedKbdShortcutsCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.EnhancedKbdShortcuts",
 															_("Enable enhanced keyboard shortcuts"),
 															_("Enables some ScummVM-only keyboard shortcuts for quality of life improvements."));
-	_fixFleenDepartStreakCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.FixFleenDepartStreak",
-															_("Magic Mirrors: Remove stray streaks from fleeing Fleens"),
-															_("Hides stray brown streaks in some Fleen departure frames in Magic Mirrors."));
+	_wallOfFleensFixDepartStreakCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.WallOfFleensFixDepartStreak",
+																   _("Magic Mirrors: Remove stray streaks from fleeing Fleens"),
+																   _("Hides stray brown streaks in some Fleen departure frames in Magic Mirrors."));
+	_mysticMarshFillCellGapsCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.MysticMarshFillCellGaps",
+															   _("Bubble Bumpers: Fill gaps between cell sprites and edges"),
+															   _("Fills narrow gaps between cell sprites and grid lines."));
+	_mysticMarshExpandAreaMaskCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.MysticMarshExpandAreaMask",
+																 _("Bubble Bumpers: Expand the staging area"),
+																 _("Expands the area where Zoombinis can be reloated along the lower-left side."));
 	_chezNorfClueSubtitlesCheckbox = new GUI::CheckboxWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ChezNorfClueSubtitles",
 															 _("Chez Norf: Show English subtitles on Norf clues"),
 															 _("Shows the original English clues."));
@@ -714,7 +720,9 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 		.addWidget("ColorAssist", "", 210)
 		.closeLayout()
 		.addWidget("EnhancedKbdShortcuts", "Checkbox")
-		.addWidget("FixFleenDepartStreak", "Checkbox")
+		.addWidget("WallOfFleensFixDepartStreak", "Checkbox")
+		.addWidget("MysticMarshFillCellGaps", "Checkbox")
+		.addWidget("MysticMarshExpandAreaMask", "Checkbox")
 		.addWidget("ChezNorfClueSubtitles", "Checkbox")
 		.addWidget("HelpDialogTransparentBody", "Checkbox")
 		.addSpace(10)
@@ -783,7 +791,9 @@ void Zoombini2OptionsWidget::load() {
 		break;
 	}
 	_enhancedKbdShortcutsCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _domain));
-	_fixFleenDepartStreakCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigFixFleenDepartStreak, _domain));
+	_wallOfFleensFixDepartStreakCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigWallOfFleensFixDepartStreak, _domain));
+	_mysticMarshFillCellGapsCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigMysticMarshFillCellGaps, _domain));
+	_mysticMarshExpandAreaMaskCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigMysticMarshExpandAreaMask, _domain));
 	if (_helpDialogTransparentBodyCheckbox)
 		_helpDialogTransparentBodyCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigHelpDialogTransparentBody, _domain));
 	_debugHotkeysCheckbox->setState(ConfMan.getBool(Zoombini2MetaEngine::kConfigDebugHotkeys, _domain));
@@ -813,7 +823,9 @@ bool Zoombini2OptionsWidget::save() {
 	ConfMan.setInt(Zoombini2MetaEngine::kConfigBezierCurveDataType, static_cast<int>(bezierCurveDataType), _domain);
 	ConfMan.setInt(Zoombini2MetaEngine::kConfigColorAssistMode, static_cast<int>(colorAssistMode), _domain);
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigEnhancedKbdShortcuts, _enhancedKbdShortcutsCheckbox->getState(), _domain);
-	ConfMan.setBool(Zoombini2MetaEngine::kConfigFixFleenDepartStreak, _fixFleenDepartStreakCheckbox->getState(), _domain);
+	ConfMan.setBool(Zoombini2MetaEngine::kConfigWallOfFleensFixDepartStreak, _wallOfFleensFixDepartStreakCheckbox->getState(), _domain);
+	ConfMan.setBool(Zoombini2MetaEngine::kConfigMysticMarshFillCellGaps, _mysticMarshFillCellGapsCheckbox->getState(), _domain);
+	ConfMan.setBool(Zoombini2MetaEngine::kConfigMysticMarshExpandAreaMask, _mysticMarshExpandAreaMaskCheckbox->getState(), _domain);
 	if (_helpDialogTransparentBodyCheckbox)
 		ConfMan.setBool(Zoombini2MetaEngine::kConfigHelpDialogTransparentBody, _helpDialogTransparentBodyCheckbox->getState(), _domain);
 	ConfMan.setBool(Zoombini2MetaEngine::kConfigDebugHotkeys, _debugHotkeysCheckbox->getState(), _domain);

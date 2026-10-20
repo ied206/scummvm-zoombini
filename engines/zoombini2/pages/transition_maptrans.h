@@ -49,9 +49,7 @@ public:
 		RouteRescueCondition rescueCondition; ///< Rescue-count condition for this route.
 	};
 
-	/** Construct the map transition for @p vm. */
 	TransitionMapTrans(Zoombini2Engine *vm);
-	/** Release the composited map and per-Zoombini paths. */
 	~TransitionMapTrans() override;
 
 	/** Load the route, compose map overlays, and initialize the walking party. */
@@ -226,14 +224,11 @@ private:
 	/** Commit the destination page after the last walker finishes. */
 	void finishTransition();
 	/** Compose the map transition background with the route-specific overlays. */
-	ManagedSurface32 *createMapTransitionBackground(PageId srcPageId, int mapRegion);
+	void composeMapTransitionBackground(PageId srcPageId, int mapRegion);
 	/** Compose the route-map overlays appropriate to the current progress. */
 	void drawMapOverlays(ManagedSurface32 *dst, PageId srcPageId, int mapRegion);
 	/** Draw one map-overlay RLE sprite retained for the current page. */
 	void drawOverlaySprite(ManagedSurface32 *dst, const Common::String &name, const Common::Point32 &pos);
-
-	/** Background with route-specific overlays already applied. */
-	ManagedSurface32 *_compositedBg = nullptr;
 
 	/** Route shared as the template for each party member's path. */
 	Common::Path _patPath;

@@ -101,7 +101,7 @@ void ShelterRescueSite2::refillBoardingRoster() {
 		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
 		zoombini->setCanAdvanceFromPage(false);
 		zoombini->setInputEnabled(true);
-		zoombini->setDragging(false);
+		zoombini->setHeld(false);
 		zoombini->setIdleAnimationEnabled(true);
 		zoombini->setHidden(false);
 		zoombini->setDefaultAnimation(ZmbAnimationKind::kBasic, 33);
@@ -170,9 +170,9 @@ bool ShelterRescueSite2::seatsFullyOccupied() const {
 	return true;
 }
 
-ZoombiniRunner *ShelterRescueSite2::getDraggedZoombini() const {
+ZoombiniRunner *ShelterRescueSite2::getHeldZoombini() const {
 	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
-		if (_vm->_state->_activeZoombinis[i]->isDragging())
+		if (_vm->_state->_activeZoombinis[i]->isHeld())
 			return _vm->_state->_activeZoombinis[i];
 	}
 	return nullptr;
@@ -271,12 +271,12 @@ bool ShelterRescueSite2::materializeFromStorage(int gridCol, int gridRow, const 
 	zoombini->setNameBytes(storage[storageIndex]->getNameBytes());
 	zoombini->setDefaultAnimation(ZmbAnimationKind::kBasic, 33);
 	zoombini->setPosition(Common::Point32(kRosterGridBasePos.x + gridCol * 40 + 24, kRosterGridBasePos.y + gridRow * 57 + 30));
-	const Common::Point32 screenPosition = zoombini->getScreenPosition();
-	zoombini->setDragOrigin(screenPosition);
-	const Common::Point32 dragOffset(pointerPos.x - screenPosition.x - 3, pointerPos.y - screenPosition.y - 10);
-	zoombini->setDragOffset(dragOffset);
-	zoombini->setPosition(Common::Point32(screenPosition.x + dragOffset.x, screenPosition.y + dragOffset.y));
-	zoombini->setDragging(true);
+	const Common::Point32 screenPos = zoombini->getScreenPosition();
+	zoombini->setHoldOrigin(screenPos);
+	const Common::Point32 holdOffset(pointerPos.x - screenPos.x - 3, pointerPos.y - screenPos.y - 10);
+	zoombini->setHoldOffset(holdOffset);
+	zoombini->setPosition(Common::Point32(screenPos.x + holdOffset.x, screenPos.y + holdOffset.y));
+	zoombini->setHeld(true);
 	zoombini->startAnimation(ZmbAnimationKind::kPickup, 33, tick);
 	_vm->_state->_activeZoombinis.push_back(zoombini);
 	delete storage[storageIndex];
@@ -358,12 +358,12 @@ StorageRecord **ShelterRescueSite2::getRescueStorage() const {
 	return _vm->_state->_rescue2Storage;
 }
 
-void ShelterRescueSite2::buildBoardingDrawOrder(Common::Array<uint> &order, ZoombiniRunner *&draggedZoombini) const {
+void ShelterRescueSite2::buildBoardingDrawOrder(Common::Array<uint> &order, ZoombiniRunner *&heldZoombini) const {
 	order.clear();
-	draggedZoombini = nullptr;
+	heldZoombini = nullptr;
 	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
-		if (_vm->_state->_activeZoombinis[i]->isDragging()) {
-			draggedZoombini = _vm->_state->_activeZoombinis[i];
+		if (_vm->_state->_activeZoombinis[i]->isHeld()) {
+			heldZoombini = _vm->_state->_activeZoombinis[i];
 			continue;
 		}
 		order.push_back(i);
@@ -373,8 +373,8 @@ void ShelterRescueSite2::buildBoardingDrawOrder(Common::Array<uint> &order, Zoom
 
 void ShelterRescueSite2::drawBoardingActives(ManagedSurface32 *screen) const {
 	Common::Array<uint> order;
-	ZoombiniRunner *draggedZoombini = nullptr;
-	buildBoardingDrawOrder(order, draggedZoombini);
+	ZoombiniRunner *heldZoombini = nullptr;
+	buildBoardingDrawOrder(order, heldZoombini);
 	for (uint i = 0; i < order.size(); i++) {
 		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[order[i]];
 		if (zoombini->isHidden())
@@ -383,9 +383,9 @@ void ShelterRescueSite2::drawBoardingActives(ManagedSurface32 *screen) const {
 		_vm->_gfx->drawZoombiniRunner(screen, zoombini);
 		zoombini->advanceAnimationAfterDraw();
 	}
-	if (draggedZoombini && !draggedZoombini->isHidden()) {
-		_vm->_gfx->drawZoombiniRunner(screen, draggedZoombini);
-		draggedZoombini->advanceAnimationAfterDraw();
+	if (heldZoombini && !heldZoombini->isHidden()) {
+		_vm->_gfx->drawZoombiniRunner(screen, heldZoombini);
+		heldZoombini->advanceAnimationAfterDraw();
 	}
 }
 
@@ -464,7 +464,7 @@ EventHandleResult ShelterRescueSite2::onLButtonUp(const Common::Point &pos) {
 	default:
 		return EventHandleResult::kConsumed;
 	}
-	if (_scrollPhase != kScrollIdle || getDraggedZoombini())
+	if (_scrollPhase != kScrollIdle || getHeldZoombini())
 		return EventHandleResult::kPassthrough;
 
 	if (_rosterScrollUpRect.contains(pos)) {

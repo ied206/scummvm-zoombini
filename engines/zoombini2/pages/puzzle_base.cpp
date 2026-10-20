@@ -26,6 +26,7 @@
 #include "zoombini2/pages/puzzle_base.h"
 #include "zoombini2/scripts.h"
 #include "zoombini2/state.h"
+#include "zoombini2/text_manager.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
@@ -78,13 +79,13 @@ void PuzzleBase::drawPrimaryPageLayer(ManagedSurface32 *screen) {
 
 void PuzzleBase::renderZoombinis(ManagedSurface32 *screen) const {
 	Common::Array<uint> order;
-	const ZoombiniRunner *draggedZoombini = nullptr;
+	const ZoombiniRunner *heldZoombini = nullptr;
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
 		const ZoombiniRunner *zoombini = _puzzleZoombinis[i];
 		if (!zoombini)
 			continue;
-		if (zoombini->isDragging()) {
-			draggedZoombini = zoombini;
+		if (zoombini->isHeld()) {
+			heldZoombini = zoombini;
 			continue;
 		}
 		order.push_back(i);
@@ -92,8 +93,8 @@ void PuzzleBase::renderZoombinis(ManagedSurface32 *screen) const {
 	ZoombiniRunner::sortDrawOrderByY(_puzzleZoombinis, order);
 	for (uint index : order)
 		_vm->_gfx->drawZoombiniRunner(screen, _puzzleZoombinis[index]);
-	if (draggedZoombini)
-		_vm->_gfx->drawZoombiniRunner(screen, draggedZoombini);
+	if (heldZoombini)
+		_vm->_gfx->drawZoombiniRunner(screen, heldZoombini);
 }
 
 const char *PuzzleChanceInfo::typeName(Type type) {
@@ -120,7 +121,8 @@ Common::String PuzzleBase::debugActorDescription(int index) const {
 	if (index < 0 || static_cast<int>(_puzzleZoombinis.size()) <= index)
 		return "(none)";
 	const ZoombiniRunner *actor = _puzzleZoombinis[index];
-	return Common::String::format("Zoombini (%-6s): %s", actor->getName().c_str(), actor->getTraits().toStr().c_str());
+	const Common::String name = _vm->_text->getZoombiniDisplayName(actor->getName());
+	return Common::String::format("Zoombini (%-6s): %s", name.c_str(), actor->getTraits().toStr().c_str());
 }
 
 void PuzzleBase::debugForceFinish() {
@@ -130,7 +132,7 @@ void PuzzleBase::debugForceFinish() {
 	for (ZoombiniRunner *actor : _puzzleZoombinis) {
 		actor->clearMovement();
 		actor->setAnimationCompleteCallback(nullptr);
-		actor->setDragging(false);
+		actor->setHeld(false);
 		actor->setInputEnabled(false);
 		actor->setCanAdvanceFromPage(true);
 		actor->setExitComplete(true);

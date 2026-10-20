@@ -39,6 +39,7 @@
 
 #include "zoombini2/detection.h"
 #include "zoombini2/graphics.h"
+#include "zoombini2/metaengine.h"
 #include "zoombini2/random.h"
 #include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
@@ -68,7 +69,7 @@ class TextManager;
  * The engine presents a fixed 800x600 surface and dispatches one @ref PageBase at a time.
  * @ref GameState retains the party and saved progress across page transitions.
  * Pages borrow the graphics, audio, and animation services retained for this engine instance.
- * @ref Zoombini2Engine::destroyCurrentPage closes dialogs and deletes the page before clearing its layers and bitmap cache.
+ * @ref Zoombini2Engine::destroyActivePage closes dialogs and deletes the page before clearing its layers and bitmap cache.
  */
 class Zoombini2Engine : public Engine {
 public:
@@ -79,7 +80,7 @@ public:
 		kRight02 = 2 ///< Right branch.
 	};
 
-	/** Cursor artwork or a request to remove the current page cursor. */
+	/** Cursor artwork or a request to remove the active page cursor. */
 	enum class CursorType : byte {
 		kDefault,     ///< Pointing hand
 		kInteractive, ///< Spread hand
@@ -145,7 +146,9 @@ public:
 	void setCursor(CursorType type);
 
 	/** Return the detected release language. */
-	Common::Language getLanguage() const { return _gameDescription->desc.language; }
+	Common::Language getLanguage() const { return _relInfo.getLanguage(); }
+	/** Return the immutable release identity and its resource/layout selections. */
+	const ZmbReleaseInfo &getRelInfo() const { return _relInfo; }
 	/** Return whether the detected game is the Korean release. */
 	bool isKorean() const { return getLanguage() == Common::KO_KOR; }
 	/** Return whether the detected language is Hebrew. */
@@ -153,9 +156,9 @@ public:
 	/** Return whether the detected language is Swedish. */
 	bool isSwedish() const { return getLanguage() == Common::SV_SWE; }
 	/** Return the detected release feature flags. */
-	uint32 getFeatures() const { return _gameDescription->features; }
+	uint32 getFeatures() const { return _relInfo.getFeatures(); }
 	/** Return whether the detected release is the playable demo. */
-	bool isDemo() const { return (_gameDescription->desc.flags & ADGF_DEMO) != 0; }
+	bool isDemo() const { return _relInfo.isDemo(); }
 
 	/** Return the single immutable alpha-blending lookup table shared by this game instance. */
 	const AlphaBlendLUT &getAlphaLUT() const { return _alphaBlendLUT; }
@@ -167,7 +170,7 @@ public:
 	/** Queue a UI-text confirmation and retain its completion callback. */
 	bool requestUiTextMsgBox(const Common::U32String &text, Common::BaseCallback<DialogMsgBoxButton> *callback,
 							 const Common::Point32 &pos = Common::Point32(-1, -1));
-	/** Open the help overlay for the current page and level. */
+	/** Open the help overlay for the active page and level. */
 	bool openHelpDialog(PageId pageId, int level);
 	/** Open a console debug view. */
 	bool openDebugDialog(const DialogDebugCommand &cmd);
@@ -188,7 +191,11 @@ public:
 	/** Return the numeric representation selected for Bezier path calculations. */
 	BezierCurveDataType getBezierCurveDataType() const { return _bezierCurveDataType; }
 	/** Return whether the Wall of Fleens departure artwork correction is enabled. */
-	bool fixFleenDepartStreak() const { return _fixFleenDepartStreak; }
+	bool fixFleenDepartStreak() const { return _wallOfFleensFixDepartStreak; }
+	/** Whether to fill narrow cell-plate gaps in every Mystic Marsh difficulty. */
+	bool fillMysticMarshCellGaps() const { return _mysticMarshFillCellGaps; }
+	/** Return whether additional Mystic Marsh L1-L3 area-mask coverage is enabled. */
+	bool expandMysticMarshAreaMask() const { return _mysticMarshExpandAreaMask; }
 	/** Return whether the enhanced keyboard shortcut set is enabled. */
 	bool useEnhancedKbdShortcuts() const { return _enhancedKbdShortcuts; }
 	/** Return whether the practice map exposes recoverable level 4 puzzles. */
@@ -216,17 +223,22 @@ public:
 	static Common::Path normalizeResourcePath(const Common::String &path);
 	/** Open an original logical resource name through the engine's CD/installed-root resolver. */
 	Common::SeekableReadStream *openResourceFile(const Common::String &path) const;
-	/** Resource format recorded for files opened or cached during the current page lifetime. */
+	/** Resource format recorded for files opened or cached during the active page lifetime. */
 	enum class PageResourceType {
 		/** File format could not be determined from its path or cache caller. */
 		kUnknown,
 		/** Bitmap or bitmap-mask file. */
 		kBitmap,
+		/**
+		 * Drop-acceptance bitmap file.
+		 * Identified by its loader rather than the BMT extension.
+		 */
+		kAreaMask,
 		/** Standalone RLE sprite file. */
 		kSprite,
 		/** Animation file. */
 		kAnimation,
-		/** Shared animation grid used for party sprites. */
+		/** Zoombini animation files. */
 		kZoombiniAnimation,
 		/** Cached path-object data. */
 		kPath,
@@ -237,7 +249,7 @@ public:
 		/** Puzzle layout or definition data. */
 		kLayout
 	};
-	/** A resource path accessed during the current page lifetime. */
+	/** A resource path accessed during the active page lifetime. */
 	struct PageResource {
 		/** Resolved resource path retained for display and filtering. */
 		Common::Path path;
@@ -247,11 +259,21 @@ public:
 		bool opened = false;
 		/** Whether a page cache request used this resource. */
 		bool cacheUsed = false;
+		/** Successful file opens during this page lifetime. */
+		uint32 openCount = 0;
+		/** Successful cache requests, including the initial load. */
+		uint32 cacheRequests = 0;
+		/** Requests satisfied by an existing decoded entry. */
+		uint32 cacheHits = 0;
+		/** Successful graphics or PAT decodes during this page lifetime. */
+		uint32 decodeCount = 0;
 	};
 	/** Successful file opens and cache requests since the last page transition, including dialogs and console previews. */
 	const Common::Array<PageResource> &getPageResources() const { return _pageResources; }
 	/** Remember a successfully returned cache resource without reopening its file. */
-	void recordPageResourceCacheUse(const Common::String &path, PageResourceType type) const;
+	void recordPageResourceCacheUse(const Common::String &path, PageResourceType type, bool cacheHit = true) const;
+	/** Record a successful graphics or PAT decode independently of cache requests. */
+	void recordPageResourceDecode(const Common::String &path, PageResourceType type) const;
 	/** Return whether @p path resolves through the engine's CD/installed-root resolver. */
 	bool hasResource(const Common::String &path) const;
 	/** Return and clear the validated direct-practice request, if the startup command supplied one. */
@@ -322,17 +344,17 @@ public:
 	/** Return whether the current route was requested by the debugger without puzzle completion. */
 	bool isDebugMapTransition() const { return _debugMapTransition; }
 	/** Return the active page identifier. */
-	PageId getCurrentPageId() const { return _currentPageId; }
-	/** Return the borrowed active page. */
-	PageBase *getCurrentPage() { return _currentPage; }
+	PageId getActivePageId() const { return _activePageId; }
+	/** Return the borrowed engine-owned page, excluding modal dialogs. */
+	PageBase *getActivePage() const { return _activePage; }
 	/** Return whether game state and a page are both active. */
-	bool hasActiveGamePage() const { return _state && _currentPage; }
+	bool hasActiveGamePage() const { return _state && _activePage; }
 	/** Request a retry from the active puzzle's entry state; reject non-puzzles and pending departures. */
 	bool debugRetryPuzzle();
 
 	/** Return the active color-only presentation setting. */
 	ColorAssistMode getColorAssistMode() const { return _colorAssistMode; }
-	/** Return the gameplay millisecond snapshot captured before the current page pass. */
+	/** Return the gameplay millisecond snapshot captured before the active page pass. */
 	uint32 getFrameTickCount() const { return _cachedGameTickCount; }
 	/** Return gameplay milliseconds elapsed between the last two page passes. */
 	uint32 getFrameDeltaMs() const { return _cachedGameTickCount - _prevFrameTickCount; }
@@ -383,6 +405,9 @@ public:
 	int _transitionState = 0;
 
 private:
+	/** Detected release settings retained for this game instance. */
+	const ZmbReleaseInfo _relInfo;
+	/** Resolve logical resource names against the CD Data root, or the installed HD root for names prefixed with '#'. */
 	class ResourceFileResolver;
 	/** Decimal factor separating a direct-practice page ID from its level. */
 	static constexpr int kPracticeBootParamPageFactor = 100;
@@ -403,7 +428,8 @@ private:
 		"bmp/chez_norf/slurp_tarte",
 		"bmp/chez_norf/slurp_pasteque",
 		"bmp/chez_norf/slurp_glace",
-		"bmp/chez_norf/plato_mini"};
+		"bmp/chez_norf/plato_mini",
+	};
 	/** Original artwork for the quit-confirmation message. */
 	static constexpr const char *kQuitConfirmationPath = "bmp/menu/Quit_panel_text_quit";
 	/** Target-specific filename format for persisted debug Zoombini traits. */
@@ -428,8 +454,15 @@ private:
 	typedef Common::HashMap<Common::Path, uint, Common::Path::IgnoreCase_Hash, Common::Path::IgnoreCase_EqualTo> PageResourceIndex;
 	/** Classify file formats without opening or decoding another stream. */
 	static PageResourceType inferPageResourceType(const Common::Path &path);
-	/** Record a successful file open or cache request in the current page listing. */
-	void recordPageResource(const Common::String &path, bool cacheUsed, PageResourceType type = PageResourceType::kUnknown) const;
+	/** Events counted by the resource diagnostics. */
+	enum class ResourceAccess {
+		kOpen,
+		kCacheMiss,
+		kCacheHit,
+		kDecode,
+	};
+	/** Record one resource event in the active page listing. */
+	void recordPageResource(const Common::String &path, ResourceAccess access, PageResourceType type = PageResourceType::kUnknown) const;
 
 	/** Cursor pixels derived once from a cached RLE sprite. */
 	struct CursorImage {
@@ -453,7 +486,7 @@ private:
 
 	/** Original logical resource-name resolver for the CD and installed roots. */
 	ResourceFileResolver *_resourceFileResolver = nullptr;
-	/** Unstarted PAT templates and failed loads retained for the current page. */
+	/** Unstarted PAT templates and failed loads retained for the active page. */
 	PATPathCache _pagePATPaths;
 	/** Append-only resource handles reset after page teardown or a resource-root change. */
 	mutable Common::Array<PageResource> _pageResources;
@@ -487,7 +520,7 @@ private:
 
 	/** Most recently processed game-space mouse position. */
 	Common::Point32 _mousePos = Common::Point32();
-	/** Ordered input events awaiting the current page's dispatch boundary. */
+	/** Ordered input events awaiting the active page's dispatch boundary. */
 	Common::Array<Common::Event> _pendingPageEvents;
 	/**
 	 * Whether the tracked press began inside a shared modal dialog.
@@ -496,11 +529,11 @@ private:
 	bool _modalOwnedPress = false;
 
 	/** Active page identifier. */
-	PageId _currentPageId = PageId::kPageNone_M1;
+	PageId _activePageId = PageId::kPageNone_M1;
 	/** Requested replacement page identifier. */
 	PageId _nextPageId = PageId::kPageLogoTLC_17;
 	/** Active page, or nullptr between page lifetimes. */
-	PageBase *_currentPage = nullptr;
+	PageBase *_activePage = nullptr;
 	/** Progress and fresh roster identities retained immediately before puzzle initialization. */
 	GameState *_puzzleRetryState = nullptr;
 	/** Random stream state immediately before puzzle initialization. */
@@ -553,7 +586,11 @@ private:
 	/** Numeric representation selected for Bezier path calculations. */
 	BezierCurveDataType _bezierCurveDataType = BezierCurveDataType::kQ10FixedPoint;
 	/** Whether the departing Fleen omits the malformed white-nose frames. */
-	bool _fixFleenDepartStreak = true;
+	bool _wallOfFleensFixDepartStreak = true;
+	/** Optional Mystic Marsh cell-plate edge fill, shared by levels 1-4. */
+	bool _mysticMarshFillCellGaps = false;
+	/** Whether Mystic Marsh L1-L3 install additional area-mask coverage. */
+	bool _mysticMarshExpandAreaMask = false;
 	/** Whether the enhanced keyboard shortcut set is enabled. */
 	bool _enhancedKbdShortcuts = false;
 	/** Whether the practice map exposes recoverable level 4 puzzles. */
@@ -582,7 +619,7 @@ private:
 	static bool readDebugSetInteger(const char *&cursor, const char *end, int32 &value);
 	/** Apply the global puzzle-completion shortcut to the active roster and page. */
 	bool applyDebugPuzzleCompletion();
-	/** Release parsed PAT templates and failed-load entries after the current page is destroyed. */
+	/** Release parsed PAT templates and failed-load entries after the active page is destroyed. */
 	void clearPagePATCache();
 	/** Load and register the game cursor. */
 	void initCursor();
@@ -591,9 +628,9 @@ private:
 	/** Release derived cursor pixels beginning at @p firstIndex. */
 	void clearCursorImages(uint firstIndex);
 	/** Return the first held global Zoombini, or nullptr when none is held. */
-	const ZoombiniRunner *getDraggedGlobalZoombini() const;
+	const ZoombiniRunner *getHeldGlobalZoombini() const;
 	/** Hide the cursor while held, then draw the page overlay and held name plate. */
-	void updateDragOverlay(bool advanceState);
+	void updateHoldOverlay(bool advanceState);
 	/** Open the shared quit confirmation unless the original close gates suppress it. */
 	void handleQuitRequest();
 	/** Open the shared quit confirmation through the message-box dialog. */
@@ -624,7 +661,7 @@ private:
 	/** Destroy the active page and construct @p pageId. */
 	void switchPage(PageId pageId);
 	/** Close shared dialogs and delete the active page before releasing page layers, bitmaps, and cursor art. */
-	void destroyCurrentPage();
+	void destroyActivePage();
 };
 
 } // End of namespace Zoombini2

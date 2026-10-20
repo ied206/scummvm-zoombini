@@ -62,12 +62,12 @@ public:
 	/** Draw the large Zoombini preview using the currently selected station traits. */
 	void onRenderForeground(ManagedSurface32 *screen) override;
 	/** Draw and advance the held Zoombini above the shared sidebar. */
-	void renderDragOverlay(ManagedSurface32 *screen, bool advanceState) override;
+	void renderHoldOverlay(ManagedSurface32 *screen, bool advanceState) override;
 	/** Refresh button availability and restart the runner under the final frame pointer. */
 	void onPostRender() override;
 	/** Dispatch a click to a feature station or party action. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
-	/** Finish dragging the held boarding Zoombini. */
+	/** Pick up or drop a boarding Zoombini on a mouse-button release. */
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
 	/** Move the held boarding Zoombini with the pointer. */
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
@@ -114,7 +114,7 @@ private:
 	};
 	/** Full-screen background bitmap for the Zoombiniville party picker. */
 	static constexpr const char *kBackgroundPath = "#bmp/zombiniville/zoombiniville";
-	/** Area map defining the interactive regions used for drag-and-drop input. */
+	/** Area map defining the interactive regions used for hold-and-drop input. */
 	static constexpr const char *kAreaMaskPath = "bmp/zombiniville/area.bmt";
 	/** Trait-button animation format; arguments select one of four traits and five values. */
 	static constexpr const char *kFeatureAnimationFormat = "bmp/zombiniville/pikaroll/z1pi%d%d.an";
@@ -256,8 +256,8 @@ private:
 	void buildBoardingZoombiniDrawOrder(Common::Array<uint> &order) const;
 	/** Draw non-held Zoombinis currently in the boarding area. */
 	void drawBoardingZoombinis(ManagedSurface32 *screen) const;
-	/** Return the currently dragged boarding Zoombini, or nullptr. */
-	ZoombiniRunner *getDraggedZoombini() const;
+	/** Return the currently held boarding Zoombini, or nullptr. */
+	ZoombiniRunner *getHeldZoombini() const;
 };
 
 } // End of namespace Zoombini2

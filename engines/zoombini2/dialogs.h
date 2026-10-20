@@ -261,7 +261,11 @@ private:
 	/** Toggle enabling the enhanced keyboard shortcut set. */
 	GUI::CheckboxWidget *_enhancedKbdShortcutsCheckbox = nullptr;
 	/** Toggle hiding the stray streaks in the Fleen departure animation. */
-	GUI::CheckboxWidget *_fixFleenDepartStreakCheckbox = nullptr;
+	GUI::CheckboxWidget *_wallOfFleensFixDepartStreakCheckbox = nullptr;
+	/** Toggle filling gaps between Mystic Marsh cell plates and grid edges. */
+	GUI::CheckboxWidget *_mysticMarshFillCellGapsCheckbox = nullptr;
+	/** Toggle expanding the left waiting bank away from crater entrances. */
+	GUI::CheckboxWidget *_mysticMarshExpandAreaMaskCheckbox = nullptr;
 	/** Toggle optional English subtitles for the Norfs' spoken clues. */
 	GUI::CheckboxWidget *_chezNorfClueSubtitlesCheckbox = nullptr;
 	/** Toggle keying the solid color from affected help-sheet bitmaps. */

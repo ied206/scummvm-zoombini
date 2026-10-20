@@ -254,37 +254,83 @@ public:
 };
 
 /**
- * Coordinates one screen-facing update, drawing, and input lifecycle.
- * The engine dispatches one regular page at a time, keeping shared modal dialogs separately while that page remains alive.
- * @ref PageBase::onFrame optionally updates state, then draws background, content, actors, and foreground in that order.
- * When state may advance, @ref PageBase::onActorsRendered runs between actors and foreground, and @ref PageBase::onPostRender runs last.
- * @ref PageBase::render follows the same drawing order while skipping those state-advance hooks and @ref PageBase::onUpdate.
+ * Defines the input, update, and drawing hooks for a page.
+ * The engine dispatches input through @ref PageEventHandler before the frame pass.
+ * Shared @ref DialogBase overlays use a separate modal input and rendering route.
+ *
+ * @par Frame entry points and hook order
+ * @verbatim
+ * onFrame(screen, true)  -> onUpdate() -> renderFrame(screen, true)
+ * onFrame(screen, false) ---------------> renderFrame(screen, false)
+ * render(screen)         ---------------> renderFrame(screen, false)
+ *
+ * renderFrame(screen, advanceState):
+ *   clear target if needsScreenClear()
+ *     -> onRenderBackground(screen)
+ *     -> onRenderContent(screen)
+ *     -> onRenderActors(screen)
+ *     -> onActorsRendered()       [only if advanceState]
+ *     -> onRenderForeground(screen)
+ *     -> onPostRender()           [only if advanceState]
+ * @endverbatim
+ * Later drawing covers earlier drawing. The engine composes the sidebar, shared dialogs,
+ * and hold overlay after this page pass, then presents the screen.
  */
 class PageBase : public PageEventHandler, public Common::NonCopyable {
 public:
 	/** Bind this page to @p vm and record its @p pageCategory. */
 	PageBase(Zoombini2Engine *vm, PageCategory pageCategory);
-	/** Release resources retained by the concrete page. */
+	/** Stop and unload this page's music; concrete destructors release their own additional resources. */
 	virtual ~PageBase();
 
 	/**
 	 * Dispatch the concrete event handler, then update the page-layer pointer latch for left-button events even if the handler consumed them.
 	 * Dialogs skip layer dispatch because those layers belong to the page underneath the modal.
+	 * Implement input behavior in the inherited mouse/key callbacks rather than replacing this dispatcher.
+	 *
+	 * @param[in] event Backend event with pointer coordinates already expressed in game pixels.
+	 * @return Whether the page callback or a page-layer runner consumed the event.
 	 */
 	EventHandleResult handleEvent(const Common::Event &event);
-	/** Advance page state when permitted, then execute the complete render pass. */
+	/**
+	 * Run the optional simulation step, then the ordered page render pass shown in the class documentation.
+	 * The engine passes false when a page change is already pending before this pass.
+	 * A transition requested by a hook does not interrupt this pass or change its @p advanceState value.
+	 *
+	 * @param[in,out] screen Non-null destination surface in page pixel coordinates.
+	 * @param[in] advanceState Run @ref onUpdate, @ref onActorsRendered, and @ref onPostRender when true.
+	 *                         Drawing hooks run regardless of this flag.
+	 */
 	void onFrame(ManagedSurface32 *screen, bool advanceState);
-	/** Recompose visuals while skipping @ref PageBase::onUpdate, @ref PageBase::onActorsRendered, and @ref PageBase::onPostRender. */
+	/**
+	 * Recompose the page through the same drawing hooks, skipping all three update/completion hooks.
+	 * Used by the modal rendering route. Animation helpers called by drawing hooks retain their own update behavior.
+	 *
+	 * @param[in,out] screen Non-null destination surface, which may already contain the underlying page.
+	 */
 	void render(ManagedSurface32 *screen);
-	/** Draw a page-specific held actor above shared controls, then optionally advance it. */
-	virtual void renderDragOverlay(ManagedSurface32 *screen, bool advanceState) {
+	/**
+	 * Draw a held actor above shared controls, separately from the main page render pass.
+	 * The engine calls this after page, sidebar, and shared-dialog composition when the hold route permits it.
+	 *
+	 * @param[in,out] screen Non-null destination surface containing the composed page and controls.
+	 * @param[in] advanceState Whether the held actor may advance after its current pose is drawn.
+	 */
+	virtual void renderHoldOverlay(ManagedSurface32 *screen, bool advanceState) {
 		(void)screen;
 		(void)advanceState;
 	}
 
-	/** Initialize page-local state and resources. */
+	/**
+	 * Initialize page state, resources, and deadlines before its first frame.
+	 * The dispatcher calls this after construction; derived pages must call any required family initialization.
+	 * @ref DialogBase uses opener-driven configuration instead of this dispatcher step.
+	 */
 	virtual void init() = 0;
-	/** Return whether the engine must clear the screen before @ref PageBase::render. */
+	/**
+	 * Request a full target clear before @ref onRenderBackground in both frame and redraw entry paths.
+	 * Leave false when drawing restores its own background or an overlay must retain underlying pixels.
+	 */
 	virtual bool needsScreenClear() const { return false; }
 	/** Return whether a panel belonging to this page exclusively handles its input. */
 	virtual bool hasActiveDialog() const { return false; }
@@ -311,50 +357,90 @@ public:
 	virtual bool isShelter() const { return false; }
 	/** Apply any page-local state required by the global debug-completion hotkey. */
 	virtual void applyDebugPuzzleCompletion() {}
-	/** Load or replace the 1-bit area mask used by Zoombini drop handling.
+	/**
+	 * Load or replace the 1-bit area mask used by Zoombini drop handling.
 	 * @param path Resource file whose set pixels mark the permitted drop area.
 	 */
 	bool loadAreaMask(const Common::Path &path);
-	/** Release the area mask retained by this page. */
+	/** Release the active area mask retained by Gfx. */
 	void clearAreaMask();
 	/** Return whether this page has an area mask loaded. */
-	bool hasAreaMask() const { return _areaMask != nullptr; }
+	bool hasAreaMask() const;
 	/** Return the drop-acceptance area mask, or nullptr when the page has none. */
-	const AreaMask *getAreaMask() const { return _areaMask; }
+	const AreaMask *getAreaMask() const;
+	/**
+	 * Return the squared pixel distance between two screen-space points.
+	 * Omit the square root for callers that use squared thresholds or distance-based weights.
+	 *
+	 * @param[in] first First point in screen pixels.
+	 * @param[in] second Second point in the same coordinate space.
+	 * @return Squared Euclidean distance in pixels squared.
+	 */
+	static int32 squaredDistance(const Common::Point32 &first, const Common::Point32 &second);
 
 protected:
-	/** Start or replace this page's looping music and retain it until replacement or page destruction.
-	 * @param path Audio resource played at the configured music volume.
+	/**
+	 * Start or replace this page's looping music, normally from @ref init.
+	 * This is a resource helper, not a frame hook; PageBase unloads the previous track on replacement
+	 * and releases the retained track at page destruction.
+	 * @param[in] path Audio resource played at the configured music volume.
 	 */
 	void startPageMusic(const Common::Path &path);
-	/** Advance this page's simulation before rendering. */
+	/**
+	 * Advance simulation, timers, and page state before any pixels are cleared or drawn.
+	 * Called only by @ref onFrame with advanceState=true. A queued transition still leaves this pass's drawing to complete.
+	 */
 	virtual void onUpdate() {}
-	/** Restore or draw this page's background pixels. */
+	/**
+	 * Restore the backdrop before content and actors; the default does nothing.
+	 * @param[in,out] screen Destination after the optional full clear, shared by all drawing hooks in this pass.
+	 */
 	virtual void onRenderBackground(ManagedSurface32 *screen) { (void)screen; }
-	/** Draw this page's content elements behind its actors. */
+	/**
+	 * Draw board elements, scenery, and other content above the backdrop but behind actors.
+	 * This is the required drawing hook; simple pages may draw the whole screen here.
+	 * @param[in,out] screen Destination containing the background drawn earlier in this pass.
+	 */
 	virtual void onRenderContent(ManagedSurface32 *screen) = 0;
-	/** Draw actors at the page's actor boundary. */
+	/**
+	 * Draw the current actor poses over content, before actor completion and foreground work.
+	 * The page or family base owns actor selection and ordering; PageBase draws no actors automatically.
+	 * @param[in,out] screen Destination containing background and content.
+	 */
 	virtual void onRenderActors(ManagedSurface32 *screen) { (void)screen; }
-	/** Advance actor completion work after drawing, before foreground composition, on an active frame only. */
+	/**
+	 * Advance or finalize actors after their current poses have been drawn, before foreground composition.
+	 * Use this for after-draw animation steps, completion callbacks, and resulting page-state changes.
+	 * Called only when the pass's advanceState is true; @ref render skips this hook.
+	 */
 	virtual void onActorsRendered() {}
-	/** Draw this page's elements that cover its actors. */
+	/**
+	 * Draw occluders and other page elements that must cover actors, after actor completion work.
+	 * @param[in,out] screen Destination containing the actor poses drawn in this pass.
+	 */
 	virtual void onRenderForeground(ManagedSurface32 *screen) { (void)screen; }
-	/** Complete work after composition on an active frame only. */
+	/**
+	 * Finish page-local work after foreground composition, only when the pass's advanceState is true.
+	 * Shared controls, hold overlays, and screen presentation still follow in the engine.
+	 * This is the last page hook, not a notification that the screen has been presented; @ref render skips it.
+	 */
 	virtual void onPostRender() {}
 
-	/** Reference to the engine interface. */
+	/** Borrowed engine interface, which outlives this page and the resources released by its destructor. */
 	Zoombini2Engine *_vm;
 	/** Category assigned to this page for lifecycle and UI policy. */
 	const PageCategory _pageCategory;
 	/** Numeric dispatcher identifier for this page. */
 	PageId _pageId = PageId::kPageNone_M1;
-	/** Optional page-area mask released with this page. */
-	AreaMask *_areaMask = nullptr;
 
 private:
 	/** Stop and unload music started by this page. */
 	void releasePageMusic();
-	/** Run visual hooks and, when requested, the two completion boundaries. */
+	/**
+	 * Run the clear policy and drawing hooks in fixed order, inserting the two gated completion hooks.
+	 * @param[in,out] screen Non-null destination shared by every drawing hook.
+	 * @param[in] advanceState Whether to run @ref onActorsRendered and @ref onPostRender; @ref onUpdate is handled by the caller.
+	 */
 	void renderFrame(ManagedSurface32 *screen, bool advanceState);
 	/** Music buffer released when this page is destroyed. */
 	int _pageMusicId = -1;

@@ -1324,7 +1324,7 @@ bool ZoombiniRunner::tryStartCelebrationAnimation(const ZoombiniAnimation *anima
 }
 
 bool ZoombiniRunner::tryStartIdleAnimation(const ZoombiniAnimation *animation, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz) {
-	if (!animation || _hidden || !_idleAnimationEnabled || _animationActive || _movementPath || _dragging)
+	if (!animation || _hidden || !_idleAnimationEnabled || _animationActive || _movementPath || _held)
 		return false;
 	// Bank quota so the original one-in-250 roll runs pacingHz times per second.
 	// The remainder spreads double-roll frames evenly when pacing exceeds the render rate.
@@ -1417,40 +1417,40 @@ bool ZoombiniRunner::hitTest(const Common::Point32 &point) const {
 		   _screenPos.y + 11 < point.y && point.y < _screenPos.y + 42;
 }
 
-bool ZoombiniRunner::beginDrag(const Common::Point32 &pointerPos, const ZoombiniAnimation *pickupAnimation, uint32 tickCount) {
-	if (!canBeginDrag(pointerPos))
+bool ZoombiniRunner::beginHold(const Common::Point32 &pointerPos, const ZoombiniAnimation *pickupAnimation, uint32 tickCount) {
+	if (!canBeginHold(pointerPos))
 		return false;
-	startDrag(pointerPos, pickupAnimation, tickCount);
+	startHold(pointerPos, pickupAnimation, tickCount);
 	return true;
 }
 
-bool ZoombiniRunner::canBeginDrag(const Common::Point32 &pointerPos) const {
+bool ZoombiniRunner::canBeginHold(const Common::Point32 &pointerPos) const {
 	const Common::Point32 adjustedHitPoint(pointerPos.x + 2, pointerPos.y - 3);
-	return _inputEnabled && !_dragging && hitTest(adjustedHitPoint);
+	return _inputEnabled && !_held && hitTest(adjustedHitPoint);
 }
 
-void ZoombiniRunner::startDrag(const Common::Point32 &pointerPos, const ZoombiniAnimation *pickupAnimation, uint32 tickCount) {
-	_dragging = true;
-	_dragOrigin = _screenPos;
-	_dragOffset = Common::Point32(pointerPos.x - _screenPos.x - 3, pointerPos.y - _screenPos.y - 10);
+void ZoombiniRunner::startHold(const Common::Point32 &pointerPos, const ZoombiniAnimation *pickupAnimation, uint32 tickCount) {
+	_held = true;
+	_holdOrigin = _screenPos;
+	_holdOffset = Common::Point32(pointerPos.x - _screenPos.x - 3, pointerPos.y - _screenPos.y - 10);
 	setPosition(Common::Point32(pointerPos.x - 3, pointerPos.y - 10));
 	resetAnimation();
 	startAnimation(pickupAnimation, 33, tickCount);
 }
 
-void ZoombiniRunner::updateDrag(const Common::Point32 &pointerPos) {
-	if (!_dragging)
+void ZoombiniRunner::updateHold(const Common::Point32 &pointerPos) {
+	if (!_held)
 		return;
 	setPosition(Common::Point32(pointerPos.x - 3, pointerPos.y - 10));
 }
 
-void ZoombiniRunner::endDrag(bool applyGrabOffset) {
-	if (!_dragging)
+void ZoombiniRunner::endHold(bool applyGrabOffset) {
+	if (!_held)
 		return;
-	_dragging = false;
+	_held = false;
 	if (applyGrabOffset) {
-		_screenPos.x -= _dragOffset.x;
-		_screenPos.y -= _dragOffset.y;
+		_screenPos.x -= _holdOffset.x;
+		_screenPos.y -= _holdOffset.y;
 	}
 	_overDropTarget = false;
 	_hoveredDropTargetIndex = -1;
@@ -1462,7 +1462,7 @@ bool ZoombiniRunner::isStrictlyInside(const Common::Point32 &point, const Common
 }
 
 int ZoombiniRunner::findHoveredDropTarget(const ZoombiniRunner &zoombini, const Common::Point32 &pointerPos, const Common::Array<ZmbDropTarget> &targets) {
-	const Common::Point32 footPoint(pointerPos.x - zoombini._dragOffset.x + 17, pointerPos.y - zoombini._dragOffset.y + 46);
+	const Common::Point32 footPoint(pointerPos.x - zoombini._holdOffset.x + 17, pointerPos.y - zoombini._holdOffset.y + 46);
 	int targetIndex = -1;
 	for (uint i = 0; i < targets.size(); i++) {
 		if (!targets[i].occupied && isStrictlyInside(footPoint, targets[i].rect))
@@ -1472,7 +1472,7 @@ int ZoombiniRunner::findHoveredDropTarget(const ZoombiniRunner &zoombini, const 
 }
 
 int ZoombiniRunner::findReleaseDropTarget(const ZoombiniRunner &zoombini, const Common::Point32 &pointerPos, const Common::Array<ZmbDropTarget> &targets, int scrollX, int backgroundWidth) {
-	Common::Point32 footPoint(pointerPos.x - zoombini._dragOffset.x + 17, pointerPos.y - zoombini._dragOffset.y + 46);
+	Common::Point32 footPoint(pointerPos.x - zoombini._holdOffset.x + 17, pointerPos.y - zoombini._holdOffset.y + 46);
 	if (backgroundWidth != AnimationRunner::kDefaultBackgroundWidth) {
 		footPoint.x += scrollX;
 		if (backgroundWidth <= footPoint.x)
@@ -1503,13 +1503,13 @@ ZmbDropResult ZoombiniRunner::handleHoldAndDrop(Zoombini2Engine *vm, const Commo
 												ZmbHoldDropInput input, const ZoombiniAnimation *pickupAnimation, Common::Array<ZmbDropTarget> *dropTargets,
 												const AreaMask *areaMask, int scrollX, int backgroundWidth) {
 	const uint32 tickCount = vm->getTotalPlayTime();
-	ZoombiniRunner *dragged = nullptr;
-	int draggedIndex = -1;
+	ZoombiniRunner *held = nullptr;
+	int heldIndex = -1;
 	for (uint i = 0; i < zoombinis.size(); i++) {
-		if (zoombinis[i] && zoombinis[i]->_dragging) {
-			if (!dragged) {
-				dragged = zoombinis[i];
-				draggedIndex = static_cast<int>(i);
+		if (zoombinis[i] && zoombinis[i]->_held) {
+			if (!held) {
+				held = zoombinis[i];
+				heldIndex = static_cast<int>(i);
 			}
 		} else if (zoombinis[i]) {
 			zoombinis[i]->_overDropTarget = false;
@@ -1517,13 +1517,13 @@ ZmbDropResult ZoombiniRunner::handleHoldAndDrop(Zoombini2Engine *vm, const Commo
 		}
 	}
 
-	if (dragged) {
-		dragged->updateDrag(cursorPos);
-		dragged->_overDropTarget = false;
-		dragged->_hoveredDropTargetIndex = -1;
+	if (held) {
+		held->updateHold(cursorPos);
+		held->_overDropTarget = false;
+		held->_hoveredDropTargetIndex = -1;
 		if (dropTargets) {
-			dragged->_hoveredDropTargetIndex = findHoveredDropTarget(*dragged, cursorPos, *dropTargets);
-			dragged->_overDropTarget = dragged->_hoveredDropTargetIndex != -1;
+			held->_hoveredDropTargetIndex = findHoveredDropTarget(*held, cursorPos, *dropTargets);
+			held->_overDropTarget = held->_hoveredDropTargetIndex != -1;
 		}
 
 		switch (input) {
@@ -1534,18 +1534,18 @@ ZmbDropResult ZoombiniRunner::handleHoldAndDrop(Zoombini2Engine *vm, const Commo
 		}
 		int targetIndex = -1;
 		if (dropTargets)
-			targetIndex = findReleaseDropTarget(*dragged, cursorPos, *dropTargets, scrollX, backgroundWidth);
+			targetIndex = findReleaseDropTarget(*held, cursorPos, *dropTargets, scrollX, backgroundWidth);
 		if (dropTargets && targetIndex != -1) {
 			ZmbDropTarget &target = (*dropTargets)[targetIndex];
-			dragged->endDrag(false);
+			held->endHold(false);
 			target.occupied = true;
-			target.zoombiniIndex = draggedIndex;
+			target.zoombiniIndex = heldIndex;
 			if (target.callback)
-				target.callback(target.callbackContext, targetIndex, draggedIndex);
+				target.callback(target.callbackContext, targetIndex, heldIndex);
 			return ZmbDropResult::kDroppedOnTarget02;
 		}
 		if (areaMask && areaMask->hasMarkedByteAt(Common::Point32(cursorPos.x, cursorPos.y))) {
-			dragged->endDrag(true);
+			held->endHold(true);
 			return ZmbDropResult::kDroppedOnArea03;
 		}
 		return ZmbDropResult::kStillHeld04;
@@ -1559,7 +1559,7 @@ ZmbDropResult ZoombiniRunner::handleHoldAndDrop(Zoombini2Engine *vm, const Commo
 	}
 	for (uint i = 0; i < zoombinis.size(); i++) {
 		ZoombiniRunner *zoombini = zoombinis[i];
-		if (!zoombini || !zoombini->canBeginDrag(cursorPos))
+		if (!zoombini || !zoombini->canBeginHold(cursorPos))
 			continue;
 		if (dropTargets) {
 			for (uint targetIndex = 0; targetIndex < dropTargets->size(); targetIndex++) {
@@ -1571,7 +1571,7 @@ ZmbDropResult ZoombiniRunner::handleHoldAndDrop(Zoombini2Engine *vm, const Commo
 					target.callback(target.callbackContext, static_cast<int>(targetIndex), static_cast<int>(i));
 			}
 		}
-		zoombini->startDrag(cursorPos, pickupAnimation, tickCount);
+		zoombini->startHold(cursorPos, pickupAnimation, tickCount);
 		return ZmbDropResult::kPickedUp01;
 	}
 	return ZmbDropResult::kIgnored00;
@@ -1591,8 +1591,8 @@ void ZoombiniRunner::sortDrawOrderByY(const Common::Array<ZoombiniRunner *> &zoo
 }
 
 Common::Point32 ZoombiniRunner::getDrawPosition(int scrollX, int backgroundWidth) const {
-	if (_dragging)
-		return Common::Point32(_screenPos.x - _dragOffset.x, _screenPos.y - _dragOffset.y);
+	if (_held)
+		return Common::Point32(_screenPos.x - _holdOffset.x, _screenPos.y - _holdOffset.y);
 	if (backgroundWidth == kUnscrolledBackgroundWidth || backgroundWidth == AnimationRunner::kDefaultBackgroundWidth)
 		return _screenPos;
 

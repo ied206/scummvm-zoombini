@@ -171,10 +171,10 @@ AlphaBlendLUT::AlphaBlendLUT() {
 }
 
 RGBColor AlphaBlendLUT::blend(const RGBColor &srcColor, const RGBColor &destColor, byte sourceFactor, byte destFactor) const {
-	return RGBColor(
-		static_cast<byte>(MIN<int>(scale(sourceFactor, srcColor.r) + scale(destFactor, destColor.r), 255)),
-		static_cast<byte>(MIN<int>(scale(sourceFactor, srcColor.g) + scale(destFactor, destColor.g), 255)),
-		static_cast<byte>(MIN<int>(scale(sourceFactor, srcColor.b) + scale(destFactor, destColor.b), 255)));
+	const auto blendChannels = [this, sourceFactor, destFactor](byte source, byte destination) {
+		return MIN<int>(scale(sourceFactor, source) + scale(destFactor, destination), 255);
+	};
+	return srcColor.transformChannels(destColor, blendChannels);
 }
 
 BitBlock::BitBlock(Zoombini2Engine *vm)
@@ -213,7 +213,9 @@ bool BitBlock::loadFromColorAlphaBMP(const Common::Path &colorPath, const Common
 	}
 
 	loaded._resourcePath = colorPath;
+	_vm->recordPageResourceDecode(colorPath.toString('/'), Zoombini2Engine::PageResourceType::kBitmap);
 	loaded._alphaResourcePath = alphaPath;
+	_vm->recordPageResourceDecode(alphaPath.toString('/'), Zoombini2Engine::PageResourceType::kBitmap);
 	swapData(loaded);
 
 	return true;
@@ -231,6 +233,7 @@ bool BitBlock::loadFromColorBMP(const Common::Path &colorPath) {
 		return false;
 
 	loaded._resourcePath = colorPath;
+	_vm->recordPageResourceDecode(colorPath.toString('/'), Zoombini2Engine::PageResourceType::kBitmap);
 	swapData(loaded);
 	return true;
 }
@@ -323,6 +326,7 @@ bool BitBlock::loadBBStream(Common::SeekableReadStream &f, const Common::Path &b
 	_pixels = pixels;
 	_alphaMap = nullptr;
 	_resourcePath = bbPath;
+	_vm->recordPageResourceDecode(bbPath.toString('/'), Zoombini2Engine::PageResourceType::kBitmap);
 	_alphaResourcePath.clear();
 
 	return true;
@@ -352,10 +356,10 @@ bool BitBlock::load(const Common::Path &basePath) {
 	return loadFromColorBMP(srcPath);
 }
 
-void BitBlock::recordPageCacheUse() const {
-	_vm->recordPageResourceCacheUse(_resourcePath.toString('/'), Zoombini2Engine::PageResourceType::kBitmap);
+void BitBlock::recordPageCacheUse(bool cacheHit) const {
+	_vm->recordPageResourceCacheUse(_resourcePath.toString('/'), Zoombini2Engine::PageResourceType::kBitmap, cacheHit);
 	if (!_alphaResourcePath.empty())
-		_vm->recordPageResourceCacheUse(_alphaResourcePath.toString('/'), Zoombini2Engine::PageResourceType::kBitmap);
+		_vm->recordPageResourceCacheUse(_alphaResourcePath.toString('/'), Zoombini2Engine::PageResourceType::kBitmap, cacheHit);
 }
 
 void BitBlock::createEmpty(const Size32 &size, bool withAlpha) {
@@ -529,8 +533,10 @@ void BitBlock::drawAlphaBlend(ManagedSurface32 *dst, const Common::Point32 &pos)
 
 			const RGBColor srcColor = RGBColor::fromPixel(READ_UINT32(src), kSourceFormat);
 			const RGBColor destColor = RGBColor::fromPixel(READ_UINT32(dstPixel), dst->format);
-			const RGBColor blendedColor(blendChannel(srcColor.r, destColor.r, alpha), blendChannel(srcColor.g, destColor.g, alpha),
-										blendChannel(srcColor.b, destColor.b, alpha));
+			const auto blendChannels = [alpha](byte source, byte destination) {
+				return blendChannel(source, destination, alpha);
+			};
+			const RGBColor blendedColor = srcColor.transformChannels(destColor, blendChannels);
 			WRITE_UINT32(dstPixel, blendedColor.toPixel(dst->format));
 		}
 	}
@@ -680,6 +686,7 @@ bool RleBlock::loadFromFile(const Common::Path &path) {
 	if (f.pos() != f.size())
 		warning("RleBlock: ignoring %" PRIu64 " trailing bytes in '%s'", f.size() - f.pos(), resolvedPath.toString().c_str());
 	loaded._resourcePath = resolvedPath;
+	_vm->recordPageResourceDecode(resolvedPath.toString('/'), Zoombini2Engine::PageResourceType::kSprite);
 	swapData(loaded);
 	return true;
 }
@@ -688,8 +695,8 @@ bool RleBlock::load(const Common::Path &basePath) {
 	return loadFromFile(basePath);
 }
 
-void RleBlock::recordPageCacheUse() const {
-	_vm->recordPageResourceCacheUse(_resourcePath.toString('/'), Zoombini2Engine::PageResourceType::kSprite);
+void RleBlock::recordPageCacheUse(bool cacheHit) const {
+	_vm->recordPageResourceCacheUse(_resourcePath.toString('/'), Zoombini2Engine::PageResourceType::kSprite, cacheHit);
 }
 
 bool RleBlock::loadAnimationFrame(Common::SeekableReadStream *stream, uint32 outerSize) {
@@ -848,8 +855,8 @@ bool RleBlock::recolorPixel(const byte *source, bool premultiplied, const RGBCol
 	if (alpha < 8)
 		return false;
 	const RGBColor pixelColor = RGBColor::fromPixel(READ_UINT32(source), kSourceFormat);
-	const RGBColor sourceColor(static_cast<byte>(MIN(255, pixelColor.r * 255 / alpha)), static_cast<byte>(MIN(255, pixelColor.g * 255 / alpha)),
-							   static_cast<byte>(MIN(255, pixelColor.b * 255 / alpha)));
+	const auto unpremultiplyChannel = [alpha](byte channel) { return MIN(255, channel * 255 / alpha); };
+	const RGBColor sourceColor = pixelColor.transformChannels(unpremultiplyChannel);
 	const int brightest = sourceColor.getMaxChannel();
 	const int darkest = sourceColor.getMinChannel();
 	if (brightest - darkest < 24)
@@ -858,10 +865,33 @@ bool RleBlock::recolorPixel(const byte *source, bool premultiplied, const RGBCol
 		adjustedColor = Gfx::recolorNoseGradientRGB(sourceColor, targetColor);
 		return true;
 	}
-	adjustedColor.r = static_cast<byte>(MIN(255, targetColor.r * brightest / srcBrightness));
-	adjustedColor.g = static_cast<byte>(MIN(255, targetColor.g * brightest / srcBrightness));
-	adjustedColor.b = static_cast<byte>(MIN(255, targetColor.b * brightest / srcBrightness));
+	const auto recolorChannel = [brightest, srcBrightness](byte channel) { return MIN(255, channel * brightest / srcBrightness); };
+	adjustedColor = targetColor.transformChannels(recolorChannel);
 	return true;
+}
+
+void RleBlock::samplePixel(const Common::Point32 &pos, RGBColor &color, byte &alpha) const {
+	color = RGBColor(0, 0, 0);
+	alpha = 0;
+	if (!_loaded || pos.x < 0 || _size.width <= pos.x || pos.y < 0 || _size.height <= pos.y)
+		return;
+	for (uint i = 0; i < _spans.size(); i++) {
+		const Span &span = _spans[i];
+		if (span.yOffset != pos.y || pos.x < span.xOffset || span.xOffset + static_cast<int32>(span.pixelCount) <= pos.x)
+			continue;
+		const uint32 pixel = _pixels[span.pixelOffset + pos.x - span.xOffset];
+		color = RGBColor::fromPixel(pixel, kSourceFormat);
+		alpha = 255;
+		if (span.mode == SpanMode::kInverseAlphaBgr01) {
+			const byte inverseAlpha = reinterpret_cast<const byte *>(_pixels + span.pixelOffset + pos.x - span.xOffset)[3];
+			alpha = 255 - inverseAlpha;
+			if (alpha) {
+				const auto unpremultiplyChannel = [alpha](byte channel) { return MIN(255, (channel * 255 + alpha / 2) / alpha); };
+				color = color.transformChannels(unpremultiplyChannel);
+			}
+		}
+		return;
+	}
 }
 
 /**
@@ -928,9 +958,10 @@ void RleBlock::drawToScreenMirrored(ManagedSurface32 *destSurface, const Common:
 				const byte invAlpha = srcPixel[3];
 				const RGBColor sourceColor = RGBColor::fromPixel(READ_UINT32(srcPixel), kSourceFormat);
 				const RGBColor destColor = RGBColor::fromPixel(READ_UINT32(dstPixel), destSurface->format);
-				const RGBColor blendedColor(blendChannel(sourceColor.r, destColor.r, invAlpha, alphaLUT),
-											blendChannel(sourceColor.g, destColor.g, invAlpha, alphaLUT),
-											blendChannel(sourceColor.b, destColor.b, invAlpha, alphaLUT));
+				const auto blendChannels = [invAlpha, &alphaLUT](byte source, byte destination) {
+					return blendChannel(source, destination, invAlpha, alphaLUT);
+				};
+				const RGBColor blendedColor = sourceColor.transformChannels(destColor, blendChannels);
 				WRITE_UINT32(dstPixel, blendedColor.toPixel(destSurface->format));
 			}
 			dstPixel += 4;
@@ -1041,10 +1072,10 @@ void RleBlock::drawToScreenInternal(ManagedSurface32 *destSurface, const Common:
 						}
 					}
 					const RGBColor destColor = RGBColor::fromPixel(READ_UINT32(dstPixel), destSurface->format);
-					const RGBColor blendedColor(
-						blendChannel(sourceColor.r, destColor.r, invAlpha, alphaLUT),
-						blendChannel(sourceColor.g, destColor.g, invAlpha, alphaLUT),
-						blendChannel(sourceColor.b, destColor.b, invAlpha, alphaLUT));
+					const auto blendChannels = [invAlpha, &alphaLUT](byte source, byte destination) {
+						return blendChannel(source, destination, invAlpha, alphaLUT);
+					};
+					const RGBColor blendedColor = sourceColor.transformChannels(destColor, blendChannels);
 					WRITE_UINT32(dstPixel, blendedColor.toPixel(destSurface->format));
 					srcPixel += 4;
 					dstPixel += 4;
@@ -1078,19 +1109,22 @@ const ZoombiniAnimation *Gfx::loadZoombiniAnimation(const Common::Path &path, ui
 	const Common::Path key = Zoombini2Engine::normalizeResourcePath(path.toString('/'));
 	ZoombiniAnimationCache::const_iterator cached = _zoombiniAnimationCache.find(key);
 	if (cached != _zoombiniAnimationCache.end()) {
-		cached->_value->setFrameDelay(frameDelay);
-		_vm->recordPageResourceCacheUse(key.toString('/'), Zoombini2Engine::PageResourceType::kZoombiniAnimation);
+		if (cached->_value) {
+			cached->_value->setFrameDelay(frameDelay);
+			_vm->recordPageResourceCacheUse(key.toString('/'), Zoombini2Engine::PageResourceType::kZoombiniAnimation);
+		}
 		return cached->_value;
 	}
 
 	ZoombiniAnimation *animation = new ZoombiniAnimation(_vm);
 	if (!animation->loadFromFile(key)) {
 		delete animation;
+		_zoombiniAnimationCache[key] = nullptr;
 		return nullptr;
 	}
 	animation->setFrameDelay(frameDelay);
 	_zoombiniAnimationCache[key] = animation;
-	_vm->recordPageResourceCacheUse(key.toString('/'), Zoombini2Engine::PageResourceType::kZoombiniAnimation);
+	_vm->recordPageResourceCacheUse(key.toString('/'), Zoombini2Engine::PageResourceType::kZoombiniAnimation, false);
 	return animation;
 }
 
@@ -1147,7 +1181,14 @@ void Gfx::clearPageLayers() {
 		_pageLayerStack->clear();
 }
 
-RleBlock *Gfx::loadRleBlock(RleBlockCache &cache, const Common::String &key) {
+RleBlock *Gfx::loadRleBlock(RleBlockCache &cache, const Common::String &request) {
+	Common::Path path = Zoombini2Engine::normalizeResourcePath(request);
+	Common::String key = path.toString('/');
+	if (!key.hasSuffixIgnoreCase(".rb")) {
+		if (key.hasSuffixIgnoreCase(".bmp") || key.hasSuffixIgnoreCase(".bmt"))
+			path.removeExtension();
+		key = path.append(".rb").toString('/');
+	}
 	RleBlockCache::const_iterator cached = cache.find(key);
 	if (cached != cache.end()) {
 		if (cached->_value)
@@ -1163,35 +1204,58 @@ RleBlock *Gfx::loadRleBlock(RleBlockCache &cache, const Common::String &key) {
 	}
 	cache[key] = sprite;
 	if (sprite)
-		sprite->recordPageCacheUse();
+		sprite->recordPageCacheUse(false);
 	return sprite;
 }
 
-BitBlock *Gfx::loadBitBlock(BitBlockCache &cache, const Common::String &key) {
+BitBlock *Gfx::loadBitBlock(BitBlockCache &cache, const Common::String &request) {
+	const Common::String key = Zoombini2Engine::normalizeResourcePath(request).toString('/');
 	BitBlockCache::const_iterator cached = cache.find(key);
 	if (cached != cache.end()) {
 		if (cached->_value)
 			cached->_value->recordPageCacheUse();
-		return cached->_value;
+		return cached->_value.get();
 	}
 
-	BitBlock *bitmap = new BitBlock(_vm);
-	const bool loaded = bitmap->load(Common::Path(key));
-	if (!loaded) {
-		delete bitmap;
-		bitmap = nullptr;
+	// A fallback request can reuse its BB source, but an explicit BB request never reuses a BMP fallback.
+	Common::Path bbPath(key);
+	if (!key.hasSuffixIgnoreCase(".bb")) {
+		if (key.hasSuffixIgnoreCase(".bmp") || key.hasSuffixIgnoreCase(".bmt"))
+			bbPath.removeExtension();
+		bbPath = bbPath.append(".bb");
+		cached = cache.find(bbPath.toString('/'));
+		if (cached != cache.end() && cached->_value) {
+			Common::SharedPtr<BitBlock> bitmap = cached->_value;
+			cache[key] = bitmap;
+			bitmap->recordPageCacheUse();
+			return bitmap.get();
+		}
+	}
+	Common::SharedPtr<BitBlock> bitmap(new BitBlock(_vm));
+	if (!bitmap->load(Common::Path(key)))
+		bitmap.reset();
+	if (bitmap) {
+		const Common::String source = Zoombini2Engine::normalizeResourcePath(bitmap->getResourcePath().toString('/')).toString('/');
+		cached = cache.find(source);
+		if (cached != cache.end() && cached->_value)
+			bitmap = cached->_value;
+		else
+			cache[source] = bitmap;
 	}
 	cache[key] = bitmap;
 	if (bitmap)
-		bitmap->recordPageCacheUse();
-	return bitmap;
+		bitmap->recordPageCacheUse(false);
+	return bitmap.get();
 }
 
-BitBlock *Gfx::loadMaskedBitBlock(const Common::String &colorKey, const Common::String &alphaKey) {
+BitBlock *Gfx::loadMaskedBitBlock(const Common::String &colorRequest, const Common::String &alphaRequest) {
+	const Common::String colorKey = Zoombini2Engine::normalizeResourcePath(colorRequest).toString('/');
+	const Common::String alphaKey = Zoombini2Engine::normalizeResourcePath(alphaRequest).toString('/');
 	for (uint i = 0; i < _pageMaskedBitBlocks.size(); i++) {
 		const MaskedBitBlockEntry &entry = _pageMaskedBitBlocks[i];
 		if (entry.colorPath.equalsIgnoreCase(colorKey) && entry.alphaPath.equalsIgnoreCase(alphaKey)) {
-			entry.bitmap->recordPageCacheUse();
+			if (entry.bitmap)
+				entry.bitmap->recordPageCacheUse();
 			return entry.bitmap;
 		}
 	}
@@ -1201,11 +1265,12 @@ BitBlock *Gfx::loadMaskedBitBlock(const Common::String &colorKey, const Common::
 	BitBlock *bitmap = new BitBlock(_vm);
 	if (!bitmap->loadFromColorAlphaBMP(colorFilePath, alphaFilePath)) {
 		delete bitmap;
-		return nullptr;
+		bitmap = nullptr;
 	}
 	const MaskedBitBlockEntry entry = {colorKey, alphaKey, bitmap};
 	_pageMaskedBitBlocks.push_back(entry);
-	bitmap->recordPageCacheUse();
+	if (bitmap)
+		bitmap->recordPageCacheUse(false);
 	return bitmap;
 }
 
@@ -1216,13 +1281,12 @@ void Gfx::clearRleBlockCache(RleBlockCache &cache) {
 }
 
 void Gfx::clearBitBlockCache(BitBlockCache &cache) {
-	for (BitBlockCache::iterator entry = cache.begin(); entry != cache.end(); entry++)
-		delete entry->_value;
 	cache.clear();
 }
 
 void Gfx::clearPageBitmapCache() {
 	clearBackground();
+	clearAreaMask();
 	clearRleBlockCache(_pageRleBlocks);
 	clearBitBlockCache(_pageBitBlocks);
 	for (uint i = 0; i < _pageMaskedBitBlocks.size(); i++)
@@ -1232,6 +1296,40 @@ void Gfx::clearPageBitmapCache() {
 
 ManagedSurface32 *Gfx::createSurface(const Size32 &size) const {
 	return new ManagedSurface32(size, _screen->format);
+}
+
+uint64 Gfx::getCachedDataSize() const {
+	uint64 bytes = _backSurface ? static_cast<uint64>(_backSurface->pitch) * _backSurface->h : 0;
+	if (_areaMask)
+		bytes += _areaMask->getDataSize();
+	const BitBlockCache *bitmapCaches[] = {&_pageBitBlocks, &_sharedBitBlocks};
+	for (const BitBlockCache *cache : bitmapCaches) {
+		for (const auto &entry : *cache) {
+			const BitBlock *bitmap = entry._value.get();
+			if (!bitmap)
+				continue;
+			const Common::String sourceKey = Zoombini2Engine::normalizeResourcePath(bitmap->getResourcePath().toString('/')).toString('/');
+			if (entry._key.equalsIgnoreCase(sourceKey)) {
+				bytes += bitmap->getDataSize();
+			}
+		}
+	}
+	const RleBlockCache *spriteCaches[] = {&_pageRleBlocks, &_sharedRleBlocks};
+	for (const RleBlockCache *cache : spriteCaches) {
+		for (const auto &entry : *cache) {
+			if (entry._value)
+				bytes += entry._value->getDataSize();
+		}
+	}
+	for (const MaskedBitBlockEntry &entry : _pageMaskedBitBlocks) {
+		if (entry.bitmap)
+			bytes += entry.bitmap->getDataSize();
+	}
+	for (const auto &entry : _zoombiniAnimationCache) {
+		if (entry._value)
+			bytes += entry._value->getDataSize();
+	}
+	return bytes;
 }
 
 void Gfx::captureScreen(ManagedSurface32 *destSurface) const {
@@ -1272,22 +1370,57 @@ void Gfx::drawBitBlockSubRect(ManagedSurface32 *destSurface, const BitBlock *bit
 		bitmap->drawSubRect(destSurface, pos, srcRect);
 }
 
-bool Gfx::loadBackground(const Common::String &key) {
+bool Gfx::loadBackground(const Common::String &key, const Size32 &canvasSize) {
 	BitBlock bitmap(_vm);
 	if (!bitmap.load(Common::Path(key)))
 		return false;
 
-	ManagedSurface32 *bgSurface = createSurface(bitmap.getSize());
+	const bool fixedCanvas = 0 < canvasSize.width && 0 < canvasSize.height;
+	ManagedSurface32 *bgSurface = createSurface(fixedCanvas ? canvasSize : bitmap.getSize());
 	bitmap.drawToSurface(bgSurface, Common::Point32(0, 0));
-	bitmap.recordPageCacheUse();
+	bitmap.recordPageCacheUse(false);
 	clearBackground();
 	_backSurface = bgSurface;
 	return true;
 }
 
+ManagedSurface32 *Gfx::createBackground(const Size32 &size) {
+	ManagedSurface32 *background = createSurface(size);
+	clearBackground();
+	_backSurface = background;
+	return background;
+}
+
 void Gfx::clearBackground() {
 	delete _backSurface;
 	_backSurface = nullptr;
+}
+
+bool Gfx::loadAreaMask(const Common::Path &path) {
+	AreaMask *mask = new AreaMask(_vm);
+	if (!mask->loadFromFile(path)) {
+		delete mask;
+		return false;
+	}
+	clearAreaMask();
+	_areaMask = mask;
+	return true;
+}
+
+bool Gfx::createAreaMask(const Size32 &size, const Common::Array<Common::Rect32> &rects) {
+	AreaMask *mask = new AreaMask(_vm);
+	if (!mask->createFromRects(size, rects)) {
+		delete mask;
+		return false;
+	}
+	clearAreaMask();
+	_areaMask = mask;
+	return true;
+}
+
+void Gfx::clearAreaMask() {
+	delete _areaMask;
+	_areaMask = nullptr;
 }
 
 void Gfx::drawBackground(ManagedSurface32 *destSurface, const Common::Point32 &pos) const {
@@ -1460,9 +1593,10 @@ RGBColor Gfx::recolorNoseGradientRGB(const RGBColor &srcColor, const RGBColor &t
 	// Keep source value changes and half of its saturation variation in the new hue.
 	const int chroma = value * (sourceSaturation + targetSaturation) / 510;
 	const int base = value - chroma;
-	return RGBColor(static_cast<byte>(base + chroma * (targetColor.r - targetMinimum) / targetRange),
-					static_cast<byte>(base + chroma * (targetColor.g - targetMinimum) / targetRange),
-					static_cast<byte>(base + chroma * (targetColor.b - targetMinimum) / targetRange));
+	const auto recolorChannel = [base, chroma, targetMinimum, targetRange](byte channel) {
+		return base + chroma * (channel - targetMinimum) / targetRange;
+	};
+	return targetColor.transformChannels(recolorChannel);
 }
 
 void Gfx::drawZoombiniRunner(ManagedSurface32 *screen, const ZoombiniRunner *runner, const Common::Rect32 *clip, int scrollX, int backgroundWidth) const {
@@ -1483,7 +1617,7 @@ void Gfx::drawZoombiniRunner(ManagedSurface32 *screen, const ZoombiniRunner *run
 	if (spriteRect.right <= 0 || spriteRect.bottom <= 0 || screen->w <= spriteRect.left || screen->h <= spriteRect.top)
 		return;
 	const Common::Point32 drawPos = runner->getDrawPosition(scrollX, backgroundWidth);
-	if (runner->isDragging() && runner->getHoveredDropTargetIndex() != -1 && dropTargetIndicator)
+	if (runner->isHeld() && runner->getHoveredDropTargetIndex() != -1 && dropTargetIndicator)
 		dropTargetIndicator->drawToScreen(screen, drawPos, alphaLUT);
 	const int frame = runner->isAnimationActive() ? runner->getAnimationFrame() : 0;
 	const ZmbTrait &traitsToDraw = presentationTraits ? *presentationTraits : runner->getTraits();
@@ -1517,7 +1651,7 @@ int Gfx::getTextWidth(const Common::String &text, const TextConf &conf) const {
 	return getTextWidth(TextManager::toU32String(text, _vm->getLanguage()), conf);
 }
 
-void Gfx::drawDragNameTooltip(ManagedSurface32 *destSurface, const Common::String &name) {
+void Gfx::drawZoombiniNameBox(ManagedSurface32 *destSurface, const Common::String &name) {
 	if (!destSurface)
 		return;
 	if (!_nameBoxSprite) {
@@ -1528,39 +1662,50 @@ void Gfx::drawDragNameTooltip(ManagedSurface32 *destSurface, const Common::Strin
 	BmtFont *bmtFont = _vm->_text->bmtFont();
 	if (!bmtFont)
 		return;
-	static constexpr int kPlateX = 310;
-	static constexpr int kPlateY = 565;
-	static constexpr int kTextCenterX = 400;
-	static constexpr int kTextY = 570;
-	drawRleBlock(destSurface, _nameBoxSprite, Common::Point32(kPlateX, kPlateY));
+	const ZmbReleaseInfo::NameTooltipLayout layout = _vm->getRelInfo().getNameTooltipLayout();
+	drawRleBlock(destSurface, _nameBoxSprite, layout.platePosition);
 	const int width = bmtFont->getStringLayoutWidth(name);
-	const uint32 tint = Gfx::PredefinedColor::kDark00.toPixel(destSurface->format);
-	bmtFont->drawString(destSurface, Common::Point32(kTextCenterX - width / 2, kTextY), name, Gfx::kNoMaxWidth, tint);
+	const uint32 textColor = Gfx::PredefinedColor::kDark00.toPixel(destSurface->format);
+	bmtFont->drawString(destSurface, Common::Point32(layout.textAnchor.x - width / 2, layout.textAnchor.y), name, Gfx::kNoMaxWidth, textColor);
 }
 
 void Gfx::maskRejectedArea(ManagedSurface32 *destSurface, const AreaMask *areaMask) {
 	if (!destSurface)
 		return;
+	static constexpr byte kRejectedAlpha = static_cast<byte>(255 * 0.6f);   // 60% opacity
+	static constexpr byte kAdditionalAlpha = static_cast<byte>(255 * 0.3f); // 30% opacity
+	ManagedSurface32 overlay(Size32(destSurface->w, destSurface->h), kScreenFormat);
+	const uint32 rejectedBlack = overlay.format.ARGBToColor(kRejectedAlpha, 0, 0, 0);
+	const uint32 additionalBlack = overlay.format.ARGBToColor(kAdditionalAlpha, 0, 0, 0);
 	if (!areaMask) {
-		fillRect(destSurface, Common::Rect32(destSurface->w, destSurface->h), 0);
-		return;
-	}
-	const int width = MIN<int>(destSurface->w, 800);
-	const int height = MIN<int>(destSurface->h, 600);
-	for (int y = 0; y < height; y++) {
-		int runStart = -1;
-		for (int groupX = 0; groupX < width; groupX += 8) {
-			if (!areaMask->hasMarkedByteAt(Common::Point32(groupX, y))) {
-				if (runStart < 0)
+		overlay.clear(rejectedBlack);
+	} else {
+		const int width = MIN<int>(destSurface->w, kScreenSize.width);
+		const int height = MIN<int>(destSurface->h, kScreenSize.height);
+		for (int y = 0; y < height; y++) {
+			int runStart = 0;
+			uint32 runColor = 0;
+			for (int groupX = 0; groupX < width; groupX += 8) {
+				// Sample the first byte at x=1; x=0 is rejected independently of its mask byte.
+				const Common::Point32 sample(MAX(1, groupX), y);
+				uint32 color = rejectedBlack;
+				// Base-mask bytes stay unchanged even where the additional mask overlaps them.
+				if (areaMask->hasMarkedByteAt(sample, false))
+					color = 0;
+				else if (areaMask->hasMarkedByteAt(sample))
+					color = additionalBlack;
+				if (color != runColor) {
+					if (runColor != 0)
+						overlay.fillRect(Common::Rect32(runStart, y, groupX, y + 1), runColor);
 					runStart = groupX;
-			} else if (0 <= runStart) {
-				fillRect(destSurface, Common::Rect32(runStart, y, groupX, y + 1), 0);
-				runStart = -1;
+					runColor = color;
+				}
 			}
+			if (runColor != 0)
+				overlay.fillRect(Common::Rect32(runStart, y, width, y + 1), runColor);
 		}
-		if (0 <= runStart)
-			fillRect(destSurface, Common::Rect32(runStart, y, width, y + 1), 0);
 	}
+	destSurface->blitFrom(overlay, Common::Point32(0, 0));
 }
 
 void Gfx::fillRect(ManagedSurface32 *destSurface, const Common::Rect32 &rect, uint32 color) const {
@@ -1655,6 +1800,12 @@ void Gfx::drawLines(ManagedSurface32 *destSurface, const Common::Array<LineSegme
 	// [*] Non-AA path
 	for (const LineSegment &line : lines)
 		drawLine(destSurface, line.start, line.end, color, thickness);
+}
+
+void Gfx::drawLines(ManagedSurface32 *destSurface, const Common::Array<SubpixelLineSegment> &lines, uint32 color, int thickness) const {
+	if (!destSurface || thickness <= 0 || lines.empty())
+		return;
+	drawSubpixelLinesAA(destSurface, lines, color, thickness);
 }
 
 void Gfx::hLineAA(Graphics::Surface *coverage, float left, int y, float right) {
@@ -1782,7 +1933,7 @@ void Gfx::drawLinesAA(ManagedSurface32 *destSurface, const Common::Array<LineSeg
 	blitColorWithCoverage(destSurface, coverage.surfacePtr(), origin, color);
 }
 
-float Gfx::integrateClampedCoverage(float start, float end) {
+float Gfx::averageClampedBoundaryHeight(float start, float end) {
 	if (end < start)
 		SWAP(start, end);
 	if (end <= 0.0f)
@@ -1892,8 +2043,8 @@ void Gfx::rasterizeLineAA(Graphics::Surface *coverage, SubpixelLineSegment segme
 				for (uint i = 0; i + 1 < cutCount; i++) {
 					// Clamped upper minus lower ramp means give the average height inside this pixel.
 					// Multiply by the slice width and sum to integrate its covered area.
-					const float upper = integrateClampedCoverage(high[i] - minor, high[i + 1] - minor);
-					const float lower = integrateClampedCoverage(low[i] - minor, low[i + 1] - minor);
+					const float upper = averageClampedBoundaryHeight(high[i] - minor, high[i + 1] - minor);
+					const float lower = averageClampedBoundaryHeight(low[i] - minor, low[i + 1] - minor);
 					area += (cuts[i + 1] - cuts[i]) * (upper - lower);
 				}
 			}
@@ -1904,7 +2055,7 @@ void Gfx::rasterizeLineAA(Graphics::Surface *coverage, SubpixelLineSegment segme
 	}
 }
 
-void Gfx::drawCurveLineSegmentsAA(ManagedSurface32 *surface, const Common::Array<SubpixelLineSegment> &lineSegments, uint32 color, int thickness) {
+void Gfx::drawSubpixelLinesAA(ManagedSurface32 *surface, const Common::Array<SubpixelLineSegment> &lineSegments, uint32 color, int thickness) {
 	if (lineSegments.empty())
 		return;
 	// The pen extends each endpoint toward +x and +y by thickness pixels.
@@ -2000,7 +2151,7 @@ void Gfx::drawCubicBezierCurve(ManagedSurface32 *destSurface, CubicBezierCurve &
 		}
 	}
 	if (antialias)
-		drawCurveLineSegmentsAA(destSurface, lineSegments, color, thickness);
+		drawSubpixelLinesAA(destSurface, lineSegments, color, thickness);
 }
 
 void Gfx::drawString(ManagedSurface32 *destSurface, const Common::U32String &text, const Common::Point32 &pos, int maxWidth, const TextConf &conf) const {
@@ -2133,6 +2284,7 @@ bool Animation::loadFromFile(const Common::Path &path) {
 	_frames.clear();
 	const uint loadedFrameCount = loadedFrames.size();
 	_frames.swap(loadedFrames);
+	_vm->recordPageResourceDecode(resolvedPath.toString('/'), Zoombini2Engine::PageResourceType::kAnimation);
 
 	debug(3, "Animation: loaded %u of %u frames from '%s'%s", loadedFrameCount, frameCount, resolvedPath.toString().c_str(),
 		  complete ? "" : " with salvage warnings");
@@ -2171,7 +2323,7 @@ bool AreaMask::loadOneBitBitmap(Common::SeekableReadStream &stream, const Common
 	const uint32 bitsPerPixel = static_cast<uint32>(header[28]) | (static_cast<uint32>(header[29]) << 8);
 	const uint32 compression = static_cast<uint32>(header[30]) | (static_cast<uint32>(header[31]) << 8) |
 							   (static_cast<uint32>(header[32]) << 16) | (static_cast<uint32>(header[33]) << 24);
-	if (bitsPerPixel != 1 || compression != 0 || width <= 0 || height == 0) {
+	if (bitsPerPixel != 1 || compression != 0 || width <= 0 || height == 0 || height == INT32_MIN) {
 		stream.seek(0);
 		return false;
 	}
@@ -2190,26 +2342,19 @@ bool AreaMask::loadOneBitBitmap(Common::SeekableReadStream &stream, const Common
 		return false;
 	}
 	Common::Array<byte> pixels;
-	pixels.resize(static_cast<uint32>(pixelCount));
+	const uint32 pitch = (static_cast<uint32>(width) + 7) / 8;
+	pixels.resize(pitch * height, 0);
 	for (int32 row = 0; row < height; row++) {
 		const int32 srcRow = bottomUp ? height - 1 - row : row;
 		stream.seek(static_cast<int64>(pixelOffset) + static_cast<int64>(srcRow) * stride);
-		byte packed = 0;
-		for (int32 col = 0; col < width; col++) {
-			if (col % 8 == 0)
-				packed = stream.readByte();
-			pixels[static_cast<uint32>(row) * static_cast<uint32>(width) + static_cast<uint32>(col)] =
-				static_cast<byte>((packed >> (7 - (col % 8))) & 1);
-		}
+		stream.read(&pixels[row * pitch], pitch);
+		if (width % 8)
+			pixels[(row + 1) * pitch - 1] &= static_cast<byte>(255 << (8 - width % 8));
 	}
 	_size = Size32(width, height);
-	_pixels.swap(pixels);
-	uint32 markedCount = 0;
-	for (uint32 i = 0; i < static_cast<uint32>(pixelCount); i++) {
-		if (_pixels[i])
-			markedCount += 1;
-	}
-	debug(1, "AreaMask: decoded 1-bit mask '%s' as %dx%d with %u marked pixels", path.toString().c_str(), width, height, markedCount);
+	_pitch = pitch;
+	_packedPixels.swap(pixels);
+	debug(1, "AreaMask: decoded 1-bit mask '%s' as %dx%d with %u marked pixels", path.toString().c_str(), width, height, countMarkedPixels());
 	return true;
 }
 
@@ -2221,8 +2366,11 @@ bool AreaMask::loadFromFile(const Common::Path &path) {
 		return false;
 	}
 
-	if (loadOneBitBitmap(*stream, path))
+	if (loadOneBitBitmap(*stream, path)) {
+		clearAdditionalRects();
+		_vm->recordPageResourceDecode(path.toString('/'), Zoombini2Engine::PageResourceType::kAreaMask);
 		return true;
+	}
 	stream->seek(0);
 
 	Image::BitmapDecoder decoder;
@@ -2244,34 +2392,91 @@ bool AreaMask::loadFromFile(const Common::Path &path) {
 	}
 
 	Common::Array<byte> pixels;
-	pixels.resize(static_cast<uint32>(pixelCount));
-	Graphics::copyBlit(&pixels[0], static_cast<const byte *>(surface->getPixels()), size.width, surface->pitch, size.width, size.height, 1);
+	const uint32 pitch = (static_cast<uint32>(size.width) + 7) / 8;
+	pixels.resize(pitch * size.height, 0);
+	for (int y = 0; y < size.height; y++) {
+		const byte *row = static_cast<const byte *>(surface->getBasePtr(0, y));
+		for (int x = 0; x < size.width; x++) {
+			if (row[x])
+				pixels[y * pitch + x / 8] |= 1 << (7 - x % 8);
+		}
+	}
 
 	_size = size;
-	_pixels.swap(pixels);
+	_pitch = pitch;
+	_packedPixels.swap(pixels);
+	clearAdditionalRects();
+	_vm->recordPageResourceDecode(path.toString('/'), Zoombini2Engine::PageResourceType::kAreaMask);
+	return true;
+}
+
+void AreaMask::fillRects(Common::Array<byte> &pixels, const Common::Array<Common::Rect32> &rects) const {
+	for (const Common::Rect32 &rect : rects) {
+		const int left = CLIP(rect.left, 0, _size.width);
+		const int right = CLIP(rect.right, 0, _size.width);
+		if (right <= left)
+			continue;
+		// Round inward so each accepted byte group stays within the allowed rectangle.
+		const int firstByte = (left + 7) / 8;
+		const int endByte = right < _size.width ? right / 8 : (right + 7) / 8;
+		if (endByte <= firstByte)
+			continue;
+		const int firstY = MAX(1, rect.top);
+		const int endY = MIN(_size.height, rect.bottom);
+		for (int y = firstY; y < endY; y++) {
+			byte *row = &pixels[y * _pitch];
+			memset(row + firstByte, 255, endByte - firstByte);
+			// Keep padding bits clear when the rightmost byte contains fewer than eight pixels.
+			if (endByte == static_cast<int>(_pitch) && _size.width % 8)
+				row[endByte - 1] &= 0xFF << (8 - _size.width % 8);
+		}
+	}
+}
+
+void AreaMask::setAdditionalRects(const Common::Array<Common::Rect32> &rects) {
+	clearAdditionalRects();
+	if (rects.empty() || _packedPixels.empty())
+		return;
+	_additionalPixels.resize(_packedPixels.size(), 0);
+	fillRects(_additionalPixels, rects);
+}
+
+bool AreaMask::createFromRects(const Size32 &size, const Common::Array<Common::Rect32> &rects) {
+	if (size.width <= 0 || size.height <= 0)
+		return false;
+	const uint64 pixelCount = static_cast<uint64>(size.width) * static_cast<uint64>(size.height);
+	if (0xFFFFFFFFU < pixelCount)
+		return false;
+	_size = size;
+	_pitch = (static_cast<uint32>(size.width) + 7) / 8;
+	_packedPixels.clear();
+	_packedPixels.resize(_pitch * size.height, 0);
+	fillRects(_packedPixels, rects);
+	clearAdditionalRects();
 	return true;
 }
 
 uint32 AreaMask::countMarkedPixels() const {
 	uint32 markedCount = 0;
-	for (uint i = 0; i < _pixels.size(); i++) {
-		if (_pixels[i] != 0)
-			markedCount += 1;
+	for (byte packed : _packedPixels) {
+		while (packed) {
+			packed &= packed - 1;
+			markedCount++;
+		}
 	}
 	return markedCount;
 }
 
-bool AreaMask::hasMarkedByteAt(const Common::Point32 &point) const {
-	if (point.x <= 0 || point.y <= 0 || _size.width <= point.x || _size.height <= point.y || _pixels.empty())
+uint64 AreaMask::getDataSize() const {
+	return static_cast<uint64>(_packedPixels.size()) + _additionalPixels.size();
+}
+
+bool AreaMask::hasMarkedByteAt(const Common::Point32 &point, bool includeAdditional) const {
+	if (point.x <= 0 || point.y <= 0 || _size.width <= point.x || _size.height <= point.y || _packedPixels.empty())
 		return false;
 
-	const int byteStartX = point.x & ~7;
-	const int byteEndX = MIN(byteStartX + 8, _size.width);
-	for (int x = byteStartX; x < byteEndX; x++) {
-		if (_pixels[point.y * _size.width + x] != 0)
-			return true;
-	}
-	return false;
+	const uint offset = point.y * _pitch + point.x / 8;
+	return _packedPixels[offset] != 0 || (includeAdditional && !_additionalPixels.empty() && _additionalPixels[offset] != 0);
 }
 
 // ============================================================================
@@ -2356,14 +2561,24 @@ bool ZoombiniAnimation::loadFromFile(const Common::Path &path) {
 	for (int i = 0; i < kCellCount; i++)
 		_cells[i].frames.swap(loadedCells[i].frames);
 	_resourcePath = path;
+	_vm->recordPageResourceDecode(path.toString('/'), Zoombini2Engine::PageResourceType::kZoombiniAnimation);
 
 	debug(2, "ZoombiniAnimation: loaded %d of %d cells and %u frames from '%s'%s", cellIndex, kCellCount, recoveredFrameCount,
 		  path.toString().c_str(), complete ? "" : " with salvage warnings");
 	return true;
 }
 
-void ZoombiniAnimation::recordPageCacheUse() const {
-	_vm->recordPageResourceCacheUse(_resourcePath.toString('/'), Zoombini2Engine::PageResourceType::kZoombiniAnimation);
+void ZoombiniAnimation::recordPageCacheUse(bool cacheHit) const {
+	_vm->recordPageResourceCacheUse(_resourcePath.toString('/'), Zoombini2Engine::PageResourceType::kZoombiniAnimation, cacheHit);
+}
+
+uint64 ZoombiniAnimation::getDataSize() const {
+	uint64 bytes = 0;
+	for (const Cell &cell : _cells) {
+		for (const RleBlock *frame : cell.frames)
+			bytes += frame->getDataSize();
+	}
+	return bytes;
 }
 
 const RleBlock *ZoombiniAnimation::getFrame(int cellIndex, int frameIndex) const {
