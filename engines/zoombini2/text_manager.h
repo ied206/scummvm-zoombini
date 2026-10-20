@@ -70,6 +70,12 @@ public:
 	static Common::U32String toU32String(const Common::String &str, Common::Language language);
 	/** Encode Unicode text to release-encoded game bytes with the release encoding. */
 	static Common::String fromU32String(const Common::U32String &str, Common::Language language);
+	/**
+	 * Return a copy of @p name with the letter case visible in the bitmap-font name box.
+	 * Latin lowercase glyphs have capital shapes except 'i'.
+	 * Hebrew keeps its original bytes.
+	 */
+	Common::String getZoombiniDisplayName(const Common::String &name) const;
 
 	/** Load the shared text strip on demand; failed loads can be retried by the caller. */
 	bool loadTextFont();

@@ -32,7 +32,6 @@
 #endif
 
 #include "zoombini2/graphics.h"
-#include "zoombini2/text_manager.h"
 #include "zoombini2/pages/dialog_debug.h"
 #include "zoombini2/pages/interactive_map.h"
 #include "zoombini2/pages/page_base.h"
@@ -42,6 +41,7 @@
 #include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
+#include "zoombini2/text_manager.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
@@ -50,6 +50,7 @@ constexpr RGBColor Zoombini2Console::kDefaultPlotColor;
 constexpr const char *Zoombini2Console::kDebugDumpPathFormat;
 
 const Zoombini2Console::ResourceTypeInfo Zoombini2Console::kResourceTypes[] = {
+	{Zoombini2Engine::PageResourceType::kAreaMask, "areamask", "areamask"},
 	{Zoombini2Engine::PageResourceType::kBitmap, "bitmap", "bb"},
 	{Zoombini2Engine::PageResourceType::kBitmap, "bitmap", "bmp"},
 	{Zoombini2Engine::PageResourceType::kSprite, "sprite", "rb"},
@@ -542,12 +543,13 @@ bool Zoombini2Console::Cmd_Draw(int argc, const char **argv) {
 		debugPrintf("Usage: %s <subcommand> [arguments]\n\n", kCmdDraw);
 		debugPrintf("Subcommands:\n");
 		debugPrintf("  %s\n", kSubCmdDrawAreaMask);
-		debugPrintf("      Show the active page only where its area mask accepts drops,\n");
-		debugPrintf("      masking the rest with black.\n\n");
+		debugPrintf("      Show the active page with rejected drop areas darkened.\n\n");
 		debugPrintf("  %s <path> [start-frame]\n", kSubCmdDrawSprites);
 		debugPrintf("      Show a numbered sprite sheet from an .an or .rb resource. Alias: sprite.\n\n");
 		debugPrintf("  %s <path>\n", kSubCmdDrawImage);
 		debugPrintf("      Show a decoded bitmap (.bb/.bmp) over white.\n\n");
+		debugPrintf("  %s <path> [color]\n", kSubCmdDrawCurve);
+		debugPrintf("      Draw a PAT path over the current screen.\n\n");
 		debugPrintf("  %s <path> | --text \"message\"\n", kSubCmdDrawMsgBox);
 		debugPrintf("      Preview a bitmap message or UTF-8 UI text without a game callback.\n\n");
 		printResourcePathHelp();
@@ -557,8 +559,8 @@ bool Zoombini2Console::Cmd_Draw(int argc, const char **argv) {
 	}
 
 	if (argc < 2) {
-		debugPrintf("Usage: %s <%s|%s|%s|%s> [arguments]\n", kCmdDraw, kSubCmdDrawAreaMask, kSubCmdDrawSprites,
-					kSubCmdDrawImage, kSubCmdDrawMsgBox);
+		debugPrintf("Usage: %s <%s|%s|%s|%s|%s> [arguments]\n", kCmdDraw, kSubCmdDrawAreaMask, kSubCmdDrawSprites,
+					kSubCmdDrawImage, kSubCmdDrawCurve, kSubCmdDrawMsgBox);
 		debugPrintf("\n");
 		return true;
 	}
@@ -569,24 +571,23 @@ bool Zoombini2Console::Cmd_Draw(int argc, const char **argv) {
 		return CmdSub_DrawSprites(argc, argv);
 	if (scumm_stricmp(argv[1], kSubCmdDrawImage) == 0)
 		return CmdSub_DrawImage(argc, argv);
+	if (scumm_stricmp(argv[1], kSubCmdDrawCurve) == 0)
+		return CmdSub_DrawCurve(argc, argv);
 	if (scumm_stricmp(argv[1], kSubCmdDrawMsgBox) == 0)
 		return CmdSub_DrawMsgBox(argc, argv);
 
 	debugPrintf("Unknown %s subcommand '%s'.\n", kCmdDraw, argv[1]);
-	debugPrintf("Usage: %s <%s|%s|%s|%s> [arguments]\n", kCmdDraw, kSubCmdDrawAreaMask, kSubCmdDrawSprites,
-				kSubCmdDrawImage, kSubCmdDrawMsgBox);
+	debugPrintf("Usage: %s <%s|%s|%s|%s|%s> [arguments]\n", kCmdDraw, kSubCmdDrawAreaMask, kSubCmdDrawSprites,
+				kSubCmdDrawImage, kSubCmdDrawCurve, kSubCmdDrawMsgBox);
 	debugPrintf("\n");
 	return true;
 }
 
 bool Zoombini2Console::CmdSub_DrawAreaMask(int argc, const char **argv) {
 	if (hasHelpOption(argc, argv)) {
-		debugPrintf("Show the active page through its drop-acceptance area mask in the debug dialog.\n");
+		debugPrintf("Show the active staging area of this page.\n");
 		debugPrintf("Usage: %s %s\n\n", kCmdDraw, kSubCmdDrawAreaMask);
-		debugPrintf("Only mask bytes with a marked bit remain visible.\n");
-		debugPrintf("The other pixels are masked with black.\n");
-		debugPrintf("If the active page has no area mask, the debug display is\n");
-		debugPrintf("fully black and shows a diagnostic message.\n");
+		debugPrintf("Areas outside the are mask are darkened.\n");
 		debugPrintf("Click or press ESC while the dialog is shown to close it.\n\n");
 		debugPrintf("Options:\n");
 		printHelpOption();
@@ -599,8 +600,8 @@ bool Zoombini2Console::CmdSub_DrawAreaMask(int argc, const char **argv) {
 		return true;
 	}
 
-	if (!_vm->getCurrentPage()) {
-		debugPrintf("No active Zoombini2 page\n");
+	if (!_vm->getActivePage()) {
+		debugPrintf("No active Zoombini2 page.\n");
 		debugPrintf("\n");
 		return true;
 	}
@@ -630,8 +631,8 @@ bool Zoombini2Console::CmdSub_DrawSprites(int argc, const char **argv) {
 	}
 
 	if (argc < 3 || 4 < argc) {
-		debugPrintf("Usage: %s %s <path> [start-frame]\n", kCmdDraw, kSubCmdDrawSprites);
-		debugPrintf("\n");
+		debugPrintf("Usage: %s %s <path> [start-frame]\n\n", kCmdDraw, kSubCmdDrawSprites);
+		printResourcePathHelp();
 		return true;
 	}
 
@@ -655,9 +656,36 @@ bool Zoombini2Console::CmdSub_DrawSprites(int argc, const char **argv) {
 	return false;
 }
 
+bool Zoombini2Console::CmdSub_DrawCurve(int argc, const char **argv) {
+	if (hasHelpOption(argc, argv) || argc < 3 || 4 < argc) {
+		debugPrintf("Draw a PAT path over the current screen.\n");
+		debugPrintf("Usage: %s %s <path> [color]\n\n", kCmdDraw, kSubCmdDrawCurve);
+		debugPrintf("Use a .pat resource path. Every segment is drawn at its original screen coordinates.\n");
+		debugPrintf("Quote paths containing spaces.\n");
+		debugPrintf("Color is 24-bit RGB (0xRRGGBB or #RRGGBB), default: white.\n");
+		debugPrintf("Click or press ESC to close the dialog.\n\n");
+		printResourcePathHelp();
+		debugPrintf("Options:\n");
+		printHelpOption();
+		return true;
+	}
+
+	Common::Path path;
+	RGBColor color = kDefaultPlotColor;
+	if (!parseDebugResourcePath(argv[2], path) || (argc == 4 && !parsePlotColor(argv[3], color)))
+		return true;
+	DialogDebugCommand cmd;
+	cmd.setDrawCurve(path, color);
+	if (!_vm->openDebugDialog(cmd)) {
+		debugPrintf("Cannot draw PAT path '%s'.\n\n", path.toString('/').c_str());
+		return true;
+	}
+	return false;
+}
+
 bool Zoombini2Console::Cmd_Plot(int argc, const char **argv) {
 	if (argc < 2 || (argc == 2 && isHelpOption(argv[1]))) {
-		debugPrintf("Plot a primitive geometry.\n");
+		debugPrintf("Plot geometry over the current screen.\n");
 		debugPrintf("Usage: %s <subcommand> [arguments]\n\n", kCmdPlot);
 		debugPrintf("Subcommands:\n");
 		debugPrintf("  %s <x> <y> [color]\n", kSubCmdPlotPoint);
@@ -665,8 +693,10 @@ bool Zoombini2Console::Cmd_Plot(int argc, const char **argv) {
 		debugPrintf("  %s <x0> <y0> <x1> <y1> [color]\n", kSubCmdPlotLine);
 		debugPrintf("      Plot a line between two inclusive endpoints.\n");
 		debugPrintf("  %s <x1> <y1> <x2> <y2> [color]\n", kSubCmdPlotRect);
-		debugPrintf("      Plot a rectangle outline; right and bottom coordinates are exclusive.\n\n");
-		debugPrintf("Coordinates are 0-based signed 16-bit values; lines and rectangles are clipped to the screen.\n");
+		debugPrintf("      Plot a rectangle outline; right and bottom coordinates are exclusive.\n");
+		debugPrintf("  %s <x0> <y0> <cx0> <cy0> <cx1> <cy1> <x1> <y1> [color]\n", kSubCmdPlotCurve);
+		debugPrintf("      Plot a cubic Bezier curve from its endpoints and two control points.\n\n");
+		debugPrintf("Coordinates are 0-based signed 16-bit values; geometry is clipped to the screen.\n");
 		debugPrintf("Integer arguments accept a 0x prefix. Color is 24-bit RGB (0xRRGGBB or #RRGGBB), default: white.\n");
 		debugPrintf("Click or press ESC to close the dialog.\n\n");
 		debugPrintf("Options:\n");
@@ -680,8 +710,11 @@ bool Zoombini2Console::Cmd_Plot(int argc, const char **argv) {
 		return CmdSub_PlotLine(argc, argv);
 	if (scumm_stricmp(argv[1], kSubCmdPlotRect) == 0)
 		return CmdSub_PlotRect(argc, argv);
+	if (scumm_stricmp(argv[1], kSubCmdPlotCurve) == 0)
+		return CmdSub_PlotCurve(argc, argv);
 
-	debugPrintf("Unknown %s subcommand '%s'. Use %s, %s, or %s.\n\n", kCmdPlot, argv[1], kSubCmdPlotPoint, kSubCmdPlotLine, kSubCmdPlotRect);
+	debugPrintf("Unknown %s subcommand '%s'. Use %s, %s, %s, or %s.\n\n", kCmdPlot, argv[1],
+				kSubCmdPlotPoint, kSubCmdPlotLine, kSubCmdPlotRect, kSubCmdPlotCurve);
 	return true;
 }
 
@@ -811,6 +844,40 @@ bool Zoombini2Console::CmdSub_PlotRect(int argc, const char **argv) {
 	return false;
 }
 
+bool Zoombini2Console::CmdSub_PlotCurve(int argc, const char **argv) {
+	if (hasHelpOption(argc, argv) || argc < 10 || 11 < argc) {
+		debugPrintf("Plot a cubic Bezier curve over the current screen.\n");
+		debugPrintf("Usage: %s %s <x0> <y0> <cx0> <cy0> <cx1> <cy1> <x1> <y1> [color]\n\n", kCmdPlot, kSubCmdPlotCurve);
+		debugPrintf("Example: %s %s 100 450 150 50 600 50 700 450 #00FFFF\n\n", kCmdPlot, kSubCmdPlotCurve);
+		debugPrintf("(x0,y0) and (x1,y1) are the endpoints; (cx0,cy0) and (cx1,cy1) are the control points.\n");
+		debugPrintf("Coordinates are signed 16-bit values; the curve is clipped to the screen.\n");
+		debugPrintf("Color is 24-bit RGB (0xRRGGBB or #RRGGBB), default: white.\n");
+		debugPrintf("Click or press ESC to close the dialog.\n\n");
+		debugPrintf("Options:\n");
+		printHelpOption();
+		return true;
+	}
+
+	Common::Point32 start;
+	Common::Point32 ctrl0;
+	Common::Point32 ctrl1;
+	Common::Point32 end;
+	RGBColor color = kDefaultPlotColor;
+	if (!parsePlotPoint(argv[2], argv[3], start) || !parsePlotPoint(argv[4], argv[5], ctrl0) ||
+		!parsePlotPoint(argv[6], argv[7], ctrl1) || !parsePlotPoint(argv[8], argv[9], end) ||
+		(argc == 11 && !parsePlotColor(argv[10], color))) {
+		debugPrintf("\n");
+		return true;
+	}
+	DialogDebugCommand cmd;
+	cmd.setPlotCurve(start, ctrl0, ctrl1, end, color);
+	if (!_vm->openDebugDialog(cmd)) {
+		debugPrintf("Cannot open the plot debug dialog.\n\n");
+		return true;
+	}
+	return false;
+}
+
 bool Zoombini2Console::Cmd_Puzzle(int argc, const char **argv) {
 	if (argc < 2 || isHelpOption(argv[1])) {
 		debugPrintf("Inspect or control the active puzzle.\nUsage: page|puzzle <subcommand> [arguments]\n\n");
@@ -819,7 +886,7 @@ bool Zoombini2Console::Cmd_Puzzle(int argc, const char **argv) {
 		debugPrintf("  answer                       Print the generated rules/answer without changing state.\n");
 		debugPrintf("  chance|chances [get]          Show remaining chances and other resource budgets.\n");
 		debugPrintf("  chance|chances set <remaining> Set a supported finite budget.\n\n");
-		const PuzzleBase *puzzle = dynamic_cast<PuzzleBase *>(_vm->getCurrentPage());
+		const PuzzleBase *puzzle = dynamic_cast<PuzzleBase *>(_vm->getActivePage());
 		const char *chanceSupport = "unsupported";
 		if (puzzle && puzzle->debugCanSetChances())
 			chanceSupport = "supported";
@@ -846,7 +913,7 @@ bool Zoombini2Console::CmdSub_PuzzleRetry(int argc, const char **argv) {
 		debugPrintf("Progress and chances return to their state at puzzle entry. Works in practice and journey modes.\n\n");
 		return true;
 	}
-	if (!dynamic_cast<PuzzleBase *>(_vm->getCurrentPage())) {
+	if (!dynamic_cast<PuzzleBase *>(_vm->getActivePage())) {
 		debugPrintf("Current page is not a puzzle page.\n\n");
 		return true;
 	}
@@ -864,7 +931,7 @@ bool Zoombini2Console::CmdSub_PuzzleFinish(int argc, const char **argv) {
 		debugPrintf("Practice mode returns to its map; journey mode retains the accepted party and advances along the route.\n\n");
 		return true;
 	}
-	PuzzleBase *puzzle = dynamic_cast<PuzzleBase *>(_vm->getCurrentPage());
+	PuzzleBase *puzzle = dynamic_cast<PuzzleBase *>(_vm->getActivePage());
 	if (!puzzle) {
 		debugPrintf("Current page is not a puzzle page.\n\n");
 		return true;
@@ -879,7 +946,7 @@ bool Zoombini2Console::CmdSub_PuzzleAnswer(int argc, const char **argv) {
 		debugPrintf("Usage: page|puzzle answer\nPrint the current generated answer without changing game state or RNG.\n\n");
 		return true;
 	}
-	const PuzzleBase *puzzle = dynamic_cast<PuzzleBase *>(_vm->getCurrentPage());
+	const PuzzleBase *puzzle = dynamic_cast<PuzzleBase *>(_vm->getActivePage());
 	if (!puzzle) {
 		debugPrintf("Current page is not a puzzle page.\n\n");
 		return true;
@@ -927,7 +994,7 @@ Common::String Zoombini2Console::formatPuzzleAnswer(const Common::String &answer
 }
 
 bool Zoombini2Console::CmdSub_PuzzleChance(int argc, const char **argv) {
-	PuzzleBase *puzzle = dynamic_cast<PuzzleBase *>(_vm->getCurrentPage());
+	PuzzleBase *puzzle = dynamic_cast<PuzzleBase *>(_vm->getActivePage());
 	const bool query = argc == 2 || (argc == 3 && scumm_stricmp(argv[2], "get") == 0);
 	const bool set = 2 < argc && scumm_stricmp(argv[2], "set") == 0;
 	if (hasHelpOption(argc, argv) || (!query && !set)) {
@@ -1016,7 +1083,7 @@ bool Zoombini2Console::parseDebugResourcePath(const char *text, Common::Path &pa
 }
 
 void Zoombini2Console::printResourcePathHelp() {
-	debugPrintf("Use list resource [type] [filter] to list this page's file paths and types.\n");
+	debugPrintf("Use list resources to view the currently loaded resources.\n");
 	debugPrintf("A listed @number can replace <path>; handles reset on page transitions.\n\n");
 }
 
@@ -1199,10 +1266,6 @@ bool Zoombini2Console::CmdSub_DumpImage(int argc, const char **argv) {
 	}
 	if (!validateDebugImageSize(image.getSize()))
 		return true;
-	if (!_vm->_gfx) {
-		debugPrintf("Graphics are unavailable.\n\n");
-		return true;
-	}
 	Common::ScopedPtr<ManagedSurface32> surface(_vm->_gfx->createSurface(image.getSize()));
 	surface->fillRect(Common::Rect(surface->w, surface->h), surface->format.ARGBToColor(255, 255, 255, 255));
 	_vm->_gfx->drawBitBlock(surface.get(), &image, Common::Point32());
@@ -1233,10 +1296,6 @@ bool Zoombini2Console::CmdSub_DumpAnimation(int argc, const char **argv) {
 	bool singleFrame = false;
 	if (!loadDebugAnimation(path, animation, sprite, singleFrame))
 		return true;
-	if (!_vm->_gfx) {
-		debugPrintf("Graphics are unavailable.\n\n");
-		return true;
-	}
 	const int count = singleFrame ? 1 : animation.getFrameCount();
 	const Common::String stem = makeDebugDumpStem(path.toString('/'));
 	int exported = 0;
@@ -1325,13 +1384,15 @@ bool Zoombini2Console::CmdSub_ListResource(int argc, const char **argv) {
 		debugPrintf("List successful resource file opens and cache requests since the last page transition.\n");
 		debugPrintf("Usage: %s resource [type] [filter]\n\n", kCmdList);
 		debugPrintf("Types: bitmap (bb/bmp), sprite (rb), animation (an), zoombini (anm),\n");
-		debugPrintf("       path (pat), sound (wav), video (bik), layout (ztl), unknown, all.\n");
+		debugPrintf("       areamask, path (pat), sound (wav), video (bik), layout (ztl), unknown, all.\n");
 		debugPrintf("Type names and extension aliases ignore case; all includes every type.\n");
 		debugPrintf("The optional filter matches any part of the path, ignoring case.\n");
 		debugPrintf("A single argument that is not a type is treated as a path filter.\n");
 		debugPrintf("Paths name the resolved files, including their extensions.\n");
 		debugPrintf("Includes dialogs and console previews; an opened file need not still have a live stream.\n");
 		debugPrintf("Cache labels describe successful requests, including hits on shared caches.\n");
+		debugPrintf("Counters show opens, successful graphics/PAT decodes, cache requests and cache hits.\n");
+		debugPrintf("Graphics payload bytes include active background/mask and page/shared graphics caches, excluding allocation overhead.\n");
 		debugPrintf("File opens and cache requests for the same resolved path share one entry.\n");
 		debugPrintf("Filtering retains handle numbers; new resources append without renumbering them.\n");
 		debugPrintf("The resources subcommand is an alias for resource.\n\n");
@@ -1359,7 +1420,7 @@ bool Zoombini2Console::CmdSub_ListResource(int argc, const char **argv) {
 	}
 	const Common::Array<Zoombini2Engine::PageResource> &resources = _vm->getPageResources();
 	filter.toLowercase();
-	debugPrintf("Page %d: %u recorded resource paths.\n", static_cast<int>(_vm->getCurrentPageId()), resources.size());
+	debugPrintf("Page %d: %u recorded resource paths.\n", static_cast<int>(_vm->getActivePageId()), resources.size());
 	uint shown = 0;
 	for (uint i = 0; i < resources.size(); i++) {
 		const Zoombini2Engine::PageResource &resource = resources[i];
@@ -1370,12 +1431,14 @@ bool Zoombini2Console::CmdSub_ListResource(int argc, const char **argv) {
 		match.toLowercase();
 		if (!filter.empty() && !match.contains(filter))
 			continue;
-		debugPrintf("  @%u  [%s] [%s%s%s] %s\n", i + 1, getResourceTypeName(resource.type), resource.opened ? "open" : "",
+		debugPrintf("  @%-3u [%s] [%s%s%s] %s\n", i + 1, getResourceTypeName(resource.type), resource.opened ? "open" : "",
 					resource.opened && resource.cacheUsed ? ", " : "",
 					resource.cacheUsed ? "cache" : "", name.c_str());
+		debugPrintf("       opens=%u decodes=%u requests=%u hits=%u\n", resource.openCount, resource.decodeCount, resource.cacheRequests, resource.cacheHits);
 		shown += 1;
 	}
 	debugPrintf("%u matching paths. Use @number in place of a resource path; handles reset on page transitions.\n\n", shown);
+	debugPrintf("Retained graphics payload: %" PRIu64 " bytes (all graphics caches, independent of filter).\n\n", _vm->_gfx->getCachedDataSize());
 	return true;
 }
 
@@ -1388,12 +1451,12 @@ bool Zoombini2Console::CmdSub_ListRunners(int argc, const char **argv) {
 		printHelpOption();
 		return true;
 	}
-	if (!_vm->getCurrentPage() || !_vm->_gfx || !_vm->_gfx->getPageLayerStack()) {
+	if (!_vm->getActivePage() || !_vm->_gfx->getPageLayerStack()) {
 		debugPrintf("No active page-layer registry.\n\n");
 		return true;
 	}
 	const PageLayerStack *stack = _vm->_gfx->getPageLayerStack();
-	debugPrintf("Page %d: %u layers; registered general-object runners only.\n", static_cast<int>(_vm->getCurrentPageId()), stack->getLayerCount());
+	debugPrintf("Page %d: %u layers; registered general-object runners only.\n", static_cast<int>(_vm->getActivePageId()), stack->getLayerCount());
 	for (uint layerIndex = 0; layerIndex < stack->getLayerCount(); layerIndex++) {
 		const PageLayer *layer = stack->getLayer(static_cast<int>(layerIndex));
 		if (!layer)
@@ -1418,7 +1481,7 @@ bool Zoombini2Console::CmdSub_ListRunners(int argc, const char **argv) {
 bool Zoombini2Console::printDebugStateGroup(const Common::String &group) {
 	const GameState &state = *_vm->_state;
 	if (group.equalsIgnoreCase("page")) {
-		debugPrintf("page: current=%d gameplay=%d level=%d mode=%s\n", static_cast<int>(_vm->getCurrentPageId()),
+		debugPrintf("page: current=%d gameplay=%d level=%d mode=%s\n", static_cast<int>(_vm->getActivePageId()),
 					static_cast<int>(state._currentPage), state.getLevel(), _vm->inPracticeMode() ? "practice" : "journey");
 	} else if (group.equalsIgnoreCase("progress")) {
 		debugPrintf("progress: rescue1=%u rescue2=%u booliewood=%u rescuedBoolies=%d rescue1Arrivals=%d completedZoombinis=%d\n",

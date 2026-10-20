@@ -70,7 +70,7 @@ private:
 	static constexpr const char *kScrollRightPath = "bmp/rescue2/button_right.an";
 	/** Background music played at Rescue Site II. */
 	static constexpr const char *kMusicPath = "#sounds/music/C2-BB02.wav";
-	/** Area mask used to constrain rescue-site Zoombini drag-and-drop hit testing. */
+	/** Area mask used to constrain rescue-site Zoombini hold-and-drop hit testing. */
 	static constexpr const char *kAreaMaskPath = "bmp/rescue2/area.bmt";
 	/** Missing-arrivals speech format; the argument is the number of arrivals still needed. */
 	static constexpr const char *kMissingArrivalsSpeechFormat = "sounds/BC222.%u.wav";
@@ -154,7 +154,7 @@ private:
 	/** Return whether all eight departure seats are occupied. */
 	bool seatsFullyOccupied() const;
 	/** Return the currently held Zoombini, if any. */
-	ZoombiniRunner *getDraggedZoombini() const;
+	ZoombiniRunner *getHeldZoombini() const;
 	/**
 	 * Store a grid-dropped Zoombini in storage and schedule deferred roster
 	 * removal, which runs on the next update like the original release index.
@@ -177,7 +177,7 @@ private:
 	/** Draw the waiting-storage pictures with the current scroll shift. */
 	void drawWaitingStorage(ManagedSurface32 *screen, int pixelShiftX) const;
 	/** Collect the visible boarding draw order with the held Zoombini last. */
-	void buildBoardingDrawOrder(Common::Array<uint> &order, ZoombiniRunner *&draggedZoombini) const;
+	void buildBoardingDrawOrder(Common::Array<uint> &order, ZoombiniRunner *&heldZoombini) const;
 	/** Draw the seated and waiting boarding actives. */
 	void drawBoardingActives(ManagedSurface32 *screen) const;
 	/** Snap a dropped Zoombini into a waiting-grid cell. */

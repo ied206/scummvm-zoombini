@@ -42,7 +42,7 @@ void TransitionTitle::init() {
 	_deadline = _vm->getTotalPlayTime() + 10000;
 
 	// Load the static title background.
-	if (!_vm->_gfx->loadPageBitBlock(kBackgroundPath)) {
+	if (!_vm->_gfx->loadBackground(kBackgroundPath)) {
 		warning("TitleScreen: Failed to load title background");
 	}
 
@@ -59,7 +59,7 @@ void TransitionTitle::onUpdate() {
 }
 
 void TransitionTitle::onRenderContent(ManagedSurface32 *screen) {
-	_vm->_gfx->drawPageBitBlock(screen, kBackgroundPath, Common::Point32(0, 0));
+	_vm->_gfx->drawBackground(screen, Common::Point32(0, 0));
 }
 
 EventHandleResult TransitionTitle::onLButtonDown(const Common::Point &pos) {

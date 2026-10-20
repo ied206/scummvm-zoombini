@@ -80,7 +80,7 @@ Sidebar::~Sidebar() {
 }
 
 bool Sidebar::shouldShow() const {
-	const PageBase *page = _vm->getCurrentPage();
+	const PageBase *page = _vm->getActivePage();
 	return page && page->hasSidebar();
 }
 
@@ -108,7 +108,7 @@ void Sidebar::updateGoBlink(bool goEnabled, PageId pageId) {
 }
 
 void Sidebar::restartGoBlink() {
-	_goPageId = _vm->getCurrentPageId();
+	_goPageId = _vm->getActivePageId();
 	_goBlinkHighlighted = false;
 	_goBlinkTogglesRemaining = 30;
 	_goBlinkDeadline = _vm->getTotalPlayTime() + 150;
@@ -126,10 +126,10 @@ bool Sidebar::isInButtonRegion(const Common::Point &pos) const {
 bool Sidebar::isInteractionBlocked() const {
 	for (uint i = 0; i < _vm->_state->_activeZoombinis.size(); i++) {
 		const ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[i];
-		if (zoombini && zoombini->isDragging())
+		if (zoombini && zoombini->isHeld())
 			return true;
 	}
-	const PageBase *page = _vm->getCurrentPage();
+	const PageBase *page = _vm->getActivePage();
 	return page && page->blocksSidebarInteraction();
 }
 
@@ -143,7 +143,7 @@ void Sidebar::updateHoverState(const Common::Point &pos, bool inputAllowed) {
 
 	_helpHovered = isPointStrictlyInside(_helpButtonRect, pos);
 	_mapHovered = isPointStrictlyInside(_mapButtonRect, pos);
-	const PageBase *page = _vm->getCurrentPage();
+	const PageBase *page = _vm->getActivePage();
 	_goHovered = page && page->hasGoButton() && page->canUseGoButton() && isPointStrictlyInside(_goButtonRect, pos);
 }
 
@@ -220,7 +220,7 @@ void Sidebar::drawOverDialog(ManagedSurface32 *screen) {
 }
 
 void Sidebar::drawControls(ManagedSurface32 *screen) {
-	const PageBase *page = _vm->getCurrentPage();
+	const PageBase *page = _vm->getActivePage();
 	if (!page)
 		return;
 	updateGoBlink(page->hasGoButton() && page->canUseGoButton(), page->getPageId());
@@ -263,15 +263,15 @@ EventHandleResult Sidebar::onLButtonDown(const Common::Point &pos) {
 void Sidebar::onHelpClick() {
 	_vm->getSoundManager()->play(_helpClickSoundId);
 
-	const PageId currentPage = _vm->getCurrentPageId();
+	const PageId activePageId = _vm->getActivePageId();
 	int level = _vm->_state->getLevel();
 
-	_vm->openHelpDialog(currentPage, level);
+	_vm->openHelpDialog(activePageId, level);
 }
 
 void Sidebar::onMapClick() {
 	_vm->getSoundManager()->play(_mapClickSoundId);
-	PageBase *page = _vm->getCurrentPage();
+	PageBase *page = _vm->getActivePage();
 	if (page)
 		page->onMapButtonPressed();
 	if (_vm->inPracticeMode()) {
@@ -286,14 +286,14 @@ void Sidebar::onMapClick() {
 		hasActive = hasActive || zoombini->canAdvanceFromPage() || zoombini->isInputEnabled();
 	}
 	if ((page && page->isShelter()) ||
-		(!hasActive && (!_vm->getCurrentPage() || _vm->isStartingMapTransition())))
+		(!hasActive && (!_vm->getActivePage() || _vm->isStartingMapTransition())))
 		returnToMap();
 	else
 		requestAbandonConfirmation();
 }
 
 void Sidebar::onGoClick() {
-	PageBase *page = _vm->getCurrentPage();
+	PageBase *page = _vm->getActivePage();
 	if (!page || !page->canUseGoButton())
 		return;
 	if (!page->onGoButtonPressed())
@@ -302,7 +302,7 @@ void Sidebar::onGoClick() {
 		returnToMap();
 		return;
 	}
-	const PageId pageId = _vm->getCurrentPageId();
+	const PageId pageId = _vm->getActivePageId();
 	_vm->_mapTransitSrcPageId = pageId;
 	_vm->requestPageChange(PageId::kPageMapTrans_22);
 }

@@ -332,7 +332,12 @@ PageBase::PageBase(Zoombini2Engine *vm, PageCategory pageCategory)
 
 PageBase::~PageBase() {
 	releasePageMusic();
-	clearAreaMask();
+}
+
+int32 PageBase::squaredDistance(const Common::Point32 &first, const Common::Point32 &second) {
+	const int32 dx = first.x - second.x;
+	const int32 dy = first.y - second.y;
+	return dx * dx + dy * dy;
 }
 
 void PageBase::startPageMusic(const Common::Path &path) {
@@ -357,20 +362,23 @@ void PageBase::releasePageMusic() {
 }
 
 bool PageBase::loadAreaMask(const Common::Path &path) {
-	AreaMask *areaMask = new AreaMask(_vm);
-	if (!areaMask->loadFromFile(path)) {
+	if (!_vm->_gfx->loadAreaMask(path)) {
 		warning("PageBase: Failed to load area mask '%s'", path.toString().c_str());
-		delete areaMask;
 		return false;
 	}
-	clearAreaMask();
-	_areaMask = areaMask;
 	return true;
 }
 
 void PageBase::clearAreaMask() {
-	delete _areaMask;
-	_areaMask = nullptr;
+	_vm->_gfx->clearAreaMask();
+}
+
+bool PageBase::hasAreaMask() const {
+	return getAreaMask() != nullptr;
+}
+
+const AreaMask *PageBase::getAreaMask() const {
+	return _vm->_gfx->getAreaMask();
 }
 
 EventHandleResult PageEventHandler::handleEvent(const Common::Event &event) {

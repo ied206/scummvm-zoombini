@@ -66,7 +66,6 @@ TransitionMapTrans::TransitionMapTrans(Zoombini2Engine *vm)
 TransitionMapTrans::~TransitionMapTrans() {
 	cleanupSpeech();
 	cleanupPaths();
-	delete _compositedBg;
 }
 
 void TransitionMapTrans::queueSpeech(const Common::String &name) {
@@ -317,8 +316,7 @@ void TransitionMapTrans::init() {
 	}
 
 	// Compose the background and overlays for this transition.
-	delete _compositedBg;
-	_compositedBg = createMapTransitionBackground(src, mapRegion);
+	composeMapTransitionBackground(src, mapRegion);
 
 	if (!_vm->_gfx->getCommonZoombiniAnimation(ZmbAnimationKind::kMapTransTiny))
 		warning("MapTransition: Failed to load PitiZomb3.anm");
@@ -347,20 +345,15 @@ void TransitionMapTrans::init() {
 	updateSpeechQueue();
 }
 
-ManagedSurface32 *TransitionMapTrans::createMapTransitionBackground(PageId srcPageId, int mapRegion) {
-	ManagedSurface32 *background = _vm->_gfx->createSurface(Gfx::kScreenSize);
-
-	const Common::String backgroundPath = Common::String::format(kMapTransitionBackgroundPathFormat, mapRegion);
-	BitBlock *bitmap = _vm->_gfx->loadPageBitBlock(backgroundPath);
-	if (bitmap) {
-		_vm->_gfx->drawBitBlock(background, bitmap, Common::Point32(0, 0));
-	} else {
-		warning("MapTransition: Failed to load background %s", backgroundPath.c_str());
-		_vm->_gfx->fillRect(background, Common::Rect32(0, 0, Gfx::kScreenSize.width, Gfx::kScreenSize.height), 0);
+void TransitionMapTrans::composeMapTransitionBackground(PageId srcPageId, int mapRegion) {
+	const Common::String bgPath = Common::String::format(kMapTransitionBackgroundPathFormat, mapRegion);
+	if (!_vm->_gfx->loadBackground(bgPath, Gfx::kScreenSize)) {
+		warning("MapTransition: Failed to load background %s", bgPath.c_str());
+		ManagedSurface32 *fallback = _vm->_gfx->createBackground(Gfx::kScreenSize);
+		_vm->_gfx->fillRect(fallback, Common::Rect32(0, 0, Gfx::kScreenSize.width, Gfx::kScreenSize.height), 0);
 	}
 
-	drawMapOverlays(background, srcPageId, mapRegion);
-	return background;
+	drawMapOverlays(_vm->_gfx->getBackgroundSurface(), srcPageId, mapRegion);
 }
 
 /** Draw one map-overlay RLE sprite retained for the current page. */
@@ -660,8 +653,7 @@ void TransitionMapTrans::finishTransition() {
 
 void TransitionMapTrans::onRenderContent(ManagedSurface32 *screen) {
 	// Draw composited background (map + overlays)
-	if (_compositedBg)
-		screen->blitFrom(*_compositedBg, Common::Point32(0, 0));
+	_vm->_gfx->drawBackground(screen, Common::Point32(0, 0));
 }
 
 void TransitionMapTrans::onRenderActors(ManagedSurface32 *screen) {

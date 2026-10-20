@@ -96,6 +96,20 @@ Common::String TextManager::fromU32String(const Common::U32String &str, Common::
 	return str.encode(gameCodePage(language));
 }
 
+Common::String TextManager::getZoombiniDisplayName(const Common::String &name) const {
+	// The Hebrew strip replaces the Latin letter slots with Hebrew shapes.
+	if (_vm->isHebrew())
+		return name;
+	Common::String displayName = name;
+	for (uint i = 0; i < displayName.size(); i++) {
+		const char letter = displayName[i];
+		// Make every Latin alphabet uppercase except 'i'.
+		if ('a' <= letter && letter <= 'z' && letter != 'i')
+			displayName.setChar(letter - 'a' + 'A', i);
+	}
+	return displayName;
+}
+
 bool TextManager::loadTextFont() {
 	if (hasTextFont())
 		return true;

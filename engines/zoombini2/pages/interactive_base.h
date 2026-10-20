@@ -109,7 +109,7 @@ private:
 	static bool isPointStrictlyInside(const Common::Rect &rect, const Common::Point &pos);
 	/** Return whether @p pos is in a fixed sidebar control region. */
 	bool isInButtonRegion(const Common::Point &pos) const;
-	/** Return whether a drag or page-local state must receive pointer events before the sidebar. */
+	/** Return whether a held Zoombini or page-local state must receive pointer events before the sidebar. */
 	bool isInteractionBlocked() const;
 	/** Update hover state from the pointer position used for this frame's controls. */
 	void updateHoverState(const Common::Point &pos, bool inputAllowed);

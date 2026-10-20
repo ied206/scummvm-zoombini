@@ -129,6 +129,8 @@ private:
 	static constexpr const char *kSubCmdDrawSprite = "sprite";
 	/** Draw one loose-file bitmap. */
 	static constexpr const char *kSubCmdDrawImage = "image";
+	/** Draw every curve segment in a PAT resource. */
+	static constexpr const char *kSubCmdDrawCurve = "curve";
 	/** Preview a resource message or Unicode UI text in the game's confirmation dialog. */
 	static constexpr const char *kSubCmdDrawMsgBox = "msgbox";
 
@@ -140,6 +142,8 @@ private:
 	bool CmdSub_DrawSprites(int argc, const char **argv);
 	/** Open an independently decoded bitmap in the debug dialog. */
 	bool CmdSub_DrawImage(int argc, const char **argv);
+	/** Open the debug dialog showing a PAT path over the current screen. */
+	bool CmdSub_DrawCurve(int argc, const char **argv);
 	/** Open a bitmap or Unicode message preview with no game callback. */
 	bool CmdSub_DrawMsgBox(int argc, const char **argv);
 	/** Export decoded resource images or the current journey state. */
@@ -207,7 +211,7 @@ private:
 	bool exportDebugSurface(const Graphics::Surface &surface, const Common::String &stem);
 	/** Print one supported group of read-only state fields. */
 	bool printDebugStateGroup(const Common::String &group);
-	/** Plot a point, line, or rectangle over the current screen through @ref Zoombini2Console::Cmd_Plot. */
+	/** Plot a primitive geometry over the current screen through @ref Zoombini2Console::Cmd_Plot. */
 	static constexpr const char *kCmdPlot = "plot";
 	/** Plot one pixel. */
 	static constexpr const char *kSubCmdPlotPoint = "point";
@@ -215,6 +219,8 @@ private:
 	static constexpr const char *kSubCmdPlotLine = "line";
 	/** Plot a rectangle outline with exclusive right and bottom coordinates. */
 	static constexpr const char *kSubCmdPlotRect = "rect";
+	/** Plot a cubic Bezier curve from four coordinate pairs. */
+	static constexpr const char *kSubCmdPlotCurve = "curve";
 	/** Default plot color matching the white Z1 reference. */
 	static constexpr RGBColor kDefaultPlotColor = RGBColor(255, 255, 255);
 	/** Dispatch the plot command to its selected subcommand. */
@@ -225,6 +231,8 @@ private:
 	bool CmdSub_PlotLine(int argc, const char **argv);
 	/** Open the debug dialog showing one diagnostic rectangle outline. */
 	bool CmdSub_PlotRect(int argc, const char **argv);
+	/** Open the debug dialog showing a cubic Bezier curve supplied as coordinates. */
+	bool CmdSub_PlotCurve(int argc, const char **argv);
 	/** Parse a signed coordinate pair without allowing values to wrap when passed to surface drawing. */
 	bool parsePlotPoint(const char *xText, const char *yText, Common::Point32 &point);
 	/** Parse a 24-bit RGB color, accepting 0xRRGGBB or #RRGGBB independently of the destination pixel format. */

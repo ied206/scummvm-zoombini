@@ -25,6 +25,7 @@
 #include "common/array.h"
 #include "common/hashmap.h"
 #include "common/str.h"
+#include "zoombini2/graphics.h"
 #include "zoombini2/pages/puzzle_base.h"
 #include "zoombini2/scripts.h"
 #include "zoombini2/state.h"
@@ -622,9 +623,11 @@ private:
  */
 class MysticMarshL4Background {
 public:
+	/** Column-major cell index of the restored L4 top-row reject marker and its outline. */
+	static constexpr int kRejectVisualCellIdx = 8 * MysticMarshGrid::kRows;
 	/**
-	 * Resonstruct L4 background from a L1 layout resource.
-	 * Erase the baked grid, smooth the upper shoreline, and bake new grid edges.
+	 * Reconstruct L4 background from a L1 layout resource.
+	 * Retain shared grid lighting, repair obsolete edges, and light the new outlines.
 	 *
 	 * @param[in,out] surface Background surface receiving the restored artwork.
 	 * @param[in] cells Generated grid cells used to select visible outlines.
@@ -635,24 +638,25 @@ public:
 	static Common::Point32 cellPosition(int index);
 
 private:
-	struct WaterNeighbor {
-		/** Pixel steps from the sampled shore point to this water-colored neighbor. */
-		int distance = 0;
-		/** Red channel of the sampled neighboring water pixel. */
-		uint8 red = 0;
-		/** Green channel of the sampled neighboring water pixel. */
-		uint8 green = 0;
-		/** Blue channel of the sampled neighboring water pixel. */
-		uint8 blue = 0;
-	};
-	/** Return whether the red and blue channels match the background's water-color criterion. */
-	static bool isWaterPixel(uint8 red, uint8 blue);
-	/** Find a water-colored neighbor along @p step within the search bounds and exclusion mask. */
-	static WaterNeighbor findWaterNeighbor(ManagedSurface32 *surface, const Common::Array<byte> &mask, const Common::Point32 &position, const Common::Point32 &step);
-	/** Replace the background's baked grid lines using nearby water pixels. */
-	static void eraseBakedGrid(ManagedSurface32 *surface);
-	/** Blend pixels along the upper shoreline of the composed level 4 background. */
-	static void antialiasUpperShore(ManagedSurface32 *surface);
+	/** Warm grid-halo color shared by removal estimates and newly lit edges. */
+	static constexpr RGBColor kGlowColor = RGBColor(255, 232, 163);
+	/** Largest supported grid-mask radius in pixels, used by the halo kernels in this background pass. */
+	static constexpr int kMaxGridSpreadRadius = 14;
+	/** Find the connected bright L1 grid in the complete source artwork; return false when its seed is absent. */
+	static bool findBakedGrid(const ManagedSurface32 *surface, Common::Array<byte> &mask);
+	/** Replace only baked opaque strokes with adjacent unmasked colors before drawing the single final grid core. */
+	static void removeBakedGridCore(ManagedSurface32 *surface, const Common::Array<byte> &bakedGrid);
+	/** Mark water while excluding shore-colored terrain connected to the image boundary. */
+	static void findWaterMask(const ManagedSurface32 *surface, Common::Array<byte> &water);
+	/**
+	 * Expand a screen-sized mask by maximum coverage, using a solid disk or a soft grid halo of @p radius pixels.
+	 * @pre @p radius is nonnegative and does not exceed @ref MysticMarshL4Background::kMaxGridSpreadRadius.
+	 */
+	static void spreadGridMask(const Common::Array<byte> &mask, Common::Array<byte> &spread, int width, int height, int radius, bool glow);
+	/** Repair only water in @p repair, using water-only center samples and relaxation that never crosses @p water boundaries. */
+	static void repairUncoveredGrid(ManagedSurface32 *surface, const Common::Array<byte> &repair, const Common::Array<byte> &bakedGrid, const Common::Array<byte> &bakedGlow, const Common::Array<byte> &water);
+	/** Add only the missing halo contribution; repaired pixels no longer contain a baked halo. */
+	static void applyGridGlow(ManagedSurface32 *surface, const Common::Array<byte> &bakedGlow, const Common::Array<byte> &gridGlow, const Common::Array<byte> &repair);
 	/** Return whether this level 4 grid cell is assigned a visible outline. */
 	static bool isCellBorderVisible(int column, int row);
 	/** Return whether the device type is a grid entry or exit portal. */
@@ -728,8 +732,6 @@ private:
 	static constexpr const char *kBackgroundFormat = "#bmp/mystic_marsh/background%d";
 	/** Existing backdrop used when the L4 layout selects missing background 6. */
 	static constexpr MysticMarshGrid::BackgroundKind kL4FallbackBackgroundIndex = MysticMarshGrid::kBackgroundL1LayoutA_01;
-	/** Column-major cell index where a whirlpool symbol marks the restored L4 upper-edge loss route. */
-	static constexpr int kL4RejectVisualCellIdx = 8 * MysticMarshGrid::kRows;
 	/** Displayed whirlpool symbol type; the marked cell retains its logical type. */
 	static constexpr int kRejectCellType = MysticMarshGrid::kCellSymbolTourbiType58;
 	/** Path format for the drop-area mask corresponding to the generated background index. */
@@ -858,6 +860,122 @@ private:
 		/** Gameplay tick in milliseconds when this visual effect began. */
 		uint32 start;
 	};
+	/**
+	 * Upper-bank rectangles above the shared lower bank, grouped by background.
+	 * Used for optional L1-L3 area-mask expansion.
+	 * Restored L4 always uses its rectangles to generate the base mask, independently of the option.
+	 * Rectangles leave the sidebar, grid and crater bounds clear.
+	 * Each background has 15 slots. When fewer rectangles are specified, the remaining slots
+	 * default to empty rectangles and are skipped by initAreaMaskExpansion().
+	 */
+	static constexpr Common::Rect32 kAreaMaskExpansionUpperBankRects[6][15] = {
+		{
+			// L1 layout A, background 1.
+			Common::Rect32(Common::Point32(0, 234), 72, 25),
+			Common::Rect32(Common::Point32(0, 259), 144, 29),
+			Common::Rect32(Common::Point32(0, 288), 152, 23),
+			Common::Rect32(Common::Point32(0, 311), 160, 31),
+			Common::Rect32(Common::Point32(0, 342), 176, 31),
+			Common::Rect32(Common::Point32(0, 373), 184, 31),
+			Common::Rect32(Common::Point32(0, 404), 192, 31),
+			Common::Rect32(Common::Point32(0, 435), 264, 14),
+			Common::Rect32(Common::Point32(0, 449), 272, 1),
+			Common::Rect32(Common::Point32(0, 450), 280, 5),
+		},
+		{
+			// L1 layout B, background 2.
+			Common::Rect32(Common::Point32(0, 234), 72, 25),
+			Common::Rect32(Common::Point32(0, 259), 136, 23),
+			Common::Rect32(Common::Point32(0, 282), 152, 29),
+			Common::Rect32(Common::Point32(0, 311), 160, 31),
+			Common::Rect32(Common::Point32(0, 342), 176, 31),
+			Common::Rect32(Common::Point32(0, 373), 184, 31),
+			Common::Rect32(Common::Point32(0, 404), 192, 31),
+			Common::Rect32(Common::Point32(0, 435), 280, 20),
+		},
+		{
+			// L2 layouts A-D, background 3.
+			Common::Rect32(Common::Point32(0, 238), 80, 52),
+			Common::Rect32(Common::Point32(0, 290), 128, 10),
+			Common::Rect32(Common::Point32(0, 300), 104, 52),
+			Common::Rect32(Common::Point32(0, 352), 144, 10),
+			Common::Rect32(Common::Point32(0, 362), 120, 52),
+			Common::Rect32(Common::Point32(0, 414), 160, 2),
+			Common::Rect32(Common::Point32(0, 416), 192, 19),
+			Common::Rect32(Common::Point32(0, 435), 264, 14),
+			Common::Rect32(Common::Point32(0, 449), 272, 1),
+			Common::Rect32(Common::Point32(0, 450), 280, 5),
+		},
+		{
+			// L3 layout A, background 4.
+			// Extend the upper-left bank, narrowing beside the upper crater.
+			Common::Rect32(Common::Point32(0, 0), 128, 50),
+			Common::Rect32(Common::Point32(0, 50), 64, 56),
+			Common::Rect32(Common::Point32(0, 106), 128, 132),
+			Common::Rect32(Common::Point32(0, 238), 40, 52),
+			Common::Rect32(Common::Point32(104, 238), 24, 36),
+			Common::Rect32(Common::Point32(0, 290), 64, 21),
+			Common::Rect32(Common::Point32(0, 311), 72, 51),
+			Common::Rect32(Common::Point32(0, 362), 80, 28),
+			Common::Rect32(Common::Point32(0, 390), 96, 14),
+			Common::Rect32(Common::Point32(0, 404), 104, 34),
+			Common::Rect32(Common::Point32(0, 438), 136, 6),
+			Common::Rect32(Common::Point32(0, 444), 200, 3),
+			Common::Rect32(Common::Point32(0, 447), 240, 2),
+			Common::Rect32(Common::Point32(0, 449), 272, 1),
+			Common::Rect32(Common::Point32(0, 450), 280, 5),
+		},
+		{
+			// L3 layout B, background 5.
+			Common::Rect32(Common::Point32(0, 274), 48, 47),
+			Common::Rect32(Common::Point32(0, 321), 72, 41),
+			Common::Rect32(Common::Point32(0, 362), 80, 28),
+			Common::Rect32(Common::Point32(0, 390), 96, 14),
+			Common::Rect32(Common::Point32(0, 404), 104, 31),
+			Common::Rect32(Common::Point32(0, 435), 136, 8),
+			Common::Rect32(Common::Point32(0, 443), 144, 1),
+			Common::Rect32(Common::Point32(0, 444), 200, 3),
+			Common::Rect32(Common::Point32(0, 447), 240, 2),
+			Common::Rect32(Common::Point32(0, 449), 272, 1),
+			Common::Rect32(Common::Point32(0, 450), 280, 5),
+		},
+		{
+			// Restored L4 layout A, background 6.
+			Common::Rect32(Common::Point32(0, 242), 136, 79),
+			Common::Rect32(Common::Point32(0, 321), 160, 1),
+			Common::Rect32(Common::Point32(0, 322), 200, 32),
+			Common::Rect32(Common::Point32(0, 354), 216, 19),
+			Common::Rect32(Common::Point32(0, 373), 224, 20),
+			Common::Rect32(Common::Point32(0, 393), 176, 52),
+			Common::Rect32(Common::Point32(248, 437), 16, 8),
+			Common::Rect32(Common::Point32(0, 445), 264, 4),
+			Common::Rect32(Common::Point32(0, 449), 272, 1),
+			Common::Rect32(Common::Point32(0, 450), 280, 5),
+		},
+	};
+	/** Lower-bank rectangles shared by optional L1-L3 expansion and the always-generated restored L4 mask, leaving the sidebar clear. */
+	static constexpr Common::Rect32 kAreaMaskExpansionLowerBankRects[12] = {
+		Common::Rect32(Common::Point32(0, 455), 312, 17),
+		Common::Rect32(Common::Point32(48, 472), 264, 13),
+		Common::Rect32(Common::Point32(48, 485), 280, 4),
+		Common::Rect32(Common::Point32(48, 489), 288, 2),
+		Common::Rect32(Common::Point32(48, 491), 296, 5),
+		Common::Rect32(Common::Point32(48, 496), 312, 6),
+		Common::Rect32(Common::Point32(48, 502), 320, 6),
+		Common::Rect32(Common::Point32(48, 508), 312, 6),
+		Common::Rect32(Common::Point32(48, 514), 296, 4),
+		Common::Rect32(Common::Point32(48, 518), 288, 3),
+		Common::Rect32(Common::Point32(48, 521), 264, 6),
+		Common::Rect32(Common::Point32(48, 527), 240, 53),
+	};
+	/** Select the allowed area-mask rectangles and generate the always-enabled restored L4 base mask. */
+	void initAreaMaskExpansion();
+	/** Enable or clear additional L1-L3 area-mask rectangles when the option changes; restored L4 is unaffected. */
+	void refreshAreaMaskExpansion();
+	/** Page-pixel rectangles added to the loaded L1-L3 mask when expansion is enabled, or used as the restored L4 base mask. */
+	Common::Array<Common::Rect32> _areaMaskExpansionRects;
+	/** Whether the area mask is expanded by L1-L3 additions or the always-enabled restored L4 base mask. */
+	bool _areaMaskExpanded = false;
 	/** Forward a crater drop from the slot manager to this puzzle instance. */
 	static void slotDropCallback(void *context, int slotIndex, int zoombiniIndex);
 	/** Launch the selected roster actor from the crater assigned to the drop slot. */
@@ -882,6 +1000,21 @@ private:
 	void loadResources();
 	/** Draw a trigger or matching spot with the same assisted color for its group. */
 	void drawColorSymbol(ManagedSurface32 *screen, int symbolIndex, const Common::Point32 &pos) const;
+	/** One missing-coverage sample along the left fringe of a cell plate. */
+	struct CellEdgePixel {
+		/** Pixel position relative to the original symbol origin. */
+		Common::Point32 position;
+		/** Straight color of the adjacent plate edge, without its pictogram. */
+		RGBColor color;
+		/** Additional opacity required to match the adjacent plate edge. */
+		byte alpha;
+	};
+	/** Cache missing plate coverage without modifying the shared sprite. */
+	void cacheCellEdgePixels(int symbolIndex, const RleBlock *sprite);
+	/** Fill a symbol's narrow left fringe, clipped to the existing white grid's inner edge. */
+	void fillCellEdge(ManagedSurface32 *screen, int symbolIndex, const Common::Point32 &pos) const;
+	/** Page-owned plate samples indexed by the current symbol, including rotating states. */
+	Common::Array<CellEdgePixel> _cellEdgePixels[60];
 	/** Cache the answer for this puzzle's initial board until the page is initialized again. */
 	mutable Common::String _initialAnswer;
 
