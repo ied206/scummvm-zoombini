@@ -524,7 +524,7 @@ void ShelterZombiniville::sendZoombiniOff(ZoombiniRunner *zoombini, bool restore
 
 	if (restoreFeatures)
 		restoreSelectedFeatures(*zoombini);
-	zoombini->endDrag(true);
+	zoombini->endHold(true);
 	zoombini->setInputEnabled(false);
 	_boardingSlots[slotIndex].occupied = false;
 	_departingZoombinis.push_back(zoombini);
@@ -652,7 +652,7 @@ void ShelterZombiniville::onUpdate() {
 void ShelterZombiniville::buildBoardingZoombiniDrawOrder(Common::Array<uint> &order) const {
 	order.clear();
 	for (uint i = 0; i < _boardingZoombinis.size(); i++) {
-		if (_boardingZoombinis[i]->isDragging())
+		if (_boardingZoombinis[i]->isHeld())
 			continue;
 		order.push_back(i);
 	}
@@ -666,9 +666,9 @@ void ShelterZombiniville::drawBoardingZoombinis(ManagedSurface32 *screen) const 
 		_vm->_gfx->drawZoombiniRunner(screen, _boardingZoombinis[order[i]]);
 }
 
-ZoombiniRunner *ShelterZombiniville::getDraggedZoombini() const {
+ZoombiniRunner *ShelterZombiniville::getHeldZoombini() const {
 	for (uint i = 0; i < _boardingZoombinis.size(); i++) {
-		if (_boardingZoombinis[i]->isDragging())
+		if (_boardingZoombinis[i]->isHeld())
 			return _boardingZoombinis[i];
 	}
 	return nullptr;
@@ -711,14 +711,14 @@ void ShelterZombiniville::onRenderForeground(ManagedSurface32 *screen) {
 	_vm->_gfx->drawZoombiniPreview(screen, _bigZombAnimation, selectedValues, Common::Point32(300, 110));
 }
 
-void ShelterZombiniville::renderDragOverlay(ManagedSurface32 *screen, bool advanceState) {
-	ZoombiniRunner *draggedZoombini = getDraggedZoombini();
-	if (!draggedZoombini || draggedZoombini->isHidden())
+void ShelterZombiniville::renderHoldOverlay(ManagedSurface32 *screen, bool advanceState) {
+	ZoombiniRunner *heldZoombini = getHeldZoombini();
+	if (!heldZoombini || heldZoombini->isHidden())
 		return;
 
-	_vm->_gfx->drawZoombiniRunner(screen, draggedZoombini);
+	_vm->_gfx->drawZoombiniRunner(screen, heldZoombini);
 	if (advanceState)
-		draggedZoombini->advanceAnimationAfterDraw();
+		heldZoombini->advanceAnimationAfterDraw();
 }
 
 void ShelterZombiniville::drawHoverRunners(ManagedSurface32 *screen) {
@@ -753,7 +753,8 @@ void ShelterZombiniville::recolorPickerNose(ManagedSurface32 *screen, byte noseV
 			continue;
 		for (int dx = -12; dx <= 12; dx++) {
 			const int x = centerX + dx;
-			if (x < 0 || screen->w <= x || 144 < dx * dx + dy * dy)
+			if (x < 0 || screen->w <= x ||
+				144 < squaredDistance(Common::Point32(x, y), Common::Point32(centerX, centerY)))
 				continue;
 			byte *pixel = static_cast<byte *>(screen->getBasePtr(x, y));
 			byte alpha;
@@ -791,7 +792,7 @@ void ShelterZombiniville::updateHoverRunners() {
 	// the original, which never refreshes them after SetRect.
 	_createButtonRunner->setHitTestEnabled(canCreateSelectedZoombini());
 
-	if (!_vm->_gfx->getPageLayerStack()->isScrollLocked() || getDraggedZoombini())
+	if (!_vm->_gfx->getPageLayerStack()->isScrollLocked() || getHeldZoombini())
 		return;
 
 	const Common::Point32 mousePos = _vm->getMousePos();
@@ -814,7 +815,7 @@ void ShelterZombiniville::onPostRender() {
 }
 
 EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
-	if (getDraggedZoombini())
+	if (getHeldZoombini())
 		return EventHandleResult::kConsumed;
 
 	for (int traitIdx = 0; traitIdx < ZmbTrait::kTraitKindCount; traitIdx++) {
@@ -927,7 +928,7 @@ EventHandleResult ShelterZombiniville::onKeyDown(const Common::KeyState &key, bo
 		if (key.hasFlags(Common::KBD_SHIFT))
 			sendAllZoombinisOff();
 		else
-			sendZoombiniOff(getDraggedZoombini(), true);
+			sendZoombiniOff(getHeldZoombini(), true);
 	}
 	return EventHandleResult::kConsumed;
 }

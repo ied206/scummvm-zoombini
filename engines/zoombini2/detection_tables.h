@@ -29,6 +29,7 @@ namespace Zoombini2 {
 static constexpr Zoombini2GameDescription gameDescriptions[] = {
 	// Zoombinis: Mountain Rescue
 	// English Windows, v1.0
+	// EXE PE timestamp: 2001-09-09 18:16:56 UTC
 	{
 		{
 			"zoombini2",
@@ -44,6 +45,7 @@ static constexpr Zoombini2GameDescription gameDescriptions[] = {
 	},
 	// Zoombinis: Mountain Rescue
 	// Dutch (Belgium and Netherlands) Windows, v1.0
+	// EXE PE timestamp: 2001-09-09 18:16:56 UTC
 	{
 		{
 			"zoombini2",
@@ -59,6 +61,7 @@ static constexpr Zoombini2GameDescription gameDescriptions[] = {
 	},
 	// Zoombinis: Mountain Rescue
 	// Hebrew Windows, v1.0
+	// EXE PE timestamp: 2003-06-23 13:08:03 UTC
 	{
 		{
 			"zoombini2",
@@ -74,6 +77,7 @@ static constexpr Zoombini2GameDescription gameDescriptions[] = {
 	},
 	// Zoombinis: Mountain Rescue
 	// English Windows, v1.1
+	// EXE PE timestamp: 2001-11-30 18:39:09 UTC
 	{
 		{
 			"zoombini2",
@@ -89,6 +93,7 @@ static constexpr Zoombini2GameDescription gameDescriptions[] = {
 	},
 	// Zoombinis: Mountain Rescue
 	// Korean Windows, v1.1, ArisuMedia
+	// EXE PE timestamp: 2002-04-08 06:56:28 UTC
 	{
 		{
 			"zoombini2",
@@ -104,6 +109,7 @@ static constexpr Zoombini2GameDescription gameDescriptions[] = {
 	},
 	// Zoombinis: Mountain Rescue
 	// Swedish Windows, v1.1
+	// EXE PE timestamp: 2001-11-30 18:39:09 UTC
 	{
 		{
 			"zoombini2",
@@ -119,6 +125,7 @@ static constexpr Zoombini2GameDescription gameDescriptions[] = {
 	},
 	// Zoombinis: Mountain Rescue
 	// Polish Windows, v1.1
+	// EXE PE timestamp: 2001-11-30 18:39:09 UTC
 	{
 		{
 			"zoombini2",
@@ -133,11 +140,13 @@ static constexpr Zoombini2GameDescription gameDescriptions[] = {
 		GF_Z2_V11,
 	},
 	// Zoombinis: Mountain Rescue
-	// English Windows, v1.0 pre-base demo (flat Bmp/ layout)
+	// English Windows, Prerelease US Demo
+	// Uses flat 'Bmp/' layout, unlike final releases.
+	// EXE PE timestamp: 2001-07-30 13:25:47 UTC
 	{
 		{
 			"zoombini2",
-			"v1.0US Demo",
+			"Prerelease US Demo",
 			AD_ENTRY2s("Bmp/typo.bmt", "ee5870b87a6015bd3b055d07c114fa06", 78056,
 					   "zoombini2.exe", "1aa039f72c4fa25d911cbfc4a96a1aa3", 946176),
 			Common::EN_USA,

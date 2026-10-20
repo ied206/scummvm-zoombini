@@ -52,12 +52,16 @@ struct DialogDebugCommand {
 		kDrawSprites,
 		/** Show one decoded bitmap. */
 		kDrawImage,
+		/** Draw every segment of one PAT path. */
+		kDrawCurve,
 		/** Plot one pixel. */
 		kPlotPoint,
 		/** Plot a line */
 		kPlotLine,
 		/** Plot a rectangle outline. */
-		kPlotRect
+		kPlotRect,
+		/** Plot one cubic Bezier curve from four supplied points. */
+		kPlotCurve,
 	};
 
 	/** Selected debug view. */
@@ -66,12 +70,18 @@ struct DialogDebugCommand {
 	Common::Path _animPath;
 	/** Bitmap resource path for @ref DialogDebugCommand::Type::kDrawImage. */
 	Common::Path _imagePath;
+	/** PAT resource path for @ref DialogDebugCommand::Type::kDrawCurve. */
+	Common::Path _curvePath;
 	/** Zero-based first frame on the sheet for @ref DialogDebugCommand::Type::kDrawSprites. */
 	int _startFrame = 0;
-	/** Pixel position, first line endpoint, or rectangle's top-left corner for a plot command. */
+	/** Pixel position, first line/curve endpoint, or rectangle's top-left corner for a plot command. */
 	Common::Point32 _plotStart;
-	/** Last inclusive line endpoint or exclusive bottom-right rectangle corner for a plot command. */
+	/** Last line/curve endpoint or exclusive bottom-right rectangle corner for a plot command. */
 	Common::Point32 _plotEnd;
+	/** First cubic Bezier control point for @ref DialogDebugCommand::Type::kPlotCurve. */
+	Common::Point32 _plotCtrl0;
+	/** Second cubic Bezier control point for @ref DialogDebugCommand::Type::kPlotCurve. */
+	Common::Point32 _plotCtrl1;
 	/** Diagnostic color, independent of the screen format. */
 	RGBColor _plotColor;
 
@@ -87,6 +97,12 @@ struct DialogDebugCommand {
 	void setDrawImage(const Common::Path &path) {
 		_type = Type::kDrawImage;
 		_imagePath = path;
+	}
+	/** Draw every segment of the PAT at @p path using @p color. */
+	void setDrawCurve(const Common::Path &path, const RGBColor &color) {
+		_type = Type::kDrawCurve;
+		_curvePath = path;
+		_plotColor = color;
 	}
 	/** Plot @p point using @p color. */
 	void setPlotPoint(const Common::Point32 &point, const RGBColor &color) {
@@ -108,16 +124,26 @@ struct DialogDebugCommand {
 		_plotEnd = bottomRight;
 		_plotColor = color;
 	}
+	/** Plot from @p start to @p end with control points @p ctrl0 and @p ctrl1, using @p color. */
+	void setPlotCurve(const Common::Point32 &start, const Common::Point32 &ctrl0, const Common::Point32 &ctrl1, const Common::Point32 &end, const RGBColor &color) {
+		_type = Type::kPlotCurve;
+		_plotStart = start;
+		_plotCtrl0 = ctrl0;
+		_plotCtrl1 = ctrl1;
+		_plotEnd = end;
+		_plotColor = color;
+	}
 };
 
 /**
  * Modal debug view dispatched from the console draw and plot commands.
  *
- * The area-mask view snapshots the screen on open and masks rejected drop areas with black.
+ * The area-mask view snapshots the screen on open and darkens rejected drop areas.
  * The animation view arranges numbered resource frames on a white sprite sheet and permits sheet paging.
  * The bitmap view renders an independently decoded image over white.
- * Resource previews and area-mask snapshots start below the title bar and clip at the screen bottom.
- * Plot views snapshot the current screen and draw one primitive over it through the shared graphics interface.
+ * Every canvas retains its pixel coordinates, with the title bar drawn over it.
+ * Sprite sheets reserve title space when placing their cells.
+ * Plot views and PAT previews draw geometry over a screen snapshot through the shared graphics interface.
  * Gameplay timing is paused until the view closes.
  * Every view closes on any click or ESC key.
  */
@@ -161,11 +187,11 @@ private:
 	void prepareAnimationSheet();
 	/** Refresh the animation title from the visible frame range. */
 	void updateAnimationTitle();
-	/** Prepare the plot canvas and title, clipping primitive edges to the screen. */
-	void preparePlot(const DialogDebugCommand &cmd);
+	/** Prepare the geometry overlay and title; return false if a requested PAT cannot be loaded. */
+	bool preparePlot(const DialogDebugCommand &cmd);
 	/** Reserve the title strip and the actual height of both title-bar fonts. */
 	int getTitleHeight() const;
-	/** Draw the stored title line over a title bar at the top of @p screen. */
+	/** Draw the stored title over a 50% transparent black title bar at the top of @p screen. */
 	void drawTitleText(ManagedSurface32 *screen) const;
 	/** Draw the close legend right-aligned in the title bar, appended to @p keyLegend when given. */
 	void drawEscText(ManagedSurface32 *screen, const Common::String &keyLegend = Common::String()) const;

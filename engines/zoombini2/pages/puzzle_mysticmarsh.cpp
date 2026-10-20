@@ -24,11 +24,13 @@
 #include "zoombini2/graphics.h"
 #include "zoombini2/random.h"
 #include "zoombini2/sound.h"
+#include "zoombini2/text_manager.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
 
 constexpr byte MysticMarshGrid::kLayouts[9][kRows][kColumns];
+constexpr RGBColor MysticMarshL4Background::kGlowColor;
 
 constexpr const char *PuzzleMysticMarsh::kPageName;
 constexpr const char *PuzzleMysticMarsh::kBackgroundPath;
@@ -49,6 +51,8 @@ constexpr const char *PuzzleMysticMarsh::kCompleteSpeech;
 constexpr const char *PuzzleMysticMarsh::kSymbolNames[60];
 constexpr Common::Point32 PuzzleMysticMarsh::kStartingPositions[6][8];
 constexpr Common::Point32 PuzzleMysticMarsh::kExitPositions[6][8];
+constexpr Common::Rect32 PuzzleMysticMarsh::kAreaMaskExpansionUpperBankRects[6][15];
+constexpr Common::Rect32 PuzzleMysticMarsh::kAreaMaskExpansionLowerBankRects[12];
 
 int MysticMarshGrid::randomBelow(int count) {
 	assert(0 < count);
@@ -1025,7 +1029,7 @@ void MysticMarshGrid::correctL4Arrow() {
 	Cell &arrow = _cells[toCellIndex(7, 9)];
 	if (_layout == kGridL4LayoutA_08 && arrow.type == kCellSymbolCDiv2Type07 && arrow.direction == 4) {
 		arrow.direction = 1;
-		warning("MysticMarsh: corrected level 4 arrow at column 8, row 10 (1-based) from direction 4 to right to prevent a trapped Zoombini");
+		warning("MysticMarsh: L4: corrected arrow at (r10, c8) (1-based) from direction 4 to right to make puzzle solvable");
 	}
 }
 
@@ -1793,18 +1797,20 @@ void PuzzleMysticMarsh::init() {
 	for (int i = 0; i < MysticMarshGrid::kCellCount; i++)
 		_drawCells[i] = _grid.cell(i);
 	_bgKind = _grid.background();
-	MysticMarshGrid::BackgroundKind artworkIndex = _bgKind;
+	MysticMarshGrid::BackgroundKind artworkIdx = _bgKind;
 	if (_bgKind == MysticMarshGrid::kBackgroundL4LayoutA_06) {
-		artworkIndex = kL4FallbackBackgroundIndex;
-		warning("MysticMarsh: background6 is missing; composing level 4 artwork from background%d", static_cast<int>(artworkIndex));
+		artworkIdx = kL4FallbackBackgroundIndex;
+		warning("MysticMarsh: L4: background6 is missing; composing level 4 artwork from background%d", static_cast<int>(artworkIdx));
 	}
-	loadPrimaryLayerBackground(Common::Path(Common::String::format(kBackgroundFormat, static_cast<int>(artworkIndex))));
+	loadPrimaryLayerBackground(Common::Path(Common::String::format(kBackgroundFormat, static_cast<int>(artworkIdx))));
 	if (_bgKind == MysticMarshGrid::kBackgroundL4LayoutA_06) {
 		ManagedSurface32 *background = _vm->_gfx->getBackgroundSurface();
 		if (background)
 			MysticMarshL4Background::compose(background, _drawCells, *_vm->_gfx);
 	}
-	loadAreaMask(Common::Path(Common::String::format(kAreaFormat, static_cast<int>(_bgKind))));
+	// Restored L4 uses a generated mask for its reconstructed artwork; L1-L3 retain the shipped masks.
+	if (_bgKind != MysticMarshGrid::kBackgroundL4LayoutA_06)
+		loadAreaMask(Common::Path(Common::String::format(kAreaFormat, static_cast<int>(_bgKind))));
 	loadResources();
 	startPageMusic(Common::Path(kMusicPath));
 	_bubbles.resize(party.size());
@@ -1816,7 +1822,7 @@ void PuzzleMysticMarsh::init() {
 		zoombini->setInputEnabled(true);
 		zoombini->setCanAdvanceFromPage(false);
 		zoombini->setHidden(false);
-		zoombini->setDragging(false);
+		zoombini->setHeld(false);
 	}
 	for (int i = 0; i < MysticMarshGrid::kCellCount; i++) {
 		const int type = _grid.cell(i).type;
@@ -1833,6 +1839,7 @@ void PuzzleMysticMarsh::init() {
 		target.callbackContext = this;
 		_dropTargets.push_back(target);
 	}
+	initAreaMaskExpansion();
 	_lastTick = _vm->getTotalPlayTime();
 	debug(1, "MysticMarsh: level=%d layout=%d background=%d party=%u craters=%u", _puzzleLevel, _grid.layout(), static_cast<int>(_bgKind),
 		  _puzzleZoombinis.size(), _slots.size());
@@ -1840,9 +1847,44 @@ void PuzzleMysticMarsh::init() {
 		_vm->_state->registerPageVisit(_pageId, 1);
 }
 
+void PuzzleMysticMarsh::initAreaMaskExpansion() {
+	// These rectangles already leave the sidebar, grid and crater bounds clear.
+	_areaMaskExpansionRects.clear();
+	const int background = static_cast<int>(_bgKind) - 1;
+	for (const Common::Rect32 &rect : kAreaMaskExpansionUpperBankRects[background]) {
+		if (!rect.isEmpty())
+			_areaMaskExpansionRects.push_back(rect);
+	}
+	for (const Common::Rect32 &rect : kAreaMaskExpansionLowerBankRects)
+		_areaMaskExpansionRects.push_back(rect);
+	_areaMaskExpanded = false;
+	// Restored L4 always uses its generated mask, independently of the L1-L3 expansion option.
+	if (_bgKind == MysticMarshGrid::kBackgroundL4LayoutA_06) {
+		_vm->_gfx->createAreaMask(Gfx::kScreenSize, _areaMaskExpansionRects);
+		_areaMaskExpanded = true;
+	}
+	refreshAreaMaskExpansion();
+}
+
+void PuzzleMysticMarsh::refreshAreaMaskExpansion() {
+	if (_bgKind == MysticMarshGrid::kBackgroundL4LayoutA_06)
+		return;
+	// L1-L3 keep their loaded base masks; the option changes only additional rectangles.
+	const bool expanded = _vm->expandMysticMarshAreaMask();
+	AreaMask *areaMask = _vm->_gfx->getAreaMask();
+	if (!areaMask || _areaMaskExpanded == expanded)
+		return;
+	if (expanded)
+		areaMask->setAdditionalRects(_areaMaskExpansionRects);
+	else
+		areaMask->clearAdditionalRects();
+	_areaMaskExpanded = expanded;
+}
+
 void PuzzleMysticMarsh::loadResources() {
 	for (int i = 0; i < ARRAYSIZE(kSymbolNames); i++) {
-		_vm->_gfx->loadPageRleBlock(Common::String::format(kSymbolFormat, kSymbolNames[i]));
+		const RleBlock *sprite = _vm->_gfx->loadPageRleBlock(Common::String::format(kSymbolFormat, kSymbolNames[i]));
+		cacheCellEdgePixels(i, sprite);
 	}
 	for (int f = 0; f < 4; f++) {
 		for (int v = 0; v < 5; v++) {
@@ -1971,6 +2013,8 @@ void PuzzleMysticMarsh::advanceGrid(uint32 now) {
 }
 
 void PuzzleMysticMarsh::onUpdate() {
+	// Apply option changes on the next active frame without regenerating the puzzle.
+	refreshAreaMaskExpansion();
 	const uint32 now = _vm->getTotalPlayTime();
 	// Cell changes become visible after the frame which advances the grid.
 	for (int i = 0; i < MysticMarshGrid::kCellCount; i++)
@@ -2059,275 +2103,372 @@ void PuzzleMysticMarsh::onRenderBackground(ManagedSurface32 *screen) {
 	drawPrimaryPageLayer(screen);
 }
 
-bool MysticMarshL4Background::isWaterPixel(uint8 red, uint8 blue) {
-	return static_cast<int>(red) + 30 <= blue;
-}
-
-MysticMarshL4Background::WaterNeighbor MysticMarshL4Background::findWaterNeighbor(ManagedSurface32 *surface, const Common::Array<byte> &mask, const Common::Point32 &position, const Common::Point32 &step) {
-	WaterNeighbor neighbor;
-	for (int distance = 1; distance <= 24; distance++) {
-		const Common::Point32 sample = position + step * distance;
-		if (sample.x < 0 || surface->w <= sample.x || sample.y < 0 || surface->h <= sample.y)
-			break;
-		if (mask[sample.y * surface->w + sample.x])
-			continue;
-		const uint32 *pixels = static_cast<const uint32 *>(surface->getBasePtr(0, sample.y));
-		uint8 red;
-		uint8 green;
-		uint8 blue;
-		surface->format.colorToRGB(pixels[sample.x], red, green, blue);
-		if (!isWaterPixel(red, blue))
-			continue;
-		neighbor.distance = distance;
-		neighbor.red = red;
-		neighbor.green = green;
-		neighbor.blue = blue;
-		break;
-	}
-	return neighbor;
-}
-
-void MysticMarshL4Background::eraseBakedGrid(ManagedSurface32 *surface) {
+bool MysticMarshL4Background::findBakedGrid(const ManagedSurface32 *surface, Common::Array<byte> &mask) {
 	const int width = surface->w;
 	const int height = surface->h;
-	if (width < 720 || height < 350) {
-		warning("MysticMarsh: restored level 4 grid cleanup needs the complete grid artwork region");
-		return;
-	}
-	const int pixelCount = width * height;
-	Common::Array<byte> candidates(pixelCount, 0);
+	// Search the L1 grid region for its bright core, leaving the softer halo out of this mask.
+	Common::Array<byte> candidates(width * height, 0);
 	for (int y = 145; y < 350; y++) {
 		const uint32 *pixels = static_cast<const uint32 *>(surface->getBasePtr(0, y));
 		for (int x = 120; x < 720; x++) {
-			uint8 red;
-			uint8 green;
-			uint8 blue;
-			surface->format.colorToRGB(pixels[x], red, green, blue);
-			if (160 <= red && 180 <= green && 180 <= blue)
-				candidates[y * width + x] = 1;
+			const RGBColor color = RGBColor::fromPixel(pixels[x], surface->format);
+			if (160 <= color.r && 180 <= color.g && 180 <= color.b)
+				candidates[y * width + x] = 255;
 		}
 	}
+	// Follow bright pixels up, down, left and right from a known grid point, excluding disconnected highlights.
 	const int seed = 154 * width + 164;
 	if (!candidates[seed]) {
 		warning("MysticMarsh: background1 baked-grid outline could not be identified");
-		return;
+		return false;
 	}
-	Common::Array<byte> core(pixelCount, 0);
+	mask.resize(width * height, 0);
+	mask[seed] = 255;
 	Common::Array<int> queue;
-	core[seed] = 1;
 	queue.push_back(seed);
-	static constexpr int kCardinalDirections[4][2] = {
-		{-1, 0},
-		{1, 0},
-		{0, -1},
-		{0, 1},
-	};
-	for (uint cursor = 0; cursor < queue.size(); cursor++) {
-		const int index = queue[cursor];
-		const int x = index % width;
-		const int y = index / width;
-		for (int direction = 0; direction < ARRAYSIZE(kCardinalDirections); direction++) {
-			const int sampleX = x + kCardinalDirections[direction][0];
-			const int sampleY = y + kCardinalDirections[direction][1];
-			if (sampleX < 0 || width <= sampleX || sampleY < 0 || height <= sampleY)
-				continue;
-			const int neighbor = sampleY * width + sampleX;
-			if (candidates[neighbor] && !core[neighbor]) {
-				core[neighbor] = 1;
-				queue.push_back(neighbor);
-			}
-		}
-	}
-	Common::Array<byte> mask(core);
-	for (uint i = 0; i < queue.size(); i++) {
-		const int x = queue[i] % width;
-		const int y = queue[i] / width;
-		for (int sampleY = MAX(0, y - 6); sampleY < MIN(height, y + 7); sampleY++) {
-			const uint32 *pixels = static_cast<const uint32 *>(surface->getBasePtr(0, sampleY));
-			for (int sampleX = MAX(0, x - 6); sampleX < MIN(width, x + 7); sampleX++) {
-				uint8 red;
-				uint8 green;
-				uint8 blue;
-				surface->format.colorToRGB(pixels[sampleX], red, green, blue);
-				if (red <= static_cast<int>(blue) + 5)
-					mask[sampleY * width + sampleX] = 1;
-			}
-		}
-	}
-	static constexpr Common::Point32 kWaterDirections[8] = {
+	static constexpr Common::Point32 kDirections[] = {
 		Common::Point32(-1, 0),
 		Common::Point32(1, 0),
 		Common::Point32(0, -1),
 		Common::Point32(0, 1),
-		Common::Point32(-1, -1),
-		Common::Point32(1, 1),
-		Common::Point32(1, -1),
-		Common::Point32(-1, 1),
 	};
-	for (int y = 145; y < 350; y++) {
-		uint32 *pixels = static_cast<uint32 *>(surface->getBasePtr(0, y));
-		for (int x = 120; x < 720; x++) {
-			if (!mask[y * width + x])
+	for (uint cursor = 0; cursor < queue.size(); cursor++) {
+		const int x = queue[cursor] % width;
+		const int y = queue[cursor] / width;
+		for (uint i = 0; i < ARRAYSIZE(kDirections); i++) {
+			const int sampleX = x + kDirections[i].x;
+			const int sampleY = y + kDirections[i].y;
+			if (sampleX < 0 || width <= sampleX || sampleY < 0 || height <= sampleY)
 				continue;
-			const Common::Point32 position(x, y);
-			WaterNeighbor neighbors[8];
-			for (int direction = 0; direction < ARRAYSIZE(neighbors); direction++) {
-				neighbors[direction] = findWaterNeighbor(surface, mask, position, kWaterDirections[direction]);
+			const int neighbor = sampleY * width + sampleX;
+			if (candidates[neighbor] && !mask[neighbor]) {
+				mask[neighbor] = 255;
+				queue.push_back(neighbor);
 			}
-			int bestAxis = -1;
-			int bestTotal = 1000000;
-			for (int axis = 0; axis < ARRAYSIZE(neighbors) / 2; axis++) {
-				const WaterNeighbor &first = neighbors[axis * 2];
-				const WaterNeighbor &second = neighbors[axis * 2 + 1];
-				if (first.distance && second.distance && first.distance + second.distance < bestTotal) {
-					bestAxis = axis;
-					bestTotal = first.distance + second.distance;
+		}
+	}
+	return true;
+}
+
+void MysticMarshL4Background::removeBakedGridCore(ManagedSurface32 *surface, const Common::Array<byte> &bakedGrid) {
+	/** Deferred replacement for one source grid-core pixel. */
+	struct PixelUpdate {
+		/** Row-major position of an old opaque grid pixel. */
+		int pixelIdx;
+		/** Replacement color sampled before any opaque stroke is removed. */
+		uint32 color;
+	};
+	// Defer writes so every replacement samples unmodified artwork.
+	Common::Array<PixelUpdate> updates;
+	for (int y = 0; y < surface->h; y++) {
+		for (int x = 0; x < surface->w; x++) {
+			const int pixelIdx = y * surface->w + x;
+			if (!bakedGrid[pixelIdx])
+				continue;
+			int sums[3] = {};
+			int weightSum = 0;
+			// Estimate the covered color from nearby unmasked pixels, weighting closer samples more strongly.
+			for (int sampleY = MAX(0, y - 3); sampleY <= MIN(surface->h - 1, y + 3); sampleY++) {
+				const uint32 *pixels = static_cast<const uint32 *>(surface->getBasePtr(0, sampleY));
+				for (int sampleX = MAX(0, x - 3); sampleX <= MIN(surface->w - 1, x + 3); sampleX++) {
+					if (bakedGrid[sampleY * surface->w + sampleX])
+						continue;
+					const int weight = 100 / PageBase::squaredDistance(Common::Point32(sampleX, sampleY), Common::Point32(x, y));
+					const RGBColor color = RGBColor::fromPixel(pixels[sampleX], surface->format);
+					weightSum += weight;
+					sums[0] += color.r * weight;
+					sums[1] += color.g * weight;
+					sums[2] += color.b * weight;
 				}
 			}
-			uint8 red;
-			uint8 green;
-			uint8 blue;
-			if (bestAxis != -1) {
-				const WaterNeighbor &first = neighbors[bestAxis * 2];
-				const WaterNeighbor &second = neighbors[bestAxis * 2 + 1];
-				red = (first.red * second.distance + second.red * first.distance + bestTotal / 2) / bestTotal;
-				green = (first.green * second.distance + second.green * first.distance + bestTotal / 2) / bestTotal;
-				blue = (first.blue * second.distance + second.blue * first.distance + bestTotal / 2) / bestTotal;
-			} else {
-				int nearest = -1;
-				for (int direction = 0; direction < ARRAYSIZE(neighbors); direction++) {
-					if (neighbors[direction].distance && (nearest == -1 || neighbors[direction].distance < neighbors[nearest].distance))
-						nearest = direction;
+			if (weightSum) {
+				byte channels[3] = {};
+				// Normalize each RGB channel independently, rounding to the nearest byte.
+				for (int i = 0; i < ARRAYSIZE(sums); i++) {
+					channels[i] = (sums[i] + weightSum / 2) / weightSum;
 				}
-				if (nearest == -1)
-					continue;
-				red = neighbors[nearest].red;
-				green = neighbors[nearest].green;
-				blue = neighbors[nearest].blue;
+				const PixelUpdate update = {pixelIdx, surface->format.RGBToColor(channels[0], channels[1], channels[2])};
+				updates.push_back(update);
 			}
-			pixels[x] = surface->format.RGBToColor(red, green, blue);
+		}
+	}
+	for (uint i = 0; i < updates.size(); i++) {
+		uint32 *pixel = static_cast<uint32 *>(surface->getBasePtr(updates[i].pixelIdx % surface->w, updates[i].pixelIdx / surface->w));
+		*pixel = updates[i].color;
+	}
+}
+
+void MysticMarshL4Background::findWaterMask(const ManagedSurface32 *surface, Common::Array<byte> &water) {
+	const int width = surface->w;
+	const int height = surface->h;
+	Common::Array<byte> terrain(width * height, 0);
+	Common::Array<int> queue;
+	// Start with water everywhere, then seed shore-colored terrain only at the image boundary.
+	water.resize(width * height, 255);
+	for (int y = 0; y < height; y++) {
+		const uint32 *pixels = static_cast<const uint32 *>(surface->getBasePtr(0, y));
+		for (int x = 0; x < width; x++) {
+			const RGBColor color = RGBColor::fromPixel(pixels[x], surface->format);
+			const int index = y * width + x;
+			if (color.b < static_cast<int>(color.r) + 20) {
+				terrain[index] = 255;
+				if (x == 0 || x == width - 1 || y == 0 || y == height - 1) {
+					water[index] = 0;
+					queue.push_back(index);
+				}
+			}
+		}
+	}
+	static constexpr Common::Point32 kDirections[] = {
+		Common::Point32(-1, 0),
+		Common::Point32(1, 0),
+		Common::Point32(0, -1),
+		Common::Point32(0, 1),
+	};
+	// Remove connected terrain while retaining enclosed grid highlights within the water region.
+	for (uint cursor = 0; cursor < queue.size(); cursor++) {
+		const int x = queue[cursor] % width;
+		const int y = queue[cursor] / width;
+		for (uint i = 0; i < ARRAYSIZE(kDirections); i++) {
+			const int sampleX = x + kDirections[i].x;
+			const int sampleY = y + kDirections[i].y;
+			if (sampleX < 0 || width <= sampleX || sampleY < 0 || height <= sampleY)
+				continue;
+			const int neighbor = sampleY * width + sampleX;
+			if (terrain[neighbor] && water[neighbor]) {
+				water[neighbor] = 0;
+				queue.push_back(neighbor);
+			}
 		}
 	}
 }
 
-void MysticMarshL4Background::antialiasUpperShore(ManagedSurface32 *surface) {
-	if (surface->w < 197 || surface->h < 291) {
-		warning("MysticMarsh: level 4 shoreline anti-aliasing needs a full background surface");
-		return;
+void MysticMarshL4Background::spreadGridMask(const Common::Array<byte> &mask, Common::Array<byte> &spread, int width, int height, int radius, bool glow) {
+	assert(0 <= radius && radius <= kMaxGridSpreadRadius);
+	spread.resize(width * height, 0);
+	// Index weights by squared distance: a solid disk keeps coverage, while a halo fades with distance.
+	// Fixed radii 2, 13 and 14 need at most 197 weight bytes; cache expf() outside the pixel loops.
+	// Both table size and neighborhood scan cost grow quadratically with radius.
+	// Review those costs before increasing kMaxGridSpreadRadius.
+	Common::Array<byte> weights(radius * radius + 1, 255);
+	if (glow) {
+		// A bounded warm halo follows the existing artwork's approximately four-pixel falloff.
+		for (uint i = 0; i < weights.size(); i++)
+			weights[i] = static_cast<byte>(84.0f * expf(-i / 33.62f) + 0.5f); // Round nonnegative opacity to the nearest byte.
 	}
-	static constexpr int kFirstRow = 198;
-	static constexpr int kLastRow = 287;
-	static constexpr int kGaussianWeights[7] = {
-		1,
-		6,
-		24,
-		42,
-		24,
-		6,
-		1,
-	};
-	static constexpr int kWeightSum = 104;
-	struct PixelUpdate {
-		/** Horizontal destination pixel in the composed background. */
-		int x;
-		/** Vertical destination pixel in the composed background. */
-		int y;
-		/** Replacement pixel packed in the background surface's format. */
-		uint32 color;
-	};
-	Common::Array<PixelUpdate> updates;
-	bool missingEdge = false;
-	for (int y = kFirstRow; y <= kLastRow; y++) {
-		int edge = -1;
-		const uint32 *edgeRow = static_cast<const uint32 *>(surface->getBasePtr(0, y));
-		for (int x = 100; x < 190; x++) {
-			bool water = true;
-			for (int offset = 0; offset < 5; offset++) {
-				uint8 red;
-				uint8 green;
-				uint8 blue;
-				surface->format.colorToRGB(edgeRow[x + offset], red, green, blue);
-				if (blue <= static_cast<int>(red) + 35) {
-					water = false;
-					break;
-				}
-			}
-			if (water) {
-				edge = x;
-				break;
-			}
-		}
-		if (edge == -1) {
-			missingEdge = true;
-			continue;
-		}
-		const int verticalWeight = MIN(8, MIN(y - kFirstRow, kLastRow - y));
-		for (int relativeX = -3; relativeX <= 4; relativeX++) {
-			const int horizontalWeight = MIN(2, MIN(relativeX + 3, 4 - relativeX));
-			const int weight = verticalWeight * horizontalWeight;
-			if (weight == 0)
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			const int coverage = mask[y * width + x];
+			if (!coverage)
 				continue;
-			const int x = edge + relativeX;
-			int blurSums[3] = {};
-			for (int sampleY = -3; sampleY < ARRAYSIZE(kGaussianWeights) - 3; sampleY++) {
-				const uint32 *sampleRow = static_cast<const uint32 *>(surface->getBasePtr(0, y + sampleY));
-				int rowSums[3] = {};
-				for (int sampleX = -3; sampleX < ARRAYSIZE(kGaussianWeights) - 3; sampleX++) {
-					uint8 red;
-					uint8 green;
-					uint8 blue;
-					surface->format.colorToRGB(sampleRow[x + sampleX], red, green, blue);
-					const int sampleWeight = kGaussianWeights[sampleX + 3];
-					rowSums[0] += sampleWeight * red;
-					rowSums[1] += sampleWeight * green;
-					rowSums[2] += sampleWeight * blue;
+			for (int sampleY = MAX(0, y - radius); sampleY <= MIN(height - 1, y + radius); sampleY++) {
+				for (int sampleX = MAX(0, x - radius); sampleX <= MIN(width - 1, x + radius); sampleX++) {
+					const int squaredDistance = PageBase::squaredDistance(Common::Point32(sampleX, sampleY), Common::Point32(x, y));
+					if (radius * radius < squaredDistance)
+						continue;
+					// Scale by source coverage; +127 rounds division by 255 to the nearest integer.
+					const byte value = static_cast<byte>((coverage * weights[squaredDistance] + 127) / 255);
+					byte &destination = spread[sampleY * width + sampleX];
+					// Overlapping edges share the strongest contribution instead of brightening their joins.
+					destination = MAX(destination, value);
 				}
-				const int sampleWeight = kGaussianWeights[sampleY + 3];
-				for (int channel = 0; channel < ARRAYSIZE(blurSums); channel++)
-					blurSums[channel] += sampleWeight * ((rowSums[channel] + kWeightSum / 2) / kWeightSum);
 			}
-			uint8 red;
-			uint8 green;
-			uint8 blue;
-			surface->format.colorToRGB(edgeRow[x], red, green, blue);
-			const int original[3] = {
-				red,
-				green,
-				blue,
-			};
-			uint8 blended[3] = {};
-			for (int channel = 0; channel < ARRAYSIZE(blended); channel++) {
-				const int softened = (blurSums[channel] + kWeightSum / 2) / kWeightSum;
-				const int numerator = original[channel] * (16 - weight) + softened * weight;
-				int value = numerator / 16;
-				const int remainder = numerator % 16;
-				if (8 < remainder || (remainder == 8 && (value & 1)))
-					value += 1;
-				blended[channel] = static_cast<uint8>(value);
-			}
-			PixelUpdate update = {x, y, surface->format.RGBToColor(blended[0], blended[1], blended[2])};
-			updates.push_back(update);
 		}
 	}
-	// Apply the narrow edge blend after sampling so every blur reads the unmodified background.
-	for (uint i = 0; i < updates.size(); i++) {
-		uint32 *pixel = static_cast<uint32 *>(surface->getBasePtr(updates[i].x, updates[i].y));
-		*pixel = updates[i].color;
+}
+
+void MysticMarshL4Background::repairUncoveredGrid(ManagedSurface32 *surface, const Common::Array<byte> &repair, const Common::Array<byte> &bakedGrid,
+												  const Common::Array<byte> &bakedGlow, const Common::Array<byte> &water) {
+	const int width = surface->w;
+	const int height = surface->h;
+	/** Water color estimate sampled around one cell center. */
+	struct CenterSample {
+		/** Source pixel at the center of a projected cell. */
+		Common::Point32 position;
+		/** Mean RGB over the center's five-by-five neighborhood. */
+		RGBColorF32 color;
+	};
+	// Seed water colors from five-by-five cell-center patches that do not cross the shore mask.
+	Common::Array<CenterSample> samples;
+	for (int i = 0; i < MysticMarshGrid::kCellCount; i++) {
+		CenterSample sample;
+		sample.position = cellPosition(i) + Common::Point32(27, 75);
+		if (sample.position.x < 2 || width - 2 <= sample.position.x || sample.position.y < 2 || height - 2 <= sample.position.y)
+			continue;
+		bool waterOnly = true;
+		for (int y = sample.position.y - 2; y <= sample.position.y + 2; y++) {
+			const uint32 *pixels = static_cast<const uint32 *>(surface->getBasePtr(0, y));
+			for (int x = sample.position.x - 2; x <= sample.position.x + 2; x++) {
+				waterOnly = waterOnly && water[y * width + x];
+				sample.color += RGBColorF32::fromPixel(pixels[x], surface->format) / 25.0f;
+			}
+		}
+		if (waterOnly)
+			samples.push_back(sample);
 	}
-	if (missingEdge)
-		warning("MysticMarsh: level 4 shoreline anti-aliasing skipped rows without a water edge");
+	static constexpr RGBColorF32 glowColor(kGlowColor);
+	// The full color field supplies fixed boundary samples; only positions in repair will be written back.
+	// Keep fractional colors through weighted interpolation and all relaxation steps; quantize only on writeback.
+	Common::Array<RGBColorF32> field(width * height);
+	Common::Array<int> positions;
+	for (int y = 0; y < height; y++) {
+		const uint32 *pixels = static_cast<const uint32 *>(surface->getBasePtr(0, y));
+		for (int x = 0; x < width; x++) {
+			const int index = y * width + x;
+			const RGBColorF32 original = RGBColorF32::fromPixel(pixels[x], surface->format);
+			// Exclude the outermost row and column so every repaired pixel has four valid neighbors.
+			if (repair[index] && 0 < x && x + 1 < width && 0 < y && y + 1 < height)
+				positions.push_back(index);
+			if (repair[index] || bakedGrid[index]) {
+				// Normalize distances by the projected cell size, blending centers within 2.5 cells.
+				float weightSum = 0;
+				for (uint i = 0; i < samples.size(); i++) {
+					const float dx = (x - samples[i].position.x) / 44.0f;
+					const float dy = (y - samples[i].position.y) / 31.0f;
+					const float distance = dx * dx + dy * dy;
+					if (6.25f <= distance)
+						continue;
+					const float extent = 6.25f - distance;
+					const float weight = extent * extent / (0.01f + distance);
+					weightSum += weight;
+					field[index] += samples[i].color * weight;
+				}
+				if (0 < weightSum)
+					field[index] /= weightSum;
+				else
+					field[index] = original;
+			} else {
+				// Recover water RGB by subtracting the weighted halo color and dividing by the remaining opacity.
+				// These samples anchor the repair to surrounding water without carrying the old halo into it.
+				const float opacity = bakedGlow[index] / 255.0f;
+				field[index] = ((original - glowColor * opacity) / (1 - opacity)).getClamped();
+			}
+		}
+	}
+	Common::Array<RGBColorF32> updates(positions.size());
+	// Repeatedly average water neighbors only inside the repair region, keeping the surrounding samples fixed.
+	// Commit a full iteration at once so the result does not depend on pixel traversal order.
+	for (int iteration = 0; iteration < 500; iteration++) {
+		for (uint i = 0; i < positions.size(); i++) {
+			const int index = positions[i];
+			const int neighbors[] = {
+				index - 1,
+				index + 1,
+				index - width,
+				index + width,
+			};
+			updates[i] = RGBColorF32();
+			int count = 0;
+			for (uint j = 0; j < ARRAYSIZE(neighbors); j++) {
+				if (!water[neighbors[j]])
+					continue;
+				count += 1;
+				updates[i] += field[neighbors[j]];
+			}
+			if (count) {
+				updates[i] /= count;
+			} else {
+				updates[i] = field[index];
+			}
+		}
+		for (uint i = 0; i < positions.size(); i++)
+			field[positions[i]] = updates[i];
+	}
+	// Write only the repaired water pixels; toPixel clamps and rounds channels to the nearest byte.
+	for (uint i = 0; i < positions.size(); i++) {
+		const int index = positions[i];
+		uint32 *pixel = static_cast<uint32 *>(surface->getBasePtr(index % width, index / width));
+		*pixel = field[index].toPixel(surface->format);
+	}
+}
+
+void MysticMarshL4Background::applyGridGlow(ManagedSurface32 *surface, const Common::Array<byte> &bakedGlow, const Common::Array<byte> &gridGlow,
+											const Common::Array<byte> &repair) {
+	for (int y = 0; y < surface->h; y++) {
+		uint32 *pixels = static_cast<uint32 *>(surface->getBasePtr(0, y));
+		for (int x = 0; x < surface->w; x++) {
+			const int pixelIndex = y * surface->w + x;
+			int oldOpacity = bakedGlow[pixelIndex];
+			// Reconstructed water no longer contains the old halo; unrepaired pixels still do.
+			if (repair[pixelIndex])
+				oldOpacity = 0;
+			if (gridGlow[pixelIndex] <= oldOpacity)
+				continue;
+			// The extra opacity is (gridGlow[pixelIndex] - oldOpacity) / (255 - oldOpacity).
+			// Applying the full new opacity would count the retained halo twice.
+			const int added = gridGlow[pixelIndex] - oldOpacity;
+			const int denominator = 255 - oldOpacity;
+			const RGBColor color = RGBColor::fromPixel(pixels[x], surface->format);
+			// Half the denominator rounds each nonnegative RGB result to the nearest integer.
+			const auto blendGlowChannel = [added, denominator](byte channel, byte glowChannel) {
+				return (channel * (denominator - added) + glowChannel * added + denominator / 2) / denominator;
+			};
+			pixels[x] = color.transformChannels(kGlowColor, blendGlowChannel).toPixel(surface->format);
+		}
+	}
 }
 
 void MysticMarshL4Background::compose(ManagedSurface32 *surface, const MysticMarshGrid::Cell *cells, const Gfx &gfx) {
-	eraseBakedGrid(surface);
-	antialiasUpperShore(surface);
+	// Rebuild the L4 grid over the L1 artwork once at page initialization.
+	// Preserve shared lighting, repair water around obsolete edges, then light and draw the new outlines.
+	// BitBlock can salvage a truncated BB with fewer rows, so loading need not yield the full 800x600 artwork.
+	// Skip artwork repair on such a surface; grid drawing still clips to the available bounds.
+	if (surface->w < 800 || surface->h < 600) {
+		warning("MysticMarsh: restored L4 lighting needs the complete background artwork");
+		drawGrid(surface, cells, gfx);
+		return;
+	}
+	// Byte masks have one entry per image pixel, indexed by y * width + x, with strengths from 0 to 255.
+	// Baked masks describe the source L1 grid; grid masks describe the generated L4 outlines.
+	Common::Array<byte> bakedGrid;
+	if (!findBakedGrid(surface, bakedGrid)) {
+		drawGrid(surface, cells, gfx);
+		return;
+	}
+	// Draw white on opaque black so a color channel records the new grid's AA coverage.
+	ManagedSurface32 gridMask(Size32(surface->w, surface->h), surface->format);
+	gridMask.fillRect(Common::Rect32(0, 0, surface->w, surface->h), Gfx::PredefinedColor::kBlack.toPixel(surface->format));
+	drawGrid(&gridMask, cells, gfx);
+	Common::Array<byte> grid(surface->w * surface->h, 0);
+	for (int y = 0; y < surface->h; y++) {
+		const uint32 *pixels = static_cast<const uint32 *>(gridMask.getBasePtr(0, y));
+		for (int x = 0; x < surface->w; x++)
+			grid[y * surface->w + x] = RGBColor::fromPixel(pixels[x], surface->format).r;
+	}
+	// Allow a two-pixel alignment margin around new edges before classifying an old core pixel as obsolete.
+	Common::Array<byte> retained;
+	spreadGridMask(grid, retained, surface->w, surface->h, 2, false);
+	Common::Array<byte> obsolete(grid.size(), 0);
+	for (uint i = 0; i < grid.size(); i++) {
+		if (bakedGrid[i] && !retained[i])
+			obsolete[i] = 255;
+	}
+	// Expand only obsolete cores into repair neighborhoods; shared edges keep their existing lighting.
+	Common::Array<byte> repair;
+	spreadGridMask(obsolete, repair, surface->w, surface->h, 13, false);
+	// Estimate both halos with the same profile to identify how much lighting is already present.
+	Common::Array<byte> bakedGlow;
+	Common::Array<byte> gridGlow;
+	spreadGridMask(bakedGrid, bakedGlow, surface->w, surface->h, kMaxGridSpreadRadius, true);
+	spreadGridMask(grid, gridGlow, surface->w, surface->h, kMaxGridSpreadRadius, true);
+	removeBakedGridCore(surface, bakedGrid);
+	// Restrict the wider repair to water, leaving the surrounding shoreline out of interpolation.
+	Common::Array<byte> water;
+	findWaterMask(surface, water);
+	for (uint i = 0; i < repair.size(); i++) {
+		if (!water[i])
+			repair[i] = 0;
+	}
+	repairUncoveredGrid(surface, repair, bakedGrid, bakedGlow, water);
+	applyGridGlow(surface, bakedGlow, gridGlow, repair);
+	// Draw the white core once, after all water and halo work is complete.
 	drawGrid(surface, cells, gfx);
 }
 
 bool MysticMarshL4Background::isCellBorderVisible(int column, int row) {
 	// Omit selected peripheral outlines from the level 4 substitute without changing the underlying cells.
 	if (row == 0)
-		return false;
+		return column * MysticMarshGrid::kRows == kRejectVisualCellIdx;
 	if (column == 3)
 		return row == 7 || row == 11;
 	if (8 <= row && 12 <= column && column <= 13)
@@ -2340,32 +2481,36 @@ bool MysticMarshL4Background::isPortalCellType(int type) {
 }
 
 void MysticMarshL4Background::drawGrid(ManagedSurface32 *surface, const MysticMarshGrid::Cell *cells, const Gfx &gfx) {
-	Common::Array<Gfx::LineSegment> lines;
+	// Fit the side strokes to the baked L1 artwork, independently of the logical row pitch.
+	static constexpr float kSideTopOffset = 0.8f;
+	static constexpr float kSideBottomOffset = 0.3f;
+	Common::Array<Gfx::SubpixelLineSegment> lines;
+	// Each visible cell supplies its top and left edges; add bottom/right only when a neighbor will not.
 	for (int column = 0; column < MysticMarshGrid::kColumns; column++) {
 		for (int row = 0; row < MysticMarshGrid::kRows; row++) {
 			const int cellIdx = column * MysticMarshGrid::kRows + row;
 			if (cells[cellIdx].type == MysticMarshGrid::kCellEmptyType00 || isPortalCellType(cells[cellIdx].type) || !isCellBorderVisible(column, row))
 				continue;
 			const Common::Point32 pos = cellPosition(cellIdx);
-			const Common::Point32 topLeft(pos.x, pos.y + 60);
-			const Common::Point32 topRight(pos.x + 44, pos.y + 60);
-			const Common::Point32 bottomLeft(pos.x + 10, pos.y + 91);
-			const Common::Point32 bottomRight(pos.x + 54, pos.y + 91);
-			lines.push_back({topLeft, topRight});
-			lines.push_back({topLeft, bottomLeft});
+			const float left = pos.x;
+			const float top = pos.y + 60;
+			const float bottom = pos.y + 91;
+			lines.push_back({left, top, left + 44, top});
+			lines.push_back({left + kSideTopOffset, top, left + 10 + kSideBottomOffset, bottom});
 			if (row + 1 == MysticMarshGrid::kRows || cells[cellIdx + 1].type == MysticMarshGrid::kCellEmptyType00 ||
 				isPortalCellType(cells[cellIdx + 1].type) || !isCellBorderVisible(column, row + 1)) {
-				lines.push_back({bottomLeft, bottomRight});
+				lines.push_back({left + 10, bottom, left + 54, bottom});
 			}
 			if (column + 1 == MysticMarshGrid::kColumns ||
 				cells[cellIdx + MysticMarshGrid::kRows].type == MysticMarshGrid::kCellEmptyType00 ||
 				isPortalCellType(cells[cellIdx + MysticMarshGrid::kRows].type) || !isCellBorderVisible(column + 1, row)) {
-				lines.push_back({topRight, bottomRight});
+				lines.push_back({left + 44 + kSideTopOffset, top, left + 54 + kSideBottomOffset, bottom});
 			}
 		}
 	}
 	const uint32 white = Gfx::PredefinedColor::kWhite03.toPixel(surface->format);
-	gfx.drawLines(surface, lines, white, 2, true);
+	// Merge coverage for the entire grid before blending so shared corners do not become brighter.
+	gfx.drawLines(surface, lines, white, 2);
 }
 
 void PuzzleMysticMarsh::onRenderContent(ManagedSurface32 *screen) {
@@ -2373,12 +2518,15 @@ void PuzzleMysticMarsh::onRenderContent(ManagedSurface32 *screen) {
 		const MysticMarshGrid::Cell &cell = _drawCells[i];
 		int symbolType = cell.type;
 		// Mark the restored L4 upper-edge loss route without changing the cell's routing.
-		if (_bgKind == MysticMarshGrid::kBackgroundL4LayoutA_06 && i == kL4RejectVisualCellIdx)
+		if (_bgKind == MysticMarshGrid::kBackgroundL4LayoutA_06 && i == MysticMarshL4Background::kRejectVisualCellIdx)
 			symbolType = kRejectCellType;
 		if (symbolType < MysticMarshGrid::kCellSymbolSDiv1Type02 || MysticMarshGrid::kCellSymbolEntry1Type60 <= symbolType)
 			continue;
 		const Common::Point32 position = MysticMarshL4Background::cellPosition(i);
 		drawColorSymbol(screen, symbolType - MysticMarshGrid::kCellSymbolSDiv1Type02, Common::Point32(position.x + 3, position.y + 61));
+		// Supplement the current sprite before its separate trait overlay, including devices that change type.
+		if (_vm->fillMysticMarshCellGaps())
+			fillCellEdge(screen, symbolType - MysticMarshGrid::kCellSymbolSDiv1Type02, Common::Point32(position.x + 3, position.y + 61));
 		if (MysticMarshGrid::kCellSymbolCDiv1Type06 <= cell.type && cell.type <= MysticMarshGrid::kCellSymbolCDiv4Type09 &&
 			1 <= cell.trait && cell.trait <= 4 && 1 <= cell.value && cell.value <= 5) {
 			if (cell.trait - 1 == static_cast<int>(ZmbTrait::TraitKind::kNose01))
@@ -2404,6 +2552,72 @@ void PuzzleMysticMarsh::onRenderContent(ManagedSurface32 *screen) {
 			const int frame = MIN<int>((now - effect.start) / 100, _whirlpoolAnimation->getFrameCount() - 1);
 			_vm->_gfx->drawAnimationFrame(screen, _whirlpoolAnimation, frame, effect.position);
 		}
+	}
+}
+
+void PuzzleMysticMarsh::cacheCellEdgePixels(int symbolIndex, const RleBlock *sprite) {
+	Common::Array<CellEdgePixel> &pixels = _cellEdgePixels[symbolIndex];
+	pixels.clear();
+	if (!sprite || sprite->getWidth() != 54 || sprite->getHeight() != 31)
+		return;
+	// Cache the narrow left fringe once per symbol; preserve the top/bottom caps and the source sprite.
+	for (int y = 1; y < 30; y++) {
+		// The released plate shifts nine pixels over thirty rows; sample just inside its soft edge.
+		const int anchor = (3 * y + 5) / 10 + 1;
+		RGBColor color;
+		byte alpha;
+		sprite->samplePixel(Common::Point32(anchor, y), color, alpha);
+		for (int x = anchor - 4; x < anchor; x++) {
+			RGBColor originalColor;
+			byte originalAlpha;
+			sprite->samplePixel(Common::Point32(x, y), originalColor, originalAlpha);
+			if (originalAlpha < alpha) {
+				// Store only the missing opacity relative to the adjacent plate color, not a replacement pixel.
+				const CellEdgePixel pixel = {Common::Point32(x, y), color, static_cast<byte>(alpha - originalAlpha)};
+				pixels.push_back(pixel);
+			}
+		}
+	}
+}
+
+void PuzzleMysticMarsh::fillCellEdge(ManagedSurface32 *screen, int symbolIndex, const Common::Point32 &pos) const {
+	const ManagedSurface32 *background = _vm->_gfx->getBackgroundSurface();
+	if (!background)
+		return;
+	const Common::Array<CellEdgePixel> &pixels = _cellEdgePixels[symbolIndex];
+	int lastRow = -1;
+	int innerEdge = 0;
+	for (uint i = 0; i < pixels.size(); i++) {
+		const CellEdgePixel &pixel = pixels[i];
+		const int x = pos.x + pixel.position.x;
+		const int y = pos.y + pixel.position.y;
+		if (x < 0 || screen->w <= x || background->w <= x || y < 0 || screen->h <= y || background->h <= y)
+			continue;
+		if (lastRow != y) {
+			// Samples are grouped by row, so find the actual white grid core once for each row.
+			lastRow = y;
+			// Without a detected core, skip the row rather than extending the plate onto exposed terrain.
+			innerEdge = screen->w;
+			const int edge = pos.x - 3 + 10 * (pixel.position.y + 1) / 31;
+			for (int sampleX = MAX(0, edge - 1); sampleX <= MIN(background->w - 1, edge + 3); sampleX++) {
+				const uint32 sample = *static_cast<const uint32 *>(background->getBasePtr(sampleX, y));
+				const RGBColor color = RGBColor::fromPixel(sample, background->format);
+				if (210 <= color.r && 210 <= color.g && 210 <= color.b)
+					innerEdge = sampleX + 1;
+			}
+		}
+		if (x < innerEdge)
+			continue;
+		const uint32 original = *static_cast<const uint32 *>(background->getBasePtr(x, y));
+		const RGBColor base = RGBColor::fromPixel(original, background->format);
+		uint32 *destination = static_cast<uint32 *>(screen->getBasePtr(x, y));
+		const RGBColor current = RGBColor::fromPixel(*destination, screen->format);
+		// The sprite is already drawn: add pixel.alpha / 255 of the difference between plate and background RGB.
+		// This fills only the coverage deficit without drawing the sprite or its pictogram twice.
+		const auto fillPlateChannel = [&pixel](byte currentChannel, byte baseChannel, byte plateChannel) {
+			return CLIP(currentChannel + pixel.alpha * (plateChannel - baseChannel) / 255, 0, 255);
+		};
+		*destination = current.transformChannels(base, pixel.color, fillPlateChannel).toPixel(screen->format);
 	}
 }
 
@@ -2609,7 +2823,8 @@ Common::String PuzzleMysticMarsh::debugGetAnswer() const {
 	for (uint i = 0; i < launches.size(); i++) {
 		const MysticMarshGrid::AnswerLaunch &launch = launches[i];
 		const ZoombiniRunner *actor = _puzzleZoombinis[launch.actor];
-		_initialAnswer += Common::String::format("    %u. Zoombini (%-6s) to Crater (r%d, c%d): %s\n", i + 1, actor->getName().c_str(),
+		const Common::String name = _vm->_text->getZoombiniDisplayName(actor->getName());
+		_initialAnswer += Common::String::format("    %u. Zoombini (%-6s) to Crater (r%d, c%d): %s\n", i + 1, name.c_str(),
 												 launch.cell % MysticMarshGrid::kRows + 1, launch.cell / MysticMarshGrid::kRows + 1,
 												 actor->getTraits().toStr().c_str());
 	}

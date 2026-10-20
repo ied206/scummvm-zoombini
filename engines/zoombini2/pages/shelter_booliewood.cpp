@@ -94,7 +94,7 @@ void ShelterBooliewood::init() {
 	if (rescuedTotal < 50)
 		_developmentStage = 1;
 
-	if (!_vm->_gfx->loadPageBitBlock(kBackgroundPath)) {
+	if (!_vm->_gfx->loadBackground(kBackgroundPath)) {
 		warning("BooliewoodPage: Failed to load background");
 	}
 
@@ -462,20 +462,21 @@ void ShelterBooliewood::playAmbientSpeech() {
 }
 
 void ShelterBooliewood::drawBackground(ManagedSurface32 *screen) const {
-	const int width = _vm->_gfx->getPageBitBlockSize(kBackgroundPath).width;
+	const ManagedSurface32 *background = _vm->_gfx->getBackgroundSurface();
+	const int width = background ? background->w : 0;
 	if (width == 0)
 		return;
 	if (width <= Gfx::kScreenSize.width) {
-		_vm->_gfx->drawPageBitBlock(screen, kBackgroundPath, Common::Point32(0, 0));
+		_vm->_gfx->drawBackground(screen, Common::Point32(0, 0));
 		return;
 	}
 	const int origin = (_scrollX + width) % width;
 	const int tailWidth = width - origin;
 	if (Gfx::kScreenSize.width <= tailWidth) {
-		_vm->_gfx->drawPageBitBlockSubRect(screen, kBackgroundPath, Common::Point32(0, 0), Common::Rect(origin, 0, origin + Gfx::kScreenSize.width, Gfx::kScreenSize.height));
+		_vm->_gfx->drawBackgroundSubRect(screen, Common::Point32(0, 0), Common::Rect(origin, 0, origin + Gfx::kScreenSize.width, Gfx::kScreenSize.height));
 	} else {
-		_vm->_gfx->drawPageBitBlockSubRect(screen, kBackgroundPath, Common::Point32(0, 0), Common::Rect(origin, 0, width, Gfx::kScreenSize.height));
-		_vm->_gfx->drawPageBitBlockSubRect(screen, kBackgroundPath, Common::Point32(tailWidth, 0), Common::Rect(0, 0, Gfx::kScreenSize.width - tailWidth, Gfx::kScreenSize.height));
+		_vm->_gfx->drawBackgroundSubRect(screen, Common::Point32(0, 0), Common::Rect(origin, 0, width, Gfx::kScreenSize.height));
+		_vm->_gfx->drawBackgroundSubRect(screen, Common::Point32(tailWidth, 0), Common::Rect(0, 0, Gfx::kScreenSize.width - tailWidth, Gfx::kScreenSize.height));
 	}
 }
 

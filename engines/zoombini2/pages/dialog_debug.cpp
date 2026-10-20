@@ -21,6 +21,7 @@
 
 #include "zoombini2/pages/dialog_debug.h"
 #include "zoombini2/graphics.h"
+#include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/zoombini2.h"
 
@@ -56,7 +57,7 @@ bool DialogDebug::open(const DialogDebugCommand &cmd) {
 
 	switch (cmd._type) {
 	case DialogDebugCommand::Type::kDrawAreaMask: {
-		PageBase *page = _vm->getCurrentPage();
+		PageBase *page = _vm->getActivePage();
 		if (!page)
 			return false;
 
@@ -105,7 +106,10 @@ bool DialogDebug::open(const DialogDebugCommand &cmd) {
 	case DialogDebugCommand::Type::kPlotPoint:
 	case DialogDebugCommand::Type::kPlotLine:
 	case DialogDebugCommand::Type::kPlotRect:
-		preparePlot(cmd);
+	case DialogDebugCommand::Type::kPlotCurve:
+	case DialogDebugCommand::Type::kDrawCurve:
+		if (!preparePlot(cmd))
+			return false;
 		break;
 	default:
 		return false;
@@ -189,7 +193,8 @@ void DialogDebug::prepareAnimationSheet() {
 	}
 	_sheetCellSize = Size32(cellWidth + kSheetPadding * 2, frameHeight + labelHeight + kSheetPadding * 3);
 	_sheetColumns = MAX(1, (_savedScreen->w - kSheetPadding * 2) / _sheetCellSize.width);
-	const int rows = MAX(1, (_savedScreen->h - getTitleHeight() - kSheetPadding * 2) / _sheetCellSize.height);
+	const int firstRowY = getTitleHeight() + kSheetPadding;
+	const int rows = MAX(1, (_savedScreen->h - firstRowY - kSheetPadding) / _sheetCellSize.height);
 	_sheetFrameCapacity = _sheetColumns * rows;
 	const uint32 white = _savedScreen->format.ARGBToColor(255, 255, 255, 255);
 	const uint32 border = _savedScreen->format.ARGBToColor(255, 192, 192, 192);
@@ -201,7 +206,7 @@ void DialogDebug::prepareAnimationSheet() {
 			continue;
 		const int cellIndex = i - _sheetStartFrame;
 		const int x = kSheetPadding + cellIndex % _sheetColumns * _sheetCellSize.width;
-		const int y = kSheetPadding + cellIndex / _sheetColumns * _sheetCellSize.height;
+		const int y = firstRowY + cellIndex / _sheetColumns * _sheetCellSize.height;
 		gfx->frameRect(_savedScreen, Common::Rect(x, y, x + _sheetCellSize.width, y + _sheetCellSize.height), border);
 		const Common::String label = Common::String::format("%d: %d x %d", i, frame->getWidth(), frame->getHeight());
 		gfx->drawString(_savedScreen, label, Common::Point32(x + kSheetPadding, y + kSheetPadding), cellWidth, conf);
@@ -230,14 +235,15 @@ void DialogDebug::updateAnimationTitle() {
 										_animPath.toString('/').c_str());
 }
 
-void DialogDebug::preparePlot(const DialogDebugCommand &cmd) {
-	// Overlay the primitive on a snapshot of the current screen so the
-	// coordinate can be read against the live game scene.
+bool DialogDebug::preparePlot(const DialogDebugCommand &cmd) {
+	// Draw geometry over a snapshot in the original game coordinate system.
 	_vm->_gfx->captureScreen(_savedScreen);
 	const uint32 color = cmd._plotColor.toPixel(_savedScreen->format);
 	const Common::String colorText = cmd._plotColor.toString();
 	const Common::Point32 &start = cmd._plotStart;
 	const Common::Point32 &end = cmd._plotEnd;
+	// Let the AA rasterizer clip segments that cross the screen boundary.
+	const Common::Rect32 sampleBounds(INT32_MIN, INT32_MIN, INT32_MAX, INT32_MAX);
 
 	switch (cmd._type) {
 	case DialogDebugCommand::Type::kPlotPoint:
@@ -253,9 +259,29 @@ void DialogDebug::preparePlot(const DialogDebugCommand &cmd) {
 		_titleText = Common::String::format("[Plot Rect] from (%d, %d) to (%d, %d) color(%s)", start.x, start.y, end.x, end.y, colorText.c_str());
 		break;
 	}
-	default:
+	case DialogDebugCommand::Type::kPlotCurve: {
+		// Use the smallest Q10 parameter step and no endpoint wait for a static plot.
+		static constexpr int kPlotCurveStep = 1;
+		CubicBezierCurve curve(_vm->getBezierCurveDataType());
+		curve.init(start, cmd._plotCtrl0, cmd._plotCtrl1, end, kPlotCurveStep, 0);
+		_vm->_gfx->drawCubicBezierCurve(_savedScreen, curve, color, 1, sampleBounds, true);
+		_titleText = Common::String::format("[Plot Curve] from (%d, %d) to (%d, %d) color(%s)", start.x, start.y, end.x, end.y, colorText.c_str());
 		break;
 	}
+	case DialogDebugCommand::Type::kDrawCurve: {
+		Common::ScopedPtr<PathObject> path(_vm->loadPagePATPath(cmd._curvePath));
+		if (!path || path->segments.empty())
+			return false;
+		for (CubicBezierCurve *segment : path->segments)
+			_vm->_gfx->drawCubicBezierCurve(_savedScreen, *segment, color, 1, sampleBounds, true);
+		_titleText = Common::String::format("[PAT Curve] %s (%u segments) color(%s)",
+											cmd._curvePath.toString('/').c_str(), path->segments.size(), colorText.c_str());
+		break;
+	}
+	default:
+		return false;
+	}
+	return true;
 }
 
 int DialogDebug::getTitleHeight() const {
@@ -270,16 +296,28 @@ int DialogDebug::getTitleHeight() const {
 void DialogDebug::drawTitleText(ManagedSurface32 *screen) const {
 	if (_titleText.empty())
 		return;
-	_vm->_gfx->fillRect(screen, Common::Rect32(0, 0, Gfx::kScreenSize.width, getTitleHeight()), 0);
+	ManagedSurface32 titleBackground(Size32(screen->w, getTitleHeight()), Gfx::kScreenFormat);
+	// Composite 50% transparent black so the preview remains visible beneath the title.
+	titleBackground.clear(titleBackground.format.ARGBToColor(128, 0, 0, 0));
+	screen->blitFrom(titleBackground, Common::Point32(0, 0));
 	Gfx::TextConf conf;
 	conf.fontKind = Gfx::FontKind::kDebugTitleFont;
 	conf.fillColor = Gfx::PredefinedColor::kWhite03.toPixel(screen->format);
 	int maxWidth = Gfx::kNoMaxWidth;
-	if (_viewType == DialogDebugCommand::Type::kDrawSprites) {
+	switch (_viewType) {
+	case DialogDebugCommand::Type::kDrawSprites:
+	case DialogDebugCommand::Type::kDrawCurve:
+	case DialogDebugCommand::Type::kPlotCurve: {
 		Gfx::TextConf legendConf;
 		legendConf.fontKind = Gfx::FontKind::kDebugFont;
-		const Common::String legend = Common::String(kSheetKeyLegend) + " [ESC] close";
+		Common::String legend = "[ESC] close";
+		if (_viewType == DialogDebugCommand::Type::kDrawSprites)
+			legend = Common::String(kSheetKeyLegend) + " " + legend;
 		maxWidth = screen->w - _vm->_gfx->getTextWidth(legend, legendConf) - kTitleX * 3;
+		break;
+	}
+	default:
+		break;
 	}
 	_vm->_gfx->drawString(screen, _titleText, Common::Point32(kTitleX, kTitleY), maxWidth, conf);
 }
@@ -318,11 +356,8 @@ void DialogDebug::onRenderContent(ManagedSurface32 *screen) {
 		break;
 	}
 
-	if (_viewType == DialogDebugCommand::Type::kDrawImage || _viewType == DialogDebugCommand::Type::kDrawSprites ||
-		_viewType == DialogDebugCommand::Type::kDrawAreaMask)
-		screen->copyRectToSurface(_savedScreen->rawSurface(), 0, getTitleHeight(), Common::Rect32(_savedScreen->w, _savedScreen->h));
-	else
-		screen->copyFrom(*_savedScreen);
+	// Preserve canvas coordinates and draw the title over the displayed pixels.
+	screen->copyFrom(*_savedScreen);
 
 	drawTitleText(screen);
 	if (_viewType == DialogDebugCommand::Type::kDrawSprites)

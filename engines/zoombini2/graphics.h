@@ -26,6 +26,7 @@
 #include "common/hash-str.h"
 #include "common/noncopyable.h"
 #include "common/path.h"
+#include "common/ptr.h"
 #include "common/rect.h"
 #include "common/scummsys.h"
 #include "common/str.h"
@@ -64,33 +65,123 @@ enum class ColorAssistMode : uint32 {
 	kRedGreenBlindAssist = 2
 };
 
-/** One RGB color with eight bits per channel and no alpha component. */
-struct RGBColor {
-	/** Red channel intensity from 0 to 255. */
-	byte r;
-	/** Green channel intensity from 0 to 255. */
-	byte g;
-	/** Blue channel intensity from 0 to 255. */
-	byte b;
+/**
+ * Shared RGB channels in byte-scale units, with storage type T and results of type ConcreteColor.
+ * Channel operations leave rounding and clamping to the caller; results must fit T.
+ */
+template<typename T, typename ConcreteColor>
+struct RGBColorBase {
+	/** Red intensity in byte-scale units. */
+	T r;
+	/** Green intensity in byte-scale units. */
+	T g;
+	/** Blue intensity in byte-scale units. */
+	T b;
 
-	/** Construct an RGB color from channel intensities, defaulting to black. */
-	constexpr RGBColor(byte red = 0, byte green = 0, byte blue = 0) : r(red), g(green), b(blue) {}
+	/** Construct channel values, defaulting to black. */
+	constexpr RGBColorBase(T red = 0, T green = 0, T blue = 0) : r(red), g(green), b(blue) {}
+	/** Decode a packed pixel with @p pixelFormat. */
+	static ConcreteColor fromPixel(uint32 pixel, const Graphics::PixelFormat &pixelFormat) {
+		byte red = 0, green = 0, blue = 0;
+		pixelFormat.colorToRGB(pixel, red, green, blue);
+		return ConcreteColor(red, green, blue);
+	}
+	/** Return the greatest RGB channel value. */
+	T getMaxChannel() const { return MAX(r, MAX(g, b)); }
+	/** Return the least RGB channel value. */
+	T getMinChannel() const { return MIN(r, MIN(g, b)); }
+	/** Return a copy clamped to [0, 255], retaining any fractional channel values. */
+	ConcreteColor getClamped() const {
+		const auto clampChannel = [](T channel) { return CLIP(channel, static_cast<T>(0), static_cast<T>(255)); };
+		return transformChannels(clampChannel);
+	}
+	/** Multiply each channel by @p factor without clamping; results must fit T. */
+	template<typename Factor>
+	ConcreteColor scale(Factor factor) const {
+		const auto scaleChannel = [factor](T channel) { return channel * factor; };
+		return transformChannels(scaleChannel);
+	}
+	/**
+	 * Scale each channel through scaler.scale(factor, channel), preserving that scaler's arithmetic.
+	 * @param[in] factor Scale coefficient in the units expected by @p scaler.
+	 * @param[in] scaler Channel scaler, such as @ref AlphaBlendLUT for byte colors and /256 coefficients.
+	 */
+	template<typename Factor, typename Scaler>
+	ConcreteColor scale(Factor factor, const Scaler &scaler) const {
+		const auto scaleChannel = [factor, &scaler](T channel) { return scaler.scale(factor, channel); };
+		return transformChannels(scaleChannel);
+	}
+	/** Return a color by applying @p operation independently to each channel. */
+	template<typename Operation>
+	ConcreteColor transformChannels(Operation operation) const {
+		return ConcreteColor(operation(r), operation(g), operation(b));
+	}
+	/** Apply @p operation to matching channels from this color and @p other, in that argument order. */
+	template<typename Operation>
+	ConcreteColor transformChannels(const ConcreteColor &other, Operation operation) const {
+		return ConcreteColor(operation(r, other.r), operation(g, other.g), operation(b, other.b));
+	}
+	/** Apply @p operation to matching channels from this color, @p first and @p second, in that argument order. */
+	template<typename Operation>
+	ConcreteColor transformChannels(const ConcreteColor &first, const ConcreteColor &second, Operation operation) const {
+		return ConcreteColor(operation(r, first.r, second.r), operation(g, first.g, second.g), operation(b, first.b, second.b));
+	}
+};
+
+/** One RGB color with eight bits per channel and no alpha component. */
+struct RGBColor : public RGBColorBase<byte, RGBColor> {
+	/** Construct an RGB color from channel intensities in [0, 255], defaulting to black. */
+	constexpr RGBColor(byte red = 0, byte green = 0, byte blue = 0) : RGBColorBase(red, green, blue) {}
 	/** Return this color as a lowercase #rrggbb string. */
 	Common::String toString() const {
 		return Common::String::format("#%02x%02x%02x", static_cast<uint32>(r), static_cast<uint32>(g), static_cast<uint32>(b));
 	}
-	/** Decode a packed pixel with @p pixelFormat. */
-	static RGBColor fromPixel(uint32 pixel, const Graphics::PixelFormat &pixelFormat) {
-		RGBColor color;
-		pixelFormat.colorToRGB(pixel, color.r, color.g, color.b);
-		return color;
-	}
 	/** Encode this color with @p pixelFormat. */
 	uint32 toPixel(const Graphics::PixelFormat &pixelFormat) const { return pixelFormat.RGBToColor(r, g, b); }
-	/** Return the greatest RGB channel value. */
-	byte getMaxChannel() const { return MAX(r, MAX(g, b)); }
-	/** Return the least RGB channel value. */
-	byte getMinChannel() const { return MIN(r, MIN(g, b)); }
+};
+
+/**
+ * RGB color arithmetic retaining fractional channels in the same 0..255 units as @ref RGBColor.
+ * Intermediate sums may exceed that range; conversion to @ref RGBColor clamps and rounds once.
+ */
+struct RGBColorF32 : public RGBColorBase<float, RGBColorF32> {
+	/** Construct fractional RGB channel values, defaulting to black. */
+	constexpr RGBColorF32(float red = 0.0f, float green = 0.0f, float blue = 0.0f) : RGBColorBase(red, green, blue) {}
+	/** Widen an eight-bit color without normalizing or changing its channel values. */
+	explicit constexpr RGBColorF32(const RGBColor &color) : RGBColorBase(color.r, color.g, color.b) {}
+	/** Clamp channels to [0, 255] and round to the nearest eight-bit values. */
+	RGBColor toRGBColor() const {
+		const RGBColorF32 color = getClamped();
+		// Adding 0.5f rounds each clamped, nonnegative channel before integer conversion.
+		return RGBColor(static_cast<byte>(color.r + 0.5f), static_cast<byte>(color.g + 0.5f), static_cast<byte>(color.b + 0.5f));
+	}
+	/** Clamp and round the channels, then encode a packed pixel with @p pixelFormat. */
+	uint32 toPixel(const Graphics::PixelFormat &pixelFormat) const { return toRGBColor().toPixel(pixelFormat); }
+	/** Add @p color to the corresponding channels, retaining fractional values. */
+	RGBColorF32 &operator+=(const RGBColorF32 &color) {
+		const auto addChannels = [](float channel, float other) { return channel + other; };
+		*this = transformChannels(color, addChannels);
+		return *this;
+	}
+	/** Return the channel-wise difference from @p color, including negative values. */
+	RGBColorF32 operator-(const RGBColorF32 &color) const {
+		const auto subtractChannels = [](float channel, float other) { return channel - other; };
+		return transformChannels(color, subtractChannels);
+	}
+	/** Return each channel multiplied by @p factor, retaining fractional values. */
+	RGBColorF32 operator*(float factor) const {
+		return scale(factor);
+	}
+	/** Return each channel divided by @p divisor, retaining fractional values. */
+	RGBColorF32 operator/(float divisor) const {
+		const auto divideChannel = [divisor](float channel) { return channel / divisor; };
+		return transformChannels(divideChannel);
+	}
+	/** Divide each channel by @p divisor, retaining fractional values. */
+	RGBColorF32 &operator/=(float divisor) {
+		*this = *this / divisor;
+		return *this;
+	}
 };
 
 /**
@@ -206,8 +297,8 @@ enum class ZmbAnimationKind {
 	 */
 	kJumping,
 	/**
-	 * Pick-up sprite grid used while dragging a Zoombini.
-	 * For example, a Zoombini being dragged onto a turtle in CrazyTurtle.
+	 * Pick-up sprite grid used while holding a Zoombini.
+	 * For example, a held Zoombini about to be placed on a turtle in CrazyTurtle.
 	 */
 	kPickup,
 	/**
@@ -243,6 +334,18 @@ public:
 		Common::Point32 end;
 	};
 
+	/** Straight line endpoints retaining fractional pixel coordinates for AA drawing. */
+	struct SubpixelLineSegment {
+		/** First endpoint's horizontal coordinate in pixels, retaining its fractional part. */
+		float startX;
+		/** First endpoint's vertical coordinate in pixels, retaining its fractional part. */
+		float startY;
+		/** Last endpoint's horizontal coordinate in pixels, retaining its fractional part. */
+		float endX;
+		/** Last endpoint's vertical coordinate in pixels, retaining its fractional part. */
+		float endY;
+	};
+
 	/** Sentinel for drawing text without a caller-specified width limit. */
 	static constexpr int kNoMaxWidth = -1;
 
@@ -276,6 +379,8 @@ public:
 	BitBlock *loadSharedBitBlock(const Common::String &key) { return loadBitBlock(_sharedBitBlocks, key); }
 	/** Release cached page bitmaps after all page and dialog users have closed. */
 	void clearPageBitmapCache();
+	/** Return retained graphics payload bytes, excluding container capacity and allocator overhead. */
+	uint64 getCachedDataSize() const;
 	/** Copy the current game screen into @p destSurface. */
 	void captureScreen(ManagedSurface32 *destSurface) const;
 	/** Copy @p srcSurface onto the current game screen. */
@@ -313,10 +418,20 @@ public:
 		if (destSurface)
 			drawBitBlockSubRect(destSurface, loadPageBitBlock(key), pos, srcRect);
 	}
-	/** Decode the active page background into a screen-format surface without retaining a bitmap-cache entry. */
-	bool loadBackground(const Common::String &key);
+	/** Decode the active background, optionally fixing its canvas size, without retaining a bitmap-cache entry. */
+	bool loadBackground(const Common::String &key, const Size32 &canvasSize = Size32());
+	/** Replace the active background with an empty screen-format canvas. */
+	ManagedSurface32 *createBackground(const Size32 &size);
 	/** Release the active page background surface. */
 	void clearBackground();
+	/** Load the active drop mask, replacing it only after a successful decode. */
+	bool loadAreaMask(const Common::Path &path);
+	/** Create the active drop mask from allowed page-space rectangles. */
+	bool createAreaMask(const Size32 &size, const Common::Array<Common::Rect32> &rects);
+	/** Borrow the active mutable drop mask until replacement or page cleanup. */
+	AreaMask *getAreaMask() const { return _areaMask; }
+	/** Release the active drop mask. */
+	void clearAreaMask();
 	/** Return whether a page background is loaded. */
 	bool hasBackground() const { return _backSurface != nullptr; }
 	/** Borrow the active background for page-specific composition until it is replaced or cleared. */
@@ -385,7 +500,7 @@ public:
 	static bool noseColorRGB(ColorAssistMode mode, byte value, RGBColor &color);
 	/** Shift a nose pixel toward the display hue while retaining its value and saturation variation. */
 	static RGBColor recolorNoseGradientRGB(const RGBColor &srcColor, const RGBColor &targetColor);
-	/** Draw one visible runner and its available drop-target glow at the scrolled or dragged anchor without advancing animation. */
+	/** Draw one visible runner and its available drop-target glow at the scrolled or held anchor without advancing animation. */
 	void drawZoombiniRunner(ManagedSurface32 *destSurface, const ZoombiniRunner *runner, const Common::Rect32 *clip = nullptr, int scrollX = 0, int backgroundWidth = 800) const;
 	/** Draw one runner with temporary presentation traits without changing its gameplay traits. */
 	void drawZoombiniRunnerWithTraits(ManagedSurface32 *destSurface, const ZoombiniRunner *runner, const ZmbTrait &presentationTraits,
@@ -395,8 +510,13 @@ public:
 								   const Common::Rect32 *clip = nullptr, int scrollX = 0, int backgroundWidth = 800,
 								   const RleBlock *dropTargetIndicator = nullptr, const ZmbTrait *presentationTraits = nullptr);
 	/** Draw the held Zoombini name plate centered at the bottom of @p destSurface. */
-	void drawDragNameTooltip(ManagedSurface32 *destSurface, const Common::String &name);
-	/** Black out @p destSurface where @p areaMask rejects drops, or everywhere when @p areaMask is nullptr. */
+	void drawZoombiniNameBox(ManagedSurface32 *destSurface, const Common::String &name);
+	/**
+	 * Mask rejected drop areas.
+	 *
+	 * @param[in,out] destSurface Captured screen to shade; base-mask areas retain their colors.
+	 * @param[in] areaMask Drop-acceptance mask, or nullptr to shade the entire surface.
+	 */
 	void maskRejectedArea(ManagedSurface32 *destSurface, const AreaMask *areaMask);
 	/** Fill a clipped rectangle. */
 	void fillRect(ManagedSurface32 *destSurface, const Common::Rect32 &rect, uint32 color) const;
@@ -448,6 +568,12 @@ public:
 	 */
 	void drawLines(ManagedSurface32 *destSurface, const Common::Array<LineSegment> &lines, uint32 color,
 				   int thickness = 1, bool antialias = false) const;
+	/**
+	 * Draw fractional line segments with AA, merging coverage before one composite.
+	 * The square pen's top-left corner follows each segment; null destinations and nonpositive thickness draw nothing.
+	 */
+	void drawLines(ManagedSurface32 *destSurface, const Common::Array<SubpixelLineSegment> &lines, uint32 color,
+				   int thickness = 1) const;
 	/** Evaluate @p curve in five-millisecond steps, optionally integrating subpixel coverage at destination resolution. */
 	void drawCubicBezierCurve(ManagedSurface32 *destSurface, CubicBezierCurve &curve, uint32 color,
 							  int thickness = 1, bool antialias = false) const;
@@ -592,22 +718,6 @@ private:
 	 */
 	static void drawLinesAA(ManagedSurface32 *destSurface, const Common::Array<LineSegment> &lines, uint32 color, int thickness);
 	/**
-	 * Straight line endpoints retaining fractional pixel coordinates for AA drawing.
-	 * A segment captured between two sampled curve positions is called a chord;
-	 * @ref CubicBezierCurve retains the curved path and playback state separately.
-	 */
-	struct SubpixelLineSegment {
-		/** First endpoint's horizontal coordinate in pixels, retaining its fractional part. */
-		float startX;
-		/** First endpoint's vertical coordinate in pixels, retaining its fractional part. */
-		float startY;
-		/** Last endpoint's horizontal coordinate in pixels, retaining its fractional part. */
-		float endX;
-		/** Last endpoint's vertical coordinate in pixels, retaining its fractional part. */
-		float endY;
-	};
-
-	/**
 	 * Return the average height reached by a stroke boundary as it crosses a pixel slice.
 	 * Clamp the linearly varying boundary height to the pixel's [0, 1] range before averaging.
 	 * The caller subtracts the lower boundary's mean from the upper boundary's mean, then
@@ -617,7 +727,7 @@ private:
 	 * @param[in] end Boundary height at the end of the slice, in the same pixel-relative coordinates.
 	 * @return Mean clamped boundary height in [0, 1].
 	 */
-	static float integrateClampedCoverage(float start, float end);
+	static float averageClampedBoundaryHeight(float start, float end);
 	/**
 	 * Merge a straight segment's square-pen pixel areas into the clipped coverage surface.
 	 * Shared by integer lines and sampled curve segments; allocates no surfaces and performs no compositing.
@@ -628,14 +738,14 @@ private:
 	 */
 	static void rasterizeLineAA(Graphics::Surface *coverage, SubpixelLineSegment segment, float thickness);
 	/**
-	 * Merge sampled straight segments into one coverage surface and composite once.
+	 * Merge fractional straight segments into one coverage surface and composite once.
 	 *
 	 * @param[in,out] surface Non-null destination surface receiving the drawing.
 	 * @param[in] lineSegments Captured float endpoints in destination pixels, not curve evaluators or control points.
 	 * @param[in] color Drawing color encoded in the destination pixel format.
 	 * @param[in] thickness Positive square pen size in pixels.
 	 */
-	static void drawCurveLineSegmentsAA(ManagedSurface32 *surface, const Common::Array<SubpixelLineSegment> &lineSegments, uint32 color, int thickness);
+	static void drawSubpixelLinesAA(ManagedSurface32 *surface, const Common::Array<SubpixelLineSegment> &lineSegments, uint32 color, int thickness);
 
 	typedef Common::HashMap<Common::Path, ZoombiniAnimation *, Common::Path::IgnoreCase_Hash, Common::Path::IgnoreCase_EqualTo> ZoombiniAnimationCache;
 
@@ -656,7 +766,7 @@ private:
 		BitBlock *bitmap;
 	};
 	typedef Common::HashMap<Common::String, RleBlock *, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> RleBlockCache;
-	typedef Common::HashMap<Common::String, BitBlock *, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> BitBlockCache;
+	typedef Common::HashMap<Common::String, Common::SharedPtr<BitBlock>, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> BitBlockCache;
 
 	/** Reuse a decoded resource or a cached failed load. */
 	RleBlock *loadRleBlock(RleBlockCache &cache, const Common::String &key);
@@ -690,7 +800,7 @@ private:
 	/** Tiny Zoombini sprite grid used for MapTrans page transitions. */
 	static constexpr const char *kMapTransTinyZoombiniAnimationPath = "bmp/transition1/PitiZomb3.anm";
 
-	/** Name plate sprite shown while dragging a Zoombini. */
+	/** Name plate sprite shown while holding a Zoombini. */
 	static constexpr const char *kNameBoxSpritePath = "bmp/menu/name_box.rb";
 	/** Yellow mask drawn beneath a held Zoombini over an available drop target. */
 	static constexpr const char *kDropTargetGlowPath = "bmp/cursor/glow";
@@ -700,6 +810,8 @@ private:
 	RleBlock *_dropTargetGlowSprite = nullptr;
 	/** Mutable page background retained in the screen pixel format until replacement or page cleanup. */
 	ManagedSurface32 *_backSurface = nullptr;
+	/** Active drop mask retained until replacement or page cleanup. */
+	AreaMask *_areaMask = nullptr;
 	/** RLE sprites released when the page cache is cleared. */
 	RleBlockCache _pageRleBlocks;
 	/** Uncompressed bitmaps released when the page cache is cleared. */
@@ -797,7 +909,7 @@ public:
 	byte scale(byte factor, byte value) const { return _values[factor][value]; }
 	/** Scale each RGB channel by @p factor using the /256 lookup table. */
 	RGBColor scale(byte factor, const RGBColor &color) const {
-		return RGBColor(scale(factor, color.r), scale(factor, color.g), scale(factor, color.b));
+		return color.scale(factor, *this);
 	}
 	/** Scale source and destination channels separately, then add with saturation at 255. */
 	RGBColor blend(const RGBColor &srcColor, const RGBColor &destColor, byte sourceFactor, byte destFactor) const;
@@ -859,7 +971,11 @@ public:
 	bool load(const Common::Path &basePath);
 
 	/** Record cache use of the actual bitmap and optional alpha-mask source files. */
-	void recordPageCacheUse() const;
+	void recordPageCacheUse(bool cacheHit = true) const;
+	/** Return the actual color source selected by the bitmap loader. */
+	const Common::Path &getResourcePath() const { return _resourcePath; }
+	/** Return color and optional alpha buffer bytes. */
+	uint64 getDataSize() const { return static_cast<uint64>(_size.width) * _size.height * (_alphaMap ? 5 : 4); }
 
 	/** Allocate a zeroed bitmap and optionally a fully transparent alpha mask. */
 	void createEmpty(const Size32 &size, bool withAlpha);
@@ -978,6 +1094,8 @@ private:
  */
 class RleBlock : public Common::NonCopyable {
 public:
+	/** Return decoded pixel and span payload bytes. */
+	uint64 getDataSize() const { return static_cast<uint64>(_pixelCount) * 4 + static_cast<uint64>(_spans.size()) * sizeof(Span); }
 	/** Construct an empty RLE frame bound to @p vm. */
 	explicit RleBlock(Zoombini2Engine *vm);
 	/** Release the decoded pixel storage. */
@@ -990,7 +1108,7 @@ public:
 	/** Resolve @p basePath to an RB cache path and load it. */
 	bool load(const Common::Path &basePath);
 	/** Record cache use of the resolved standalone sprite file. */
-	void recordPageCacheUse() const;
+	void recordPageCacheUse(bool cacheHit = true) const;
 	/** Load the recoverable prefix of an ANM frame with a trusted size boundary. */
 	bool loadAnimationFrame(Common::SeekableReadStream *stream, uint32 outerSize);
 
@@ -1028,6 +1146,8 @@ public:
 	int32 getHeight() const { return _size.height; }
 	/** Return whether frame data has been loaded. */
 	bool isValid() const { return _loaded; }
+	/** Sample an unscaled frame pixel as straight RGB and opacity; absent pixels are transparent. */
+	void samplePixel(const Common::Point32 &pos, RGBColor &color, byte &alpha) const;
 
 private:
 	/** Source pixel layout of decoded RLE frame data. */
@@ -1150,35 +1270,55 @@ private:
  *
  * Pixels are packed most-significant bit first, rows are padded to a four-byte
  * boundary, and the sign of the BMP height selects bottom-up or top-down rows.
- * Other indexed BMP variants use the shared bitmap decoder and retain their
- * palette indices as one byte per pixel.
+ * Other indexed BMP variants use the shared bitmap decoder and pack nonzero palette indices.
  *
  * The original tests the packed source byte containing a point rather than an
- * individual bit. The decoder keeps the pixel row and reproduces that byte-wide
- * acceptance rule explicitly.
+ * individual bit. The packed rows retain that byte-wide acceptance rule.
  */
 class AreaMask : public Common::NonCopyable {
 public:
+	/** Return base-mask and additional-mask payload bytes. */
+	uint64 getDataSize() const;
 	/** Construct an empty mask bound to @p vm. */
 	explicit AreaMask(Zoombini2Engine *vm);
 	/** Load a 1-bit BMP mask through the engine resource resolver. */
 	bool loadFromFile(const Common::Path &path);
+	/**
+	 * Build a base mask from allowed page-space rectangles.
+	 * Include only whole eight-pixel groups within each rectangle, except at the mask's right boundary.
+	 */
+	bool createFromRects(const Size32 &size, const Common::Array<Common::Rect32> &rects);
+	/** Replace the additional rectangles using the same byte-group rules, without changing the loaded base mask. */
+	void setAdditionalRects(const Common::Array<Common::Rect32> &rects);
+	/** Remove the additive drop area, restoring the base mask's acceptance exactly. */
+	void clearAdditionalRects() { _additionalPixels.clear(); }
 	/** Return the decoded mask dimensions, or an empty size when unloaded. */
 	Size32 getSize() const { return _size; }
-	/** Return the number of marked pixels in the decoded mask. */
+	/** Return the number of marked base-mask pixels, excluding additive regions. */
 	uint32 countMarkedPixels() const;
-	/** Return whether the source byte containing @p point has any marked bit. */
-	bool hasMarkedByteAt(const Common::Point32 &point) const;
+	/**
+	 * Return whether @p point belongs to an accepted mask byte.
+	 *
+	 * @param[in] point Page-space position to test.
+	 * @param[in] includeAdditional Include additional-mask bytes; false tests only the base mask.
+	 */
+	bool hasMarkedByteAt(const Common::Point32 &point, bool includeAdditional = true) const;
 
 private:
+	/** Packed additional rows with the base mask's layout; empty when no expansion is active. */
+	Common::Array<byte> _additionalPixels;
+	/** Mark accepted byte groups inside @p rects in a packed mask with this mask's dimensions. */
+	void fillRects(Common::Array<byte> &pixels, const Common::Array<Common::Rect32> &rects) const;
 	/** Borrowed engine used to resolve the mask resource. */
 	Zoombini2Engine *_vm;
 	/** Decoded mask width and height in pixels. */
 	Size32 _size = Size32();
-	/** Decoded palette index for each mask pixel in row-major order; zero is unmarked. */
-	Common::Array<byte> _pixels;
+	/** Packed row size, excluding BMP row padding. */
+	uint32 _pitch = 0;
+	/** Top-down, most-significant-bit-first mask rows; each byte covers eight pixels. */
+	Common::Array<byte> _packedPixels;
 
-	/** Decode an uncompressed 1-bit BMP into palette indices, or return false. */
+	/** Decode an uncompressed 1-bit BMP into packed top-down rows, or return false. */
 	bool loadOneBitBitmap(Common::SeekableReadStream &stream, const Common::Path &path);
 };
 
@@ -1208,6 +1348,8 @@ private:
  */
 class ZoombiniAnimation : public Common::NonCopyable {
 public:
+	/** Return the decoded pixel and span payload bytes of all retained frames. */
+	uint64 getDataSize() const;
 	/** Number of movement and animation cells. */
 	static constexpr int kDim0 = 100;
 	/** Number of sprite layers per cell. */
@@ -1225,7 +1367,7 @@ public:
 	/** Load every recoverable grid entry from @p path. */
 	bool loadFromFile(const Common::Path &path);
 	/** Record that the active page reused this grid's ANM resource. */
-	void recordPageCacheUse() const;
+	void recordPageCacheUse(bool cacheHit = true) const;
 	/** Set the frame delay shared by every Zoombini using this grid. */
 	void setFrameDelay(uint32 frameDelay) { _frameDelay = frameDelay; }
 	/** Return the frame delay shared by every Zoombini using this grid. */

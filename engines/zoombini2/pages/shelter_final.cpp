@@ -89,7 +89,7 @@ void ShelterFinal::init() {
 	debug(1, "BooliewoodFinalPage::init");
 	_vm->_state->clearActiveZoombinis();
 
-	if (!_vm->_gfx->loadPageBitBlock(kBackgroundPath)) {
+	if (!_vm->_gfx->loadBackground(kBackgroundPath)) {
 		warning("BooliewoodFinalPage: Failed to load big BOOL background");
 	}
 	if (!_vm->_gfx->loadPageBitBlock(kFullBigBoolPath)) {
@@ -179,7 +179,7 @@ void ShelterFinal::onUpdate() {
 }
 
 void ShelterFinal::onRenderContent(ManagedSurface32 *screen) {
-	_vm->_gfx->drawPageBitBlock(screen, kBackgroundPath, Common::Point32(0, 0));
+	_vm->_gfx->drawBackground(screen, Common::Point32(0, 0));
 	_vm->_gfx->drawPageBitBlock(screen, kFullBigBoolPath, Common::Point32(225, 34));
 
 	const uint32 elapsed = _vm->getTotalPlayTime() - _animationStartTime;

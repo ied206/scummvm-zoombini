@@ -23,6 +23,7 @@
 #define ZOOMBINI2_METAENGINE_H
 
 #include "common/error.h"
+#include "common/rect.h"
 #include "common/str.h"
 
 #include "engines/advancedDetector.h"
@@ -41,6 +42,67 @@ class OptionsContainerWidget;
 class Engine;
 class OSystem;
 
+namespace Zoombini2 {
+
+enum class PageId : int;
+
+/** Immutable detected release identity and its resource/layout selections. */
+class ZmbReleaseInfo {
+public:
+	/** Implementation lineages, keeping the Hebrew rebuild separate from the other v1.0 releases. */
+	enum Family {
+		/** US/Dutch v1.0 and the prerelease US demo. */
+		kBaseV10,
+		/** Hebrew v1.0 rebuild. */
+		kHebrewV10,
+		/** US/Korean/Swedish/Polish v1.1. */
+		kExtendedV11,
+	};
+	/** Bitmap-font character and layout conventions. */
+	enum class BitmapTextLayout {
+		/** Ordinary forward Latin text and positive layout widths. */
+		kLatin,
+		/** Reversed byte traversal and signed Hebrew layout widths. */
+		kHebrew,
+		/** Swedish character slots and layout-width exceptions. */
+		kSwedish,
+	};
+	/** Page-pixel placement of the held Zoombini's name plate and measured text anchor. */
+	struct NameTooltipLayout {
+		/** Top-left position of the name-plate sprite. */
+		Common::Point32 platePosition;
+		/** Text origin before subtracting half the game's signed layout width. */
+		Common::Point32 textAnchor;
+	};
+
+	/** Snapshot the detector's family flags, language and demo status. */
+	explicit ZmbReleaseInfo(const Zoombini2GameDescription &gameDesc);
+	/** Match a release implementation lineage. */
+	bool isFamily(Family family) const;
+	/** Return the detected game language. */
+	Common::Language getLanguage() const { return _language; }
+	/** Return the detector's unchanged feature bits. */
+	uint32 getFeatures() const { return _features; }
+	/** Return whether the detector identifies the playable demo. */
+	bool isDemo() const { return _demo; }
+	/** Select the bitmap-font conventions used by this release. */
+	BitmapTextLayout getBitmapTextLayout() const;
+	/** Select name-plate placement, including the Hebrew text adjustment. */
+	NameTooltipLayout getNameTooltipLayout() const;
+	/** Select the first startup page, including publisher branding and the demo's direct title entry. */
+	PageId getStartupPageId() const;
+
+private:
+	/** Detector feature bits retained for release-family selection. */
+	const uint32 _features;
+	/** Detected language retained for localized resource and layout selection. */
+	const Common::Language _language;
+	/** Whether the detector marked this release as a demo. */
+	const bool _demo;
+};
+
+} // End of namespace Zoombini2
+
 /** Meta-engine settings and factory for the Zoombini2 engine. */
 class Zoombini2MetaEngine : public AdvancedMetaEngine<Zoombini2::Zoombini2GameDescription> {
 public:
@@ -53,7 +115,11 @@ public:
 	/** Target configuration key enabling the enhanced keyboard shortcut set. */
 	static constexpr const char *kConfigEnhancedKbdShortcuts = "enhanced_kbd_shortcuts";
 	/** Target configuration key hiding the stray Fleen departure streaks. */
-	static constexpr const char *kConfigFixFleenDepartStreak = "fix_fleen_depart_streak";
+	static constexpr const char *kConfigWallOfFleensFixDepartStreak = "walloffleens_fix_depart_streak";
+	/** Target configuration key filling narrow gaps between Mystic Marsh cell plates and their grid. */
+	static constexpr const char *kConfigMysticMarshFillCellGaps = "mysticmarsh_fill_cell_gaps";
+	/** Target configuration key enabling Mystic Marsh L1-L3 area-mask expansion. */
+	static constexpr const char *kConfigMysticMarshExpandAreaMask = "mysticmarsh_expand_areamask";
 	/** Target configuration key making solid help-sheet backgrounds transparent. */
 	static constexpr const char *kConfigHelpDialogTransparentBody = "help_dialog_transparent_body";
 	/** Target configuration key enabling optional English Norf clue subtitles. */

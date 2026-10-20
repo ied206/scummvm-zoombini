@@ -52,7 +52,7 @@ public:
 	void onRenderActors(ManagedSurface32 *screen) override;
 	/** Advance Zoombini animation frames after the actor pass. */
 	void onActorsRendered() override;
-	/** Start dragging a Zoombini or arm the valve at @p pos. */
+	/** Start holding a Zoombini or arm the valve at @p pos. */
 	EventHandleResult onLButtonDown(const Common::Point &pos) override;
 	/** Drop the held Zoombini into a compatible slot at @p pos. */
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
@@ -116,7 +116,7 @@ private:
 	static constexpr const char *kValvePath = "bmp/waterslide/mr valve master";
 	/** Cascade animation format; levels below 3 use variant 1, level 3 and higher use variant 2. */
 	static constexpr const char *kCascadeFormat = "bmp/waterslide/pipe - cascade %d";
-	/** Area mask used to constrain Zoombini drag-and-drop hit testing. */
+	/** Area mask used to constrain Zoombini hold-and-drop hit testing. */
 	static constexpr const char *kAreaPath = "bmp/waterslide/area.bmt";
 	/** Sound-effects path format used for the six Waterslide effect identifiers. */
 	static constexpr const char *kSoundFormat = "sounds/fx/%s.wav";

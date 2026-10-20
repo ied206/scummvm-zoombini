@@ -64,7 +64,7 @@ public:
 	void onActorsRendered() override;
 	/** Handle release at @p pos and start a ride when the board receives the rider. */
 	EventHandleResult onLButtonUp(const Common::Point &pos) override;
-	/** Update a dragged Zoombini as the pointer moves to @p pos. */
+	/** Update a held Zoombini as the pointer moves to @p pos. */
 	EventHandleResult onMouseMove(const Common::Point &pos) override;
 	/** Queue the original Go speech before leaving journey mode. */
 	bool onGoButtonPressed() override;
@@ -120,7 +120,7 @@ private:
 		41,
 		44,
 	};
-	/** One-bit mask that limits where a dragged Zoombini can be dropped onto the board. */
+	/** One-bit mask that limits where a held Zoombini can be dropped onto the board. */
 	static constexpr const char *kAreaMaskPath = "bmp/snowboard/AREA.BMT";
 	/** Sound played when the lift board is ready for another rider. */
 	static constexpr const char *kBoardReadySoundPath = "sounds/fx/01-BB02.wav";
@@ -222,7 +222,7 @@ private:
 	};
 	/**
 	 * Retained exit slots for L4, including its offscreen overflow positions.
-	 * This exit points were excavated from the v1.0US demo.
+	 * These exit points were excavated from the Prerelease US Demo.
 	 */
 	static constexpr PathPoint kL4ExitPoints[kL4EndpointCount] = {
 		{21, 341, 7},
@@ -390,7 +390,7 @@ private:
 	int _laneCount = kLaneCount;
 	/** Number of active trait-test nodes for the current difficulty. */
 	int _ruleCount = kRuleCount;
-	/** Board drop region used when a dragged rider is released. */
+	/** Board drop region used when a held rider is released. */
 	Common::Array<ZmbDropTarget> _dropTargets;
 	/** One-shot board cover after the final rider is captured. */
 	Animation *_boardAnim = nullptr;
