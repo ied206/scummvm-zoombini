@@ -72,7 +72,7 @@ public:
 				 const Common::Point32 &position = Common::Point32(-1, -1), const Common::Point32 &textOffset = Common::Point32(17, 17));
 
 	/**
-	 * Queue Unicode UI text drawn with the release language font.
+	 * Queue Unicode UI text drawn with the language's GUI font.
 	 * Callback lifetime and the queued-success result follow @ref DialogMsgBox::request.
 	 */
 	bool requestUiText(const Common::U32String &text, Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &position = Common::Point32(-1, -1));
@@ -117,7 +117,7 @@ private:
 	bool openDialog();
 	/** Release the saved screen pixels for the current request. */
 	void releaseResources();
-	/** Draw the current UI-font text request over the panel. */
+	/** Draw added text directly with the language's GUI font. */
 	void drawUiText(ManagedSurface32 *screen) const;
 	/** Return the dialog button under @p pos. */
 	DialogMsgBoxButton hitTest(const Common::Point &pos) const;
@@ -132,7 +132,7 @@ private:
 	Common::Point32 _textOffset = Common::Point32(17, 17);
 	/** Request-specific text bitmap path. */
 	Common::String _textPath;
-	/** Request-specific text drawn with the release language font. */
+	/** Request-specific text drawn with the language's GUI font. */
 	Common::U32String _uiText;
 	/** Callback deleted after button activation or closure; detached before invocation so it can queue a new request. */
 	Common::BaseCallback<DialogMsgBoxButton> *_callback = nullptr;

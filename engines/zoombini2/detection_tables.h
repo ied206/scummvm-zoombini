@@ -29,7 +29,8 @@ namespace Zoombini2 {
 static constexpr Zoombini2GameDescription gameDescriptions[] = {
 	// Zoombinis: Mountain Rescue
 	// English Windows, v1.0
-	// EXE PE timestamp: 2001-09-09 18:16:56 UTC
+	// Build Date: 2001-09-09 UTC
+	// From Hajin Jang
 	{
 		{
 			"zoombini2",
@@ -45,13 +46,13 @@ static constexpr Zoombini2GameDescription gameDescriptions[] = {
 	},
 	// Zoombinis: Mountain Rescue
 	// Dutch (Belgium and Netherlands) Windows, v1.0
-	// EXE PE timestamp: 2001-09-09 18:16:56 UTC
+	// Build Date: 2001-09-09 UTC
+	// From Hajin Jang
 	{
 		{
 			"zoombini2",
 			"v1.0NL",
-			AD_ENTRY2s("INSTALL/HD/Bmp/Map/background.bb", "cfc9d681ca98b4aa639fdd43a21dce8e", 1440024,
-					   "INSTALL/HD/zoombini2.exe", "f8cf557d5f5075af8d0342b74922fe40", 1639009),
+			AD_ENTRY1s("INSTALL/HD/Bmp/Map/background.bb", "cfc9d681ca98b4aa639fdd43a21dce8e", 1440024),
 			Common::NL_NLD,
 			Common::kPlatformWindows,
 			ADGF_NO_FLAGS,
@@ -61,13 +62,13 @@ static constexpr Zoombini2GameDescription gameDescriptions[] = {
 	},
 	// Zoombinis: Mountain Rescue
 	// Hebrew Windows, v1.0
-	// EXE PE timestamp: 2003-06-23 13:08:03 UTC
+	// Build Date: 2003-06-23 UTC
+	// From Hajin Jang
 	{
 		{
 			"zoombini2",
 			"v1.0HE",
-			AD_ENTRY2s("INSTALL/HD/Bmp/Map/background.bb", "b2b60177a0fdbb315961f86d4ef8d06d", 1440024,
-					   "INSTALL/HD/zoombini2.exe", "b566daeadb2c60a80ba26064860f911c", 815104),
+			AD_ENTRY1s("INSTALL/HD/Bmp/Map/background.bb", "b2b60177a0fdbb315961f86d4ef8d06d", 1440024),
 			Common::HE_ISR,
 			Common::kPlatformWindows,
 			ADGF_NO_FLAGS,
@@ -77,13 +78,14 @@ static constexpr Zoombini2GameDescription gameDescriptions[] = {
 	},
 	// Zoombinis: Mountain Rescue
 	// English Windows, v1.1
-	// EXE PE timestamp: 2001-11-30 18:39:09 UTC
+	// Build Date: 2001-11-30 UTC
+	// From Hajin Jang
 	{
 		{
 			"zoombini2",
 			"v1.1US",
 			AD_ENTRY2s("INSTALL/HD/Bmp/Map/background.bb", "8810734b173c40bac5863997a7196f12", 1440024,
-					   "INSTALL/HD/zoombini2.exe", "df24a5559803c10f03b399b25950ea00", 725073),
+					   "Data/Bmp/Menu/Option - dialogues Normal.rb", "e7d39b38548a648dedd3b72c684e09a7", 81756),
 			Common::EN_USA,
 			Common::kPlatformWindows,
 			ADGF_NO_FLAGS,
@@ -92,14 +94,65 @@ static constexpr Zoombini2GameDescription gameDescriptions[] = {
 		GF_Z2_V11,
 	},
 	// Zoombinis: Mountain Rescue
+	// English Macintosh, v1.1; also the 2003 Adventure Workshop disc.
+	// Build Date: 2001-11-27
+	// From Hajin Jang
+	{
+		{
+			"zoombini2",
+			"v1.1US",
+			AD_ENTRY2s("Data/Bmp/Map/background.bb", "8810734b173c40bac5863997a7196f12", 1440024,
+					   "Zoombinis Mountain Rescue", "r:c4b2f9ca1a9245089ae66f1d77c69794", 3604),
+			Common::EN_USA,
+			Common::kPlatformMacintosh,
+			ADGF_UNSTABLE,
+			GUIO1(GUIO_NOASPECT),
+		},
+		GF_Z2_V11,
+	},
+	// Zoombinis: Mountain Rescue
+	// British English Windows, v1.1 family
+	// Build Date: 2001-11-30 UTC
+	// From Hajin Jang
+	{
+		{
+			"zoombini2",
+			"v1.1UK",
+			AD_ENTRY2s("INSTALL/HD/Bmp/Map/background.bb", "8810734b173c40bac5863997a7196f12", 1440024,
+					   "Data/Sounds/ZBV11.wav", "e4a61e4c288975cd2066bb46e102b0d3", 467420),
+			Common::EN_GRB,
+			Common::kPlatformWindows,
+			ADGF_NO_FLAGS,
+			GUIO1(GUIO_NOASPECT),
+		},
+		GF_Z2_V11,
+	},
+	// Zoombinis: Mountain Rescue
+	// British English Macintosh, v1.1.
+	// Build Date: 2001-11-27
+	// From Hajin Jang
+	{
+		{
+			"zoombini2",
+			"v1.1UK",
+			AD_ENTRY2s("Data/Bmp/Map/background.bb", "8810734b173c40bac5863997a7196f12", 1440024,
+					   "Zoombinis 2", "r:1ac2511b19c9a9079e08f75cf76802a0", 3492),
+			Common::EN_GRB,
+			Common::kPlatformMacintosh,
+			ADGF_UNSTABLE,
+			GUIO1(GUIO_NOASPECT),
+		},
+		GF_Z2_V11,
+	},
+	// Zoombinis: Mountain Rescue
 	// Korean Windows, v1.1, ArisuMedia
-	// EXE PE timestamp: 2002-04-08 06:56:28 UTC
+	// Build Date: 2002-04-08 UTC
+	// From Hajin Jang
 	{
 		{
 			"zoombini2",
 			"v1.1KR",
-			AD_ENTRY2s("INSTALL/HD/Bmp/Map/background.bb", "019d27367ef3cd4fc83ab77ac8c4f217", 1440024,
-					   "INSTALL/HD/zoombini2.exe", "7e2e8636a7d32c5b9a7a0286ed55105e", 708684),
+			AD_ENTRY1s("INSTALL/HD/Bmp/Map/background.bb", "019d27367ef3cd4fc83ab77ac8c4f217", 1440024),
 			Common::KO_KOR,
 			Common::kPlatformWindows,
 			ADGF_NO_FLAGS,
@@ -109,7 +162,8 @@ static constexpr Zoombini2GameDescription gameDescriptions[] = {
 	},
 	// Zoombinis: Mountain Rescue
 	// Swedish Windows, v1.1
-	// EXE PE timestamp: 2001-11-30 18:39:09 UTC
+	// Build Date: 2001-11-30 UTC
+	// From Hajin Jang
 	{
 		{
 			"zoombini2",
@@ -125,13 +179,13 @@ static constexpr Zoombini2GameDescription gameDescriptions[] = {
 	},
 	// Zoombinis: Mountain Rescue
 	// Polish Windows, v1.1
-	// EXE PE timestamp: 2001-11-30 18:39:09 UTC
+	// Build Date: 2001-11-30 UTC
+	// From Hajin Jang
 	{
 		{
 			"zoombini2",
 			"v1.1PL",
-			AD_ENTRY2s("Bmp/Map/background.bb", "b58e398807cd459d563cb6338c3fa32b", 1440024,
-					   "zoombini2.exe", "e7267a51d0edd95718ce9a849dd21e63", 729169),
+			AD_ENTRY1s("Bmp/Map/background.bb", "b58e398807cd459d563cb6338c3fa32b", 1440024),
 			Common::PL_POL,
 			Common::kPlatformWindows,
 			ADGF_NO_FLAGS,
@@ -142,13 +196,13 @@ static constexpr Zoombini2GameDescription gameDescriptions[] = {
 	// Zoombinis: Mountain Rescue
 	// English Windows, Prerelease US Demo
 	// Uses flat 'Bmp/' layout, unlike final releases.
-	// EXE PE timestamp: 2001-07-30 13:25:47 UTC
+	// Build Date: 2001-07-30 UTC
+	// From Hajin Jang
 	{
 		{
 			"zoombini2",
 			"Prerelease US Demo",
-			AD_ENTRY2s("Bmp/typo.bmt", "ee5870b87a6015bd3b055d07c114fa06", 78056,
-					   "zoombini2.exe", "1aa039f72c4fa25d911cbfc4a96a1aa3", 946176),
+			AD_ENTRY1s("Bmp/story_intro/title_screen.bb", "e82d7fb66bce4e2fc811cac72322e925", 1440024),
 			Common::EN_USA,
 			Common::kPlatformWindows,
 			ADGF_DEMO,

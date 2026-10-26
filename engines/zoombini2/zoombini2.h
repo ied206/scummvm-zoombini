@@ -202,7 +202,7 @@ public:
 	bool allowCutL4PracticePuzzles() const { return _allowCutL4PracticePuzzles; }
 	/**
 	 * Return the reference rate used to convert frame-derived motion and random-event quotas to elapsed-time updates.
-	 * This covers Booliewood scrolling, Aqua Cube bubble spawning, and banked idle or celebration rolls.
+	 * This covers Booliewood scrolling, Aqua Cube bubble spawning, and banked fidget or celebration rolls.
 	 * Presentation FPS and millisecond-deadline animations are independent of this rate.
 	 */
 	int getLogicPacingHz() const;

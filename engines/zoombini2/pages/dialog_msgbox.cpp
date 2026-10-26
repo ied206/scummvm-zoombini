@@ -138,13 +138,15 @@ void DialogMsgBox::drawUiText(ManagedSurface32 *screen) const {
 	if (lineHeight <= 0)
 		return;
 
+	const int panelX = _position.x + kUiTextMarginX;
+	const int panelY = _position.y + kUiTextOffsetY;
+
 	Common::Array<Common::U32String> lines;
 	_vm->_gfx->wordWrapText(_uiText, kUiTextWidth, lines, conf);
 	const int maxLines = kUiTextHeight / lineHeight;
 	for (uint i = 0; i < lines.size() && static_cast<int>(i) < maxLines; i++) {
-		const int x = _position.x + kUiTextMarginX;
-		const int y = _position.y + kUiTextOffsetY + static_cast<int>(i) * lineHeight;
-		_vm->_gfx->drawString(screen, lines[i], Common::Point32(x, y), kUiTextWidth, conf);
+		const int y = panelY + static_cast<int>(i) * lineHeight;
+		_vm->_gfx->drawString(screen, lines[i], Common::Point32(panelX, y), kUiTextWidth, conf);
 	}
 }
 

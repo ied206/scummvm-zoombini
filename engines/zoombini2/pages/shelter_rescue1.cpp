@@ -140,7 +140,7 @@ void ShelterRescueSite1::refillBoardingRoster() {
 		zoombini->setCanAdvanceFromPage(false);
 		zoombini->setInputEnabled(true);
 		zoombini->setHeld(false);
-		zoombini->setIdleAnimationEnabled(true);
+		zoombini->setFidgetAnimationEnabled(true);
 		zoombini->setHidden(false);
 		zoombini->setDefaultAnimation(ZmbAnimationKind::kBasic, 33);
 		if (i < kDepartureSeatCount) {
@@ -403,7 +403,6 @@ void ShelterRescueSite1::drawBoardingActives(ManagedSurface32 *screen) const {
 		ZoombiniRunner *zoombini = _vm->_state->_activeZoombinis[order[i]];
 		if (zoombini->isHidden())
 			continue;
-		zoombini->tryStartIdleAnimation(ZmbAnimationKind::kFidget, *_vm->_rnd, _vm->getTotalPlayTime(), _vm->getFrameDeltaMs(), _vm->getLogicPacingHz());
 		_vm->_gfx->drawZoombiniRunner(screen, zoombini);
 		zoombini->advanceAnimationAfterDraw();
 	}

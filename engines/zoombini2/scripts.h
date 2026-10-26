@@ -721,10 +721,10 @@ public:
 	void setSavedAnimation(const ZoombiniAnimation *animation) { _savedAnimation = animation; }
 	/** Select the common grid restored when the current animation ends. */
 	void setSavedAnimation(ZmbAnimationKind animKind) { setSavedAnimation(getCommonAnimation(animKind)); }
-	/** Return whether the common renderer may start an ambient idle animation. */
-	bool isIdleAnimationEnabled() const { return _idleAnimationEnabled; }
-	/** Select whether the common renderer may start an ambient idle animation. */
-	void setIdleAnimationEnabled(bool enabled) { _idleAnimationEnabled = enabled; }
+	/** Return whether the common renderer may start a fidget animation. */
+	bool isFidgetAnimationEnabled() const { return _fidgetAnimationEnabled; }
+	/** Select whether the common renderer may start a fidget animation. */
+	void setFidgetAnimationEnabled(bool enabled) { _fidgetAnimationEnabled = enabled; }
 	/** Return whether the current animation selects a nonzero frame. */
 	bool isAnimationActive() const { return _animationActive; }
 	/** Return the cell selected from the active Zoombini animation grid. */
@@ -784,11 +784,11 @@ public:
 	void stopAnimationOnCompletion() { _stopAnimationOnCompletion = true; }
 	/** Start a direction-tracked animation on the current grid. */
 	void startDirectionTrackedAnimation(uint32 tickCount);
-	/** Bank quota from @p elapsedMs and @p pacingHz, then run the original one-in-250 idle rolls owed. */
-	bool tryStartIdleAnimation(const ZoombiniAnimation *animation, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz);
-	/** Apply the idle roll to a previously loaded common grid. */
-	bool tryStartIdleAnimation(ZmbAnimationKind animKind, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz) {
-		return tryStartIdleAnimation(getCommonAnimation(animKind), randomSrc, tickCount, elapsedMs, pacingHz);
+	/** Bank quota from @p elapsedMs and @p pacingHz, then run the original one-in-250 fidget rolls owed. */
+	bool tryStartFidgetAnimation(const ZoombiniAnimation *animation, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz);
+	/** Apply the fidget roll to a previously loaded common grid. */
+	bool tryStartFidgetAnimation(ZmbAnimationKind animKind, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz) {
+		return tryStartFidgetAnimation(getCommonAnimation(animKind), randomSrc, tickCount, elapsedMs, pacingHz);
 	}
 	/** Bank quota from @p elapsedMs and @p pacingHz, then run the original one-in-20 celebrate rolls owed. */
 	bool tryStartCelebrationAnimation(const ZoombiniAnimation *animation, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz);
@@ -800,7 +800,7 @@ public:
 	void resetAnimation();
 	/** Schedule a due frame advance while preserving the frame drawn by the current render pass. */
 	void updateAnimation(uint32 tickCount);
-	/** Apply a scheduled frame transition immediately after the current frame has been drawn. */
+	/** Roll an eligible fidget animation, then apply a scheduled frame transition after drawing. */
 	void advanceAnimationAfterDraw();
 	/** Return whether @p point lies inside the original fixed Zoombini pickup rectangle. */
 	bool hitTest(const Common::Point32 &point) const;
@@ -859,10 +859,10 @@ private:
 	const ZoombiniAnimation *_activeAnimation = nullptr;
 	/** Borrowed sprite grid restored when the current animation ends. */
 	const ZoombiniAnimation *_savedAnimation = nullptr;
-	/** Whether the common renderer may start an ambient idle animation. */
-	bool _idleAnimationEnabled = true;
-	/** Banked idle-roll quota; the original one-in-250 roll runs once per 1000 banked units. */
-	int64 _idleRollQuota = 0;
+	/** Whether the common renderer may start a fidget animation. */
+	bool _fidgetAnimationEnabled = true;
+	/** Banked fidget-roll quota; the original one-in-250 roll runs once per 1000 banked units. */
+	int64 _fidgetRollQuota = 0;
 	/** Banked celebrate-roll quota; the original one-in-20 roll runs once per 1000 banked units. */
 	int64 _celebrateRollQuota = 0;
 	/** Gameplay tick at which the next animation frame becomes due. */

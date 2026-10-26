@@ -55,6 +55,60 @@ constexpr uint32 Zoombini2SaveManagementDialog::kSavefileSelectionChangedCommand
 constexpr uint32 Zoombini2OptionsWidget::kManageSavefilesCommand;
 constexpr uint32 Zoombini2OptionsWidget::kUnlockFrameRateCommand;
 
+class Zoombini2SaveManagementDialog::SavefileListWidget : public GUI::ScrollContainerWidget {
+public:
+	/** Construct a save list that describes corrupted rows on hover. */
+	SavefileListWidget(GUI::GuiObject *boss, int x, int y, int w, int h)
+		: GUI::ScrollContainerWidget(boss, x, y, w, h) {
+		setFlags(GUI::WIDGET_DYN_TOOLTIP);
+	}
+
+	/** Associate a row's current position and full height with its validation state. */
+	void setRowState(uint row, GUI::Widget *widget, int height, bool corrupted) {
+		if (_rows.size() <= row)
+			_rows.resize(row + 1);
+
+		_rows[row]._widget = widget;
+		_rows[row]._height = height;
+		_rows[row]._corrupted = corrupted;
+	}
+
+	/** Show corruption guidance when hovering over any part of a damaged row. */
+	void handleTooltipUpdate(int x, int y) override {
+		(void)x;
+		setTooltip(Common::U32String());
+
+		// Compare absolute positions so hit testing follows the scrolled rows.
+		const int absY = getAbsY() + y;
+		for (uint i = 0; i < _rows.size(); i++) {
+			const RowState &row = _rows[i];
+			if (!row._widget || !row._widget->isVisible())
+				continue;
+
+			const int rowTop = row._widget->getAbsY();
+			if (rowTop <= absY && absY < rowTop + row._height) {
+				if (row._corrupted)
+					setTooltip(_("Corrupted save"));
+				return;
+			}
+		}
+	}
+
+private:
+	/** Visible row geometry and whether its savefile could be parsed. */
+	struct RowState {
+		/** First cell, whose position follows scrolling and layout changes. */
+		GUI::Widget *_widget = nullptr;
+		/** Full row height, including statistics on a second line. */
+		int _height = 0;
+		/** Whether the row represents an invalid savefile. */
+		bool _corrupted = false;
+	};
+
+	/** Row references refreshed when the table is laid out. */
+	Common::Array<RowState> _rows;
+};
+
 class Zoombini2OptionsWidget::SeparatorWidget : public GUI::Widget {
 public:
 	/** Construct a themed horizontal separator in the supplied GUI container. */
@@ -131,18 +185,22 @@ void Zoombini2MenuDialog::handleCommand(GUI::CommandSender *sender, uint32 cmd, 
 }
 
 Zoombini2SavefileNameDialog::Zoombini2SavefileNameDialog(const Common::U32String &title, const Common::U32String &initialName, Common::Language language)
-	: GUI::Dialog(0, 0, 360, 144) {
-	new GUI::StaticTextWidget(this, 12, 10, 336, 24, title, Graphics::kTextAlignStart);
-	Common::U32String nameHint;
+	: GUI::Dialog(0, 0, 1, 1) {
+	_title = new GUI::StaticTextWidget(this, 0, 0, 1, 1, title, Graphics::kTextAlignStart);
+
 	if (language == Common::HE_ISR)
-		nameHint = _("1-16 letters or spaces; , . ; also allowed");
+		_nameHint = _("1-16 letters or spaces; , . ; also allowed");
 	else
-		nameHint = _("Use 1 to 16 letters, digits, or spaces");
-	new GUI::StaticTextWidget(this, 12, 38, 336, 20, false, nameHint, Graphics::kTextAlignStart,
-							  Common::U32String(), GUI::ThemeEngine::kFontStyleNormal, Common::UNK_LANG, false);
-	_edit = new GUI::EditTextWidget(this, 12, 62, 336, 28, false, initialName);
-	new GUI::ButtonWidget(this, 12, 104, 150, 28, false, _("OK"), Common::U32String(), GUI::kOKCmd);
-	new GUI::ButtonWidget(this, 198, 104, 150, 28, false, _("Cancel"), Common::U32String(), GUI::kCloseCmd);
+		_nameHint = _("Use 1 to 16 letters, digits, or spaces");
+
+	// Defer sizing until the current theme and available overlay area are known.
+	_descriptionScroller = new GUI::ScrollContainerWidget(this, 0, 0, 1, 1);
+	_descriptionScroller->setBackgroundType(GUI::ThemeEngine::kWidgetBackgroundNo);
+
+	_edit = new GUI::EditTextWidget(this, 0, 0, 1, 1, false, initialName);
+
+	_okButton = new GUI::ButtonWidget(this, 0, 0, 1, 1, _("OK"), Common::U32String(), GUI::kOKCmd);
+	_cancelButton = new GUI::ButtonWidget(this, 0, 0, 1, 1, _("Cancel"), Common::U32String(), GUI::kCloseCmd);
 }
 
 Common::U32String Zoombini2SavefileNameDialog::getSavefileName() const {
@@ -150,9 +208,78 @@ Common::U32String Zoombini2SavefileNameDialog::getSavefileName() const {
 }
 
 void Zoombini2SavefileNameDialog::reflowLayout() {
-	const Size32 screenSize(g_system->getOverlayWidth(), g_system->getOverlayHeight());
-	_x = MAX<int>(0, (screenSize.width - _w) / 2);
-	_y = MAX<int>(0, (screenSize.height - _h) / 2);
+	// Measure spacing and control heights using the current GUI scale and theme.
+	const Common::Rect safeArea = g_system->getSafeOverlayArea();
+	const float scale = g_gui.getScaleFactor();
+	const int outerMargin = MAX(1, static_cast<int>(4 * scale));
+	const int margin = MAX(4, static_cast<int>(8 * scale));
+	const int gap = MAX(2, static_cast<int>(4 * scale));
+
+	const Graphics::Font &font = g_gui.getFont(GUI::ThemeEngine::kFontStyleNormal);
+	const int lineHeight = font.getFontHeight() + MAX(1, static_cast<int>(2 * scale));
+	const int titleHeight = g_gui.getFontHeight();
+	const int buttonHeight = MAX(g_gui.xmlEval()->getVar("Globals.Button.Height", 0), titleHeight + static_cast<int>(6 * scale));
+	const int inputHeight = MAX(buttonHeight, font.getFontHeight() + static_cast<int>(8 * scale));
+	const int scrollbarWidth = g_gui.xmlEval()->getVar("Globals.Scrollbar.Width", static_cast<int>(9 * scale));
+
+	// Wrap the hint at the available width, reserving room for the scrollbar.
+	_w = MIN<int>(safeArea.width() - 2 * outerMargin, static_cast<int>(360 * scale));
+	const int contentWidth = _w - 2 * margin;
+	const int descriptionWidth = contentWidth - scrollbarWidth;
+	Common::Array<Common::U32String> lines;
+	font.wordWrapText(_nameHint, descriptionWidth, lines);
+
+	// Size the dialog for the wrapped hint, capped by the safe overlay area.
+	const int scrollPadding = g_gui.xmlEval()->getVar("Globals.Font.Height", font.getFontHeight());
+	const int fixedHeight = 2 * margin + titleHeight + 3 * gap + inputHeight + buttonHeight;
+	_h = MIN<int>(safeArea.height() - 2 * outerMargin, fixedHeight + lines.size() * lineHeight + 2 * scrollPadding);
+	_x = safeArea.left + (safeArea.width() - _w) / 2;
+	_y = safeArea.top + (safeArea.height() - _h) / 2;
+
+	_title->setPos(margin, margin);
+	_title->setSize(contentWidth, titleHeight);
+	_title->setTooltip(_title->getLabel());
+
+	// Anchor the input and buttons at the bottom; the hint uses the remaining height.
+	const int footerY = _h - margin - buttonHeight;
+	const int inputY = footerY - gap - inputHeight;
+	const int descriptionY = margin + titleHeight + gap;
+	_descriptionScroller->setPos(margin, descriptionY);
+	_descriptionScroller->setSize(descriptionWidth, MAX(1, inputY - gap - descriptionY));
+
+	// Reuse line widgets across reflows and hide any lines no longer needed.
+	while (_descLines.size() < lines.size()) {
+		GUI::StaticTextWidget *line = new GUI::StaticTextWidget(_descriptionScroller, 0, 0, 1, 1, Common::U32String(), Graphics::kTextAlignStart,
+																Common::U32String(), GUI::ThemeEngine::kFontStyleNormal);
+		_descLines.push_back(line);
+	}
+
+	for (uint i = 0; i < _descLines.size(); i++) {
+		const bool visible = i < lines.size();
+		_descLines[i]->setVisible(visible);
+		if (visible) {
+			_descLines[i]->setPos(0, i * lineHeight);
+			_descLines[i]->setSize(descriptionWidth, lineHeight);
+			_descLines[i]->setLabel(lines[i]);
+		}
+	}
+
+	_edit->setPos(margin, inputY);
+	_edit->setSize(contentWidth, inputHeight);
+
+	// Center equal-width buttons sized for their labels, within the dialog width.
+	int buttonWidth = MAX(g_gui.getStringWidth(_okButton->getLabel()), g_gui.getStringWidth(_cancelButton->getLabel()));
+	buttonWidth += 2 * margin;
+	buttonWidth = MAX(buttonWidth, g_gui.xmlEval()->getVar("Globals.Button.Width", 0));
+	buttonWidth = MIN(buttonWidth, (contentWidth - gap) / 2);
+	const int buttonX = margin + (contentWidth - 2 * buttonWidth - gap) / 2;
+	_okButton->setPos(buttonX, footerY);
+	_okButton->setSize(buttonWidth, buttonHeight);
+	_okButton->setTooltip(_okButton->getLabel());
+	_cancelButton->setPos(buttonX + buttonWidth + gap, footerY);
+	_cancelButton->setSize(buttonWidth, buttonHeight);
+	_cancelButton->setTooltip(_cancelButton->getLabel());
+
 	GUI::Dialog::reflowLayout();
 }
 
@@ -180,14 +307,14 @@ Zoombini2SaveManagementDialog::Zoombini2SaveManagementDialog(const Common::Strin
 		_language = vm->getLanguage();
 	}
 
-	new GUI::StaticTextWidget(this, kDialogMargin, 8, kTableWidth, 24, true, _("Manage saved games"), Graphics::kTextAlignStart);
+	_description = new GUI::StaticTextWidget(this, kDialogMargin, 8, kTableWidth, 24, true, _("Manage saved games"), Graphics::kTextAlignStart);
 
 	static constexpr int kActionButtonGap = 6;
 	static constexpr int kActionButtonCount = 5;
 	static constexpr int kActionButtonWidth = (kTableWidth - (kActionButtonCount - 1) * kActionButtonGap) / kActionButtonCount;
 	int actionX = kDialogMargin;
 	_editButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kActionButtonWidth, kButtonHeight, true, _("Rename"),
-										_("Return to the launcher before renaming the active saved game."), kEditSavefileCommand);
+										Common::U32String(), kEditSavefileCommand);
 	actionX += kActionButtonWidth + kActionButtonGap;
 	_duplicateButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kActionButtonWidth, kButtonHeight, true, _("Clone"),
 											 Common::U32String(), kDuplicateSavefileCommand);
@@ -199,25 +326,25 @@ Zoombini2SaveManagementDialog::Zoombini2SaveManagementDialog(const Common::Strin
 										  Common::U32String(), kExportSavefileCommand);
 	actionX += kActionButtonWidth + kActionButtonGap;
 	_deleteButton = new GUI::ButtonWidget(this, actionX, kActionButtonsTop, kTableWidth - actionX + kDialogMargin, kButtonHeight, true,
-										  _("Delete"), _("Return to the launcher before deleting the active saved game."),
+										  _("Delete"), Common::U32String(),
 										  kDeleteSavefileCommand);
 
-	GUI::ContainerWidget *savefileHeader = new GUI::ContainerWidget(this, kDialogMargin, kHeaderTop, kTableWidth, kTableRowHeight, true);
-	savefileHeader->setBackgroundType(GUI::ThemeEngine::kWidgetBackgroundNo);
-	new GUI::StaticTextWidget(savefileHeader, kNameX, 0, kNameWidth, kTableRowHeight, true, _("Name"), Graphics::kTextAlignCenter);
+	_savefileHeader = new GUI::ContainerWidget(this, kDialogMargin, kHeaderTop, kTableWidth, kTableRowHeight, true);
+	_savefileHeader->setBackgroundType(GUI::ThemeEngine::kWidgetBackgroundNo);
+	_savefileColumnLabels[0] = new GUI::StaticTextWidget(_savefileHeader, kNameX, 0, kNameWidth, kTableRowHeight, true, _("Name"), Graphics::kTextAlignCenter);
 	// I18N: Name of the Zoombini settlement.
-	new GUI::StaticTextWidget(savefileHeader, kZombinivilleX, 0, kZombinivilleWidth, kTableRowHeight, true, _("Zombiniville"),
-							  Graphics::kTextAlignCenter);
-	new GUI::StaticTextWidget(savefileHeader, kRescue1X, 0, kRescueWidth, kTableRowHeight, true, _("Rescue I"), Graphics::kTextAlignCenter);
-	new GUI::StaticTextWidget(savefileHeader, kRescue2X, 0, kRescueWidth, kTableRowHeight, true, _("Rescue II"), Graphics::kTextAlignCenter);
+	_savefileColumnLabels[1] = new GUI::StaticTextWidget(_savefileHeader, kZombinivilleX, 0, kZombinivilleWidth, kTableRowHeight, true, _("Zombiniville"),
+														 Graphics::kTextAlignCenter);
+	_savefileColumnLabels[2] = new GUI::StaticTextWidget(_savefileHeader, kRescue1X, 0, kRescueWidth, kTableRowHeight, true, _("Rescue I"), Graphics::kTextAlignCenter);
+	_savefileColumnLabels[3] = new GUI::StaticTextWidget(_savefileHeader, kRescue2X, 0, kRescueWidth, kTableRowHeight, true, _("Rescue II"), Graphics::kTextAlignCenter);
 	// I18N: Name of the Boolie shelter.
-	new GUI::StaticTextWidget(savefileHeader, kBooliewoodX, 0, kBooliewoodWidth, kTableRowHeight, true, _("Booliewood"),
-							  Graphics::kTextAlignCenter);
-	new GUI::StaticTextWidget(savefileHeader, kActivePartyX, 0, kActivePartyWidth, kTableRowHeight, true, _("Active"),
-							  Graphics::kTextAlignCenter);
+	_savefileColumnLabels[4] = new GUI::StaticTextWidget(_savefileHeader, kBooliewoodX, 0, kBooliewoodWidth, kTableRowHeight, true, _("Booliewood"),
+														 Graphics::kTextAlignCenter);
+	_savefileColumnLabels[5] = new GUI::StaticTextWidget(_savefileHeader, kActivePartyX, 0, kActivePartyWidth, kTableRowHeight, true, _("Active"),
+														 Graphics::kTextAlignCenter);
 
-	_savefileList = new GUI::ScrollContainerWidget(this, scaleDialogValue(kDialogMargin), scaleDialogValue(kListTop), scaleDialogValue(kTableWidth),
-												   scaleDialogValue(kListHeight));
+	_savefileList = new SavefileListWidget(this, scaleDialogValue(kDialogMargin), scaleDialogValue(kListTop), scaleDialogValue(kTableWidth),
+										   scaleDialogValue(kListHeight));
 	_savefileTable = new GUI::ContainerWidget(_savefileList, 0, 0, kTableWidth, 0, true);
 	const int fontHeight = MAX<int>(1, static_cast<int>(g_gui.getFontHeight() / g_gui.getScaleFactor()));
 	const int selectionHeight = MIN<int>(kTableRowHeight, fontHeight);
@@ -240,8 +367,8 @@ Zoombini2SaveManagementDialog::Zoombini2SaveManagementDialog(const Common::Strin
 														  Graphics::kTextAlignCenter, Common::U32String(), GUI::ThemeEngine::kFontStyleNormal);
 	}
 
-	new GUI::ButtonWidget(this, kDialogMargin + (kTableWidth - 120) / 2, kBottomButtonsTop, 120, kButtonHeight, true, _("Close"),
-						  Common::U32String(), GUI::kCloseCmd, Common::ASCII_ESCAPE);
+	_closeButton = new GUI::ButtonWidget(this, kDialogMargin + (kTableWidth - 120) / 2, kBottomButtonsTop, 120, kButtonHeight, true, _("Close"),
+										 Common::U32String(), GUI::kCloseCmd, Common::ASCII_ESCAPE);
 }
 
 void Zoombini2SaveManagementDialog::open() {
@@ -252,13 +379,78 @@ void Zoombini2SaveManagementDialog::open() {
 }
 
 void Zoombini2SaveManagementDialog::reflowLayout() {
-	const int scrollbarWidth = g_gui.xmlEval()->getVar("Globals.Scrollbar.Width", 16);
-	const Size32 dialogSize(scaleDialogValue(kTableWidth + 2 * kDialogMargin) + scrollbarWidth, scaleDialogValue(kDialogHeight));
-	const Size32 screenSize(g_system->getOverlayWidth(), g_system->getOverlayHeight());
-	_x = MAX<int>(0, (screenSize.width - dialogSize.width) / 2);
-	_y = MAX<int>(0, (screenSize.height - dialogSize.height) / 2);
-	_w = dialogSize.width;
-	_h = dialogSize.height;
+	// Reduce spacing on short overlays to leave more room for the save list.
+	const Common::Rect safeArea = g_system->getSafeOverlayArea();
+	const int outerMargin = MAX<int>(1, scaleDialogValue(4));
+	int margin = MAX<int>(2, scaleDialogValue(6));
+	int gap = MAX<int>(1, scaleDialogValue(4));
+	int padding = MAX<int>(2, scaleDialogValue(6));
+	if (safeArea.height() < scaleDialogValue(280)) {
+		margin = MAX<int>(2, scaleDialogValue(4));
+		gap = MAX<int>(1, scaleDialogValue(2));
+		padding = MAX<int>(2, scaleDialogValue(4));
+	}
+
+	const int scrollbarWidth = g_gui.xmlEval()->getVar("Globals.Scrollbar.Width", scaleDialogValue(9));
+	const int fontHeight = MAX(g_gui.getFontHeight(), g_gui.getFontHeight(GUI::ThemeEngine::kFontStyleNormal));
+	const int lineHeight = fontHeight + gap;
+	const int buttonHeight = MAX(g_gui.xmlEval()->getVar("Globals.Button.Height", 0), fontHeight + padding);
+
+	// Fit and center the dialog, reserving scrollbar space beside the table.
+	_w = MIN<int>(safeArea.width() - 2 * outerMargin, scaleDialogValue(kTableWidth + 2 * kDialogMargin) + scrollbarWidth);
+	_h = MIN<int>(safeArea.height() - 2 * outerMargin, scaleDialogValue(kDialogHeight));
+	_x = safeArea.left + (safeArea.width() - _w) / 2;
+	_y = safeArea.top + (safeArea.height() - _h) / 2;
+	const int contentWidth = _w - 2 * margin;
+	const int tableWidth = contentWidth - scrollbarWidth;
+
+	_description->setPos(margin, margin);
+	_description->setSize(contentWidth, lineHeight);
+	_description->setTooltip(_description->getLabel());
+
+	// Size actions from their translated labels and wrap them onto another row as needed.
+	GUI::ButtonWidget *const actions[] = {
+		_editButton,
+		_duplicateButton,
+		_importButton,
+		_exportButton,
+		_deleteButton,
+	};
+	int actionX = margin;
+	int actionY = margin + lineHeight + gap;
+	const int maximumButtonWidth = (contentWidth - 3 * gap) / 4;
+	for (uint i = 0; i < ARRAYSIZE(actions); i++) {
+		GUI::ButtonWidget *button = actions[i];
+		int width = MAX(g_gui.getStringWidth(button->getLabel()) + 2 * padding, scaleDialogValue(22));
+		width = MIN(width, maximumButtonWidth);
+		if (margin < actionX && margin + contentWidth < actionX + width) {
+			actionX = margin;
+			actionY += buttonHeight + gap;
+		}
+
+		button->setPos(actionX, actionY);
+		button->setSize(width, buttonHeight);
+		actionX += width + gap;
+	}
+
+	// Place the table header below the final action row.
+	updateSavefileTableLayout(tableWidth, lineHeight, padding);
+	const int headerY = actionY + buttonHeight + gap;
+	_savefileHeader->setPos(margin, headerY);
+
+	// Anchor Close at the bottom and give the list all space above it.
+	const int footerY = _h - margin - buttonHeight;
+	int closeWidth = g_gui.getStringWidth(_closeButton->getLabel()) + 2 * padding;
+	closeWidth = MAX(closeWidth, g_gui.xmlEval()->getVar("Globals.Button.Width", 0));
+	closeWidth = MIN(closeWidth, contentWidth);
+	_closeButton->setPos(margin + (contentWidth - closeWidth) / 2, footerY);
+	_closeButton->setSize(closeWidth, buttonHeight);
+	_closeButton->setTooltip(_closeButton->getLabel());
+
+	const int listY = headerY + _savefileHeader->getHeight();
+	_savefileList->setPos(margin, listY);
+	_savefileList->setSize(tableWidth, MAX(1, footerY - gap - listY));
+
 	GUI::Dialog::reflowLayout();
 }
 
@@ -328,12 +520,92 @@ void Zoombini2SaveManagementDialog::refreshSavefiles(const Common::String &selec
 	}
 
 	_savefileSelectionGroup.setValue(_selectedSavefileIndex);
-	updateSavefileTableLayout();
+	reflowLayout();
 	updateButtons();
 }
 
-void Zoombini2SaveManagementDialog::updateSavefileTableLayout() {
-	_savefileTable->setSize(scaleDialogValue(kTableWidth), scaleDialogValue(_savefileRowCount * kTableRowHeight));
+void Zoombini2SaveManagementDialog::updateSavefileTableLayout(int tableWidth, int lineHeight, int padding) {
+	// Measure each column from its heading and expected count width.
+	const Graphics::Font &font = g_gui.getFont(GUI::ThemeEngine::kFontStyleNormal);
+	const int selectionWidth = font.getFontHeight() + padding;
+	int widths[6] = {
+		scaleDialogValue(64),
+		font.getStringWidth(Common::U32String(U"999")),
+		font.getStringWidth(Common::U32String(U"999")),
+		font.getStringWidth(Common::U32String(U"999")),
+		font.getStringWidth(Common::U32String(U"999")),
+		font.getStringWidth(Common::U32String(U"99")),
+	};
+
+	int requiredWidth = selectionWidth;
+	for (uint i = 0; i < ARRAYSIZE(widths); i++) {
+		widths[i] = MAX(widths[i], g_gui.getStringWidth(_savefileColumnLabels[i]->getLabel())) + padding;
+		requiredWidth += widths[i];
+	}
+
+	// Keep counts beside the name when they fit; otherwise move them below it.
+	const bool stacked = tableWidth < requiredWidth;
+	int fixedWidth = selectionWidth;
+	if (!stacked) {
+		for (uint i = 1; i < ARRAYSIZE(widths); i++)
+			fixedWidth += widths[i];
+	}
+	widths[0] = MAX(1, tableWidth - fixedWidth);
+
+	int columnX[6] = {};
+	int columnY[6] = {};
+	int x = selectionWidth;
+	for (uint i = 0; i < ARRAYSIZE(widths); i++) {
+		if (stacked && 1 <= i) {
+			// Divide the second line evenly, including any pixel-rounding remainder.
+			const int statsWidth = tableWidth - selectionWidth;
+			const int statIndex = i - 1;
+			const int statCount = ARRAYSIZE(widths) - 1;
+			columnX[i] = selectionWidth + statsWidth * statIndex / statCount;
+			columnY[i] = lineHeight;
+			widths[i] = statsWidth * (statIndex + 1) / statCount - statsWidth * statIndex / statCount;
+		} else {
+			columnX[i] = x;
+			x += widths[i];
+		}
+
+		_savefileColumnLabels[i]->setPos(columnX[i], columnY[i]);
+		_savefileColumnLabels[i]->setSize(widths[i], lineHeight);
+		_savefileColumnLabels[i]->setTooltip(_savefileColumnLabels[i]->getLabel());
+	}
+
+	// Apply the same column positions and row height to the header and save entries.
+	int rowHeight = lineHeight;
+	if (stacked)
+		rowHeight += lineHeight;
+	_savefileHeader->setSize(tableWidth, rowHeight);
+	_savefileTable->setSize(tableWidth, _savefileRowCount * rowHeight);
+
+	for (int row = 0; row < kMaximumSavefileRows; row++) {
+		const int y = row * rowHeight;
+		_savefileSelectionButtons[row]->setPos(0, y + (lineHeight - font.getFontHeight()) / 2);
+		_savefileSelectionButtons[row]->setSize(selectionWidth, font.getFontHeight());
+		_savefileList->setRowState(row, _savefileNameLabels[row], rowHeight, !_savefileStateValid[row]);
+
+		GUI::StaticTextWidget *const labels[] = {
+			_savefileNameLabels[row],
+			_zombinivilleLabels[row],
+			_rescue1Labels[row],
+			_rescue2Labels[row],
+			_booliewoodLabels[row],
+			_activePartyLabels[row],
+		};
+		for (uint i = 0; i < ARRAYSIZE(labels); i++) {
+			labels[i]->setPos(columnX[i], y + columnY[i]);
+			labels[i]->setSize(widths[i], lineHeight);
+
+			// Preserve full labels on hover, with corruption guidance for invalid saves.
+			if (row < _savefileRowCount && !_savefileStateValid[row])
+				labels[i]->setTooltip(_("Corrupted save"));
+			else
+				labels[i]->setTooltip(labels[i]->getLabel());
+		}
+	}
 }
 
 void Zoombini2SaveManagementDialog::updateButtons() {
@@ -345,6 +617,18 @@ void Zoombini2SaveManagementDialog::updateButtons() {
 	_importButton->setEnabled(true);
 	_exportButton->setEnabled(stateValid);
 	_deleteButton->setEnabled(hasSelection && !activeSavefile);
+
+	// Restore label tooltips before adding guidance for the active save.
+	_editButton->setTooltip(_editButton->getLabel());
+	_duplicateButton->setTooltip(_duplicateButton->getLabel());
+	_importButton->setTooltip(_importButton->getLabel());
+	_exportButton->setTooltip(_exportButton->getLabel());
+	_deleteButton->setTooltip(_deleteButton->getLabel());
+
+	if (activeSavefile) {
+		_editButton->setTooltip(_("Return to the launcher before renaming the active saved game."));
+		_deleteButton->setTooltip(_("Return to the launcher before deleting the active saved game."));
+	}
 }
 
 bool Zoombini2SaveManagementDialog::isActiveSavefile(const Common::String &savefileName) const {
@@ -667,7 +951,7 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	_pacingLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
 	_pacingPopUp = new GUI::PopUpWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.Pacing",
 										_("Selects the reference frame rate used to normalize logic pacing. "
-										  "Affects panorama scrolling speed in Booliewood and how often idle animations are triggered. "
+										  "Affects panorama scrolling speed in Booliewood and how often fidget animations are triggered. "
 										  "Does not affect the rendering frame rate."));
 	_pacingPopUp->appendEntry(_("60Hz (LCD preset)"), static_cast<uint32>(LogicPacingMode::k60Hz));
 	_pacingPopUp->appendEntry(_("75Hz (CRT preset)"), static_cast<uint32>(LogicPacingMode::k75Hz));

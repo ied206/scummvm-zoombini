@@ -188,6 +188,8 @@ private:
 	static constexpr const char *kFxPrefix = "sounds/fx/";
 	/** UI blip resource classified as a sound effect outside the effects directory. */
 	static constexpr const char *kBlipPath = "sounds/blip.wav";
+	/** Identical menu blip used when the UK Macintosh disc omits the root copy. */
+	static constexpr const char *kUKMacBlipFallbackPath = "Bmp/MENU/SOUNDS/BLIP.WAV";
 	/** Normalized sound-tree prefix used to classify remaining sounds as speech. */
 	static constexpr const char *kSoundsPrefix = "sounds/";
 	/** Disc data-directory prefix removed before classifying a sound path. */
