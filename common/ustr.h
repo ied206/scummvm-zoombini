@@ -191,6 +191,10 @@ private:
 	void decodeWindows936(const char *src, uint32 len);
 	void decodeWindows949(const char *src, uint32 len);
 	void decodeWindows950(const char *src, uint32 len);
+	void decodeMacKorean(const char *src, uint32 len);
+	void decodeMacJapanese(const char *src, uint32 len);
+	void decodeMacChineseTrad(const char *src, uint32 len);
+	void decodeMacChineseSimp(const char *src, uint32 len);
 	void decodeJohab(const char *src, uint32 len);
 	void decodeUTF8(const char *str, uint32 len);
 

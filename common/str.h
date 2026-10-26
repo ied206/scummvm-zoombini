@@ -179,6 +179,10 @@ protected:
 	StringEncodingResult encodeWindows936(const U32String &src, char errorChar);
 	StringEncodingResult encodeWindows949(const U32String &src, char errorChar);
 	StringEncodingResult encodeWindows950(const U32String &src, bool translit, char errorChar);
+	StringEncodingResult encodeMacKorean(const U32String &src, char errorChar);
+	StringEncodingResult encodeMacJapanese(const U32String &src, char errorChar);
+	StringEncodingResult encodeMacChineseTrad(const U32String &src, char errorChar);
+	StringEncodingResult encodeMacChineseSimp(const U32String &src, char errorChar);
 	StringEncodingResult encodeJohab(const U32String &src, char errorChar);
 	StringEncodingResult encodeOneByte(const U32String &src, CodePage page, bool translit, char errorChar);
 	StringEncodingResult encodeInternal(const U32String &src, CodePage page, char errorChar);

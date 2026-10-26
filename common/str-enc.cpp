@@ -21,6 +21,7 @@
 
 #include "common/str.h"
 #include "common/ustr.h"
+#include "common/noncopyable.h"
 #include "common/util.h"
 #include "common/endian.h"
 #include "common/error.h"
@@ -91,6 +92,39 @@ void U32String::decodeUTF8(const char *src, uint32 len) {
 
 const uint16 invalidCode = 0xFFFD;
 
+struct MacCJKSequence {
+	/** Mac CJK character code, encoded in one or two bytes. */
+	uint16 encoded = 0;
+	/** Unicode code points, padded with zeroes after the sequence. */
+	uint16 unicode[5] = {};
+};
+
+struct MacCJKSequenceTable : private NonCopyable {
+	/** Number of elements in each owned array. */
+	uint32 count = 0;
+	/**
+	 * Records sorted lexicographically by their Unicode sequences.
+	 *
+	 * @remarks
+	 * Encoding from Unicode to MacCJK binary-searches these records for the longest matching sequence.
+	 */
+	const MacCJKSequence *records = nullptr;
+	/**
+	 * Indices into @ref MacCJKSequenceTable::records, sorted by the records' MacCJK character codes.
+	 *
+	 * @remarks
+	 * Decoding from MacCJK to Unicode binary-searches these indices to find a record by its encoded character.
+	 * One uint16 per record avoids linear scans, especially for MacKorean, without duplicating the records.
+	 */
+	const uint16 *encodedOrder = nullptr;
+
+	/** Free the owned record and index arrays. */
+	~MacCJKSequenceTable() {
+		delete[] records;
+		delete[] encodedOrder;
+	}
+};
+
 static bool cjk_tables_loaded = false;
 static const uint16 *windows932ConversionTable = 0;
 static const uint16 *windows932ReverseConversionTable = 0;
@@ -103,7 +137,25 @@ static uint16 *windows950ReverseConversionTable = 0;
 static const uint16 *johabConversionTable = 0;
 static const uint16 *johabReverseConversionTable = 0;
 static const uint16 *traditional2SimplifiedChineseConversionTable = 0;
+static const uint16 *macKoreanConversionTable = 0;
+static const MacCJKSequenceTable *macKoreanSequenceTable = 0;
+static uint16 *macKoreanReverseConversionTable = 0;
+static const uint16 *macJapaneseConversionTable = 0;
+static const MacCJKSequenceTable *macJapaneseSequenceTable = 0;
+static uint16 *macJapaneseReverseConversionTable = 0;
+static const uint16 *macChineseTradConversionTable = 0;
+static const MacCJKSequenceTable *macChineseTradSequenceTable = 0;
+static uint16 *macChineseTradReverseConversionTable = 0;
+static const uint16 *macChineseSimpConversionTable = 0;
+static const MacCJKSequenceTable *macChineseSimpSequenceTable = 0;
+static uint16 *macChineseSimpReverseConversionTable = 0;
 
+/**
+ * Load a primary CJK lookup table from encoding.dat.
+ *
+ * Entries hold one Unicode code point, or zero for an unmapped character.
+ * Mac mappings with several code points are loaded separately by loadMacCJKSequences().
+ */
 static const uint16 *loadCJKTable(File &f, int idx, size_t sz) {
 	f.seek(16 + idx * 4);
 	uint32 off = f.readUint32LE();
@@ -115,6 +167,63 @@ static const uint16 *loadCJKTable(File &f, int idx, size_t sz) {
 		res[i] = FROM_LE_16(res[i]);
 #endif
 	return res;
+}
+
+/**
+ * Load an auxiliary Mac CJK mapping table for characters that expand into several Unicode code points.
+ *
+ * For example, MacKorean 0xAA41 maps to two Unicode code points: U+C6B4 + U+20DE.
+ * Such mappings cannot fit in one uint16 entry of primary table.
+ * Instead, they are looked up in this auxiliary sequence table.
+ *
+ * This follows ICU's separation of base (1:1) and extension (1:N) mappings:
+ * https://unicode-org.github.io/icu/userguide/conversion/data.html#extension-and-delta-tables
+ * - Decoding from MacCJK to Unicode checks the primary table first.
+ * - Encoding from Unicode to MacCJK matches the longest sequence before a single code point.
+ *
+ * A uint32 count precedes records of six uint16 values:
+ * the encoded character followed by up to five Unicode code points, padded with zeroes.
+ * The records are followed by uint16 record indices sorted by encoded character.
+ *
+ * @return The loaded table, or nullptr on allocation failure or invalid offset, size or record indices.
+ */
+static const MacCJKSequenceTable *loadMacCJKSequences(File &f, int idx) {
+	f.seek(16 + idx * 4);
+	uint32 offset = f.readUint32LE();
+	if (offset < 16 || f.size() < offset + 4)
+		return nullptr;
+	f.seek(offset);
+
+	uint32 entries = f.readUint32LE();
+	// Each distinct uint16 encoded character can have at most one record.
+	if (0x10000 < entries || f.size() < offset + 4 + entries * 14)
+		return nullptr;
+	MacCJKSequenceTable *table = new MacCJKSequenceTable();
+	if (!table)
+		return nullptr;
+	table->count = entries;
+	MacCJKSequence *records = new MacCJKSequence[entries];
+	table->records = records;
+	uint16 *encodedOrder = new uint16[entries];
+	table->encodedOrder = encodedOrder;
+	if (!records || !encodedOrder) {
+		delete table;
+		return nullptr;
+	}
+	for (uint i = 0; i < entries; i++) {
+		MacCJKSequence &record = records[i];
+		record.encoded = f.readUint16LE();
+		for (uint j = 0; j < ARRAYSIZE(record.unicode); j++)
+			record.unicode[j] = f.readUint16LE();
+	}
+	for (uint i = 0; i < entries; i++) {
+		encodedOrder[i] = f.readUint16LE();
+		if (entries <= encodedOrder[i]) {
+			delete table;
+			return nullptr;
+		}
+	}
+	return table;
 }
 
 static void loadChineseT2S(File &f) {
@@ -173,6 +282,17 @@ static void loadCJKTables() {
 		windows936ConversionTable = loadCJKTable(f, 4, 126 * 190);
 	if (num_tables >= 6)
 		loadChineseT2S(f);
+	if (num_tables >= 14) {
+		// Each primary Mac CJK table is followed by its auxiliary Unicode sequence table.
+		macKoreanConversionTable = loadCJKTable(f, 6, 256 + 94 * 190);
+		macKoreanSequenceTable = loadMacCJKSequences(f, 7);
+		macJapaneseConversionTable = loadCJKTable(f, 8, 256 + 60 * 192);
+		macJapaneseSequenceTable = loadMacCJKSequences(f, 9);
+		macChineseTradConversionTable = loadCJKTable(f, 10, 256 + 92 * 157);
+		macChineseTradSequenceTable = loadMacCJKSequences(f, 11);
+		macChineseSimpConversionTable = loadCJKTable(f, 12, 256 + 92 * 94);
+		macChineseSimpSequenceTable = loadMacCJKSequences(f, 13);
+	}
 }
 
 void releaseCJKTables() {
@@ -199,6 +319,30 @@ void releaseCJKTables() {
 	johabReverseConversionTable = 0;
 	delete[] traditional2SimplifiedChineseConversionTable;
 	traditional2SimplifiedChineseConversionTable = 0;
+	delete[] macKoreanConversionTable;
+	macKoreanConversionTable = 0;
+	delete macKoreanSequenceTable;
+	macKoreanSequenceTable = 0;
+	delete[] macKoreanReverseConversionTable;
+	macKoreanReverseConversionTable = 0;
+	delete[] macJapaneseConversionTable;
+	macJapaneseConversionTable = 0;
+	delete macJapaneseSequenceTable;
+	macJapaneseSequenceTable = 0;
+	delete[] macJapaneseReverseConversionTable;
+	macJapaneseReverseConversionTable = 0;
+	delete[] macChineseTradConversionTable;
+	macChineseTradConversionTable = 0;
+	delete macChineseTradSequenceTable;
+	macChineseTradSequenceTable = 0;
+	delete[] macChineseTradReverseConversionTable;
+	macChineseTradReverseConversionTable = 0;
+	delete[] macChineseSimpConversionTable;
+	macChineseSimpConversionTable = 0;
+	delete macChineseSimpSequenceTable;
+	macChineseSimpSequenceTable = 0;
+	delete[] macChineseSimpReverseConversionTable;
+	macChineseSimpReverseConversionTable = 0;
 }
 
 void U32String::decodeWindows932(const char *src, uint32 len) {
@@ -853,6 +997,491 @@ StringEncodingResult String::encodeJohab(const U32String &src, char errorChar) {
 	return encodingResult;
 }
 
+static uint16 convertMacKoreanToUnicode(uint16 code) {
+	const uint16 *table = macKoreanConversionTable;
+	if (!table)
+		return 0;
+	if (code < 256)
+		return table[code];
+	const uint high = code >> 8;
+	const uint low = code & 0xff;
+	if (high < 0xa1 || 0xfe < high || low < 0x41 || 0xfe < low)
+		return 0;
+	return table[256 + (high - 0xa1) * 190 + low - 0x41];
+}
+
+static uint16 convertMacJapaneseToUnicode(uint16 code) {
+	const uint16 *table = macJapaneseConversionTable;
+	if (!table)
+		return 0;
+	if (code < 256)
+		return table[code];
+	const uint high = code >> 8;
+	const uint low = code & 0xff;
+	if (low < 0x40 || low == 0x7f || 0xfc < low)
+		return 0;
+	uint row;
+	if (0x81 <= high && high <= 0x9f)
+		row = high - 0x81;
+	else if (0xe0 <= high && high <= 0xfc)
+		row = high - 0xe0 + 31;
+	else
+		return 0;
+	return table[256 + row * 192 + low - 0x40];
+}
+
+static uint16 convertMacChineseTradToUnicode(uint16 code) {
+	const uint16 *table = macChineseTradConversionTable;
+	if (!table)
+		return 0;
+	if (code < 256)
+		return table[code];
+	const uint high = code >> 8;
+	const uint low = code & 0xff;
+	if (high < 0xa1 || 0xfc < high)
+		return 0;
+	uint column;
+	if (0x40 <= low && low <= 0x7e)
+		column = low - 0x40;
+	else if (0xa1 <= low && low <= 0xfe)
+		column = low - 0xa1 + 63;
+	else
+		return 0;
+	return table[256 + (high - 0xa1) * 157 + column];
+}
+
+static uint16 convertMacChineseSimpToUnicode(uint16 code) {
+	const uint16 *table = macChineseSimpConversionTable;
+	if (!table)
+		return 0;
+	if (code < 256)
+		return table[code];
+	const uint high = code >> 8;
+	const uint low = code & 0xff;
+	if (high < 0xa1 || 0xfc < high || low < 0xa1 || 0xfe < low)
+		return 0;
+	return table[256 + (high - 0xa1) * 94 + low - 0xa1];
+}
+
+// Search the record indices sorted by encoded character.
+static const MacCJKSequence *findMacCJKSequence(uint16 code, const MacCJKSequenceTable *table) {
+	if (!table)
+		return nullptr;
+	uint first = 0;
+	uint last = table->count;
+	while (first < last) {
+		const uint middle = first + (last - first) / 2;
+		const MacCJKSequence &record = table->records[table->encodedOrder[middle]];
+		if (record.encoded < code)
+			first = middle + 1;
+		else if (code < record.encoded)
+			last = middle;
+		else
+			return &record;
+	}
+	return nullptr;
+}
+
+void U32String::decodeMacKorean(const char *src, uint32 len) {
+	ensureCapacity(len, false);
+
+	if (!cjk_tables_loaded)
+		loadCJKTables();
+
+	for (uint i = 0; i < len;) {
+		uint16 code = static_cast<uint8>(src[i]);
+		i += 1;
+
+		const bool lead = 0xa1 <= code && code <= 0xfe;
+		if (lead) {
+			if (i == len) {
+				operator+=(invalidCode);
+				continue;
+			}
+
+			const uint8 low = static_cast<uint8>(src[i]);
+			const bool trail = (0xa1 <= low && low <= 0xfe) ||
+				(code <= 0xad && ((0x41 <= low && low <= 0x7d) || (0x81 <= low && low <= 0xa0)));
+			if (!trail) {
+				operator+=(invalidCode);
+				continue;
+			}
+
+			code = (code << 8) | low;
+			i += 1;
+		}
+
+		const uint16 unicode = convertMacKoreanToUnicode(code);
+		if (unicode || code == 0) {
+			operator+=(unicode);
+		} else {
+			const MacCJKSequence *sequence = findMacCJKSequence(code, macKoreanSequenceTable);
+			if (sequence) {
+				for (uint j = 0; j < ARRAYSIZE(sequence->unicode) && sequence->unicode[j]; j++)
+					operator+=(sequence->unicode[j]);
+			} else {
+				operator+=(invalidCode);
+			}
+		}
+	}
+}
+
+void U32String::decodeMacJapanese(const char *src, uint32 len) {
+	ensureCapacity(len, false);
+
+	if (!cjk_tables_loaded)
+		loadCJKTables();
+
+	for (uint i = 0; i < len;) {
+		uint16 code = static_cast<uint8>(src[i]);
+		i += 1;
+
+		const bool lead = (0x81 <= code && code <= 0x9f) || (0xe0 <= code && code <= 0xfc);
+		if (lead) {
+			if (i == len) {
+				operator+=(invalidCode);
+				continue;
+			}
+
+			const uint8 low = static_cast<uint8>(src[i]);
+			const bool trail = 0x40 <= low && low <= 0xfc && low != 0x7f;
+			if (!trail) {
+				operator+=(invalidCode);
+				continue;
+			}
+
+			code = (code << 8) | low;
+			i += 1;
+		}
+
+		const uint16 unicode = convertMacJapaneseToUnicode(code);
+		if (unicode || code == 0) {
+			operator+=(unicode);
+		} else {
+			const MacCJKSequence *sequence = findMacCJKSequence(code, macJapaneseSequenceTable);
+			if (sequence) {
+				for (uint j = 0; j < ARRAYSIZE(sequence->unicode) && sequence->unicode[j]; j++)
+					operator+=(sequence->unicode[j]);
+			} else {
+				operator+=(invalidCode);
+			}
+		}
+	}
+}
+
+void U32String::decodeMacChineseTrad(const char *src, uint32 len) {
+	ensureCapacity(len, false);
+
+	if (!cjk_tables_loaded)
+		loadCJKTables();
+
+	for (uint i = 0; i < len;) {
+		uint16 code = static_cast<uint8>(src[i]);
+		i += 1;
+
+		const bool lead = 0xa1 <= code && code <= 0xfc;
+		if (lead) {
+			if (i == len) {
+				operator+=(invalidCode);
+				continue;
+			}
+
+			const uint8 low = static_cast<uint8>(src[i]);
+			const bool trail = (0x40 <= low && low <= 0x7e) || (0xa1 <= low && low <= 0xfe);
+			if (!trail) {
+				operator+=(invalidCode);
+				continue;
+			}
+
+			code = (code << 8) | low;
+			i += 1;
+		}
+
+		const uint16 unicode = convertMacChineseTradToUnicode(code);
+		if (unicode || code == 0) {
+			operator+=(unicode);
+		} else {
+			const MacCJKSequence *sequence = findMacCJKSequence(code, macChineseTradSequenceTable);
+			if (sequence) {
+				for (uint j = 0; j < ARRAYSIZE(sequence->unicode) && sequence->unicode[j]; j++)
+					operator+=(sequence->unicode[j]);
+			} else {
+				operator+=(invalidCode);
+			}
+		}
+	}
+}
+
+void U32String::decodeMacChineseSimp(const char *src, uint32 len) {
+	ensureCapacity(len, false);
+
+	if (!cjk_tables_loaded)
+		loadCJKTables();
+
+	for (uint i = 0; i < len;) {
+		uint16 code = static_cast<uint8>(src[i]);
+		i += 1;
+
+		const bool lead = 0xa1 <= code && code <= 0xfc;
+		if (lead) {
+			if (i == len) {
+				operator+=(invalidCode);
+				continue;
+			}
+
+			const uint8 low = static_cast<uint8>(src[i]);
+			const bool trail = 0xa1 <= low && low <= 0xfe;
+			if (!trail) {
+				operator+=(invalidCode);
+				continue;
+			}
+
+			code = (code << 8) | low;
+			i += 1;
+		}
+
+		const uint16 unicode = convertMacChineseSimpToUnicode(code);
+		if (unicode || code == 0) {
+			operator+=(unicode);
+		} else {
+			const MacCJKSequence *sequence = findMacCJKSequence(code, macChineseSimpSequenceTable);
+			if (sequence) {
+				for (uint j = 0; j < ARRAYSIZE(sequence->unicode) && sequence->unicode[j]; j++)
+					operator+=(sequence->unicode[j]);
+			} else {
+				operator+=(invalidCode);
+			}
+		}
+	}
+}
+
+// Like ICU, prefer the longest exact sequence over a single-code-point mapping.
+// This retains Apple's grouping and variant hints.
+static const MacCJKSequence *findMacCJKSequence(const U32String &src, uint position, const MacCJKSequenceTable *table, uint &length) {
+	if (!table)
+		return nullptr;
+	for (length = MIN<uint>(5, src.size() - position); 2 <= length; length -= 1) {
+		uint first = 0;
+		uint last = table->count;
+		while (first < last) {
+			const uint middle = first + (last - first) / 2;
+			const MacCJKSequence &record = table->records[middle];
+			int comparison = 0;
+			for (uint i = 0; i < length; i++) {
+				if (!record.unicode[i] || record.unicode[i] < src[position + i]) {
+					comparison = -1;
+					break;
+				}
+				if (src[position + i] < record.unicode[i]) {
+					comparison = 1;
+					break;
+				}
+			}
+			if (!comparison && length < ARRAYSIZE(record.unicode) && record.unicode[length])
+				comparison = 1;
+			if (comparison < 0)
+				first = middle + 1;
+			else if (0 < comparison)
+				last = middle;
+			else
+				return &record;
+		}
+	}
+	return nullptr;
+}
+
+StringEncodingResult String::encodeMacKorean(const U32String &src, char errorChar) {
+	ensureCapacity(src.size() * 2, false);
+
+	if (!cjk_tables_loaded)
+		loadCJKTables();
+
+	if (!macKoreanReverseConversionTable) {
+		macKoreanReverseConversionTable = new uint16[0x10000]();
+
+		for (uint code = 0; code < 0x10000; code++) {
+			const uint16 unicode = convertMacKoreanToUnicode(code);
+			if (unicode)
+				macKoreanReverseConversionTable[unicode] = code;
+		}
+	}
+
+	StringEncodingResult result = kStringEncodingResultSucceeded;
+
+	for (uint i = 0; i < src.size();) {
+		uint length;
+		const MacCJKSequence *sequence = findMacCJKSequence(src, i, macKoreanSequenceTable, length);
+		uint16 code = 0;
+
+		if (sequence) {
+			code = sequence->encoded;
+			i += length;
+		} else {
+			const uint32 point = src[i];
+			i += 1;
+
+			if (point < 0x10000)
+				code = macKoreanReverseConversionTable[point];
+
+			if (!code && point != 0) {
+				operator+=(errorChar);
+				result = kStringEncodingResultHasErrors;
+				continue;
+			}
+		}
+
+		if (0xff < code)
+			operator+=(static_cast<char>(code >> 8));
+		operator+=(static_cast<char>(code & 0xff));
+	}
+
+	return result;
+}
+
+StringEncodingResult String::encodeMacJapanese(const U32String &src, char errorChar) {
+	ensureCapacity(src.size() * 2, false);
+
+	if (!cjk_tables_loaded)
+		loadCJKTables();
+
+	if (!macJapaneseReverseConversionTable) {
+		macJapaneseReverseConversionTable = new uint16[0x10000]();
+
+		for (uint code = 0; code < 0x10000; code++) {
+			const uint16 unicode = convertMacJapaneseToUnicode(code);
+			if (unicode)
+				macJapaneseReverseConversionTable[unicode] = code;
+		}
+	}
+
+	StringEncodingResult result = kStringEncodingResultSucceeded;
+
+	for (uint i = 0; i < src.size();) {
+		uint length;
+		const MacCJKSequence *sequence = findMacCJKSequence(src, i, macJapaneseSequenceTable, length);
+		uint16 code = 0;
+
+		if (sequence) {
+			code = sequence->encoded;
+			i += length;
+		} else {
+			const uint32 point = src[i];
+			i += 1;
+
+			if (point < 0x10000)
+				code = macJapaneseReverseConversionTable[point];
+
+			if (!code && point != 0) {
+				operator+=(errorChar);
+				result = kStringEncodingResultHasErrors;
+				continue;
+			}
+		}
+
+		if (0xff < code)
+			operator+=(static_cast<char>(code >> 8));
+		operator+=(static_cast<char>(code & 0xff));
+	}
+
+	return result;
+}
+
+StringEncodingResult String::encodeMacChineseTrad(const U32String &src, char errorChar) {
+	ensureCapacity(src.size() * 2, false);
+
+	if (!cjk_tables_loaded)
+		loadCJKTables();
+
+	if (!macChineseTradReverseConversionTable) {
+		macChineseTradReverseConversionTable = new uint16[0x10000]();
+
+		for (uint code = 0; code < 0x10000; code++) {
+			const uint16 unicode = convertMacChineseTradToUnicode(code);
+			if (unicode)
+				macChineseTradReverseConversionTable[unicode] = code;
+		}
+	}
+
+	StringEncodingResult result = kStringEncodingResultSucceeded;
+
+	for (uint i = 0; i < src.size();) {
+		uint length;
+		const MacCJKSequence *sequence = findMacCJKSequence(src, i, macChineseTradSequenceTable, length);
+		uint16 code = 0;
+
+		if (sequence) {
+			code = sequence->encoded;
+			i += length;
+		} else {
+			const uint32 point = src[i];
+			i += 1;
+
+			if (point < 0x10000)
+				code = macChineseTradReverseConversionTable[point];
+
+			if (!code && point != 0) {
+				operator+=(errorChar);
+				result = kStringEncodingResultHasErrors;
+				continue;
+			}
+		}
+
+		if (0xff < code)
+			operator+=(static_cast<char>(code >> 8));
+		operator+=(static_cast<char>(code & 0xff));
+	}
+
+	return result;
+}
+
+StringEncodingResult String::encodeMacChineseSimp(const U32String &src, char errorChar) {
+	ensureCapacity(src.size() * 2, false);
+
+	if (!cjk_tables_loaded)
+		loadCJKTables();
+
+	if (!macChineseSimpReverseConversionTable) {
+		macChineseSimpReverseConversionTable = new uint16[0x10000]();
+
+		for (uint code = 0; code < 0x10000; code++) {
+			const uint16 unicode = convertMacChineseSimpToUnicode(code);
+			if (unicode)
+				macChineseSimpReverseConversionTable[unicode] = code;
+		}
+	}
+
+	StringEncodingResult result = kStringEncodingResultSucceeded;
+
+	for (uint i = 0; i < src.size();) {
+		uint length;
+		const MacCJKSequence *sequence = findMacCJKSequence(src, i, macChineseSimpSequenceTable, length);
+		uint16 code = 0;
+
+		if (sequence) {
+			code = sequence->encoded;
+			i += length;
+		} else {
+			const uint32 point = src[i];
+			i += 1;
+
+			if (point < 0x10000)
+				code = macChineseSimpReverseConversionTable[point];
+
+			if (!code && point != 0) {
+				operator+=(errorChar);
+				result = kStringEncodingResultHasErrors;
+				continue;
+			}
+		}
+
+		if (0xff < code)
+			operator+=(static_cast<char>(code >> 8));
+		operator+=(static_cast<char>(code & 0xff));
+	}
+
+	return result;
+}
+
 // //TODO: This is a quick and dirty converter. Refactoring needed:
 // 1. Original version has an option for performing strict / nonstrict
 //    conversion for the 0xD800...0xDFFF interval
@@ -1023,6 +1652,10 @@ getConversionTable(CodePage page) {
 	case kWindows936:
 	case kWindows949:
 	case kWindows950:
+	case kMacKorean:
+	case kMacJapanese:
+	case kMacChineseTrad:
+	case kMacChineseSimp:
 	case kJohab:
 		return nullptr;
 	}
@@ -1155,6 +1788,14 @@ StringEncodingResult String::encodeInternal(const U32String &src, CodePage page,
 		return encodeWindows949(src, errorChar);
 	case kWindows950:
 		return encodeWindows950(src, true, errorChar);
+	case kMacKorean:
+		return encodeMacKorean(src, errorChar);
+	case kMacJapanese:
+		return encodeMacJapanese(src, errorChar);
+	case kMacChineseTrad:
+		return encodeMacChineseTrad(src, errorChar);
+	case kMacChineseSimp:
+		return encodeMacChineseSimp(src, errorChar);
 	case kJohab:
 		return encodeJohab(src, errorChar);
 	default:
@@ -1199,6 +1840,18 @@ void U32String::decodeInternal(const char *str, uint32 len, CodePage page) {
 		break;
 	case kWindows950:
 		decodeWindows950(str, len);
+		break;
+	case kMacKorean:
+		decodeMacKorean(str, len);
+		break;
+	case kMacJapanese:
+		decodeMacJapanese(str, len);
+		break;
+	case kMacChineseTrad:
+		decodeMacChineseTrad(str, len);
+		break;
+	case kMacChineseSimp:
+		decodeMacChineseSimp(str, len);
 		break;
 	case kJohab:
 		decodeJohab(str, len);
