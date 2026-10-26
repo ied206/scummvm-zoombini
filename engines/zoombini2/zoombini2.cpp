@@ -234,10 +234,20 @@ void Zoombini2Engine::initializePath(const Common::FSNode &gamePath) {
 
 	Common::FSNode cdDataRoot = dataDir;
 	Common::FSNode installedRoot = installHdDir;
-	if (!dataBmpDir.isDirectory() && rootBmpDir.isDirectory()) {
-		// Some supported installed releases already present both logical trees in one flattened directory.
+	switch (_gameDescription->desc.platform) {
+	case Common::kPlatformMacintosh:
+		// Macintosh discs keep CD assets at the volume root and installation payloads in Data.
 		cdDataRoot = gamePath;
-		installedRoot = gamePath;
+		installedRoot = dataDir;
+		break;
+	case Common::kPlatformWindows:
+	default:
+		if (!dataBmpDir.isDirectory() && rootBmpDir.isDirectory()) {
+			// Some supported installed releases already present both logical trees in one flattened directory.
+			cdDataRoot = gamePath;
+			installedRoot = gamePath;
+		}
+		break;
 	}
 
 	if (!cdDataRoot.isDirectory())
@@ -850,7 +860,7 @@ void Zoombini2Engine::restartGoBlink() {
 }
 
 void Zoombini2Engine::reseedRandomForV10() {
-	if ((_gameDescription->features & GF_Z2_V10) != 0)
+	if (_relInfo.isFamily(ZmbReleaseInfo::Family::kV10))
 		_rnd->setSeed(getTotalPlayTime());
 }
 

@@ -49,14 +49,12 @@ enum class PageId : int;
 /** Immutable detected release identity and its resource/layout selections. */
 class ZmbReleaseInfo {
 public:
-	/** Implementation lineages, keeping the Hebrew rebuild separate from the other v1.0 releases. */
-	enum Family {
-		/** US/Dutch v1.0 and the prerelease US demo. */
-		kBaseV10,
-		/** Hebrew v1.0 rebuild. */
-		kHebrewV10,
-		/** US/Korean/Swedish/Polish v1.1. */
-		kExtendedV11,
+	/** Broad implementation lineages; localized variants retain their parent family. */
+	enum class Family {
+		/** v1.0 releases, and the prerelease US demo. */
+		kV10,
+		/** v1.1 releases, including the Macintosh ports. */
+		kV11,
 	};
 	/** Bitmap-font character and layout conventions. */
 	enum class BitmapTextLayout {
@@ -79,6 +77,8 @@ public:
 	explicit ZmbReleaseInfo(const Zoombini2GameDescription &gameDesc);
 	/** Match a release implementation lineage. */
 	bool isFamily(Family family) const;
+	/** Match both the implementation family and its language. */
+	bool isFamily(Family family, Common::Language language) const;
 	/** Return the detected game language. */
 	Common::Language getLanguage() const { return _language; }
 	/** Return the detector's unchanged feature bits. */

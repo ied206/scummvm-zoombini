@@ -1578,23 +1578,23 @@ bool Gfx::noseColorRGB(ColorAssistMode mode, byte value, RGBColor &color) {
 }
 
 RGBColor Gfx::recolorNoseGradientRGB(const RGBColor &srcColor, const RGBColor &targetColor) {
-	const int sourceMaximum = srcColor.getMaxChannel();
-	const int sourceMinimum = srcColor.getMinChannel();
-	const int targetMaximum = targetColor.getMaxChannel();
-	const int targetMinimum = targetColor.getMinChannel();
-	if (sourceMaximum == 0 || targetMaximum == 0)
+	const int sourceMax = srcColor.getMaxChannel();
+	const int sourceMin = srcColor.getMinChannel();
+	const int targetMax = targetColor.getMaxChannel();
+	const int targetMin = targetColor.getMinChannel();
+	if (sourceMax == 0 || targetMax == 0)
 		return RGBColor();
-	const int value = sourceMaximum * targetMaximum / 255;
-	const int targetRange = targetMaximum - targetMinimum;
+	const int value = sourceMax * targetMax / 255;
+	const int targetRange = targetMax - targetMin;
 	if (targetRange == 0)
 		return RGBColor(static_cast<byte>(value), static_cast<byte>(value), static_cast<byte>(value));
-	const int sourceSaturation = (sourceMaximum - sourceMinimum) * 255 / sourceMaximum;
-	const int targetSaturation = targetRange * 255 / targetMaximum;
+	const int sourceSaturation = (sourceMax - sourceMin) * 255 / sourceMax;
+	const int targetSaturation = targetRange * 255 / targetMax;
 	// Keep source value changes and half of its saturation variation in the new hue.
 	const int chroma = value * (sourceSaturation + targetSaturation) / 510;
 	const int base = value - chroma;
-	const auto recolorChannel = [base, chroma, targetMinimum, targetRange](byte channel) {
-		return base + chroma * (channel - targetMinimum) / targetRange;
+	const auto recolorChannel = [base, chroma, targetMin, targetRange](byte channel) {
+		return base + chroma * (channel - targetMin) / targetRange;
 	};
 	return targetColor.transformChannels(recolorChannel);
 }

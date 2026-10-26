@@ -303,7 +303,7 @@ enum class ZmbAnimationKind {
 	kPickup,
 	/**
 	 * Fidget sprite grid played occasionally while a Zoombini waits.
-	 * For example, an occasional idle motion by a waiting Zoombini at RescueSite I.
+	 * For example, a waiting Zoombini blinking its eyes.
 	 */
 	kFidget,
 	/**
@@ -795,7 +795,7 @@ private:
 	static constexpr const char *kJumpingZoombiniAnimationPath = "bmp/zombis/saut/saut.anm";
 	/** Shared Zoombini pick-up animation. */
 	static constexpr const char *kPickupZoombiniAnimationPath = "bmp/zombis/pris/pris.anm";
-	/** Shared alternate idle Zoombini sprite grid used by the rescue shelters. */
+	/** Shared fidget sprite grid for waiting Zoombinis. */
 	static constexpr const char *kFidgetZoombiniAnimationPath = "bmp/zombis/attente2/attenteZomb2.anm";
 	/** Tiny Zoombini sprite grid used for MapTrans page transitions. */
 	static constexpr const char *kMapTransTinyZoombiniAnimationPath = "bmp/transition1/PitiZomb3.anm";

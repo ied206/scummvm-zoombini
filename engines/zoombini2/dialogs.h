@@ -22,6 +22,7 @@
 #ifndef ZOOMBINI2_DIALOGS_H
 #define ZOOMBINI2_DIALOGS_H
 
+#include "common/array.h"
 #include "common/fs.h"
 #include "common/language.h"
 #include "common/str-array.h"
@@ -69,14 +70,26 @@ public:
 
 	/** Return the entered savefile name. */
 	Common::U32String getSavefileName() const;
-	/** Keep the editor centered in the current overlay. */
+	/** Wrap guidance and fit the editor and buttons within the safe overlay area. */
 	void reflowLayout() override;
 	/** Accept or cancel the edited savefile name. */
 	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
 
 private:
+	/** Name-length and character guidance wrapped above the editor. */
+	Common::U32String _nameHint;
+	/** Title positioned within the safe overlay area. */
+	GUI::StaticTextWidget *_title = nullptr;
+	/** Scrollable guidance for small overlays and long translations. */
+	GUI::ScrollContainerWidget *_descriptionScroller = nullptr;
+	/** Reusable wrapped guidance lines inside the scroller. */
+	Common::Array<GUI::StaticTextWidget *> _descLines;
 	/** Savefile-name editor managed by this dialog. */
 	GUI::EditTextWidget *_edit = nullptr;
+	/** Button that accepts the edited name. */
+	GUI::ButtonWidget *_okButton = nullptr;
+	/** Button that cancels the name edit. */
+	GUI::ButtonWidget *_cancelButton = nullptr;
 };
 
 /** Modal ScummVM dialog for managing one target's independent .mk savefiles. */
@@ -87,12 +100,15 @@ public:
 
 	/** Populate the savefile table and enter the modal dialog. */
 	void open() override;
-	/** Keep the save-management table centered in the current overlay. */
+	/** Fit actions, headings and save rows to the safe overlay area and current font. */
 	void reflowLayout() override;
 	/** Handle table selection, savefile actions, and ordinary dialog commands. */
 	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
 
 private:
+	/** Scrollable save rows with corruption tooltips in otherwise empty cells. */
+	class SavefileListWidget;
+
 	/** Maximum number of savefiles displayed in the management table. */
 	static constexpr int kMaximumSavefileRows = 99;
 	/** Left edge of the selection column relative to the table, in pixels. */
@@ -157,8 +173,8 @@ private:
 
 	/** Reload the sorted savefile table and optionally reselect @p selectedSavefile. */
 	void refreshSavefiles(const Common::String &selectedSavefile = Common::String());
-	/** Resize the scrollable row container to its populated row count. */
-	void updateSavefileTableLayout();
+	/** Fit columns and row geometry to the current font and available width. */
+	void updateSavefileTableLayout(int tableWidth, int lineHeight, int padding);
 	/** Enable or disable actions for the current selection. */
 	void updateButtons();
 	/** Return whether this target's running engine will automatically write @p savefileName. */
@@ -188,9 +204,15 @@ private:
 	GUI::RadiobuttonGroup _savefileSelectionGroup;
 	/** Selected row in @ref Zoombini2SaveManagementDialog::_savefileNames, or -1. */
 	int _selectedSavefileIndex = -1;
+	/** Description above the action buttons and table. */
+	GUI::StaticTextWidget *_description = nullptr;
+	/** Container for the column headings. */
+	GUI::ContainerWidget *_savefileHeader = nullptr;
+	/** Headings in name, Zombiniville, Rescue I, Rescue II, Booliewood and active order. */
+	GUI::StaticTextWidget *_savefileColumnLabels[6] = {};
 	/** Scroll container holding savefile rows. */
-	GUI::ScrollContainerWidget *_savefileList = nullptr;
-	/** Container holding the fixed-column row widgets. */
+	SavefileListWidget *_savefileList = nullptr;
+	/** Container holding the adaptively positioned row widgets. */
 	GUI::ContainerWidget *_savefileTable = nullptr;
 	/** Number of rows currently populated in the table. */
 	int _savefileRowCount = 0;
@@ -204,6 +226,8 @@ private:
 	GUI::ButtonWidget *_exportButton = nullptr;
 	/** Delete button managed by this dialog. */
 	GUI::ButtonWidget *_deleteButton = nullptr;
+	/** Button that closes the management dialog. */
+	GUI::ButtonWidget *_closeButton = nullptr;
 	/** Uncaptioned selection controls for visible savefile rows. */
 	GUI::RadiobuttonWidget *_savefileSelectionButtons[kMaximumSavefileRows] = {};
 	/** Savefile-name cells. */

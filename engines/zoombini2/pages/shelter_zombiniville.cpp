@@ -692,14 +692,12 @@ void ShelterZombiniville::onRenderActors(ManagedSurface32 *screen) {
 }
 
 void ShelterZombiniville::onActorsRendered() {
-	const uint32 tick = _vm->getTotalPlayTime();
 	Common::Array<uint> order;
 	buildBoardingZoombiniDrawOrder(order);
 	for (uint i = 0; i < order.size(); i++) {
 		ZoombiniRunner *zoombini = _boardingZoombinis[order[i]];
 		if (zoombini->isHidden())
 			continue;
-		zoombini->tryStartIdleAnimation(ZmbAnimationKind::kFidget, *_vm->_rnd, tick, _vm->getFrameDeltaMs(), _vm->getLogicPacingHz());
 		zoombini->advanceAnimationAfterDraw();
 	}
 }

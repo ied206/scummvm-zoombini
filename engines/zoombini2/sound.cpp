@@ -39,6 +39,7 @@ constexpr int SoundManager::SoundBuffer::kSampleSlotCount;
 constexpr const char *SoundManager::kMusicPrefix;
 constexpr const char *SoundManager::kFxPrefix;
 constexpr const char *SoundManager::kBlipPath;
+constexpr const char *SoundManager::kUKMacBlipFallbackPath;
 constexpr const char *SoundManager::kSoundsPrefix;
 constexpr const char *SoundManager::kDataPrefix;
 
@@ -108,6 +109,19 @@ int SoundManager::load(bool isStream, const Common::Path &filename, bool loop) {
 	buf->usesCategoryVolume = true;
 	if (!isStream) {
 		Common::SeekableReadStream *file = _vm->openResourceFile(buf->path.toString('/'));
+		if (!file) {
+			// Restore the UK Macintosh menu blip from its identical copy on the disc.
+			const bool isMissingUKMacBlip = _vm->_gameDescription->desc.platform == Common::kPlatformMacintosh &&
+											_vm->getRelInfo().isFamily(ZmbReleaseInfo::Family::kV11, Common::EN_GRB) &&
+											Zoombini2Engine::normalizeResourcePath(buf->path.toString('/')).toString('/').equalsIgnoreCase(kBlipPath);
+			if (isMissingUKMacBlip) {
+				file = _vm->openResourceFile(kUKMacBlipFallbackPath);
+				if (file) {
+					warning("SoundManager::load: UK Macintosh '%s' is missing; using '%s' instead", buf->path.toString().c_str(), kUKMacBlipFallbackPath);
+					buf->path = Common::Path(kUKMacBlipFallbackPath);
+				}
+			}
+		}
 		if (!file) {
 			if (!_vm->isDemo())
 				warning("SoundManager::load: Cannot retain sample '%s'", buf->path.toString().c_str());

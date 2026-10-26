@@ -21,9 +21,9 @@
 
 #include "zoombini2/pages/dialog_help.h"
 #include "zoombini2/graphics.h"
-#include "zoombini2/text_manager.h"
 #include "zoombini2/metaengine.h"
 #include "zoombini2/sound.h"
+#include "zoombini2/text_manager.h"
 #include "zoombini2/zoombini2.h"
 
 #include "common/config-manager.h"

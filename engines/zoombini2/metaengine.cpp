@@ -39,15 +39,16 @@ ZmbReleaseInfo::ZmbReleaseInfo(const Zoombini2GameDescription &gameDesc)
 
 bool ZmbReleaseInfo::isFamily(Family family) const {
 	switch (family) {
-	case kBaseV10:
-		return (_features & GF_Z2_V10) != 0 && _language != Common::HE_ISR;
-	case kHebrewV10:
-		return (_features & GF_Z2_V10) != 0 && _language == Common::HE_ISR;
-	case kExtendedV11:
+	case Family::kV10:
+		return (_features & GF_Z2_V10) != 0;
+	case Family::kV11:
 		return (_features & GF_Z2_V11) != 0;
-	default:
-		return false;
 	}
+	return false;
+}
+
+bool ZmbReleaseInfo::isFamily(Family family, Common::Language language) const {
+	return isFamily(family) && _language == language;
 }
 
 ZmbReleaseInfo::BitmapTextLayout ZmbReleaseInfo::getBitmapTextLayout() const {

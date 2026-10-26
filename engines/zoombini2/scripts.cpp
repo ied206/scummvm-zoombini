@@ -1180,7 +1180,7 @@ void ZoombiniRunner::setDefaultAnimation(const ZoombiniAnimation *animation, int
 	_animationCell = cellIndex;
 	_animationFrame = 0;
 	_animationActive = false;
-	_idleAnimationEnabled = true;
+	_fidgetAnimationEnabled = true;
 	_tracksMovementDirection = false;
 	_animationAdvancePending = false;
 	_bypassAnimationCompletionWork = false;
@@ -1282,7 +1282,7 @@ void ZoombiniRunner::startAnimation(const ZoombiniAnimation *animation, int cell
 	_savedAnimation = _activeAnimation;
 	if (animation)
 		_activeAnimation = animation;
-	_idleAnimationEnabled = false;
+	_fidgetAnimationEnabled = false;
 	_animationActive = true;
 	_animationCell = cellIndex;
 	_animationFrame = 1;
@@ -1323,16 +1323,16 @@ bool ZoombiniRunner::tryStartCelebrationAnimation(const ZoombiniAnimation *anima
 	return false;
 }
 
-bool ZoombiniRunner::tryStartIdleAnimation(const ZoombiniAnimation *animation, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz) {
-	if (!animation || _hidden || !_idleAnimationEnabled || _animationActive || _movementPath || _held)
+bool ZoombiniRunner::tryStartFidgetAnimation(const ZoombiniAnimation *animation, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz) {
+	if (!animation || !_vm || _hidden || _animationActive || _movementPath || _activeAnimation != getCommonAnimation(ZmbAnimationKind::kBasic))
 		return false;
 	// Bank quota so the original one-in-250 roll runs pacingHz times per second.
 	// The remainder spreads double-roll frames evenly when pacing exceeds the render rate.
-	_idleRollQuota += static_cast<int64>(elapsedMs) * pacingHz;
-	while (1000 <= _idleRollQuota) {
-		_idleRollQuota -= 1000;
-		if (randomSrc.getRandomNumber(249) == 1) {
-			_idleRollQuota = 0;
+	_fidgetRollQuota += static_cast<int64>(elapsedMs) * pacingHz;
+	while (1000 <= _fidgetRollQuota) {
+		_fidgetRollQuota -= 1000;
+		if (randomSrc.getRandomNumber(249) == 1 && _fidgetAnimationEnabled && !_held) {
+			_fidgetRollQuota = 0;
 			startAnimation(animation, 33, tickCount, AnimationCompletionPolicy::kBypassCallbackAndCorrection01);
 			return true;
 		}
@@ -1343,7 +1343,7 @@ bool ZoombiniRunner::tryStartIdleAnimation(const ZoombiniAnimation *animation, R
 void ZoombiniRunner::resetAnimation() {
 	_animationActive = false;
 	_animationCell = 33;
-	_idleAnimationEnabled = true;
+	_fidgetAnimationEnabled = true;
 	if (_savedAnimation)
 		_activeAnimation = _savedAnimation;
 	_savedAnimation = _activeAnimation;
@@ -1370,6 +1370,8 @@ void ZoombiniRunner::updateAnimation(uint32 tickCount) {
 }
 
 void ZoombiniRunner::advanceAnimationAfterDraw() {
+	if (_vm)
+		tryStartFidgetAnimation(ZmbAnimationKind::kFidget, *_vm->_rnd, _vm->getTotalPlayTime(), _vm->getFrameDeltaMs(), _vm->getLogicPacingHz());
 	if (_animationAdvancePending)
 		commitAnimationAdvance();
 }
