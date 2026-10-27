@@ -234,7 +234,7 @@ private:
 		float y = 640;
 		/** Sine-wave phase in radians. */
 		float phase = 0;
-		/** Banked spawn-roll quota; the original two-in-600 roll runs once per 1000 banked units. */
+		/** Spawn-roll credit in thousandths of a reference frame, capped below one frame after each roll. */
 		int64 _spawnQuota = 0;
 	};
 	/** Eight-node cube layout used by the first two level tables. */

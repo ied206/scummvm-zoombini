@@ -407,6 +407,11 @@ EventHandleResult ShelterBooliewood::onLButtonDown(const Common::Point &pos) {
 }
 
 void ShelterBooliewood::updateScroll(uint32 now) {
+	static constexpr int kHoverStep = 30;
+	static constexpr int kCreditScale = 1000;
+	static constexpr int kMaximumCredit = kHoverStep * kCreditScale - 1;
+	// At either reference rate, 50 ms saturates both outputs even with opposing credit.
+	static constexpr uint32 kMaximumElapsedMs = 50;
 	const uint32 elapsed = now - _lastScrollTime;
 	_lastScrollTime = now;
 	const Common::Point32 mousePos = _vm->getMousePos();
@@ -423,13 +428,15 @@ void ShelterBooliewood::updateScroll(uint32 now) {
 	} else {
 		int speed = 0;
 		if (760 < mousePos.x)
-			speed = 30 * _vm->getLogicPacingHz();
+			speed = kHoverStep * _vm->getLogicPacingHz();
 		else if (mousePos.x < 30 && mousePos.y < 475)
-			speed = -30 * _vm->getLogicPacingHz();
+			speed = -kHoverStep * _vm->getLogicPacingHz();
 		if (speed != 0) {
-			const int64 displacement = static_cast<int64>(speed) * elapsed + _scrollRemainder;
-			delta = static_cast<int>(displacement / 1000);
-			_scrollRemainder = static_cast<int>(displacement % 1000);
+			const int boundedElapsed = static_cast<int>(MIN(elapsed, kMaximumElapsedMs));
+			const int displacement = speed * boundedElapsed + _scrollRemainder;
+			// Retain rounding credit, but do not replay missed hover steps after a slow update.
+			delta = CLIP(displacement / kCreditScale, -kHoverStep, kHoverStep);
+			_scrollRemainder = CLIP(displacement - delta * kCreditScale, -kMaximumCredit, kMaximumCredit);
 		} else {
 			_scrollRemainder = 0;
 		}

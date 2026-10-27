@@ -2254,7 +2254,7 @@ void MysticMarshL4Background::spreadGridMask(const Common::Array<byte> &mask, Co
 	if (glow) {
 		// A bounded warm halo follows the existing artwork's approximately four-pixel falloff.
 		for (uint i = 0; i < weights.size(); i++)
-			weights[i] = static_cast<byte>(84.0f * expf(-i / 33.62f) + 0.5f); // Round nonnegative opacity to the nearest byte.
+			weights[i] = static_cast<byte>(84.0f * expf(-1 * (i / 33.62f)) + 0.5f); // Round nonnegative opacity to the nearest byte.
 	}
 	for (int y = 0; y < height; y++) {
 		for (int x = 0; x < width; x++) {
@@ -2481,9 +2481,8 @@ bool MysticMarshL4Background::isPortalCellType(int type) {
 }
 
 void MysticMarshL4Background::drawGrid(ManagedSurface32 *surface, const MysticMarshGrid::Cell *cells, const Gfx &gfx) {
-	// Fit the side strokes to the baked L1 artwork, independently of the logical row pitch.
-	static constexpr float kSideTopOffset = 0.8f;
-	static constexpr float kSideBottomOffset = 0.3f;
+	// Align every border to the same row vertices so horizontal strokes stay inside the continuous sides.
+	static constexpr float kBorderOffset = 0.8f;
 	Common::Array<Gfx::SubpixelLineSegment> lines;
 	// Each visible cell supplies its top and left edges; add bottom/right only when a neighbor will not.
 	for (int column = 0; column < MysticMarshGrid::kColumns; column++) {
@@ -2492,11 +2491,11 @@ void MysticMarshL4Background::drawGrid(ManagedSurface32 *surface, const MysticMa
 			if (cells[cellIdx].type == MysticMarshGrid::kCellEmptyType00 || isPortalCellType(cells[cellIdx].type) || !isCellBorderVisible(column, row))
 				continue;
 			const Common::Point32 pos = cellPosition(cellIdx);
-			const float left = pos.x;
+			const float left = pos.x + kBorderOffset;
 			const float top = pos.y + 60;
 			const float bottom = pos.y + 91;
 			lines.push_back({left, top, left + 44, top});
-			lines.push_back({left + kSideTopOffset, top, left + 10 + kSideBottomOffset, bottom});
+			lines.push_back({left, top, left + 10, bottom});
 			if (row + 1 == MysticMarshGrid::kRows || cells[cellIdx + 1].type == MysticMarshGrid::kCellEmptyType00 ||
 				isPortalCellType(cells[cellIdx + 1].type) || !isCellBorderVisible(column, row + 1)) {
 				lines.push_back({left + 10, bottom, left + 54, bottom});
@@ -2504,7 +2503,7 @@ void MysticMarshL4Background::drawGrid(ManagedSurface32 *surface, const MysticMa
 			if (column + 1 == MysticMarshGrid::kColumns ||
 				cells[cellIdx + MysticMarshGrid::kRows].type == MysticMarshGrid::kCellEmptyType00 ||
 				isPortalCellType(cells[cellIdx + MysticMarshGrid::kRows].type) || !isCellBorderVisible(column + 1, row)) {
-				lines.push_back({left + 44 + kSideTopOffset, top, left + 54 + kSideBottomOffset, bottom});
+				lines.push_back({left + 44, top, left + 54, bottom});
 			}
 		}
 	}
