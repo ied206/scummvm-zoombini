@@ -363,10 +363,10 @@ void PuzzleAquacube::updateBubbles(uint32 elapsed) {
 					bubble.phase = 0;
 			}
 		} else {
-			// Bank quota so the original two-in-600 roll runs pacingHz times per second.
+			// Limit spawn rolls to the selected pacing rate without replaying missed page updates.
 			bubble._spawnQuota += static_cast<int64>(elapsed) * _vm->getLogicPacingHz();
-			while (1000 <= bubble._spawnQuota) {
-				bubble._spawnQuota -= 1000;
+			if (1000 <= bubble._spawnQuota) {
+				bubble._spawnQuota = MIN<int64>(bubble._spawnQuota - 1000, 999);
 				if (_vm->_rnd->getRandomNumber(599) < 2) {
 					bubble._spawnQuota = 0;
 					bubble.active = true;
@@ -377,7 +377,6 @@ void PuzzleAquacube::updateBubbles(uint32 elapsed) {
 						bubble.originX = _vm->_rnd->getRandomNumber(769);
 					bubble.x = bubble.originX;
 					bubble.phase = 0;
-					break;
 				}
 			}
 		}

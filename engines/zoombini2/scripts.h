@@ -784,13 +784,13 @@ public:
 	void stopAnimationOnCompletion() { _stopAnimationOnCompletion = true; }
 	/** Start a direction-tracked animation on the current grid. */
 	void startDirectionTrackedAnimation(uint32 tickCount);
-	/** Bank quota from @p elapsedMs and @p pacingHz, then run the original one-in-250 fidget rolls owed. */
+	/** Use @p elapsedMs and @p pacingHz to pace at most one fidget roll per draw, discarding missed rolls. */
 	bool tryStartFidgetAnimation(const ZoombiniAnimation *animation, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz);
 	/** Apply the fidget roll to a previously loaded common grid. */
 	bool tryStartFidgetAnimation(ZmbAnimationKind animKind, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz) {
 		return tryStartFidgetAnimation(getCommonAnimation(animKind), randomSrc, tickCount, elapsedMs, pacingHz);
 	}
-	/** Bank quota from @p elapsedMs and @p pacingHz, then run the original one-in-20 celebrate rolls owed. */
+	/** Use @p elapsedMs and @p pacingHz to pace at most one celebration roll per update, discarding missed rolls. */
 	bool tryStartCelebrationAnimation(const ZoombiniAnimation *animation, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz);
 	/** Apply the celebration roll to a previously loaded common grid. */
 	bool tryStartCelebrationAnimation(ZmbAnimationKind animKind, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz) {
@@ -861,9 +861,9 @@ private:
 	const ZoombiniAnimation *_savedAnimation = nullptr;
 	/** Whether the common renderer may start a fidget animation. */
 	bool _fidgetAnimationEnabled = true;
-	/** Banked fidget-roll quota; the original one-in-250 roll runs once per 1000 banked units. */
+	/** Fidget-roll credit in thousandths of a reference frame, capped below one frame after each roll. */
 	int64 _fidgetRollQuota = 0;
-	/** Banked celebrate-roll quota; the original one-in-20 roll runs once per 1000 banked units. */
+	/** Celebration-roll credit in thousandths of a reference frame, capped below one frame after each roll. */
 	int64 _celebrateRollQuota = 0;
 	/** Gameplay tick at which the next animation frame becomes due. */
 	uint32 _nextAnimationFrameTime = 0;

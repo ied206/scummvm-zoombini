@@ -252,7 +252,7 @@ private:
 	/** Return the waiting-animation delay for @p frame. */
 	static uint32 getWaitingFrameDelay(int frame);
 
-	/** Advance edge scrolling at the displacement of 60 frames per second. */
+	/** Pace edge scrolling at the selected reference rate, advancing at most one hover step per update. */
 	void updateScroll(uint32 now);
 	/** Convert a scene actor's anchor to the current viewport. */
 	int getActorScreenX(int sceneX) const;
@@ -278,8 +278,7 @@ private:
 	/** Draw all waiting and walking decorative Boolies. */
 	void drawCrowdActors(ManagedSurface32 *screen) const;
 	/** Draw one Little-Zoombini state from @p animation at a cyclic scene position. */
-	void drawZoombiniInPanorama(const ZoombiniRunner &zoombini, const ZoombiniAnimation *animation, int cell, int animationFrame,
-								const Common::Point32 &pos, ManagedSurface32 *screen) const;
+	void drawZoombiniInPanorama(const ZoombiniRunner &zoombini, const ZoombiniAnimation *animation, int cell, int animationFrame, const Common::Point32 &pos, ManagedSurface32 *screen) const;
 
 	/** Current horizontal origin within the cyclic panorama. */
 	int _scrollX = 10;
@@ -287,7 +286,7 @@ private:
 	int _pendingScrollDelta = 0;
 	/** Gameplay tick of the previous scroll update, used to calculate elapsed motion. */
 	uint32 _lastScrollTime = 0;
-	/** Signed thousandths of a pixel carried between edge-hover updates; cleared by a click jump or leaving the edge. */
+	/** Signed hover-scroll credit in thousandths of a pixel, bounded below one step and cleared by a click or leaving the edge. */
 	int _scrollRemainder = 0;
 	/** Development stage selected from the rescued total. */
 	int _developmentStage = 1;

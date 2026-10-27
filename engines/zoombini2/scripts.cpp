@@ -1308,12 +1308,12 @@ void ZoombiniRunner::startDirectionTrackedAnimation(uint32 tickCount) {
 bool ZoombiniRunner::tryStartCelebrationAnimation(const ZoombiniAnimation *animation, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz) {
 	if (!animation || !canAdvanceFromPage() || _animationActive)
 		return false;
-	// Bank quota so the original one-in-20 roll runs pacingHz times per second.
-	// The remainder spreads multi-roll frames evenly when pacing exceeds the render rate.
+	// Limit rolls to the selected pacing rate without replaying missed page updates.
 	// The celebrate grid is an ordinary page-selected grid, so it repeats like the original.
 	_celebrateRollQuota += static_cast<int64>(elapsedMs) * pacingHz;
-	while (1000 <= _celebrateRollQuota) {
-		_celebrateRollQuota -= 1000;
+	if (1000 <= _celebrateRollQuota) {
+		// Retain fractional credit across millisecond rounding without banking another roll.
+		_celebrateRollQuota = MIN<int64>(_celebrateRollQuota - 1000, 999);
 		if (randomSrc.getRandomNumber(19) == 1) {
 			_celebrateRollQuota = 0;
 			startAnimation(animation, 33, tickCount);
@@ -1326,11 +1326,11 @@ bool ZoombiniRunner::tryStartCelebrationAnimation(const ZoombiniAnimation *anima
 bool ZoombiniRunner::tryStartFidgetAnimation(const ZoombiniAnimation *animation, Random &randomSrc, uint32 tickCount, uint32 elapsedMs, int pacingHz) {
 	if (!animation || !_vm || _hidden || _animationActive || _movementPath || _activeAnimation != getCommonAnimation(ZmbAnimationKind::kBasic))
 		return false;
-	// Bank quota so the original one-in-250 roll runs pacingHz times per second.
-	// The remainder spreads double-roll frames evenly when pacing exceeds the render rate.
+	// Limit rolls to the selected pacing rate without replaying missed render passes.
 	_fidgetRollQuota += static_cast<int64>(elapsedMs) * pacingHz;
-	while (1000 <= _fidgetRollQuota) {
-		_fidgetRollQuota -= 1000;
+	if (1000 <= _fidgetRollQuota) {
+		// Retain fractional credit across millisecond rounding without banking another roll.
+		_fidgetRollQuota = MIN<int64>(_fidgetRollQuota - 1000, 999);
 		if (randomSrc.getRandomNumber(249) == 1 && _fidgetAnimationEnabled && !_held) {
 			_fidgetRollQuota = 0;
 			startAnimation(animation, 33, tickCount, AnimationCompletionPolicy::kBypassCallbackAndCorrection01);
