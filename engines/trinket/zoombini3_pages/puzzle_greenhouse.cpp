@@ -42,8 +42,8 @@ void GreenhouseRules::shuffle(uint *values, uint count, uint first, Shell::Rando
 	for (uint i = 0; i < count; i++)
 		values[i] = first + i;
 	for (uint i = 0; i < 10 * count; i++) {
-		uint a = random.draw() % count;
-		uint b = random.draw() % count;
+		uint a = random.getRandomNumber(count - 1);
+		uint b = random.getRandomNumber(count - 1);
 		SWAP(values[a], values[b]);
 	}
 }
@@ -61,7 +61,7 @@ bool GreenhouseRules::loadTemplate(const OM::XMLParser &templates, uint family, 
 	}
 	if (!count)
 		return false;
-	path += Common::String::format(kTUnsignedIndexFormat, random.draw() % count + 1);
+	path += Common::String::format(kTUnsignedIndexFormat, static_cast<uint>(random.getRandomNumber(count - 1) + 1));
 	const OM::XMLParser::Element *selected = nullptr;
 	for (uint i = 0; i < elements.size(); i++) {
 		if (elements[i].path.equals(path))
@@ -99,7 +99,7 @@ bool GreenhouseRules::loadTemplate(const OM::XMLParser &templates, uint family, 
 		}
 	}
 	if (orientation == -1)
-		orientation = random.draw() % 4;
+		orientation = random.getRandomNumber(3);
 	static constexpr uint shifts[] = {
 		0,
 		2,
@@ -131,8 +131,8 @@ bool GreenhouseRules::generate(uint level, const OM::XMLParser &templates, Shell
 	for (uint i = 0; i < 12; i++) {
 		bool overlaps;
 		do {
-			int x = random.draw() % (155 - mothSize.x);
-			int y = 150 + random.draw() % (350 - mothSize.y);
+			int x = random.getRandomNumber(154 - mothSize.x);
+			int y = 150 + random.getRandomNumber(349 - mothSize.y);
 			_moths[i].supply = Common::Point(x, y);
 			Common::Rect bounds(x, y, x + mothSize.x, y + mothSize.y);
 			overlaps = false;
@@ -150,17 +150,17 @@ bool GreenhouseRules::generate(uint level, const OM::XMLParser &templates, Shell
 		return false;
 	for (uint i = 0; i < 144; i++) {
 		if (!(_cells[i] & 3))
-			_cells[i] += random.draw() % 3 + 1;
+			_cells[i] += random.getRandomNumber(2) + 1;
 		if (!(_cells[i] & 28))
-			_cells[i] += (random.draw() % shapes + 1) << 2;
+			_cells[i] += (random.getRandomNumber(shapes - 1) + 1) << 2;
 		if (!(_cells[i] & 224))
-			_cells[i] += (random.draw() % colors + 1) << 5;
+			_cells[i] += (random.getRandomNumber(colors - 1) + 1) << 5;
 		_original[i] = _cells[i];
 	}
 	if (1 < level) {
 		while (_scramble.size() < 20) {
-			uint a = random.draw() % 144;
-			uint b = random.draw() % 144;
+			uint a = random.getRandomNumber(143);
+			uint b = random.getRandomNumber(143);
 			if (a == b || (level == 3 && (_cells[a] & 3) != (_cells[b] & 3)))
 				continue;
 			SWAP(_cells[a], _cells[b]);
@@ -253,13 +253,13 @@ GreenhouseRules::Direction GreenhouseRules::nextDirection(uint index, int &colum
 		0,
 	};
 	static constexpr uint priorities[4][3] = {{3, 4, 2}, {4, 3, 1}, {2, 1, 4}, {1, 2, 3}};
-	uint32 oldest = UINT_MAX;
+	uint32 oldest = UINT32_MAX;
 	uint32 visits[5] = {
-		UINT_MAX,
-		UINT_MAX,
-		UINT_MAX,
-		UINT_MAX,
-		UINT_MAX,
+		UINT32_MAX,
+		UINT32_MAX,
+		UINT32_MAX,
+		UINT32_MAX,
+		UINT32_MAX,
 	};
 	for (uint direction = 1; direction <= 4; direction++) {
 		int x = column + dx[direction];
@@ -269,7 +269,7 @@ GreenhouseRules::Direction GreenhouseRules::nextDirection(uint index, int &colum
 			oldest = MIN(oldest, visits[direction]);
 		}
 	}
-	if (oldest == UINT_MAX)
+	if (oldest == UINT32_MAX)
 		return kNone00;
 	uint direction = moth.direction;
 	if (visits[direction] != oldest) {
@@ -731,9 +731,9 @@ bool GreenhouseMachine::start(uint32 seed) {
 			seed = ConfMan.getInt(TrinketMetaEngine::kConfigRandomSeed);
 	}
 	_seed = seed;
-	_vm.rnd().setSeed(seed);
+	_vm._rnd->setSeed(seed);
 	Common::Point size(_moths[0].body->width(), _moths[0].body->height());
-	if (!_rules.generate(_level, templates, _vm.rnd(), size))
+	if (!_rules.generate(_level, templates, *_vm._rnd, size))
 		return false;
 	for (uint i = 0; i < 144; i++)
 		rebuildPlant(i);
@@ -915,8 +915,8 @@ void GreenhouseMachine::updateBeetles() {
 			2,
 		};
 		for (uint i = 0; i < 30; i++) {
-			uint a = _vm.rnd().draw() % 3;
-			uint b = _vm.rnd().draw() % 3;
+			uint a = _vm._rnd->getRandomNumber(2);
+			uint b = _vm._rnd->getRandomNumber(2);
 			SWAP(order[a], order[b]);
 		}
 		for (uint i = 0; i < 3; i++) {
@@ -967,7 +967,7 @@ void GreenhouseMachine::updateBeetles() {
 			uint direction = beetle.direction;
 			uint flow = beetle.trait ? _rules.beetleFlow(cell) : 1;
 			if (flow == 6)
-				flow = _vm.rnd().draw() % 100 < 50 ? 2 : 4;
+				flow = _vm._rnd->getRandomNumber(99) < 50 ? 2 : 4;
 			if (flow == 1) {
 				y += 1;
 				direction = 2;

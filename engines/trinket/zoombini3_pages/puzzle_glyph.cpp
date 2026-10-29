@@ -113,8 +113,8 @@ GlyphRules::GlyphRules() {
 
 void GlyphRules::shuffleByPairs(int *values, uint count, Shell::Random &random) {
 	for (uint i = 0; i < count; i++) {
-		uint first = random.draw() % count;
-		uint second = random.draw() % count;
+		uint first = random.getRandomNumber(count - 1);
+		uint second = random.getRandomNumber(count - 1);
 		SWAP(values[first], values[second]);
 	}
 }
@@ -133,14 +133,14 @@ bool GlyphRules::generate(uint level, Shell::Random &random) {
 		_glyphs[i] = i;
 	// Seed each symbol once before filling the remaining cells.
 	for (uint i = 0; i < kValueCount; i++) {
-		uint other = random.draw() % _glyphCount;
+		uint other = random.getRandomNumber(_glyphCount - 1);
 		SWAP(_glyphs[i], _glyphs[other]);
 	}
 	uint cell = 0;
 	for (uint i = 0; i < _glyphCount - kValueCount; i++) {
 		while (0 <= _glyphs[cell])
 			cell += 1;
-		_glyphs[cell] = random.draw() % kValueCount;
+		_glyphs[cell] = random.getRandomNumber(kValueCount - 1);
 		cell += 1;
 	}
 	for (uint i = 0; i < kValueCount; i++)
@@ -185,7 +185,7 @@ void GlyphRules::addDuplicatePatterns(int *starts, Shell::Random &random) {
 	for (uint row = 0; row < kRowCount; row++) {
 		uint gapCounts[tilesPerRow + 1] = {};
 		for (uint i = 0; i < gaps; i++)
-			gapCounts[random.draw() % (tilesPerRow + 1)] += 1;
+			gapCounts[random.getRandomNumber(tilesPerRow)] += 1;
 		for (uint gap = 0; gap <= tilesPerRow; gap++) {
 			for (uint i = 0; i < gapCounts[gap]; i++) {
 				markers[cell] = kGap;
@@ -244,7 +244,7 @@ void GlyphRules::addDuplicatePatterns(int *starts, Shell::Random &random) {
 			}
 		}
 		assert(0 < total);
-		int choice = random.draw() % total + 1;
+		int choice = random.getRandomNumber(total - 1) + 1;
 		for (uint i = 0; i < ranges.size(); i++) {
 			if (ranges[i].count < choice) {
 				choice -= ranges[i].count;

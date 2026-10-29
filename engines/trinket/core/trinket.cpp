@@ -118,8 +118,8 @@ bool Trinket::play(const Common::String &method, const ScriptArguments &sargs, S
 	if (method.equals(kMethodPlace)) {
 		return set(kPropertyX, ScriptArguments(), sargs[0]) && set(kPropertyY, ScriptArguments(), sargs[1]);
 	} else {
-		return set(kPropertyX, ScriptArguments(), ScriptValue(static_cast<int32>(x + sargs[0].toInt32()))) &&
-			   set(kPropertyY, ScriptArguments(), ScriptValue(static_cast<int32>(y + sargs[1].toInt32())));
+		return set(kPropertyX, ScriptArguments(), ScriptValue(x + sargs[0].toInt32())) &&
+			   set(kPropertyY, ScriptArguments(), ScriptValue(y + sargs[1].toInt32()));
 	}
 }
 

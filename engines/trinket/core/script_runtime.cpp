@@ -702,7 +702,7 @@ bool ScriptRuntime::operate(char operation, const ScriptValue &left, const Scrip
 	} else if (operation == '%' || operation == '\\') {
 		int32 divisor = right.toInt32Trunc();
 		int32 dividend = left.toInt32Trunc();
-		if (!divisor || (dividend == INT_MIN && divisor == -1))
+		if (!divisor || (dividend == INT32_MIN && divisor == -1))
 			return fail("Invalid integer division");
 		result = ScriptValue(operation == '%' ? dividend % divisor : dividend / divisor);
 	} else {

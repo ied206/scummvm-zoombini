@@ -163,7 +163,7 @@ bool Saves::exportSlot(uint player, Common::WriteStream &stream) const {
 
 bool Saves::importSave(const Common::String &name, Common::SeekableReadStream &stream) {
 	_rollbackFailed = false;
-	if (!validName(name) || 99 <= _registry.users.size() || 99 <= players().size() || 2147483647u <= _registry.nextID)
+	if (!validName(name) || 99 <= _registry.users.size() || 99 <= players().size() || INT32_MAX <= _registry.nextID)
 		return false;
 	for (const auto &user : _registry.users) {
 		if (user.name.equals(name))

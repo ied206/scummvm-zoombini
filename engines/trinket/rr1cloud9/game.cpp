@@ -142,7 +142,7 @@ bool Game::prepareState(Common::SeekableReadStream *save, const Common::String &
 	_practice = false;
 	_world.reset();
 	_sound = {ConfMan.getInt(TrinketMetaEngine::kOptionMusicVolume), ConfMan.getInt(TrinketMetaEngine::kOptionSfxVolume),
-			   ConfMan.getInt(TrinketMetaEngine::kOptionSpeechVolume), ConfMan.getBool(TrinketMetaEngine::kOptionMute)};
+			  ConfMan.getInt(TrinketMetaEngine::kOptionSpeechVolume), ConfMan.getBool(TrinketMetaEngine::kOptionMute)};
 	if (!save)
 		return true;
 	return readSave(*save, _location, _sound, _arrivalPending, _world);
@@ -170,13 +170,13 @@ bool Game::readSave(Common::SeekableReadStream &save, int &location, SoundSettin
 		return false;
 	if (4 <= version && !world.artwork.load(save))
 		return false;
-	return !save.err() && !save.eos() && 1 <= location && location <= static_cast<int>(ARRAYSIZE(kPages)) &&
+	return !save.err() && !save.eos() && 1 <= location && location <= ARRAYSIZE(kPages) &&
 		   sound.music <= Audio::Mixer::kMaxMixerVolume && sound.effects <= Audio::Mixer::kMaxMixerVolume &&
 		   sound.speech <= Audio::Mixer::kMaxMixerVolume;
 }
 
 bool Game::prepareBoot(int bootParam) {
-	if (bootParam < 1 || static_cast<int>(ARRAYSIZE(kPages)) < bootParam)
+	if (bootParam < 1 || ARRAYSIZE(kPages) < bootParam)
 		return false;
 	prepareState(nullptr, kNavigationName);
 	_location = bootParam;
@@ -309,7 +309,7 @@ void Game::finishMovie(bool skipToSignin) {
 }
 
 bool Game::enterPage(int location) {
-	if (location < 1 || static_cast<int>(ARRAYSIZE(kPages)) < location)
+	if (location < 1 || ARRAYSIZE(kPages) < location)
 		return false;
 	Common::String name = kPages[location - 1];
 	_credits.reset();
@@ -797,7 +797,7 @@ Common::String Game::debugPageCommand(const Common::String &command) {
 	if (command.equals(kCacheName)) {
 		OM::FontCache &fonts = _vm.fonts();
 		return "Page: " + _scene.cacheDescription() + "\nMap: " + _mapScene.cacheDescription() +
-			Common::String::format("\nFonts: retained=%u decodes=%" PRIu64 " hits=%" PRIu64 "\n", fonts.size(), fonts.decodes(), fonts.hits());
+			   Common::String::format("\nFonts: retained=%u decodes=%" PRIu64 " hits=%" PRIu64 "\n", fonts.size(), fonts.decodes(), fonts.hits());
 	}
 	if (command.hasPrefix(kGoCommandPrefix))
 		return enterPage(pageIndex(command.substr(3))) ? "Page entered.\n" : "Unknown or unavailable page.\n";

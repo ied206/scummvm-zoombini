@@ -141,7 +141,7 @@ bool SheepCrossing::enter() {
 	else {
 		int choice = 0;
 		if (_state == 1)
-			choice = _host._vm.rnd().number(1, 2);
+			choice = _host._vm._rnd->getRandomNumberRng(1, 2);
 		else if (_state == 2)
 			choice = increment(kR1CG2State2CountKey) == 1 ? 1 : 2;
 		else if (world.get(kPreviousLocationKey) == 2 && increment(kR1CG2State3CountKey) == 1)
@@ -201,7 +201,7 @@ void SheepCrossing::update(uint32 time) {
 	} else if (_phase == kSpeech)
 		_phase = kIdle;
 	else if (!_host._practice && static_cast<uint32>(number(kGIdleHelpTimeName)) <= time - _idle) {
-		int choice = _host._vm.rnd().number(3, number(kMaxIdleIndexKey));
+		int choice = _host._vm._rnd->getRandomNumberRng(3, number(kMaxIdleIndexKey));
 		if (increment(kR1CG2IdleCountKey) == 1 && _state < 3)
 			choice = _state;
 		group(kIdleCharIDKey, kIdleSpchIDKey, kMaxIdleIndexSpeechesKey, Common::String::format(kSignedIndexFormat, choice));
@@ -214,7 +214,7 @@ void SheepCrossing::talk(bool sheep) {
 		_destination = _host._page->text(kPreviousLocations1Key);
 		return;
 	}
-	int choice = _host._vm.rnd().number(sheep ? 5 : 4, number(sheep ? kMaxSheepIndexKey : kMaxMainIndexKey));
+	int choice = _host._vm._rnd->getRandomNumberRng(sheep ? 5 : 4, number(sheep ? kMaxSheepIndexKey : kMaxMainIndexKey));
 	int count = increment(sheep ? kR1CG2SheepClicksKey : kR1CG2MainClicksKey);
 	if (count == 1) {
 		if (_state == 1)
@@ -249,7 +249,7 @@ bool SheepCrossing::click(Common::Point point) {
 			continue;
 		if (entry._key.equals(kPaigeName)) {
 			Common::String suffix = Common::String::format(kSignedIndexFormat, _state);
-			suffix += Common::String::format(kSignedIndexFormat, _host._vm.rnd().number(1, number(kNumHelpSpchsKey + suffix)));
+			suffix += Common::String::format(kSignedIndexFormat, _host._vm._rnd->getRandomNumberRng(1, number(kNumHelpSpchsKey + suffix)));
 			_host.say(_host._page->text(kHelpSpchCharIDsKey + suffix), number(kHelpSpchIDsKey + suffix));
 		} else
 			talk(false);
@@ -279,7 +279,7 @@ bool SheepCrossing::donate(uint item) {
 	if (_moving)
 		_host.say(_host._page->text(kWrongItemCharIDKey), number(kWrongItemSpchIDKey));
 	else {
-		int choice = _host._vm.rnd().number(1, number(kMaxItemSpchsKey));
+		int choice = _host._vm._rnd->getRandomNumberRng(1, number(kMaxItemSpchsKey));
 		if (item == static_cast<uint>(number(kINV1WhistleKey)))
 			choice = 3;
 		Common::String suffix = Common::String::format(kSignedIndexFormat, choice);

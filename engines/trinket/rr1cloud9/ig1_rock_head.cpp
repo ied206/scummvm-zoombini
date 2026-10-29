@@ -163,7 +163,7 @@ bool RockHead::character(const char *name, const char *prefix, int pose) {
 	int lips = number(base + kLipsIDName + suffix);
 	if (!lips)
 		lips = settle;
-	Common::ScopedPtr<Shell::Character> actor(new Shell::Character(_host._scene, _host._vm.mixer(), _host._vm.resources(), _host._vm.rnd(), _host));
+	Common::ScopedPtr<Shell::Character> actor(new Shell::Character(_host._scene, _host._vm.mixer(), _host._vm.resources(), *_host._vm._rnd, _host));
 	if (!actor->create(settle ? settle : lips, number(base + kZName)))
 		return false;
 	actor->movable = false;
@@ -260,7 +260,7 @@ void RockHead::entrySpeech() {
 	else if (world.get(kPreviousLocationKey) == 20) {
 		int count = world.get(kR1IG1RainbowSlideCountKey) + 1;
 		world.set(kR1IG1RainbowSlideCountKey, count);
-		Common::String suffix = Common::String::format(kSignedIndexFormat, count == 1 ? 1 : _host._vm.rnd().number(2, 3));
+		Common::String suffix = Common::String::format(kSignedIndexFormat, count == 1 ? 1 : _host._vm._rnd->getRandomNumberRng(2, 3));
 		group(kReEnterCharIDsKey + suffix, kReEnterSpchIDsKey + suffix, number(kMaxReEnterSpchsKey + suffix));
 	}
 }
@@ -344,7 +344,7 @@ void RockHead::update(uint32 time) {
 		_phase = kIdle;
 	else if (_phase == kIdle && !_host._practice && static_cast<uint32>(number(kGIdleHelpTimeName)) <= time - _idle) {
 		Common::String suffix = Common::String::format(kSignedIndexFormat, _state < 3 ? 1 : _pose + 1);
-		suffix += Common::String::format(kSignedIndexFormat, _host._vm.rnd().number(1, number(kMaxIdleIndexKey + suffix)));
+		suffix += Common::String::format(kSignedIndexFormat, _host._vm._rnd->getRandomNumberRng(1, number(kMaxIdleIndexKey + suffix)));
 		group(kIdleCharIDKey + suffix, kIdleSpchIDKey + suffix, number(kMaxIdleIndexSpeechesKey + suffix));
 		_idle = time;
 	}
@@ -352,7 +352,7 @@ void RockHead::update(uint32 time) {
 
 void RockHead::mainSpeech() {
 	if (_state == 1) {
-		int choice = _host._vm.rnd().number(1, _host._world.visits(Page::kPageCA1) ? 4 : 3);
+		int choice = _host._vm._rnd->getRandomNumberRng(1, _host._world.visits(Page::kPageCA1) ? 4 : 3);
 		if (!_host._world.visits(Page::kPageCA1) && choice == 3)
 			choice = 4;
 		Common::String suffix = Common::String::format(k1SignedIndexFormat, choice);
@@ -360,7 +360,7 @@ void RockHead::mainSpeech() {
 	} else if (_state == 2)
 		line(kMainSpchCharIDs2Key, kMainSpchIDs2Key);
 	else if (_state == 3 && _pose == 1) {
-		Common::String suffix = Common::String::format(k3SignedIndexFormat, _host._vm.rnd().number(1, 2));
+		Common::String suffix = Common::String::format(k3SignedIndexFormat, _host._vm._rnd->getRandomNumberRng(1, 2));
 		line(kMainSpchCharIDsKey + suffix, kMainSpchIDsKey + suffix);
 	} else
 		rockSpeech();
@@ -410,7 +410,7 @@ void RockHead::rockSpeech() {
 void RockHead::hoopClick() {
 	if (_pose == 1) {
 		_host.playSounds({static_cast<uint16>(number(kWAVECOMSOFTCLICKName))});
-		Common::String suffix = Common::String::format(kSignedIndexFormat, _host._vm.rnd().number(1, number(kMaxHoopSpchsKey)));
+		Common::String suffix = Common::String::format(kSignedIndexFormat, _host._vm._rnd->getRandomNumberRng(1, number(kMaxHoopSpchsKey)));
 		group(kHoopCharIDKey + suffix, kHoopSpchIDKey + suffix, number(kNumHoopSpchsKey + suffix));
 	} else if (_host._world.get(kR1IG1HatHereKey) && !_host._practice) {
 		_host.playSounds({static_cast<uint16>(number(kWAVECOMPICKUPName))});
@@ -444,7 +444,7 @@ bool RockHead::click(Common::Point point) {
 			rockSpeech();
 		else if (entry._key.equals(kPaigeName)) {
 			int state = _state;
-			int choice = _host._vm.rnd().number(1, number(Common::String::format(kMaxHelpSpchsSignedIndexKey, state)));
+			int choice = _host._vm._rnd->getRandomNumberRng(1, number(Common::String::format(kMaxHelpSpchsSignedIndexKey, state)));
 			if (state == 3 && _host._world.get(kR1IG1HatHereKey)) {
 				state = 4;
 				choice = 1;
@@ -490,10 +490,10 @@ bool RockHead::donate(uint item) {
 	if (_pose == 1 && item == 8)
 		line(kRockCharID211Key, kRockSpchID211Key);
 	else if (_pose == 2 && world.get(kTalkedToRockHeadKey)) {
-		Common::String suffix = Common::String::format(kSignedIndexFormat, _host._vm.rnd().number(1, number(kMaxWrongColorSpchsKey)));
+		Common::String suffix = Common::String::format(kSignedIndexFormat, _host._vm._rnd->getRandomNumberRng(1, number(kMaxWrongColorSpchsKey)));
 		line(kWrongColorCharIDKey + suffix, kWrongColorSpchIDKey + suffix);
 	} else {
-		Common::String suffix = Common::String::format(kSignedIndexFormat, _host._vm.rnd().number(1, number(kMaxItemSpchsKey)));
+		Common::String suffix = Common::String::format(kSignedIndexFormat, _host._vm._rnd->getRandomNumberRng(1, number(kMaxItemSpchsKey)));
 		line(kItemCharSpchKey + suffix, kItemSpchsIDKey + suffix);
 	}
 	return false;

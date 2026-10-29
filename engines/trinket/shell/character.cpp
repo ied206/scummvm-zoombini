@@ -151,7 +151,7 @@ bool Character::set(const Common::String &property, const Core::ScriptArguments 
 }
 
 void Character::schedule(FidgetGroup &group) {
-	group.deadline = ticks(_time) + 60 * (group.minimum + _random.draw() % (group.maximum - group.minimum));
+	group.deadline = ticks(_time) + 60 * (group.minimum + _random.getRandomNumber(32767) % (group.maximum - group.minimum));
 }
 
 bool Character::addFidgetGroup(uint groupTag, uint minimum, uint maximum, bool repeat) {
@@ -205,7 +205,7 @@ void Character::updateFidgets() {
 		if (!visible || isBusy() || _fidget || _paused)
 			schedule(group);
 		else if (!group.available.empty()) {
-			uint choice = _random.draw() % group.available.size();
+			uint choice = _random.getRandomNumber(group.available.size() - 1);
 			_fidget = group.sprites[group.available[choice]];
 			_fidgetGroup = i;
 			_fidgetHidesSettle = group.hideSettle[group.available[choice]];

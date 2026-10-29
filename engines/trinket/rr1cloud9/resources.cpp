@@ -68,7 +68,7 @@ Common::SeekableReadStream *Resources::unpack(Common::SeekableReadStream *stream
 		return stream;
 	}
 	Common::ScopedPtr<Common::SeekableReadStream> source(stream);
-	if (source->size() < 17 || 0xffffffffULL < static_cast<uint64>(source->size()))
+	if (source->size() < 17 || UINT32_MAX < static_cast<uint64>(source->size()))
 		return nullptr;
 	const uint32 size = source->readUint32LE();
 	// Each three-byte match expands by at most 255 bytes. Check before allocating.

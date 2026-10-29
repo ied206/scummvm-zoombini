@@ -371,7 +371,7 @@ bool Gumball::enter() {
 	} else if (_state == 3) {
 		group(kRsggName, kReEnterSpchIDs3Key);
 	} else {
-		int choice = _host._vm.rnd().number(1, 3);
+		int choice = _host._vm._rnd->getRandomNumberRng(1, 3);
 		if (choice == 1)
 			group(kRgName, kReEnterSpchIDs41Key);
 		else if (choice == 2)
@@ -384,8 +384,8 @@ bool Gumball::enter() {
 }
 
 void Gumball::randomDataset() {
-	_dataset = _host._vm.rnd().number(1, number(Common::String::format(kMaxDataSetsSignedIndexKey, _level)));
-	_set = _host._vm.rnd().number(1, number(kNumSetsKey));
+	_dataset = _host._vm._rnd->getRandomNumberRng(1, number(Common::String::format(kMaxDataSetsSignedIndexKey, _level)));
+	_set = _host._vm._rnd->getRandomNumberRng(1, number(kNumSetsKey));
 }
 
 void Gumball::setupRamps() {
@@ -393,7 +393,7 @@ void Gumball::setupRamps() {
 		Ramp &ramp = _ramps[i];
 		if (!ramp.sprite)
 			continue;
-		ramp.right = _host._vm.rnd().number(1, 2) == 2;
+		ramp.right = _host._vm._rnd->getRandomNumberRng(1, 2) == 2;
 		ramp.locked = false;
 		if (_level < 3) {
 			for (uint j = 1; j <= 2; j++) {
@@ -412,11 +412,11 @@ void Gumball::setupRamps() {
 		// Keep the previous candidate index when changing to the lower ramp group.
 		int previous = 0;
 		for (uint j = 1; j <= 3; j++) {
-			int candidate = 1 + _host._vm.rnd().excluding(j < 3 ? 5 : 4, previous - 1);
+			int candidate = 1 + _host._vm._rnd->getRandomNumberExcluding(j < 3 ? 5 : 4, previous - 1);
 			int node = number(Common::String::format(kFixedRamp3SignedIndexSignedIndexKey, j < 3 ? 1 : 2, candidate));
 			Ramp &ramp = _ramps[node];
 			ramp.locked = true;
-			ramp.right = _host._vm.rnd().number(1, 2) == 2;
+			ramp.right = _host._vm._rnd->getRandomNumberRng(1, 2) == 2;
 			previous = candidate;
 			if (node == 8)
 				ramp.right = true;
@@ -493,8 +493,8 @@ bool Gumball::puzzle() {
 	for (uint i = 0; i < 3; i++)
 		_order[i] = i + 1;
 	// The authored three-word permutation swaps exactly one pair.
-	int first = _host._vm.rnd().number(1, 3) - 1;
-	int second = _host._vm.rnd().excluding(3, first);
+	int first = _host._vm._rnd->getRandomNumberRng(1, 3) - 1;
+	int second = _host._vm._rnd->getRandomNumberExcluding(3, first);
 	SWAP(_order[first], _order[second]);
 	for (uint i = 0; i < 3; i++) {
 		_words[i] = values[_order[i]];
@@ -590,7 +590,7 @@ void Gumball::idle(uint32 time) {
 	if (time - _host._idleStart < 30000)
 		return;
 	_host._idleWaiting = false;
-	int choice = _host._vm.rnd().number(1, 4);
+	int choice = _host._vm._rnd->getRandomNumberRng(1, 4);
 	if (choice <= 2) {
 		_host.say(choice == 1 ? kReaderName : kSamName, number(Common::String::format(kIdleSpchIDsSignedIndexKey, choice)));
 	} else {
@@ -986,7 +986,7 @@ void Gumball::pickup(Reward item) {
 void Gumball::gumHelp() {
 	_gumClicks += 1;
 	if (2 < _state) {
-		say(kGumActor, Common::String::format(kInstructionSpchIDs3SignedIndexKey, _host._vm.rnd().number(1, 2)));
+		say(kGumActor, Common::String::format(kInstructionSpchIDs3SignedIndexKey, _host._vm._rnd->getRandomNumberRng(1, 2)));
 		return;
 	}
 	int help = 0;
@@ -1096,7 +1096,7 @@ bool Gumball::click(Common::Point point) {
 		if (_state == 3) {
 			say(kSamName, kMainSpchIDs3Key);
 		} else {
-			int choice = _host._vm.rnd().number(1, 3);
+			int choice = _host._vm._rnd->getRandomNumberRng(1, 3);
 			if (_state == 2) {
 				if (choice == 1)
 					say(kSamName, kEnterSpchIDs3Key);

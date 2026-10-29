@@ -80,7 +80,7 @@ bool CreditText::load(Common::SeekableReadStream &stream, const OM::NFNTFont &fo
 	if (_content.getPixels() || _width <= 0 || _height <= 0)
 		return false;
 	OM::XMLParser xml;
-	if (stream.pos() < 0 || stream.size() < stream.pos() || 0xFFFFFFFFULL < static_cast<uint64>(stream.size()) ||
+	if (stream.pos() < 0 || stream.size() < stream.pos() || UINT32_MAX < static_cast<uint64>(stream.size()) ||
 		!xml.loadStream(new Common::SeekableSubReadStream(&stream, stream.pos(), stream.size(), DisposeAfterUse::NO)) || !xml.parse())
 		return false;
 	Common::Array<Entry> entries;

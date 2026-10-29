@@ -157,7 +157,7 @@ bool CorralRules::generate(uint level, uint party, Shell::Random &random, Genera
 		do {
 			product = 1;
 			for (uint j = 0; j < 3; j++) {
-				fruit.traits[j] = random.draw() % 4;
+				fruit.traits[j] = random.getRandomNumber(3);
 				product *= fruit.traits[j] + 1;
 			}
 		} while (products[product - 1]);
@@ -165,9 +165,9 @@ bool CorralRules::generate(uint level, uint party, Shell::Random &random, Genera
 		products[product - 1] = true;
 		fruit.consumed = false;
 		fruit.projector = -1;
-		zerble.feet = random.draw() % 3;
-		zerble.tail = random.draw() % 3;
-		uint choice = random.draw() % (12 - i);
+		zerble.feet = random.getRandomNumber(2);
+		zerble.tail = random.getRandomNumber(2);
+		uint choice = random.getRandomNumber(11 - i);
 		zerble.slot = positions[choice];
 		for (uint j = choice; j + 1 < 12 - i; j++)
 			positions[j] = positions[j + 1];
@@ -178,21 +178,21 @@ bool CorralRules::generate(uint level, uint party, Shell::Random &random, Genera
 				fruit.traits[j] = (fruit.traits[j] + 1) % 4;
 			previous[j] = fruit.traits[j];
 		}
-		fruit.supply = Common::Point(fruitX[i], 535 + 2 * (random.draw() % 15));
+		fruit.supply = Common::Point(fruitX[i], 535 + 2 * random.getRandomNumber(14));
 		zerble.position = slotPosition(zerble.slot);
-		zerble.position.x += 2 * (random.draw() % 15) - 15;
-		zerble.position.y += 2 * (random.draw() % 15) - 15;
+		zerble.position.x += 2 * random.getRandomNumber(14) - 15;
+		zerble.position.y += 2 * random.getRandomNumber(14) - 15;
 		zerble.fed = false;
 		if (generator) {
 			if (!generator->corralGenerated(i))
 				return false;
 		} else {
 			// Character construction schedules its blink and idle timers here.
-			random.draw();
-			random.draw();
+			random.getRandomNumber(32767);
+			random.getRandomNumber(32767);
 		}
 	}
-	_axes[0] = random.draw() % 3;
+	_axes[0] = random.getRandomNumber(2);
 	uint remaining[2];
 	uint count = 0;
 	for (uint i = 0; i < 3; i++) {
@@ -201,12 +201,12 @@ bool CorralRules::generate(uint level, uint party, Shell::Random &random, Genera
 			count += 1;
 		}
 	}
-	_axes[1] = remaining[random.draw() % 2];
+	_axes[1] = remaining[random.getRandomNumber(1)];
 	for (uint i = 0; i < 3; i++) {
 		if (i != _axes[0] && i != _axes[1])
 			_axes[2] = i;
 	}
-	random.draw();
+	random.getRandomNumber(32767);
 	return true;
 }
 
@@ -340,7 +340,7 @@ bool CorralRules::relocate(Shell::Random &random) {
 			return false;
 		uint slot;
 		do {
-			slot = slots[i][random.draw() % slots[i].size()];
+			slot = slots[i][random.getRandomNumber(slots[i].size() - 1)];
 		} while (occupied[slot]);
 		occupied[slot] = true;
 		_zerbles[i].slot = slot;
@@ -526,7 +526,7 @@ bool CorralMachine::setup(uint level, uint party) {
 	_fruitRemaining = _zerblesRemaining = party;
 	memset(_moving, 0, sizeof(_moving));
 	memset(_exiting, 0, sizeof(_exiting));
-	if (!_rules.generate(_level, party, _vm.rnd(), this))
+	if (!_rules.generate(_level, party, *_vm._rnd, this))
 		return false;
 	debug(2, "Corral herd created");
 	add(20111, 1);
@@ -709,7 +709,7 @@ void CorralMachine::drop() {
 	for (uint i = 0; i < _rules.projectorCount(); i++) {
 		if (!_trays[i]->bounds.contains(center))
 			continue;
-		if (_rules.project(index, i, _vm.rnd())) {
+		if (_rules.project(index, i, *_vm._rnd)) {
 			positionFruit(index, _fruits[index].position - Common::Point(0, 15));
 			updateProjectors();
 			playEffect(3 <= _rules.turns() ? kResSound20112_RejectEarly : kResSound20113_RejectLate);

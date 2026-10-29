@@ -203,7 +203,7 @@ bool CloudFloors::worker(int pose) {
 		delete _host._actors[kPropertyWorker];
 		_host._actors.erase(kPropertyWorker);
 	}
-	Common::ScopedPtr<Shell::Character> actor(new Shell::Character(_host._scene, _host._vm.mixer(), _host._vm.resources(), _host._vm.rnd(), _host));
+	Common::ScopedPtr<Shell::Character> actor(new Shell::Character(_host._scene, _host._vm.mixer(), _host._vm.resources(), *_host._vm._rnd, _host));
 	if (!actor->create(indexed(kCWSetIDKey, pose), number(kCWZKey)))
 		return false;
 	actor->movable = false;
@@ -307,8 +307,8 @@ bool CloudFloors::enter() {
 	_dataset = world.get(kR1CA1DatasetKey);
 	_set = CLIP(world.get(kR1CA1SetKey), 1, indexed(kNumSetsKey, _level));
 	if (_dataset < 1 || indexed(kMaxDataSetsKey, _level) < _dataset) {
-		_dataset = _host._vm.rnd().number(1, indexed(kMaxDataSetsKey, _level));
-		_set = _host._vm.rnd().number(1, indexed(kNumSetsKey, _level));
+		_dataset = _host._vm._rnd->getRandomNumberRng(1, indexed(kMaxDataSetsKey, _level));
+		_set = _host._vm._rnd->getRandomNumberRng(1, indexed(kNumSetsKey, _level));
 	}
 	_state = CLIP(world.get(kR1CA1StateKey), 1, 3);
 	_brickCount = CLIP(world.get(kR1CA1RoundKey), 0, 3);
@@ -361,7 +361,7 @@ bool CloudFloors::enter() {
 	} else if (world.visits(Page::kPageCA1) == 0) {
 		speeches(kEnterCharIDKey, kEnterSpchIDKey, number(kMaxEntrySpchsKey));
 	} else if (_state == 1) {
-		say(kPropertyWorker, Common::String::format(kReEnterSpchIDs1SignedIndexKey, _host._vm.rnd().number(1, 2)));
+		say(kPropertyWorker, Common::String::format(kReEnterSpchIDs1SignedIndexKey, _host._vm._rnd->getRandomNumberRng(1, 2)));
 	} else if (world.get(kR1CA1ReentryKey)) {
 		say(kPropertyWorker, kReEnterSpchIDs21Key);
 		world.set(kR1CA1ReentryKey, 0);
@@ -459,8 +459,8 @@ bool CloudFloors::setup() {
 	bool adjacent;
 	do {
 		for (uint i = 0; i <= order.size() / 2; i++) {
-			int a = _host._vm.rnd().number(0, order.size() - 1);
-			int b = _host._vm.rnd().excluding(order.size(), a);
+			int a = _host._vm._rnd->getRandomNumberRng(0, order.size() - 1);
+			int b = _host._vm._rnd->getRandomNumberExcluding(order.size(), a);
 			SWAP(order[a], order[b]);
 		}
 		adjacent = false;
@@ -494,8 +494,8 @@ void CloudFloors::assess(bool correct) {
 	if (3 <= streak && !world.get(kR1CA1FixedLevelKey))
 		_level = CLIP(_level + (correct ? 1 : -1), 1, 3);
 	if (previous != _level) {
-		_dataset = _host._vm.rnd().number(1, indexed(kMaxDataSetsKey, _level));
-		_set = _host._vm.rnd().number(1, indexed(kNumSetsKey, _level));
+		_dataset = _host._vm._rnd->getRandomNumberRng(1, indexed(kMaxDataSetsKey, _level));
+		_set = _host._vm._rnd->getRandomNumberRng(1, indexed(kNumSetsKey, _level));
 	}
 }
 
@@ -651,7 +651,7 @@ void CloudFloors::checkpoint() {
 		sayWord(word);
 		sound(kCorrectSfxIDKey);
 		if (_floor == 3) {
-			int i = _host._vm.rnd().number(1, 5);
+			int i = _host._vm._rnd->getRandomNumberRng(1, 5);
 			speech(_host._page->text(Common::String::format(kCongratsCharIDSignedIndexKey, i)), indexed(kCongratsSpchIDKey, i));
 		}
 		_phase = kCorrect;

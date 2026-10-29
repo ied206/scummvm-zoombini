@@ -417,15 +417,15 @@ Core::ScriptableObject *ScriptSession::createNative(const Common::String &name, 
 			position = Common::Point(sargs[1].toInt32(), sargs[2].toInt32());
 			depth = sargs[3].toInt32();
 		}
-		Common::ScopedPtr<Shell::Character> character(new Shell::Character(_scene, _game._vm.mixer(), _paths, _game._vm.rnd(), *this));
+		Common::ScopedPtr<Shell::Character> character(new Shell::Character(_scene, _game._vm.mixer(), _paths, *_game._vm._rnd, *this));
 		return character->create(sargs[0].toInt32(), depth, position) ? character.release() : nullptr;
 	}
 	if (name.equals(kRCatapultGameName) && (sargs.empty() || (sargs.size() == 1 && sargs[0].toText().equals("!"))))
 		return new CatapultMachine(_scene);
 	if (name.equals(kRGlyphGameName) && sargs.size() == 3)
-		return new GlyphMachine(_scene, _game._vm.rnd(), Common::Point(sargs[0].toInt32(), sargs[1].toInt32()), sargs[2].toInt32());
+		return new GlyphMachine(_scene, *_game._vm._rnd, Common::Point(sargs[0].toInt32(), sargs[1].toInt32()), sargs[2].toInt32());
 	if (name.equals(kRPlanetariumGameName) && sargs.size() == 1)
-		return new PlanetariumMachine(_scene, _game._vm.rnd(), sargs[0].toInt32());
+		return new PlanetariumMachine(_scene, *_game._vm._rnd, sargs[0].toInt32());
 	if (name.equals(kRIncubatorName) && sargs.size() == 2) {
 		Common::ScopedPtr<Incubator> incubator(new Incubator(_game._vm, _scene, sargs[0].toInt32(), sargs[1].toInt32()));
 		return incubator->load() ? incubator.release() : nullptr;
@@ -583,7 +583,7 @@ bool ScriptSession::invoke(const Common::String &name, const Core::ScriptArgumen
 		return true;
 	}
 	if (name.equals(kRandomNumberName) && sargs.size() == 2) {
-		result = Core::ScriptValue(_game._vm.rnd().number(sargs[0].toInt32(), sargs[1].toInt32()));
+		result = Core::ScriptValue(_game._vm._rnd->getRandomNumberRng(sargs[0].toInt32(), sargs[1].toInt32()));
 		return true;
 	}
 	if (name.equals(kGetLauncherXMLFilenameName) && sargs.empty()) {
@@ -662,7 +662,7 @@ Shell::Action *ScriptSession::createAction(const Common::String &name, const Cor
 			return nullptr;
 		if (2 < sargs.size())
 			interruptible = sargs[2].toInt32() != 0;
-		return new Shell::RandomDelayAction(_actions, _game._vm.rnd(), first, last, interruptible);
+		return new Shell::RandomDelayAction(_actions, *_game._vm._rnd, first, last, interruptible);
 	}
 	if (name.equals(kPlayAnimActionName) && !sargs.empty() && sargs.size() <= 2) {
 		if (1 < sargs.size())

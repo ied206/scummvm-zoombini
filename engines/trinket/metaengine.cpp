@@ -78,7 +78,7 @@ Common::KeymapArray TrinketMetaEngine::initKeymaps(const char *target) const {
 
 void TrinketMetaEngine::registerDefaultSettings(const Common::String &target) const {
 	(void)target;
-	ConfMan.registerDefault(kOptionPrngAlgorithm, static_cast<int>(Trinket::Shell::Random::PrngAlgorithm::kOriginalPrng));
+	ConfMan.registerDefault(kOptionPrngAlgorithm, static_cast<int>(Trinket::Shell::PrngAlgorithmKind::kOriginalPrng));
 	ConfMan.registerDefault(kOptionStartupMode, static_cast<int>(StartupMode::kDirect00));
 	ConfMan.registerDefault(kOptionColorBlindMode, false);
 }

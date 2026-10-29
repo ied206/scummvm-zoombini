@@ -236,7 +236,7 @@ void PageScene::queenIdle(uint32 time) {
 	if (time - _idleStart < static_cast<uint32>(_page->number(kGIdleHelpTimeName)))
 		return;
 	interrupt();
-	uint choice = _vm.rnd().number(1, _world.get(kR1CN2StateKey) == 1 ? 2 : 3);
+	uint choice = _vm._rnd->getRandomNumberRng(1, _world.get(kR1CN2StateKey) == 1 ? 2 : 3);
 	uint group = choice == 1 ? 1 : 5 - choice;
 	Common::String prefix = Common::String::format(kIdleSpchIDsUnsignedIndexKey, group);
 	say(choice == 1 ? kReaderName : kSamName, _page->number(prefix + k1Name));
@@ -349,7 +349,7 @@ Common::String PageScene::queenClick(Common::Point point) {
 				int last = 9;
 				if (state < 4)
 					last = 7;
-				group = _vm.rnd().number(6, last);
+				group = _vm._rnd->getRandomNumberRng(6, last);
 			} else {
 				group = state - 1;
 			}

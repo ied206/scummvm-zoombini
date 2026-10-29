@@ -199,7 +199,7 @@ void RainbowSlide::update(uint32 time) {
 		if (!_walk->isRunning())
 			_phase = kExitReady;
 	} else if (_phase == kIdle && !_host._practice && static_cast<uint32>(number(kGIdleHelpTimeName)) <= time - _idle) {
-		int choice = _host._vm.rnd().number(1, number(kMaxIdleIndexKey));
+		int choice = _host._vm._rnd->getRandomNumberRng(1, number(kMaxIdleIndexKey));
 		group(kIdleCharIDKey, kIdleSpchIDKey, number(Common::String::format(kMaxIdleIndexSpeechesSignedIndexKey, choice)), choice);
 		_idle = time;
 	}
@@ -218,7 +218,7 @@ void RainbowSlide::carrieClick() {
 			_host.say(_host._page->text(Common::String::format(kCarrieCharID3SignedIndexKey, i)), number(Common::String::format(kCarrieSpchID3SignedIndexKey, i)));
 		return;
 	} else if (_state == 2)
-		groupIndex = _host._vm.rnd().number(4, 5);
+		groupIndex = _host._vm._rnd->getRandomNumberRng(4, 5);
 	group(kCarrieCharIDKey, kCarrieSpchIDKey, number(Common::String::format(kMaxCarrieSpchSignedIndexKey, groupIndex)), groupIndex);
 }
 
@@ -243,16 +243,16 @@ bool RainbowSlide::click(Common::Point point) {
 		if (entry._key.equals(kCarrieActor))
 			carrieClick();
 		else if (entry._key.equals(kPaigeName)) {
-			int choice = _state == 1 ? _host._vm.rnd().number(1, 2) : _state + 1;
+			int choice = _state == 1 ? _host._vm._rnd->getRandomNumberRng(1, 2) : _state + 1;
 			_host.say(_host._page->text(Common::String::format(kHelpCharIDSignedIndexKey, choice)), number(Common::String::format(kHelpSpchIDSignedIndexKey, choice)));
 		} else {
 			int choice;
 			if (_state == 1) {
-				choice = _host._vm.rnd().number(1, _host._world.visits(Page::kPageIA3) ? 3 : 2);
+				choice = _host._vm._rnd->getRandomNumberRng(1, _host._world.visits(Page::kPageIA3) ? 3 : 2);
 				if (!_host._world.visits(Page::kPageIA3) && choice == 2)
 					choice = 3;
 			} else
-				choice = _state < 4 ? _state + 2 : _host._vm.rnd().number(6, 7);
+				choice = _state < 4 ? _state + 2 : _host._vm._rnd->getRandomNumberRng(6, 7);
 			group(kMainCharIDKey, kMainSpchIDKey, number(Common::String::format(kMaxMainSpchSignedIndexKey, choice)), choice);
 		}
 		return true;

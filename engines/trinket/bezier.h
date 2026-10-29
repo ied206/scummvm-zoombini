@@ -33,10 +33,10 @@ public:
 	CubicBezierCurve() = default;
 	/** Assign the four control points in pixels and precompute polynomial coefficients. */
 	void init(const Common::Point32 &start, const Common::Point32 &ctrl0, const Common::Point32 &ctrl1, const Common::Point32 &end) {
-		const FloatPoint startPoint(static_cast<float>(start.x), static_cast<float>(start.y));
-		const FloatPoint ctrl0Point(static_cast<float>(ctrl0.x), static_cast<float>(ctrl0.y));
-		const FloatPoint ctrl1Point(static_cast<float>(ctrl1.x), static_cast<float>(ctrl1.y));
-		const FloatPoint endPoint(static_cast<float>(end.x), static_cast<float>(end.y));
+		const FloatPoint startPoint(start.x, start.y);
+		const FloatPoint ctrl0Point(ctrl0.x, ctrl0.y);
+		const FloatPoint ctrl1Point(ctrl1.x, ctrl1.y);
+		const FloatPoint endPoint(end.x, end.y);
 		const float three = 3.0f;
 		_start = startPoint;
 		_linear = (ctrl0Point - startPoint) * three;

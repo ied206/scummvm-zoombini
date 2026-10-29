@@ -107,8 +107,8 @@ public:
 	bool removeSavedPlayer(const Common::String &name);
 	/** Return the mixer used for game and launcher audio. */
 	Audio::Mixer &mixer() const { return *_mixer; }
-	/** Return the random stream shared by script and native gameplay. */
-	Shell::Random &rnd() { return _random; }
+	/** Owned gameplay random generator shared by scripts and native objects for this engine instance. */
+	Shell::Random *_rnd = nullptr;
 	/** Return the background-music controller shared across scenes. */
 	Shell::BackgroundMusic &music() { return _music; }
 	/** Return the canvas used to draw the current application state. */
@@ -142,8 +142,6 @@ private:
 	OM::FontCache _fonts;
 	/** Resolved canonical directory containing the game's resources. */
 	Common::Path _dataPath;
-	/** Random stream shared by gameplay scripts and native objects. */
-	Shell::Random _random;
 	/** Background-music state retained across game scenes. */
 	Shell::BackgroundMusic _music;
 	/** Canvas used by launcher and gameplay rendering. */

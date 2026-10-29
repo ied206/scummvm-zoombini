@@ -48,9 +48,9 @@ bool GardenRules::generate(uint level, uint party, Shell::Random &random) {
 	for (uint i = 0; i < 12; i++) {
 		_plants[i].hole = -1;
 		for (uint j = 0; j < 4; j++)
-			_plants[i].trait[j] = random.draw() % 4;
+			_plants[i].trait[j] = random.getRandomNumber(3);
 	}
-	_axes[0] = random.draw() % 4;
+	_axes[0] = random.getRandomNumber(3);
 	uint remaining[3];
 	uint count = 0;
 	for (uint i = 0; i < 4; i++) {
@@ -59,7 +59,7 @@ bool GardenRules::generate(uint level, uint party, Shell::Random &random) {
 			count += 1;
 		}
 	}
-	_axes[1] = remaining[random.draw() % 3];
+	_axes[1] = remaining[random.getRandomNumber(2)];
 	count = 0;
 	for (uint i = 0; i < 4; i++) {
 		if (i != _axes[0] && i != _axes[1]) {
@@ -67,7 +67,7 @@ bool GardenRules::generate(uint level, uint party, Shell::Random &random) {
 			count += 1;
 		}
 	}
-	_axes[2] = remaining[random.draw() % 2];
+	_axes[2] = remaining[random.getRandomNumber(1)];
 	if (level < 3)
 		_axes[2] = _axes[0];
 	if (level < 2)
@@ -217,7 +217,7 @@ bool GardenMachine::setup(uint level, uint party) {
 	_selected = _rejected = -1;
 	_returning = false;
 	_valid = true;
-	if (!_rules.generate(level, party, _vm.rnd()))
+	if (!_rules.generate(level, party, *_vm._rnd))
 		return false;
 	static constexpr uint holes[] = {
 		18173,
@@ -470,7 +470,7 @@ void GardenMachine::update(uint32 time) {
 	if (_paused || !_returning)
 		return;
 	// Curve PPS advances one normalized Bezier parameter per second.
-	const float elapsedSeconds = static_cast<float>(_clock.elapsed(_returnTime)) / 1000.0f;
+	const float elapsedSeconds = _clock.elapsed(_returnTime) / 1000.0f;
 	const float parameter = MIN<float>(1.0f, elapsedSeconds);
 	float x = 0.0f;
 	float y = 0.0f;

@@ -278,7 +278,7 @@ bool MusicPatterns::enter() {
 		group(kLocalName, 1, 7);
 		speech(_host._page->text(kLocalCharIDs16Key), number(kLocalSpchIDs18Key));
 	} else {
-		int greeting = _host._vm.rnd().number(2, _count < number(kMaxLightsKey) ? 4 : 3);
+		int greeting = _host._vm._rnd->getRandomNumberRng(2, _count < number(kMaxLightsKey) ? 4 : 3);
 		if (greeting == 3)
 			say(kReaderName, kReEnterSpchIDs31Key);
 		say(kPropertyGrid, Common::String::format(kReEnterSpchIDsSignedIndexSignedIndexKey, greeting, greeting == 3 ? 2 : 1));
@@ -542,7 +542,7 @@ void MusicPatterns::playColumn() {
 		empty = false;
 		_marbles[index].sprite->setFrame(number(kMarbleSingFrameKey));
 		_notes[row]->play(_host._vm.resources(), _host.characterResource(indexed(kMarbleIDKey, row + 1), Shell::Character::Resources::kSound),
-			Audio::Mixer::kSFXSoundType);
+						  Audio::Mixer::kSFXSoundType);
 	}
 	if (empty)
 		_notes[0]->play(_host._vm.resources(), _host.characterResource(number(kBlankSfxIDKey), Shell::Character::Resources::kSound), Audio::Mixer::kSFXSoundType);
@@ -565,7 +565,7 @@ void MusicPatterns::finishPlayback() {
 		_spin->startAnimation(1);
 		_phase = kSpin;
 	} else if (_result == kWrong) {
-		say(kPropertyGrid, Common::String::format(kWrongSpchIDsSignedIndexKey, _host._vm.rnd().number(1, 3)));
+		say(kPropertyGrid, Common::String::format(kWrongSpchIDsSignedIndexKey, _host._vm._rnd->getRandomNumberRng(1, 3)));
 		_phase = kWrongSpeech;
 	} else {
 		if (_result == kListen && _helpAfterPlayback) {
@@ -573,7 +573,7 @@ void MusicPatterns::finishPlayback() {
 			_helpAfterPlayback = false;
 		}
 		if (_result == kLocked)
-			say(kPropertyGrid, Common::String::format(kNoMoveSpchIDSignedIndexKey, _host._vm.rnd().number(1, 2)));
+			say(kPropertyGrid, Common::String::format(kNoMoveSpchIDSignedIndexKey, _host._vm._rnd->getRandomNumberRng(1, 2)));
 		_phase = kIdle;
 		_idle = _host._time;
 	}
@@ -704,7 +704,7 @@ void MusicPatterns::update(uint32 time) {
 		_phase = kIdle;
 	} else if (_phase == kSpin && !_spin->isRunning()) {
 		_spin->visible = false;
-		say(kPropertyGrid, Common::String::format(kCongratsSpchIDSignedIndexKey, _host._vm.rnd().number(1, 4)));
+		say(kPropertyGrid, Common::String::format(kCongratsSpchIDSignedIndexKey, _host._vm._rnd->getRandomNumberRng(1, 4)));
 		_phase = kCongratulations;
 	} else if (_phase == kCongratulations) {
 		accept();
@@ -718,7 +718,7 @@ void MusicPatterns::update(uint32 time) {
 			sound(kFanFareSfxIDKey);
 			speeches(kLastDoorCharIDsKey, kLastDoorSpchIDsKey, 4);
 		} else {
-			int line = _host._vm.rnd().number(1, 3);
+			int line = _host._vm._rnd->getRandomNumberRng(1, 3);
 			speech(_host._page->text(Common::String::format(kDoorOpenCharIDs4SignedIndexKey, line)), indexed(kDoorOpenSpchIDs4Key, line));
 		}
 		_phase = kNext;
@@ -873,7 +873,7 @@ bool MusicPatterns::click(Common::Point point) {
 			if (_level != 3)
 				say(kPropertyGrid, kLocalSpchIDs512Key);
 		} else {
-			say(kPropertyGrid, Common::String::format(kLocalSpchIDs52SignedIndexKey, _host._vm.rnd().number(1, 6)));
+			say(kPropertyGrid, Common::String::format(kLocalSpchIDs52SignedIndexKey, _host._vm._rnd->getRandomNumberRng(1, 6)));
 		}
 		return true;
 	}
