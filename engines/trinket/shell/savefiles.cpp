@@ -27,6 +27,8 @@
 namespace Trinket {
 namespace Shell {
 
+constexpr const char *SaveFiles::kRegistryFile;
+
 bool SaveFiles::line(Common::SeekableReadStream &stream, Common::String &value) {
 	value.clear();
 	while (stream.pos() < stream.size() && value.size() < 1024) {
@@ -41,8 +43,8 @@ bool SaveFiles::line(Common::SeekableReadStream &stream, Common::String &value) 
 }
 
 bool SaveFiles::load() {
-	Common::ScopedPtr<Common::InSaveFile> stream(_manager.openForLoading(_prefix + "users.dat"));
-	if (!stream && !_manager.listSavefiles(_prefix + "users.dat").empty())
+	Common::ScopedPtr<Common::InSaveFile> stream(_manager.openForLoading(_prefix + kRegistryFile));
+	if (!stream && !_manager.listSavefiles(_prefix + kRegistryFile).empty())
 		return false;
 	Common::Array<Player> players;
 	if (!readRegistry(stream.get(), players))
@@ -52,7 +54,7 @@ bool SaveFiles::load() {
 }
 
 bool SaveFiles::store() const {
-	Common::ScopedPtr<Common::OutSaveFile> stream(_manager.openForSaving(_prefix + "users.dat"));
+	Common::ScopedPtr<Common::OutSaveFile> stream(_manager.openForSaving(_prefix + kRegistryFile));
 	if (!stream || !writeRegistry(*stream, _players))
 		return false;
 	stream->finalize();
@@ -65,14 +67,14 @@ bool SaveFiles::storeLocation(uint index, int location, bool forceStore) {
 	Player &player = _players[index];
 	if (!player.current || player.count < player.current || player.locations.size() < player.count)
 		return false;
-	int previousLocation = player.locations[player.current - 1];
+	int prevLoc = player.locations[player.current - 1];
 	// Ordinary saves update the registry only when the slot's displayed location changes.
-	if (!forceStore && previousLocation == location)
+	if (!forceStore && prevLoc == location)
 		return true;
 	player.locations[player.current - 1] = location;
 	if (store())
 		return true;
-	player.locations[player.current - 1] = previousLocation;
+	player.locations[player.current - 1] = prevLoc;
 	return false;
 }
 
@@ -95,9 +97,10 @@ bool SaveFiles::checkpoint(uint index, uint slot, Checkpoint &checkpoint) const 
 	checkpoint._files.clear();
 	if (_players.size() <= index || !slot || _players[index].locations.size() < slot)
 		return false;
-	Checkpoint::File state, registry;
+	Checkpoint::File state;
+	Checkpoint::File registry;
 	state.name = stateName(index, slot);
-	registry.name = _prefix + "users.dat";
+	registry.name = _prefix + kRegistryFile;
 	for (Checkpoint::File *file : {&state, &registry}) {
 		if (!readCheckpointFile(*file)) {
 			warning("Trinket: could not checkpoint save file %s before game entry", file->name.c_str());
@@ -145,7 +148,7 @@ int SaveFiles::add(const Common::String &name, int initialLocation) {
 	}
 	uint id = 1;
 	for (uint i = 0; i < _players.size(); i++) {
-		if (_players[i].name == name)
+		if (_players[i].name.equals(name))
 			return -1;
 	}
 	for (uint i = 0; i < _players.size();) {

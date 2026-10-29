@@ -32,12 +32,30 @@ namespace OM {
 
 /**
  * Supply named resource bytes to consumers such as @ref Trinket::Shell::Scene and @ref Trinket::OM::Sound.
- * Each returned stream is owned by the caller and has an independent read position.
+ * Each returned stream has an independent read position and must be deleted by the caller.
  */
 class ResourceProvider {
 public:
+	/** Allow destruction through the resource-provider interface. */
 	virtual ~ResourceProvider() {}
+	/** Open a resource stream with an independent position; the caller must delete it. */
 	virtual Common::SeekableReadStream *open(const Common::String &name) const = 0;
+	/** Check availability; indexed providers can avoid copying the payload. */
+	virtual bool contains(const Common::String &name) const {
+		Common::SeekableReadStream *stream = open(name);
+		bool found = stream != nullptr;
+		delete stream;
+		return found;
+	}
+	/** Return a provider-local cache identity, including any resolved search path. */
+	virtual Common::String cacheKey(const Common::String &name) const {
+		Common::String key = name;
+		key.toLowercase();
+		key.replace('\\', '/');
+		while (key.hasPrefix("/"))
+			key.erase(0, 1);
+		return key;
+	}
 };
 
 } // End of namespace OM

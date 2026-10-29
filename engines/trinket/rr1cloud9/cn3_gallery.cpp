@@ -26,34 +26,135 @@
 namespace Trinket {
 namespace RR1Cloud9 {
 
+constexpr const char *Gallery::kNameSignedIndexFormat;
+constexpr const char *Gallery::kArtistKey;
+constexpr const char *Gallery::kNameUnsignedIndexFormat;
+constexpr const char *Gallery::kR1CN3StateKey;
+constexpr const char *Gallery::kArtistSetIDKey;
+constexpr const char *Gallery::kArtistZKey;
+constexpr const char *Gallery::kRegisterFidgetsToSettleName;
+constexpr const char *Gallery::kRegisterSpeechToSettleName;
+constexpr const char *Gallery::kLoadSpeechAnimsInBkgdName;
+constexpr const char *Gallery::kAnimateSettledName;
+constexpr const char *Gallery::kMethodSetSpeechAnims;
+constexpr const char *Gallery::kArtistLipsIDKey;
+constexpr const char *Gallery::kArtistBodyIDKey;
+constexpr const char *Gallery::kMethodAddFidgetGroup;
+constexpr const char *Gallery::kMethodAddFidget;
+constexpr const char *Gallery::kArtistFidg1IDKey;
+constexpr const char *Gallery::kArtistFidg2IDKey;
+constexpr const char *Gallery::kR1CN3NumFramesKey;
+constexpr const char *Gallery::kNumMinPagesKey;
+constexpr const char *Gallery::kR1CN3SaidAct4Key;
+constexpr const char *Gallery::kASEQCN3EASELName;
+constexpr const char *Gallery::kASEQCN3HATName;
+constexpr const char *Gallery::kASEQCN3TAKEOFFName;
+constexpr const char *Gallery::kASEQCN3PICFRAME1SignedIndexFormat;
+constexpr const char *Gallery::kPicXKey;
+constexpr const char *Gallery::kPicYKey;
+constexpr const char *Gallery::kR1CA2PicMaxSignedIndexKey;
+constexpr const char *Gallery::kSamplesSampleBSignedIndexISignedIndexDATPath;
+constexpr const char *Gallery::kR1CA2DatasetKey;
+constexpr const char *Gallery::kR1CN3HatPendingKey;
+constexpr const char *Gallery::kR1CN3MoviePendingKey;
+constexpr const char *Gallery::kEnterSpchIDsKey;
+constexpr const char *Gallery::kSsrName;
+constexpr const char *Gallery::kR1CN3FromStreetKey;
+constexpr const char *Gallery::kPreviousLocationKey;
+constexpr const char *Gallery::kReEnterSpchIDs2Key;
+constexpr const char *Gallery::kAsaName;
+constexpr const char *Gallery::kReEnterSpchIDs31Key;
+constexpr const char *Gallery::kReEnterSpchIDs3Key;
+constexpr const char *Gallery::kReEnterSpchIDs34Key;
+constexpr const char *Gallery::kR1CN3SaidSS4Key;
+constexpr const char *Gallery::kReEnterSpchIDs4Key;
+constexpr const char *Gallery::kAaName;
+constexpr const char *Gallery::kR1CN31stEditKey;
+constexpr const char *Gallery::kReaderName;
+constexpr const char *Gallery::kReEnterSpchIDsA31Key;
+constexpr const char *Gallery::kReEnterSpchIDsA4Key;
+constexpr const char *Gallery::kAaraName;
+constexpr const char *Gallery::kReEnterSpchIDsA5Key;
+constexpr const char *Gallery::kR1CA2PicUsedSignedIndexKey;
+constexpr const char *Gallery::kItemSignedIndexFormat;
+constexpr const char *Gallery::kINV1HatKey;
+constexpr const char *Gallery::kPropertyVisible;
+constexpr const char *Gallery::kSamName;
+constexpr const char *Gallery::kReEnterSpchIDsA45Key;
+constexpr const char *Gallery::kReEnterSpchIDsA46Key;
+constexpr const char *Gallery::kTalkedToRockHeadKey;
+constexpr const char *Gallery::kReEnterSpchIDsA47Key;
+constexpr const char *Gallery::kIdleCharIDSignedIndexKey;
+constexpr const char *Gallery::kIdleSpchIDSignedIndexKey;
+constexpr const char *Gallery::kMaxIdleIndexSpeechesKey;
+constexpr const char *Gallery::kArtistCharIDs1Key;
+constexpr const char *Gallery::kArtistSpchIDs1Key;
+constexpr const char *Gallery::kArtistSpchIDs21Key;
+constexpr const char *Gallery::kArtistSpchIDs31Key;
+constexpr const char *Gallery::kR1CN3FromSampleKey;
+constexpr const char *Gallery::kArtistSpchIDs34Key;
+constexpr const char *Gallery::kArtistSpchIDs32Key;
+constexpr const char *Gallery::kAaaName;
+constexpr const char *Gallery::kArtistSpchIDs33Key;
+constexpr const char *Gallery::kArtistSpchIDs4Key;
+constexpr const char *Gallery::kArName;
+constexpr const char *Gallery::kMainCharIDs2SignedIndexKey;
+constexpr const char *Gallery::kMainSpchIDs2SignedIndexKey;
+constexpr const char *Gallery::kMaxMain2SpeechesKey;
+constexpr const char *Gallery::kMainSpchIDs41Key;
+constexpr const char *Gallery::kMainSpchIDs51Key;
+constexpr const char *Gallery::kSaName;
+constexpr const char *Gallery::kMainSpchIDs52Key;
+constexpr const char *Gallery::kSrName;
+constexpr const char *Gallery::kCOMSoftClickSfxIDKey;
+constexpr const char *Gallery::kHatSpchIDs11Key;
+constexpr const char *Gallery::kHatSpchIDs31Key;
+constexpr const char *Gallery::kRaaasaaName;
+constexpr const char *Gallery::kHatSpchIDs21Key;
+constexpr const char *Gallery::kRaaaName;
+constexpr const char *Gallery::kHatSpchIDs22Key;
+constexpr const char *Gallery::kRaaName;
+constexpr const char *Gallery::kHatSpchIDs4Key;
+constexpr const char *Gallery::kSarName;
+constexpr const char *Gallery::kEaselSpchIDKey;
+constexpr const char *Gallery::kRraName;
+constexpr const char *Gallery::kPaigeName;
+constexpr const char *Gallery::kPaigeSpchIDsKey;
+
 Gallery::~Gallery() {
 	for (auto &image : _edited)
 		image.free();
-	for (auto &book : _samples)
+	for (auto &book : _samples) {
 		for (auto *image : book) {
 			image->free();
 			delete image;
 		}
+	}
 }
 
 int Gallery::number(const Common::String &key) const { return _host._page->number(key); }
 
-int Gallery::indexed(const char *key, int index) const { return number(Common::String::format("%s.%d", key, index)); }
+int Gallery::indexed(const char *key, int index) const { return number(Common::String::format(kNameSignedIndexFormat, key, index)); }
 
 void Gallery::say(const char *actorName, const Common::String &key) { _host.say(actorName, number(key)); }
 
 void Gallery::group(const char *key, const char *actors) {
 	for (uint i = 0; actors[i]; i++) {
-		const char *actorName = actors[i] == 'r' ? "reader" : actors[i] == 's' ? "sam"
-																			   : "artist";
-		say(actorName, Common::String::format("%s.%u", key, i + 1));
+		const char *actorName;
+		if (actors[i] == 'r')
+			actorName = "reader";
+		else if (actors[i] == 's')
+			actorName = "sam";
+		else
+			actorName = kArtistKey;
+		say(actorName, Common::String::format(kNameUnsignedIndexFormat, key, i + 1));
 	}
 }
 
 void Gallery::setState(int state) {
 	_state = state;
 	if (!_host._practice)
-		_host._world.set("R1CN3State", state);
+		_host._world.set(kR1CN3StateKey, state);
 }
 
 bool Gallery::loadImage(Common::SeekableReadStream &stream, Graphics::Surface &image) {
@@ -78,7 +179,9 @@ bool Gallery::loadImage(Common::SeekableReadStream &stream, Graphics::Surface &i
 		for (uint x = 0; x < width; x++) {
 			uint color = bigEndian ? stream.readUint16BE() : stream.readUint16LE();
 			if (targetY < 100) {
-				uint r = (color >> 10) & 31, g = (color >> 5) & 31, b = color & 31;
+				uint r = (color >> 10) & 31;
+				uint g = (color >> 5) & 31;
+				uint b = color & 31;
 				image.setPixel(x * 151 / width, targetY, image.format.RGBToColor((r << 3) | (r >> 2), (g << 3) | (g >> 2), (b << 3) | (b >> 2)));
 			}
 		}
@@ -87,41 +190,42 @@ bool Gallery::loadImage(Common::SeekableReadStream &stream, Graphics::Surface &i
 }
 
 bool Gallery::artist(int pose) {
-	if (_host._actors.contains("artist")) {
-		delete _host._actors["artist"];
-		_host._actors.erase("artist");
+	if (_host._actors.contains(kArtistKey)) {
+		delete _host._actors[kArtistKey];
+		_host._actors.erase(kArtistKey);
 	}
 	Common::ScopedPtr<Shell::Character> actor(new Shell::Character(_host._scene, _host._vm.mixer(), _host._vm.resources(), _host._vm.rnd(), _host));
-	if (!actor->create(indexed("kArtistSetID", pose), number("kArtistZ")))
+	if (!actor->create(indexed(kArtistSetIDKey, pose), number(kArtistZKey)))
 		return false;
 	actor->movable = false;
-	for (const char *key : {"registerFidgetsToSettle", "registerSpeechToSettle", "loadSpeechAnimsInBkgd", "animateSettled"})
+	for (const char *key : {kRegisterFidgetsToSettleName, kRegisterSpeechToSettleName, kLoadSpeechAnimsInBkgdName, kAnimateSettledName})
 		actor->set(key, {}, Core::ScriptValue(0));
 	Core::ScriptValue result;
-	actor->play("setSpeechAnims", {Core::ScriptValue(indexed("kArtistLipsID", pose)), Core::ScriptValue(pose == 1 ? 0 : 10), Core::ScriptValue(1), Core::ScriptValue(number("kArtistBodyID")), Core::ScriptValue(0), Core::ScriptValue(0)}, result);
-	actor->play("addFidgetGroup", {Core::ScriptValue(1), Core::ScriptValue(5), Core::ScriptValue(10)}, result);
-	actor->play("addFidget", {Core::ScriptValue(1), Core::ScriptValue(indexed("kArtistSetID", pose))}, result);
-	actor->play("addFidgetGroup", {Core::ScriptValue(2), Core::ScriptValue(15), Core::ScriptValue(30)}, result);
-	actor->play("addFidget", {Core::ScriptValue(2), Core::ScriptValue(number(pose == 1 ? "kArtistFidg1ID" : "kArtistFidg2ID"))}, result);
-	_host._actors["artist"] = actor.release();
+	actor->play(kMethodSetSpeechAnims, {Core::ScriptValue(indexed(kArtistLipsIDKey, pose)), Core::ScriptValue(pose == 1 ? 0 : 10), Core::ScriptValue(1),
+						 Core::ScriptValue(number(kArtistBodyIDKey)), Core::ScriptValue(0), Core::ScriptValue(0)}, result);
+	actor->play(kMethodAddFidgetGroup, {Core::ScriptValue(1), Core::ScriptValue(5), Core::ScriptValue(10)}, result);
+	actor->play(kMethodAddFidget, {Core::ScriptValue(1), Core::ScriptValue(indexed(kArtistSetIDKey, pose))}, result);
+	actor->play(kMethodAddFidgetGroup, {Core::ScriptValue(2), Core::ScriptValue(15), Core::ScriptValue(30)}, result);
+	actor->play(kMethodAddFidget, {Core::ScriptValue(2), Core::ScriptValue(number(pose == 1 ? kArtistFidg1IDKey : kArtistFidg2IDKey))}, result);
+	_host._actors[kArtistKey] = actor.release();
 	return true;
 }
 
 bool Gallery::enter() {
 	World &world = _host._world;
-	_state = CLIP(world.get("R1CN3State"), 1, 5);
-	int edited = world.get("R1CN3NumFrames");
-	if ((_state == 2 && world.visits("r1ca2")) || _state == 3)
-		setState(edited < number("kNumMinPages") ? 3 : 4);
-	bool offered = world.get("R1CN3SaidAct4") != 0;
+	_state = CLIP(world.get(kR1CN3StateKey), 1, 5);
+	int edited = world.get(kR1CN3NumFramesKey);
+	if ((_state == 2 && world.visits(Page::kPageCA2)) || _state == 3)
+		setState(edited < number(kNumMinPagesKey) ? 3 : 4);
+	bool offered = world.get(kR1CN3SaidAct4Key) != 0;
 	if (!artist(_state < 5 && !offered ? 1 : 2))
 		return false;
 	auto sprite = [this](const Common::String &key, int depth) {
 		return _host._scene.add(_host.characterResource(number(key), Shell::Character::Resources::kAnimation), depth);
 	};
-	_easel = sprite("ASEQ_CN3EASEL", 2);
-	_hat = sprite("ASEQ_CN3HAT", 75);
-	_takeOff = sprite("ASEQ_CN3TAKEOFF", 80);
+	_easel = sprite(kASEQCN3EASELName, 2);
+	_hat = sprite(kASEQCN3HATName, 75);
+	_takeOff = sprite(kASEQCN3TAKEOFFName, 80);
 	if (!_easel || !_hat || !_takeOff)
 		return false;
 	_hat->boxTouchy = true;
@@ -135,16 +239,16 @@ bool Gallery::enter() {
 		1,
 	};
 	for (int i = 0; i < 5; i++) {
-		_frames[i] = sprite(Common::String::format("ASEQ_CN3PICFRAME1.%d", i + 1), 15);
+		_frames[i] = sprite(Common::String::format(kASEQCN3PICFRAME1SignedIndexFormat, i + 1), 15);
 		if (!_frames[i])
 			return false;
-		_positions[i] = Common::Point(indexed("kPicX", i + 1), indexed("kPicY", i + 1));
-		int saved = world.get(Common::String::format("R1CA2PicMax%d", i + 1));
+		_positions[i] = Common::Point(indexed(kPicXKey, i + 1), indexed(kPicYKey, i + 1));
+		int saved = world.get(Common::String::format(kR1CA2PicMaxSignedIndexKey, i + 1));
 		_maximum[i] = saved ? CLIP(saved, 1, 18) : defaults[i];
 		if (i < 3) {
 			for (int frame = 1; frame <= defaults[i]; frame++) {
 				Common::ScopedPtr<Common::SeekableReadStream> stream(_host._vm.resources().open(
-					Common::String::format("samples/SampleB%dI%02d.DAT", i + 1, frame)));
+					Common::String::format(kSamplesSampleBSignedIndexISignedIndexDATPath, i + 1, frame)));
 				auto *image = new Graphics::Surface();
 				_samples[i].push_back(image);
 				if (!stream || !loadImage(*stream, *image))
@@ -152,39 +256,39 @@ bool Gallery::enter() {
 			}
 		}
 	}
-	_painting = CLIP(world.get("R1CA2Dataset"), 1, 5);
+	_painting = CLIP(world.get(kR1CA2DatasetKey), 1, 5);
 	highlight();
-	if (world.get("R1CN3HatPending")) {
+	if (world.get(kR1CN3HatPendingKey)) {
 		_phase = kCollectSpeech;
-	} else if (world.get("R1CN3MoviePending")) {
+	} else if (world.get(kR1CN3MoviePendingKey)) {
 		_phase = kMovie;
-	} else if (!world.visits("r1cn3")) {
-		group("kEnterSpchIDs", "ssr");
-	} else if (world.get("R1CN3FromStreet") || world.get("previousLocation") == 2) {
+	} else if (!world.visits(Page::kPageCN3)) {
+		group(kEnterSpchIDsKey, kSsrName);
+	} else if (world.get(kR1CN3FromStreetKey) || world.get(kPreviousLocationKey) == 2) {
 		if (_state == 1)
-			group("kEnterSpchIDs", "ssr");
+			group(kEnterSpchIDsKey, kSsrName);
 		else if (_state == 2)
-			group("kReEnterSpchIDs.2", "asa");
+			group(kReEnterSpchIDs2Key, kAsaName);
 		else if (_state == 3) {
-			say("artist", "kReEnterSpchIDs.3.1");
-			_host.say("artist", indexed("kReEnterSpchIDs.3", _host._vm.rnd().number(2, 3)));
-			say("artist", "kReEnterSpchIDs.3.4");
-		} else if (!world.get("R1CN3SaidSS4")) {
-			world.set("R1CN3SaidSS4", 1);
-			group("kReEnterSpchIDs.4", "aa");
+			say(kArtistKey, kReEnterSpchIDs31Key);
+			_host.say(kArtistKey, indexed(kReEnterSpchIDs3Key, _host._vm.rnd().number(2, 3)));
+			say(kArtistKey, kReEnterSpchIDs34Key);
+		} else if (!world.get(kR1CN3SaidSS4Key)) {
+			world.set(kR1CN3SaidSS4Key, 1);
+			group(kReEnterSpchIDs4Key, kAaName);
 		}
 	} else if (_state == 3) {
-		if (world.get("R1CN31stEdit") == 1 && 0 < edited) {
-			world.set("R1CN31stEdit", 2);
-			say("reader", "kReEnterSpchIDsA.3.1");
+		if (world.get(kR1CN31stEditKey) == 1 && 0 < edited) {
+			world.set(kR1CN31stEditKey, 2);
+			say(kReaderName, kReEnterSpchIDsA31Key);
 		}
 		artistSpeech();
 	} else if (4 <= _state) {
 		if (!offered) {
-			group("kReEnterSpchIDsA.4", "aara");
+			group(kReEnterSpchIDsA4Key, kAaraName);
 			_phase = kOfferSpeech;
 		} else {
-			_host.say("artist", indexed("kReEnterSpchIDsA.5", world.visits("r1cn3") % 5 + 1));
+			_host.say(kArtistKey, indexed(kReEnterSpchIDsA5Key, world.visits(Page::kPageCN3) % 5 + 1));
 		}
 	}
 	return true;
@@ -209,7 +313,7 @@ void Gallery::advance(uint32 time) {
 		_frame = 1;
 		do {
 			_painting = _painting % 5 + 1;
-		} while (3 < _painting && !_host._world.get(Common::String::format("R1CA2PicUsed%d", _painting)));
+		} while (3 < _painting && !_host._world.get(Common::String::format(kR1CA2PicUsedSignedIndexKey, _painting)));
 		highlight();
 	}
 }
@@ -228,11 +332,11 @@ void Gallery::pause(bool paused) {
 
 void Gallery::collect() {
 	World &world = _host._world;
-	if (world.get("R1CN3HatPending")) {
-		Common::String key = Common::String::format("item:%d", number("kINV1Hat"));
+	if (world.get(kR1CN3HatPendingKey)) {
+		Common::String key = Common::String::format(kItemSignedIndexFormat, number(kINV1HatKey));
 		world.set(key, MIN(25, world.get(key) + 1));
 		_host.putAway();
-		world.set("R1CN3HatPending", 0);
+		world.set(kR1CN3HatPendingKey, 0);
 	}
 	_hat->visible = false;
 	_phase = kIdle;
@@ -247,7 +351,7 @@ void Gallery::update(uint32 time) {
 	} else if (_phase == kBeforeMovie) {
 		_phase = kMovie;
 	} else if (_phase == kOfferSpeech) {
-		_host._actors["artist"]->set("visible", {}, Core::ScriptValue(0));
+		_host._actors[kArtistKey]->set(kPropertyVisible, {}, Core::ScriptValue(0));
 		_takeOff->visible = true;
 		_takeOff->startAnimation(1);
 		_phase = kTakeOff;
@@ -257,11 +361,11 @@ void Gallery::update(uint32 time) {
 		artist(2);
 		_takeOff->visible = false;
 		_hat->visible = true;
-		_host._world.set("R1CN3SaidAct4", 1);
-		say("sam", "kReEnterSpchIDsA.4.5");
-		say("artist", "kReEnterSpchIDsA.4.6");
-		if (_host._world.get("talkedToRockHead"))
-			say("reader", "kReEnterSpchIDsA.4.7");
+		_host._world.set(kR1CN3SaidAct4Key, 1);
+		say(kSamName, kReEnterSpchIDsA45Key);
+		say(kArtistKey, kReEnterSpchIDsA46Key);
+		if (_host._world.get(kTalkedToRockHeadKey))
+			say(kReaderName, kReEnterSpchIDsA47Key);
 		_phase = kIdle;
 	} else if (_phase == kCollectSpeech) {
 		collect();
@@ -269,31 +373,31 @@ void Gallery::update(uint32 time) {
 	if (_phase == kIdle && !_host._chestOpen && !_host._practice && 30000 <= time - _idle) {
 		_idle = time;
 		_idleIndex = _idleIndex % 3 + 1;
-		_host.speeches(Common::String::format("kIdleCharID.%d", _idleIndex), Common::String::format("kIdleSpchID.%d", _idleIndex),
-					   indexed("kMaxIdleIndexSpeeches", _idleIndex));
+		_host.speeches(Common::String::format(kIdleCharIDSignedIndexKey, _idleIndex), Common::String::format(kIdleSpchIDSignedIndexKey, _idleIndex),
+					   indexed(kMaxIdleIndexSpeechesKey, _idleIndex));
 	}
 }
 
 void Gallery::artistSpeech() {
 	if (_state == 1) {
-		_host.speeches("kArtistCharIDs.1", "kArtistSpchIDs.1", 5);
+		_host.speeches(kArtistCharIDs1Key, kArtistSpchIDs1Key, 5);
 		_phase = kIntroduction;
 	} else if (_state == 2) {
-		say("artist", "kArtistSpchIDs.2.1");
-		_host._world.set("R1CN3MoviePending", 1);
+		say(kArtistKey, kArtistSpchIDs21Key);
+		_host._world.set(kR1CN3MoviePendingKey, 1);
 		_phase = kBeforeMovie;
 	} else if (_state == 3) {
-		int edited = _host._world.get("R1CN3NumFrames");
+		int edited = _host._world.get(kR1CN3NumFramesKey);
 		if (edited)
-			_host.say("artist", indexed("kArtistSpchIDs.3.1", _host._vm.rnd().number(1, 2)));
-		if (!edited || _host._world.get("R1CN3FromSample"))
-			group("kArtistSpchIDs.3.4", "aa");
+			_host.say(kArtistKey, indexed(kArtistSpchIDs31Key, _host._vm.rnd().number(1, 2)));
+		if (!edited || _host._world.get(kR1CN3FromSampleKey))
+			group(kArtistSpchIDs34Key, kAaName);
 		else if (edited == 1)
-			group("kArtistSpchIDs.3.2", "aaa");
+			group(kArtistSpchIDs32Key, kAaaName);
 		else if (edited < 6)
-			group("kArtistSpchIDs.3.3", "aa");
+			group(kArtistSpchIDs33Key, kAaName);
 	} else {
-		group("kArtistSpchIDs.4", "ar");
+		group(kArtistSpchIDs4Key, kArName);
 	}
 }
 
@@ -302,34 +406,34 @@ void Gallery::mainSpeech() {
 		artistSpeech();
 	else if (_state < 4) {
 		int choice = _host._vm.rnd().number(1, 2);
-		_host.speeches(Common::String::format("kMainCharIDs.2.%d", choice), Common::String::format("kMainSpchIDs.2.%d", choice),
-					   indexed("kMaxMain2Speeches", choice));
-	} else if (_state == 4 && _host._world.get("talkedToRockHead"))
-		say("reader", "kMainSpchIDs.4.1");
+		_host.speeches(Common::String::format(kMainCharIDs2SignedIndexKey, choice), Common::String::format(kMainSpchIDs2SignedIndexKey, choice),
+					   indexed(kMaxMain2SpeechesKey, choice));
+	} else if (_state == 4 && _host._world.get(kTalkedToRockHeadKey))
+		say(kReaderName, kMainSpchIDs41Key);
 	else if (_host._vm.rnd().number(1, 2) == 1)
-		group("kMainSpchIDs.5.1", "sa");
+		group(kMainSpchIDs51Key, kSaName);
 	else
-		group("kMainSpchIDs.5.2", "sr");
+		group(kMainSpchIDs52Key, kSrName);
 }
 
 void Gallery::hatClick() {
 	_hatClicks += 1;
-	_host.playSounds({static_cast<uint16>(number("kCOMSoftClickSfxID"))});
+	_host.playSounds({static_cast<uint16>(number(kCOMSoftClickSfxIDKey))});
 	if (_state == 1) {
 		_hatClicks = 0;
-		say("sam", "kHatSpchIDs.1.1");
+		say(kSamName, kHatSpchIDs11Key);
 		artistSpeech();
 	} else if (_state < 4) {
-		if (!_host._world.get("talkedToRockHead"))
-			group("kHatSpchIDs.3.1", "raaasaa");
+		if (!_host._world.get(kTalkedToRockHeadKey))
+			group(kHatSpchIDs31Key, kRaaasaaName);
 		else if (_hatClicks == 1)
-			group("kHatSpchIDs.2.1", "raaa");
+			group(kHatSpchIDs21Key, kRaaaName);
 		else
-			group("kHatSpchIDs.2.2", "raa");
+			group(kHatSpchIDs22Key, kRaaName);
 	} else if (_state == 4 && _hat->visible && !_host._practice) {
 		setState(5);
-		_host._world.set("R1CN3HatPending", 1);
-		group("kHatSpchIDs.4", "sar");
+		_host._world.set(kR1CN3HatPendingKey, 1);
+		group(kHatSpchIDs4Key, kSarName);
 		_phase = kCollectSpeech;
 	}
 }
@@ -337,22 +441,22 @@ void Gallery::hatClick() {
 void Gallery::choose(int painting) {
 	_painting = painting;
 	_frame = 1;
-	_host._world.set("R1CA2Dataset", painting);
+	_host._world.set(kR1CA2DatasetKey, painting);
 	if (_state == 1) {
-		group("kEaselSpchID", "rra");
+		group(kEaselSpchIDKey, kRraName);
 		setState(2);
 	}
 	if (_state == 2)
 		artistSpeech();
 	else {
-		_host._world.set("R1CN3FromSample", painting <= 3);
+		_host._world.set(kR1CN3FromSampleKey, painting <= 3);
 		_destination = 6;
 	}
 }
 
 bool Gallery::click(Common::Point point) {
 	_idle = _host._time;
-	if (!_host._world.get("R1CN3SaidAct4") && Common::Rect(510, 145, 590, 235).contains(point)) {
+	if (!_host._world.get(kR1CN3SaidAct4Key) && Common::Rect(510, 145, 590, 235).contains(point)) {
 		hatClick();
 		return true;
 	}
@@ -360,13 +464,19 @@ bool Gallery::click(Common::Point point) {
 		hatClick();
 		return true;
 	}
-	for (const char *name : {"paige", "reader", "sam", "artist"}) {
+	for (const char *name : {kPaigeName, kReaderName, kSamName, kArtistKey}) {
 		if (!_host._actors[name]->bounds().contains(point))
 			continue;
-		if (!strcmp(name, "paige"))
-			_host.say("paige", indexed("kPaigeSpchIDs", _state < 3 ? 1 : _state == 3 ? 2
-																					 : 3));
-		else if (!strcmp(name, "artist"))
+		if (!strcmp(name, kPaigeName)) {
+			int group;
+			if (_state < 3)
+				group = 1;
+			else if (_state == 3)
+				group = 2;
+			else
+				group = 3;
+			_host.say(kPaigeName, indexed(kPaigeSpchIDsKey, group));
+		} else if (!strcmp(name, kArtistKey))
 			artistSpeech();
 		else
 			mainSpeech();

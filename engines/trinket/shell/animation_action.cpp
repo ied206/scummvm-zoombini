@@ -29,11 +29,11 @@ AnimationAction::~AnimationAction() {
 }
 
 void AnimationAction::removeAnimation() {
-	if (_animation) {
-		_animation->removeAnimationListener(*this);
-		_animation->removeObserver(*this);
-		_scene.remove(_animation);
-		_animation = nullptr;
+	if (_anim) {
+		_anim->removeAnimationListener(*this);
+		_anim->removeObserver(*this);
+		_scene.remove(_anim);
+		_anim = nullptr;
 	}
 }
 
@@ -45,17 +45,17 @@ void AnimationAction::start() {
 		finished();
 		return;
 	}
-	_animation = _scene.add(_resource, _depth);
-	if (!_animation || !_animation->startAnimation(_repeat))
+	_anim = _scene.add(_resource, _depth);
+	if (!_anim || !_anim->startAnimation(_repeat))
 		error("Could not load action animation %s", _resource.c_str());
-	_animation->enabled = false;
+	_anim->enabled = false;
 	if (_position.x != 11111)
-		_animation->x = _position.x;
+		_anim->x = _position.x;
 	if (_position.y != 11111)
-		_animation->y = _position.y;
-	_animation->addObserver(*this);
-	_animation->setAnimationListener(this);
-	_animation->playAnimation();
+		_anim->y = _position.y;
+	_anim->addObserver(*this);
+	_anim->setAnimationListener(this);
+	_anim->playAnimation();
 }
 
 void AnimationAction::halt() {
@@ -66,14 +66,14 @@ void AnimationAction::halt() {
 
 void AnimationAction::pause() {
 	Action::pause();
-	if (_animation)
-		_animation->pauseAnimation(true);
+	if (_anim)
+		_anim->pauseAnimation(true);
 }
 
 void AnimationAction::resume() {
 	Action::resume();
-	if (_animation)
-		_animation->pauseAnimation(false);
+	if (_anim)
+		_anim->pauseAnimation(false);
 }
 
 void AnimationAction::animationFinished(Sprite &) {
@@ -87,25 +87,25 @@ PlayAnimationAction::~PlayAnimationAction() {
 }
 
 void PlayAnimationAction::detach() {
-	if (_animation) {
-		_animation->removeAnimationListener(*this);
-		_animation->removeObserver(*this);
-		_animation = nullptr;
+	if (_anim) {
+		_anim->removeAnimationListener(*this);
+		_anim->removeObserver(*this);
+		_anim = nullptr;
 	}
 }
 
 void PlayAnimationAction::start() {
 	ActionSystem::Scope scope(_system);
 	detach();
-	_animation = target();
+	_anim = target();
 	Action::start();
-	if (!_animation) {
+	if (!_anim) {
 		finished();
 		return;
 	}
-	_animation->addObserver(*this);
-	_animation->setAnimationListener(this);
-	_animation->playAnimation();
+	_anim->addObserver(*this);
+	_anim->setAnimationListener(this);
+	_anim->playAnimation();
 }
 
 void PlayAnimationAction::halt() {

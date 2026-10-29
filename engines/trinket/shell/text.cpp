@@ -42,7 +42,10 @@ bool Text::wrap(const Graphics::Font &font, Common::String text, int width, Comm
 		lines.push_back(text);
 		return true;
 	}
-	int position = 0, start = 0, end = -1, lastSpace = 0;
+	int position = 0;
+	int start = 0;
+	int end = -1;
+	int lastSpace = 0;
 	bool inSpace = false;
 	while (position < static_cast<int>(text.size())) {
 		char c = text[position];

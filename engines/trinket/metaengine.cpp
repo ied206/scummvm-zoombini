@@ -19,64 +19,83 @@
  *
  */
 
+#include "trinket/metaengine.h"
 #include "backends/keymapper/action.h"
 #include "backends/keymapper/keymap.h"
 #include "base/plugins.h"
 #include "common/config-manager.h"
 #include "common/translation.h"
-#include "trinket/detection.h"
+#include "trinket/shell/random.h"
 #include "trinket/trinket.h"
 #ifdef ENABLE_ZOOMBINI3
 #include "trinket/zoombini3.h"
 #include "trinket/zoombini3_dialogs.h"
 #endif
 #ifdef ENABLE_RR1CLOUD9
+#include "trinket/rr1cloud9/dialogs.h"
 #include "trinket/rr1cloud9/rr1cloud9.h"
 #endif
 
-class TrinketMetaEngine : public AdvancedMetaEngine<Trinket::TrinketGameDescription> {
-public:
-	const char *getName() const override {
-		return "trinket";
-	}
+constexpr const char *TrinketMetaEngine::kOptionStartupMode;
+constexpr const char *TrinketMetaEngine::kOptionColorBlindMode;
+constexpr const char *TrinketMetaEngine::kOptionPrngAlgorithm;
+constexpr const char *TrinketMetaEngine::kOptionMusicVolume;
+constexpr const char *TrinketMetaEngine::kOptionSfxVolume;
+constexpr const char *TrinketMetaEngine::kOptionSpeechVolume;
+constexpr const char *TrinketMetaEngine::kOptionMute;
+constexpr const char *TrinketMetaEngine::kConfigBootParam;
+constexpr const char *TrinketMetaEngine::kConfigRandomSeed;
+constexpr const char *TrinketMetaEngine::kZoombini3Name;
+constexpr const char *TrinketMetaEngine::kRr1cloud9Name;
+constexpr const char *TrinketMetaEngine::kREMOVENAMEName;
 
-	Common::Error createInstance(OSystem *syst, Engine **engine, const Trinket::TrinketGameDescription *desc) const override {
+Common::Error TrinketMetaEngine::createInstance(OSystem *syst, Engine **engine, const Trinket::TrinketGameDescription *desc) const {
+	if (desc->desc.platform != Common::kPlatformWindows && desc->desc.platform != Common::kPlatformMacintosh)
+		return Common::kUnsupportedGameidError;
 #ifdef ENABLE_ZOOMBINI3
-		if (!strcmp(desc->desc.gameId, "zoombini3") && desc->desc.platform == Common::kPlatformWindows) {
-			*engine = new Trinket::TrinketEngine(syst, Trinket::Zoombini3::getSubengine());
-			return Common::kNoError;
-		}
+	if (!strcmp(desc->desc.gameId, kZoombini3Name)) {
+		*engine = new Trinket::TrinketEngine(syst, Trinket::Zoombini3::getSubengine(), desc->desc.platform);
+		return Common::kNoError;
+	}
 #endif
 #ifdef ENABLE_RR1CLOUD9
-		if (!strcmp(desc->desc.gameId, "rr1cloud9") && desc->desc.platform == Common::kPlatformWindows) {
-			*engine = new Trinket::TrinketEngine(syst, Trinket::RR1Cloud9::getSubengine());
-			return Common::kNoError;
-		}
-#endif
-		return Common::kUnsupportedGameidError;
+	if (!strcmp(desc->desc.gameId, kRr1cloud9Name)) {
+		*engine = new Trinket::TrinketEngine(syst, Trinket::RR1Cloud9::getSubengine(), desc->desc.platform);
+		return Common::kNoError;
 	}
+#endif
+	return Common::kUnsupportedGameidError;
+}
 
-	bool hasFeature(MetaEngineFeature feature) const override { return false; }
-	Common::KeymapArray initKeymaps(const char *target) const override {
-		Common::KeymapArray keymaps = AdvancedMetaEngine::initKeymaps(target);
-		Common::Action *remove = new Common::Action("REMOVE_NAME", _("Remove player name"));
-		remove->setKeyEvent(Common::KeyState(Common::KEYCODE_r, 'r', Common::KBD_CTRL));
-		remove->addDefaultInputMapping("C+r");
-		keymaps[0]->addAction(remove);
-		return keymaps;
-	}
-	void registerDefaultSettings(const Common::String &target) const override {
-		(void)target;
-		ConfMan.registerDefault(Trinket::Shell::Random::kPrngAlgorithmOption, static_cast<int>(Trinket::Shell::Random::PrngAlgorithm::kOriginalPrng));
-	}
+Common::KeymapArray TrinketMetaEngine::initKeymaps(const char *target) const {
+	Common::KeymapArray keymaps = AdvancedMetaEngine::initKeymaps(target);
+	Common::Action *remove = new Common::Action(kREMOVENAMEName, _("Remove player name"));
+	remove->setKeyEvent(Common::KeyState(Common::KEYCODE_r, 'r', Common::KBD_CTRL));
+	remove->addDefaultInputMapping("C+r");
+	keymaps[0]->addAction(remove);
+	return keymaps;
+}
+
+void TrinketMetaEngine::registerDefaultSettings(const Common::String &target) const {
+	(void)target;
+	ConfMan.registerDefault(kOptionPrngAlgorithm, static_cast<int>(Trinket::Shell::Random::PrngAlgorithm::kOriginalPrng));
+	ConfMan.registerDefault(kOptionStartupMode, static_cast<int>(StartupMode::kDirect00));
+	ConfMan.registerDefault(kOptionColorBlindMode, false);
+}
+
+GUI::OptionsContainerWidget *TrinketMetaEngine::buildEngineOptionsWidget(GUI::GuiObject *boss, const Common::String &name, const Common::String &target) const {
+	const Common::String gameId = getGameId(target.c_str());
+
 #ifdef ENABLE_ZOOMBINI3
-	GUI::OptionsContainerWidget *buildEngineOptionsWidget(GUI::GuiObject *boss, const Common::String &name, const Common::String &target) const override {
-		if (ConfMan.get("gameid", target) == "zoombini3")
-			return new Trinket::Zoombini3::OptionsWidget(boss, name, target);
-		return nullptr;
-	}
+	if (gameId.equals(kZoombini3Name))
+		return new Trinket::Zoombini3::OptionsWidget(boss, name, target);
 #endif
-};
+#ifdef ENABLE_RR1CLOUD9
+	if (gameId.equals(kRr1cloud9Name))
+		return new Trinket::RR1Cloud9::OptionsWidget(boss, name, target);
+#endif
+	return nullptr;
+}
 
 #if PLUGIN_ENABLED_DYNAMIC(TRINKET)
 REGISTER_PLUGIN_DYNAMIC(TRINKET, PLUGIN_TYPE_ENGINE, TrinketMetaEngine);

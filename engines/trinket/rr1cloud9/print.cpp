@@ -22,12 +22,15 @@
 namespace Trinket {
 namespace RR1Cloud9 {
 
+constexpr const char *Print::kFileNameFormat;
+constexpr const char *Print::kScreenshotPathOption;
+
 bool Print::save(const Graphics::Surface &image) {
-	Common::Path directory = ConfMan.getPath("screenshotpath");
+	Common::Path directory = ConfMan.getPath(kScreenshotPathOption);
 	Common::String name;
 	Common::Path path;
 	for (uint i = 1; i <= 10000; i++) {
-		name = Common::String::format("%s-print-%04u.bmp", ConfMan.getActiveDomainName().c_str(), i);
+		name = Common::String::format(kFileNameFormat, ConfMan.getActiveDomainName().c_str(), i);
 		path = directory.join(name);
 		if (!Common::FSNode(path).exists())
 			break;
@@ -48,7 +51,8 @@ bool Print::save(const Graphics::Surface &image) {
 bool Print::book(const Artwork &artwork, const OM::ResourceProvider &resources, int book) {
 	if (book < 1 || Artwork::kBooks < book)
 		return false;
-	static constexpr int columns = 3, margin = 20;
+	static constexpr int columns = 3;
+	static constexpr int margin = 20;
 	Graphics::Surface sheet;
 	sheet.create(columns * (Artwork::kWidth + margin) + margin,
 				 (Artwork::kFrames / columns) * (Artwork::kHeight + margin) + margin, Graphics::PixelFormat::createFormatRGBA32());

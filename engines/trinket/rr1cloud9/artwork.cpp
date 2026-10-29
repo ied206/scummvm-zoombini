@@ -27,6 +27,8 @@
 namespace Trinket {
 namespace RR1Cloud9 {
 
+constexpr const char *Artwork::kSampleFormat;
+
 void Artwork::clear() {
 	for (auto &frame : _frames) {
 		frame.pixels.clear();
@@ -48,7 +50,7 @@ bool Artwork::image(const OM::ResourceProvider &resources, int book, int page, C
 	pixels.resize(kWidth * kHeight, kWhite);
 	if (3 < book || (book == 3 && 14 < page))
 		return true;
-	Common::ScopedPtr<Common::SeekableReadStream> stream(resources.open(Common::String::format("samples/SampleB%dI%02d.DAT", book, page)));
+	Common::ScopedPtr<Common::SeekableReadStream> stream(resources.open(Common::String::format(kSampleFormat, book, page)));
 	if (!stream || stream->size() != 10 + kWidth * kHeight * 2)
 		return false;
 	uint version = stream->readUint16LE();
@@ -102,7 +104,10 @@ void Artwork::render(const Common::Array<uint16> &pixels, Graphics::Surface &sur
 		if (surface.h <= targetY)
 			continue;
 		for (int x = 0; x < kWidth; x++) {
-			uint c = pixels[y * kWidth + x], r = (c >> 10) & 31, g = (c >> 5) & 31, b = c & 31;
+			uint c = pixels[y * kWidth + x];
+			uint r = (c >> 10) & 31;
+			uint g = (c >> 5) & 31;
+			uint b = c & 31;
 			surface.setPixel(preview ? x * 151 / kWidth : x, targetY,
 							 surface.format.RGBToColor((r << 3) | (r >> 2), (g << 3) | (g >> 2), (b << 3) | (b >> 2)));
 		}

@@ -33,22 +33,46 @@ namespace RR1Cloud9 {
 /** The five CA2 books. Empty pixels mean the CD sample (or a blank page). */
 class Artwork {
 public:
-	static constexpr int kWidth = 320, kHeight = 214, kVisibleHeight = 212, kFrames = 18, kBooks = 5;
+	/** Stored artwork frame width in pixels. */
+	static constexpr int kWidth = 320;
+	/** Stored artwork frame height in pixels. */
+	static constexpr int kHeight = 214;
+	/** Number of frame rows shown by the drawing interface. */
+	static constexpr int kVisibleHeight = 212;
+	/** Number of frames in each flipbook. */
+	static constexpr int kFrames = 18;
+	/** Number of flipbooks retained in the game state. */
+	static constexpr int kBooks = 5;
+	/** RGB555 value used for blank white artwork pixels. */
 	static constexpr uint16 kWhite = 32767;
 	struct Frame {
+		/** RGB555 artwork pixels, empty when using a disc sample or blank page. */
 		Common::Array<uint16> pixels;
+		/** Whether this frame is marked in the saved book state. */
 		bool marked = false;
 	};
+	/** Return a frame using one-based book and page numbers. */
 	Frame &frame(int book, int page) { return _frames[(book - 1) * kFrames + page - 1]; }
+	/** Return a frame using one-based book and page numbers. */
 	const Frame &frame(int book, int page) const { return _frames[(book - 1) * kFrames + page - 1]; }
+	/** Clear all edited pixels and saved frame marks. */
 	void clear();
+	/** Count frames marked in the current book state. */
 	int markedCount() const;
+	/** Copy a frame's edited pixels or load its disc sample when no edit exists. */
 	bool image(const OM::ResourceProvider &resources, int book, int page, Common::Array<uint16> &pixels) const;
+	/** Decode the saved flipbook frames and their marks. */
 	bool load(Common::ReadStream &stream);
+	/** Serialize edited frame pixels and saved marks. */
 	bool save(Common::WriteStream &stream) const;
+	/** Convert RGB555 artwork to a drawable surface, optionally at preview size. */
 	static void render(const Common::Array<uint16> &pixels, Graphics::Surface &surface, bool preview = false);
 
 private:
+	/** Sample artwork path indexed by book and page. */
+	static constexpr const char *kSampleFormat = "samples/SampleB%dI%02d.DAT";
+
+	/** Saved artwork indexed by book and then frame. */
 	Frame _frames[kBooks * kFrames];
 };
 

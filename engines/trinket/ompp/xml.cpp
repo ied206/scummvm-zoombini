@@ -28,6 +28,13 @@
 namespace Trinket {
 namespace OM {
 
+constexpr const char *XMLParser::kAmpEntity;
+constexpr const char *XMLParser::kLessThanEntity;
+constexpr const char *XMLParser::kGreaterThanEntity;
+constexpr const char *XMLParser::kQuoteEntity;
+constexpr const char *XMLParser::kApostropheEntity;
+constexpr const char *XMLParser::kDeclarationTarget;
+
 constexpr uint32 XMLParser::kMaxSourceSize;
 
 Common::String XMLParser::escape(const Common::String &value) {
@@ -35,19 +42,19 @@ Common::String XMLParser::escape(const Common::String &value) {
 	for (uint i = 0; i < value.size(); i++) {
 		switch (value[i]) {
 		case '&':
-			result += "&amp;";
+			result += kAmpEntity;
 			break;
 		case '<':
-			result += "&lt;";
+			result += kLessThanEntity;
 			break;
 		case '>':
-			result += "&gt;";
+			result += kGreaterThanEntity;
 			break;
 		case '"':
-			result += "&quot;";
+			result += kQuoteEntity;
 			break;
 		case '\'':
-			result += "&apos;";
+			result += kApostropheEntity;
 			break;
 		default:
 			result += value[i];
@@ -112,7 +119,7 @@ bool XMLParser::validateMarkup(const Common::String &source) {
 			pos += 1;
 			continue;
 		}
-		if (source.substr(pos, 4) == "<!--") {
+		if (source.substr(pos, 4).equals("<!--")) {
 			uint end = source.find("-->", pos + 4);
 			if (end == Common::String::npos)
 				return false;
@@ -122,7 +129,8 @@ bool XMLParser::validateMarkup(const Common::String &source) {
 		pos += 1;
 		if (pos == source.size())
 			return false;
-		bool closing = source[pos] == '/', header = source[pos] == '?';
+		bool closing = source[pos] == '/';
+		bool header = source[pos] == '?';
 		if (closing || header)
 			pos += 1;
 		uint start = pos;
@@ -131,7 +139,7 @@ bool XMLParser::validateMarkup(const Common::String &source) {
 		if (start == pos)
 			return false;
 		Common::String name = source.substr(start, pos - start);
-		if (header && (headerSeen || name != "xml" || !tags.empty()))
+		if (header && (headerSeen || !name.equals(kDeclarationTarget) || !tags.empty()))
 			return false;
 		Common::StringMap attributes;
 		bool selfClosing = false;
@@ -189,7 +197,7 @@ bool XMLParser::validateMarkup(const Common::String &source) {
 				return false;
 			headerSeen = true;
 		} else if (closing) {
-			if (selfClosing || tags.empty() || tags.back() != name)
+			if (selfClosing || tags.empty() || !tags.back().equals(name))
 				return false;
 			tags.pop_back();
 		} else if (!selfClosing) {
@@ -207,7 +215,7 @@ Common::String XMLParser::guardText(const Common::String &source) {
 	while (header < source.size()) {
 		if (Common::isSpace(source[header])) {
 			header += 1;
-		} else if (source.substr(header, 4) == "<!--") {
+		} else if (source.substr(header, 4).equals("<!--")) {
 			uint end = source.find("-->", header + 4);
 			if (end == Common::String::npos)
 				break;
@@ -217,14 +225,14 @@ Common::String XMLParser::guardText(const Common::String &source) {
 		}
 	}
 	// Authored game XML omits the declaration required by Common's parser.
-	if (source.substr(header, 5) != "<?xml")
+	if (!source.substr(header, 5).equals("<?xml"))
 		result = "<?xml version=\"1.0\"?>\n";
 	uint pos = 0;
 	int depth = 0;
 	while (pos < source.size()) {
 		uint start = pos;
 		if (source[pos] == '<') {
-			if (source.substr(pos, 4) == "<!--") {
+			if (source.substr(pos, 4).equals("<!--")) {
 				uint end = source.find("-->", pos + 4);
 				pos = end == Common::String::npos ? source.size() : end + 3;
 			} else {
@@ -247,7 +255,8 @@ Common::String XMLParser::guardText(const Common::String &source) {
 				}
 			}
 		} else {
-			bool hasText = false, hasLineBreak = false;
+			bool hasText = false;
+			bool hasLineBreak = false;
 			while (pos < source.size() && source[pos] != '<') {
 				hasText |= !Common::isSpace(source[pos]);
 				hasLineBreak |= source[pos] == '\n' || source[pos] == '\r' || source[pos] == '\t';

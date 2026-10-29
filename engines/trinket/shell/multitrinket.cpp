@@ -24,21 +24,23 @@
 namespace Trinket {
 namespace Shell {
 
+constexpr const char *MultiTrinket::kUserDataName;
+
 MultiTrinket::~MultiTrinket() {
 	clearTrinkets();
 }
 
-bool MultiTrinket::get(const Common::String &property, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if (property != "userData")
-		return Core::Trinket::get(property, arguments, result);
+bool MultiTrinket::get(const Common::String &property, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if (!property.equals(kUserDataName))
+		return Core::Trinket::get(property, sargs, result);
 	result = Core::ScriptValue::fromText(_userData);
 	return true;
 }
 
-bool MultiTrinket::set(const Common::String &property, const Core::ScriptArguments &arguments, const Core::ScriptValue &value) {
-	if (property != "userData")
-		return Core::Trinket::set(property, arguments, value);
-	_userData = value.text();
+bool MultiTrinket::set(const Common::String &property, const Core::ScriptArguments &sargs, const Core::ScriptValue &value) {
+	if (!property.equals(kUserDataName))
+		return Core::Trinket::set(property, sargs, value);
+	_userData = value.toText();
 	return true;
 }
 

@@ -20,6 +20,7 @@
  */
 
 #include "trinket/zoombini3_pages/interactive_ziv.h"
+#include "trinket/frame_clock.h"
 
 #include "common/algorithm.h"
 #include "common/file.h"
@@ -27,6 +28,10 @@
 
 namespace Trinket {
 namespace Zoombini3 {
+
+constexpr const char *ZIVMachine::kMethodPauseRound;
+constexpr const char *ZIVMachine::kMethodResumeRound;
+constexpr const char *ZIVMachine::kMethodSetupGame;
 
 constexpr const char *ZIVMachine::kAnimation;
 
@@ -44,7 +49,7 @@ void ZIVMachine::clearAnimations() {
 		_scene.remove(_animations[i]);
 	_ambient.clear();
 	_animations.clear();
-	_pausedAnimations.clear();
+	_pausedAnims.clear();
 }
 
 bool ZIVMachine::addAnimation(uint id, bool cull, int repeat) {
@@ -113,33 +118,36 @@ bool ZIVMachine::setup(uint tokens, uint32 time) {
 		22017,
 		22042,
 	};
-	for (uint i = 0; i < ARRAYSIZE(decorative); i++)
+	for (uint i = 0; i < ARRAYSIZE(decorative); i++) {
 		if (!addAnimation(decorative[i], false))
 			return false;
-	for (uint i = 0; i < ARRAYSIZE(ambient); i++)
+	}
+	for (uint i = 0; i < ARRAYSIZE(ambient); i++) {
 		if (!addAnimation(ambient[i], true))
 			return false;
+	}
 	uint population = MAX<uint>(1, tokens / 10);
 	if (population == 24)
 		population = 25;
-	for (uint i = 0; i < population; i++)
+	for (uint i = 0; i < population; i++) {
 		if (!addAnimation(22017 + i, i < 24, i < 24 ? -1 : 0))
 			return false;
+	}
 	_cullTime = time + 200;
 	return true;
 }
 
-bool ZIVMachine::play(const Common::String &method, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if ((method == "pauseRound" || method == "resumeRound") && arguments.empty()) {
-		pause(method == "pauseRound");
+bool ZIVMachine::play(const Common::String &method, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if ((method.equals(kMethodPauseRound) || method.equals(kMethodResumeRound)) && sargs.empty()) {
+		pause(method.equals(kMethodPauseRound));
 		return true;
 	}
-	if (method == "setupGame" && arguments.size() == 1 && 0 <= arguments[0].integer() &&
-		static_cast<uint>(arguments[0].integer()) <= World::kTokenCount) {
-		_valid = setup(arguments[0].integer(), callTime());
+	if (method.equals(kMethodSetupGame) && sargs.size() == 1 && 0 <= sargs[0].toInt32() &&
+		static_cast<uint>(sargs[0].toInt32()) <= World::kTokenCount) {
+		_valid = setup(sargs[0].toInt32(), callTime());
 		return _valid;
 	}
-	return Shell::MultiTrinket::play(method, arguments, result);
+	return Shell::MultiTrinket::play(method, sargs, result);
 }
 
 void ZIVMachine::pause(bool paused) {
@@ -147,20 +155,21 @@ void ZIVMachine::pause(bool paused) {
 		return;
 	_paused = paused;
 	if (paused) {
-		for (uint i = 0; i < _animations.size(); i++)
+		for (uint i = 0; i < _animations.size(); i++) {
 			if (_animations[i]->isRunning()) {
-				_pausedAnimations.push_back(_animations[i]);
+				_pausedAnims.push_back(_animations[i]);
 				_animations[i]->pauseAnimation(true);
 			}
+		}
 	} else {
-		for (uint i = 0; i < _pausedAnimations.size(); i++)
-			_pausedAnimations[i]->pauseAnimation(false);
-		_pausedAnimations.clear();
+		for (uint i = 0; i < _pausedAnims.size(); i++)
+			_pausedAnims[i]->pauseAnimation(false);
+		_pausedAnims.clear();
 	}
 }
 
 void ZIVMachine::update(uint32 time) {
-	if (_paused || static_cast<int32>(time) < static_cast<int32>(_cullTime))
+	if (_paused || !FrameClock::reached(time, _cullTime))
 		return;
 	_cullTime = time + 200;
 	for (uint i = 0; i < _ambient.size(); i++) {

@@ -13,6 +13,22 @@
 namespace Trinket {
 namespace Shell {
 
+constexpr const char *Action::kEventFinished;
+constexpr const char *Action::kPropertyIsInterruptible;
+constexpr const char *Action::kPropertyIsActive;
+constexpr const char *Action::kMethodStart;
+constexpr const char *Action::kMethodHalt;
+constexpr const char *Action::kMethodPause;
+constexpr const char *Action::kMethodResume;
+
+constexpr const char *ActionContainer::kPropertyActionCount;
+constexpr const char *ActionContainer::kPropertyRepeatCount;
+constexpr const char *ActionContainer::kMethodAdd;
+constexpr const char *ActionContainer::kMethodClear;
+
+constexpr const char *ActionSystem::kDelayActionName;
+constexpr const char *ActionSystem::kPropertyActionName;
+
 /** References an existing script action without cloning its authored children. */
 class ReferencedAction : public Action, private Action::Listener, private Core::ScriptableObject::Observer {
 public:
@@ -71,25 +87,25 @@ ActionSystem::~ActionSystem() {
 	dispose();
 }
 
-Core::ScriptableObject *ActionSystem::ContainerFactory::create(const Core::ScriptArguments &arguments) {
-	if (2 < arguments.size())
+Core::ScriptableObject *ActionSystem::ContainerFactory::create(const Core::ScriptArguments &sargs) {
+	if (2 < sargs.size())
 		return nullptr;
-	int repeat = arguments.empty() ? 1 : arguments[0].integer();
-	bool interruptible = _parallel ? repeat != 0 : arguments.size() < 2 || arguments[1].integer() != 0;
+	int repeat = sargs.empty() ? 1 : sargs[0].toInt32();
+	bool interruptible = _parallel ? repeat != 0 : sargs.size() < 2 || sargs[1].toInt32() != 0;
 	return new ActionContainer(_system, _parallel, interruptible, repeat);
 }
 
 Core::ScriptableObject *ActionSystem::resolve(const Core::ScriptValue &value) const {
 	Core::ScriptValue reference = value;
 	if (reference.kind() != Core::ScriptValue::kObject)
-		reference = _runtime.variable(value.text());
+		reference = _runtime.variable(value.toText());
 	return reference.kind() == Core::ScriptValue::kObject ? _runtime.objects().resolve(reference.reference()) : nullptr;
 }
 
 Core::ScriptableObject *ActionSystem::resolve(const Core::ScriptValue &value, const Common::String &className) const {
 	Core::ScriptValue reference = value;
 	if (reference.kind() != Core::ScriptValue::kObject)
-		reference = _runtime.variable(value.text());
+		reference = _runtime.variable(value.toText());
 	return reference.kind() == Core::ScriptValue::kObject ? _runtime.objects().resolve(reference.reference(), className) : nullptr;
 }
 
@@ -102,49 +118,49 @@ Action *ActionSystem::resolveAction(const Core::ScriptValue &value) const {
 	return nullptr;
 }
 
-Action *ActionSystem::create(const Core::ScriptArguments &arguments, bool interruptible) {
-	if (arguments.empty())
+Action *ActionSystem::create(const Core::ScriptArguments &sargs, bool interruptible) {
+	if (sargs.empty())
 		return nullptr;
-	Core::ScriptableObject *object = resolve(arguments[0]);
+	Core::ScriptableObject *object = resolve(sargs[0]);
 	if (object) {
-		Action *action = resolveAction(arguments[0]);
+		Action *action = resolveAction(sargs[0]);
 		if (!action)
 			return nullptr;
-		return new ReferencedAction(*this, arguments[0], action->isInterruptible());
+		return new ReferencedAction(*this, sargs[0], action->isInterruptible());
 	}
 	Core::ScriptArguments parameters;
-	for (uint i = 1; i < arguments.size(); i++)
-		parameters.push_back(arguments[i]);
-	if (arguments[0].text() == "DelayAction") {
+	for (uint i = 1; i < sargs.size(); i++)
+		parameters.push_back(sargs[i]);
+	if (sargs[0].toText().equals(kDelayActionName)) {
 		if (parameters.empty() || 2 < parameters.size())
 			return nullptr;
 		if (1 < parameters.size())
-			interruptible = parameters[1].integer() != 0;
-		return new DelayAction(*this, static_cast<uint32>(parameters[0].integer()), interruptible);
+			interruptible = parameters[1].toInt32() != 0;
+		return new DelayAction(*this, static_cast<uint32>(parameters[0].toInt32()), interruptible);
 	}
-	if (arguments[0].text() == "PropertyAction") {
+	if (sargs[0].toText().equals(kPropertyActionName)) {
 		if (parameters.size() < 3 || !resolve(parameters[0]))
 			return nullptr;
 		if (3 < parameters.size())
-			interruptible = parameters[3].integer() != 0;
+			interruptible = parameters[3].toInt32() != 0;
 		Core::ScriptArguments values;
 		values.push_back(parameters[2]);
 		for (uint i = 4; i < parameters.size(); i++)
 			values.push_back(parameters[i]);
-		return new PropertyAction(*this, parameters[0], parameters[1].text(), values, interruptible);
+		return new PropertyAction(*this, parameters[0], parameters[1].toText(), values, interruptible);
 	}
-	return _factory.createAction(arguments[0].text(), parameters, interruptible);
+	return _factory.createAction(sargs[0].toText(), parameters, interruptible);
 }
 
 void PropertyAction::execute() {
 	Core::ScriptableObject *target = _system.resolve(_target);
 	if (!target || _values.empty())
 		return;
-	Core::ScriptArguments arguments;
+	Core::ScriptArguments sargs;
 	for (uint i = 0; i + 1 < _values.size(); i++)
-		arguments.push_back(_values[i]);
+		sargs.push_back(_values[i]);
 	target->setCallTime(_system.currentTime());
-	target->set(_property, arguments, _values.back());
+	target->set(_property, sargs, _values.back());
 }
 
 void PropertyAction::start() {
@@ -209,7 +225,7 @@ void ActionSystem::update(uint32 time) {
 }
 
 Action::Action(ActionSystem &system, bool interruptible) : _system(system), _interruptible(interruptible) {
-	addEvent("finished");
+	addEvent(kEventFinished);
 	_system.attach(*this);
 }
 
@@ -217,25 +233,25 @@ Action::~Action() {
 	_system.detach(*this);
 }
 
-bool Action::get(const Common::String &property, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if (property == "isInterruptible")
+bool Action::get(const Common::String &property, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if (property.equals(kPropertyIsInterruptible))
 		result = Core::ScriptValue(static_cast<int32>(_interruptible));
-	else if (property == "isActive")
+	else if (property.equals(kPropertyIsActive))
 		result = Core::ScriptValue(static_cast<int32>(_active));
 	else
-		return ScriptableObject::get(property, arguments, result);
+		return ScriptableObject::get(property, sargs, result);
 	return true;
 }
 
 bool Action::play(const Common::String &method, const Core::ScriptArguments &, Core::ScriptValue &) {
 	ActionSystem::Scope scope(_system);
-	if (method == "start")
+	if (method.equals(kMethodStart))
 		start();
-	else if (method == "halt")
+	else if (method.equals(kMethodHalt))
 		halt();
-	else if (method == "pause")
+	else if (method.equals(kMethodPause))
 		pause();
-	else if (method == "resume")
+	else if (method.equals(kMethodResume))
 		resume();
 	else
 		return false;
@@ -272,7 +288,7 @@ void Action::finished() {
 		return;
 	complete();
 	if (!_retired)
-		emitEvent("finished");
+		emitEvent(kEventFinished);
 }
 
 void DelayAction::start() {
@@ -453,32 +469,32 @@ void ActionContainer::updateAction(uint32 time) {
 	}
 }
 
-bool ActionContainer::get(const Common::String &property, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if (property == "actionCount")
+bool ActionContainer::get(const Common::String &property, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if (property.equals(kPropertyActionCount))
 		result = Core::ScriptValue(static_cast<int32>(_children.size()));
-	else if (property == "repeatCount" && !_parallel)
+	else if (property.equals(kPropertyRepeatCount) && !_parallel)
 		result = Core::ScriptValue(_repeat);
 	else
-		return Action::get(property, arguments, result);
+		return Action::get(property, sargs, result);
 	return true;
 }
 
-bool ActionContainer::set(const Common::String &property, const Core::ScriptArguments &arguments, const Core::ScriptValue &value) {
-	if (property != "repeatCount" || _parallel)
-		return ScriptableObject::set(property, arguments, value);
-	_repeat = value.integer() ? value.integer() : 1;
+bool ActionContainer::set(const Common::String &property, const Core::ScriptArguments &sargs, const Core::ScriptValue &value) {
+	if (!property.equals(kPropertyRepeatCount) || _parallel)
+		return ScriptableObject::set(property, sargs, value);
+	_repeat = value.toInt32() ? value.toInt32() : 1;
 	return true;
 }
 
-bool ActionContainer::play(const Common::String &method, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
+bool ActionContainer::play(const Common::String &method, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
 	ActionSystem::Scope scope(_system);
-	if (method == "add")
-		return add(_system.create(arguments, isInterruptible()));
-	if (method == "clear" && !_parallel) {
+	if (method.equals(kMethodAdd))
+		return add(_system.create(sargs, isInterruptible()));
+	if (method.equals(kMethodClear) && !_parallel) {
 		clear();
 		return true;
 	}
-	return Action::play(method, arguments, result);
+	return Action::play(method, sargs, result);
 }
 
 Core::ScriptableObject *ActionContainer::clone() const {

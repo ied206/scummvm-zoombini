@@ -25,7 +25,7 @@ namespace Trinket {
 namespace Shell {
 
 void BackgroundMusic::start(const Common::String &resource, uint volume) {
-	if (_resource != resource) {
+	if (!_resource.equals(resource)) {
 		stop();
 		_resource = resource;
 	}
@@ -39,7 +39,7 @@ void BackgroundMusic::start(const Common::String &resource, uint volume) {
 }
 
 void BackgroundMusic::setResource(const Common::String &resource) {
-	if (_resource != resource || !_sound.isPlaying()) {
+	if (!_resource.equals(resource) || !_sound.isPlaying()) {
 		stop();
 		start(resource, _volume);
 	}

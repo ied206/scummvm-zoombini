@@ -12,10 +12,45 @@
 
 #include "trinket/rr1cloud9/options.h"
 
+#include "trinket/rr1cloud9/page.h"
 #include "trinket/trinket.h"
 
 namespace Trinket {
 namespace RR1Cloud9 {
+
+constexpr const char *Options::kR1mvop1BikPath;
+constexpr const char *Options::kR1mvop2BikPath;
+constexpr const char *Options::kRr1mvcqBikPath;
+constexpr const char *Options::kR1mvdemoBikPath;
+constexpr const char *Options::kR1mvcl1BikPath;
+constexpr const char *Options::kR1mvclosingBikPath;
+constexpr const char *Options::kPropertyCenter;
+constexpr const char *Options::kColorKey;
+constexpr const char *Options::kIsBackgroundMusicOffKey;
+constexpr const char *Options::kIsPrinterOffKey;
+constexpr const char *Options::kMovieSignedIndexKey;
+constexpr const char *Options::kLevelKey;
+constexpr const char *Options::kFixedLevelKey;
+constexpr const char *Options::kNameStatsSignedIndexFormat;
+constexpr const char *Options::kCorrectKey;
+constexpr const char *Options::kTotalKey;
+constexpr const char *Options::kR1CN3NumFramesKey;
+constexpr const char *Options::kHistoryCountKey;
+constexpr const char *Options::kStreakKey;
+constexpr const char *Options::kStreakKindKey;
+constexpr const char *Options::kAssessmentCountKey;
+
+constexpr const char *Options::kFont;
+constexpr const char *Options::kSmallFont;
+constexpr const char *Options::kAnimationFormat;
+constexpr const char *Options::kMapLibrary;
+constexpr const char *Options::kCommonLibrary;
+constexpr const char *Options::kSpeechFormat;
+constexpr const char *Options::kDialogBackground;
+constexpr const char *Options::kRestartPrompt;
+constexpr const char *Options::kDialogAccept;
+constexpr const char *Options::kDialogCancel;
+constexpr const char *Options::kClickSound;
 
 const int Options::kLocations[] = {
 	5,
@@ -28,14 +63,14 @@ const int Options::kLocations[] = {
 	6,
 };
 const char *const Options::kActivities[] = {
-	"r1ca1",
-	"r1ia1",
-	"r1ia3",
-	"r1ia2",
-	"r1la2",
-	"r1la1",
-	"r1la3",
-	"r1ca2",
+	Page::kPageCA1,
+	Page::kPageIA1,
+	Page::kPageIA3,
+	Page::kPageIA2,
+	Page::kPageLA2,
+	Page::kPageLA1,
+	Page::kPageLA3,
+	Page::kPageCA2,
 };
 
 Options::Options(TrinketEngine &vm, World &world, const Common::String &name, int location, bool practice) : _vm(vm), _world(world), _paths(vm.resources()), _scene(vm.resources()), _dialog(vm.resources()),
@@ -50,22 +85,20 @@ Common::String Options::prefix(int row) {
 }
 
 const char *Options::movieFile(int index) {
-	static const char *const files[] = {
-		"r1mvop1.bik",
-		"r1mvop2.bik",
-		"rr1mvcq.bik",
-		"r1mvdemo.bik",
-		"r1mvcl1.bik",
-		"r1mvclosing.bik",
+	static constexpr const char *files[] = {
+		kR1mvop1BikPath,
+		kR1mvop2BikPath,
+		kRr1mvcqBikPath,
+		kR1mvdemoBikPath,
+		kR1mvcl1BikPath,
+		kR1mvclosingBikPath,
 	};
 	return 0 <= index && index < 6 ? files[index] : "";
 }
 
 bool Options::enter() {
-	Common::ScopedPtr<Common::SeekableReadStream> font(_vm.resources().open("common/1024.nfnt"));
-	Common::ScopedPtr<Common::SeekableReadStream> small(_vm.resources().open("common/1018.nfnt"));
-	_font.reset(font ? OM::NFNTFont::load(*font) : nullptr);
-	_smallFont.reset(small ? OM::NFNTFont::load(*small) : nullptr);
+	_font = _vm.fonts().load(kFont);
+	_smallFont = _vm.fonts().load(kSmallFont);
 	return _font && _smallFont && show(kMain);
 }
 
@@ -76,7 +109,7 @@ void Options::clearText() {
 }
 
 Shell::Sprite *Options::add(int resource, int action, int x, int y) {
-	auto *sprite = _scene.add(Common::String::format("%s/%d.ao", resource == 1853 ? "r1map" : "common", resource),
+	auto *sprite = _scene.add(Common::String::format(kAnimationFormat, resource == 1853 ? kMapLibrary : kCommonLibrary, resource),
 							  action ? 1 : 0, action, action != 0);
 	if (sprite) {
 		if (0 <= x)
@@ -88,17 +121,17 @@ Shell::Sprite *Options::add(int resource, int action, int x, int y) {
 }
 
 void Options::text(const Common::String &value, const Common::Rect &rect, bool small) {
-	auto *item = new Shell::TextObject(_paths, small ? _smallFont : _font);
+	auto *item = new Shell::TextObject(_paths, _vm.fonts(), small ? _smallFont : _font);
 	item->create({Core::ScriptValue::fromText(value), Core::ScriptValue(rect.left), Core::ScriptValue(rect.top),
 				  Core::ScriptValue(rect.width()), Core::ScriptValue(rect.height()), Core::ScriptValue(0)});
-	item->set("center", {}, Core::ScriptValue(1));
-	item->set("color", {Core::ScriptValue(500), Core::ScriptValue(450)}, Core::ScriptValue(7500));
+	item->set(kPropertyCenter, {}, Core::ScriptValue(1));
+	item->set(kColorKey, {Core::ScriptValue(500), Core::ScriptValue(450)}, Core::ScriptValue(7500));
 	_texts.push_back(item);
 }
 
 void Options::say(int resource) {
 	_voice.stop();
-	_voice.play(_vm.resources(), Common::String::format("comspch/%d.wav", resource), Audio::Mixer::kSpeechSoundType);
+	_voice.play(_vm.resources(), Common::String::format(kSpeechFormat, resource), Audio::Mixer::kSpeechSoundType);
 }
 
 void Options::control(Shell::Sprite *sprite, uint rest, uint pressed) {
@@ -128,12 +161,19 @@ bool Options::show(Panel panel) {
 			add(id, id);
 		for (int id : {6010, 6014}) {
 			auto *toggle = add(id, id);
-			uint frame = _world.get(id == 6010 ? "isBackgroundMusicOff" : "isPrinterOff") ? 3 : 1;
+			const char *key;
+			if (id == 6010)
+				key = kIsBackgroundMusicOffKey;
+			else
+				key = kIsPrinterOffKey;
+			uint frame = 1;
+			if (_world.get(key))
+				frame = 3;
 			control(toggle, frame, frame + 1);
 		}
 	} else if (panel == kMovies) {
 		for (int i = 0; i < 6; i++) {
-			if (!_world.get(Common::String::format("movie:%d", i)))
+			if (!_world.get(Common::String::format(kMovieSignedIndexKey, i)))
 				continue;
 			add(6350 + i);
 			add(6356 + i, 500 + i);
@@ -188,29 +228,29 @@ bool Options::show(Panel panel) {
 					marker->z = 2;
 			}
 			if (panel == kLevels && row < 7) {
-				int level = CLIP(_world.get(prefix(row) + "Level"), 1, 3);
+				int level = CLIP(_world.get(prefix(row) + kLevelKey), 1, 3);
 				for (int n = 0; n < 3; n++) {
 					auto *button = add(6210 + n, 200 + row * 3 + n, 406 + 38 * n, y);
 					control(button, level == n + 1 ? 2 : 1, 2);
 				}
 				auto *automatic = add(6245, 300 + row, 571, y - 2);
-				uint frame = _world.get(prefix(row) + "FixedLevel") ? 1 : 2;
+				uint frame = _world.get(prefix(row) + kFixedLevelKey) ? 1 : 2;
 				control(automatic, frame, 3 - frame);
 			} else if (panel == kReport && row < 7) {
 				for (int n = 1; n <= 3; n++) {
-					Common::String key = Common::String::format("%sStats:%d:", prefix(row).c_str(), n);
+					Common::String key = Common::String::format(kNameStatsSignedIndexFormat, prefix(row).c_str(), n);
 					int x = 428 + 67 * (n - 1);
 					if (row == 6) {
-						text(Common::String::format("%d", _world.get(key + "correct")), Common::Rect(x, 327, x + 38, 368));
-					} else if (_world.get(key + "total")) {
-						int color = CLIP(_world.get(key + "color"), 0, 3);
+						text(Common::String::format("%d", _world.get(key + kCorrectKey)), Common::Rect(x, 327, x + 38, 368));
+					} else if (_world.get(key + kTotalKey)) {
+						int color = CLIP(_world.get(key + kColorKey), 0, 3);
 						auto *badge = add(badges[color], 400 + color, x, badgeY[row]);
 						if (badge)
 							badge->button = false;
 					}
 				}
 			} else if (panel == kReport) {
-				int count = _world.get("R1CN3NumFrames");
+				int count = _world.get(kR1CN3NumFramesKey);
 				text(Common::String::format(count == 1 ? "%d Page Created" : "%d Pages Created", count), Common::Rect(425, 376, 617, 404), true);
 			}
 		}
@@ -218,7 +258,7 @@ bool Options::show(Panel panel) {
 		if (panel == kReport) {
 			auto *print = add(6130, 6130);
 			if (print)
-				print->enabled = !_world.get("isPrinterOff");
+				print->enabled = !_world.get(kIsPrinterOffKey);
 		}
 	}
 	add(1853, 1853, 521, 422);
@@ -227,11 +267,11 @@ bool Options::show(Panel panel) {
 
 void Options::setLevel(int row, int level) {
 	Common::String key = prefix(row);
-	_world.set(key + "Level", level);
-	_world.set(key + "HistoryCount", 0);
-	_world.set(key + "Streak", 0);
-	_world.set(key + "StreakKind", 0);
-	_world.set(key + "AssessmentCount", 0);
+	_world.set(key + kLevelKey, level);
+	_world.set(key + kHistoryCountKey, 0);
+	_world.set(key + kStreakKey, 0);
+	_world.set(key + kStreakKindKey, 0);
+	_world.set(key + kAssessmentCountKey, 0);
 	if (_location == kLocations[row])
 		_changedCurrent = true;
 	show(kLevels);
@@ -254,10 +294,10 @@ Options::Request Options::activate(int action) {
 		show(kLevels);
 	else if (action == 6004)
 		show(kMovies);
-	else if (action == 6130 && !_world.get("isPrinterOff"))
+	else if (action == 6130 && !_world.get(kIsPrinterOffKey))
 		return kPrint;
 	else if (action == 6010 || action == 6014) {
-		Common::String key = action == 6010 ? "isBackgroundMusicOff" : "isPrinterOff";
+		Common::String key = action == 6010 ? kIsBackgroundMusicOffKey : kIsPrinterOffKey;
 		int off = !_world.get(key);
 		_world.set(key, off);
 		show(kMain);
@@ -270,23 +310,24 @@ Options::Request Options::activate(int action) {
 		}
 		say(6101);
 	} else if (200 <= action && action < 221) {
-		int row = (action - 200) / 3, level = (action - 200) % 3 + 1;
+		int row = (action - 200) / 3;
+		int level = (action - 200) % 3 + 1;
 		if (!_world.visits(kActivities[row]))
 			say(6113);
-		else if (level != CLIP(_world.get(prefix(row) + "Level"), 1, 3)) {
+		else if (level != CLIP(_world.get(prefix(row) + kLevelKey), 1, 3)) {
 			if (!_practice && _location == kLocations[row] && !_changedCurrent) {
 				_pendingRow = row;
 				_pendingLevel = level;
-				_dialog.add("common/1905.ao", 0);
-				_dialog.add("common/6140.ao", 1);
-				_dialog.add("common/1861.ao", 2, 1, true);
-				_dialog.add("common/1862.ao", 2, 2, true);
+				_dialog.add(kDialogBackground, 0);
+				_dialog.add(kRestartPrompt, 1);
+				_dialog.add(kDialogAccept, 2, 1, true);
+				_dialog.add(kDialogCancel, 2, 2, true);
 				say(6205);
 			} else
 				setLevel(row, level);
 		}
 	} else if (300 <= action && action < 307) {
-		Common::String key = prefix(action - 300) + "FixedLevel";
+		Common::String key = prefix(action - 300) + kFixedLevelKey;
 		_world.set(key, !_world.get(key));
 		show(kLevels);
 	} else if (400 <= action && action < 404) {
@@ -297,7 +338,7 @@ Options::Request Options::activate(int action) {
 			6111,
 		};
 		say(voices[action - 400]);
-	} else if (500 <= action && action < 506 && _world.get(Common::String::format("movie:%d", action - 500))) {
+	} else if (500 <= action && action < 506 && _world.get(Common::String::format(kMovieSignedIndexKey, action - 500))) {
 		_movie = action - 500;
 		return kMovie;
 	}
@@ -321,7 +362,7 @@ Options::Request Options::event(const Common::Event &event) {
 	for (auto &item : _controls)
 		item.sprite->setFrame(item.sprite->pressed ? item.pressed : item.rest);
 	if (action)
-		_effect.play(_vm.resources(), "common/1801.wav", Audio::Mixer::kSFXSoundType);
+		_effect.play(_vm.resources(), kClickSound, Audio::Mixer::kSFXSoundType);
 	return activate(action);
 }
 

@@ -11,8 +11,42 @@
 namespace Trinket {
 namespace Shell {
 
+constexpr const char *ScenePort::kBackgroundClickedName;
+constexpr const char *ScenePort::kEffectFinishedName;
+constexpr const char *ScenePort::kExittingGameName;
+constexpr const char *ScenePort::kPausedName;
+constexpr const char *ScenePort::kResumedName;
+constexpr const char *ScenePort::kReturnPressedName;
+constexpr const char *ScenePort::kSpacebarPressedName;
+constexpr const char *ScenePort::kMouseMovedName;
+constexpr const char *ScenePort::kSfxVolumeChangedName;
+constexpr const char *ScenePort::kSpeechVolumeChangedName;
+constexpr const char *ScenePort::kPropertyBackgroundMusicID;
+constexpr const char *ScenePort::kPropertyBackgroundMusicVolume;
+constexpr const char *ScenePort::kPropertyIsBackgroundMusicEnabled;
+constexpr const char *ScenePort::kPropertyDebugMode;
+constexpr const char *ScenePort::kPropertyMouseMoveEvents;
+constexpr const char *ScenePort::kPropertyMouseX;
+constexpr const char *ScenePort::kPropertyMouseY;
+constexpr const char *ScenePort::kPropertyIsCursorHidden;
+constexpr const char *ScenePort::kMethodDisplayScreen;
+constexpr const char *ScenePort::kMethodScene;
+constexpr const char *ScenePort::kMethodAddKeyEvent;
+constexpr const char *ScenePort::kMethodFreeze;
+constexpr const char *ScenePort::kMethodFreezeScreen;
+constexpr const char *ScenePort::kMethodHideCursor;
+constexpr const char *ScenePort::kMethodShowCursor;
+constexpr const char *ScenePort::kMethodStopBackgroundMusic;
+
+constexpr const char *ScenePortEnvironment::kEventF7;
+constexpr const char *ScenePortEnvironment::kEventMouseMoved;
+constexpr const char *ScenePortEnvironment::kEventSpacebarPressed;
+constexpr const char *ScenePortEnvironment::kEventReturnPressed;
+constexpr const char *ScenePortEnvironment::kCtrlName;
+constexpr const char *ScenePortEnvironment::kCmdName;
+
 ScenePortEnvironment::ScenePortEnvironment(Window &window, BackgroundMusic &music) : _window(window), _music(music) {
-	addKeyEvent("F7", "F7");
+	addKeyEvent(kEventF7, kEventF7);
 }
 
 ScenePortEnvironment::~ScenePortEnvironment() {
@@ -29,9 +63,10 @@ void ScenePortEnvironment::detach(ScenePort &port) {
 	for (uint i = 0; i < _ports.size(); i++) {
 		if (_ports[i] == &port) {
 			_ports.remove_at(i);
-			for (uint j = 0; j < _nextBroadcast.size(); j++)
+			for (uint j = 0; j < _nextBroadcast.size(); j++) {
 				if (i < _nextBroadcast[j])
 					_nextBroadcast[j] -= 1;
+			}
 			return;
 		}
 	}
@@ -57,28 +92,28 @@ bool ScenePortEnvironment::event(const Common::Event &event) {
 	if (event.type == Common::EVENT_MOUSEMOVE) {
 		_mouse = event.mouse;
 		if (_mouseMoveEvents)
-			broadcast("mouseMoved");
+			broadcast(kEventMouseMoved);
 		return false;
 	}
 	if (event.type != Common::EVENT_KEYDOWN)
 		return false;
 	if (event.kbd.keycode == Common::KEYCODE_SPACE) {
-		broadcast("spacebarPressed");
+		broadcast(kEventSpacebarPressed);
 		return true;
 	}
 	if (event.kbd.keycode == Common::KEYCODE_RETURN || event.kbd.keycode == Common::KEYCODE_KP_ENTER) {
-		broadcast("returnPressed");
+		broadcast(kEventReturnPressed);
 		return true;
 	}
 	Common::String key;
 	if (event.kbd.keycode == Common::KEYCODE_F7) {
-		broadcast("F7");
+		broadcast(kEventF7);
 		return true;
 	}
 	if (event.kbd.flags & Common::KBD_CTRL)
-		key = "Ctrl-";
+		key = kCtrlName;
 	else if (event.kbd.flags & Common::KBD_META)
-		key = "Cmd-";
+		key = kCmdName;
 	int character = event.kbd.ascii;
 	if (!key.empty() && 'a' <= character && character <= 'z')
 		character -= 'a' - 'A';
@@ -95,17 +130,17 @@ bool ScenePortEnvironment::event(const Common::Event &event) {
 }
 
 ScenePort::ScenePort(ScenePortEnvironment &environment) : _environment(environment) {
-	static const char *const events[] = {
-		"backgroundClicked",
-		"effectFinished",
-		"exittingGame",
-		"paused",
-		"resumed",
-		"returnPressed",
-		"spacebarPressed",
-		"mouseMoved",
-		"sfxVolumeChanged",
-		"speechVolumeChanged",
+	static constexpr const char *events[] = {
+		kBackgroundClickedName,
+		kEffectFinishedName,
+		kExittingGameName,
+		kPausedName,
+		kResumedName,
+		kReturnPressedName,
+		kSpacebarPressedName,
+		kMouseMovedName,
+		kSfxVolumeChangedName,
+		kSpeechVolumeChangedName,
 	};
 	for (uint i = 0; i < ARRAYSIZE(events); i++)
 		addEvent(events[i]);
@@ -116,73 +151,73 @@ ScenePort::~ScenePort() {
 	_environment.detach(*this);
 }
 
-bool ScenePort::get(const Common::String &property, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if (!arguments.empty())
+bool ScenePort::get(const Common::String &property, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if (!sargs.empty())
 		return false;
-	if (property == "backgroundMusicID")
+	if (property.equals(kPropertyBackgroundMusicID))
 		result = _environment._musicID;
-	else if (property == "backgroundMusicVolume")
+	else if (property.equals(kPropertyBackgroundMusicVolume))
 		result = Core::ScriptValue(static_cast<int32>(_environment._music.volume()));
-	else if (property == "isBackgroundMusicEnabled")
+	else if (property.equals(kPropertyIsBackgroundMusicEnabled))
 		result = Core::ScriptValue(static_cast<int32>(_environment._music.isEnabled()));
-	else if (property == "debugMode")
+	else if (property.equals(kPropertyDebugMode))
 		result = Core::ScriptValue(0);
-	else if (property == "mouseMoveEvents")
+	else if (property.equals(kPropertyMouseMoveEvents))
 		result = Core::ScriptValue(static_cast<int32>(_environment._mouseMoveEvents));
-	else if (property == "mouseX")
+	else if (property.equals(kPropertyMouseX))
 		result = Core::ScriptValue(_environment._mouse.x);
-	else if (property == "mouseY")
+	else if (property.equals(kPropertyMouseY))
 		result = Core::ScriptValue(_environment._mouse.y);
-	else if (property == "isCursorHidden")
+	else if (property.equals(kPropertyIsCursorHidden))
 		result = Core::ScriptValue(static_cast<int32>(_environment._window.isCursorHidden()));
 	else
-		return ScriptableObject::get(property, arguments, result);
+		return ScriptableObject::get(property, sargs, result);
 	return true;
 }
 
-bool ScenePort::set(const Common::String &property, const Core::ScriptArguments &arguments, const Core::ScriptValue &value) {
-	if (!arguments.empty())
+bool ScenePort::set(const Common::String &property, const Core::ScriptArguments &sargs, const Core::ScriptValue &value) {
+	if (!sargs.empty())
 		return false;
-	if (property == "backgroundMusicID") {
+	if (property.equals(kPropertyBackgroundMusicID)) {
 		_environment._musicID = value;
 		_environment._music.setResource(_environment._window.musicResource(value));
-	} else if (property == "backgroundMusicVolume") {
-		_environment._music.setVolume(CLIP<int32>(value.integer(), 0, 100));
-	} else if (property == "isBackgroundMusicEnabled") {
-		_environment._music.setEnabled(value.integer() != 0);
-	} else if (property == "mouseMoveEvents") {
-		_environment._mouseMoveEvents = value.integer() != 0;
+	} else if (property.equals(kPropertyBackgroundMusicVolume)) {
+		_environment._music.setVolume(CLIP<int32>(value.toInt32(), 0, 100));
+	} else if (property.equals(kPropertyIsBackgroundMusicEnabled)) {
+		_environment._music.setEnabled(value.toInt32() != 0);
+	} else if (property.equals(kPropertyMouseMoveEvents)) {
+		_environment._mouseMoveEvents = value.toInt32() != 0;
 	} else {
-		return ScriptableObject::set(property, arguments, value);
+		return ScriptableObject::set(property, sargs, value);
 	}
 	return true;
 }
 
-bool ScenePort::play(const Common::String &method, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if (method == "displayScreen" && arguments.empty()) {
+bool ScenePort::play(const Common::String &method, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if (method.equals(kMethodDisplayScreen) && sargs.empty()) {
 		_environment._window.displayWindow();
 		return true;
 	}
-	if (method == "scene" && !arguments.empty() && arguments.size() <= 2) {
-		return _environment._window.installBackground(arguments[0], arguments.size() == 2 ? arguments[1] : arguments[0]);
+	if (method.equals(kMethodScene) && !sargs.empty() && sargs.size() <= 2) {
+		return _environment._window.installBackground(sargs[0], sargs.size() == 2 ? sargs[1] : sargs[0]);
 	}
-	if (method == "addKeyEvent" && arguments.size() == 2) {
-		_environment.addKeyEvent(arguments[0].text(), arguments[1].text());
+	if (method.equals(kMethodAddKeyEvent) && sargs.size() == 2) {
+		_environment.addKeyEvent(sargs[0].toText(), sargs[1].toText());
 		return true;
 	}
-	if ((method == "freeze" || method == "freezeScreen") && arguments.empty()) {
-		_environment._window.freezeWindow(method == "freezeScreen");
+	if ((method.equals(kMethodFreeze) || method.equals(kMethodFreezeScreen)) && sargs.empty()) {
+		_environment._window.freezeWindow(method.equals(kMethodFreezeScreen));
 		return true;
 	}
-	if ((method == "hideCursor" || method == "showCursor") && arguments.empty()) {
-		_environment._window.hideCursor(method == "hideCursor");
+	if ((method.equals(kMethodHideCursor) || method.equals(kMethodShowCursor)) && sargs.empty()) {
+		_environment._window.hideCursor(method.equals(kMethodHideCursor));
 		return true;
 	}
-	if (method == "stopBackgroundMusic" && arguments.size() <= 1) {
+	if (method.equals(kMethodStopBackgroundMusic) && sargs.size() <= 1) {
 		_environment._music.stop();
 		return true;
 	}
-	return ScriptableObject::play(method, arguments, result);
+	return ScriptableObject::play(method, sargs, result);
 }
 
 } // namespace Shell

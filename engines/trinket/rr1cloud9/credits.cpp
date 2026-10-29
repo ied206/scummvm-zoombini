@@ -22,17 +22,39 @@
 
 #include "common/tokenizer.h"
 #include "trinket/ompp/xml.h"
+#include "trinket/string_parser.h"
 #include "trinket/trinket.h"
 
 namespace Trinket {
 namespace RR1Cloud9 {
 
+constexpr const char *Credits::kPropertyCenter;
+constexpr const char *Credits::kPropertyColor;
+constexpr const char *Credits::kXMLRootElementSection;
+constexpr const char *Credits::kXMLTitle;
+constexpr const char *Credits::kXMLRootElementSectionMember;
+constexpr const char *Credits::kXMLName;
+constexpr const char *Credits::kXMLRootElementCase1;
+constexpr const char *Credits::kXMLRootElementCase1Text;
+constexpr const char *Credits::kXMLRootElementCase1Imgpair;
+
+constexpr const char *Credits::kFont;
+constexpr const char *Credits::kCreditsXML;
+constexpr const char *Credits::kBackground;
+constexpr const char *Credits::kSigninButton;
+constexpr const char *Credits::kQuitButton;
+constexpr const char *Credits::kCloseButton;
+constexpr const char *Credits::kImageFormat;
+constexpr const char *Credits::kMusic;
+constexpr const char *Credits::kEndingSpeech;
+
 Credits::Credits(TrinketEngine &vm) : _vm(vm), _voice(vm.mixer()), _paths(vm.resources()), _scene(vm.resources()), _images(vm.resources()) {}
 
 Credits::~Credits() {
-	for (auto &row : _rows)
+	for (auto &row : _rows) {
 		for (auto *text : row.text)
 			delete text;
+	}
 }
 
 void Credits::addRow(int height) {
@@ -44,52 +66,57 @@ void Credits::addRow(int height) {
 }
 
 void Credits::addText(const Common::String &value, int x, bool center) {
-	Shell::TextObject *text = new Shell::TextObject(_paths, _font);
+	Shell::TextObject *text = new Shell::TextObject(_paths, _vm.fonts(), _font);
 	text->create({Core::ScriptValue::fromText(value), Core::ScriptValue(x), Core::ScriptValue(396),
 				  Core::ScriptValue(535 - x), Core::ScriptValue(_rows.back().height), Core::ScriptValue(0)});
-	text->set("center", {}, Core::ScriptValue(center));
-	text->set("color", {Core::ScriptValue(65535), Core::ScriptValue(63487)}, Core::ScriptValue(59647));
+	text->set(kPropertyCenter, {}, Core::ScriptValue(center));
+	text->set(kPropertyColor, {Core::ScriptValue(65535), Core::ScriptValue(63487)}, Core::ScriptValue(59647));
 	_rows.back().text.push_back(text);
 }
 
 bool Credits::enter(bool ending) {
-	Common::ScopedPtr<Common::SeekableReadStream> font(_vm.resources().open("common/1014.nfnt"));
-	_font.reset(font ? OM::NFNTFont::load(*font) : nullptr);
+	_font = _vm.fonts().load(kFont);
 	OM::XMLParser xml;
-	if (!_font || !xml.loadStream(_vm.resources().open("r1credits.xml")) || !xml.parse() || !_scene.add("common/6550.ao", 0))
+	if (!_font || !xml.loadStream(_vm.resources().open(kCreditsXML)) || !xml.parse() || !_scene.add(kBackground, 0))
 		return false;
 	if (ending) {
-		if (!_scene.add("common/6501.ao", 1, 1, true) || !_scene.add("common/6502.ao", 1, 2, true))
+		if (!_scene.add(kSigninButton, 1, 1, true) || !_scene.add(kQuitButton, 1, 2, true))
 			return false;
-	} else if (!_scene.add("common/6503.ao", 1, 3, true)) {
+	} else if (!_scene.add(kCloseButton, 1, 3, true)) {
 		return false;
 	}
 	const auto &elements = xml.elements();
 	for (uint i = 0; i < elements.size(); i++) {
 		const auto &element = elements[i];
-		if (element.path == "Root_Element/Section") {
+		if (element.path.equals(kXMLRootElementSection)) {
 			addRow();
 			addRow();
-			addText(element.attributes.getValOrDefault("title"), 120, true);
+			addText(element.attrs.getValOrDefault(kXMLTitle), 120, true);
 			addRow();
-		} else if (element.path == "Root_Element/Section/member") {
+		} else if (element.path.equals(kXMLRootElementSectionMember)) {
 			addRow();
-			addText(xml.child(i, "title"));
-			addText(xml.child(i, "name"), 350);
-		} else if (element.path == "Root_Element/case1") {
+			addText(xml.child(i, kXMLTitle));
+			addText(xml.child(i, kXMLName), 350);
+		} else if (element.path.equals(kXMLRootElementCase1)) {
 			addRow(16);
-		} else if (element.path == "Root_Element/case1/text") {
+		} else if (element.path.equals(kXMLRootElementCase1Text)) {
 			addRow(16);
 			addText(element.value);
-		} else if (element.path == "Root_Element/case1/imgpair") {
+		} else if (element.path.equals(kXMLRootElementCase1Imgpair)) {
 			addRow(16);
 			Common::StringTokenizer tokens(element.value);
 			while (!tokens.empty()) {
-				int id = atoi(tokens.nextToken().c_str());
+				Common::String idText = tokens.nextToken();
+				int32 id = 0;
+				if (StringParser::parseSignedInt(idText.c_str(), id, StringParser::kDecimalProfile) != StringParser::Result::kSuccess)
+					return false;
 				if (tokens.empty())
 					return false;
-				int x = atoi(tokens.nextToken().c_str());
-				auto *image = _images.add(Common::String::format("common/%d.ao", id), 0);
+				Common::String xText = tokens.nextToken();
+				int32 x = 0;
+				if (StringParser::parseSignedInt(xText.c_str(), x, StringParser::kDecimalProfile) != StringParser::Result::kSuccess)
+					return false;
+				auto *image = _images.add(Common::String::format(kImageFormat, id), 0);
 				if (!image)
 					return false;
 				image->x = x;
@@ -101,9 +128,9 @@ bool Credits::enter(bool ending) {
 	}
 	if (_rows.empty())
 		return false;
-	_vm.music().start("common/1050.wav", 100);
+	_vm.music().start(kMusic, 100);
 	if (ending)
-		_voice.play(_vm.resources(), "comspch/1913.wav", Audio::Mixer::kSpeechSoundType);
+		_voice.play(_vm.resources(), kEndingSpeech, Audio::Mixer::kSpeechSoundType);
 	return true;
 }
 

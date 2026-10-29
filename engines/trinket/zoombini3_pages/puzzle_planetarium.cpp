@@ -12,14 +12,72 @@
 #include "common/file.h"
 #include "common/system.h"
 #include "common/util.h"
+#include "trinket/math.h"
 #include "trinket/trinket.h"
-#include <math.h>
 
 namespace Trinket {
 namespace Zoombini3 {
 
+constexpr const char *Incubator::kPropertyPupaeCount;
+constexpr const char *Incubator::kPropertyPupaeLeftToTransform;
+constexpr const char *Incubator::kPropertyDoorCount;
+constexpr const char *Incubator::kMethodTransformPupae;
+constexpr const char *Incubator::kMethodPause;
+constexpr const char *Incubator::kMethodResume;
+
+constexpr const char *PlanetariumMachine::kEventPickedUp;
+constexpr const char *PlanetariumMachine::kEventDropped;
+constexpr const char *PlanetariumMachine::kEventSolved;
+constexpr const char *PlanetariumMachine::kEventWrong;
+constexpr const char *PlanetariumMachine::kPropertyIsSolved;
+constexpr const char *PlanetariumMachine::kPropertyLastSolvedExhibit;
+constexpr const char *PlanetariumMachine::kPropertyLastSolvedDenomType;
+constexpr const char *PlanetariumMachine::kPropertyLastSolvedByHittingTarget;
+constexpr const char *PlanetariumMachine::kPropertyTurnsLeft;
+constexpr const char *PlanetariumMachine::kPropertyIsExhibitAdvancing;
+constexpr const char *PlanetariumMachine::kPropertyDisplayText;
+constexpr const char *PlanetariumMachine::kPropertyDebugMode;
+constexpr const char *PlanetariumMachine::kPropertyPieceGrabAOCursorID;
+constexpr const char *PlanetariumMachine::kPropertyPieceSpotAOCursorID;
+constexpr const char *PlanetariumMachine::kPropertyEnabled;
+constexpr const char *PlanetariumMachine::kMethodPause;
+constexpr const char *PlanetariumMachine::kMethodResume;
+constexpr const char *PlanetariumMachine::kMethodForceDrop;
+constexpr const char *PlanetariumMachine::kMethodClearPuzzle;
+constexpr const char *PlanetariumMachine::kMethodGeneratePuzzle;
+constexpr const char *PlanetariumMachine::kClassHours;
+constexpr const char *PlanetariumMachine::kClassDays;
+
 const int PlanetariumRules::kMoonHiddenHours[28][2] = {
-	{13, 23}, {13, 23}, {14, 23}, {15, 23}, {16, 23}, {17, 23}, {18, 23}, {19, 23}, {19, 23}, {20, 23}, {21, 23}, {22, 23}, {23, 23}, {-1, -1}, {-1, -1}, {-1, -1}, {13, 13}, {13, 14}, {13, 15}, {13, 16}, {13, 17}, {13, 17}, {13, 18}, {13, 19}, {13, 20}, {13, 21}, {13, 22}, {13, 23}};
+	{13, 23},
+	{13, 23},
+	{14, 23},
+	{15, 23},
+	{16, 23},
+	{17, 23},
+	{18, 23},
+	{19, 23},
+	{19, 23},
+	{20, 23},
+	{21, 23},
+	{22, 23},
+	{23, 23},
+	{-1, -1},
+	{-1, -1},
+	{-1, -1},
+	{13, 13},
+	{13, 14},
+	{13, 15},
+	{13, 16},
+	{13, 17},
+	{13, 17},
+	{13, 18},
+	{13, 19},
+	{13, 20},
+	{13, 21},
+	{13, 22},
+	{13, 23},
+};
 
 PlanetariumRules::PlanetariumRules() = default;
 
@@ -30,9 +88,10 @@ int PlanetariumRules::randomExcept(Shell::Random &random, uint bound, int exclud
 
 void PlanetariumRules::addPieces(uint exhibit, Denomination type, const uint *values, uint count) {
 	uint position = 0;
-	for (uint i = 0; i < _pieces.size(); i++)
+	for (uint i = 0; i < _pieces.size(); i++) {
 		if (_pieces[i].exhibit == exhibit && _pieces[i].type == type)
 			position += 1;
+	}
 	for (uint i = 0; i < count; i++) {
 		Piece piece = {values[i], exhibit, position + i, type, false, true};
 		_pieces.push_back(piece);
@@ -115,9 +174,10 @@ bool PlanetariumRules::canUse(uint index) const {
 }
 
 void PlanetariumRules::disablePieces(uint exhibit, Denomination type) {
-	for (uint i = 0; i < _pieces.size(); i++)
+	for (uint i = 0; i < _pieces.size(); i++) {
 		if (_pieces[i].exhibit == exhibit && _pieces[i].type == type)
 			_pieces[i].enabled = false;
+	}
 }
 
 bool PlanetariumRules::use(uint index) {
@@ -137,9 +197,10 @@ bool PlanetariumRules::use(uint index) {
 }
 
 bool PlanetariumRules::hasTurns() const {
-	for (uint i = 0; i < _pieces.size(); i++)
+	for (uint i = 0; i < _pieces.size(); i++) {
 		if (!_pieces[i].consumed && _pieces[i].enabled)
 			return true;
+	}
 	return false;
 }
 
@@ -183,26 +244,30 @@ bool PlanetariumRules::findAnswer(uint exhibit, Denomination type, Common::Array
 	if (solved(exhibit, type))
 		return true;
 	Common::Array<uint> candidates;
-	for (uint i = 0; i < _pieces.size(); i++)
+	for (uint i = 0; i < _pieces.size(); i++) {
 		if (_pieces[i].exhibit == exhibit && _pieces[i].type == type && canUse(i))
 			candidates.push_back(i);
+	}
 	uint period = type == kHour00 ? 24 : 28;
 	int start = type == kHour00 ? _hour[exhibit] : _day[exhibit];
 	int target = type == kHour00 ? _targetHour : _targetDay;
-	uint bestMask = 0, bestTotal = UINT_MAX;
+	uint bestMask = 0;
+	uint bestTotal = UINT_MAX;
 	for (uint mask = 1; mask < (1u << candidates.size()); mask++) {
 		uint total = 0;
-		for (uint i = 0; i < candidates.size(); i++)
+		for (uint i = 0; i < candidates.size(); i++) {
 			if (mask & (1u << i))
 				total += _pieces[candidates[i]].value;
+		}
 		if ((start + total) % period != static_cast<uint>(target) || bestTotal <= total)
 			continue;
 		bestMask = mask;
 		bestTotal = total;
 	}
-	for (uint i = 0; i < candidates.size(); i++)
+	for (uint i = 0; i < candidates.size(); i++) {
 		if (bestMask & (1u << i))
 			pieces.push_back(candidates[i]);
+	}
 	return bestMask != 0;
 }
 
@@ -226,17 +291,21 @@ bool PlanetariumRules::findCompleteAnswer(Common::Array<uint> &pieces) const {
 	for (uint exhibit = 0; exhibit < 2; exhibit++) {
 		Common::Array<uint> bills;
 		if (_level == 3) {
-			for (uint i = 0; i < state.pieceCount(); i++)
+			for (uint i = 0; i < state.pieceCount(); i++) {
 				if (state.piece(i).exhibit == exhibit && state.piece(i).type == kDay01 && state.canUse(i))
 					bills.push_back(i);
+			}
 		}
 		bool found = false;
 		for (uint mask = 0; mask < (1u << bills.size()) && !found; mask++) {
 			PlanetariumRules trial = state;
-			Common::Array<uint> prefix, hours, days;
-			for (uint i = 0; i < bills.size(); i++)
+			Common::Array<uint> prefix;
+			Common::Array<uint> hours;
+			Common::Array<uint> days;
+			for (uint i = 0; i < bills.size(); i++) {
 				if (mask & (1u << i))
 					prefix.push_back(bills[i]);
+			}
 			if (!applyAnswer(trial, prefix) || !trial.findAnswer(exhibit, kHour00, hours) || !applyAnswer(trial, hours))
 				continue;
 			if (_level == 3 && (!trial.findAnswer(exhibit, kDay01, days) || !applyAnswer(trial, days)))
@@ -300,10 +369,10 @@ const Common::Point PlanetariumMachine::kDayPositions[2][9] = {
 	{{628, 475}, {688, 475}, {746, 475}, {628, 518}, {688, 518}, {746, 518}, {666, 556}, {0, 0}, {0, 0}}};
 
 PlanetariumMachine::PlanetariumMachine(Shell::Scene &scene, Shell::Random &random, int depth) : _scene(scene), _random(random), _depth(depth) {
-	addEvent("pickedUp");
-	addEvent("dropped");
-	addEvent("solved");
-	addEvent("wrong");
+	addEvent(kEventPickedUp);
+	addEvent(kEventDropped);
+	addEvent(kEventSolved);
+	addEvent(kEventWrong);
 }
 
 PlanetariumMachine::~PlanetariumMachine() {
@@ -333,81 +402,88 @@ void PlanetariumMachine::clearPuzzle() {
 	_dragged = -1;
 }
 
-bool PlanetariumMachine::get(const Common::String &property, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if (property == "isSolved" && arguments.size() == 2 && 0 <= arguments[0].integer() && arguments[0].integer() < 2 &&
-		0 <= arguments[1].integer() && arguments[1].integer() < 2) {
-		result = Core::ScriptValue(static_cast<int32>(_rules.solved(arguments[0].integer(),
-																	static_cast<PlanetariumRules::Denomination>(arguments[1].integer()))));
+bool PlanetariumMachine::get(const Common::String &property, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if (property.equals(kPropertyIsSolved) && sargs.size() == 2 && 0 <= sargs[0].toInt32() && sargs[0].toInt32() < 2 &&
+		0 <= sargs[1].toInt32() && sargs[1].toInt32() < 2) {
+		result = Core::ScriptValue(static_cast<int32>(_rules.solved(sargs[0].toInt32(), sargs[1].toEnum<PlanetariumRules::Denomination>())));
 		return true;
 	}
-	if (!arguments.empty())
-		return Core::ScriptableObject::get(property, arguments, result);
-	if (property == "lastSolvedExhibit")
+	if (!sargs.empty())
+		return Core::ScriptableObject::get(property, sargs, result);
+	if (property.equals(kPropertyLastSolvedExhibit))
 		result = Core::ScriptValue(static_cast<int32>(_lastResult.exhibit));
-	else if (property == "lastSolvedDenomType")
+	else if (property.equals(kPropertyLastSolvedDenomType))
 		result = Core::ScriptValue(static_cast<int32>(_lastResult.type));
-	else if (property == "lastSolvedByHittingTarget")
+	else if (property.equals(kPropertyLastSolvedByHittingTarget))
 		result = Core::ScriptValue(static_cast<int32>(_lastResult.hitTarget));
-	else if (property == "turnsLeft")
+	else if (property.equals(kPropertyTurnsLeft))
 		result = Core::ScriptValue(static_cast<int32>(_rules.hasTurns()));
-	else if (property == "isExhibitAdvancing")
+	else if (property.equals(kPropertyIsExhibitAdvancing))
 		result = Core::ScriptValue(static_cast<int32>(_rules.advancing(0) || _rules.advancing(1)));
-	else if (property == "displayText")
+	else if (property.equals(kPropertyDisplayText))
 		result = Core::ScriptValue(static_cast<int32>(_displayText));
-	else if (property == "debugMode")
+	else if (property.equals(kPropertyDebugMode))
 		result = Core::ScriptValue(static_cast<int32>(_debugMode));
-	else if (property == "pieceGrabAOCursorID")
+	else if (property.equals(kPropertyPieceGrabAOCursorID))
 		result = _grabCursor;
-	else if (property == "pieceSpotAOCursorID")
+	else if (property.equals(kPropertyPieceSpotAOCursorID))
 		result = _spotCursor;
 	else
-		return Core::ScriptableObject::get(property, arguments, result);
+		return Core::ScriptableObject::get(property, sargs, result);
 	return true;
 }
 
-bool PlanetariumMachine::set(const Common::String &property, const Core::ScriptArguments &arguments, const Core::ScriptValue &value) {
-	if (!arguments.empty())
-		return Core::ScriptableObject::set(property, arguments, value);
-	if (property == "enabled")
-		_enabled = value.integer() != 0;
-	else if (property == "displayText")
-		_displayText = value.integer() != 0;
-	else if (property == "debugMode")
-		_debugMode = value.integer() != 0;
-	else if (property == "pieceGrabAOCursorID")
+bool PlanetariumMachine::set(const Common::String &property, const Core::ScriptArguments &sargs, const Core::ScriptValue &value) {
+	if (!sargs.empty())
+		return Core::ScriptableObject::set(property, sargs, value);
+	if (property.equals(kPropertyEnabled))
+		_enabled = value.toInt32() != 0;
+	else if (property.equals(kPropertyDisplayText))
+		_displayText = value.toInt32() != 0;
+	else if (property.equals(kPropertyDebugMode))
+		_debugMode = value.toInt32() != 0;
+	else if (property.equals(kPropertyPieceGrabAOCursorID))
 		_grabCursor = value;
-	else if (property == "pieceSpotAOCursorID")
+	else if (property.equals(kPropertyPieceSpotAOCursorID))
 		_spotCursor = value;
 	else
-		return Core::ScriptableObject::set(property, arguments, value);
+		return Core::ScriptableObject::set(property, sargs, value);
 	return true;
 }
 
-bool PlanetariumMachine::play(const Common::String &method, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if ((method == "pause" || method == "resume") && arguments.empty()) {
-		pause(method == "pause", callTime());
+bool PlanetariumMachine::play(const Common::String &method, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	_clock.update(callTime(), !_paused);
+	if ((method.equals(kMethodPause) || method.equals(kMethodResume)) && sargs.empty()) {
+		pause(method.equals(kMethodPause), callTime());
 		return true;
 	}
-	if (method == "forceDrop" && arguments.empty()) {
+	if (method.equals(kMethodForceDrop) && sargs.empty()) {
 		forceDrop();
 		return true;
 	}
-	if (method == "clearPuzzle" && arguments.empty()) {
+	if (method.equals(kMethodClearPuzzle) && sargs.empty()) {
 		clearPuzzle();
 		return true;
 	}
-	if (method == "generatePuzzle" && 2 <= arguments.size() && arguments.size() <= 4) {
-		bool targetHour = arguments[0].integer() != 0, targetDay = arguments[1].integer() != 0;
-		bool showMoon = 2 < arguments.size() && arguments[2].integer() != 0;
-		bool helpers = 3 < arguments.size() && arguments[3].integer() != 0;
-		uint level = targetDay ? 3 : (showMoon ? 2 : 1);
+	if (method.equals(kMethodGeneratePuzzle) && 2 <= sargs.size() && sargs.size() <= 4) {
+		bool targetHour = sargs[0].toInt32() != 0;
+		bool targetDay = sargs[1].toInt32() != 0;
+		bool showMoon = 2 < sargs.size() && sargs[2].toInt32() != 0;
+		bool helpers = 3 < sargs.size() && sargs[3].toInt32() != 0;
+		uint level;
+		if (targetDay)
+			level = 3;
+		else if (showMoon)
+			level = 2;
+		else
+			level = 1;
 		if (!targetHour || showMoon != (1 < level) || helpers != (level == 1))
 			return false;
 		clearPuzzle();
 		_valid = true;
 		return _rules.generate(level, _random) && load();
 	}
-	return Core::ScriptableObject::play(method, arguments, result);
+	return Core::ScriptableObject::play(method, sargs, result);
 }
 
 Shell::Sprite *PlanetariumMachine::add(uint id, int depth, bool cd, int frame) {
@@ -526,7 +602,7 @@ float PlanetariumMachine::hourAngle(float hour) {
 }
 
 Common::Point PlanetariumMachine::celestialPosition(float angle) {
-	const float radians = angle * 3.1415927f * 0.0055555557f;
+	const double radians = static_cast<double>(angle) * static_cast<float>(M_PI) * (1.0f / 180.0f);
 	return Common::Point(static_cast<int>(cos(radians) * 141 + 607), static_cast<int>(sin(radians) * 225 + 386));
 }
 
@@ -551,7 +627,15 @@ void PlanetariumMachine::updateExhibit(uint exhibit, float fraction) {
 		}
 		return;
 	}
-	uint skyFrame = static_cast<int>(hour) == 0 || static_cast<int>(hour) == 23 ? 2 : (hour < 11 ? 1 : (hour < 13 ? 3 : 4));
+	uint skyFrame;
+	if (static_cast<int>(hour) == 0 || static_cast<int>(hour) == 23)
+		skyFrame = 2;
+	else if (hour < 11)
+		skyFrame = 1;
+	else if (hour < 13)
+		skyFrame = 3;
+	else
+		skyFrame = 4;
 	_sky->setFrame(skyFrame);
 	_skyFront[0]->setFrame(skyFrame);
 	_skyFront[1]->setFrame(skyFrame);
@@ -581,11 +665,13 @@ void PlanetariumMachine::updateExhibit(uint exhibit, float fraction) {
 uint PlanetariumMachine::stepDuration(uint exhibit) const {
 	if (_rules.advancingType(exhibit) == PlanetariumRules::kDay01)
 		return exhibit ? 2500 : 750;
-	return exhibit ? 500 : 1000 / (_earth->asset->fps() / 4);
+	if (exhibit)
+		return 500;
+	return FrameClock::milliseconds(1, _earth->asset->fps() / 4);
 }
 
-void PlanetariumMachine::beginStep(uint exhibit, uint32 time) {
-	_stepTime[exhibit] = time;
+void PlanetariumMachine::beginStep(uint exhibit) {
+	_stepTime[exhibit] = _clock.now();
 	_waiting[exhibit] = false;
 	if (_rules.advancingType(exhibit) == PlanetariumRules::kDay01)
 		_sounds.push_back(exhibit ? kResSound14055_ExhibitC : kResSound14052_ExhibitA);
@@ -635,7 +721,7 @@ void PlanetariumMachine::updateCovers() {
 }
 
 void PlanetariumMachine::update(uint32 time) {
-	_time = time;
+	_clock.update(time, !_paused);
 	_scene.update(time, _sounds);
 	if (_paused)
 		return;
@@ -643,11 +729,11 @@ void PlanetariumMachine::update(uint32 time) {
 	for (uint exhibit = 0; exhibit < 2; exhibit++) {
 		if (!_rules.advancing(exhibit))
 			continue;
-		uint elapsed = time - _stepTime[exhibit];
+		uint elapsed = _clock.elapsed(_stepTime[exhibit]);
 		if (_waiting[exhibit]) {
 			if (elapsed < 200)
 				continue;
-			beginStep(exhibit, time);
+			beginStep(exhibit);
 			elapsed = 0;
 		}
 		const uint duration = stepDuration(exhibit);
@@ -664,10 +750,10 @@ void PlanetariumMachine::update(uint32 time) {
 				openCover(exhibit * 2 + results[i].type, !results[i].hitTarget);
 				_lastResult = results[i];
 			}
-			emitEvent(results[i].correct ? "solved" : "wrong");
+			emitEvent(results[i].correct ? kEventSolved : kEventWrong);
 		}
 		updateExhibit(exhibit, 0);
-		_stepTime[exhibit] = time;
+		_stepTime[exhibit] = _clock.now();
 		_waiting[exhibit] = _rules.advancing(exhibit);
 	}
 }
@@ -700,9 +786,10 @@ int PlanetariumMachine::hitPiece(Common::Point point) const {
 }
 
 void PlanetariumMachine::updateSlot() {
-	for (uint i = 0; i < 4; i++)
+	for (uint i = 0; i < 4; i++) {
 		if (_slots[i])
 			_slots[i]->setFrame(1);
+	}
 	if (0 <= _dragged && _rules.canUse(_dragged) && pieceBounds(_dragged).intersects(slotBounds(_dragged))) {
 		const PlanetariumRules::Piece &piece = _rules.piece(_dragged);
 		_slots[piece.exhibit * 2 + piece.type]->setFrame(2);
@@ -721,7 +808,7 @@ void PlanetariumMachine::drop() {
 		sprite->visible = false;
 		_sounds.push_back(piece.type == PlanetariumRules::kHour00 ? kResSound14011_HourPlace : kResSound14087_DayPlace);
 		if (!advancing)
-			beginStep(piece.exhibit, _time);
+			beginStep(piece.exhibit);
 	} else {
 		const Common::Rect supply(piece.exhibit ? 490 : 0, 470, piece.exhibit ? 800 : 320, 598);
 		if (!pieceBounds(index).intersects(supply)) {
@@ -737,7 +824,7 @@ void PlanetariumMachine::drop() {
 	}
 	_dragged = -1;
 	updateSlot();
-	emitEvent("dropped");
+	emitEvent(kEventDropped);
 }
 
 void PlanetariumMachine::forceDrop() {
@@ -745,7 +832,7 @@ void PlanetariumMachine::forceDrop() {
 }
 
 void PlanetariumMachine::event(const Common::Event &event, uint32 time) {
-	_time = time;
+	_clock.update(time, !_paused);
 	if (_paused)
 		return;
 	if (event.type == Common::EVENT_LBUTTONDOWN && _dragged < 0) {
@@ -757,7 +844,7 @@ void PlanetariumMachine::event(const Common::Event &event, uint32 time) {
 			_scene.setDepth(sprite, 10000);
 			_sounds.push_back(_rules.piece(_dragged).type == PlanetariumRules::kHour00 ? kResSound14010_HourMove : kResSound14086_DayMove);
 			updateSlot();
-			emitEvent("pickedUp");
+			emitEvent(kEventPickedUp);
 		}
 	} else if (0 <= _dragged && (event.type == Common::EVENT_MOUSEMOVE || event.type == Common::EVENT_LBUTTONUP)) {
 		_pieces[_dragged]->x = event.mouse.x - _grabOffset.x;
@@ -771,9 +858,8 @@ void PlanetariumMachine::event(const Common::Event &event, uint32 time) {
 void PlanetariumMachine::pause(bool paused, uint32 time) {
 	if (_paused == paused)
 		return;
-	_time = time;
+	_clock.update(time, !_paused);
 	if (paused) {
-		_pauseTime = time;
 		for (uint i = 0; i < _owned.size(); i++) {
 			if (_owned[i]->isRunning()) {
 				_pausedSprites.push_back(_owned[i]);
@@ -781,8 +867,6 @@ void PlanetariumMachine::pause(bool paused, uint32 time) {
 			}
 		}
 	} else {
-		for (uint i = 0; i < 2; i++)
-			_stepTime[i] += time - _pauseTime;
 		for (uint i = 0; i < _pausedSprites.size(); i++)
 			_pausedSprites[i]->pauseAnimation(false);
 		_pausedSprites.clear();
@@ -863,37 +947,37 @@ bool Incubator::setPopulation(uint row, uint count) {
 	return true;
 }
 
-bool Incubator::get(const Common::String &property, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if ((property == "pupaeCount" || property == "pupaeLeftToTransform") && arguments.size() == 1 &&
-		0 <= arguments[0].integer() && static_cast<uint>(arguments[0].integer()) < _rows) {
-		uint row = arguments[0].integer();
-		result = Core::ScriptValue(static_cast<int32>(property == "pupaeCount" ? _population[row] : _population[row] - _transformed[row]));
+bool Incubator::get(const Common::String &property, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if ((property.equals(kPropertyPupaeCount) || property.equals(kPropertyPupaeLeftToTransform)) && sargs.size() == 1 &&
+		0 <= sargs[0].toInt32() && static_cast<uint>(sargs[0].toInt32()) < _rows) {
+		uint row = sargs[0].toInt32();
+		result = Core::ScriptValue(static_cast<int32>(property.equals(kPropertyPupaeCount) ? _population[row] : _population[row] - _transformed[row]));
 		return true;
 	}
-	if (property == "doorCount" && arguments.empty()) {
+	if (property.equals(kPropertyDoorCount) && sargs.empty()) {
 		result = Core::ScriptValue(static_cast<int32>(_rows));
 		return true;
 	}
-	return Core::Trinket::get(property, arguments, result);
+	return Core::Trinket::get(property, sargs, result);
 }
 
-bool Incubator::set(const Common::String &property, const Core::ScriptArguments &arguments, const Core::ScriptValue &value) {
-	if (property == "pupaeCount" && arguments.size() == 1 && 0 <= arguments[0].integer() && 0 <= value.integer())
-		return setPopulation(arguments[0].integer(), value.integer());
-	return Core::Trinket::set(property, arguments, value);
+bool Incubator::set(const Common::String &property, const Core::ScriptArguments &sargs, const Core::ScriptValue &value) {
+	if (property.equals(kPropertyPupaeCount) && sargs.size() == 1 && 0 <= sargs[0].toInt32() && 0 <= value.toInt32())
+		return setPopulation(sargs[0].toInt32(), value.toInt32());
+	return Core::Trinket::set(property, sargs, value);
 }
 
-bool Incubator::play(const Common::String &method, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if (method == "transformPupae" && arguments.size() == 2 && 0 <= arguments[0].integer() && 0 <= arguments[1].integer()) {
-		_time = callTime();
-		transform(arguments[0].integer(), arguments[1].integer());
+bool Incubator::play(const Common::String &method, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if (method.equals(kMethodTransformPupae) && sargs.size() == 2 && 0 <= sargs[0].toInt32() && 0 <= sargs[1].toInt32()) {
+		_clock.update(callTime(), !_paused);
+		transform(sargs[0].toInt32(), sargs[1].toInt32());
 		return _valid;
 	}
-	if ((method == "pause" || method == "resume") && arguments.empty()) {
-		pause(method == "pause", callTime());
+	if ((method.equals(kMethodPause) || method.equals(kMethodResume)) && sargs.empty()) {
+		pause(method.equals(kMethodPause), callTime());
 		return true;
 	}
-	return Core::Trinket::play(method, arguments, result);
+	return Core::Trinket::play(method, sargs, result);
 }
 
 void Incubator::transform(uint row, uint count) {
@@ -915,7 +999,7 @@ void Incubator::transform(uint row, uint count) {
 		pupa.state = 1;
 	}
 	if (count) {
-		Batch batch = {row, first, _transformed[row], _time};
+		Batch batch = {row, first, _transformed[row], _clock.now()};
 		_batches.push_back(batch);
 	}
 	_doors[row]->setFrame(1);
@@ -925,7 +1009,7 @@ void Incubator::transform(uint row, uint count) {
 }
 
 void Incubator::update(uint32 time) {
-	_time = time;
+	_clock.update(time, !_paused);
 	if (_paused)
 		return;
 	for (uint row = 0; row < _rows; row++) {
@@ -944,21 +1028,23 @@ void Incubator::update(uint32 time) {
 	}
 	for (uint i = 0; i < _batches.size();) {
 		Batch &batch = _batches[i];
-		if (500 < _time - batch.time && batch.first < batch.end) {
+		if (500 < _clock.elapsed(batch.time) && batch.first < batch.end) {
 			Pupa &pupa = _pupae[batch.row][batch.first];
 			pupa.state = 2;
-			pupa.started = _time;
+			pupa.started = _clock.now();
 			pupa.start = Common::Point(pupa.sprite->x, pupa.sprite->y);
-			pupa.phase = static_cast<float>(_vm.rnd().draw() * 6.2831855f * 0.000030518509);
-			pupa.amplitude = static_cast<float>(_vm.rnd().draw() * 2.0f * 0.000030518509 + 8.0);
-			pupa.frequency = static_cast<float>(_vm.rnd().draw() * 0.0040000002f * 0.000030518509 + 0.0080000004);
+			static constexpr float twoPi = 2.0f * static_cast<float>(M_PI);
+			static constexpr float randScale = 1.0f / 32767.0f;
+			pupa.phase = static_cast<float>(_vm.rnd().draw() * twoPi * randScale);
+			pupa.amplitude = static_cast<float>(_vm.rnd().draw() * 2.0f * randScale + 8.0f);
+			pupa.frequency = static_cast<float>(_vm.rnd().draw() * 0.004f * randScale + 0.008f);
 			int sign = (_vm.rnd().draw() % 2) ? 1 : -1;
 			pupa.destination = Common::Point(800, pupa.start.y + sign * (_vm.rnd().draw() % 60));
 			Common::Point delta = pupa.destination - pupa.start;
-			pupa.distance = sqrt(static_cast<float>(delta.x * delta.x + delta.y * delta.y));
+			pupa.distance = Math::distance<float>(delta);
 			_scene.setDepth(pupa.sprite, z + 3);
 			batch.first += 1;
-			batch.time = _time;
+			batch.time = _clock.now();
 		}
 		if (batch.first == batch.end)
 			_batches.remove_at(i);
@@ -970,11 +1056,13 @@ void Incubator::update(uint32 time) {
 			Pupa &pupa = _pupae[row][i];
 			if (pupa.state != 2)
 				continue;
-			const uint elapsed = _time - pupa.started;
+			const uint elapsed = _clock.elapsed(pupa.started);
 			float progress = MIN<float>(1, elapsed * 0.2f / pupa.distance);
 			Common::Point delta = pupa.destination - pupa.start;
+			const float phase = pupa.phase + elapsed * pupa.frequency;
+			const double wave = sin(static_cast<double>(phase)) * pupa.amplitude;
 			pupa.sprite->x = pupa.start.x + static_cast<int>(delta.x * progress);
-			pupa.sprite->y = pupa.start.y + static_cast<int>(delta.y * progress + sin(pupa.phase + elapsed * pupa.frequency) * pupa.amplitude);
+			pupa.sprite->y = pupa.start.y + static_cast<int>(delta.y * progress + wave);
 			if (1 <= progress) {
 				remove(pupa.sprite);
 				pupa.sprite = nullptr;
@@ -987,9 +1075,9 @@ void Incubator::update(uint32 time) {
 void Incubator::pause(bool paused, uint32 time) {
 	if (_paused == paused)
 		return;
+	_clock.update(time, !_paused);
 	_paused = paused;
 	if (paused) {
-		_pauseTime = time;
 		for (uint i = 0; i < _owned.size(); i++) {
 			if (_owned[i]->isRunning()) {
 				_pausedSprites.push_back(_owned[i]);
@@ -997,12 +1085,6 @@ void Incubator::pause(bool paused, uint32 time) {
 			}
 		}
 	} else {
-		uint elapsed = time - _pauseTime;
-		for (uint i = 0; i < _batches.size(); i++)
-			_batches[i].time += elapsed;
-		for (uint row = 0; row < _rows; row++)
-			for (uint i = 0; i < _population[row]; i++)
-				_pupae[row][i].started += elapsed;
 		for (uint i = 0; i < _pausedSprites.size(); i++)
 			_pausedSprites[i]->pauseAnimation(false);
 		_pausedSprites.clear();
@@ -1022,9 +1104,10 @@ Common::String PlanetariumMachine::debugAnswer(uint level) const {
 	for (uint i = 0; i < answer.size(); i++) {
 		uint index = answer[i];
 		const PlanetariumRules::Piece &piece = rules.piece(index);
-		Common::Rect from = pieceBounds(index), to = slotBounds(index);
+		Common::Rect from = pieceBounds(index);
+		Common::Rect to = slotBounds(index);
 		text += Common::String::format("Piece %u: %s %u, exhibit %u; drag (%d,%d) to (%d,%d)\n", index + 1,
-									   piece.type == PlanetariumRules::kHour00 ? "hours" : "days", piece.value, piece.exhibit + 1,
+									   piece.type == PlanetariumRules::kHour00 ? kClassHours : kClassDays, piece.value, piece.exhibit + 1,
 									   from.left + 10, from.top + 10, to.left + to.width() / 2, to.top + to.height() / 2);
 	}
 	return text;

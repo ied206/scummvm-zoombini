@@ -36,14 +36,15 @@ public:
 		kOriginalPrng = 0,
 		kStandardPrng = 1,
 	};
-	static constexpr const char *kPrngAlgorithmOption = "prng_algorithm";
 
 	/** Read the selected algorithm from the target configuration. */
 	static PrngAlgorithm getPrngAlgorithm(const Common::String &domain = Common::String());
+	/** Initialize the gameplay random stream from the configured algorithm and seed. */
 	Random();
 
 	/** Switch algorithms and start a new random sequence only when the selection changes. */
 	void setAlgorithm(PrngAlgorithm prngAlgorithm);
+	/** Restart the selected generator from the supplied seed. */
 	void setSeed(uint32 seed);
 
 	/** CRT-compatible raw draw; advances even when a caller has a singleton range. */
@@ -56,7 +57,9 @@ public:
 	int excluding(int count, int excluded = -1);
 
 private:
+	/** ScummVM random generator used by the standard algorithm. */
 	Common::RandomSource _fallback{"trinket"};
+	/** Current 32-bit state of the original-compatible generator. */
 	uint32 _state = _fallback.getSeed();
 
 	/** Currently selected PRNG algorithm. */

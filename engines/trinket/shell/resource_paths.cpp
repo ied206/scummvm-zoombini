@@ -19,6 +19,7 @@ Common::String ResourcePaths::normalize(const Common::String &name) {
 }
 
 void ResourcePaths::addPath(const Common::String &path) {
+	_resolved.clear();
 	Common::String normalized = normalize(path);
 	while (!normalized.empty() && normalized.hasSuffix("/"))
 		normalized.deleteLastChar();
@@ -26,8 +27,9 @@ void ResourcePaths::addPath(const Common::String &path) {
 }
 
 void ResourcePaths::use(const Common::String &directory) {
+	_resolved.clear();
 	Common::String path = normalize(directory);
-	if (path == "..") {
+	if (path.equals("..")) {
 		uint slash = _directory.findLastOf('/');
 		_directory = slash == Common::String::npos ? Common::String() : _directory.substr(0, slash);
 	} else if (path.hasPrefix("/")) {
@@ -37,25 +39,29 @@ void ResourcePaths::use(const Common::String &directory) {
 	}
 }
 
-Common::String ResourcePaths::find(const Common::String &name, Common::SeekableReadStream *&stream) const {
+bool ResourcePaths::findCandidate(const Common::String &name, Common::SeekableReadStream *&stream, bool openStream) const {
+	if (!openStream)
+		return _provider.contains(name);
+	stream = _provider.open(name);
+	return stream != nullptr;
+}
+
+Common::String ResourcePaths::find(const Common::String &name, Common::SeekableReadStream *&stream, bool openStream) const {
 	Common::String normalized = normalize(name);
 	bool absolute = normalized.hasPrefix("/");
 	Common::String candidate = absolute ? normalized.substr(1) : normalized;
 	if (!absolute && !_directory.empty())
 		candidate = _directory + "/" + candidate;
-	stream = _provider.open(candidate);
-	if (stream)
+	if (findCandidate(candidate, stream, openStream))
 		return candidate;
 	uint slash = normalized.findLastOf('/');
 	for (uint i = 0; i < _paths.size(); i++) {
 		candidate = _paths[i] + (absolute ? Common::String() : Common::String("/")) + normalized;
-		stream = _provider.open(candidate);
-		if (stream)
+		if (findCandidate(candidate, stream, openStream))
 			return candidate;
 		if (slash != Common::String::npos) {
 			candidate = _paths[i] + "/" + normalized.substr(slash + 1);
-			stream = _provider.open(candidate);
-			if (stream)
+			if (findCandidate(candidate, stream, openStream))
 				return candidate;
 		}
 	}
@@ -64,15 +70,29 @@ Common::String ResourcePaths::find(const Common::String &name, Common::SeekableR
 
 Common::SeekableReadStream *ResourcePaths::open(const Common::String &name) const {
 	Common::SeekableReadStream *stream = nullptr;
-	find(name, stream);
+	Common::String resolved = find(name, stream, true);
+	if (!resolved.empty())
+		_resolved[normalize(name)] = resolved;
 	return stream;
 }
 
 Common::String ResourcePaths::resolve(const Common::String &name) const {
+	Common::String key = normalize(name);
+	auto found = _resolved.find(key);
+	if (found != _resolved.end())
+		return found->_value;
 	Common::SeekableReadStream *stream = nullptr;
-	Common::String resolved = find(name, stream);
-	delete stream;
+	Common::String resolved = find(name, stream, false);
+	if (!resolved.empty())
+		_resolved[key] = resolved;
 	return resolved;
+}
+
+Common::String ResourcePaths::cacheKey(const Common::String &name) const {
+	Common::String resolved = resolve(name);
+	if (resolved.empty())
+		return Common::String();
+	return "/" + _provider.cacheKey(resolved);
 }
 
 Common::String ResourcePaths::resourcePath(const Common::String &id, const Common::String &extension) const {

@@ -7,6 +7,7 @@
  */
 
 #include "trinket/zoombini3_pages/puzzle_corral.h"
+#include "trinket/frame_clock.h"
 
 #include "common/debug.h"
 #include "common/file.h"
@@ -17,6 +18,22 @@
 
 namespace Trinket {
 namespace Zoombini3 {
+
+constexpr const char *CorralMachine::kEventCorrect;
+constexpr const char *CorralMachine::kEventOutOfTurns;
+constexpr const char *CorralMachine::kEventFinished;
+constexpr const char *CorralMachine::kEventTokenPickedUp;
+constexpr const char *CorralMachine::kPropertyRemainingTurns;
+constexpr const char *CorralMachine::kPropertyCurrentZerbleFeet;
+constexpr const char *CorralMachine::kPropertyCurrentZerbleTail;
+constexpr const char *CorralMachine::kMethodSetupGame;
+constexpr const char *CorralMachine::kMethodStartRound;
+constexpr const char *CorralMachine::kMethodFinishRound;
+constexpr const char *CorralMachine::kMethodPauseRound;
+constexpr const char *CorralMachine::kMethodResumeRound;
+constexpr const char *CorralMachine::kShapeName;
+constexpr const char *CorralMachine::kColorName;
+constexpr const char *CorralMachine::kLeafName;
 
 CorralRules::CorralRules() = default;
 
@@ -176,16 +193,19 @@ bool CorralRules::generate(uint level, uint party, Shell::Random &random, Genera
 		}
 	}
 	_axes[0] = random.draw() % 3;
-	uint remaining[2], count = 0;
-	for (uint i = 0; i < 3; i++)
+	uint remaining[2];
+	uint count = 0;
+	for (uint i = 0; i < 3; i++) {
 		if (i != _axes[0]) {
 			remaining[count] = i;
 			count += 1;
 		}
+	}
 	_axes[1] = remaining[random.draw() % 2];
-	for (uint i = 0; i < 3; i++)
+	for (uint i = 0; i < 3; i++) {
 		if (i != _axes[0] && i != _axes[1])
 			_axes[2] = i;
+	}
 	random.draw();
 	return true;
 }
@@ -218,9 +238,10 @@ bool CorralRules::project(uint fruit, uint projector, Shell::Random &random) {
 bool CorralRules::matches(uint fruit, uint zerble) const {
 	if (_party <= fruit || _party <= zerble || _fruits[fruit].consumed || _zerbles[zerble].fed)
 		return false;
-	for (uint i = 0; i < projectorCount(); i++)
+	for (uint i = 0; i < projectorCount(); i++) {
 		if (_fruits[fruit].traits[_axes[i]] != _fruits[zerble].traits[_axes[i]])
 			return false;
+	}
 	return true;
 }
 
@@ -237,9 +258,10 @@ bool CorralRules::feed(uint fruit, uint zerble) {
 
 uint CorralRules::region(uint zerble) const {
 	uint result = 0;
-	for (uint i = 0; i < projectorCount(); i++)
+	for (uint i = 0; i < projectorCount(); i++) {
 		if (0 <= _projectors[i] && _fruits[_projectors[i]].traits[_axes[i]] == _fruits[zerble].traits[_axes[i]])
 			result |= 1 << i;
+	}
 	return result;
 }
 
@@ -268,20 +290,21 @@ void CorralRules::allowedSlots(uint zerble, Common::Array<uint> &slots) const {
 		30,
 		33,
 		36,
-	},
-						  counts[] = {
-							  5,
-							  5,
-							  5,
-							  3,
-							  3,
-							  3,
-							  1,
-						  };
+	};
+	static constexpr uint counts[] = {
+		5,
+		5,
+		5,
+		3,
+		3,
+		3,
+		1,
+	};
 	uint active = 0;
-	for (uint i = 0; i < 3; i++)
+	for (uint i = 0; i < 3; i++) {
 		if (0 <= _projectors[i])
 			active |= 1 << i;
+	}
 	for (uint group = 0; group < ARRAYSIZE(masks); group++) {
 		if ((masks[group] & active) != match)
 			continue;
@@ -296,9 +319,10 @@ bool CorralRules::relocate(Shell::Random &random) {
 	for (uint i = 0; i < _party; i++) {
 		allowedSlots(i, slots[i]);
 		bool retained = false;
-		for (uint j = 0; j < slots[i].size(); j++)
+		for (uint j = 0; j < slots[i].size(); j++) {
 			if (static_cast<int>(slots[i][j]) == _zerbles[i].slot)
 				retained = true;
+		}
 		if (retained)
 			occupied[_zerbles[i].slot] = true;
 		else
@@ -308,9 +332,10 @@ bool CorralRules::relocate(Shell::Random &random) {
 		if (0 <= _zerbles[i].slot)
 			continue;
 		bool available = false;
-		for (uint j = 0; j < slots[i].size(); j++)
+		for (uint j = 0; j < slots[i].size(); j++) {
 			if (!occupied[slots[i][j]])
 				available = true;
+		}
 		if (!available)
 			return false;
 		uint slot;
@@ -327,17 +352,19 @@ bool CorralRules::relocate(Shell::Random &random) {
 
 uint CorralRules::fruitRemaining() const {
 	uint count = 0;
-	for (uint i = 0; i < _party; i++)
+	for (uint i = 0; i < _party; i++) {
 		if (!_fruits[i].consumed)
 			count += 1;
+	}
 	return count;
 }
 
 uint CorralRules::fedCount() const {
 	uint count = 0;
-	for (uint i = 0; i < _party; i++)
+	for (uint i = 0; i < _party; i++) {
 		if (_zerbles[i].fed)
 			count += 1;
+	}
 	return count;
 }
 
@@ -362,12 +389,24 @@ constexpr const char *CorralMachine::kAnimation;
 constexpr const char *CorralMachine::kBeamAnimation;
 constexpr const char *CorralMachine::kCommonAnimation;
 
+OM::Canvas::ColorRemap CorralMachine::fruitColor(uint color) {
+	static constexpr OM::Canvas::ColorRemap colors[] = {
+		OM::Canvas::ColorRemap::kNone,                        // Red.
+		OM::Canvas::ColorRemap::kPurpleOrMagentaToDarkPurple, // Purple.
+		OM::Canvas::ColorRemap::kNone,                        // Yellow.
+		OM::Canvas::ColorRemap::kNone,                        // Blue.
+	};
+	if (ARRAYSIZE(colors) <= color)
+		return OM::Canvas::ColorRemap::kNone;
+	return colors[color];
+}
+
 CorralMachine::CorralMachine(TrinketEngine &vm, Shell::Scene &scene) : _vm(vm), _scene(scene) {
 	const char *events[] = {
-		"correct",
-		"outOfTurns",
-		"finished",
-		"tokenPickedUp",
+		kEventCorrect,
+		kEventOutOfTurns,
+		kEventFinished,
+		kEventTokenPickedUp,
 	};
 	for (uint i = 0; i < ARRAYSIZE(events); i++)
 		addEvent(events[i]);
@@ -394,11 +433,12 @@ void CorralMachine::removeSprite(Shell::Sprite *sprite) {
 	if (!sprite)
 		return;
 	removeTrinket(*sprite);
-	for (uint i = 0; i < _owned.size(); i++)
+	for (uint i = 0; i < _owned.size(); i++) {
 		if (_owned[i] == sprite) {
 			_owned.remove_at(i);
 			break;
 		}
+	}
 	_scene.remove(sprite);
 }
 
@@ -416,49 +456,49 @@ Shell::Sprite *CorralMachine::add(uint id, int depth, bool common) {
 	return sprite;
 }
 
-bool CorralMachine::get(const Common::String &property, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if (!arguments.empty())
-		return MultiTrinket::get(property, arguments, result);
-	if (property == "remainingTurns")
+bool CorralMachine::get(const Common::String &property, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if (!sargs.empty())
+		return MultiTrinket::get(property, sargs, result);
+	if (property.equals(kPropertyRemainingTurns))
 		result = Core::ScriptValue(_rules.turns());
-	else if (property == "currentZerbleFeet")
+	else if (property.equals(kPropertyCurrentZerbleFeet))
 		result = Core::ScriptValue(static_cast<int32>(_lastExited < 0 ? 0 : _rules.zerble(_lastExited).feet));
-	else if (property == "currentZerbleTail")
+	else if (property.equals(kPropertyCurrentZerbleTail))
 		result = Core::ScriptValue(static_cast<int32>(_lastExited < 0 ? 0 : _rules.zerble(_lastExited).tail));
 	else
-		return MultiTrinket::get(property, arguments, result);
+		return MultiTrinket::get(property, sargs, result);
 	return true;
 }
 
-bool CorralMachine::set(const Common::String &property, const Core::ScriptArguments &arguments, const Core::ScriptValue &value) {
-	if (property != "remainingTurns" || !arguments.empty())
-		return MultiTrinket::set(property, arguments, value);
-	_rules.setTurns(value.integer());
+bool CorralMachine::set(const Common::String &property, const Core::ScriptArguments &sargs, const Core::ScriptValue &value) {
+	if (!property.equals(kPropertyRemainingTurns) || !sargs.empty())
+		return MultiTrinket::set(property, sargs, value);
+	_rules.setTurns(value.toInt32());
 	return true;
 }
 
-bool CorralMachine::play(const Common::String &method, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
+bool CorralMachine::play(const Common::String &method, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
 	_time = callTime();
-	if (method == "setupGame" && arguments.size() == 2)
-		return setup(arguments[0].integer(), arguments[1].integer());
-	if (!arguments.empty())
-		return MultiTrinket::play(method, arguments, result);
-	if (method == "startRound") {
+	if (method.equals(kMethodSetupGame) && sargs.size() == 2)
+		return setup(sargs[0].toInt32(), sargs[1].toInt32());
+	if (!sargs.empty())
+		return MultiTrinket::play(method, sargs, result);
+	if (method.equals(kMethodStartRound)) {
 		_demonstrating = true;
 		_blinkDeadline = _time + 200;
 		_blinkCount = 8;
 		return true;
 	}
-	if (method == "finishRound") {
+	if (method.equals(kMethodFinishRound)) {
 		pause(true, _time);
-		emitEvent("finished");
+		emitEvent(kEventFinished);
 		return true;
 	}
-	if (method == "pauseRound" || method == "resumeRound") {
-		pause(method == "pauseRound", _time);
+	if (method.equals(kMethodPauseRound) || method.equals(kMethodResumeRound)) {
+		pause(method.equals(kMethodPauseRound), _time);
 		return true;
 	}
-	return MultiTrinket::play(method, arguments, result);
+	return MultiTrinket::play(method, sargs, result);
 }
 
 bool CorralMachine::corralGenerated(uint index) {
@@ -504,22 +544,22 @@ bool CorralMachine::setup(uint level, uint party) {
 		-200,
 		200,
 		20,
-	},
-						 offsetY[] = {
-							 20,
-							 20,
-							 -180,
-						 };
+	};
+	static constexpr int offsetY[] = {
+		20,
+		20,
+		-180,
+	};
 	static constexpr int trayX[] = {
 		27,
 		698,
 		600,
-	},
-						 trayY[] = {
-							 528,
-							 528,
-							 0,
-						 };
+	};
+	static constexpr int trayY[] = {
+		528,
+		528,
+		0,
+	};
 	for (uint i = 0; i < 3; i++) {
 		_projectors[i] = add(20104 + i, 1);
 		_trays[i] = add(20107 + i, 2);
@@ -543,6 +583,7 @@ bool CorralMachine::setup(uint level, uint party) {
 			return false;
 		const CorralRules::Fruit &fruit = _rules.fruit(i);
 		view.body->setFrame(1 + fruit.traits[1] + 4 * fruit.traits[0]);
+		view.body->colorRemap = fruitColor(fruit.traits[1]);
 		view.leaf->setFrame(1 + fruit.traits[2]);
 		Common::Rect body(view.body->x, view.body->y, view.body->x + view.body->width(), view.body->y + view.body->height());
 		Common::Rect leaf(view.leaf->x, view.leaf->y, view.leaf->x + view.leaf->width(), view.leaf->y + view.leaf->height());
@@ -574,9 +615,10 @@ Common::Rect CorralMachine::fruitBounds(uint index) const {
 }
 
 int CorralMachine::hitFruit(Common::Point point) const {
-	for (int i = _rules.party() - 1; 0 <= i; i--)
+	for (int i = _rules.party() - 1; 0 <= i; i--) {
 		if (!_rules.fruit(i).consumed && fruitBounds(i).contains(point))
 			return i;
+	}
 	return -1;
 }
 
@@ -595,9 +637,16 @@ void CorralMachine::updateProjectors() {
 		if (_level == 3)
 			continue;
 		const CorralRules::Fruit &value = _rules.fruit(fruit);
-		uint body = _rules.axis(i) == 0 ? 1 : _rules.axis(i) == 1 ? 0
-																  : 2;
+		uint body;
+		if (_rules.axis(i) == 0)
+			body = 1;
+		else if (_rules.axis(i) == 1)
+			body = 0;
+		else
+			body = 2;
 		uint leaf = _rules.axis(i) == 2 ? 3 : 4;
+		if (body == 0)
+			_clues[i][body]->colorRemap = fruitColor(value.traits[1]);
 		_clues[i][body]->setFrame(1 + value.traits[1] + 4 * value.traits[0]);
 		_clues[i][leaf]->setFrame(1 + value.traits[2]);
 		_clues[i][body]->visible = _clues[i][leaf]->visible = true;
@@ -623,7 +672,7 @@ void CorralMachine::updateBlink() {
 		return;
 	if (!_blinkDeadline)
 		_blinkDeadline = _time + 200;
-	if (static_cast<int32>(_time - _blinkDeadline) < 0)
+	if (!FrameClock::reached(_time, _blinkDeadline))
 		return;
 	_blinkCount -= 1;
 	_blinkDeadline = _time + (_demonstrating ? 800 : 200);
@@ -670,7 +719,7 @@ void CorralMachine::drop() {
 				_blinkDeadline = _time + 200;
 			}
 			if (!_rules.turns())
-				emitEvent("outOfTurns");
+				emitEvent(kEventOutOfTurns);
 			moveZerbles();
 			debug(1, "Corral projection %u: fruit %u, charges %u", i + 1, index + 1, _rules.turns());
 		} else
@@ -741,12 +790,14 @@ void CorralMachine::updateHover() {
 		}
 	}
 	int tray = -1;
-	if (0 < _rules.turns())
-		for (uint i = 0; i < _rules.projectorCount(); i++)
+	if (0 < _rules.turns()) {
+		for (uint i = 0; i < _rules.projectorCount(); i++) {
 			if (bounds.intersects(_trays[i]->bounds)) {
 				tray = i;
 				break;
 			}
+		}
+	}
 	if (tray != _hoverTray) {
 		if (0 <= _hoverTray)
 			_trays[_hoverTray]->setFrame(1);
@@ -790,7 +841,8 @@ void CorralMachine::beginFeeding(uint fruit, uint zerble) {
 }
 
 void CorralMachine::finishFeeding() {
-	uint index = _feeding, fruit = _feedingFruit;
+	uint index = _feeding;
+	uint fruit = _feedingFruit;
 	for (uint i = 0; i < 3; i++) {
 		removeSprite(_feedback[i]);
 		_feedback[i] = nullptr;
@@ -805,12 +857,12 @@ void CorralMachine::finishFeeding() {
 		_zerbles[index]->walk(true, _time);
 		_moving[index] = _exiting[index] = true;
 		playEffect(kResSound2726_CommonGo);
-		emitEvent("correct");
+		emitEvent(kEventCorrect);
 	} else {
 		playEffect(kResSound20400_Projection);
 		_fruitRemaining -= 1;
 		if (!_fruitRemaining)
-			emitEvent("finished");
+			emitEvent(kEventFinished);
 	}
 	debug(1, "Corral fruit %u %s by zerble %u: fed %u, fruit remaining %u", fruit + 1, _correct ? "accepted" : "rejected", index + 1,
 		  _rules.fedCount(), _rules.fruitRemaining());
@@ -820,9 +872,10 @@ void CorralMachine::updateFeedback(Common::Array<uint16> &sounds) {
 	if (_feeding < 0 || !_feedback[0])
 		return;
 	_feedback[0]->update(_time, sounds);
-	for (uint i = 1; i < 3; i++)
+	for (uint i = 1; i < 3; i++) {
 		if (_feedback[i])
 			_feedback[i]->setFrame(_feedback[0]->displayedFrame());
+	}
 	if (!_feedback[0]->isRunning())
 		finishFeeding();
 }
@@ -849,7 +902,7 @@ void CorralMachine::event(const Common::Event &event, uint32 time) {
 			_rules.remove(_selected);
 			updateProjectors();
 			playEffect(kResSound20115_ProjectorReady);
-			emitEvent("tokenPickedUp");
+			emitEvent(kEventTokenPickedUp);
 		}
 	}
 	if (event.type == Common::EVENT_LBUTTONUP && 0 <= _selected)
@@ -873,16 +926,17 @@ void CorralMachine::update(uint32 time) {
 					_fruitRemaining -= 1;
 					_zerblesRemaining -= 1;
 					if (!_fruitRemaining || !_zerblesRemaining)
-						emitEvent("finished");
+						emitEvent(kEventFinished);
 				}
 			}
 		}
 		updateFeedback(sounds);
 		if (_sniff[0]) {
 			_sniff[0]->update(time, sounds);
-			for (uint i = 1; i < 3; i++)
+			for (uint i = 1; i < 3; i++) {
 				if (_sniff[i])
 					_sniff[i]->setFrame(_sniff[0]->displayedFrame());
+			}
 		}
 		updateBlink();
 		for (uint i = 0; i < sounds.size(); i++)
@@ -915,10 +969,10 @@ bool CorralMachine::pollSound(uint16 &sound) {
 }
 
 Common::String CorralMachine::debugAnswer() const {
-	static const char *const names[] = {
-		"shape",
-		"color",
-		"leaf",
+	static constexpr const char *names[] = {
+		kShapeName,
+		kColorName,
+		kLeafName,
 	};
 	Common::String result = Common::String::format("Corral level %u: left=%s, right=%s", _level, names[_rules.axis(0)], names[_rules.axis(1)]);
 	if (1 < _level)
@@ -934,7 +988,8 @@ Common::String CorralMachine::debugAnswer() const {
 	Common::Array<CorralRules::Feeding> plan;
 	_rules.findAnswer(plan);
 	for (uint i = 0; i < plan.size(); i++) {
-		Common::Rect fruit = fruitBounds(plan[i].fruit), zerble = _zerbles[plan[i].zerble]->bounds();
+		Common::Rect fruit = fruitBounds(plan[i].fruit);
+		Common::Rect zerble = _zerbles[plan[i].zerble]->bounds();
 		result += Common::String::format("Fruit %u: drag (%d,%d) to (%d,%d), zerble %u%s\n", plan[i].fruit + 1,
 										 fruit.left + fruit.width() / 2, fruit.top + fruit.height() / 2, zerble.left + zerble.width() / 2, zerble.top + zerble.height() / 2,
 										 plan[i].zerble + 1, _moving[plan[i].zerble] ? " (moving; wait)" : "");

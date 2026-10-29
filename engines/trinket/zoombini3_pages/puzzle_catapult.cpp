@@ -29,6 +29,21 @@
 namespace Trinket {
 namespace Zoombini3 {
 
+constexpr const char *CatapultMachine::kRunningName;
+constexpr const char *CatapultMachine::kStoppedName;
+constexpr const char *CatapultMachine::kOpenName;
+constexpr const char *CatapultMachine::kClosedName;
+constexpr const char *CatapultMachine::kEventCorrect;
+constexpr const char *CatapultMachine::kEventIncorrect;
+constexpr const char *CatapultMachine::kEventFinishedCorrect;
+constexpr const char *CatapultMachine::kEventFinishedIncorrect;
+constexpr const char *CatapultMachine::kTokenPickedUpName;
+constexpr const char *CatapultMachine::kMethodSetupGame;
+constexpr const char *CatapultMachine::kMethodStartRound;
+constexpr const char *CatapultMachine::kMethodPauseRound;
+constexpr const char *CatapultMachine::kMethodFinishRound;
+constexpr const char *CatapultMachine::kMethodResumeRound;
+
 constexpr uint CatapultRules::kDatasetCount;
 constexpr uint CatapultRules::kPartyLimit;
 
@@ -111,7 +126,7 @@ bool CatapultRules::configure(uint level, uint partySize, uint dataset, int over
 	_paddleFamily = level == 1 ? 0 : paddle[dataset];
 	_driveFamily = level == 1 ? 0 : drive[dataset];
 	_primaryCount = count[dataset] == -3 ? 3 : count[dataset];
-	_primaryPhaseDivisor = count[dataset] == -3 ? 4 : _primaryCount;
+	_primaryPhaseDiv = count[dataset] == -3 ? 4 : _primaryCount;
 	return true;
 }
 
@@ -131,7 +146,7 @@ uint CatapultRules::primaryStartFrame(uint index, uint frameCount) const {
 		20,
 		10,
 	};
-	return frameCount / _primaryPhaseDivisor * index + phase[_dataset] + 1;
+	return frameCount / _primaryPhaseDiv * index + phase[_dataset] + 1;
 }
 
 uint CatapultRules::secondaryStartFrame(uint index, uint frameCount) const {
@@ -260,62 +275,51 @@ int CatapultRules::datasetForDraw(uint draw, const bool *seen) {
 
 CatapultMotion::CatapultMotion() = default;
 
-void CatapultMotion::startWalk(int xVelocity, int yVelocity) {
+void CatapultMotion::startWalk(int xVelocity, int yVelocity, uint32 time) {
+	_clock.update(time, !_paused);
 	_walking = true;
 	_walkX = xVelocity;
 	_walkY = yVelocity;
 }
 
 void CatapultMotion::startBounce(int velocity, int acceleration, int decay, const Common::Rect &position, uint32 time) {
+	_clock.update(time, !_paused);
 	_bouncing = true;
 	_bounceVelocity = velocity;
-	_currentBounceVelocity = position.bottom < _bounds.bottom ? 0 : velocity;
+	_curBounceVelocity = position.bottom < _bounds.bottom ? 0 : velocity;
 	_acceleration = acceleration;
 	_decay = decay;
-	_bounceTime = time;
+	_bounceElapsed = 0;
 	_bounceOriginY = position.top;
-	_previousBounceY = position.top;
+	_prevBounceY = position.top;
 }
 
 void CatapultMotion::pause(uint32 time) {
+	_clock.update(time, !_paused);
 	_paused = true;
-	_pauseTime = time;
 }
 
 void CatapultMotion::resume(uint32 time) {
-	_lastUpdate = time;
-	if (_bouncing)
-		_bounceTime += static_cast<double>(time) - _pauseTime;
+	_clock.update(time, false);
 	_paused = false;
 }
 
 void CatapultMotion::update(Common::Rect &position, uint32 time, Listener &listener) {
-	uint32 elapsed = _lastUpdate ? time - _lastUpdate : 8;
+	_clock.update(time, !_paused);
+	const uint32 elapsed = MIN<uint32>(_clock.delta(), 500);
 	if (!elapsed)
 		return;
-	_lastUpdate = time;
 	if (_paused || (!_walking && !_bouncing))
 		return;
-	double rawDelta = elapsed * 0.001;
-	double total = rawDelta;
-	for (uint i = ARRAYSIZE(_samples) - 1; 0 < i; i--) {
-		_samples[i] = _samples[i - 1] == 0 ? rawDelta : _samples[i - 1];
-		total += _samples[i];
-	}
-	_samples[0] = rawDelta;
-	double delta = total * 0.1;
-	if (0.5 < delta) {
-		delta = 0.5;
-		if (_bouncing)
-			startBounce(_bounceVelocity, _acceleration, _decay, position, time);
-	}
+	const double delta = elapsed / 1000.0;
 	double dx = _remainderX;
 	double dy = _remainderY;
 	if (_bouncing) {
-		double seconds = (static_cast<double>(time) - _bounceTime) * 0.001;
-		double y = _bounceOriginY - _currentBounceVelocity * seconds + _acceleration * seconds * seconds;
-		dy += y - _previousBounceY;
-		_previousBounceY = y;
+		_bounceElapsed += elapsed;
+		double seconds = _bounceElapsed / 1000.0;
+		double y = _bounceOriginY - _curBounceVelocity * seconds + _acceleration * seconds * seconds;
+		dy += y - _prevBounceY;
+		_prevBounceY = y;
 	}
 	if (_walking) {
 		dx += _walkX * delta;
@@ -336,10 +340,10 @@ void CatapultMotion::update(Common::Rect &position, uint32 time, Listener &liste
 		} else {
 			listener.motionBoundary(*this, position, kBounce, time);
 		}
-		_currentBounceVelocity = _bounceVelocity;
-		_bounceTime = time;
+		_curBounceVelocity = _bounceVelocity;
+		_bounceElapsed = 0;
 		_bounceOriginY = position.top;
-		_previousBounceY = position.top;
+		_prevBounceY = position.top;
 	}
 	if (_walking) {
 		// Horizontal callbacks may change bounds; vertical comparisons use the saved position.
@@ -359,29 +363,29 @@ void CatapultMotion::update(Common::Rect &position, uint32 time, Listener &liste
 			listener.motionBoundary(*this, position, kTop, time);
 		}
 	}
-	_pauseTime = time;
 }
 
 Common::String CatapultMachine::debugAnswer() const {
 	Common::String result = Common::String::format("Catapult: level %u, dataset %u, machine %s\n",
-												   _rules.level(), _rules.dataset(), machineRunning() ? "running" : "stopped");
+												   _rules.level(), _rules.dataset(), machineRunning() ? kRunningName : kStoppedName);
 	for (uint i = 0; i < _rules.primaryCount(); i++) {
 		uint frame = _primary[i]->getFrame();
 		result += Common::String::format("Primary %u: frame %u, chute entry %s, transport frame %u\n",
-										 i + 1, frame, _rules.canReceiveFromChute(frame) ? "open" : "closed", _rules.primaryTransportFrame());
+										 i + 1, frame, _rules.canReceiveFromChute(frame) ? kOpenName : kClosedName, _rules.primaryTransportFrame());
 	}
 	if (_paddle)
 		result += Common::String::format("Paddle: frame %u/%u, landing %s\n", _paddle->getFrame(), _paddle->getNumberOfFrames(),
-										 _rules.paddleIsOpen(_paddle->getFrame(), _paddle->getNumberOfFrames()) ? "open" : "closed");
+										 _rules.paddleIsOpen(_paddle->getFrame(), _paddle->getNumberOfFrames()) ? kOpenName : kClosedName);
 	result += "Timing puzzle: test the current cycle with unlimited mud; boulders move the party. Frame values are a snapshot.\n";
 	return result;
 }
 
 Common::String CatapultMachine::debugChance() const {
 	uint supply = 0;
-	for (uint i = 0; i < _objects.size(); i++)
+	for (uint i = 0; i < _objects.size(); i++) {
 		if (_objects[i]->rock && _objects[i]->stage == kSupply && _objects[i]->sprite->enabled)
 			supply += 1;
+	}
 	return Common::String::format("Boulders: %u unresolved, %u in supply, %u in flight or machinery. Mud: unlimited.\n",
 								  _unresolved, supply, _unresolved - supply);
 }
@@ -417,12 +421,12 @@ void CatapultMachine::Object::motionBoundary(CatapultMotion &movement, Common::R
 }
 
 CatapultMachine::CatapultMachine(Shell::Scene &scene) : _scene(scene) {
-	static const char *const events[] = {
-		"correct",
-		"incorrect",
-		"finishedCorrect",
-		"finishedIncorrect",
-		"tokenPickedUp",
+	static constexpr const char *events[] = {
+		kEventCorrect,
+		kEventIncorrect,
+		kEventFinishedCorrect,
+		kEventFinishedIncorrect,
+		kTokenPickedUpName,
 	};
 	for (uint i = 0; i < ARRAYSIZE(events); i++)
 		addEvent(events[i]);
@@ -433,29 +437,29 @@ CatapultMachine::CatapultMachine(Shell::Scene &scene, const CatapultRules &rules
 	_unresolved = rules.partySize();
 }
 
-bool CatapultMachine::play(const Common::String &method, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if (method == "setupGame" && arguments.size() == 3) {
+bool CatapultMachine::play(const Common::String &method, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if (method.equals(kMethodSetupGame) && sargs.size() == 3) {
 		CatapultRules rules;
-		if (!rules.configure(arguments[0].integer(), arguments[1].integer(), arguments[2].integer()))
+		if (!rules.configure(sargs[0].toInt32(), sargs[1].toInt32(), sargs[2].toInt32()))
 			return false;
 		clearRound();
 		_rules = rules;
 		_unresolved = rules.partySize();
 		return load();
 	}
-	if (method == "startRound" && arguments.empty())
+	if (method.equals(kMethodStartRound) && sargs.empty())
 		return true;
-	if ((method == "pauseRound" || method == "finishRound") && arguments.empty()) {
+	if ((method.equals(kMethodPauseRound) || method.equals(kMethodFinishRound)) && sargs.empty()) {
 		pause(callTime());
-		if (method == "finishRound")
-			emitEvent("finishedCorrect");
+		if (method.equals(kMethodFinishRound))
+			emitEvent(kEventFinishedCorrect);
 		return true;
 	}
-	if (method == "resumeRound" && arguments.empty()) {
+	if (method.equals(kMethodResumeRound) && sargs.empty()) {
 		resume(callTime());
 		return true;
 	}
-	return MultiTrinket::play(method, arguments, result);
+	return MultiTrinket::play(method, sargs, result);
 }
 
 CatapultMachine::~CatapultMachine() {
@@ -480,7 +484,7 @@ void CatapultMachine::clearRound() {
 		_secondary[i] = nullptr;
 	_paddle = _indicator = _trigger = _mudSplash = _switch = nullptr;
 	_running = _paused = true;
-	_chuteMoving = _missDone = _secondaryDone = _missSplashDone = _waterSplashDone = _resourceError = false;
+	_chuteMoving = _missDone = _secondaryDone = _missSplashDone = _waterSplashDone = _resError = false;
 }
 
 Shell::Sprite *CatapultMachine::add(uint id, int depth, bool gear) {
@@ -490,7 +494,7 @@ Shell::Sprite *CatapultMachine::add(uint id, int depth, bool gear) {
 	if (!sprite || !sprite->startAnimation(gear ? -1 : 0)) {
 		if (sprite)
 			_scene.remove(sprite);
-		_resourceError = true;
+		_resError = true;
 		return nullptr;
 	}
 	sprite->setFPS(12);
@@ -724,7 +728,7 @@ bool CatapultMachine::load() {
 	_indicator->y += shiftY + (_rules.paddleFamily() < 2 ? -10 : 0);
 	_trigger = add(10423, 16);
 	_mudSplash = add(10452, 17);
-	if (!_trigger || !_mudSplash || _resourceError)
+	if (!_trigger || !_mudSplash || _resError)
 		return false;
 	_mudSplash->setPauseOnLastFrame(true);
 	_mudSplash->visible = false;
@@ -773,7 +777,7 @@ void CatapultMachine::resume(uint32 time) {
 }
 
 void CatapultMachine::action(int action) {
-	if (_paused || _resourceError)
+	if (_paused || _resError)
 		return;
 	if (action == kToggle03) {
 		_running = !_running;
@@ -861,7 +865,7 @@ void CatapultMachine::startFlight(Object *object, bool missed) {
 	object->landing = kWater;
 	object->motion.setBounds(Common::Rect(800, missed ? 560 : 520));
 	object->motion.startBounce(200, 500, 0, object->position(), _time);
-	object->motion.startWalk(missed ? 80 : _rules.flightVelocity(), 0);
+	object->motion.startWalk(missed ? 80 : _rules.flightVelocity(), 0, _time);
 	_scene.setDepth(object->sprite, 5);
 }
 
@@ -896,7 +900,7 @@ void CatapultMachine::land(Object &object, Common::Rect &position, CatapultMotio
 		object.landing = kTrigger;
 		object.motion.setBounds(Common::Rect(800, 465));
 		object.motion.startBounce(200, 500, 0, position, time);
-		object.motion.startWalk(780 - position.left, 0);
+		object.motion.startWalk(780 - position.left, 0, time);
 		_scene.setDepth(object.sprite, 17);
 		_sounds.push_back(kResSound10415_Impact);
 	} else if (object.landing == kTrigger && object.rock) {
@@ -940,7 +944,19 @@ void CatapultMachine::resolveRock(bool correct) {
 	if (_unresolved)
 		_unresolved -= 1;
 	Result result = {correct, _unresolved == 0};
-	emitEvent(correct ? (result.finished ? "finishedCorrect" : "correct") : (result.finished ? "finishedIncorrect" : "incorrect"));
+	const char *name;
+	if (correct) {
+		if (result.finished)
+			name = kEventFinishedCorrect;
+		else
+			name = kEventCorrect;
+	} else {
+		if (result.finished)
+			name = kEventFinishedIncorrect;
+		else
+			name = kEventIncorrect;
+	}
+	emitEvent(name);
 	if (_resultListener)
 		_resultListener->catapultResult(result, _time);
 	else
@@ -1030,7 +1046,7 @@ void CatapultMachine::updateRound() {
 
 void CatapultMachine::update(uint32 time) {
 	_time = time;
-	if (_resourceError || !_trigger)
+	if (_resError || !_trigger)
 		return;
 	updateRound();
 	_scene.update(time, _sounds);

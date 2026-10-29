@@ -28,25 +28,28 @@
 #include "trinket/detection.h"
 #include "trinket/detection_tables.h"
 
-static const PlainGameDescriptor trinketGames[] = {
+static constexpr PlainGameDescriptor trinketGames[] = {
 	{"zoombini3", "Zoombinis: Island Odyssey"},
 	{"rr1cloud9", "Reader Rabbit 1st Grade: Capers on Cloud Nine!"},
 	{nullptr, nullptr},
 };
 
-static const char *const directoryGlobs[] = {
+static constexpr const char *directoryGlobs[] = {
 	"hd",
 	"install",
 	"rsc",
 	"scripts",
 	"r1scripts",
 	"r1rsc",
+	"p",
+	"RR1 Cloud Nine",
 	"Zoombinis Island Odyssey",
 	nullptr,
 };
 
 class TrinketMetaEngineDetection : public AdvancedMetaEngineDetection<Trinket::TrinketGameDescription> {
 public:
+	/** Configure release fingerprints and the original disc search directories. */
 	TrinketMetaEngineDetection() : AdvancedMetaEngineDetection(Trinket::gameDescriptions, trinketGames) {
 		_md5Bytes = 5000;
 		_maxScanDepth = 4;
@@ -65,6 +68,7 @@ public:
 		return "Trinket games (C) The Learning Company / Riverdeep Interactive Learning Limited";
 	}
 
+	/** Build the release-specific target and explain unsupported releases. */
 	DetectedGame toDetectedGame(const ADDetectedGame &adGame, ADDetectedGameExtraInfo *extraInfo = nullptr) const override {
 		DetectedGame game = AdvancedMetaEngineDetection::toDetectedGame(adGame, extraInfo);
 
@@ -83,16 +87,17 @@ public:
 		}
 
 		// Unsupported entries normally use extra as an error message, not a
-		// version. Keep the release visible while reporting the missing runtime.
+		// version. Keep the release visible while reporting unsupported releases.
 		const char *title = nullptr;
-		for (const PlainGameDescriptor *entry = trinketGames; entry->gameId; entry++)
+		for (const PlainGameDescriptor *entry = trinketGames; entry->gameId; entry++) {
 			if (!strcmp(entry->gameId, adGame.desc->gameId))
 				title = entry->description;
+		}
 		game.description = DetectedGame(getName(), adGame.desc->gameId, title,
 										adGame.desc->language, adGame.desc->platform, adGame.desc->extra, false)
 							   .description;
 		if (adGame.desc->flags & ADGF_UNSUPPORTED)
-			game.extra = _s("Zoombinis: Island Odyssey is not yet implemented.");
+			game.extra = _s("This version of the game is not yet supported.");
 		return game;
 	}
 };

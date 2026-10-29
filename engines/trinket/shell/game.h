@@ -34,7 +34,13 @@ class Game {
 public:
 	/** Save-specific controls, using Audio::Mixer::kMaxMixerVolume as full scale. */
 	struct SoundSettings {
-		int music, effects, speech;
+		/** Stored music volume in the subengine's native volume scale. */
+		int music;
+		/** Stored sound-effects volume in the subengine's native volume scale. */
+		int effects;
+		/** Stored speech volume in the subengine's native volume scale. */
+		int speech;
+		/** Whether all game audio is muted. */
 		bool mute;
 	};
 	struct SaveRequest {
@@ -44,30 +50,49 @@ public:
 			kLoad02 = 2,
 			kReplace03 = 3,
 		};
+		/** Pending save operation, or none when no operation was requested. */
 		Action action = kNone00;
+		/** One-based slot affected by the pending operation. */
 		uint slot = 0;
+		/** Describe a save operation and its slot, defaulting to no request. */
 		SaveRequest() = default;
+		/** Describe a save operation and its slot, defaulting to no request. */
 		SaveRequest(Action requestedAction, uint requestedSlot = 0) : action(requestedAction), slot(requestedSlot) {}
 	};
+	/** Allow destruction through the shared game interface. */
 	virtual ~Game() {}
 	/** Decode or reset state without entering a scene or consuming its random draws. */
 	virtual bool prepareState(Common::SeekableReadStream *save, const Common::String &playerName) = 0;
 
 	/** Prepare a disposable direct-entry session; false leaves normal startup in control. */
 	virtual bool prepareBoot(int bootParam) { return false; }
+	/** Enter the already prepared game state, selecting new-game or resumed setup. */
 	virtual bool startPrepared(bool fresh, bool fromLauncher) = 0;
+	/** Return the active save's audio preferences. */
 	virtual SoundSettings soundSettings() const = 0;
+	/** Replace the active save's audio preferences. */
 	virtual void setSoundSettings(const SoundSettings &settings) = 0;
+	/** Apply the active save's volumes and mute state to the mixer. */
 	virtual void applySoundSettings() = 0;
+	/** Return the player name requested by the game, or an empty string if none is pending. */
 	virtual Common::String requestedPlayer() const { return Common::String(); }
+	/** Clear the pending request to change players. */
 	virtual void clearPlayerRequest() {}
+	/** Return and clear a pending save-management operation. */
 	virtual SaveRequest takeSaveRequest() { return SaveRequest(); }
+	/** Write the active game's checkpoint to the supplied stream. */
 	virtual bool save(Common::WriteStream &stream) const = 0;
+	/** Return the active game location used by the save registry. */
 	virtual int currentLocation() const = 0;
-	virtual bool canReturnToLauncher() const { return true; }
-	virtual bool takeReturnToLauncherRequest() { return false; }
+	/** Return whether Escape may leave the current game state. */
+	virtual bool canQuitWithEscape() const { return true; }
+	/** Return and clear a pending request to leave gameplay. */
+	virtual bool takeQuitRequest() { return false; }
+	/** Dispatch an input event to the active game state. */
 	virtual void event(const Common::Event &event) = 0;
+	/** Advance and draw the active game at the supplied millisecond timestamp. */
 	virtual void draw(OM::Canvas &canvas, uint32 time) = 0;
+	/** Run a debugger command for the active puzzle and return its response text. */
 	virtual Common::String debugPageCommand(const Common::String &command) { return "No puzzle is active.\n"; }
 };
 

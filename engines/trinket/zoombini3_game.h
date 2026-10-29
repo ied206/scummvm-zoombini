@@ -33,35 +33,65 @@ namespace Zoombini3 {
 
 class ScriptSession;
 
-/** Owns saved World state and the application MPS session. */
+/** Run the Zoombini 3 application scripts and maintain saved world state. */
 class Game : public Shell::Game {
 public:
+	/** Connect a Zoombinis world and script session to the engine. */
 	explicit Game(TrinketEngine &vm);
+	/** Stop the active script session before releasing game state. */
 	~Game() override;
+	/** Construct the Zoombinis runtime through the shared subengine interface. */
 	static Shell::Game *create(TrinketEngine &vm) { return new Game(vm); }
+	/** Load a player's save or initialize a fresh world before entering gameplay. */
 	bool prepareState(Common::SeekableReadStream *save, const Common::String &playerName) override;
+	/** Prepare a direct practice scene from the configured boot parameter. */
 	bool prepareBoot(int bootParam) override;
+	/** Decode a supported practice location and difficulty without changing outputs on failure. */
 	static bool parsePracticeBootParam(int bootParam, Location &location, uint &level);
+	/** Enter the prepared world through its new-game, resume or launcher path. */
 	bool startPrepared(bool fresh, bool fromLauncher) override;
+	/** Return music, effects, speech and mute preferences stored in the world. */
 	SoundSettings soundSettings() const override;
+	/** Store the supplied audio preferences in the world. */
 	void setSoundSettings(const SoundSettings &settings) override;
+	/** Apply the world's saved volumes and mute preference to the mixer. */
 	void applySoundSettings() override;
+	/** Serialize the current world to the supplied save stream. */
 	bool save(Common::WriteStream &stream) const override { return _world.write(stream); }
+	/** Return the active world's location code. */
 	int currentLocation() const override { return _world.currentLocation(); }
-	bool canReturnToLauncher() const override;
-	bool takeReturnToLauncherRequest() override;
+	/** Check whether the active script state allows Escape to leave gameplay. */
+	bool canQuitWithEscape() const override;
+	/** Return and clear the game's pending quit request. */
+	bool takeQuitRequest() override;
+	/** Forward input to the active script session. */
 	void event(const Common::Event &event) override;
+	/** Advance and draw the active script session at a millisecond timestamp. */
 	void draw(OM::Canvas &canvas, uint32 time) override;
+	/** Run an active-page debugger command and return its response. */
 	Common::String debugPageCommand(const Common::String &command) override;
 
 private:
+	/** Suffix identifying  Practice. */
+	static constexpr const char *kPracticeSuffix = "_Practice";
+	/** Script identifier for boot Practice. */
+	static constexpr const char *kBootPracticeName = "Boot_Practice";
+
 	friend class ScriptSession;
+	/** Multiplier separating a practice location from its difficulty digit. */
 	static constexpr int kPracticeBootParamPageFactor = 100;
+	/** Engine supplying shared resources, drawing and audio services. */
 	TrinketEngine &_vm;
+	/** Persistent character, location, activity and preference state. */
 	World _world;
+	/** Current script session and its scene objects. */
 	Common::ScopedPtr<ScriptSession> _session;
+	/** Name associated with the prepared save state. */
 	Common::String _playerName;
-	bool _practice = false, _quitRequested = false;
+	/** Whether the prepared world uses practice progression. */
+	bool _practice = false;
+	/** Whether the script session requested a return from gameplay. */
+	bool _quitRequested = false;
 };
 
 } // End of namespace Zoombini3

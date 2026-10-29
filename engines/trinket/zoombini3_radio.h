@@ -28,45 +28,92 @@
 namespace Trinket {
 namespace Zoombini3 {
 
-/** Scriptable radio group whose members remain owned by their scene. */
+/** Coordinate mutually exclusive selection among registered script objects. */
 class RadioGroup : public Core::ScriptableObject, private Core::ScriptableObject::Observer {
 public:
 	class Factory : public Core::ObjectRegistry::Factory {
 	public:
+		/** Configure radio-group creation with an optional script runtime. */
 		Factory() = default;
+		/** Configure radio-group creation with an optional script runtime. */
 		explicit Factory(Core::ScriptRuntime &runtime) : _runtime(&runtime) {}
-		Core::ScriptableObject *create(const Core::ScriptArguments &arguments) override { return new RadioGroup(_runtime); }
+		/** Create a radio group using this factory's optional runtime. */
+		Core::ScriptableObject *create(const Core::ScriptArguments &sargs) override { return new RadioGroup(_runtime); }
 
 	private:
+		/** Optional runtime used to resolve named radio members. */
 		Core::ScriptRuntime *_runtime = nullptr;
 	};
 
+	/** Initialize exclusive sprite selection with optional named-member lookup. */
 	explicit RadioGroup(Core::ScriptRuntime *runtime = nullptr);
+	/** Detach member callbacks and destruction observers. */
 	~RadioGroup() override;
+	/** Register a sprite as an exclusive-choice member. */
 	void add(Shell::Sprite &member);
+	/** Select a valid member and update all member button states. */
 	bool select(int index);
+	/** Clear exclusive selection and reset member button states. */
 	void clearSelection();
+	/** Apply a member click and emit the group's script selection event. */
 	void clicked(uint index);
+	/** Return the selected member index, or minus one when none is selected. */
 	int selection() const { return _selected; }
-	bool get(const Common::String &property, const Core::ScriptArguments &arguments, Core::ScriptValue &result) override;
-	bool set(const Common::String &property, const Core::ScriptArguments &arguments, const Core::ScriptValue &value) override;
-	bool play(const Common::String &method, const Core::ScriptArguments &arguments, Core::ScriptValue &result) override;
+	/** Read the selected member and supported group properties. */
+	bool get(const Common::String &property, const Core::ScriptArguments &sargs, Core::ScriptValue &result) override;
+	/** Assign the selected member through the script property interface. */
+	bool set(const Common::String &property, const Core::ScriptArguments &sargs, const Core::ScriptValue &value) override;
+	/** Dispatch member registration and selection-control script methods. */
+	bool play(const Common::String &method, const Core::ScriptArguments &sargs, Core::ScriptValue &result) override;
 
 private:
+	/** Script event name for changed. */
+	static constexpr const char *kEventChanged = "changed";
+	/** Script identifier for mouse Down. */
+	static constexpr const char *kMouseDownName = "mouseDown";
+	/** Script identifier for fly On. */
+	static constexpr const char *kFlyOnName = "flyOn";
+	/** Script identifier for fly Off. */
+	static constexpr const char *kFlyOffName = "flyOff";
+	/** Script property name for selection. */
+	static constexpr const char *kPropertySelection = "selection";
+	/** Script property name for last. */
+	static constexpr const char *kPropertyLast = "last";
+	/** Script property name for group Name. */
+	static constexpr const char *kPropertyGroupName = "groupName";
+	/** Script method name for add. */
+	static constexpr const char *kMethodAdd = "add";
+	/** Script identifier for rAnimation. */
+	static constexpr const char *kRAnimationName = "RAnimation";
+	/** Script method name for clear. */
+	static constexpr const char *kMethodClear = "clear";
+
 	class MemberLink : public Core::ObjectLink {
 	public:
+		/** Connect a member's click or hover event to its radio group. */
 		MemberLink(RadioGroup &group, int hover = 0) : _group(group), _hover(hover) {}
+		/** Copy the member event callback. */
 		Core::ObjectLink *clone() const override { return new MemberLink(_group, _hover); }
+		/** Forward a member event to group selection or hover handling. */
 		void execute(Core::ScriptableObject &source) override;
 
 	private:
+		/** Radio group receiving the member event. */
 		RadioGroup &_group;
+		/** Hover transition associated with this event, or the click marker. */
 		int _hover;
 	};
+	/** Sprites participating in exclusive selection. */
 	Common::Array<Shell::Sprite *> _members;
-	int _selected = -1, _previous = -1;
+	/** Currently selected member index, or minus one when unset. */
+	int _selected = -1;
+	/** Previous selection retained during pointer feedback. */
+	int _previous = -1;
+	/** Script name associated with this radio group. */
 	Common::String _name;
+	/** Optional script runtime used to resolve named members. */
 	Core::ScriptRuntime *_runtime;
+	/** Remove a destroyed member and adjust selection indices. */
 	void objectDestroyed(Core::ScriptableObject &object) override;
 };
 

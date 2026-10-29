@@ -24,6 +24,15 @@
 namespace Trinket {
 namespace Zoombini3 {
 
+constexpr const char *SaveFiles::kGlobalPropertiesEnd;
+constexpr const char *SaveFiles::kRegistryHeader;
+constexpr const char *SaveFiles::kVersionName;
+constexpr const char *SaveFiles::k12Name;
+constexpr const char *SaveFiles::kGLOBALENDName;
+constexpr const char *SaveFiles::kPracticeSuffix;
+
+constexpr const char *SaveFiles::kSlotFileFormat;
+
 bool SaveFiles::readRegistry(Common::SeekableReadStream *stream, Common::Array<Player> &players) {
 	if (!stream) {
 		_properties.clear();
@@ -31,12 +40,12 @@ bool SaveFiles::readRegistry(Common::SeekableReadStream *stream, Common::Array<P
 	}
 	Common::String value;
 	Common::Array<Common::String> properties;
-	if (!line(*stream, value) || value != "Version" || !line(*stream, value) || value != "12")
+	if (!line(*stream, value) || !value.equals(kVersionName) || !line(*stream, value) || !value.equals(k12Name))
 		return false;
 	while (true) {
 		if (!line(*stream, value))
 			return false;
-		if (value == "GLOBAL_END")
+		if (value.equals(kGLOBALENDName))
 			break;
 		if (value.empty() || 8192 <= properties.size())
 			return false;
@@ -65,7 +74,7 @@ bool SaveFiles::readRegistry(Common::SeekableReadStream *stream, Common::Array<P
 		for (uint i = 0; i < kSlotCount; i++)
 			player.locations[i] = stream->readSint32LE();
 		for (uint i = 0; i < players.size(); i++) {
-			if (players[i].id == player.id || players[i].name == player.name)
+			if (players[i].id == player.id || players[i].name.equals(player.name))
 				return false;
 		}
 		players.push_back(player);
@@ -77,10 +86,10 @@ bool SaveFiles::readRegistry(Common::SeekableReadStream *stream, Common::Array<P
 }
 
 bool SaveFiles::writeRegistry(Common::WriteStream &stream, const Common::Array<Player> &players) const {
-	stream.writeString("Version\n12\n");
+	stream.writeString(kRegistryHeader);
 	for (uint i = 0; i < _properties.size(); i++)
 		stream.writeString(_properties[i] + "\n");
-	stream.writeString("GLOBAL_END\n");
+	stream.writeString(kGlobalPropertiesEnd);
 	for (uint i = 0; i < players.size(); i++) {
 		const Player &player = players[i];
 		stream.writeString(player.name + "\n");
@@ -94,15 +103,15 @@ bool SaveFiles::writeRegistry(Common::WriteStream &stream, const Common::Array<P
 }
 
 Common::String SaveFiles::primaryName(const Common::String &name) const {
-	return isVisible(name) ? name : name.substr(0, name.size() - Common::String("_Practice").size());
+	return isVisible(name) ? name : name.substr(0, name.size() - Common::String(kPracticeSuffix).size());
 }
 
 bool SaveFiles::belongsTo(const Common::String &candidate, const Common::String &owner) const {
-	return candidate == owner || candidate == owner + "_Practice";
+	return candidate.equals(owner) || candidate.equals(owner + kPracticeSuffix);
 }
 
 Common::String SaveFiles::slotFileName(uint32 id, uint slot) const {
-	return Common::String::format("User%03u_%uGZ.dat", id, slot);
+	return Common::String::format(kSlotFileFormat, id, slot);
 }
 
 } // namespace Zoombini3

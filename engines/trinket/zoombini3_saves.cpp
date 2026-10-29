@@ -28,7 +28,13 @@
 namespace Trinket {
 namespace Zoombini3 {
 
-Saves::Saves(Common::SaveFileManager &manager, const Common::String &target) : _manager(manager), _prefix(target + ".trinket-"), _registryFile(_prefix + "launcher-users.xml"), _saveFiles(manager, target) {
+constexpr const char *Saves::kXMLPractice;
+
+constexpr const char *Saves::kSavePrefixSuffix;
+constexpr const char *Saves::kLauncherRegistryFile;
+
+Saves::Saves(Common::SaveFileManager &manager, const Common::String &target) : _manager(manager), _prefix(target + kSavePrefixSuffix),
+	_registryFile(_prefix + kLauncherRegistryFile), _saveFiles(manager, target) {
 }
 
 bool Saves::load() {
@@ -100,7 +106,7 @@ bool Saves::finish(bool success) {
 }
 
 bool Saves::validName(const Common::String &name) {
-	if (name.empty() || 21 < name.size() || name.hasSuffix("_Practice"))
+	if (name.empty() || 21 < name.size() || name.hasSuffix(kXMLPractice))
 		return false;
 	// Keep names representable by the US launcher's single-byte text storage.
 	for (uint i = 0; i < name.size(); i++) {
@@ -116,26 +122,26 @@ bool Saves::validSlot(uint player, uint slot) const {
 }
 
 bool Saves::rename(uint player, const Common::String &name, bool clone) {
-	if (players().size() <= player || !validName(name) || players()[player].name.hasSuffix("_Practice"))
+	if (players().size() <= player || !validName(name) || players()[player].name.hasSuffix(kXMLPractice))
 		return false;
 	Common::String old = players()[player].name;
 	for (const auto &record : players()) {
-		if (record.name == name || record.name == name + "_Practice")
+		if (record.name.equals(name) || record.name.equals(name + kXMLPractice))
 			return false;
 	}
 	for (const auto &user : _registry.users) {
-		if (user.name == name)
+		if (user.name.equals(name))
 			return false;
 	}
 	if ((clone && 99 <= _registry.users.size()) || !begin())
 		return false;
 	uint count = players().size();
 	for (uint i = 0; i < count; i++) {
-		if (players()[i].name != old && players()[i].name != old + "_Practice")
+		if (!players()[i].name.equals(old) && !players()[i].name.equals(old + kXMLPractice))
 			continue;
 		Common::String replacement = name;
-		if (players()[i].name != old)
-			replacement += "_Practice";
+		if (!players()[i].name.equals(old))
+			replacement += kXMLPractice;
 		if (!clone) {
 			_saveFiles.players()[i].name = replacement;
 			continue;
@@ -156,7 +162,7 @@ bool Saves::rename(uint player, const Common::String &name, bool clone) {
 	bool found = false;
 	if (!clone) {
 		for (auto &user : _registry.users) {
-			if (user.name == old) {
+			if (user.name.equals(old)) {
 				user.name = name;
 				found = true;
 			}
@@ -175,13 +181,13 @@ bool Saves::rename(uint player, const Common::String &name, bool clone) {
 }
 
 bool Saves::remove(uint player) {
-	if (players().size() <= player || players()[player].name.hasSuffix("_Practice") || !begin())
+	if (players().size() <= player || players()[player].name.hasSuffix(kXMLPractice) || !begin())
 		return false;
 	Common::String name = players()[player].name;
 	if (!_saveFiles.remove(player))
 		return finish(false);
 	for (int i = _registry.users.size() - 1; 0 <= i; i--) {
-		if (_registry.users[i].name == name)
+		if (_registry.users[i].name.equals(name))
 			_registry.users.remove_at(i);
 	}
 	return finish(true);
@@ -205,6 +211,36 @@ bool Saves::importSlot(uint player, uint slot, Common::SeekableReadStream &strea
 		return finish(false);
 	_saveFiles.players()[player].locations[slot - 1] = world.currentLocation();
 	return finish(true);
+}
+
+bool Saves::importSave(const Common::String &name, Common::SeekableReadStream &stream) {
+	_rollbackFailed = false;
+	if (!validName(name) || 99 <= _registry.users.size() || 2147483647u <= _registry.nextID)
+		return false;
+	for (const auto &player : players()) {
+		if (player.name.equals(name) || player.name.equals(name + kXMLPractice))
+			return false;
+	}
+	for (const auto &user : _registry.users) {
+		if (user.name.equals(name))
+			return false;
+	}
+	const int player = _saveFiles.add(name);
+	if (player < 0)
+		return false;
+	if (!_manager.listSavefiles(stateName(player, 1)).empty()) {
+		load();
+		return false;
+	}
+	Launcher::Registry::User user;
+	user.id = _registry.nextID;
+	_registry.nextID += 1;
+	user.name = name;
+	_registry.users.push_back(user);
+	if (importSlot(player, 1, stream))
+		return true;
+	load();
+	return false;
 }
 
 bool Saves::exportSlot(uint player, uint slot, Common::WriteStream &stream) {

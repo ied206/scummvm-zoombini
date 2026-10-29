@@ -28,6 +28,21 @@
 namespace Trinket {
 namespace Launcher {
 
+constexpr const char *Registry::kDocumentFooter;
+constexpr const char *Registry::kUserFormat;
+constexpr const char *Registry::kUsersHeaderFormat;
+constexpr const char *Registry::kUpdateModeFormat;
+constexpr const char *Registry::kSoundSettingsFormat;
+constexpr const char *Registry::kDocumentHeader;
+constexpr const char *Registry::kNextIDPath;
+constexpr const char *Registry::kMusicStatePath;
+constexpr const char *Registry::kEffectsStatePath;
+constexpr const char *Registry::kUpdateModePath;
+constexpr const char *Registry::kManualUpdateMode;
+constexpr const char *Registry::kUserPathPrefix;
+constexpr const char *Registry::kNameElementSuffix;
+constexpr const char *Registry::kAutomaticUpdateMode;
+
 bool Registry::parseID(const Common::String &value, uint &id) {
 	id = 0;
 	if (value.empty())
@@ -55,14 +70,14 @@ bool Registry::load(Common::SaveFileManager &manager, const Common::String &file
 	}
 	if (!xml.loadStream(stream) || !xml.parse())
 		return false;
-	if (!parseID(xml.get("launcher/nextID"), candidate.nextID))
+	if (!parseID(xml.get(kNextIDPath), candidate.nextID))
 		return false;
-	candidate.musicEnabled = xml.get("launcher/musicState") != "0";
-	candidate.soundEnabled = xml.get("launcher/sfxState") != "0";
-	candidate.updatesAutomatic = xml.get("launcher/updateMode") != "manual";
-	const Common::String prefix = "launcher/users/user";
+	candidate.musicEnabled = !xml.get(kMusicStatePath).equals("0");
+	candidate.soundEnabled = !xml.get(kEffectsStatePath).equals("0");
+	candidate.updatesAutomatic = !xml.get(kUpdateModePath).equals(kManualUpdateMode);
+	const Common::String prefix = kUserPathPrefix;
 	for (const auto &element : xml.elements()) {
-		if (!element.path.hasPrefix(prefix) || !element.path.hasSuffix("/name"))
+		if (!element.path.hasPrefix(prefix) || !element.path.hasSuffix(kNameElementSuffix))
 			continue;
 		User user;
 		Common::String id = element.path.substr(prefix.size(), element.path.size() - prefix.size() - 5);
@@ -74,7 +89,7 @@ bool Registry::load(Common::SaveFileManager &manager, const Common::String &file
 				return false;
 		}
 		for (uint i = 0; i < candidate.users.size(); i++) {
-			if (candidate.users[i].id == user.id || candidate.users[i].name == user.name)
+			if (candidate.users[i].id == user.id || candidate.users[i].name.equals(user.name))
 				return false;
 		}
 		candidate.users.push_back(user);
@@ -88,15 +103,15 @@ bool Registry::store(Common::SaveFileManager &manager, const Common::String &fil
 	Common::ScopedPtr<Common::OutSaveFile> stream(manager.openForSaving(file));
 	if (!stream)
 		return false;
-	stream->writeString("<?xml version=\"1.0\" standalone=\"yes\"?>\n<launcher>\n");
-	stream->writeString(Common::String::format("<musicState>%d</musicState>\n<sfxState>%d</sfxState>\n", musicEnabled, soundEnabled));
-	stream->writeString(Common::String::format("<updateMode>%s</updateMode>\n", updatesAutomatic ? "auto" : "manual"));
-	stream->writeString(Common::String::format("<nextID>%u</nextID>\n<users>\n", nextID));
+	stream->writeString(kDocumentHeader);
+	stream->writeString(Common::String::format(kSoundSettingsFormat, musicEnabled, soundEnabled));
+	stream->writeString(Common::String::format(kUpdateModeFormat, updatesAutomatic ? kAutomaticUpdateMode : kManualUpdateMode));
+	stream->writeString(Common::String::format(kUsersHeaderFormat, nextID));
 	for (uint i = 0; i < users.size(); i++) {
 		const User &user = users[i];
-		stream->writeString(Common::String::format("<user%u><name>%s</name></user%u>\n", user.id, OM::XMLParser::escape(user.name).c_str(), user.id));
+		stream->writeString(Common::String::format(kUserFormat, user.id, OM::XMLParser::escape(user.name).c_str(), user.id));
 	}
-	stream->writeString("</users>\n</launcher>\n");
+	stream->writeString(kDocumentFooter);
 	stream->finalize();
 	return !stream->err();
 }

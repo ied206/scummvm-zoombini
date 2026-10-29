@@ -40,27 +40,61 @@ public:
 		kValueChanged01 = 1,
 		kActivated02 = 2,
 	};
+	/** Connect an audio-volume slider to the options scene. */
 	explicit OptionsSlider(Shell::Scene &scene);
+	/** Remove slider track, thumb and label sprites. */
 	~OptionsSlider();
+	/** Create a channel's slider with its depth and input-action range. */
 	bool load(Channel channel, int z, int actionBase);
+	/** Set the slider value as a zero-to-one-hundred percentage. */
 	void setPercentage(int percentage);
+	/** Return the selected volume percentage. */
 	int percentage() const;
+	/** Handle slider dragging and timed hover feedback. */
 	uint event(const Common::Event &event, uint32 time);
+	/** Report a newly elapsed hover delay once for the current control. */
 	bool hoverExpired(uint32 time);
+	/** Return whether the pointer is currently dragging the thumb. */
 	bool isTracking() const { return _tracking; }
 
 private:
+	/** Animation path pattern for volume slider resources. */
 	static constexpr const char *kAsset = "/z3options/%u.ao";
+	/** Milliseconds before a slider hover prompt becomes due. */
 	static constexpr uint kHoverDelay = 2000;
+	/** Scene displaying the slider sprites. */
 	Shell::Scene &_scene;
-	Shell::Sprite *_track = nullptr, *_thumb = nullptr, *_label = nullptr;
-	int _minimum = 0, _maximum = 0, _position = 0, _dragOffset = 0, _hoverAction = 0;
+	/** Sprite displaying the slider track. */
+	Shell::Sprite *_track = nullptr;
+	/** Sprite displaying the draggable slider thumb. */
+	Shell::Sprite *_thumb = nullptr;
+	/** Sprite identifying the audio channel controlled by the slider. */
+	Shell::Sprite *_label = nullptr;
+	/** Minimum thumb position along the slider track, in pixels. */
+	int _minimum = 0;
+	/** Maximum thumb position along the slider track, in pixels. */
+	int _maximum = 0;
+	/** Current thumb position along the slider track, in pixels. */
+	int _position = 0;
+	/** Pointer displacement from the thumb position during dragging. */
+	int _dragOffset = 0;
+	/** Input action whose timed hover feedback is being tracked. */
+	int _hoverAction = 0;
+	/** Millisecond timestamp when the current hover began. */
 	uint32 _hoverStart = 0;
-	bool _tracking = false, _hoverConsumed = false;
+	/** Whether the slider thumb is currently being dragged. */
+	bool _tracking = false;
+	/** Whether feedback for the current hover has already been reported. */
+	bool _hoverConsumed = false;
+	/** Remove all slider sprites and reset interaction state. */
 	void clear();
+	/** Clamp the thumb position and update its sprite. */
 	void setPosition(int position);
+	/** Begin or clear timed hover feedback for a control action. */
 	void setHover(int action, uint32 time);
+	/** Prevent accidental copies of this stateful object. */
 	OptionsSlider(const OptionsSlider &) = delete;
+	/** Prevent accidental copies of this stateful object. */
 	OptionsSlider &operator=(const OptionsSlider &) = delete;
 };
 

@@ -24,22 +24,28 @@
 namespace Trinket {
 namespace RR1Cloud9 {
 
+constexpr const char *World::kNameStatsSignedIndexFormat;
+constexpr const char *World::kTotalName;
+constexpr const char *World::kCorrectName;
+constexpr const char *World::kAssessmentCountName;
+constexpr const char *World::kColorName;
+
 void World::recordAssessment(const Common::String &activity, int level, int outcome, int up, int down, int streak) {
-	Common::String key = Common::String::format("%sStats:%d:", activity.c_str(), level);
-	set(key + "total", MIN(get(key + "total") + 1, 1000000));
+	Common::String key = Common::String::format(kNameStatsSignedIndexFormat, activity.c_str(), level);
+	set(key + kTotalName, MIN(get(key + kTotalName) + 1, 1000000));
 	if (outcome == 1)
-		set(key + "correct", MIN(get(key + "correct") + 1, 1000000));
-	int count = MIN(get(activity + "AssessmentCount") + 1, 20);
+		set(key + kCorrectName, MIN(get(key + kCorrectName) + 1, 1000000));
+	int count = MIN(get(activity + kAssessmentCountName) + 1, 20);
 	if (outcome == 1 && up <= streak) {
-		set(key + "color", 1);
+		set(key + kColorName, 1);
 		count = 0;
 	} else if (outcome == 3 && down <= streak) {
-		set(key + "color", 2);
+		set(key + kColorName, 2);
 		count = 0;
 	} else if (MIN(up, down) <= count) {
-		set(key + "color", 3);
+		set(key + kColorName, 3);
 	}
-	set(activity + "AssessmentCount", count);
+	set(activity + kAssessmentCountName, count);
 }
 
 bool World::save(Common::WriteStream &stream) const {

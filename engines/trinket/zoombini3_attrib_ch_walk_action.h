@@ -33,28 +33,54 @@ namespace Zoombini3 {
  */
 class AttribChWalkAction : public Shell::Action, private AttributeCharacter::WalkListener, private Core::ScriptableObject::Observer {
 public:
-	static Shell::Action *create(Shell::ActionSystem &system, const Core::ScriptArguments &arguments, bool interruptible);
+	/** Parse a scripted character-walk action and its waypoint list. */
+	static Shell::Action *create(Shell::ActionSystem &system, const Core::ScriptArguments &sargs, bool interruptible);
+	/** Detach callbacks from any character still executing the walk. */
 	~AttribChWalkAction() override;
+	/** Resolve the target character and begin the configured path. */
 	void start() override;
+	/** Stop the active walk and detach completion callbacks. */
 	void halt() override;
+	/** Pause the target character's walk. */
 	void pause() override;
+	/** Resume the target character's walk. */
 	void resume() override;
+	/** Copy the target and waypoint settings into an inactive action. */
 	Core::ScriptableObject *clone() const override;
 
 private:
+	/** Script identifier for rAttribute Character. */
+	static constexpr const char *kRAttributeCharacterName = "RAttributeCharacter";
+
 	struct Waypoint {
+		/** Absolute destination or relative displacement in game pixels. */
 		Common::Point position;
+		/** Whether the waypoint is absolute rather than relative to the character. */
 		bool absolute = true;
 	};
+	/** Configure a target character and walk-completion policies. */
 	AttribChWalkAction(Shell::ActionSystem &system, const Core::ScriptValue &target, bool clearPath, bool keepPosition, bool interruptible) : Action(system, interruptible), _target(target), _clearPath(clearPath), _keepPosition(keepPosition) {}
+	/** Script value identifying the character that will walk. */
 	Core::ScriptValue _target;
+	/** Absolute and relative moves retained for action startup. */
 	Common::Array<Waypoint> _waypoints;
+	/** Character currently watched for walk completion. */
 	AttributeCharacter *_character = nullptr;
-	bool _clearPath, _keepPosition, _completed = false;
+	/** Whether finishing the action clears the character's queued path. */
+	bool _clearPath;
+	/** Whether finishing the action retains the final position. */
+	bool _keepPosition;
+	/** Whether the current action has already received its completion callback. */
+	bool _completed = false;
+	/** Resolve the script target as an attribute-composed character. */
 	AttributeCharacter *target() const;
+	/** Remove walk and destruction callbacks from the target character. */
 	void detach();
+	/** Install the configured waypoints and start the character walk. */
 	void startMovement(AttributeCharacter &character);
+	/** Finish the action after the character completes its path. */
 	void walkFinished(AttributeCharacter &) override;
+	/** Clear the target pointer when the character is destroyed. */
 	void objectDestroyed(Core::ScriptableObject &) override { _character = nullptr; }
 };
 

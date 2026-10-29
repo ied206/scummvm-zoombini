@@ -30,20 +30,33 @@
 #include "common/textconsole.h"
 #include "engines/util.h"
 #include "graphics/cursorman.h"
+#include "graphics/macgui/macwindowmanager.h"
 #include "graphics/wincursor.h"
 #include "gui/debugger.h"
 #include "trinket/dialogs.h"
+#include "trinket/metaengine.h"
 
 namespace Trinket {
+
+constexpr const char *TrinketEngine::kConfigPath;
+constexpr const char *TrinketEngine::kUnknownName;
+constexpr const char *TrinketEngine::kRr1cloud9Name;
 
 class TrinketDebugger : public GUI::Debugger {
 public:
 	explicit TrinketDebugger(TrinketEngine &vm) : _vm(vm) {
-		registerCmd("page", WRAP_METHOD(TrinketDebugger, page));
-		registerCmd("puzzle", WRAP_METHOD(TrinketDebugger, page));
+		registerCmd(kPageName, WRAP_METHOD(TrinketDebugger, page));
+		registerCmd(kPuzzleName, WRAP_METHOD(TrinketDebugger, page));
 	}
 
 private:
+	/** Script identifier for page. */
+	static constexpr const char *kPageName = "page";
+	/** Script identifier for puzzle. */
+	static constexpr const char *kPuzzleName = "puzzle";
+	/** Format for script names or values: %s. */
+	static constexpr const char *kNameFormat = "%s";
+
 	TrinketEngine &_vm;
 	bool page(int argc, const char **argv) {
 		if (argc < 2) {
@@ -54,18 +67,22 @@ private:
 		for (int i = 2; i < argc; i++)
 			command += Common::String(" ") + argv[i];
 		Common::String result = _vm.debugPageCommand(command);
-		debugPrintf("%s", result.c_str());
+		debugPrintf(kNameFormat, result.c_str());
 		return true;
 	}
 };
 
-TrinketEngine::TrinketEngine(OSystem *system, const Subengine &subengine) : Engine(system), _resources(subengine.createResources()), _music(*_mixer, *_resources),
-																			_saveFiles(subengine.createSaveFiles(*system->getSavefileManager(), _targetName)),
-																			_launcher(*system->getSavefileManager(), _targetName, *_mixer),
-																			_subengine(subengine) {
+constexpr const char *TrinketDebugger::kPageName;
+constexpr const char *TrinketDebugger::kPuzzleName;
+constexpr const char *TrinketDebugger::kNameFormat;
+
+TrinketEngine::TrinketEngine(OSystem *system, const Subengine &subengine, Common::Platform platform)
+	: Engine(system), _resources(subengine.createResources()), _fonts(*_resources), _music(*_mixer, *_resources),
+	  _saveFiles(subengine.createSaveFiles(*system->getSavefileManager(), _targetName)),
+	  _launcher(*this, *system->getSavefileManager(), _targetName, *_mixer), _subengine(subengine), _platform(platform) {
 	setDebugger(new TrinketDebugger(*this));
 	_mainMenuDialog = new TrinketMainMenuDialog(*this);
-	_dataPath = ConfMan.getPath("path");
+	_dataPath = ConfMan.getPath(kConfigPath);
 }
 
 TrinketEngine::~TrinketEngine() {
@@ -158,26 +175,27 @@ bool TrinketEngine::removeSavedPlayer(const Common::String &name) {
 	if (_bootSession)
 		return false;
 	for (uint index = 0; index < _saveFiles->players().size(); index++) {
-		if (_saveFiles->players()[index].name != name)
+		if (!_saveFiles->players()[index].name.equals(name))
 			continue;
 		uint32 activeID = activePlayer() ? activePlayer()->id : 0;
 		bool result = _saveFiles->remove(index);
 		_player = -1;
-		for (uint i = 0; i < _saveFiles->players().size(); i++)
+		for (uint i = 0; i < _saveFiles->players().size(); i++) {
 			if (_saveFiles->players()[i].id == activeID)
 				_player = i;
+		}
 		return result;
 	}
 	return false;
 }
 
-bool TrinketEngine::startWithoutPlayer() {
+bool TrinketEngine::startWithoutPlayer(bool fromLauncher) {
 	if (_playing)
 		return false;
 	int previousPlayer = _player;
 	_player = -1;
 	Common::ScopedPtr<Shell::Game> candidate(_subengine.create(*this));
-	if (!candidate || !candidate->prepareState(nullptr, Common::String()) || !candidate->startPrepared(true, true)) {
+	if (!candidate || !candidate->prepareState(nullptr, Common::String()) || !candidate->startPrepared(true, fromLauncher)) {
 		candidate.reset();
 		_player = previousPlayer;
 		_music.reset();
@@ -188,28 +206,22 @@ bool TrinketEngine::startWithoutPlayer() {
 	_game = candidate.release();
 	_player = -1;
 	_playing = true;
-	_launcher.suspend();
+	if (_useLauncher)
+		_launcher.suspend();
 	return true;
 }
 
-void TrinketEngine::returnToLauncher() {
+void TrinketEngine::exitGame() {
 	if (!savePlayer())
 		return;
-	if (_bootSession) {
-		delete _game;
-		_game = nullptr;
-		_playing = false;
-		_bootSession = false;
-		_music.reset();
-		syncSoundSettings();
-		if (!loadLauncher())
-			quitGame();
+	if (!_useLauncher) {
+		quitGame();
 		return;
 	}
 	if (0 <= _player) {
 		Common::String name = _saveFiles->primaryName(_saveFiles->players()[_player].name);
 		for (uint i = 0; i < _saveFiles->players().size(); i++) {
-			if (_saveFiles->players()[i].name == name) {
+			if (_saveFiles->players()[i].name.equals(name)) {
 				_player = i;
 				break;
 			}
@@ -217,18 +229,21 @@ void TrinketEngine::returnToLauncher() {
 	}
 	delete _game;
 	_game = nullptr;
+	_fonts.clear();
 	_playing = false;
 	_music.reset();
 	syncSoundSettings();
 	_launcher.resume();
+	debug(0, "Trinket: returned to Learning Launcher");
 }
 
 bool TrinketEngine::hasGamePlayer(const Common::String &name) const {
 	if (_bootSession)
-		return _bootPlayer.name == name;
-	for (const Shell::SaveFiles::Player &player : _saveFiles->players())
-		if (player.name == name)
+		return _bootPlayer.name.equals(name);
+	for (const Shell::SaveFiles::Player &player : _saveFiles->players()) {
+		if (player.name.equals(name))
 			return true;
+	}
 	return false;
 }
 
@@ -236,7 +251,7 @@ bool TrinketEngine::activateScriptPlayer(Shell::Game &game, const Common::String
 	const Shell::SaveFiles::Player *active = activePlayer();
 	if (!active)
 		return false;
-	if (name == active->name)
+	if (name.equals(active->name))
 		return true;
 	if (_bootSession || !writePlayer(game))
 		return false;
@@ -245,14 +260,14 @@ bool TrinketEngine::activateScriptPlayer(Shell::Game &game, const Common::String
 		return false;
 	const int previousPlayer = _player;
 	const Common::String previousName = active->name;
-	const Common::Array<Shell::SaveFiles::Player> previousPlayers = _saveFiles->players();
+	const Common::Array<Shell::SaveFiles::Player> prevPlayers = _saveFiles->players();
 	Shell::SaveFiles::Checkpoint checkpoint;
 	bool checkpointed = false;
 	auto rollback = [&]() {
 		if (checkpointed)
 			_saveFiles->restore(checkpoint);
 		_player = previousPlayer;
-		_saveFiles->players() = previousPlayers;
+		_saveFiles->players() = prevPlayers;
 		Common::MemoryReadStream stream(previousState.getData(), previousState.size());
 		if (!game.prepareState(&stream, previousName))
 			error("Could not restore the in-memory game state");
@@ -260,9 +275,10 @@ bool TrinketEngine::activateScriptPlayer(Shell::Game &game, const Common::String
 		return false;
 	};
 	int selected = -1;
-	for (uint i = 0; i < _saveFiles->players().size(); i++)
-		if (_saveFiles->players()[i].name == name)
+	for (uint i = 0; i < _saveFiles->players().size(); i++) {
+		if (_saveFiles->players()[i].name.equals(name))
 			selected = i;
+	}
 	bool fresh = selected < 0;
 	if (fresh)
 		selected = _saveFiles->add(name, _subengine.initialLocation);
@@ -373,7 +389,10 @@ bool TrinketEngine::activate(bool fresh, bool fromLauncher) {
 		delete candidate;
 		_music.reset();
 		syncSoundSettings();
-		_launcher.resume();
+		if (_useLauncher)
+			_launcher.resume();
+		else
+			quitGame();
 		if (fresh)
 			_saveFiles->restore(checkpoint);
 		warning("Could not load game state or required resources: game startup failed");
@@ -382,7 +401,8 @@ bool TrinketEngine::activate(bool fresh, bool fromLauncher) {
 	_game = candidate;
 	_playing = true;
 	logVersions(_subengine.gameVersions);
-	_launcher.suspend();
+	if (_useLauncher)
+		_launcher.suspend();
 	debug(1, "Trinket: game resources ready");
 	return true;
 }
@@ -436,7 +456,10 @@ bool TrinketEngine::switchSlot(const Shell::Game::SaveRequest &request) {
 		candidate.reset();
 		_music.reset();
 		syncSoundSettings();
-		_launcher.resume();
+		if (_useLauncher)
+			_launcher.resume();
+		else
+			quitGame();
 		player = previous;
 		if (append || !available)
 			_saveFiles->restore(checkpoint);
@@ -464,7 +487,7 @@ void TrinketEngine::launcherEvent(const Common::Event &event) {
 	Common::String name = _launcher.selectedName();
 	_player = -1;
 	for (uint i = 0; i < _saveFiles->players().size(); i++) {
-		if (_saveFiles->players()[i].name == name)
+		if (_saveFiles->players()[i].name.equals(name))
 			_player = i;
 	}
 	if (request == Launcher::Application::kDelete02) {
@@ -515,7 +538,7 @@ void TrinketEngine::logVersions(const RuntimeVersions &versions) {
 		const ComponentVersion &component = *components[i];
 		if (component.module)
 			debug(0, "Trinket original reference [%s] %s: version %s; built %s", versions.label ? versions.label : "unknown", component.module,
-				  component.version ? component.version : "unknown", component.builtAt.toString().c_str());
+				  component.version ? component.version : kUnknownName, component.builtAt.toString().c_str());
 	}
 }
 
@@ -537,8 +560,8 @@ bool TrinketEngine::loadLauncher() {
 }
 
 void TrinketEngine::updateScreenSize() {
-	int width = _playing ? _subengine.width : 800;
-	int height = _playing ? _subengine.height : 600;
+	int width = (_playing || !_useLauncher) ? _subengine.width : 800;
+	int height = (_playing || !_useLauncher) ? _subengine.height : 600;
 	if (_gfx && _gfx->surface().w == width && _gfx->surface().h == height)
 		return;
 	Graphics::PixelFormat format = Graphics::PixelFormat::createFormatRGBA32();
@@ -546,7 +569,32 @@ void TrinketEngine::updateScreenSize() {
 	_gfx.reset(new OM::Canvas(width, height));
 }
 
+void TrinketEngine::setDefaultCursor() {
+	if (_platform == Common::kPlatformMacintosh) {
+		const byte *data = nullptr;
+		const byte *palette = nullptr;
+		const byte *mask = nullptr;
+		int width = 0;
+		int height = 0;
+		int hotspotX = 0;
+		int hotspotY = 0;
+		int transColor = 0;
+		if (!Graphics::MacWindowManager::getBuiltInCursorData(Graphics::kMacCursorArrow, data, palette, mask, width, height, hotspotX, hotspotY, transColor))
+			error("Trinket: cannot find the built-in Macintosh arrow");
+		CursorMan.replaceCursor(data, width, height, hotspotX, hotspotY, transColor, nullptr, mask);
+		CursorMan.replaceCursorPalette(palette, 0, 2);
+	} else {
+		Common::ScopedPtr<Graphics::Cursor> cursor(Graphics::makeDefaultWinCursor());
+		CursorMan.replaceCursor(cursor.get());
+	}
+}
+
 Common::Error TrinketEngine::run() {
+	const TrinketMetaEngine *metaEngine = static_cast<const TrinketMetaEngine *>(getMetaEngine());
+	if (metaEngine->getGameId(_targetName.c_str()).equals(kRr1cloud9Name)) {
+		const TrinketMetaEngine::StartupMode startupMode = static_cast<TrinketMetaEngine::StartupMode>(ConfMan.getInt(TrinketMetaEngine::kOptionStartupMode));
+		_useLauncher = startupMode == TrinketMetaEngine::StartupMode::kLauncher01;
+	}
 	syncSoundSettings();
 	debug(0, "Trinket: loading game resources");
 	if (!_subengine.loadResources(*_resources, _dataPath)) {
@@ -555,10 +603,9 @@ Common::Error TrinketEngine::run() {
 	}
 	debug(0, "Trinket: initializing canvas");
 	updateScreenSize();
-	Common::ScopedPtr<Graphics::Cursor> launcherCursor(Graphics::makeDefaultWinCursor());
-	CursorMan.replaceCursor(launcherCursor.get());
+	setDefaultCursor();
 	CursorMan.showMouse(true);
-	int bootParam = ConfMan.getInt("boot_param");
+	int bootParam = ConfMan.getInt(TrinketMetaEngine::kConfigBootParam);
 	if (bootParam) {
 		Common::ScopedPtr<Shell::Game> candidate(_subengine.create(*this));
 		if (candidate && candidate->prepareBoot(bootParam)) {
@@ -570,6 +617,7 @@ Common::Error TrinketEngine::run() {
 			if (candidate->startPrepared(false, false)) {
 				_game = candidate.release();
 				_playing = true;
+				_useLauncher = false;
 				logVersions(_subengine.gameVersions);
 				debug(1, "Trinket: direct practice ready; persistent saves are not loaded or written");
 			} else {
@@ -583,19 +631,30 @@ Common::Error TrinketEngine::run() {
 			warning("Trinket: ignoring unsupported boot_param %d", bootParam);
 		}
 	}
-	if (!_playing && !loadLauncher())
-		return Common::kNoError;
+	if (!_playing) {
+		if (_useLauncher) {
+			if (!loadLauncher())
+				return Common::kNoError;
+		} else {
+			if (!_saveFiles->load() || !startWithoutPlayer(false)) {
+				warning("Trinket: could not start the game's sign-in screen or load the player registry");
+				return Common::kNoError;
+			}
+			logVersions(_subengine.gameVersions);
+			debug(0, "Trinket: direct startup ready");
+		}
+	}
 	while (!shouldQuit()) {
 		updateScreenSize();
 		Common::Event event;
-		while (_eventMan->pollEvent(event)) {
+		while (!shouldQuit() && _eventMan->pollEvent(event)) {
 			if (_playing) {
-				if (_game->canReturnToLauncher() && event.type == Common::EVENT_KEYDOWN && (event.kbd.keycode == Common::KEYCODE_ESCAPE || event.kbd.ascii == 27)) {
-					returnToLauncher();
+				if (_game->canQuitWithEscape() && event.type == Common::EVENT_KEYDOWN && (event.kbd.keycode == Common::KEYCODE_ESCAPE || event.kbd.ascii == 27)) {
+					exitGame();
 				} else {
 					_game->event(event);
-					if (_game->takeReturnToLauncherRequest())
-						returnToLauncher();
+					if (_game->takeQuitRequest())
+						exitGame();
 					else {
 						Shell::Game::SaveRequest request = _game->takeSaveRequest();
 						if (request.action != Shell::Game::SaveRequest::kNone00)
@@ -606,18 +665,20 @@ Common::Error TrinketEngine::run() {
 				launcherEvent(event);
 			}
 		}
+		if (shouldQuit())
+			break;
 		if (_playing && !_game->requestedPlayer().empty()) {
 			Common::String requested = _game->requestedPlayer();
 			_game->clearPlayerRequest();
 			if (_bootSession) {
-				returnToLauncher();
+				exitGame();
 				continue;
 			}
 			int previousPlayer = _player;
 			if (savePlayer()) {
 				int target = -1;
 				for (uint i = 0; i < _saveFiles->players().size(); i++) {
-					if (_saveFiles->players()[i].name == requested)
+					if (_saveFiles->players()[i].name.equals(requested))
 						target = i;
 				}
 				bool fresh = target < 0;
@@ -635,8 +696,11 @@ Common::Error TrinketEngine::run() {
 				}
 			}
 		}
+		if (shouldQuit())
+			break;
 		updateScreenSize();
 		OM::Canvas &canvas = *_gfx;
+		canvas.setColorBlindMode(_playing && ConfMan.getBool(TrinketMetaEngine::kOptionColorBlindMode));
 		if (_playing) {
 			_game->draw(canvas, _system->getMillis());
 		} else {

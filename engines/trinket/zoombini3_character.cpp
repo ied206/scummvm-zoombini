@@ -23,95 +23,121 @@
 
 #include "common/system.h"
 #include "common/util.h"
+#include "trinket/math.h"
 #include "trinket/trinket.h"
 
 namespace Trinket {
 namespace Zoombini3 {
 
+constexpr const char *AttributeCharacter::kEventFinished;
+constexpr const char *AttributeCharacter::kEventDropped;
+constexpr const char *AttributeCharacter::kPropertyRealX;
+constexpr const char *AttributeCharacter::kPropertyRealY;
+constexpr const char *AttributeCharacter::kPropertyDroppedX;
+constexpr const char *AttributeCharacter::kPropertyDroppedY;
+constexpr const char *AttributeCharacter::kPropertyIsCorralled;
+constexpr const char *AttributeCharacter::kPropertyDoWalkSFX;
+constexpr const char *AttributeCharacter::kPropertyDoZUpdates;
+constexpr const char *AttributeCharacter::kPropertyZBaseY;
+constexpr const char *AttributeCharacter::kPropertyLoadFidgetsInBkgd;
+constexpr const char *AttributeCharacter::kMethodPlayAnim;
+constexpr const char *AttributeCharacter::kMethodSetHomePoint;
+constexpr const char *AttributeCharacter::kMethodForceDrop;
+constexpr const char *AttributeCharacter::kMethodAddWalkMove;
+constexpr const char *AttributeCharacter::kMethodWalk;
+constexpr const char *AttributeCharacter::kMethodStopAction;
+constexpr const char *AttributeCharacter::kMethodStop;
+constexpr const char *AttributeCharacter::kMethodPause;
+constexpr const char *AttributeCharacter::kMethodResume;
+constexpr const char *AttributeCharacter::kPropertyX;
+constexpr const char *AttributeCharacter::kPropertyY;
+constexpr const char *AttributeCharacter::kPropertyVisible;
+constexpr const char *AttributeCharacter::kPropertyZ;
+
 constexpr const char *AttributeCharacter::kAsset;
 constexpr const char *AttributeCharacter::kSound;
 
 AttributeCharacter::AttributeCharacter(TrinketEngine &vm, Shell::Scene &scene) : _vm(vm), _scene(scene), _walkSound(vm.mixer()) {
-	addEvent("finished");
-	addEvent("dropped");
+	addEvent(kEventFinished);
+	addEvent(kEventDropped);
 }
 
-bool AttributeCharacter::get(const Common::String &property, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if (property == "realX")
+bool AttributeCharacter::get(const Common::String &property, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if (property.equals(kPropertyRealX))
 		result = Core::ScriptValue(static_cast<int32>(_position.x));
-	else if (property == "realY")
+	else if (property.equals(kPropertyRealY))
 		result = Core::ScriptValue(static_cast<int32>(_position.y));
-	else if (property == "droppedX")
+	else if (property.equals(kPropertyDroppedX))
 		result = Core::ScriptValue(static_cast<int32>(_dropped.x));
-	else if (property == "droppedY")
+	else if (property.equals(kPropertyDroppedY))
 		result = Core::ScriptValue(static_cast<int32>(_dropped.y));
-	else if (property == "isCorralled")
+	else if (property.equals(kPropertyIsCorralled))
 		result = Core::ScriptValue(static_cast<int32>(_isCorralled));
-	else if (property == "doWalkSFX")
+	else if (property.equals(kPropertyDoWalkSFX))
 		result = Core::ScriptValue(static_cast<int32>(_doWalkSFX));
-	else if (property == "doZUpdates")
+	else if (property.equals(kPropertyDoZUpdates))
 		result = Core::ScriptValue(static_cast<int32>(_depthFromY));
-	else if (property == "zBaseY")
+	else if (property.equals(kPropertyZBaseY))
 		result = Core::ScriptValue(static_cast<int32>(_depthOriginY));
-	else if (property == "loadFidgetsInBkgd")
-		result = Core::ScriptValue(static_cast<int32>(_loadFidgetsInBackground));
+	else if (property.equals(kPropertyLoadFidgetsInBkgd))
+		result = Core::ScriptValue(static_cast<int32>(_loadFidgetsBg));
 	else
-		return Shell::MultiTrinket::get(property, arguments, result);
+		return Shell::MultiTrinket::get(property, sargs, result);
 	return true;
 }
 
-bool AttributeCharacter::play(const Common::String &method, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if (method == "playAnim" && !arguments.empty() && arguments.size() <= 4)
-		return playFeedback(arguments[0].integer(), 1 < arguments.size() ? arguments[1].integer() : 1,
-							arguments.size() < 3 || arguments[2].integer() != 0, 3 < arguments.size() ? arguments[3].integer() : -1, callTime());
-	if (method == "setHomePoint" && arguments.size() == 2) {
-		setPosition(Common::Point(arguments[0].integer(), arguments[1].integer()));
+bool AttributeCharacter::play(const Common::String &method, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if (method.equals(kMethodPlayAnim) && !sargs.empty() && sargs.size() <= 4)
+		return playFeedback(sargs[0].toInt32(), 1 < sargs.size() ? sargs[1].toInt32() : 1,
+							sargs.size() < 3 || sargs[2].toInt32() != 0, 3 < sargs.size() ? sargs[3].toInt32() : -1, callTime());
+	if (method.equals(kMethodSetHomePoint) && sargs.size() == 2) {
+		setPosition(Common::Point(sargs[0].toInt32(), sargs[1].toInt32()));
 		return true;
 	}
-	if (method == "forceDrop" && arguments.empty()) {
+	if (method.equals(kMethodForceDrop) && sargs.empty()) {
 		endDrag(false);
 		return true;
 	}
-	if (method == "addWalkMove" && (arguments.size() == 2 || arguments.size() == 3)) {
-		addWalkMove(Common::Point(arguments[0].integer(), arguments[1].integer()), arguments.size() < 3 || arguments[2].integer() != 0);
+	if (method.equals(kMethodAddWalkMove) && (sargs.size() == 2 || sargs.size() == 3)) {
+		addWalkMove(Common::Point(sargs[0].toInt32(), sargs[1].toInt32()), sargs.size() < 3 || sargs[2].toInt32() != 0);
 		return true;
 	}
-	if (method == "walk" && arguments.size() <= 2)
-		return walk(true, callTime(), arguments.empty() || arguments[0].integer() != 0, 1 < arguments.size() && arguments[1].integer() != 0);
-	if ((method == "stopAction" || method == "stop") && arguments.empty()) {
+	if (method.equals(kMethodWalk) && sargs.size() <= 2)
+		return walk(true, callTime(), sargs.empty() || sargs[0].toInt32() != 0, 1 < sargs.size() && sargs[1].toInt32() != 0);
+	if ((method.equals(kMethodStopAction) || method.equals(kMethodStop)) && sargs.empty()) {
 		stopWalk(!_keepWalkPosition);
 		stopFeedback();
 		return true;
 	}
-	if ((method == "pause" || method == "resume") && arguments.empty()) {
-		pause(method == "pause", callTime());
+	if ((method.equals(kMethodPause) || method.equals(kMethodResume)) && sargs.empty()) {
+		pause(method.equals(kMethodPause), callTime());
 		return true;
 	}
-	return Shell::MultiTrinket::play(method, arguments, result);
+	return Shell::MultiTrinket::play(method, sargs, result);
 }
 
-bool AttributeCharacter::set(const Common::String &property, const Core::ScriptArguments &arguments, const Core::ScriptValue &value) {
-	if (property == "x")
-		setPosition(Common::Point(value.integer(), _position.y));
-	else if (property == "y")
-		setPosition(Common::Point(_position.x, value.integer()));
-	else if (property == "visible")
-		setVisible(value.integer() != 0, callTime());
-	else if (property == "z")
-		setDepth(value.integer());
-	else if (property == "doWalkSFX")
-		_doWalkSFX = value.integer() != 0;
-	else if (property == "doZUpdates")
-		setDepthFromY(value.integer() != 0, _depthOriginY);
-	else if (property == "zBaseY")
-		setDepthFromY(_depthFromY, value.integer());
-	else if (property == "loadFidgetsInBkgd")
-		_loadFidgetsInBackground = value.integer() != 0;
-	else if (property == "isCorralled") {
+bool AttributeCharacter::set(const Common::String &property, const Core::ScriptArguments &sargs, const Core::ScriptValue &value) {
+	if (property.equals(kPropertyX))
+		setPosition(Common::Point(value.toInt32(), _position.y));
+	else if (property.equals(kPropertyY))
+		setPosition(Common::Point(_position.x, value.toInt32()));
+	else if (property.equals(kPropertyVisible))
+		setVisible(value.toInt32() != 0, callTime());
+	else if (property.equals(kPropertyZ))
+		setDepth(value.toInt32());
+	else if (property.equals(kPropertyDoWalkSFX))
+		_doWalkSFX = value.toInt32() != 0;
+	else if (property.equals(kPropertyDoZUpdates))
+		setDepthFromY(value.toInt32() != 0, _depthOriginY);
+	else if (property.equals(kPropertyZBaseY))
+		setDepthFromY(_depthFromY, value.toInt32());
+	else if (property.equals(kPropertyLoadFidgetsInBkgd))
+		_loadFidgetsBg = value.toInt32() != 0;
+	else if (property.equals(kPropertyIsCorralled)) {
 		_scriptCorral = true;
-		_isCorralled = value.integer() != 0;
+		_isCorralled = value.toInt32() != 0;
 	} else
-		return Shell::MultiTrinket::set(property, arguments, value);
+		return Shell::MultiTrinket::set(property, sargs, value);
 	return true;
 }
 
@@ -143,7 +169,7 @@ bool AttributeCharacter::playFeedback(uint resource, int repeat, bool keepVisibl
 	finishVariant(time);
 	_feedbackKeepVisible = keepVisible;
 	if (selector == -2) {
-		Common::String path = _animationResources ? _animationResources->characterAnimationPath(resource) : Common::String::format(kAsset, resource);
+		Common::String path = _animRes ? _animRes->characterAnimationPath(resource) : Common::String::format(kAsset, resource);
 		Shell::Sprite *sprite = _scene.add(path, _z);
 		if (!sprite)
 			return false;
@@ -170,9 +196,10 @@ bool AttributeCharacter::playFeedback(uint resource, int repeat, bool keepVisibl
 			}
 		}
 	}
-	for (uint i = 0; i < _base.size(); i++)
+	for (uint i = 0; i < _base.size(); i++) {
 		if (_base[i])
 			_base[i]->visible = false;
+	}
 	return _valid;
 }
 
@@ -180,9 +207,10 @@ void AttributeCharacter::stopFeedback() {
 	if (_feedback.empty())
 		return;
 	clearParts(_feedback);
-	for (uint i = 0; i < _base.size(); i++)
+	for (uint i = 0; i < _base.size(); i++) {
 		if (_base[i])
 			_base[i]->visible = _visible;
+	}
 }
 
 void AttributeCharacter::clearTimers(uint32 time) {
@@ -231,32 +259,49 @@ Shell::Sprite *AttributeCharacter::loadPart(uint resource, uint attribute, bool 
 	return part;
 }
 
-bool AttributeCharacter::create(const Core::ScriptArguments &arguments, uint32 time) {
-	if (arguments.empty() || arguments[0].integer() < 0 || 2 < arguments[0].integer())
+bool AttributeCharacter::create(const Core::ScriptArguments &sargs, uint32 time) {
+	if (sargs.empty() || sargs[0].toInt32() < 0 || 2 < sargs[0].toInt32())
 		return false;
-	uint type = arguments[0].integer();
-	uint count = type == 1 ? 3 : (type == 2 ? 6 : 5);
-	if (arguments.size() != count + 3 && arguments.size() != count + 5)
+	uint type = sargs[0].toInt32();
+	uint count;
+	if (type == 1)
+		count = 3;
+	else if (type == 2)
+		count = 6;
+	else
+		count = 5;
+	if (sargs.size() != count + 3 && sargs.size() != count + 5)
 		return false;
 	int32 traits[6] = {};
 	for (uint i = 0; i < count; i++)
-		traits[i] = arguments[i + 1].integer();
+		traits[i] = sargs[i + 1].toInt32();
 	Common::Point position(11111, 11111);
-	int depth = arguments[count + 2].integer();
-	if (arguments.size() == count + 5) {
-		position = Common::Point(arguments[count + 2].integer(), arguments[count + 3].integer());
-		depth = arguments[count + 4].integer();
+	int depth = sargs[count + 2].toInt32();
+	if (sargs.size() == count + 5) {
+		position = Common::Point(sargs[count + 2].toInt32(), sargs[count + 3].toInt32());
+		depth = sargs[count + 4].toInt32();
 	}
-	return create(type, traits, arguments[count + 1].integer(), position, depth, time);
+	return create(type, traits, sargs[count + 1].toInt32(), position, depth, time);
 }
 
 bool AttributeCharacter::create(uint type, const int32 *traits, uint pose, Common::Point position, int depth, uint32 time) {
 	if (2 < type || 5 < pose)
 		return false;
 	_type = type;
-	_count = type == 1 ? 3 : (type == 2 ? 6 : 5);
+	if (type == 1)
+		_count = 3;
+	else if (type == 2)
+		_count = 6;
+	else
+		_count = 5;
 	for (uint i = 0; i < _count; i++) {
-		int count = (i == 0 || i == 5) ? 1 : (type == 1 ? 3 : 5);
+		int count;
+		if (i == 0 || i == 5)
+			count = 1;
+		else if (type == 1)
+			count = 3;
+		else
+			count = 5;
 		if (traits[i] < 0 || count <= traits[i])
 			return false;
 		_traits[i] = traits[i];
@@ -414,12 +459,14 @@ void AttributeCharacter::setVisible(bool shown, uint32 time) {
 	_visible = shown;
 	finishVariant(time);
 	Common::Array<Shell::Sprite *> &parts = _walking ? _moving : _base;
-	for (uint i = 0; i < parts.size(); i++)
+	for (uint i = 0; i < parts.size(); i++) {
 		if (parts[i])
 			parts[i]->visible = shown && _feedback.empty();
-	for (uint i = 0; i < _feedback.size(); i++)
+	}
+	for (uint i = 0; i < _feedback.size(); i++) {
 		if (_feedback[i])
 			_feedback[i]->visible = shown;
+	}
 }
 
 void AttributeCharacter::setDepth(int depth) {
@@ -429,14 +476,16 @@ void AttributeCharacter::setDepth(int depth) {
 	parts.push_back(_moving);
 	parts.push_back(_dragParts);
 	parts.push_back(_feedback);
-	for (uint i = 0; i < _timers.size(); i++)
+	for (uint i = 0; i < _timers.size(); i++) {
 		for (uint j = 0; j < _timers[i].variants.size(); j++)
 			parts.push_back(_timers[i].variants[j].parts);
-	for (uint i = 0; i < parts.size(); i++)
+	}
+	for (uint i = 0; i < parts.size(); i++) {
 		if (parts[i])
 			_scene.setDepth(parts[i], parts[i]->z + depth - _z);
+	}
 	_z = depth;
-	Core::Trinket::set("z", Core::ScriptArguments(), Core::ScriptValue(static_cast<int32>(depth)));
+	Core::Trinket::set(kPropertyZ, Core::ScriptArguments(), Core::ScriptValue(static_cast<int32>(depth)));
 }
 
 void AttributeCharacter::setDepthFromY(bool usePosition, int originY) {
@@ -465,9 +514,10 @@ void AttributeCharacter::stopWalk(bool finishPath) {
 		_absolutePath.clear();
 	}
 	_walking = false;
-	for (uint i = 0; i < _base.size(); i++)
+	for (uint i = 0; i < _base.size(); i++) {
 		if (_base[i])
 			_base[i]->visible = _visible;
+	}
 }
 
 bool AttributeCharacter::beginDrag(Common::Point mouse, uint32 time, const Common::Rect &corral) {
@@ -483,7 +533,18 @@ bool AttributeCharacter::beginDrag(Common::Point mouse, uint32 time, const Commo
 	_dragOutsideX = _dragOutsideY = false;
 	setDepth(10000);
 	for (uint i = 0; i < _count; i++) {
-		uint base = i == 1 ? (_type == 1 ? 3060 : 2030) : (_type == 1 ? 2530 : 660);
+		uint base;
+		if (i == 1) {
+			if (_type == 1)
+				base = 3060;
+			else
+				base = 2030;
+		} else {
+			if (_type == 1)
+				base = 2530;
+			else
+				base = 660;
+		}
 		Shell::Sprite *part = loadPart(base + i * 10 + _traits[i], i);
 		_dragParts.push_back(part);
 		if (part)
@@ -532,12 +593,13 @@ Common::Point AttributeCharacter::endDrag(bool notify) {
 	clearParts(_dragParts);
 	setDepth(_dragDepth);
 	_dragging = false;
-	for (uint i = 0; i < _base.size(); i++)
+	for (uint i = 0; i < _base.size(); i++) {
 		if (_base[i])
 			_base[i]->visible = _visible;
+	}
 	if (notify) {
 		_dropped = dropped;
-		emitEvent("dropped");
+		emitEvent(kEventDropped);
 	}
 	return dropped;
 }
@@ -546,10 +608,10 @@ void AttributeCharacter::beginSegment() {
 	_start = _position;
 	_delta = _absolutePath[_nextPoint] ? _path[_nextPoint] - _position : _path[_nextPoint];
 	_nextPoint += 1;
-	_distance = sqrt(static_cast<double>(_delta.x) * _delta.x + static_cast<double>(_delta.y) * _delta.y);
+	_distance = Math::distance(_delta);
 	_travelled = 0;
 	_lastMove = 0;
-	double angle = atan2(-static_cast<double>(_delta.y), static_cast<double>(_delta.x)) * 180.0 * 0.318309886142228;
+	double angle = atan2(-static_cast<double>(_delta.y), static_cast<double>(_delta.x)) * 180.0f * (1.0 / M_PI);
 	if (angle < 0)
 		angle += 360;
 	static const int zmbDirections[][2] = {
@@ -564,7 +626,7 @@ void AttributeCharacter::beginSegment() {
 		{3520, 72}};
 	const int (*directions)[2] = _type == 1 ? zerbleDirections : zmbDirections;
 	uint count = _type == 1 ? 5 : 3;
-	float best = 360;
+	float best = 360.0f;
 	uint direction = 0;
 	bool mirror = false;
 	for (uint i = 0; i < count; i++) {
@@ -573,7 +635,9 @@ void AttributeCharacter::beginSegment() {
 			if (flipped)
 				facing = facing < 90 ? 180 - facing : 540 - facing;
 			double difference = fabs(facing - angle);
-			difference = MIN(difference, 360.0 - difference);
+			const double wrapped = 360.0f - difference;
+			if (wrapped < difference)
+				difference = static_cast<float>(wrapped);
 			if (difference < best) {
 				best = difference;
 				direction = i;
@@ -581,7 +645,8 @@ void AttributeCharacter::beginSegment() {
 			}
 		}
 	}
-	uint frame = 1, frameCount = 0;
+	uint frame = 1;
+	uint frameCount = 0;
 	if (1 < _moving.size() && _moving[1]) {
 		frameCount = _moving[1]->getNumberOfFrames();
 		frame = _moving[1]->getFrame() + 1;
@@ -684,10 +749,14 @@ bool AttributeCharacter::update(uint32 time, Common::Array<uint16> &sounds) {
 			uint32 previous = _lastMove;
 			_lastMove = time;
 			if (previous) {
-				_travelled += static_cast<float>(time - previous) * 0.08f;
+				static constexpr float speed = 80.0f * 0.001f;
+				const float step = static_cast<float>(static_cast<double>(time - previous) * speed);
+				// Store the next frame's distance after rounding, but interpolate this frame before rounding.
+				const double travelled = static_cast<double>(_travelled) + step;
+				_travelled = static_cast<float>(travelled);
 				Common::Point delta = _delta;
-				if (_travelled < _distance) {
-					double fraction = static_cast<double>(_travelled) / _distance;
+				if (travelled < _distance) {
+					double fraction = travelled / _distance;
 					int movedX = static_cast<int>(abs(_delta.x) * fraction);
 					float movedY = abs(_delta.y) * fraction;
 					delta.x = _delta.x < 0 ? -movedX : movedX;
@@ -749,9 +818,10 @@ bool AttributeCharacter::update(uint32 time, Common::Array<uint16> &sounds) {
 		}
 		if (_dragging && 1 < _dragParts.size() && _dragParts[1]) {
 			_dragParts[1]->update(time, sounds);
-			for (uint i = 0; i < _dragParts.size(); i++)
+			for (uint i = 0; i < _dragParts.size(); i++) {
 				if (i != 1 && _dragParts[i])
 					_dragParts[i]->setFrame(_dragParts[1]->displayedFrame());
+			}
 		}
 		if (_walking)
 			updateParts(_moving, time, sounds);
@@ -776,7 +846,7 @@ bool AttributeCharacter::update(uint32 time, Common::Array<uint16> &sounds) {
 		if (lifetime.isAlive())
 			complete();
 		if (lifetime.isAlive())
-			emitEvent("finished");
+			emitEvent(kEventFinished);
 	}
 	return finished;
 }

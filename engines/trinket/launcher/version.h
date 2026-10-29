@@ -29,6 +29,7 @@ namespace Launcher {
 
 /** Original installed TLC launcher builds, independent of game component versions. */
 struct OriginalVersions {
+	/** Reference component versions for the installed US launcher. */
 	static constexpr RuntimeVersions kUSInstalled = {
 		"Z3-v1.0US installed TLC launcher",
 		{"ompp32x.tlc", "4.01d", {2002, 2, 5, 11, 58, 47}},
