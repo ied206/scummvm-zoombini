@@ -45,7 +45,7 @@ TextManager::TextManager(Zoombini2Engine *vm)
 }
 
 TextManager::~TextManager() {
-	delete _bmtFont;
+	FontMan.removeFontName(_bmtFontCacheName);
 }
 
 TextManager::LocalizedStringMap TextManager::createLocalizedStrings() {
@@ -113,17 +113,25 @@ Common::String TextManager::getZoombiniDisplayName(const Common::String &name) c
 bool TextManager::loadTextFont() {
 	if (hasTextFont())
 		return true;
-	if (!_bmtFont)
-		_bmtFont = new BmtFont(_vm);
-	return _bmtFont->load(Common::Path(kTextFontPath));
+	BmtFont *font = new BmtFont(_vm);
+	if (!font->load(Common::Path(kTextFontPath))) {
+		delete font;
+		return false;
+	}
+	// The strip retains this game instance, so do not reuse another game's registration.
+	_bmtFontCacheName = Common::String::format("zoombini2-bmt-%p", static_cast<void *>(font));
+	FontMan.assignFontToName(_bmtFontCacheName, font);
+	return true;
 }
 
 bool TextManager::hasTextFont() const {
-	return _bmtFont && _bmtFont->isLoaded();
+	return bmtFont() != nullptr;
 }
 
-BmtFont *TextManager::bmtFont() const {
-	return _bmtFont && _bmtFont->isLoaded() ? _bmtFont : nullptr;
+const BmtFont *TextManager::bmtFont() const {
+	if (_bmtFontCacheName.empty())
+		return nullptr;
+	return static_cast<const BmtFont *>(FontMan.getFontByName(_bmtFontCacheName));
 }
 
 const Graphics::Font *TextManager::resolveFont(Gfx::FontKind kind) const {

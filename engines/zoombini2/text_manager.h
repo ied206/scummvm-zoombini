@@ -39,7 +39,7 @@ class Zoombini2Engine;
 
 /**
  * Localized UI messages, game text fonts, and release-encoded conversion.
- * Retains the bitmap strip and resolves the font for one @ref Gfx::FontKind.
+ * Registers the bitmap strip with @ref Graphics::FontManager and resolves the font for one @ref Gfx::FontKind.
  * Selects added UI messages in the game language, using English when a translation is unavailable.
  */
 class TextManager : private Common::NonCopyable {
@@ -58,7 +58,7 @@ public:
 
 	/** Create the text manager for @p vm and select its localized UI messages. */
 	explicit TextManager(Zoombini2Engine *vm);
-	/** Release cached messages and the bitmap strip. */
+	/** Release cached messages and remove this game's bitmap-font registration. */
 	~TextManager();
 
 	/** Return the cached message for @p key in the game language or English, valid until this text manager is destroyed. */
@@ -77,12 +77,12 @@ public:
 	 */
 	Common::String getZoombiniDisplayName(const Common::String &name) const;
 
-	/** Load the shared text strip on demand; failed loads can be retried by the caller. */
+	/** Load and register the shared text strip on demand; failed loads can be retried by the caller. */
 	bool loadTextFont();
 	/** Return whether the shared text strip is ready. */
 	bool hasTextFont() const;
-	/** Return the loaded strip, or null when it is unavailable. */
-	BmtFont *bmtFont() const;
+	/** Look up the registered strip, or return null when it is unavailable. */
+	const BmtFont *bmtFont() const;
 	/** Resolve the font selected by @p kind, or null when it is unavailable. */
 	const Graphics::Font *resolveFont(Gfx::FontKind kind) const;
 
@@ -99,8 +99,8 @@ private:
 
 	/** Bitmap strip shared by all UI text colors. */
 	static constexpr const char *kTextFontPath = "bmp/typo";
-	/** Single coverage-mask glyph set tinted per draw, retained until graphics shutdown. */
-	BmtFont *_bmtFont = nullptr;
+	/** Registration name in @ref Graphics::FontManager for this game's loaded glyph set, empty until a load succeeds. */
+	Common::String _bmtFontCacheName;
 	/**
 	 * Whether the shared UI font load has been attempted once for this game instance.
 	 * This flag cache only the load decision so the font file loads once while callers query per frame.
