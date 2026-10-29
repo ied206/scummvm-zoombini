@@ -416,8 +416,8 @@ private:
 	PageScene &_host;
 	/** Resource-path resolver for the activity's current page. */
 	Shell::ResourcePaths _paths;
-	/** Font used for activity text and labels. */
-	Common::SharedPtr<OM::NFNTFont> _font;
+	/** FontMan-owned font used for activity text and labels. */
+	const Graphics::Font *_font = nullptr;
 	/** Parsed XML data used to construct the current activity round. */
 	OM::XMLParser _data;
 	/** Display names indexed by the thirty sandwich items. */

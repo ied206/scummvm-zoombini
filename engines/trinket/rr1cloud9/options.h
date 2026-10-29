@@ -144,10 +144,10 @@ private:
 	OM::Sound _voice;
 	/** Playback state for control feedback sounds. */
 	OM::Sound _effect;
-	/** Font used for main options labels. */
-	Common::SharedPtr<OM::NFNTFont> _font;
-	/** Font used for smaller options labels. */
-	Common::SharedPtr<OM::NFNTFont> _smallFont;
+	/** FontMan-owned font used for main options labels. */
+	const Graphics::Font *_font = nullptr;
+	/** FontMan-owned font used for smaller options labels. */
+	const Graphics::Font *_smallFont = nullptr;
 	/** Text objects created for the current panel. */
 	Common::Array<Shell::TextObject *> _texts;
 	/** Current player name displayed by options. */

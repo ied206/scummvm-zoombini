@@ -97,6 +97,17 @@ bool Text::wrap(const Graphics::Font &font, Common::String text, int width, Comm
 	return true;
 }
 
+Common::Rect Text::inkBounds(const Graphics::Font &font, const Common::String &text) {
+	if (text.empty())
+		return Common::Rect(0, -font.getFontAscent(), 0, font.getFontDescent());
+	byte first = static_cast<byte>(text.firstChar());
+	byte last = static_cast<byte>(text.lastChar());
+	// RText uses the endpoint glyphs rather than the union of every glyph's ink.
+	int left = font.getBoundingBox(first).left;
+	int right = font.getStringWidth(text) + font.getBoundingBox(last).right - font.getCharWidth(last);
+	return Common::Rect(left, -font.getFontAscent(), right, font.getFontDescent());
+}
+
 int Text::firstBaseline(int height, int lineCount, int ascent, int descent, int leading) {
 	int baseline = height / 2 - (lineCount - 1) / 2 * ascent - (lineCount - 1) * leading / 2 - lineCount / 2 * descent;
 	if (lineCount % 2)

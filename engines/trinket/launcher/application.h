@@ -368,8 +368,8 @@ private:
 		kContentLink2000 = 2000,
 	};
 	struct TextBlock {
-		/** Font used to draw this content block. */
-		Common::SharedPtr<OM::NFNTFont> font;
+		/** FontMan-owned font used to draw this content block. */
+		const Graphics::Font *font = nullptr;
 		/** Wrapped text lines in display order. */
 		Common::Array<Common::String> lines;
 		/** Game-pixel rectangle available for the text block. */
@@ -448,7 +448,7 @@ private:
 	mutable Common::NEResources _news;
 	/** Resource libraries for the six launcher world pages. */
 	mutable Common::NEResources _worldLibs[6];
-	/** Launcher strikes share only this launcher's resource namespace. */
+	/** Launcher FontMan registrations released after all launcher font consumers. */
 	OM::FontCache _fonts;
 	/** Player sign-in layout and interaction settings. */
 	OM::XMLParser _layout;
@@ -500,8 +500,8 @@ private:
 	Shell::Scene _dialogScene;
 	/** Font used to draw player names in the sign-in list. */
 	const Graphics::Font *_listFont = nullptr;
-	/** Font used for launcher dialog text. */
-	Common::SharedPtr<OM::NFNTFont> _dialogFont;
+	/** FontMan-owned font used for launcher dialog text. */
+	const Graphics::Font *_dialogFont = nullptr;
 	/** Playback state for launcher prompts and speech. */
 	OM::Sound _voice;
 	/** Playback state for launcher background music. */

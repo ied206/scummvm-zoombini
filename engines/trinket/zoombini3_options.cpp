@@ -221,7 +221,7 @@ bool Options::overControl(Common::Point point) const {
 
 bool Options::openCredits(uint32 time) {
 	Common::File xml;
-	Common::SharedPtr<OM::NFNTFont> font = _fonts.load(kCreditsFont);
+	const Graphics::Font *font = _fonts.load(kCreditsFont);
 	if (!xml.open(Common::Path(kCreditsXML)) || !font)
 		return false;
 	Common::ScopedPtr<Shell::CreditText> credits(new Shell::CreditText(520, 420));
@@ -236,7 +236,7 @@ bool Options::openCredits(uint32 time) {
 }
 
 bool Options::openNewGame() {
-	Common::SharedPtr<OM::NFNTFont> font = _fonts.load(kNewGameFont);
+	const Graphics::Font *font = _fonts.load(kNewGameFont);
 	if (!font)
 		return false;
 	Common::ScopedPtr<Shell::Scene> scene(new Shell::Scene(_resources));
@@ -356,10 +356,10 @@ void Options::draw(OM::Canvas &canvas, uint32 time) {
 	_scene.drawSprites(canvas, INT_MIN, INT_MAX);
 }
 
-void Options::drawLabel(OM::Canvas &canvas, const OM::NFNTFont &font, const Common::String &text, const Common::Rect &rect) {
-	int baseline = rect.top + Shell::Text::firstBaseline(rect.height(), 1, font.ascent(), font.descent(), 0);
+void Options::drawLabel(OM::Canvas &canvas, const Graphics::Font &font, const Common::String &text, const Common::Rect &rect) {
+	int baseline = rect.top + Shell::Text::firstBaseline(rect.height(), 1, font.getFontAscent(), font.getFontDescent(), 0);
 	uint32 color = canvas.surface().format.RGBToColor(500 / 256, 450 / 256, 7500 / 256);
-	font.drawString(&canvas.surface(), text, rect.left, baseline - font.ascent(), rect.width(), color, Graphics::kTextAlignCenter, 0, false, true);
+	font.drawString(&canvas.surface(), text, rect.left, baseline - font.getFontAscent(), rect.width(), color, Graphics::kTextAlignCenter, 0, false, true);
 }
 
 Common::Point Options::slotOrigin(uint index) {
@@ -382,8 +382,8 @@ uint Options::slotThumbnail(int location) {
 }
 
 bool Options::openSlots(bool replace) {
-	Common::SharedPtr<OM::NFNTFont> headingFont = _fonts.load(kSlotHeadingFont);
-	Common::SharedPtr<OM::NFNTFont> slotFont = _fonts.load(kCreditsFont);
+	const Graphics::Font *headingFont = _fonts.load(kSlotHeadingFont);
+	const Graphics::Font *slotFont = _fonts.load(kCreditsFont);
 	if (!headingFont || !slotFont)
 		return false;
 	Common::ScopedPtr<Shell::Scene> scene(new Shell::Scene(_resources));

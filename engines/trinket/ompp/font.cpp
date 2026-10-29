@@ -22,46 +22,49 @@
 #include "trinket/ompp/font.h"
 
 #include "common/endian.h"
+#include "common/ptr.h"
+#include "graphics/fontman.h"
 #include "graphics/surface.h"
 
 namespace Trinket {
 namespace OM {
 
-Common::SharedPtr<NFNTFont> FontCache::load(const Common::String &path) {
+Common::String FontCache::cacheName(const Common::String &key) const {
+	return Common::String::format("trinket:%p:%s", static_cast<const void *>(this), key.c_str());
+}
+
+const Graphics::Font *FontCache::load(const Common::String &path) {
 	Common::String key = _resources.cacheKey(path);
 	if (key.empty())
-		return Common::SharedPtr<NFNTFont>();
-	auto found = _fonts.find(key);
-	if (found != _fonts.end()) {
+		return nullptr;
+	Common::String name = cacheName(key);
+	const Graphics::Font *font = FontMan.getFontByName(name);
+	if (font) {
 		_hits += 1;
-		return found->_value;
+		return font;
 	}
 	Common::ScopedPtr<Common::SeekableReadStream> stream(_resources.open(key));
 	key = _resources.cacheKey(path);
-	found = _fonts.find(key);
-	if (found != _fonts.end()) {
-		_hits += 1;
-		return found->_value;
-	}
-	Common::SharedPtr<NFNTFont> font;
-	if (stream)
-		font.reset(NFNTFont::load(*stream));
+	name = cacheName(key);
+	font = FontMan.getFontByName(name);
 	if (font) {
-		_fonts[key] = font;
+		_hits += 1;
+		return font;
+	}
+	if (stream)
+		font = NFNTFont::load(*stream);
+	if (font) {
+		FontMan.assignFontToName(name, font);
+		_fontNames.push_back(name);
 		_decodes += 1;
 	}
 	return font;
 }
 
-void FontCache::removeUnused() {
-	for (auto it = _fonts.begin(); it != _fonts.end();) {
-		if (it->_value.unique()) {
-			auto unused = it++;
-			_fonts.erase(unused);
-		} else {
-			++it;
-		}
-	}
+void FontCache::clear() {
+	for (const Common::String &name : _fontNames)
+		FontMan.removeFontName(name);
+	_fontNames.clear();
 }
 
 NFNTFont *NFNTFont::load(Common::SeekableReadStream &stream) {
@@ -146,17 +149,7 @@ int NFNTFont::getCharWidth(uint32 character) const {
 Common::Rect NFNTFont::getBoundingBox(uint32 character) const {
 	const Metrics &metric = _metrics[glyph(character)];
 	// Shared string culling must use the strike bounds, including bearing and overhang.
-	return Common::Rect(metric.bearing, 0, metric.bearing + metric.inkWidth, ascent() + descent());
-}
-
-Common::Rect NFNTFont::inkBounds(const Common::String &text) const {
-	if (text.empty())
-		return Common::Rect(0, -ascent(), 0, descent());
-	uint first = glyph(static_cast<byte>(text.firstChar()));
-	uint last = glyph(static_cast<byte>(text.lastChar()));
-	int left = _metrics[first].bearing;
-	int right = getStringWidth(text) + _metrics[last].bearing + _metrics[last].inkWidth - _metrics[last].advance;
-	return Common::Rect(left, -ascent(), right, descent());
+	return Common::Rect(metric.bearing, 0, metric.bearing + metric.inkWidth, getFontAscent() + getFontDescent());
 }
 
 void NFNTFont::drawChar(Graphics::Surface *surface, uint32 character, int x, int y, uint32 color) const {

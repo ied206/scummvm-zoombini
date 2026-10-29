@@ -98,7 +98,7 @@ public:
 	void setGameSoundSettings(const Shell::Game::SoundSettings &settings);
 	/** Return the resource provider for the detected game release. */
 	const OM::ResourceProvider &resources() const { return *_resources; }
-	/** Return the game font cache; launcher fonts use a separate cache. */
+	/** Return the game FontMan loader; launcher fonts use separate registrations. */
 	OM::FontCache &fonts() { return _fonts; }
 	/** Return the visible registered player names. */
 	Common::Array<Common::String> playerNames() const;
@@ -138,7 +138,7 @@ private:
 
 	/** Resource provider for the detected release. */
 	Common::ScopedPtr<OM::ResourceProvider> _resources;
-	/** Game-font cache destroyed before its resource provider. */
+	/** FontMan registrations released after the game and before its resource provider. */
 	OM::FontCache _fonts;
 	/** Resolved canonical directory containing the game's resources. */
 	Common::Path _dataPath;

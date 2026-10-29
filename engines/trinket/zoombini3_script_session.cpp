@@ -325,7 +325,6 @@ bool ScriptSession::start(bool fresh, bool fromLauncher) {
 
 bool ScriptSession::loadScript(Core::ScriptRuntime &thread, const Common::String &name) {
 	thread.clear();
-	_game._vm.fonts().removeUnused();
 	_scroller.stop();
 	_scene.clear();
 	_pressed = _hovered = _tracked = 0;
@@ -560,7 +559,6 @@ bool ScriptSession::resourceCommand(const Common::String &method, const Core::Sc
 		return false;
 	if (method.equals(kMethodUncacheResources)) {
 		_scene.uncacheUnusedResources();
-		_game._vm.fonts().removeUnused();
 		return true;
 	}
 	// Native modules are linked into the subengine; their objects retain heap ownership.

@@ -76,7 +76,7 @@ bool CreditText::loadImage(Scene &images, const char *pattern, uint image, Graph
 	return true;
 }
 
-bool CreditText::load(Common::SeekableReadStream &stream, const OM::NFNTFont &font, const OM::ResourceProvider &resources, const char *imagePattern) {
+bool CreditText::load(Common::SeekableReadStream &stream, const Graphics::Font &font, const OM::ResourceProvider &resources, const char *imagePattern) {
 	if (_content.getPixels() || _width <= 0 || _height <= 0)
 		return false;
 	OM::XMLParser xml;

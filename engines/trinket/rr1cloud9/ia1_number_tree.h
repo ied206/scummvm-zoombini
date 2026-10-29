@@ -318,10 +318,10 @@ private:
 	Shell::ResourcePaths _paths;
 	/** Parsed XML data used to construct the current activity round. */
 	OM::XMLParser _data;
-	/** Font used for activity text and labels. */
-	Common::SharedPtr<OM::NFNTFont> _font;
-	/** Font used for the target and prominent equation values. */
-	Common::SharedPtr<OM::NFNTFont> _largeFont;
+	/** FontMan-owned font used for activity text and labels. */
+	const Graphics::Font *_font = nullptr;
+	/** FontMan-owned font used for the target and prominent equation values. */
+	const Graphics::Font *_largeFont = nullptr;
 	/** Text object displaying the required numeric result. */
 	Shell::TextObject *_targetText = nullptr;
 	/** Text objects forming each side's displayed equation. */

@@ -44,6 +44,8 @@ public:
 	/** Split text into lines that fit the supplied pixel width and font metrics. */
 	static bool wrap(const Graphics::Font &font, Common::String text, int width, Common::Array<Common::String> &lines,
 					 Rules rules, bool wrapping = true, bool outlined = false);
+	/** Return baseline-relative text bounds using the first and last glyphs' ink edges, including for empty text. */
+	static Common::Rect inkBounds(const Graphics::Font &font, const Common::String &text);
 	/** Calculate the first text baseline for a vertically centered block. */
 	static int firstBaseline(int height, int lineCount, int ascent, int descent, int leading);
 };
