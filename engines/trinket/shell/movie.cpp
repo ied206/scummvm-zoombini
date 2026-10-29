@@ -13,20 +13,31 @@
 namespace Trinket {
 namespace Shell {
 
+constexpr const char *Movie::kEventFinished;
+constexpr const char *Movie::kEventFreeze;
+constexpr const char *Movie::kEventSignal;
+constexpr const char *Movie::kPropertyFrames;
+constexpr const char *Movie::kPropertyRate;
+constexpr const char *Movie::kMethodStart;
+constexpr const char *Movie::kMethodDefault;
+constexpr const char *Movie::kMethodStop;
+constexpr const char *Movie::kMethodRelease;
+constexpr const char *Movie::kMethodAddSignals;
+
 Movie::Movie(Host &host, const Common::String &filename, Common::Point position) : _host(host), _filename(filename) {
 	x = position.x;
 	y = position.y;
 	movable = false;
-	addEvent("finished");
-	addEvent("freeze");
-	addEvent("signal");
+	addEvent(kEventFinished);
+	addEvent(kEventFreeze);
+	addEvent(kEventSignal);
 	_host.movieCreated(*this);
 }
 
 Movie::~Movie() {
-	bindEvent("finished", nullptr);
-	bindEvent("freeze", nullptr);
-	bindEvent("signal", nullptr);
+	bindEvent(kEventFinished, nullptr);
+	bindEvent(kEventFreeze, nullptr);
+	bindEvent(kEventSignal, nullptr);
 	stop(false);
 	_host.movieDestroyed(*this);
 	_frame.free();
@@ -36,15 +47,15 @@ bool Movie::load() {
 	return _decoder.loadFile(Common::Path(_filename));
 }
 
-Core::ScriptableObject *Movie::Factory::create(const Core::ScriptArguments &arguments) {
-	if (arguments.empty() || 3 < arguments.size())
+Core::ScriptableObject *Movie::Factory::create(const Core::ScriptArguments &sargs) {
+	if (sargs.empty() || 3 < sargs.size())
 		return nullptr;
 	Common::Point position;
-	if (1 < arguments.size())
-		position.x = arguments[1].integer();
-	if (2 < arguments.size())
-		position.y = arguments[2].integer();
-	Common::ScopedPtr<Movie> movie(new Movie(_host, arguments[0].text(), position));
+	if (1 < sargs.size())
+		position.x = sargs[1].toInt32();
+	if (2 < sargs.size())
+		position.y = sargs[2].toInt32();
+	Common::ScopedPtr<Movie> movie(new Movie(_host, sargs[0].toText(), position));
 	return movie->load() ? movie.release() : nullptr;
 }
 
@@ -77,7 +88,7 @@ void Movie::stop(bool notify) {
 		Core::ScriptableObject::Lifetime lifetime(*this);
 		complete();
 		if (lifetime.isAlive())
-			emitEvent("finished");
+			emitEvent(kEventFinished);
 	}
 }
 
@@ -94,7 +105,7 @@ void Movie::update() {
 		return;
 	if (_atEnd) {
 		if (_freezeWhenDone)
-			emitEvent("freeze");
+			emitEvent(kEventFreeze);
 		else
 			stop(true);
 		return;
@@ -112,7 +123,7 @@ void Movie::update() {
 	_atEnd = _decoder.endOfVideo() || _decoder.getCurFrame() + 2 >= static_cast<int>(_decoder.getFrameCount());
 	if (_atEnd) {
 		if (_freezeWhenDone)
-			emitEvent("freeze");
+			emitEvent(kEventFreeze);
 		else
 			stop(true);
 		return;
@@ -120,7 +131,7 @@ void Movie::update() {
 	int nextFrame = _decoder.getCurFrame() + 2;
 	if (_nextSignal < _signals.size() && _signals[_nextSignal] == nextFrame) {
 		_nextSignal += 1;
-		emitEvent("signal");
+		emitEvent(kEventSignal);
 	}
 }
 
@@ -129,31 +140,31 @@ void Movie::draw(OM::Canvas &canvas) {
 		canvas.blit(_frame, x, y);
 }
 
-bool Movie::get(const Common::String &property, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if (property == "frames" && arguments.empty())
+bool Movie::get(const Common::String &property, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if (property.equals(kPropertyFrames) && sargs.empty())
 		result = Core::ScriptValue(static_cast<int32>(_decoder.getFrameCount()));
-	else if (property == "rate" && arguments.empty())
+	else if (property.equals(kPropertyRate) && sargs.empty())
 		result = Core::ScriptValue(static_cast<int32>(_decoder.getFrameRate().toInt()));
 	else
-		return Core::Trinket::get(property, arguments, result);
+		return Core::Trinket::get(property, sargs, result);
 	return true;
 }
 
-bool Movie::play(const Common::String &method, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if ((method == "start" || method == "default") && arguments.empty()) {
+bool Movie::play(const Common::String &method, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if ((method.equals(kMethodStart) || method.equals(kMethodDefault)) && sargs.empty()) {
 		start();
 		return true;
 	}
-	if ((method == "stop" || method == "release") && arguments.empty()) {
+	if ((method.equals(kMethodStop) || method.equals(kMethodRelease)) && sargs.empty()) {
 		Core::ScriptableObject::Lifetime lifetime(*this);
 		stop(true);
-		if (lifetime.isAlive() && method == "release")
+		if (lifetime.isAlive() && method.equals(kMethodRelease))
 			_decoder.close();
 		return true;
 	}
-	if (method == "addSignals") {
-		for (uint i = 0; i < arguments.size(); i++) {
-			int frame = arguments[i].integer();
+	if (method.equals(kMethodAddSignals)) {
+		for (uint i = 0; i < sargs.size(); i++) {
+			int frame = sargs[i].toInt32();
 			if (frame == -2) {
 				_freezeWhenDone = true;
 				break;
@@ -167,7 +178,7 @@ bool Movie::play(const Common::String &method, const Core::ScriptArguments &argu
 		}
 		return true;
 	}
-	return Core::Trinket::play(method, arguments, result);
+	return Core::Trinket::play(method, sargs, result);
 }
 
 } // namespace Shell

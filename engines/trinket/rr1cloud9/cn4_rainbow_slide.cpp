@@ -26,64 +26,131 @@
 namespace Trinket {
 namespace RR1Cloud9 {
 
+constexpr const char *RainbowSlide::kR1CN4GameStateKey;
+constexpr const char *RainbowSlide::kSignedIndexFormat;
+constexpr const char *RainbowSlide::kItem7Key;
+constexpr const char *RainbowSlide::kR1CN4CarrieClicksKey;
+constexpr const char *RainbowSlide::kCarrieActor;
+constexpr const char *RainbowSlide::kCarrieKey;
+constexpr const char *RainbowSlide::kStackIDKey;
+constexpr const char *RainbowSlide::kStackZKey;
+constexpr const char *RainbowSlide::kStuffIDKey;
+constexpr const char *RainbowSlide::kStuffZKey;
+constexpr const char *RainbowSlide::kPropertyAnimateSettled;
+constexpr const char *RainbowSlide::kMethodAddFidgetGroup;
+constexpr const char *RainbowSlide::kMethodAddFidget;
+constexpr const char *RainbowSlide::kCarrieWrapIDKey;
+constexpr const char *RainbowSlide::kBandsIDKey;
+constexpr const char *RainbowSlide::kBandsZKey;
+constexpr const char *RainbowSlide::kWagonIDKey;
+constexpr const char *RainbowSlide::kWagonZKey;
+constexpr const char *RainbowSlide::kWalkToSlideIDKey;
+constexpr const char *RainbowSlide::kR1CN4WagonPendingKey;
+constexpr const char *RainbowSlide::kR1CN4BandsPendingKey;
+constexpr const char *RainbowSlide::kBandsCharIDKey;
+constexpr const char *RainbowSlide::kBandsSpchIDKey;
+constexpr const char *RainbowSlide::kR1CN4ExitPendingKey;
+constexpr const char *RainbowSlide::kEnterCharIDKey;
+constexpr const char *RainbowSlide::kEnterSpchIDKey;
+constexpr const char *RainbowSlide::kMaxEntrySpchsKey;
+constexpr const char *RainbowSlide::kR1CN4StateSignedIndexCountKey;
+constexpr const char *RainbowSlide::kReEnterCharIDsKey;
+constexpr const char *RainbowSlide::kReEnterSpchIDsKey;
+constexpr const char *RainbowSlide::kMaxReEnterSpchsSignedIndexKey;
+constexpr const char *RainbowSlide::kMethodRemoveFidgetGroup;
+constexpr const char *RainbowSlide::kR1CN4WagonHereKey;
+constexpr const char *RainbowSlide::kWagonCharIDKey;
+constexpr const char *RainbowSlide::kWagonSpchIDKey;
+constexpr const char *RainbowSlide::kMaxWagonSpchKey;
+constexpr const char *RainbowSlide::kItem1Key;
+constexpr const char *RainbowSlide::kReaderName;
+constexpr const char *RainbowSlide::kSamName;
+constexpr const char *RainbowSlide::kGIdleHelpTimeName;
+constexpr const char *RainbowSlide::kMaxIdleIndexKey;
+constexpr const char *RainbowSlide::kIdleCharIDKey;
+constexpr const char *RainbowSlide::kIdleSpchIDKey;
+constexpr const char *RainbowSlide::kMaxIdleIndexSpeechesSignedIndexKey;
+constexpr const char *RainbowSlide::kCarrieCharID31Key;
+constexpr const char *RainbowSlide::kCarrieSpchID31Key;
+constexpr const char *RainbowSlide::kCarrieCharID3SignedIndexKey;
+constexpr const char *RainbowSlide::kCarrieSpchID3SignedIndexKey;
+constexpr const char *RainbowSlide::kCarrieCharIDKey;
+constexpr const char *RainbowSlide::kCarrieSpchIDKey;
+constexpr const char *RainbowSlide::kMaxCarrieSpchSignedIndexKey;
+constexpr const char *RainbowSlide::kWAVECOMPICKUPName;
+constexpr const char *RainbowSlide::kPaigeName;
+constexpr const char *RainbowSlide::kHelpCharIDSignedIndexKey;
+constexpr const char *RainbowSlide::kHelpSpchIDSignedIndexKey;
+constexpr const char *RainbowSlide::kMainCharIDKey;
+constexpr const char *RainbowSlide::kMainSpchIDKey;
+constexpr const char *RainbowSlide::kMaxMainSpchSignedIndexKey;
+constexpr const char *RainbowSlide::kR1CN4SlideClicksKey;
+constexpr const char *RainbowSlide::kSlideCharIDKey;
+constexpr const char *RainbowSlide::kSlideSpchIDKey;
+constexpr const char *RainbowSlide::kMaxSlideSpchKey;
+constexpr const char *RainbowSlide::kINV1WagonKey;
+constexpr const char *RainbowSlide::kNoUseCharIDKey;
+constexpr const char *RainbowSlide::kNoUseSpchIDKey;
+constexpr const char *RainbowSlide::kMaxNoUseSpchSignedIndexKey;
+
 int RainbowSlide::number(const Common::String &key) const { return _host._page->number(key); }
 
 void RainbowSlide::setState(int state) {
 	_state = state;
 	if (!_host._practice)
-		_host._world.set("R1CN4GameState", state);
+		_host._world.set(kR1CN4GameStateKey, state);
 }
 
 void RainbowSlide::group(const char *characters, const char *speech, int count, int index) {
-	Common::String suffix = index ? Common::String::format(".%d", index) : Common::String();
+	Common::String suffix = index ? Common::String::format(kSignedIndexFormat, index) : Common::String();
 	_host.speeches(Common::String(characters) + suffix, Common::String(speech) + suffix, count);
 }
 
 bool RainbowSlide::enter() {
 	World &world = _host._world;
-	_state = CLIP(world.get("R1CN4GameState"), 1, 4);
-	if (_state == 1 && world.get("item:7")) {
+	_state = CLIP(world.get(kR1CN4GameStateKey), 1, 4);
+	if (_state == 1 && world.get(kItem7Key)) {
 		setState(2);
-		if (1 < world.get("R1CN4CarrieClicks"))
-			world.set("R1CN4CarrieClicks", 1);
+		if (1 < world.get(kR1CN4CarrieClicksKey))
+			world.set(kR1CN4CarrieClicksKey, 1);
 	}
 	auto sprite = [this](const char *key, const char *depth) {
 		return _host._scene.add(_host.characterResource(number(key), Shell::Character::Resources::kAnimation), number(depth));
 	};
 	if (_state < 3) {
-		if (!_host.actor("carrie", "kCarrie") || !sprite("kStackID", "kStackZ") || !sprite("kStuffID", "kStuffZ"))
+		if (!_host.actor(kCarrieActor, kCarrieKey) || !sprite(kStackIDKey, kStackZKey) || !sprite(kStuffIDKey, kStuffZKey))
 			return false;
-		auto *carrie = _host._actors["carrie"];
+		auto *carrie = _host._actors[kCarrieActor];
 		Core::ScriptValue result;
-		carrie->set("animateSettled", {}, Core::ScriptValue(0));
-		carrie->play("addFidgetGroup", {Core::ScriptValue(2), Core::ScriptValue(0.25), Core::ScriptValue(1)}, result);
-		carrie->play("addFidget", {Core::ScriptValue(2), Core::ScriptValue(number("kCarrieWrapID"))}, result);
+		carrie->set(kPropertyAnimateSettled, {}, Core::ScriptValue(0));
+		carrie->play(kMethodAddFidgetGroup, {Core::ScriptValue(2), Core::ScriptValue(0.25), Core::ScriptValue(1)}, result);
+		carrie->play(kMethodAddFidget, {Core::ScriptValue(2), Core::ScriptValue(number(kCarrieWrapIDKey))}, result);
 	}
-	_bands = sprite("kBandsID", "kBandsZ");
-	_wagon = sprite("kWagonID", "kWagonZ");
-	_walk = _host._scene.add(_host.characterResource(number("kWalkToSlideID"), Shell::Character::Resources::kAnimation), 1);
+	_bands = sprite(kBandsIDKey, kBandsZKey);
+	_wagon = sprite(kWagonIDKey, kWagonZKey);
+	_walk = _host._scene.add(_host.characterResource(number(kWalkToSlideIDKey), Shell::Character::Resources::kAnimation), 1);
 	if (!_bands || !_wagon || !_walk)
 		return false;
 	_bands->visible = _state < 4;
 	_wagon->visible = _walk->visible = false;
-	if (world.get("R1CN4WagonPending")) {
+	if (world.get(kR1CN4WagonPendingKey)) {
 		_phase = kDeliveryWait;
-	} else if (world.get("R1CN4BandsPending")) {
-		group("kBandsCharID", "kBandsSpchID", 2);
+	} else if (world.get(kR1CN4BandsPendingKey)) {
+		group(kBandsCharIDKey, kBandsSpchIDKey, 2);
 		_phase = kCollect;
-	} else if (world.get("R1CN4ExitPending")) {
+	} else if (world.get(kR1CN4ExitPendingKey)) {
 		_phase = kExitSpeech;
-	} else if (!world.visits("r1cn4")) {
-		group("kEnterCharID", "kEnterSpchID", number("kMaxEntrySpchs"));
+	} else if (!world.visits(Page::kPageCN4)) {
+		group(kEnterCharIDKey, kEnterSpchIDKey, number(kMaxEntrySpchsKey));
 	} else if (_state < 4) {
 		bool speak = _state == 3;
 		if (_state < 3) {
-			Common::String key = Common::String::format("R1CN4State%dCount", _state);
+			Common::String key = Common::String::format(kR1CN4StateSignedIndexCountKey, _state);
 			world.set(key, world.get(key) + 1);
 			speak = world.get(key) == 1;
 		}
 		if (speak)
-			group("kReEnterCharIDs", "kReEnterSpchIDs", number(Common::String::format("kMaxReEnterSpchs.%d", _state)), _state);
+			group(kReEnterCharIDsKey, kReEnterSpchIDsKey, number(Common::String::format(kMaxReEnterSpchsSignedIndexKey, _state)), _state);
 	}
 	return true;
 }
@@ -101,58 +168,58 @@ void RainbowSlide::update(uint32 time) {
 	if (_phase == kDeliveryWait) {
 		if (time - _start < 1500)
 			return;
-		if (_host._actors.contains("carrie")) {
+		if (_host._actors.contains(kCarrieActor)) {
 			Core::ScriptValue result;
-			_host._actors["carrie"]->play("removeFidgetGroup", {Core::ScriptValue(2)}, result);
+			_host._actors[kCarrieActor]->play(kMethodRemoveFidgetGroup, {Core::ScriptValue(2)}, result);
 		}
 		_wagon->visible = true;
-		world.set("R1CN4WagonHere", 1);
-		world.set("R1CN4WagonPending", 0);
-		group("kWagonCharID", "kWagonSpchID", number("kMaxWagonSpch"));
+		world.set(kR1CN4WagonHereKey, 1);
+		world.set(kR1CN4WagonPendingKey, 0);
+		group(kWagonCharIDKey, kWagonSpchIDKey, number(kMaxWagonSpchKey));
 		setState(3);
 		_phase = kDeliverySpeech;
 	} else if (_phase == kDeliverySpeech) {
 		_phase = kIdle;
 	} else if (_phase == kCollect) {
-		if (world.get("R1CN4BandsPending")) {
-			world.set("item:1", MIN(25, world.get("item:1") + 1));
+		if (world.get(kR1CN4BandsPendingKey)) {
+			world.set(kItem1Key, MIN(25, world.get(kItem1Key) + 1));
 			_host.putAway();
-			world.set("R1CN4BandsPending", 0);
+			world.set(kR1CN4BandsPendingKey, 0);
 		}
 		_bands->visible = false;
 		setState(4);
 		_phase = kIdle;
 	} else if (_phase == kExitSpeech) {
-		_host._actors["reader"]->setVisible(false);
-		_host._actors["sam"]->setVisible(false);
+		_host._actors[kReaderName]->setVisible(false);
+		_host._actors[kSamName]->setVisible(false);
 		_walk->visible = true;
 		_walk->startAnimation(1);
 		_phase = kExitAnimation;
 	} else if (_phase == kExitAnimation) {
 		if (!_walk->isRunning())
 			_phase = kExitReady;
-	} else if (_phase == kIdle && !_host._practice && static_cast<uint32>(number("gIdleHelpTime")) <= time - _idle) {
-		int choice = _host._vm.rnd().number(1, number("kMaxIdleIndex"));
-		group("kIdleCharID", "kIdleSpchID", number(Common::String::format("kMaxIdleIndexSpeeches.%d", choice)), choice);
+	} else if (_phase == kIdle && !_host._practice && static_cast<uint32>(number(kGIdleHelpTimeName)) <= time - _idle) {
+		int choice = _host._vm.rnd().number(1, number(kMaxIdleIndexKey));
+		group(kIdleCharIDKey, kIdleSpchIDKey, number(Common::String::format(kMaxIdleIndexSpeechesSignedIndexKey, choice)), choice);
 		_idle = time;
 	}
 }
 
 void RainbowSlide::carrieClick() {
 	World &world = _host._world;
-	int count = world.get("R1CN4CarrieClicks") + 1;
-	world.set("R1CN4CarrieClicks", count);
+	int count = world.get(kR1CN4CarrieClicksKey) + 1;
+	world.set(kR1CN4CarrieClicksKey, count);
 	int groupIndex = 6;
 	if (_state < 3 && count == 1)
 		groupIndex = _state;
 	else if (_state == 1) {
-		_host.say(_host._page->text("kCarrieCharID.3.1"), number("kCarrieSpchID.3.1"));
-		for (int i = world.visits("r1ia3") ? 2 : 4; i <= (world.visits("r1ia3") ? 3 : 4); i++)
-			_host.say(_host._page->text(Common::String::format("kCarrieCharID.3.%d", i)), number(Common::String::format("kCarrieSpchID.3.%d", i)));
+		_host.say(_host._page->text(kCarrieCharID31Key), number(kCarrieSpchID31Key));
+		for (int i = world.visits(Page::kPageIA3) ? 2 : 4; i <= (world.visits(Page::kPageIA3) ? 3 : 4); i++)
+			_host.say(_host._page->text(Common::String::format(kCarrieCharID3SignedIndexKey, i)), number(Common::String::format(kCarrieSpchID3SignedIndexKey, i)));
 		return;
 	} else if (_state == 2)
 		groupIndex = _host._vm.rnd().number(4, 5);
-	group("kCarrieCharID", "kCarrieSpchID", number(Common::String::format("kMaxCarrieSpch.%d", groupIndex)), groupIndex);
+	group(kCarrieCharIDKey, kCarrieSpchIDKey, number(Common::String::format(kMaxCarrieSpchSignedIndexKey, groupIndex)), groupIndex);
 }
 
 bool RainbowSlide::click(Common::Point point) {
@@ -163,9 +230,9 @@ bool RainbowSlide::click(Common::Point point) {
 		if (_state < 3)
 			carrieClick();
 		else if (!_host._practice) {
-			_host.playSounds({static_cast<uint16>(number("WAVE_COMPICKUP"))});
-			_host._world.set("R1CN4BandsPending", 1);
-			group("kBandsCharID", "kBandsSpchID", 2);
+			_host.playSounds({static_cast<uint16>(number(kWAVECOMPICKUPName))});
+			_host._world.set(kR1CN4BandsPendingKey, 1);
+			group(kBandsCharIDKey, kBandsSpchIDKey, 2);
 			_phase = kCollect;
 		}
 		return true;
@@ -173,31 +240,31 @@ bool RainbowSlide::click(Common::Point point) {
 	for (auto &entry : _host._actors) {
 		if (!entry._value->bounds().contains(point))
 			continue;
-		if (entry._key == "carrie")
+		if (entry._key.equals(kCarrieActor))
 			carrieClick();
-		else if (entry._key == "paige") {
+		else if (entry._key.equals(kPaigeName)) {
 			int choice = _state == 1 ? _host._vm.rnd().number(1, 2) : _state + 1;
-			_host.say(_host._page->text(Common::String::format("kHelpCharID.%d", choice)), number(Common::String::format("kHelpSpchID.%d", choice)));
+			_host.say(_host._page->text(Common::String::format(kHelpCharIDSignedIndexKey, choice)), number(Common::String::format(kHelpSpchIDSignedIndexKey, choice)));
 		} else {
 			int choice;
 			if (_state == 1) {
-				choice = _host._vm.rnd().number(1, _host._world.visits("r1ia3") ? 3 : 2);
-				if (!_host._world.visits("r1ia3") && choice == 2)
+				choice = _host._vm.rnd().number(1, _host._world.visits(Page::kPageIA3) ? 3 : 2);
+				if (!_host._world.visits(Page::kPageIA3) && choice == 2)
 					choice = 3;
 			} else
 				choice = _state < 4 ? _state + 2 : _host._vm.rnd().number(6, 7);
-			group("kMainCharID", "kMainSpchID", number(Common::String::format("kMaxMainSpch.%d", choice)), choice);
+			group(kMainCharIDKey, kMainSpchIDKey, number(Common::String::format(kMaxMainSpchSignedIndexKey, choice)), choice);
 		}
 		return true;
 	}
 	for (const auto &exit : _host._page->exits()) {
-		if (exit.destination == "r1rss" && exit.rect.contains(point)) {
+		if (exit.destination.equals(Page::kPageRSS) && exit.rect.contains(point)) {
 			World &world = _host._world;
-			int count = world.get("R1CN4SlideClicks") + 1;
-			world.set("R1CN4SlideClicks", count);
-			world.set("R1CN4ExitPending", 1);
+			int count = world.get(kR1CN4SlideClicksKey) + 1;
+			world.set(kR1CN4SlideClicksKey, count);
+			world.set(kR1CN4ExitPendingKey, 1);
 			if (count == 1)
-				group("kSlideCharID", "kSlideSpchID", number("kMaxSlideSpch"));
+				group(kSlideCharIDKey, kSlideSpchIDKey, number(kMaxSlideSpchKey));
 			_phase = kExitSpeech;
 			return true;
 		}
@@ -209,16 +276,16 @@ bool RainbowSlide::donate(uint item) {
 	if (_host._practice || busy())
 		return false;
 	_host.interrupt();
-	if (item != static_cast<uint>(number("kINV1Wagon")) || 3 <= _state) {
+	if (item != static_cast<uint>(number(kINV1WagonKey)) || 3 <= _state) {
 		int groupIndex = _state < 3 ? 1 : 2;
-		group("kNoUseCharID", "kNoUseSpchID", number(Common::String::format("kMaxNoUseSpch.%d", groupIndex)), groupIndex);
+		group(kNoUseCharIDKey, kNoUseSpchIDKey, number(Common::String::format(kMaxNoUseSpchSignedIndexKey, groupIndex)), groupIndex);
 		return false;
 	}
 	World &world = _host._world;
-	if (world.get("item:7") <= 0)
+	if (world.get(kItem7Key) <= 0)
 		return false;
-	world.set("item:7", world.get("item:7") - 1);
-	world.set("R1CN4WagonPending", 1);
+	world.set(kItem7Key, world.get(kItem7Key) - 1);
+	world.set(kR1CN4WagonPendingKey, 1);
 	_host.closeChest();
 	_start = _host._time;
 	_clock = true;
@@ -236,7 +303,7 @@ void RainbowSlide::pause(bool paused, uint32 elapsed) {
 }
 
 Common::String RainbowSlide::destination() const {
-	return _phase == kExitReady ? "r1rss" : Common::String();
+	return _phase == kExitReady ? Page::kPageRSS : Common::String();
 }
 
 } // namespace RR1Cloud9

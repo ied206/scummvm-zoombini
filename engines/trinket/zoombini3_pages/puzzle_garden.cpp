@@ -18,6 +18,24 @@
 namespace Trinket {
 namespace Zoombini3 {
 
+constexpr const char *GardenMachine::kEventCorrect;
+constexpr const char *GardenMachine::kEventIncorrectFilled;
+constexpr const char *GardenMachine::kEventIncorrectEmpty;
+constexpr const char *GardenMachine::kEventFinished;
+constexpr const char *GardenMachine::kEventTokenPickedUp;
+constexpr const char *GardenMachine::kEventSnapDone;
+constexpr const char *GardenMachine::kRemainingRejectionsName;
+constexpr const char *GardenMachine::kMethodSetupGame;
+constexpr const char *GardenMachine::kMethodStartRound;
+constexpr const char *GardenMachine::kMethodFinishRound;
+constexpr const char *GardenMachine::kMethodPauseRound;
+constexpr const char *GardenMachine::kMethodResumeRound;
+constexpr const char *GardenMachine::kMethodSnapAnswer;
+constexpr const char *GardenMachine::kFlowerName;
+constexpr const char *GardenMachine::kStemName;
+constexpr const char *GardenMachine::kLeafName;
+constexpr const char *GardenMachine::kRootName;
+
 GardenRules::GardenRules() = default;
 
 bool GardenRules::generate(uint level, uint party, Shell::Random &random) {
@@ -33,19 +51,22 @@ bool GardenRules::generate(uint level, uint party, Shell::Random &random) {
 			_plants[i].trait[j] = random.draw() % 4;
 	}
 	_axes[0] = random.draw() % 4;
-	uint remaining[3], count = 0;
-	for (uint i = 0; i < 4; i++)
+	uint remaining[3];
+	uint count = 0;
+	for (uint i = 0; i < 4; i++) {
 		if (i != _axes[0]) {
 			remaining[count] = i;
 			count += 1;
 		}
+	}
 	_axes[1] = remaining[random.draw() % 3];
 	count = 0;
-	for (uint i = 0; i < 4; i++)
+	for (uint i = 0; i < 4; i++) {
 		if (i != _axes[0] && i != _axes[1]) {
 			remaining[count] = i;
 			count += 1;
 		}
+	}
 	_axes[2] = remaining[random.draw() % 2];
 	if (level < 3)
 		_axes[2] = _axes[0];
@@ -70,9 +91,10 @@ bool GardenRules::accepts(uint plant, uint hole) const {
 	if (_party <= plant || holeCount() <= hole || _plants[plant].hole != -1 || !_chances)
 		return false;
 	uint16 intersection = _ignored | (value(plant) & _allowed[hole]);
-	for (uint i = 0; i < 4; i++)
+	for (uint i = 0; i < 4; i++) {
 		if (!(intersection & (15 << (4 * i))))
 			return false;
+	}
 	return true;
 }
 
@@ -90,8 +112,13 @@ bool GardenRules::place(uint plant, uint hole) {
 			continue;
 		uint16 allowed = _allowed[i] & exclude;
 		for (uint axis = 0; axis < _level; axis++) {
-			uint divisor = axis == 0 ? 1 : axis == 1 ? 4
-													 : 16;
+			uint divisor;
+			if (axis == 0)
+				divisor = 1;
+			else if (axis == 1)
+				divisor = 4;
+			else
+				divisor = 16;
 			if ((i / divisor) % 4 == (hole / divisor) % 4) {
 				uint16 mask = 15 << (4 * _axes[axis]);
 				allowed = (allowed & ~mask) | (accepted & mask);
@@ -131,7 +158,9 @@ bool GardenRules::findAnswer(Common::Array<Placement> &plan) const {
 }
 
 Common::Point GardenRules::holePosition(uint level, uint hole) {
-	uint column = hole % 4, row = (hole / 4) % 4, section = hole / 16;
+	uint column = hole % 4;
+	uint row = (hole / 4) % 4;
+	uint section = hole / 16;
 	if (level == 1)
 		return Common::Point(200 * column, 300);
 	if (level == 2)
@@ -146,12 +175,12 @@ constexpr const char *GardenMachine::kAnimation;
 
 GardenMachine::GardenMachine(TrinketEngine &vm, Shell::Scene &scene) : _vm(vm), _scene(scene) {
 	const char *events[] = {
-		"correct",
-		"incorrectFilled",
-		"incorrectEmpty",
-		"finished",
-		"tokenPickedUp",
-		"snapDone",
+		kEventCorrect,
+		kEventIncorrectFilled,
+		kEventIncorrectEmpty,
+		kEventFinished,
+		kEventTokenPickedUp,
+		kEventSnapDone,
 	};
 	for (uint i = 0; i < ARRAYSIZE(events); i++)
 		addEvent(events[i]);
@@ -251,42 +280,42 @@ bool GardenMachine::setup(uint level, uint party) {
 	return true;
 }
 
-bool GardenMachine::get(const Common::String &property, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if (property != "remainingRejections" || !arguments.empty())
-		return MultiTrinket::get(property, arguments, result);
+bool GardenMachine::get(const Common::String &property, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if (!property.equals(kRemainingRejectionsName) || !sargs.empty())
+		return MultiTrinket::get(property, sargs, result);
 	result = Core::ScriptValue(static_cast<int32>(_rules.chances()));
 	return true;
 }
 
-bool GardenMachine::set(const Common::String &property, const Core::ScriptArguments &arguments, const Core::ScriptValue &value) {
-	if (property != "remainingRejections" || !arguments.empty())
-		return MultiTrinket::set(property, arguments, value);
-	_rules.setChances(value.integer());
+bool GardenMachine::set(const Common::String &property, const Core::ScriptArguments &sargs, const Core::ScriptValue &value) {
+	if (!property.equals(kRemainingRejectionsName) || !sargs.empty())
+		return MultiTrinket::set(property, sargs, value);
+	_rules.setChances(value.toInt32());
 	return true;
 }
 
-bool GardenMachine::play(const Common::String &method, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	_time = callTime();
-	if (method == "setupGame" && arguments.size() == 2)
-		return setup(arguments[0].integer(), arguments[1].integer());
-	if (!arguments.empty())
-		return MultiTrinket::play(method, arguments, result);
-	if (method == "startRound")
+bool GardenMachine::play(const Common::String &method, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	_clock.update(callTime(), !_paused);
+	if (method.equals(kMethodSetupGame) && sargs.size() == 2)
+		return setup(sargs[0].toInt32(), sargs[1].toInt32());
+	if (!sargs.empty())
+		return MultiTrinket::play(method, sargs, result);
+	if (method.equals(kMethodStartRound))
 		return true;
-	if (method == "finishRound") {
-		pause(true, _time);
-		emitEvent("finished");
-		return true;
-	}
-	if (method == "pauseRound" || method == "resumeRound") {
-		pause(method == "pauseRound", _time);
+	if (method.equals(kMethodFinishRound)) {
+		pause(true, callTime());
+		emitEvent(kEventFinished);
 		return true;
 	}
-	if (method == "snapAnswer") {
+	if (method.equals(kMethodPauseRound) || method.equals(kMethodResumeRound)) {
+		pause(method.equals(kMethodPauseRound), callTime());
+		return true;
+	}
+	if (method.equals(kMethodSnapAnswer)) {
 		snapAnswer();
 		return true;
 	}
-	return MultiTrinket::play(method, arguments, result);
+	return MultiTrinket::play(method, sargs, result);
 }
 
 void GardenMachine::positionPlant(uint index, Common::Point point) {
@@ -299,7 +328,8 @@ void GardenMachine::positionPlant(uint index, Common::Point point) {
 }
 
 int GardenMachine::hitPlant(Common::Point point) const {
-	int result = -1, depth = -1;
+	int result = -1;
+	int depth = -1;
 	for (uint i = 0; i < _party; i++) {
 		Common::Rect bounds = _plants[i].bounds;
 		bounds.translate(_plants[i].position.x, _plants[i].position.y);
@@ -340,12 +370,12 @@ void GardenMachine::plantAccepted(uint index, uint hole) {
 		25,
 		15,
 		15,
-	},
-						 vertical[] = {
-							 40,
-							 25,
-							 5,
-						 };
+	};
+	static constexpr int vertical[] = {
+		40,
+		25,
+		5,
+	};
 	int offsetY = -vertical[_level - 1];
 	if (_party / 2 < count) {
 		count -= _party / 2;
@@ -356,7 +386,7 @@ void GardenMachine::plantAccepted(uint index, uint hole) {
 	Common::Rect bounds = _holes[hole]->bounds;
 	positionPlant(index, Common::Point(bounds.left + (bounds.width() - _plants[index].bounds.width()) / 2 + offsetX,
 									   bounds.top + (bounds.height() - _plants[index].bounds.height()) / 2 + offsetY));
-	emitEvent(_rules.passed() == _party ? "finished" : "correct");
+	emitEvent(_rules.passed() == _party ? kEventFinished : kEventCorrect);
 }
 
 void GardenMachine::dropPlant() {
@@ -382,7 +412,7 @@ void GardenMachine::dropPlant() {
 	}
 	_rejected = index;
 	// Remaining capacity uses the native twelve-plant comparison.
-	emitEvent(_party - _rules.population(hole) == 12 ? "incorrectEmpty" : "incorrectFilled");
+	emitEvent(_party - _rules.population(hole) == 12 ? kEventIncorrectEmpty : kEventIncorrectFilled);
 }
 
 void GardenMachine::event(const Common::Event &event) {
@@ -409,7 +439,7 @@ void GardenMachine::event(const Common::Event &event) {
 				_pickup = view.position;
 				_grab = event.mouse - view.position;
 				playEffect(kResSound18156_PlantPickup);
-				emitEvent("tokenPickedUp");
+				emitEvent(kEventTokenPickedUp);
 			}
 		}
 	}
@@ -421,23 +451,32 @@ void GardenMachine::snapAnswer() {
 	if (_rejected < 0 || _returning)
 		return;
 	_returning = true;
-	_returnTime = _time;
+	_returnTime = _clock.now();
 	_returnStart = _plants[_rejected].position;
+	const int horizontalDistance = _pickup.x - _returnStart.x;
+	const int firstCtrlX = _returnStart.x + horizontalDistance / 3;
+	const int secondCtrlX = _returnStart.x + 2 * horizontalDistance / 3;
+	const Common::Point32 start(_returnStart.x, _returnStart.y);
+	// Both interior control points lie on the garden's top edge to form the return arc.
+	const Common::Point32 firstCtrl(firstCtrlX, 0);
+	const Common::Point32 secondCtrl(secondCtrlX, 0);
+	const Common::Point32 end(_pickup.x, _pickup.y);
+	_returnCurve.init(start, firstCtrl, secondCtrl, end);
 	playEffect(kResSound18257_Return);
 }
 
 void GardenMachine::update(uint32 time) {
-	_time = time;
+	_clock.update(time, !_paused);
 	if (_paused || !_returning)
 		return;
-	// Curve PPS measures percent of the parameter interval per second.
-	float elapsed = static_cast<float>(time - _returnTime) / 1000;
-	float t = MIN<float>(1, elapsed), u = 1 - t;
-	int firstX = _returnStart.x + (_pickup.x - _returnStart.x) / 3;
-	int secondX = _returnStart.x + 2 * (_pickup.x - _returnStart.x) / 3;
-	positionPlant(_rejected, Common::Point(u * u * u * _returnStart.x + 3 * u * u * t * firstX + 3 * u * t * t * secondX + t * t * t * _pickup.x,
-										   u * u * u * _returnStart.y + t * t * t * _pickup.y));
-	if (1 < elapsed) {
+	// Curve PPS advances one normalized Bezier parameter per second.
+	const float elapsedSeconds = static_cast<float>(_clock.elapsed(_returnTime)) / 1000.0f;
+	const float parameter = MIN<float>(1.0f, elapsedSeconds);
+	float x = 0.0f;
+	float y = 0.0f;
+	_returnCurve.evaluate(parameter, x, y);
+	positionPlant(_rejected, Common::Point(static_cast<int16>(x), static_cast<int16>(y)));
+	if (1.0f < elapsedSeconds) {
 		_rules.reject();
 		uint frame = _sun->getFrame() + 1;
 		if (frame <= _sun->getNumberOfFrames())
@@ -446,18 +485,15 @@ void GardenMachine::update(uint32 time) {
 			_sun->visible = false;
 		_rejected = -1;
 		_returning = false;
-		emitEvent("snapDone");
+		emitEvent(kEventSnapDone);
 	}
 }
 
 void GardenMachine::pause(bool paused, uint32 time) {
 	if (_paused == paused)
 		return;
+	_clock.update(time, !_paused);
 	_paused = paused;
-	if (paused)
-		_pauseTime = time;
-	else
-		_returnTime += time - _pauseTime;
 }
 
 bool GardenMachine::overDraggable(Common::Point point) const {
@@ -474,11 +510,11 @@ bool GardenMachine::pollSound(uint16 &sound) {
 }
 
 Common::String GardenMachine::debugAnswer() const {
-	static const char *const names[] = {
-		"flower",
-		"stem",
-		"leaf",
-		"root",
+	static constexpr const char *names[] = {
+		kFlowerName,
+		kStemName,
+		kLeafName,
+		kRootName,
 	};
 	Common::String result = Common::String::format("Garden level %u: columns=%s", _level, names[_rules.axis(0)]);
 	if (1 < _level)

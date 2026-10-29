@@ -14,20 +14,38 @@
 namespace Trinket {
 namespace Shell {
 
-bool TextObject::create(const Core::ScriptArguments &arguments) {
-	if (arguments.size() < 3 || 6 < arguments.size())
+constexpr const char *TextObject::kPropertyText;
+constexpr const char *TextObject::kPropertyUserData;
+constexpr const char *TextObject::kPropertyCenter;
+constexpr const char *TextObject::kPropertyWrap;
+constexpr const char *TextObject::kPropertyOutline;
+constexpr const char *TextObject::kPropertyPointX;
+constexpr const char *TextObject::kPropertyX;
+constexpr const char *TextObject::kPropertyPointY;
+constexpr const char *TextObject::kPropertyY;
+constexpr const char *TextObject::kPropertyFontAscent;
+constexpr const char *TextObject::kPropertyFontDescent;
+constexpr const char *TextObject::kPropertyFontLeading;
+constexpr const char *TextObject::kPropertyFont;
+constexpr const char *TextObject::kPropertyColor;
+constexpr const char *TextObject::kPropertyOutlineColor;
+
+constexpr const char *TextObject::kFontExtension;
+
+bool TextObject::create(const Core::ScriptArguments &sargs) {
+	if (sargs.size() < 3 || 6 < sargs.size())
 		return false;
-	_text = arguments[0].text();
-	_point = Common::Point(arguments[1].integer(), arguments[2].integer());
-	_usePoint = arguments.size() < 5 || arguments[4].text().empty();
+	_text = sargs[0].toText();
+	_point = Common::Point(sargs[1].toInt32(), sargs[2].toInt32());
+	_usePoint = sargs.size() < 5 || sargs[4].toText().empty();
 	if (_usePoint) {
-		_center = 3 < arguments.size() && arguments[3].integer() != 0;
+		_center = 3 < sargs.size() && sargs[3].toInt32() != 0;
 	} else {
 		x = _point.x;
 		y = _point.y;
-		_width = arguments[3].integer();
-		_height = arguments[4].integer();
-		_wrap = 5 < arguments.size() && arguments[5].integer() != 0;
+		_width = sargs[3].toInt32();
+		_height = sargs[4].toInt32();
+		_wrap = 5 < sargs.size() && sargs[5].toInt32() != 0;
 	}
 	updateBox();
 	return true;
@@ -52,9 +70,8 @@ void TextObject::updateBox() {
 }
 
 bool TextObject::setFont(const Common::String &resource) {
-	Common::String path = _resources.resourcePath(resource, "nfnt");
-	Common::ScopedPtr<Common::SeekableReadStream> stream(_resources.open(path));
-	Common::SharedPtr<OM::NFNTFont> font(stream ? OM::NFNTFont::load(*stream) : nullptr);
+	Common::String path = _resources.resourcePath(resource, kFontExtension);
+	Common::SharedPtr<OM::NFNTFont> font = _fonts.load(path);
 	if (!font)
 		return false;
 	_resourceFont = font;
@@ -63,74 +80,74 @@ bool TextObject::setFont(const Common::String &resource) {
 	return true;
 }
 
-bool TextObject::setColor(const Core::ScriptArguments &arguments, const Core::ScriptValue &value, uint16 *color) {
-	if (arguments.size() != 2)
+bool TextObject::setColor(const Core::ScriptArguments &sargs, const Core::ScriptValue &value, uint16 *color) {
+	if (sargs.size() != 2)
 		return false;
-	color[0] = arguments[0].integer();
-	color[1] = arguments[1].integer();
-	color[2] = value.integer();
+	color[0] = sargs[0].toInt32();
+	color[1] = sargs[1].toInt32();
+	color[2] = value.toInt32();
 	return true;
 }
 
-bool TextObject::get(const Common::String &property, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if (property == "text")
+bool TextObject::get(const Common::String &property, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if (property.equals(kPropertyText))
 		result = Core::ScriptValue::fromText(_text);
-	else if (property == "userData")
+	else if (property.equals(kPropertyUserData))
 		result = Core::ScriptValue::fromText(_userData);
-	else if (property == "center")
+	else if (property.equals(kPropertyCenter))
 		result = Core::ScriptValue(static_cast<int32>(_center));
-	else if (property == "wrap")
+	else if (property.equals(kPropertyWrap))
 		result = Core::ScriptValue(static_cast<int32>(_wrap));
-	else if (property == "outline")
+	else if (property.equals(kPropertyOutline))
 		result = Core::ScriptValue(static_cast<int32>(_outline));
-	else if (property == "pointX" || (_usePoint && property == "x"))
+	else if (property.equals(kPropertyPointX) || (_usePoint && property.equals(kPropertyX)))
 		result = Core::ScriptValue(static_cast<int32>(_point.x));
-	else if (property == "pointY" || (_usePoint && property == "y"))
+	else if (property.equals(kPropertyPointY) || (_usePoint && property.equals(kPropertyY)))
 		result = Core::ScriptValue(static_cast<int32>(_point.y));
-	else if (property == "fontAscent")
+	else if (property.equals(kPropertyFontAscent))
 		result = Core::ScriptValue(font().ascent());
-	else if (property == "fontDescent")
+	else if (property.equals(kPropertyFontDescent))
 		result = Core::ScriptValue(font().descent());
-	else if (property == "fontLeading")
+	else if (property.equals(kPropertyFontLeading))
 		result = Core::ScriptValue(font().getFontHeight() - font().ascent() - font().descent());
 	else
-		return Core::Trinket::get(property, arguments, result);
+		return Core::Trinket::get(property, sargs, result);
 	return true;
 }
 
-bool TextObject::set(const Common::String &property, const Core::ScriptArguments &arguments, const Core::ScriptValue &value) {
-	if (property == "text") {
-		_text = value.text();
+bool TextObject::set(const Common::String &property, const Core::ScriptArguments &sargs, const Core::ScriptValue &value) {
+	if (property.equals(kPropertyText)) {
+		_text = value.toText();
 		if (2 <= _text.size() && _text.firstChar() == '"' && _text.lastChar() == '"')
 			_text = _text.substr(1, _text.size() - 2);
-	} else if (property == "userData") {
-		_userData = value.text();
-	} else if (property == "font") {
-		return arguments.empty() && setFont(value.text());
-	} else if (property == "color") {
-		return setColor(arguments, value, _color);
-	} else if (property == "outlineColor") {
-		return setColor(arguments, value, _outlineColor);
-	} else if (property == "center") {
-		_center = value.integer() != 0;
-	} else if (property == "outline") {
-		_outline = value.integer() != 0;
-	} else if (property == "wrap") {
+	} else if (property.equals(kPropertyUserData)) {
+		_userData = value.toText();
+	} else if (property.equals(kPropertyFont)) {
+		return sargs.empty() && setFont(value.toText());
+	} else if (property.equals(kPropertyColor)) {
+		return setColor(sargs, value, _color);
+	} else if (property.equals(kPropertyOutlineColor)) {
+		return setColor(sargs, value, _outlineColor);
+	} else if (property.equals(kPropertyCenter)) {
+		_center = value.toInt32() != 0;
+	} else if (property.equals(kPropertyOutline)) {
+		_outline = value.toInt32() != 0;
+	} else if (property.equals(kPropertyWrap)) {
 		if (!_usePoint)
-			_wrap = value.integer() != 0;
-	} else if (property == "pointX" || (_usePoint && property == "x")) {
-		_point.x = value.integer();
-	} else if (property == "pointY" || (_usePoint && property == "y")) {
-		_point.y = value.integer();
+			_wrap = value.toInt32() != 0;
+	} else if (property.equals(kPropertyPointX) || (_usePoint && property.equals(kPropertyX))) {
+		_point.x = value.toInt32();
+	} else if (property.equals(kPropertyPointY) || (_usePoint && property.equals(kPropertyY))) {
+		_point.y = value.toInt32();
 	} else {
-		return Core::Trinket::set(property, arguments, value);
+		return Core::Trinket::set(property, sargs, value);
 	}
 	updateBox();
 	return true;
 }
 
 Core::ScriptableObject *TextObject::clone() const {
-	Common::ScopedPtr<TextObject> copy(new TextObject(_resources, _defaultFont));
+	Common::ScopedPtr<TextObject> copy(new TextObject(_resources, _fonts, _defaultFont));
 	copy->_text = _text;
 	copy->_userData = _userData;
 	copy->_point = _point;

@@ -29,6 +29,7 @@ namespace Zoombini3 {
 
 /** Original Windows game component versions for the Z3-10 release family. */
 struct OriginalVersions {
+	/** Reference component versions for the Windows game runtime. */
 	static constexpr RuntimeVersions kWindowsGame = {
 		"Z3-10 Windows game",
 		{"ompp32x.dll", "4.1b", {2002, 9, 15, 6, 47, 28}},

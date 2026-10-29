@@ -30,6 +30,7 @@ namespace Core {
 
 class Background16 {
 public:
+	/** Decode a BK16 resource into the supplied RGBA surface, returning false for invalid data. */
 	static bool decode(Common::SeekableReadStream &stream, Graphics::Surface &surface);
 };
 

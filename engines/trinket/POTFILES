@@ -2,6 +2,7 @@ engines/trinket/detection.cpp
 engines/trinket/trinket.cpp
 engines/trinket/dialogs.cpp
 engines/trinket/rr1cloud9/game.cpp
+engines/trinket/rr1cloud9/dialogs.cpp
 engines/trinket/rr1cloud9/ca2_flipbook.cpp
 engines/trinket/rr1cloud9/print.cpp
 engines/trinket/metaengine.cpp

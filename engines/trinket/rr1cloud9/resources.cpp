@@ -28,8 +28,40 @@
 namespace Trinket {
 namespace RR1Cloud9 {
 
+constexpr const char *Resources::kR1comName;
+constexpr const char *Resources::kCompreName;
+constexpr const char *Resources::kComName;
+constexpr const char *Resources::kComsfxName;
+constexpr const char *Resources::kComtunzName;
+
+constexpr const char *Resources::kInstalledDirectory;
+constexpr const char *Resources::kResourceDirectory;
+constexpr const char *Resources::kSharedResourceDirectory;
+constexpr const char *Resources::kScriptDirectory;
+constexpr const char *Resources::kSharedScriptDirectory;
+constexpr const char *Resources::kMainScript;
+constexpr const char *Resources::kLibraryExtension;
+constexpr const char *Resources::kSampleLibrary;
+constexpr const char *Resources::kSampleDirectory;
+constexpr const char *Resources::kCommonLibrary;
+constexpr const char *Resources::kResolvedNameFormat;
+constexpr const char *Resources::kAnimationTag;
+constexpr const char *Resources::kPaletteTag;
+constexpr const char *Resources::kBackgroundTag;
+constexpr const char *Resources::kSoundTag;
+constexpr const char *Resources::kFontTag;
+constexpr const char *Resources::kLipsTag;
+constexpr const char *Resources::kTextTag;
+constexpr const char *Resources::kAnimationExtension;
+constexpr const char *Resources::kPaletteExtension;
+constexpr const char *Resources::kBackgroundExtension;
+constexpr const char *Resources::kSoundExtension;
+constexpr const char *Resources::kFontExtension;
+constexpr const char *Resources::kLipsExtension;
+constexpr const char *Resources::kTextExtension;
+
 Common::SeekableReadStream *Resources::unpack(Common::SeekableReadStream *stream, const Common::String &tag) {
-	if (!stream || (tag != "ASEQ" && tag != "RRGB"))
+	if (!stream || (!tag.equals(kAnimationTag) && !tag.equals(kPaletteTag)))
 		return stream;
 	if (stream->size() < 4 || stream->readUint32BE() != MKTAG('N', 'C', '1', 26)) {
 		stream->seek(0);
@@ -41,7 +73,7 @@ Common::SeekableReadStream *Resources::unpack(Common::SeekableReadStream *stream
 	const uint32 size = source->readUint32LE();
 	// Each three-byte match expands by at most 255 bytes. Check before allocating.
 	const uint32 packedSize = source->size() - 16;
-	if (!size || (tag == "RRGB" && size != 1536) || 1 + static_cast<uint64>(packedSize - 1) * 255 / 3 < size)
+	if (!size || (tag.equals(kPaletteTag) && size != 1536) || 1 + static_cast<uint64>(packedSize - 1) * 255 / 3 < size)
 		return nullptr;
 	source->seek(16);
 	Common::Array<byte> packed;
@@ -60,20 +92,21 @@ Common::SeekableReadStream *Resources::unpack(Common::SeekableReadStream *stream
 
 bool Resources::load(Common::Path &gamePath) {
 	_libraries.clear();
+	_resolvedNames.clear();
 	_directories.clear();
 	Common::FSNode root(gamePath);
-	Common::FSNode installed = root.getChild("HD");
-	if (installed.getChild("R1scripts").getChild("r1main.mps").exists())
+	Common::FSNode installed = root.getChild(kInstalledDirectory);
+	if (installed.getChild(kScriptDirectory).getChild(kMainScript).exists())
 		gamePath = installed.getPath();
-	else if (root.getName().equalsIgnoreCase("HD") && root.getParent().getChild("R1RSC").isDirectory())
+	else if (root.getName().equalsIgnoreCase(kInstalledDirectory) && root.getParent().getChild(kResourceDirectory).isDirectory())
 		root = root.getParent();
 	for (const Common::Path &base : {gamePath, root.getPath()}) {
-		_directories.push_back(base.join("R1RSC"));
-		_directories.push_back(base.join("RSC"));
-		_directories.push_back(base.join("R1scripts"));
-		_directories.push_back(base.join("scripts"));
+		_directories.push_back(base.join(kResourceDirectory));
+		_directories.push_back(base.join(kSharedResourceDirectory));
+		_directories.push_back(base.join(kScriptDirectory));
+		_directories.push_back(base.join(kSharedScriptDirectory));
 	}
-	Common::ScopedPtr<Common::SeekableReadStream> script(open("r1main.mps"));
+	Common::ScopedPtr<Common::SeekableReadStream> script(open(kMainScript));
 	return script != nullptr;
 }
 
@@ -82,7 +115,7 @@ Common::SeekableReadStream *Resources::openLibrary(const Common::String &library
 	if (found != _libraries.end())
 		return unpack(found->_value->getResource(tag, id), tag);
 	for (const Common::Path &directory : _directories) {
-		Common::Path path = directory.join(library + ".rsc");
+		Common::Path path = directory.join(library + kLibraryExtension);
 		if (!Common::FSNode(path).exists())
 			continue;
 		Common::SharedPtr<Common::NEResources> resource(new Common::NEResources());
@@ -92,6 +125,11 @@ Common::SeekableReadStream *Resources::openLibrary(const Common::String &library
 		return unpack(resource->getResource(tag, id), tag);
 	}
 	return nullptr;
+}
+
+Common::String Resources::cacheKey(const Common::String &name) const {
+	Common::String key = OM::ResourceProvider::cacheKey(name);
+	return _resolvedNames.getValOrDefault(key, key);
 }
 
 Common::SeekableReadStream *Resources::open(const Common::String &name) const {
@@ -111,12 +149,12 @@ Common::SeekableReadStream *Resources::open(const Common::String &name) const {
 	}
 	Common::String library = name.substr(0, slash);
 	library.toLowercase();
-	if (library == "samples") {
+	if (library.equals(kSampleLibrary)) {
 		Common::String filename = name.substr(slash + 1);
 		if (filename.contains('/') || filename.empty())
 			return nullptr;
 		for (const Common::Path &directory : _directories) {
-			Common::FSNode file(directory.join("Samples").join(filename));
+			Common::FSNode file(directory.join(kSampleDirectory).join(filename));
 			if (file.exists() && !file.isDirectory()) {
 				Common::SeekableReadStream *stream = file.createReadStream();
 				if (stream)
@@ -129,20 +167,20 @@ Common::SeekableReadStream *Resources::open(const Common::String &name) const {
 	if (!extension)
 		return nullptr;
 	const char *tag = nullptr;
-	if (!strcmp(extension, ".ao"))
-		tag = "ASEQ";
-	else if (!strcmp(extension, ".rgb"))
-		tag = "RRGB";
-	else if (!strcmp(extension, ".bk16"))
-		tag = "BK16";
-	else if (!strcmp(extension, ".wav"))
-		tag = "WAVE";
-	else if (!strcmp(extension, ".nfnt"))
-		tag = "NFNT";
-	else if (!strcmp(extension, ".lips"))
-		tag = "LIPS";
-	else if (!strcmp(extension, ".txt"))
-		tag = "TEXT";
+	if (!strcmp(extension, kAnimationExtension))
+		tag = kAnimationTag;
+	else if (!strcmp(extension, kPaletteExtension))
+		tag = kPaletteTag;
+	else if (!strcmp(extension, kBackgroundExtension))
+		tag = kBackgroundTag;
+	else if (!strcmp(extension, kSoundExtension))
+		tag = kSoundTag;
+	else if (!strcmp(extension, kFontExtension))
+		tag = kFontTag;
+	else if (!strcmp(extension, kLipsExtension))
+		tag = kLipsTag;
+	else if (!strcmp(extension, kTextExtension))
+		tag = kTextTag;
 	if (!tag)
 		return nullptr;
 	uint id = 0;
@@ -153,11 +191,13 @@ Common::SeekableReadStream *Resources::open(const Common::String &name) const {
 	}
 	if (!id || 32767 < id)
 		return nullptr;
-	if (library == "common") {
-		for (const char *common : {"r1com", "compre", "com", "comsfx", "comtunz"}) {
+	if (library.equals(kCommonLibrary)) {
+		for (const char *common : {kR1comName, kCompreName, kComName, kComsfxName, kComtunzName}) {
 			Common::SeekableReadStream *stream = openLibrary(common, tag, id);
-			if (stream)
+			if (stream) {
+				_resolvedNames[OM::ResourceProvider::cacheKey(name)] = Common::String::format(kResolvedNameFormat, common, id, extension);
 				return stream;
+			}
 		}
 		return nullptr;
 	}

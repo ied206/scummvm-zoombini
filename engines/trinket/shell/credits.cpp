@@ -20,21 +20,32 @@
  */
 
 #include "trinket/shell/credits.h"
+#include "trinket/shell/scene.h"
 
 #include "common/ptr.h"
 #include "common/substream.h"
 #include "common/tokenizer.h"
 #include "trinket/core/animation.h"
 #include "trinket/ompp/xml.h"
+#include "trinket/string_parser.h"
 
 namespace Trinket {
 namespace Shell {
+
+constexpr const char *CreditText::kXMLRootElementSection;
+constexpr const char *CreditText::kXMLTitle;
+constexpr const char *CreditText::kXMLRootElementSectionMember;
+constexpr const char *CreditText::kXMLName;
+constexpr const char *CreditText::kXMLRootElementCase1;
+constexpr const char *CreditText::kXMLRootElementCase1Text;
+constexpr const char *CreditText::kXMLRootElementCase1Imgpair;
 
 CreditText::CreditText(int width, int height) : _width(width), _height(height) {
 }
 
 Common::String CreditText::textContent(const Common::String &source) {
-	Common::String result, token;
+	Common::String result;
+	Common::String token;
 	bool quoted = false;
 	for (uint i = 0; i <= source.size(); i++) {
 		char c = i < source.size() ? source[i] : 0;
@@ -49,22 +60,20 @@ Common::String CreditText::textContent(const Common::String &source) {
 			token += c;
 		}
 	}
-	for (uint i = 0; i < result.size(); i++)
+	for (uint i = 0; i < result.size(); i++) {
 		if (static_cast<byte>(result[i]) == 194)
 			result.setChar(' ', i);
+	}
 	return result;
 }
 
-bool CreditText::loadImage(const OM::ResourceProvider &resources, const char *pattern, uint image, Graphics::Surface &surface) {
+bool CreditText::loadImage(Scene &images, const char *pattern, uint image, Graphics::Surface &surface) {
 	Common::String path = Common::String::format(pattern, image);
-	Common::ScopedPtr<Common::SeekableReadStream> stream(resources.open(path));
-	Core::Animation animation;
-	if (!stream || !animation.load(*stream))
+	const Core::Animation *animation = images.loadAnimation(path);
+	if (!animation || !animation->picture(0))
 		return false;
-	Common::ScopedPtr<Common::SeekableReadStream> palette(resources.open(path.substr(0, path.size() - 3) + ".rgb"));
-	if (palette && !animation.loadPalette(*palette))
-		return false;
-	return animation.decode(0, surface);
+	surface.copyFrom(*animation->picture(0));
+	return true;
 }
 
 bool CreditText::load(Common::SeekableReadStream &stream, const OM::NFNTFont &font, const OM::ResourceProvider &resources, const char *imagePattern) {
@@ -75,47 +84,56 @@ bool CreditText::load(Common::SeekableReadStream &stream, const OM::NFNTFont &fo
 		!xml.loadStream(new Common::SeekableSubReadStream(&stream, stream.pos(), stream.size(), DisposeAfterUse::NO)) || !xml.parse())
 		return false;
 	Common::Array<Entry> entries;
+	Scene images(resources);
 	const auto &nodes = xml.elements();
-	int y = 0, maximumNameWidth = 0;
+	int y = 0;
+	int maxNameWidth = 0;
 	for (uint i = 0; i < nodes.size(); i++) {
 		const auto &node = nodes[i];
-		if (node.path == "Root_Element/Section") {
+		if (node.path.equals(kXMLRootElementSection)) {
 			Entry entry;
 			entry.y = y + 24;
 			entry.x = -1;
-			entry.text = node.attributes.getValOrDefault("title");
+			entry.text = node.attrs.getValOrDefault(kXMLTitle);
 			entries.push_back(entry);
 			y += 72;
-		} else if (node.path == "Root_Element/Section/member") {
+		} else if (node.path.equals(kXMLRootElementSectionMember)) {
 			Entry entry;
 			entry.y = y;
-			entry.text = textContent(xml.child(i, "title"));
-			entry.name = textContent(xml.child(i, "name"));
-			maximumNameWidth = MAX(maximumNameWidth, font.getStringWidth(entry.name));
+			entry.text = textContent(xml.child(i, kXMLTitle));
+			entry.name = textContent(xml.child(i, kXMLName));
+			maxNameWidth = MAX(maxNameWidth, font.getStringWidth(entry.name));
 			entries.push_back(entry);
 			y += 24;
-		} else if (node.path == "Root_Element/case1") {
+		} else if (node.path.equals(kXMLRootElementCase1)) {
 			y += 40;
-		} else if (node.path == "Root_Element/case1/text") {
+		} else if (node.path.equals(kXMLRootElementCase1Text)) {
 			Entry entry;
 			entry.y = y;
 			entry.text = textContent(node.value);
 			entries.push_back(entry);
 			y += 16;
-		} else if (node.path == "Root_Element/case1/imgpair") {
+		} else if (node.path.equals(kXMLRootElementCase1Imgpair)) {
 			Common::StringTokenizer values(node.value);
 			int height = 0;
 			for (uint n = 0; n < 2; n++) {
 				Entry entry;
 				if (values.empty())
 					return false;
-				entry.image = atoi(values.nextToken().c_str());
-				if (values.empty() || entry.image < 0)
+				Common::String imageText = values.nextToken();
+				int32 imageID = 0;
+				if (StringParser::parseSignedInt(imageText.c_str(), imageID, StringParser::kDecimalProfile) != StringParser::Result::kSuccess ||
+					imageID < 0 || values.empty())
 					return false;
-				entry.x = atoi(values.nextToken().c_str());
+				entry.image = imageID;
+				Common::String xText = values.nextToken();
+				int32 x = 0;
+				if (StringParser::parseSignedInt(xText.c_str(), x, StringParser::kDecimalProfile) != StringParser::Result::kSuccess)
+					return false;
+				entry.x = x;
 				entry.y = y;
 				Graphics::Surface image;
-				if (!loadImage(resources, imagePattern, entry.image, image))
+				if (!loadImage(images, imagePattern, entry.image, image))
 					return false;
 				height = MAX<int>(height, image.h);
 				image.free();
@@ -138,13 +156,13 @@ bool CreditText::load(Common::SeekableReadStream &stream, const OM::NFNTFont &fo
 			x = (_width - font.getStringWidth(entry.text)) / 2;
 		if (0 <= entry.image) {
 			Graphics::Surface image;
-			if (!loadImage(resources, imagePattern, entry.image, image))
+			if (!loadImage(images, imagePattern, entry.image, image))
 				return false;
 			content.blit(image, x, entry.y);
 			image.free();
 		} else {
 			font.drawString(&content.surface(), entry.text, x, entry.y, _width - x, black, Graphics::kTextAlignLeft, 0, false, true);
-			int nameX = _width - maximumNameWidth - 2;
+			int nameX = _width - maxNameWidth - 2;
 			font.drawString(&content.surface(), entry.name, nameX, entry.y, _width - nameX, black, Graphics::kTextAlignLeft, 0, false, true);
 		}
 	}

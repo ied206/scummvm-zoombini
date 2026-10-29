@@ -22,9 +22,15 @@
 #include "trinket/core/object.h"
 
 #include "common/ptr.h"
+#include "common/util.h"
+#include "trinket/string_parser.h"
 
 namespace Trinket {
 namespace Core {
+
+ScriptValue::ScriptValue(double value) : _kind(kReal), _real(value) {
+	reduce(0);
+}
 
 ScriptValue ScriptValue::object(uint32 reference) {
 	ScriptValue value;
@@ -34,40 +40,101 @@ ScriptValue ScriptValue::object(uint32 reference) {
 }
 
 ScriptValue ScriptValue::fromText(const Common::String &text) {
-	if (text.empty())
-		return ScriptValue(text);
-	char *end = nullptr;
-	double number = strtod(text.c_str(), &end);
-	if (end && end != text.c_str() && !*end) {
-		if (-2147483648.0 <= number && number <= 2147483647.0 && static_cast<int32>(number) == number)
-			return ScriptValue(static_cast<int32>(number));
-		return ScriptValue(number);
+	ScriptValue value(text);
+	if (text.empty() || (!Common::isDigit(text[0]) && text[0] != '.' && text[0] != '-' && text[0] != '+'))
+		return value;
+	value._hasText = true;
+	if (text.size() <= 10) {
+		int32 integer = 0;
+		if (StringParser::parseSignedInt(text.c_str(), integer, StringParser::kDecimalProfile) == StringParser::Result::kSuccess &&
+			-kIntegerLimit <= integer && integer <= kIntegerLimit) {
+			value._kind = kInteger;
+			value._integer = integer;
+			return value;
+		}
 	}
-	return ScriptValue(text);
+	value._kind = kReal;
+	value._real = StringParser::parseDoublePrefix(text.c_str());
+	value.reduce(text.size());
+	return value;
 }
 
-int32 ScriptValue::integer() const {
-	double value = number();
-	if (!(-2147483648.0 <= value && value <= 2147483647.0))
+ScriptValue ScriptValue::fromLiteral(int32 number, const Common::String &text) {
+	ScriptValue value(number);
+	value._string = text;
+	value._hasText = true;
+	return value;
+}
+
+ScriptValue ScriptValue::fromLiteral(double number, const Common::String &text) {
+	ScriptValue value;
+	value._kind = kReal;
+	value._real = number;
+	value._string = text;
+	value._hasText = true;
+	return value;
+}
+
+void ScriptValue::reduce(uint length) {
+	if (_kind != kReal || 10 < length || !(-kIntegerLimit <= _real && _real <= kIntegerLimit))
+		return;
+	int32 integer = static_cast<int32>(_real);
+	if (integer == _real) {
+		_kind = kInteger;
+		_integer = integer;
+	}
+}
+
+int32 ScriptValue::truncate(double value) {
+	if (!(static_cast<double>(INT64_MIN) <= value && value < -static_cast<double>(INT64_MIN)))
 		return 0;
-	return static_cast<int32>(value);
+	uint32 bits = static_cast<uint32>(static_cast<int64>(value));
+	if (INT32_MAX < bits)
+		return INT32_MIN + static_cast<int32>(bits - static_cast<uint32>(INT32_MAX) - 1);
+	return static_cast<int32>(bits);
 }
 
-double ScriptValue::number() const {
-	if (isNumeric())
-		return _number;
-	if (_kind == kString)
-		return atof(_string.c_str());
+int32 ScriptValue::toInt32() const {
+	if (_kind == kInteger && !_hasText)
+		return _integer;
+	return StringParser::parseInt32Prefix(toText().c_str());
+}
+
+int32 ScriptValue::toInt32Rounded() const {
+	if (_kind == kInteger)
+		return _integer;
+	if (_kind != kReal)
+		return 0;
+	int32 lower = truncate(floor(_real));
+	int32 upper = truncate(ceil(_real));
+	if (static_cast<double>(upper) - _real < _real - static_cast<double>(lower))
+		return upper;
+	return lower;
+}
+
+int32 ScriptValue::toInt32Trunc() const {
+	if (_kind == kInteger)
+		return _integer;
+	if (_kind == kReal)
+		return truncate(_real);
 	return 0;
 }
 
-Common::String ScriptValue::text() const {
+double ScriptValue::toFloat64() const {
 	if (_kind == kInteger)
-		return Common::String::format("%d", integer());
+		return _integer;
 	if (_kind == kReal)
-		return Common::String::format("%.15g", _number);
-	if (_kind == kString)
+		return _real;
+	return 0;
+}
+
+Common::String ScriptValue::toText() const {
+	if (_kind == kString || (isNumeric() && _hasText))
 		return _string;
+	if (_kind == kInteger)
+		return Common::String::format("%d", _integer);
+	if (_kind == kReal)
+		return Common::String::format("%.15g", _real);
 	if (_kind == kObject && _reference)
 		return Common::String::format("@%u", _reference);
 	return "0";
@@ -181,11 +248,11 @@ uint32 ObjectRegistry::bind(ScriptableObject &object) {
 	return _objects.size();
 }
 
-uint32 ObjectRegistry::create(const Common::String &name, const ScriptArguments &arguments) {
+uint32 ObjectRegistry::create(const Common::String &name, const ScriptArguments &sargs) {
 	auto found = _factories.find(name);
 	if (found == _factories.end())
 		return 0;
-	ScriptableObject *object = found->_value->create(arguments);
+	ScriptableObject *object = found->_value->create(sargs);
 	if (!object)
 		return 0;
 	uint32 reference = bind(*object);
@@ -213,13 +280,13 @@ ScriptableObject *ObjectRegistry::resolve(uint32 reference) const {
 
 ScriptableObject *ObjectRegistry::resolve(uint32 reference, const Common::String &className) const {
 	ScriptableObject *object = resolve(reference);
-	return object && _objects[reference - 1].className == className ? object : nullptr;
+	return object && _objects[reference - 1].className.equals(className) ? object : nullptr;
 }
 
 Common::Array<uint32> ObjectRegistry::references(const Common::String &className) const {
 	Common::Array<uint32> result;
 	for (uint i = 0; i < _objects.size(); i++) {
-		if (_objects[i].object && (className.empty() || _objects[i].className == className))
+		if (_objects[i].object && (className.empty() || _objects[i].className.equals(className)))
 			result.push_back(i + 1);
 	}
 	return result;

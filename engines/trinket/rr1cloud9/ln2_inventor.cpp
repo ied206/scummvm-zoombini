@@ -26,120 +26,122 @@ namespace Trinket {
 namespace RR1Cloud9 {
 
 const char *PageScene::partName(uint item) {
-	static const char *const names[] = {
+	static constexpr const char *names[] = {
 		"",
-		"RBands",
-		"HulaHoop",
-		"Pillow",
+		kRBandsName,
+		kHulaHoopName,
+		kPillowName,
 	};
 	return item <= 3 ? names[item] : "";
 }
 
 void PageScene::inventorGroup(const char *prefix, const char *actors) {
 	for (uint i = 0; actors[i]; i++) {
-		const char *actor = "irvin";
+		const char *actor = kIrvinName;
 		if (actors[i] == 'r')
-			actor = "reader";
+			actor = kReaderName;
 		else if (actors[i] == 's')
-			actor = "sam";
-		say(actor, _page->number(Common::String::format("%s.%u", prefix, i + 1)));
+			actor = kSamName;
+		say(actor, _page->number(Common::String::format(kNameUnsignedIndexFormat, prefix, i + 1)));
 	}
 }
 
 bool PageScene::enterInventor() {
-	if (!actor("irvin", "kIrvin"))
+	if (!actor(kIrvinName, kIrvinKey))
 		return false;
 	for (uint item = 1; item <= 3; item++) {
-		Common::String prefix = item == 1 ? "kRubberBands" : Common::String("k") + partName(item);
-		_parts[item - 1] = _scene.add(characterResource(_page->number(prefix + "ID"), kAnimation), _page->number(prefix + "Z"));
+		Common::String prefix = item == 1 ? kRubberBandsKey : Common::String(kConstantPrefix) + partName(item);
+		_parts[item - 1] = _scene.add(characterResource(_page->number(prefix + kIDName), kAnimation), _page->number(prefix + kZName));
 		if (!_parts[item - 1])
 			return false;
-		_parts[item - 1]->visible = _world.get(Common::String("R1LN2") + partName(item) + "Delivered");
+		_parts[item - 1]->visible = _world.get(Common::String(kR1LN2Key) + partName(item) + kDeliveredKey);
 	}
-	_ambient = _scene.add(characterResource(_page->number("kAmbientID"), kAnimation), _page->number("kAmbientZ"));
+	_ambient = _scene.add(characterResource(_page->number(kAmbientIDKey), kAnimation), _page->number(kAmbientZKey));
 	if (!_ambient)
 		return false;
-	int savedState = MAX(1, _world.get("R1LN2State")), state = savedState;
+	int savedState = MAX(1, _world.get(kR1LN2StateKey));
+	int state = savedState;
 	uint collected = 0;
-	for (uint item = 1; item <= 3; item++)
-		if (_world.get(Common::String::format("item:%u", item)))
+	for (uint item = 1; item <= 3; item++) {
+		if (_world.get(Common::String::format(kItemUnsignedIndexKey, item)))
 			collected += 1;
+	}
 	if (2 <= state)
 		state = MAX(state, 2 + static_cast<int>(collected));
-	int reentry = state == savedState ? _world.get("R1LN2Reentry") + 1 : 0;
-	_world.set("R1LN2State", state);
-	_world.set("R1LN2Reentry", reentry);
-	bool fromCatapult = _world.get("previousLocation") == 10;
+	int reentry = state == savedState ? _world.get(kR1LN2ReentryKey) + 1 : 0;
+	_world.set(kR1LN2StateKey, state);
+	_world.set(kR1LN2ReentryKey, reentry);
+	bool fromCatapult = _world.get(kPreviousLocationKey) == 10;
 	if (fromCatapult)
-		_world.set("R1LN2CatapultReentry", _world.get("R1LN2CatapultReentry") + 1);
-	int pending = _world.get("R1LN2IntroPending");
-	if (_world.get("R1LN2MoviePending")) {
+		_world.set(kR1LN2CatapultReentryKey, _world.get(kR1LN2CatapultReentryKey) + 1);
+	int pending = _world.get(kR1LN2IntroPendingKey);
+	if (_world.get(kR1LN2MoviePendingKey)) {
 		_inventorPhase = kInventorMovie;
-	} else if (_world.get("R1LN2DeliveryPending")) {
+	} else if (_world.get(kR1LN2DeliveryPendingKey)) {
 		_inventorPhase = kInventorDeliveryWait;
 	} else if (pending == 2) {
 		_inventorPhase = kInventorIntro;
 	} else if (pending || state == 1) {
-		_world.set("R1LN2State", 1);
+		_world.set(kR1LN2StateKey, 1);
 		inventorSpeech();
-	} else if (fromCatapult && _world.get("R1LN2CatapultReentry") == 1) {
-		inventorGroup("kReEnterSpchIDs.10", "iri");
+	} else if (fromCatapult && _world.get(kR1LN2CatapultReentryKey) == 1) {
+		inventorGroup(kReEnterSpchIDs10Key, kIriName);
 	} else if (state == 2 && reentry == 1) {
-		inventorGroup("kReEnterSpchIDs.1", "rri");
+		inventorGroup(kReEnterSpchIDs1Key, kRriName);
 	} else if (state == 3 && reentry == 0) {
-		inventorGroup("kReEnterSpchIDs.2", "si");
+		inventorGroup(kReEnterSpchIDs2Key, kSiName);
 	} else if (state == 4 && reentry == 0) {
-		inventorGroup("kReEnterSpchIDs.3", "siri");
+		inventorGroup(kReEnterSpchIDs3Key, kSiriName);
 	} else if (state == 5) {
-		inventorGroup(reentry == 0 ? "kReEnterSpchIDs.7" : "kReEnterSpchIDs.8", reentry == 0 ? "sii" : "ir");
+		inventorGroup(reentry == 0 ? kReEnterSpchIDs7Key : kReEnterSpchIDs8Key, reentry == 0 ? kSiiName : kIrName);
 	} else {
 		uint choice = _vm.rnd().number(1, 6);
 		if (choice <= 3)
-			inventorGroup(Common::String::format("kReEnterSpchIDs.%u", choice + 3).c_str(), choice == 1 ? "iir" : "ri");
+			inventorGroup(Common::String::format(kReEnterSpchIDsUnsignedIndexKey, choice + 3).c_str(), choice == 1 ? kIirName : kRiName);
 	}
 	return true;
 }
 
 void PageScene::inventorSpeech() {
-	int state = _world.get("R1LN2State");
+	int state = _world.get(kR1LN2StateKey);
 	if (state == 1) {
-		_world.set("R1LN2State", 2);
-		_world.set("R1LN2Reentry", 0);
-		_world.set("talkedToInventor", 1);
-		_world.set("R1LN2IntroPending", 1);
+		_world.set(kR1LN2StateKey, 2);
+		_world.set(kR1LN2ReentryKey, 0);
+		_world.set(kTalkedToInventorKey, 1);
+		_world.set(kR1LN2IntroPendingKey, 1);
 		_inventorPhase = kInventorIntro;
 		_irvinClicks = 0;
-		inventorGroup("kInitialInstrSpchIDs.1", "iirsiriisirirsr");
-		inventorGroup("kInitialInstrSpchIDs.2", "iiisi");
+		inventorGroup(kInitialInstrSpchIDs1Key, kIirsiriisirirsrName);
+		inventorGroup(kInitialInstrSpchIDs2Key, kIiisiName);
 		// The two companions answer in parallel before Irvin's last line.
-		say("reader", _page->number("kInitialInstrSpchIDs.2.7"));
+		say(kReaderName, _page->number(kInitialInstrSpchIDs27Key));
 		if (!_speech.empty())
 			_speech.back().together = true;
-		say("sam", _page->number("kInitialInstrSpchIDs.2.6"));
-		say("irvin", _page->number("kInitialInstrSpchIDs.2.8"));
+		say(kSamName, _page->number(kInitialInstrSpchIDs26Key));
+		say(kIrvinName, _page->number(kInitialInstrSpchIDs28Key));
 	} else if (state == 5) {
-		say("irvin", _page->number("kInstrSpchIDs.5"));
+		say(kIrvinName, _page->number(kInstrSpchIDs5Key));
 	} else {
 		_irvinClicks = _irvinClicks % 3 + 1;
-		const char *actors = "ii";
+		const char *actors = kIiName;
 		if (_irvinClicks == 1)
-			actors = "ris";
+			actors = kRisName;
 		else if (_irvinClicks == 2)
-			actors = "ri";
-		inventorGroup(Common::String::format("kInstrSpchIDs.%u", _irvinClicks + 1).c_str(), actors);
+			actors = kRiName;
+		inventorGroup(Common::String::format(kInstrSpchIDsUnsignedIndexKey, _irvinClicks + 1).c_str(), actors);
 	}
 }
 
 void PageScene::inventorHint(uint item) {
 	if (_highlight)
 		_scene.remove(_highlight);
-	Common::String prefix = Common::String::format("collectibles.%u.", item + 14);
-	_highlight = _scene.add(Common::String::format("r1inventory/%d.ao", _page->number(prefix + "1")), 203);
+	Common::String prefix = Common::String::format(kCollectiblesUnsignedIndexFormat, item + 14);
+	_highlight = _scene.add(Common::String::format(kInventoryAnimationFormat, _page->number(prefix + kInventoryImageField)), 203);
 	if (_highlight) {
 		_highlight->setFrame(2);
 		_highlightDue = _time + 100;
-		_highlight->x = _page->number(prefix + "2");
-		_highlight->y = _page->number(prefix + "3") - _page->number("kChesterYOffset");
+		_highlight->x = _page->number(prefix + kInventoryXField);
+		_highlight->y = _page->number(prefix + kInventoryYField) - _page->number(kChesterYOffsetKey);
 	}
 	static constexpr uint kHintIndices[] = {
 		0,
@@ -147,7 +149,7 @@ void PageScene::inventorHint(uint item) {
 		1,
 		3,
 	};
-	say("irvin", _page->number(Common::String::format("kInitialInstrSpchIDs.3.%u", kHintIndices[item])));
+	say(kIrvinName, _page->number(Common::String::format(kInitialInstrSpchIDs3UnsignedIndexKey, kHintIndices[item])));
 }
 
 void PageScene::updateInventorAmbient(uint32 time) {
@@ -189,8 +191,8 @@ void PageScene::updateInventor(uint32 time) {
 	}
 	switch (_inventorPhase) {
 	case kInventorIntro:
-		_world.set("R1LN2IntroPending", 2);
-		_world.set("ShowInventoryOutlines", 1);
+		_world.set(kR1LN2IntroPendingKey, 2);
+		_world.set(kShowInventoryOutlinesKey, 1);
 		openChest();
 		_inventorPhase = kInventorChestWait;
 		break;
@@ -214,29 +216,30 @@ void PageScene::updateInventor(uint32 time) {
 		_inventorPhase = kInventorCloseWait;
 		break;
 	case kInventorCloseWait:
-		say("sam", _page->number("kInitialInstrSpchIDs.3.6"));
+		say(kSamName, _page->number(kInitialInstrSpchIDs36Key));
 		_inventorPhase = kInventorOutro;
 		break;
 	case kInventorOutro:
-		_world.set("R1LN2IntroPending", 0);
+		_world.set(kR1LN2IntroPendingKey, 0);
 		_inventorPhase = kInventorIdle;
 		break;
 	case kInventorDeliveryWait: {
-		uint item = _world.get("R1LN2DeliveryPending");
+		uint item = _world.get(kR1LN2DeliveryPendingKey);
 		if (item < 1 || 3 < item) {
 			_inventorPhase = kInventorIdle;
 			break;
 		}
-		_world.set(Common::String("R1LN2") + partName(item) + "Delivered", 1);
+		_world.set(Common::String(kR1LN2Key) + partName(item) + kDeliveredKey, 1);
 		_parts[item - 1]->visible = true;
-		static const char *const kPrefixes[] = {
+		static constexpr const char *kPrefixes[] = {
 			"",
-			"Bands",
-			"Hoop",
-			"Pillow",
+			kBandsName,
+			kHoopName,
+			kPillowName,
 		};
 		const char *prefix = kPrefixes[item];
-		speeches(Common::String("k") + prefix + "CharID", Common::String("k") + prefix + "SpchID", _page->number(Common::String("kNum") + prefix + "Spch"));
+		speeches(Common::String(kConstantPrefix) + prefix + kCharIDName, Common::String(kConstantPrefix) + prefix + kSpchIDName,
+			_page->number(Common::String(kNumKey) + prefix + kSpchName));
 		_inventorPhase = kInventorDeliverySpeech;
 		break;
 	}
@@ -245,17 +248,17 @@ void PageScene::updateInventor(uint32 time) {
 		_inventorPhase = kInventorMoreItems;
 		break;
 	case kInventorMoreItems: {
-		_world.set("R1LN2DeliveryPending", 0);
+		_world.set(kR1LN2DeliveryPendingKey, 0);
 		bool complete = true;
 		for (uint item = 1; item <= 3; item++)
 			complete &= _parts[item - 1]->visible;
 		_inventorPhase = complete ? kInventorMovie : kInventorIdle;
 		if (complete) {
 			for (uint item = 1; item <= 3; item++) {
-				_world.set(Common::String::format("item:%u", item), 1);
-				_world.set(Common::String("R1LN2") + partName(item) + "Delivered", 0);
+				_world.set(Common::String::format(kItemUnsignedIndexKey, item), 1);
+				_world.set(Common::String(kR1LN2Key) + partName(item) + kDeliveredKey, 0);
 			}
-			_world.set("R1LN2MoviePending", 1);
+			_world.set(kR1LN2MoviePendingKey, 1);
 		}
 		break;
 	}
@@ -266,20 +269,21 @@ void PageScene::updateInventor(uint32 time) {
 
 void PageScene::inventorMoreItems() {
 	uint delivered = 0;
-	for (auto *part : _parts)
+	for (auto *part : _parts) {
 		if (part->visible)
 			delivered += 1;
+	}
 	if (delivered == 3) {
-		speeches("kItemsCharIDs.2", "kItemsSpchIDs.2", _page->number("kNumItemSpch.2"));
+		speeches(kItemsCharIDs2Key, kItemsSpchIDs2Key, _page->number(kNumItemSpch2Key));
 		return;
 	}
-	say(_page->text("kItemsCharIDs.1.1"), _page->number("kItemsSpchIDs.1.1"));
+	say(_page->text(kItemsCharIDs11Key), _page->number(kItemsSpchIDs11Key));
 	uint words = 0;
 	for (uint item : {2U, 1U, 3U}) {
 		if (_parts[item - 1]->visible)
 			continue;
 		if (words == 1 && delivered == 1) {
-			say(_page->text("kItemsCharIDs.1.5"), _page->number("kItemsSpchIDs.1.5"));
+			say(_page->text(kItemsCharIDs15Key), _page->number(kItemsSpchIDs15Key));
 			words += 1;
 		}
 		uint index = 4;
@@ -287,21 +291,21 @@ void PageScene::inventorMoreItems() {
 			index = 2;
 		else if (item == 1)
 			index = 3;
-		Common::String suffix = Common::String::format(".1.%u", index);
-		say(_page->text("kItemsCharIDs" + suffix), _page->number("kItemsSpchIDs" + suffix));
+		Common::String suffix = Common::String::format(k1UnsignedIndexFormat, index);
+		say(_page->text(kItemsCharIDsKey + suffix), _page->number(kItemsSpchIDsKey + suffix));
 		words += 1;
 	}
 }
 
 void PageScene::inventorDrop(uint item) {
 	interrupt();
-	Common::String key = Common::String::format("item:%u", item);
-	if (item < 1 || 3 < item || !_world.get(key) || _world.get(Common::String("R1LN2") + partName(item) + "Delivered")) {
-		say(_page->text("kNoUseCharID"), _page->number("kNoUseSpchID"));
+	Common::String key = Common::String::format(kItemUnsignedIndexKey, item);
+	if (item < 1 || 3 < item || !_world.get(key) || _world.get(Common::String(kR1LN2Key) + partName(item) + kDeliveredKey)) {
+		say(_page->text(kNoUseCharIDKey), _page->number(kNoUseSpchIDKey));
 		return;
 	}
 	_world.set(key, _world.get(key) - 1);
-	_world.set("R1LN2DeliveryPending", item);
+	_world.set(kR1LN2DeliveryPendingKey, item);
 	closeChest();
 	_inventorPhase = kInventorDeliveryWait;
 	_inventorTimerStarted = false;
@@ -315,37 +319,37 @@ void PageScene::inventorIdle(uint32 time) {
 		_idleWaiting = true;
 		return;
 	}
-	if (time - _idleStart < static_cast<uint>(_page->number("gIdleHelpTime")))
+	if (time - _idleStart < static_cast<uint>(_page->number(kGIdleHelpTimeName)))
 		return;
 	interrupt();
 	_idleWaiting = false;
-	if (_world.get("R1LN2State") == 5)
-		say("reader", _page->number("kIdleSpchIDs.3"));
+	if (_world.get(kR1LN2StateKey) == 5)
+		say(kReaderName, _page->number(kIdleSpchIDs3Key));
 	else if (_vm.rnd().number(1, 2) == 1)
-		inventorGroup("kIdleSpchIDs.1", "rs");
+		inventorGroup(kIdleSpchIDs1Key, kRsName);
 	else
-		inventorGroup("kIdleSpchIDs.2", "srs");
+		inventorGroup(kIdleSpchIDs2Key, kSrsName);
 }
 
 Common::String PageScene::inventorClick(Common::Point point) {
 	for (const auto &actor : _actors) {
 		if (!actor._value->bounds().contains(point))
 			continue;
-		if (actor._key == "irvin")
+		if (actor._key.equals(kIrvinName))
 			inventorSpeech();
-		else if (actor._key == "paige")
-			say("paige", _page->number(_world.get("R1LN2State") == 5 ? "kHelpSpchIDs.2" : "kHelpSpchIDs.1"));
+		else if (actor._key.equals(kPaigeName))
+			say(kPaigeName, _page->number(_world.get(kR1LN2StateKey) == 5 ? kHelpSpchIDs2Key : kHelpSpchIDs1Key));
 		else {
 			_mainClicks = _mainClicks % 3 + 1;
-			const char *actors = "sr";
+			const char *actors = kSrName;
 			if (_mainClicks == 1)
-				actors = "rs";
+				actors = kRsName;
 			else if (_mainClicks == 2)
-				actors = "srs";
-			inventorGroup(Common::String::format("kMainSpchIDs.%u", _mainClicks).c_str(), actors);
+				actors = kSrsName;
+			inventorGroup(Common::String::format(kMainSpchIDsUnsignedIndexKey, _mainClicks).c_str(), actors);
 		}
 		_idleWaiting = false;
-		return "handled";
+		return kHandledName;
 	}
 	return Common::String();
 }

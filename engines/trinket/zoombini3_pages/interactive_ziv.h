@@ -35,22 +35,50 @@ namespace Zoombini3 {
 /** Native island decorations, inhabitants and visibility-margin updates. */
 class ZIVMachine : public Shell::MultiTrinket {
 public:
+	/** Connect the interactive village display to its scene and horizontal scroller. */
 	ZIVMachine(Shell::Scene &scene, Shell::Scroller &scroller, uint32 time);
+	/** Remove village animations and stop tracking them for scrolling. */
 	~ZIVMachine() override;
-	bool play(const Common::String &method, const Core::ScriptArguments &arguments, Core::ScriptValue &result) override;
+	/** Dispatch village population setup and playback-control script methods. */
+	bool play(const Common::String &method, const Core::ScriptArguments &sargs, Core::ScriptValue &result) override;
+	/** Advance village animations and periodically cull off-screen activity. */
 	void update(uint32 time);
+	/** Return whether a required village resource failed to load. */
 	bool hasResourceError() const { return !_valid; }
 
 private:
+	/** Script method name for pause Round. */
+	static constexpr const char *kMethodPauseRound = "pauseRound";
+	/** Script method name for resume Round. */
+	static constexpr const char *kMethodResumeRound = "resumeRound";
+	/** Script method name for setup Game. */
+	static constexpr const char *kMethodSetupGame = "setupGame";
+
+	/** Animation path pattern for village close-up resources. */
 	static constexpr const char *kAnimation = "/z3v3cd/%u.ao";
+	/** Scene displaying village characters and ambient animations. */
 	Shell::Scene &_scene;
+	/** Horizontal scroller used by the village panorama. */
 	Shell::Scroller &_scroller;
-	Common::Array<Shell::Sprite *> _ambient, _animations, _pausedAnimations;
+	/** Ambient animation sprites displayed in the village. */
+	Common::Array<Shell::Sprite *> _ambient;
+	/** Character and population animation sprites in the current village setup. */
+	Common::Array<Shell::Sprite *> _animations;
+	/** Animations to resume after the village is unpaused. */
+	Common::Array<Shell::Sprite *> _pausedAnims;
+	/** Source-time millisecond deadline for off-screen culling, retained across pause. */
 	uint32 _cullTime;
-	bool _paused = false, _valid = true;
+	/** Whether village animations are paused. */
+	bool _paused = false;
+	/** Whether required village resources and setup are valid. */
+	bool _valid = true;
+	/** Build the village display for the supplied character count. */
 	bool setup(uint tokens, uint32 time);
+	/** Create a village animation with optional off-screen culling and repeat count. */
 	bool addAnimation(uint id, bool cull, int repeat = -1);
+	/** Remove the current population animation sprites. */
 	void clearAnimations();
+	/** Pause or resume active village animations. */
 	void pause(bool paused);
 };
 

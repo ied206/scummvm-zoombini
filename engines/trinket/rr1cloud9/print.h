@@ -21,8 +21,17 @@ namespace RR1Cloud9 {
 /** Portable image output for the original report and picture-book print commands. */
 class Print {
 public:
+	/** Export the supplied print image as a numbered BMP in the screenshot directory. */
 	static bool save(const Graphics::Surface &image);
+	/** Render a flipbook contact sheet and export it as a print image. */
 	static bool book(const Artwork &artwork, const OM::ResourceProvider &resources, int book);
+private:
+	/** Printed page filename indexed by target and sequence number. */
+	static constexpr const char *kFileNameFormat = "%s-print-%04u.bmp";
+	/** ScummVM directory setting used for printed pages. */
+	static constexpr const char *kScreenshotPathOption = "screenshotpath";
+
+
 };
 
 } // End of namespace RR1Cloud9

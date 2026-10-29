@@ -10,12 +10,38 @@
 
 #include "common/ptr.h"
 #include "trinket/ompp/xml.h"
+#include "trinket/string_parser.h"
 
 namespace Trinket {
 namespace Shell {
 
+constexpr const char *Character::kEventFinished;
+constexpr const char *Character::kPropertyRegisterFidgetsToSettle;
+constexpr const char *Character::kPropertyRegisterSpeechToSettle;
+constexpr const char *Character::kPropertyRegisterAnimsToSettle;
+constexpr const char *Character::kPropertyLoadSpeechAnimsInBkgd;
+constexpr const char *Character::kPropertyLoadFidgetsInBkgd;
+constexpr const char *Character::kPropertyVisible;
+constexpr const char *Character::kPropertyX;
+constexpr const char *Character::kPropertyY;
+constexpr const char *Character::kPropertyZ;
+constexpr const char *Character::kCHORName;
+constexpr const char *Character::kFPSName;
+constexpr const char *Character::kXMLCHORWAVESOUND;
+constexpr const char *Character::kIDName;
+constexpr const char *Character::kCHORANIMName;
+constexpr const char *Character::kPropertyCHORANIMSEQFRAMES;
+constexpr const char *Character::kMethodAddFidgetGroup;
+constexpr const char *Character::kMethodAddFidget;
+constexpr const char *Character::kMethodSetSpeechAnims;
+constexpr const char *Character::kMethodPlaySpeech;
+constexpr const char *Character::kMethodPlayAnim;
+constexpr const char *Character::kMethodStop;
+constexpr const char *Character::kMethodPause;
+constexpr const char *Character::kMethodResume;
+
 Character::Character(Scene &scene, Audio::Mixer &mixer, const OM::ResourceProvider &provider, Random &random, const Resources &resources) : _scene(scene), _provider(provider), _random(random), _resources(resources), _voice(mixer) {
-	addEvent("finished");
+	addEvent(kEventFinished);
 }
 
 Character::~Character() {
@@ -77,50 +103,50 @@ Common::Rect Character::bounds() const {
 	return Common::Rect(_settle->x, _settle->y, _settle->x + _settle->width(), _settle->y + _settle->height());
 }
 
-bool Character::get(const Common::String &property, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
+bool Character::get(const Common::String &property, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
 	bool value;
-	if (property == "registerFidgetsToSettle")
-		value = _registerFidgets;
-	else if (property == "registerSpeechToSettle")
-		value = _registerSpeech;
-	else if (property == "registerAnimsToSettle")
-		value = _registerAnims;
-	else if (property == "loadSpeechAnimsInBkgd")
-		value = _loadSpeechInBackground;
-	else if (property == "loadFidgetsInBkgd")
-		value = _loadFidgetsInBackground;
+	if (property.equals(kPropertyRegisterFidgetsToSettle))
+		value = _regFidgets;
+	else if (property.equals(kPropertyRegisterSpeechToSettle))
+		value = _regSpeech;
+	else if (property.equals(kPropertyRegisterAnimsToSettle))
+		value = _regAnims;
+	else if (property.equals(kPropertyLoadSpeechAnimsInBkgd))
+		value = _loadSpeechBg;
+	else if (property.equals(kPropertyLoadFidgetsInBkgd))
+		value = _loadFidgetsBg;
 	else
-		return MultiTrinket::get(property, arguments, result);
+		return MultiTrinket::get(property, sargs, result);
 	result = Core::ScriptValue(static_cast<int32>(value));
 	return true;
 }
 
-bool Character::set(const Common::String &property, const Core::ScriptArguments &arguments, const Core::ScriptValue &value) {
-	if (property == "registerFidgetsToSettle")
-		_registerFidgets = value.integer() != 0;
-	else if (property == "registerSpeechToSettle")
-		_registerSpeech = value.integer() != 0;
-	else if (property == "registerAnimsToSettle")
-		_registerAnims = value.integer() != 0;
-	else if (property == "loadSpeechAnimsInBkgd")
-		_loadSpeechInBackground = value.integer() != 0;
-	else if (property == "loadFidgetsInBkgd")
-		_loadFidgetsInBackground = value.integer() != 0;
-	else if (property == "visible")
-		setVisible(value.integer() != 0);
-	else if (property == "x" || property == "y" || property == "z") {
-		int dx = property == "x" ? value.integer() - x : 0;
-		int dy = property == "y" ? value.integer() - y : 0;
-		int dz = property == "z" ? value.integer() - z : 0;
+bool Character::set(const Common::String &property, const Core::ScriptArguments &sargs, const Core::ScriptValue &value) {
+	if (property.equals(kPropertyRegisterFidgetsToSettle))
+		_regFidgets = value.toInt32() != 0;
+	else if (property.equals(kPropertyRegisterSpeechToSettle))
+		_regSpeech = value.toInt32() != 0;
+	else if (property.equals(kPropertyRegisterAnimsToSettle))
+		_regAnims = value.toInt32() != 0;
+	else if (property.equals(kPropertyLoadSpeechAnimsInBkgd))
+		_loadSpeechBg = value.toInt32() != 0;
+	else if (property.equals(kPropertyLoadFidgetsInBkgd))
+		_loadFidgetsBg = value.toInt32() != 0;
+	else if (property.equals(kPropertyVisible))
+		setVisible(value.toInt32() != 0);
+	else if (property.equals(kPropertyX) || property.equals(kPropertyY) || property.equals(kPropertyZ)) {
+		int dx = property.equals(kPropertyX) ? value.toInt32() - x : 0;
+		int dy = property.equals(kPropertyY) ? value.toInt32() - y : 0;
+		int dz = property.equals(kPropertyZ) ? value.toInt32() - z : 0;
 		for (uint i = 0; i < _owned.size(); i++) {
 			_owned[i]->x += dx;
 			_owned[i]->y += dy;
 			if (dz)
 				_scene.setDepth(_owned[i], _owned[i]->z + dz);
 		}
-		return MultiTrinket::set(property, arguments, value);
+		return MultiTrinket::set(property, sargs, value);
 	} else
-		return MultiTrinket::set(property, arguments, value);
+		return MultiTrinket::set(property, sargs, value);
 	return true;
 }
 
@@ -146,7 +172,7 @@ bool Character::addFidget(uint groupTag, uint resource, bool hideSettle) {
 		FidgetGroup &group = _groups[i];
 		if (group.tag != groupTag)
 			continue;
-		Sprite *sprite = loadAnimation(resource, 1, _registerFidgets);
+		Sprite *sprite = loadAnimation(resource, 1, _regFidgets);
 		if (!sprite)
 			return false;
 		sprite->visible = false;
@@ -190,9 +216,10 @@ void Character::updateFidgets() {
 			_fidget->visible = true;
 			if (group.repeat) {
 				group.available.remove_at(choice);
-				if (group.available.empty())
+				if (group.available.empty()) {
 					for (uint j = 0; j < group.sprites.size(); j++)
 						group.available.push_back(j);
+				}
 			}
 		}
 		break;
@@ -205,15 +232,15 @@ void Character::clearSpeechParts() {
 	_parts.clear();
 }
 
-bool Character::setSpeechAnims(const Core::ScriptArguments &arguments) {
-	if (arguments.size() % 3 || _mode == kPartsSpeech02 || _mode == kChoreography03)
+bool Character::setSpeechAnims(const Core::ScriptArguments &sargs) {
+	if (sargs.size() % 3 || _mode == kPartsSpeech02 || _mode == kChoreography03)
 		return false;
 	clearSpeechParts();
-	for (uint i = 0; i < arguments.size(); i += 3) {
+	for (uint i = 0; i < sargs.size(); i += 3) {
 		SpeechPart part;
-		part.resource = arguments[i].integer();
-		part.enabled = arguments[i + 2].integer() != 0;
-		part.sprite = loadAnimation(part.resource, arguments[i + 1].integer(), _registerSpeech);
+		part.resource = sargs[i].toInt32();
+		part.enabled = sargs[i + 2].toInt32() != 0;
+		part.sprite = loadAnimation(part.resource, sargs[i + 1].toInt32(), _regSpeech);
 		if (!part.sprite)
 			return false;
 		part.sprite->visible = false;
@@ -252,7 +279,7 @@ bool Character::playSpeechParts(uint resource) {
 		if (source.size() < 2)
 			return false;
 		Common::Array<Core::Animation::Step> steps;
-		Core::Animation::Step command = {0, 0, -4, 0};
+		Core::Animation::Step command = {Common::Point(), -4, 0};
 		steps.push_back(command);
 		Core::Animation::Step base = source[1];
 		base.picture = 0;
@@ -311,33 +338,42 @@ bool Character::playChoreography(uint resource) {
 	if (!parser.loadStream(stream.release()) || !parser.parse())
 		error("Could not load character choreography");
 	const Common::Array<OM::XMLParser::Element> &elements = parser.elements();
-	if (elements.empty() || elements[0].path != "CHOR")
+	if (elements.empty() || !elements[0].path.equals(kCHORName))
 		return false;
-	uint fps = atoi(elements[0].attributes.getValOrDefault("FPS").c_str());
-	if (!fps || 1000 < fps)
+	Common::String fpsText = elements[0].attrs.getValOrDefault(kFPSName);
+	uint32 fps = 0;
+	if (StringParser::parseUnsignedInt(fpsText.c_str(), fps, StringParser::kDecimalProfile) != StringParser::Result::kSuccess || !fps || 1000 < fps)
 		error("Invalid character choreography FPS");
 	_chorInterval = 1000 / fps;
-	uint sound = 0;
+	uint32 sound = 0;
 	for (uint i = 1; i < elements.size(); i++) {
-		if (elements[i].path == "CHOR/WAVESOUND")
-			sound = atoi(elements[i].attributes.getValOrDefault("ID").c_str());
-		if (elements[i].path != "CHOR/ANIM")
+		if (elements[i].path.equals(kXMLCHORWAVESOUND)) {
+			Common::String soundText = elements[i].attrs.getValOrDefault(kIDName);
+			if (StringParser::parseUnsignedInt(soundText.c_str(), sound, StringParser::kDecimalProfile) != StringParser::Result::kSuccess)
+				return false;
+		}
+		if (!elements[i].path.equals(kCHORANIMName))
 			continue;
-		uint id = atoi(elements[i].attributes.getValOrDefault("ID").c_str());
+		Common::String idText = elements[i].attrs.getValOrDefault(kIDName);
+		uint32 id = 0;
+		if (StringParser::parseUnsignedInt(idText.c_str(), id, StringParser::kDecimalProfile) != StringParser::Result::kSuccess)
+			return false;
 		ChorPart part;
-		for (uint j = 0; j < _parts.size(); j++)
+		for (uint j = 0; j < _parts.size(); j++) {
 			if (_parts[j].resource == id) {
 				part.sprite = _parts[j].sprite;
 				break;
 			}
+		}
 		if (!part.sprite)
 			part.sprite = loadAnimation(id, 0, false);
 		if (!part.sprite)
 			continue;
-		Common::String frames = parser.get("CHOR/ANIM/SEQ/FRAMES");
-		for (uint j = i + 1; j < elements.size() && static_cast<int>(i) <= elements[j].parent; j++)
-			if (elements[j].path == "CHOR/ANIM/SEQ/FRAMES")
+		Common::String frames = parser.get(kPropertyCHORANIMSEQFRAMES);
+		for (uint j = i + 1; j < elements.size() && static_cast<int>(i) <= elements[j].parent; j++) {
+			if (elements[j].path.equals(kPropertyCHORANIMSEQFRAMES))
 				frames = elements[j].value;
+		}
 		const char *cursor = frames.c_str();
 		while (*cursor) {
 			while (*cursor && Common::isSpace(*cursor))
@@ -390,9 +426,9 @@ void Character::stop() {
 	_listener = nullptr;
 	if (!isBusy())
 		return;
-	if (_animation) {
-		remove(_animation);
-		_animation = nullptr;
+	if (_anim) {
+		remove(_anim);
+		_anim = nullptr;
 	}
 	for (uint i = 0; i < _parts.size(); i++) {
 		_parts[i].sprite->stopAnimation();
@@ -406,9 +442,9 @@ void Character::stop() {
 }
 
 void Character::finish() {
-	if (_animation) {
-		remove(_animation);
-		_animation = nullptr;
+	if (_anim) {
+		remove(_anim);
+		_anim = nullptr;
 	}
 	for (uint i = 0; i < _parts.size(); i++) {
 		_parts[i].sprite->pauseAnimation(true);
@@ -418,7 +454,7 @@ void Character::finish() {
 	_mode = kIdle00;
 	restoreSettle();
 	Core::ScriptableObject::Lifetime lifetime(*this);
-	emitEvent("finished");
+	emitEvent(kEventFinished);
 	if (!lifetime.isAlive())
 		return;
 	complete();
@@ -445,7 +481,7 @@ void Character::playSpeech(uint resource, CompletionListener *listener) {
 	finishFidget();
 	_listener = listener;
 	_keepVisible = true;
-	_speechResource = resource;
+	_speechRes = resource;
 	if (playChoreography(resource) || playSpeechParts(resource))
 		return;
 	_mode = kDirectSpeech01;
@@ -466,15 +502,15 @@ void Character::playAnim(uint resource, int repeat, bool keepVisible, Completion
 	finishFidget();
 	_listener = listener;
 	_keepVisible = keepVisible;
-	_animation = loadAnimation(resource, 0, _registerAnims);
-	if (!_animation) {
+	_anim = loadAnimation(resource, 0, _regAnims);
+	if (!_anim) {
 		if (_listener)
 			_listener->characterFinished(*this);
 		return;
 	}
-	_animation->startAnimation(repeat);
-	_animation->setPauseListener(&_speechLink);
-	_animation->visible = visible;
+	_anim->startAnimation(repeat);
+	_anim->setPauseListener(&_speechLink);
+	_anim->visible = visible;
 	_mode = kExplicitAnimation04;
 	if (_settle)
 		_settle->visible = false;
@@ -487,14 +523,16 @@ void Character::setVisible(bool shown) {
 	visible = shown;
 	if (_settle)
 		_settle->visible = shown && (_mode == kIdle00 || _mode == kDirectSpeech01);
-	if (_animation)
-		_animation->visible = shown;
-	if (_mode == kPartsSpeech02)
+	if (_anim)
+		_anim->visible = shown;
+	if (_mode == kPartsSpeech02) {
 		for (uint i = 0; i < _parts.size(); i++)
 			_parts[i].sprite->visible = shown;
-	if (_mode == kChoreography03)
+	}
+	if (_mode == kChoreography03) {
 		for (uint i = 0; i < _chor.size(); i++)
 			_chor[i].sprite->visible = shown;
+	}
 }
 
 void Character::pause(bool paused, uint32 time) {
@@ -506,13 +544,14 @@ void Character::pause(bool paused, uint32 time) {
 	else if (_mode == kChoreography03)
 		_chorDeadline += time - _pauseTime;
 	_voice.pause(paused);
-	if (_animation)
-		_animation->pauseAnimation(paused);
+	if (_anim)
+		_anim->pauseAnimation(paused);
 	if (_fidget)
 		_fidget->pauseAnimation(paused);
-	if (_mode == kPartsSpeech02)
+	if (_mode == kPartsSpeech02) {
 		for (uint i = 0; i < _parts.size(); i++)
 			_parts[i].sprite->pauseAnimation(paused);
+	}
 }
 
 void Character::update(uint32 time, Common::Array<uint16> &sounds) {
@@ -548,7 +587,7 @@ void Character::update(uint32 time, Common::Array<uint16> &sounds) {
 		if (!lifetime.isAlive())
 			return;
 		for (uint j = 0; j < childSounds.size(); j++) {
-			if (_mode == kPartsSpeech02 && childSounds[j] == _speechResource)
+			if (_mode == kPartsSpeech02 && childSounds[j] == _speechRes)
 				_voice.play(_provider, _resources.characterResource(childSounds[j], Resources::kSound), Audio::Mixer::kSpeechSoundType);
 			else
 				sounds.push_back(childSounds[j]);
@@ -556,32 +595,31 @@ void Character::update(uint32 time, Common::Array<uint16> &sounds) {
 	}
 }
 
-bool Character::play(const Common::String &method, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
+bool Character::play(const Common::String &method, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
 	_time = callTime();
-	if (method == "addFidgetGroup" && (arguments.size() == 3 || arguments.size() == 4))
-		return addFidgetGroup(arguments[0].integer(), arguments[1].integer(), arguments[2].integer(),
-							  arguments.size() == 3 || arguments[3].integer() != 0);
-	if (method == "addFidget" && (arguments.size() == 2 || arguments.size() == 3))
-		return addFidget(arguments[0].integer(), arguments[1].integer(), arguments.size() == 2 || arguments[2].integer() != 0);
-	if (method == "setSpeechAnims")
-		return setSpeechAnims(arguments);
-	if (method == "playSpeech" && !arguments.empty() && arguments.size() <= 3) {
-		playSpeech(arguments[0].integer());
+	if (method.equals(kMethodAddFidgetGroup) && (sargs.size() == 3 || sargs.size() == 4))
+		return addFidgetGroup(sargs[0].toInt32(), sargs[1].toInt32(), sargs[2].toInt32(), sargs.size() == 3 || sargs[3].toInt32() != 0);
+	if (method.equals(kMethodAddFidget) && (sargs.size() == 2 || sargs.size() == 3))
+		return addFidget(sargs[0].toInt32(), sargs[1].toInt32(), sargs.size() == 2 || sargs[2].toInt32() != 0);
+	if (method.equals(kMethodSetSpeechAnims))
+		return setSpeechAnims(sargs);
+	if (method.equals(kMethodPlaySpeech) && !sargs.empty() && sargs.size() <= 3) {
+		playSpeech(sargs[0].toInt32());
 		return true;
 	}
-	if (method == "playAnim" && !arguments.empty() && arguments.size() <= 3) {
-		playAnim(arguments[0].integer(), 1 < arguments.size() ? arguments[1].integer() : 1,
-				 arguments.size() < 3 || arguments[2].integer() != 0);
+	if (method.equals(kMethodPlayAnim) && !sargs.empty() && sargs.size() <= 3) {
+		playAnim(sargs[0].toInt32(), 1 < sargs.size() ? sargs[1].toInt32() : 1,
+				 sargs.size() < 3 || sargs[2].toInt32() != 0);
 		return true;
 	}
-	if (arguments.empty() && (method == "stop" || method == "pause" || method == "resume")) {
-		if (method == "stop")
+	if (sargs.empty() && (method.equals(kMethodStop) || method.equals(kMethodPause) || method.equals(kMethodResume))) {
+		if (method.equals(kMethodStop))
 			stop();
 		else
-			pause(method == "pause", _time);
+			pause(method.equals(kMethodPause), _time);
 		return true;
 	}
-	return MultiTrinket::play(method, arguments, result);
+	return MultiTrinket::play(method, sargs, result);
 }
 
 } // namespace Shell

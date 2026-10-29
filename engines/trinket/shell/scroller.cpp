@@ -13,6 +13,8 @@
 namespace Trinket {
 namespace Shell {
 
+constexpr const char *Scroller::kPropertyX;
+
 Scroller::Scroller(Scene &scene, const Common::Rect &viewport, int edgeWidth) : _scene(scene), _viewport(viewport), _edgeWidth(edgeWidth), _mouseX(viewport.left + viewport.width() / 2) {
 	assert(!viewport.isEmpty() && 0 <= edgeWidth && edgeWidth <= viewport.width() / 2);
 }
@@ -34,19 +36,21 @@ void Scroller::stop() {
 }
 
 void Scroller::add(Core::Trinket &trinket) {
-	for (uint i = 0; i < _trinkets.size(); i++)
+	for (uint i = 0; i < _trinkets.size(); i++) {
 		if (_trinkets[i] == &trinket)
 			return;
+	}
 	trinket.addObserver(*this);
 	_trinkets.push_back(&trinket);
 }
 
 void Scroller::objectDestroyed(Core::ScriptableObject &object) {
-	for (uint i = 0; i < _trinkets.size(); i++)
+	for (uint i = 0; i < _trinkets.size(); i++) {
 		if (_trinkets[i] == &object) {
 			_trinkets.remove_at(i);
 			return;
 		}
+	}
 }
 
 void Scroller::event(const Common::Event &event) {
@@ -79,7 +83,7 @@ void Scroller::update(uint32 time) {
 	if (direction != _direction)
 		_lastTime = time;
 	_direction = direction;
-	int distance = static_cast<int32>(static_cast<double>(static_cast<int32>(time - _lastTime)) * 0.001 * kSpeed);
+	int distance = static_cast<int32>(static_cast<double>(static_cast<int32>(time - _lastTime)) * 0.001f * kSpeed);
 	if (!distance)
 		return;
 	int offset = CLIP(_offset + direction * distance, 0, _maximum);
@@ -87,10 +91,10 @@ void Scroller::update(uint32 time) {
 	_offset = offset;
 	_lastTime = time;
 	_scene.setScrollX(offset);
-	Core::ScriptArguments arguments;
+	Core::ScriptArguments sargs;
 	for (uint i = 0; i < _trinkets.size(); i++) {
 		Core::Trinket &trinket = *_trinkets[i];
-		trinket.set("x", arguments, Core::ScriptValue(trinket.x + translation));
+		trinket.set(kPropertyX, sargs, Core::ScriptValue(trinket.x + translation));
 		Common::Rect bounds(trinket.x, trinket.y, trinket.x + trinket.width(), trinket.y + trinket.height());
 		trinket.visible = bounds.intersects(_viewport);
 	}

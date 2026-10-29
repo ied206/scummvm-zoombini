@@ -23,15 +23,14 @@
 
 #include "common/config-manager.h"
 #include "common/util.h"
+#include "trinket/metaengine.h"
 
 namespace Trinket {
 namespace Shell {
 
-constexpr const char *Random::kPrngAlgorithmOption;
-
 Random::PrngAlgorithm Random::getPrngAlgorithm(const Common::String &domain) {
-	const int prngAlgorithmVal = ConfMan.getInt(kPrngAlgorithmOption, domain);
-	const PrngAlgorithm prngAlgorithm = static_cast<PrngAlgorithm>(prngAlgorithmVal);
+	const int prngAlgoVal = ConfMan.getInt(TrinketMetaEngine::kOptionPrngAlgorithm, domain);
+	const PrngAlgorithm prngAlgorithm = static_cast<PrngAlgorithm>(prngAlgoVal);
 	if (prngAlgorithm == PrngAlgorithm::kStandardPrng)
 		return prngAlgorithm;
 	return PrngAlgorithm::kOriginalPrng;

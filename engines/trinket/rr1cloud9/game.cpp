@@ -26,6 +26,7 @@
 #include "common/debug.h"
 #include "common/system.h"
 #include "common/translation.h"
+#include "trinket/metaengine.h"
 #include "trinket/rr1cloud9/credits.h"
 #include "trinket/rr1cloud9/options.h"
 #include "trinket/rr1cloud9/print.h"
@@ -35,27 +36,79 @@
 namespace Trinket {
 namespace RR1Cloud9 {
 
+constexpr const char *Game::kGoCommandPrefix;
+constexpr const char *Game::kNavigationName;
+constexpr const char *Game::kR1EndingPendingKey;
+constexpr const char *Game::kIsBackgroundMusicOffKey;
+constexpr const char *Game::kTlclogoBikPath;
+constexpr const char *Game::kR1mvop1BikPath;
+constexpr const char *Game::kRr1titleBikPath;
+constexpr const char *Game::kR1mvop2BikPath;
+constexpr const char *Game::kR1mvshipdownBikPath;
+constexpr const char *Game::kRr1mvcqBikPath;
+constexpr const char *Game::kR1mvshipupBikPath;
+constexpr const char *Game::kR1mvcl1BikPath;
+constexpr const char *Game::kR1mvdemoBikPath;
+constexpr const char *Game::kR1mvclosingBikPath;
+constexpr const char *Game::kMovie0Key;
+constexpr const char *Game::kMovie1Key;
+constexpr const char *Game::kMovie2Key;
+constexpr const char *Game::kMovie3Key;
+constexpr const char *Game::kMovie4Key;
+constexpr const char *Game::kMovie5Key;
+constexpr const char *Game::kR1CN3MoviePendingKey;
+constexpr const char *Game::kR1LN2MoviePendingKey;
+constexpr const char *Game::kBackgroundIDKey;
+constexpr const char *Game::kPreviousLocationKey;
+constexpr const char *Game::kR1CN3FromStreetKey;
+constexpr const char *Game::kBackgroundMusicIDKey;
+constexpr const char *Game::kBackgroundMusicIDs1Key;
+constexpr const char *Game::kMovieClosingKey;
+constexpr const char *Game::kR1EndingSeenKey;
+constexpr const char *Game::kUnsignedIndexFormat;
+constexpr const char *Game::kMapDestScriptName;
+constexpr const char *Game::kPmIconEnabledKey;
+constexpr const char *Game::kMapIconName;
+constexpr const char *Game::kBeenToMapKey;
+constexpr const char *Game::kMapPMSpeechKey;
+constexpr const char *Game::kMapPM1stTimeSpeechKey;
+constexpr const char *Game::kMapName;
+constexpr const char *Game::kR1endName;
+constexpr const char *Game::kR1CN4ExitPendingKey;
+constexpr const char *Game::kR1LG2ExitPendingKey;
+constexpr const char *Game::kR1CN2ExitPendingKey;
+constexpr const char *Game::kCacheName;
+
+constexpr const char *Game::kPageBackgroundFormat;
+constexpr const char *Game::kPageMusicFormat;
+constexpr const char *Game::kMapAnimationFormat;
+constexpr const char *Game::kMapSpeechFormat;
+constexpr const char *Game::kMapCloseButton;
+constexpr const char *Game::kMapPreviousButton;
+constexpr const char *Game::kMapNextButton;
+constexpr const char *Game::kMapBackground;
+
 const char *const Game::kPages[] = {
-	"r1cn1",
-	"r1cn2",
-	"r1cn3",
-	"r1cn4",
-	"r1ca1",
-	"r1ca2",
-	"r1cg1",
-	"r1cg2",
-	"r1ln2",
-	"r1lg2",
-	"r1la1",
-	"r1la2",
-	"r1la3",
-	"r1in1",
-	"r1in4",
-	"r1ig1",
-	"r1ia1",
-	"r1ia2",
-	"r1ia3",
-	"r1rss",
+	Page::kPageCN1,
+	Page::kPageCN2,
+	Page::kPageCN3,
+	Page::kPageCN4,
+	Page::kPageCA1,
+	Page::kPageCA2,
+	Page::kPageCG1,
+	Page::kPageCG2,
+	Page::kPageLN2,
+	Page::kPageLG2,
+	Page::kPageLA1,
+	Page::kPageLA2,
+	Page::kPageLA3,
+	Page::kPageIN1,
+	Page::kPageIN4,
+	Page::kPageIG1,
+	Page::kPageIA1,
+	Page::kPageIA2,
+	Page::kPageIA3,
+	Page::kPageRSS,
 };
 
 Game::Game(TrinketEngine &vm) : _vm(vm), _scene(vm.resources()), _mapScene(vm.resources()), _mapVoice(vm.mixer()), _presentation(vm, _scene, _world) {}
@@ -67,7 +120,7 @@ Game::~Game() {
 
 int Game::pageIndex(const Common::String &name) {
 	for (uint i = 0; i < ARRAYSIZE(kPages); i++) {
-		if (name == kPages[i])
+		if (name.equals(kPages[i]))
 			return i + 1;
 	}
 	return 0;
@@ -88,39 +141,44 @@ bool Game::prepareState(Common::SeekableReadStream *save, const Common::String &
 	_arrivalPending = !playerName.empty() && !save;
 	_practice = false;
 	_world.reset();
-	_sound = {ConfMan.getInt("music_volume"), ConfMan.getInt("sfx_volume"), ConfMan.getInt("speech_volume"), ConfMan.getBool("mute")};
+	_sound = {ConfMan.getInt(TrinketMetaEngine::kOptionMusicVolume), ConfMan.getInt(TrinketMetaEngine::kOptionSfxVolume),
+			   ConfMan.getInt(TrinketMetaEngine::kOptionSpeechVolume), ConfMan.getBool(TrinketMetaEngine::kOptionMute)};
 	if (!save)
 		return true;
+	return readSave(*save, _location, _sound, _arrivalPending, _world);
+}
+
+bool Game::readSave(Common::SeekableReadStream &save, int &location, SoundSettings &sound, bool &arrivalPending, World &world) {
 	// This portable story checkpoint is independent of native World serialization.
-	if (save->readUint32BE() != MKTAG('R', '1', 'C', '9'))
+	if (save.readUint32BE() != MKTAG('R', '1', 'C', '9'))
 		return false;
-	uint version = save->readUint16LE();
+	uint version = save.readUint16LE();
 	if (version < 1 || 4 < version)
 		return false;
-	_location = save->readUint16LE();
-	_sound.music = save->readUint16LE();
-	_sound.effects = save->readUint16LE();
-	_sound.speech = save->readUint16LE();
-	_sound.mute = save->readByte() != 0;
+	location = save.readUint16LE();
+	sound.music = save.readUint16LE();
+	sound.effects = save.readUint16LE();
+	sound.speech = save.readUint16LE();
+	sound.mute = save.readByte() != 0;
 	if (2 <= version) {
-		uint pending = save->readByte();
+		uint pending = save.readByte();
 		if (1 < pending)
 			return false;
-		_arrivalPending = pending != 0;
+		arrivalPending = pending != 0;
 	}
-	if (3 <= version && !_world.load(*save))
+	if (3 <= version && !world.load(save))
 		return false;
-	if (4 <= version && !_world.artwork.load(*save))
+	if (4 <= version && !world.artwork.load(save))
 		return false;
-	return !save->err() && !save->eos() && 1 <= _location && _location <= static_cast<int>(ARRAYSIZE(kPages)) &&
-		   _sound.music <= Audio::Mixer::kMaxMixerVolume && _sound.effects <= Audio::Mixer::kMaxMixerVolume &&
-		   _sound.speech <= Audio::Mixer::kMaxMixerVolume;
+	return !save.err() && !save.eos() && 1 <= location && location <= static_cast<int>(ARRAYSIZE(kPages)) &&
+		   sound.music <= Audio::Mixer::kMaxMixerVolume && sound.effects <= Audio::Mixer::kMaxMixerVolume &&
+		   sound.speech <= Audio::Mixer::kMaxMixerVolume;
 }
 
 bool Game::prepareBoot(int bootParam) {
 	if (bootParam < 1 || static_cast<int>(ARRAYSIZE(kPages)) < bootParam)
 		return false;
-	prepareState(nullptr, "Navigation");
+	prepareState(nullptr, kNavigationName);
 	_location = bootParam;
 	_arrivalPending = false;
 	return true;
@@ -132,7 +190,7 @@ bool Game::startPrepared(bool fresh, bool fromLauncher) {
 		return startMovie(kLogo);
 	if (_arrivalPending)
 		return startMovie(kArrival);
-	if (_world.get("R1EndingPending"))
+	if (_world.get(kR1EndingPendingKey))
 		return startEnding();
 	return enterPage(_location);
 }
@@ -143,7 +201,7 @@ uint Game::musicVolume() const {
 }
 
 void Game::applySoundSettings() {
-	_vm.music().setEnabled(!_sound.mute && !_world.get("isBackgroundMusicOff"));
+	_vm.music().setEnabled(!_sound.mute && !_world.get(kIsBackgroundMusicOffKey));
 	_vm.music().setVolume(musicVolume());
 	_movie.setVolume(_sound.mute ? 0 : MIN(_sound.speech, 255));
 	_vm.mixer().setVolumeForSoundType(Audio::Mixer::kSpeechSoundType, _sound.mute ? 0 : _sound.speech);
@@ -171,18 +229,18 @@ bool Game::save(Common::WriteStream &stream) const {
 bool Game::startMovie(MovieStage stage) {
 	if (stage == kReplay && !_options)
 		return false;
-	static const char *const filenames[] = {
+	static constexpr const char *filenames[] = {
 		"",
-		"tlclogo.bik",
-		"r1mvop1.bik",
-		"rr1title.bik",
-		"r1mvop2.bik",
-		"r1mvshipdown.bik",
-		"rr1mvcq.bik",
-		"r1mvshipup.bik",
-		"r1mvcl1.bik",
-		"r1mvdemo.bik",
-		"r1mvclosing.bik",
+		kTlclogoBikPath,
+		kR1mvop1BikPath,
+		kRr1titleBikPath,
+		kR1mvop2BikPath,
+		kR1mvshipdownBikPath,
+		kRr1mvcqBikPath,
+		kR1mvshipupBikPath,
+		kR1mvcl1BikPath,
+		kR1mvdemoBikPath,
+		kR1mvclosingBikPath,
 	};
 	_movie.close();
 	_movieFrame.free();
@@ -197,16 +255,16 @@ bool Game::startMovie(MovieStage stage) {
 	_movie.setVolume(_sound.mute ? 0 : MIN(_sound.speech, 255));
 	_movieStage = stage;
 	if (stage == kArrival) {
-		_world.set("movie:0", 1);
-		_world.set("movie:1", 1);
+		_world.set(kMovie0Key, 1);
+		_world.set(kMovie1Key, 1);
 	} else if (stage == kQueen)
-		_world.set("movie:2", 1);
+		_world.set(kMovie2Key, 1);
 	else if (stage == kGalleryDemo)
-		_world.set("movie:3", 1);
+		_world.set(kMovie3Key, 1);
 	else if (stage == kInventor)
-		_world.set("movie:4", 1);
+		_world.set(kMovie4Key, 1);
 	else if (stage == kClosing)
-		_world.set("movie:5", 1);
+		_world.set(kMovie5Key, 1);
 	_movie.start();
 	debug(1, "RR1Cloud9: movie %s started", filename);
 	return true;
@@ -230,13 +288,13 @@ void Game::finishMovie(bool skipToSignin) {
 	} else if (previous == kGalleryDemo) {
 		ready = enterPage(6);
 		if (ready)
-			_world.set("R1CN3MoviePending", 0);
+			_world.set(kR1CN3MoviePendingKey, 0);
 	} else if (previous == kInventor) {
 		ready = enterPage(13);
 		if (ready)
-			_world.set("R1LN2MoviePending", 0);
+			_world.set(kR1LN2MoviePendingKey, 0);
 	} else if (previous == kDescent || previous == kAscent) {
-		ready = enterPage(_movieDestination);
+		ready = enterPage(_movieDest);
 	} else if (previous == kArrival) {
 		ready = enterPage(1);
 		if (ready)
@@ -259,7 +317,7 @@ bool Game::enterPage(int location) {
 	if (!candidate.load(_vm.resources(), name))
 		return false;
 	// Load the new background before releasing the current scene.
-	Common::String background = Common::String::format("%s/%d.bk16", name.c_str(), candidate.number("kBackgroundID"));
+	Common::String background = Common::String::format(kPageBackgroundFormat, name.c_str(), candidate.number(kBackgroundIDKey));
 	Shell::Scene probe(_vm.resources());
 	if (!probe.setBackground(background))
 		return false;
@@ -267,13 +325,13 @@ bool Game::enterPage(int location) {
 	_movieFrame.free();
 	_movieStage = kNoMovie;
 	if (_presentation.active())
-		_world.set("previousLocation", _location);
+		_world.set(kPreviousLocationKey, _location);
 	_presentation.clear();
 	_scene.clear();
 	if (!_scene.setBackground(background))
 		return false;
 	if (location == 3 && _location != 3)
-		_world.set("R1CN3FromStreet", _location != 6);
+		_world.set(kR1CN3FromStreetKey, _location != 6);
 	_page = candidate;
 	_signinUI.reset();
 	if (!_presentation.enter(_page, name, _practice))
@@ -282,15 +340,15 @@ bool Game::enterPage(int location) {
 	_location = location;
 	closeMap();
 	_signin = false;
-	int music = _page.number("kBackgroundMusicID");
-	if (name == "r1in4")
-		music = _page.number("kBackgroundID");
+	int music = _page.number(kBackgroundMusicIDKey);
+	if (name.equals(Page::kPageIN4))
+		music = _page.number(kBackgroundIDKey);
 	if (!music)
-		music = _page.number("kBackgroundMusicIDs.1");
+		music = _page.number(kBackgroundMusicIDs1Key);
 	_vm.music().reset();
-	_vm.music().setEnabled(!_sound.mute && !_world.get("isBackgroundMusicOff"));
+	_vm.music().setEnabled(!_sound.mute && !_world.get(kIsBackgroundMusicOffKey));
 	if (music)
-		_vm.music().start(Common::String::format("%stunz/%d.wav", name.c_str(), music), musicVolume());
+		_vm.music().start(Common::String::format(kPageMusicFormat, name.c_str(), music), musicVolume());
 	debug(1, "RR1Cloud9: page %s ready, %u exits", name.c_str(), _page.exits().size());
 	return true;
 }
@@ -322,8 +380,8 @@ bool Game::showSignin() {
 }
 
 bool Game::startEnding() {
-	_world.set("R1EndingPending", 1);
-	_world.set("movie:closing", 1);
+	_world.set(kR1EndingPendingKey, 1);
+	_world.set(kMovieClosingKey, 1);
 	_location = 15;
 	_presentation.clear();
 	_scene.clear();
@@ -340,8 +398,8 @@ bool Game::showCredits(bool ending) {
 	}
 	_vm.music().setVolume(_sound.music * 100 / Audio::Mixer::kMaxMixerVolume);
 	if (ending) {
-		_world.set("R1EndingPending", 0);
-		_world.set("R1EndingSeen", 1);
+		_world.set(kR1EndingPendingKey, 0);
+		_world.set(kR1EndingSeenKey, 1);
 	}
 	return true;
 }
@@ -368,7 +426,7 @@ void Game::signinRequest(int request) {
 		Common::String name = _signinUI->deletedName();
 		if (!_vm.removeSavedPlayer(name))
 			g_system->displayMessageOnOSD(_("Could not remove all saved game files."));
-		if (_name == name && !_vm.hasGamePlayer(name)) {
+		if (_name.equals(name) && !_vm.hasGamePlayer(name)) {
 			_storyLoaded = false;
 			_world.reset();
 			_name.clear();
@@ -381,34 +439,51 @@ void Game::signinEvent(const Common::Event &event) {
 	signinRequest(_signinUI->event(event, _time));
 }
 
+void Game::setMapIconColors(Shell::Sprite &icon, int resource) {
+	using Region = OM::Canvas::ColorRemapRegion;
+	using Source = OM::Canvas::ColorSource;
+	if (resource == 4322) {
+		icon.colorRemapRegions.push_back(Region(Common::Rect(43, 0, 70, 26), PageScene::marbleColor(3), Source::kGreenDominant));
+	} else if (resource == 4329) {
+		icon.colorRemapRegions.push_back(Region(Common::Rect(50, 0, 76, 26), PageScene::marbleColor(1), Source::kRedDominant));
+	} else if (resource == 4323) {
+		icon.colorRemapRegions.push_back(Region(Common::Rect(10, 25, 62, 31), PageScene::marbleColor(1)));
+		icon.colorRemapRegions.push_back(Region(Common::Rect(10, 40, 62, 46), PageScene::marbleColor(3)));
+	}
+}
+
 void Game::showMap() {
 	if (_map || _presentation.blocksMap())
 		return;
 	Page mapData;
-	if (!mapData.load(_vm.resources(), "r1main"))
+	if (!mapData.load(_vm.resources(), Page::kPageMAIN))
 		return;
 	_mapScene.clear();
-	if (!_mapScene.add("r1map/4300.ao", 0)) {
+	if (!_mapScene.add(kMapBackground, 0)) {
 		return;
 	}
 	for (uint i = 1; i <= 19; i++) {
-		Common::String suffix = Common::String::format(".%u", i);
-		Common::String destination = mapData.text("mapDestScript" + suffix);
-		bool enabled = _practice ? mapData.number("pmIconEnabled" + suffix) == 1 : _world.visits(destination) > 0;
+		Common::String suffix = Common::String::format(kUnsignedIndexFormat, i);
+		Common::String destination = mapData.text(kMapDestScriptName + suffix);
+		bool enabled = _practice ? mapData.number(kPmIconEnabledKey + suffix) == 1 : _world.visits(destination) > 0;
 		if (!_practice && (_location == 13 || i == 13))
 			enabled = _location == 13 && i == 13;
-		if (enabled)
-			_mapScene.add(Common::String::format("r1map/%d.ao", mapData.number("mapIcon" + suffix)), 1, pageIndex(destination), true);
+		if (enabled) {
+			const int resource = mapData.number(kMapIconName + suffix);
+			Shell::Sprite *icon = _mapScene.add(Common::String::format(kMapAnimationFormat, resource), 1, pageIndex(destination), true);
+			if (icon)
+				setMapIconColors(*icon, resource);
+		}
 	}
-	_mapScene.add("r1map/1853.ao", 2, 21, true);
-	_mapScene.add("r1map/4001.ao", 2, 22, true);
-	_mapScene.add("r1map/4002.ao", 2, 23, true);
+	_mapScene.add(kMapCloseButton, 2, 21, true);
+	_mapScene.add(kMapPreviousButton, 2, 22, true);
+	_mapScene.add(kMapNextButton, 2, 23, true);
 	_map = true;
 	_presentation.pause(true, _time);
 	if (_practice) {
-		int speech = mapData.number(_world.get("beenToMap") ? "mapPMSpeech" : "mapPM1stTimeSpeech");
-		_world.set("beenToMap", 1);
-		_mapVoice.play(_vm.resources(), Common::String::format("r1map/%d.wav", speech), Audio::Mixer::kSpeechSoundType);
+		int speech = mapData.number(_world.get(kBeenToMapKey) ? kMapPMSpeechKey : kMapPM1stTimeSpeechKey);
+		_world.set(kBeenToMapKey, 1);
+		_mapVoice.play(_vm.resources(), Common::String::format(kMapSpeechFormat, speech), Audio::Mixer::kSpeechSoundType);
 	}
 	debug(1, "RR1Cloud9: map ready");
 }
@@ -426,18 +501,18 @@ bool Game::showOptions() {
 		return false;
 	}
 	_optionsMusic = _vm.music().resource();
-	_optionsMusicVolume = _vm.music().volume();
+	_optionsMusicVol = _vm.music().volume();
 	return true;
 }
 
 void Game::restoreOptionsMusic() {
-	_vm.music().start(_optionsMusic, _optionsMusicVolume);
-	_vm.music().setEnabled(!_sound.mute && !_world.get("isBackgroundMusicOff"));
+	_vm.music().start(_optionsMusic, _optionsMusicVol);
+	_vm.music().setEnabled(!_sound.mute && !_world.get(kIsBackgroundMusicOffKey));
 }
 
 void Game::optionsEvent(const Common::Event &event) {
 	Options::Request request = _options->event(event);
-	_vm.music().setEnabled(!_sound.mute && !_world.get("isBackgroundMusicOff"));
+	_vm.music().setEnabled(!_sound.mute && !_world.get(kIsBackgroundMusicOffKey));
 	if (request == Options::kNone)
 		return;
 	_options->stopSound();
@@ -476,7 +551,7 @@ void Game::optionsEvent(const Common::Event &event) {
 	}
 }
 
-bool Game::takeReturnToLauncherRequest() {
+bool Game::takeQuitRequest() {
 	bool requested = _return;
 	_return = false;
 	return requested;
@@ -600,7 +675,7 @@ void Game::event(const Common::Event &event) {
 	}
 	Common::String action = _presentation.click(event.mouse);
 	if (!action.empty()) {
-		if (action == "map")
+		if (action.equals(kMapName))
 			showMap();
 		return;
 	}
@@ -611,8 +686,8 @@ void Game::event(const Common::Event &event) {
 			continue;
 		int destination = pageIndex(exit.destination);
 		if (destination) {
-			if ((_location == 1 && exit.destination == "r1in4") || (_location == 15 && exit.destination == "r1cn1")) {
-				_movieDestination = destination;
+			if ((_location == 1 && exit.destination.equals(Page::kPageIN4)) || (_location == 15 && exit.destination.equals(Page::kPageCN1))) {
+				_movieDest = destination;
 				_presentation.pause(true, _time);
 				if (!startMovie(_location == 1 ? kDescent : kAscent))
 					_return = true;
@@ -669,7 +744,7 @@ void Game::draw(OM::Canvas &canvas, uint32 time) {
 	}
 	_presentation.update(time);
 	if (!_presentation.destination().empty()) {
-		if (_presentation.destination() == "r1end") {
+		if (_presentation.destination().equals(kR1endName)) {
 			if (!startEnding())
 				_return = true;
 			return;
@@ -677,16 +752,16 @@ void Game::draw(OM::Canvas &canvas, uint32 time) {
 		if (!enterPage(pageIndex(_presentation.destination())))
 			_return = true;
 		else {
-			_world.set("R1CN4ExitPending", 0);
-			_world.set("R1LG2ExitPending", 0);
+			_world.set(kR1CN4ExitPendingKey, 0);
+			_world.set(kR1LG2ExitPendingKey, 0);
 		}
 		return;
 	}
 	if (_presentation.wantsQueenExit()) {
-		if (!enterPage(pageIndex("r1cn3")))
+		if (!enterPage(pageIndex(Page::kPageCN3)))
 			_return = true;
 		else
-			_world.set("R1CN2ExitPending", 0);
+			_world.set(kR1CN2ExitPendingKey, 0);
 		return;
 	}
 	if (_presentation.wantsGalleryMovie()) {
@@ -719,9 +794,14 @@ void Game::draw(OM::Canvas &canvas, uint32 time) {
 }
 
 Common::String Game::debugPageCommand(const Common::String &command) {
-	if (command.hasPrefix("go "))
+	if (command.equals(kCacheName)) {
+		OM::FontCache &fonts = _vm.fonts();
+		return "Page: " + _scene.cacheDescription() + "\nMap: " + _mapScene.cacheDescription() +
+			Common::String::format("\nFonts: retained=%u decodes=%" PRIu64 " hits=%" PRIu64 "\n", fonts.size(), fonts.decodes(), fonts.hits());
+	}
+	if (command.hasPrefix(kGoCommandPrefix))
 		return enterPage(pageIndex(command.substr(3))) ? "Page entered.\n" : "Unknown or unavailable page.\n";
-	if (command == "map") {
+	if (command.equals(kMapName)) {
 		if (!_signin)
 			showMap();
 		return "Map requested.\n";

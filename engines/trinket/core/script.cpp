@@ -21,8 +21,15 @@
 
 #include "trinket/core/script.h"
 
+#include "trinket/string_parser.h"
+
 namespace Trinket {
 namespace Core {
+
+constexpr const char *Script::kSYSTEMName;
+constexpr const char *Script::kRECEIVERName;
+constexpr const char *Script::kRESULTName;
+constexpr const char *Script::kWINName;
 
 bool Script::readString(Common::SeekableReadStream &stream, bool bigEndian, Common::String &value) {
 	int32 length = readInt(stream, bigEndian);
@@ -39,19 +46,19 @@ bool Script::readString(Common::SeekableReadStream &stream, bool bigEndian, Comm
 bool Script::load(Common::SeekableReadStream &stream) {
 	_instructions.clear();
 	_operands.clear();
-	_variables.clear();
-	byte flag = stream.readByte();
-	if (flag != 1 && flag != 2)
+	_vars.clear();
+	byte byteOrder = stream.readByte();
+	if (byteOrder != kByteOrder01_BigEndian && byteOrder != kByteOrder02_LittleEndian)
 		return false;
-	bool bigEndian = flag == 1;
+	bool bigEndian = byteOrder == kByteOrder01_BigEndian;
 	uint32 count = readInt(stream, bigEndian);
 	if (count > (stream.size() - stream.pos()) / 3)
 		return false;
 	for (uint32 i = 0; i < count; i++) {
-		Instruction instruction;
-		instruction.opcode = stream.readByte();
-		instruction.operand = readShort(stream, bigEndian);
-		_instructions.push_back(instruction);
+		Instruction inst;
+		inst.opcode = stream.readByte();
+		inst.operand = readShort(stream, bigEndian);
+		_instructions.push_back(inst);
 	}
 	count = readInt(stream, bigEndian);
 	if (count > (stream.size() - stream.pos()) / 2)
@@ -61,48 +68,50 @@ bool Script::load(Common::SeekableReadStream &stream) {
 	count = readInt(stream, bigEndian);
 	if (count < 3 || 32768 < count || count - 3 > (stream.size() - stream.pos()) / 36)
 		return false;
-	_variables.resize(count);
-	_variables[0].name = "SYSTEM";
-	_variables[1].name = "RECEIVER";
-	_variables[2].name = "RESULT";
-	_variables[0].type = _variables[1].type = _variables[2].type = 2;
-	_variables[0].extra = "WIN";
-	_variables[0].indirect = 1;
-	_variables[1].indirect = -1;
+	_vars.resize(count);
+	_vars[0].name = kSYSTEMName;
+	_vars[1].name = kRECEIVERName;
+	_vars[2].name = kRESULTName;
+	_vars[0].type = _vars[1].type = _vars[2].type = 2;
+	_vars[0].extra = kWINName;
+	_vars[0].indirect = 1;
+	_vars[1].indirect = -1;
 	for (uint32 i = 3; i < count; i++) {
-		Variable &variable = _variables[i];
-		variable.classification = readInt(stream, bigEndian);
-		variable.type = readInt(stream, bigEndian);
-		if (variable.type == 3) {
-			variable.integer = readInt(stream, bigEndian);
-		} else if (variable.type == 4) {
+		Variable &var = _vars[i];
+		var.classification = readInt(stream, bigEndian);
+		var.type = readInt(stream, bigEndian);
+		if (var.type == 3) {
+			var.integer = readInt(stream, bigEndian);
+		} else if (var.type == 4) {
 			int16 length = readShort(stream, bigEndian);
 			if (length < 0 || stream.size() - stream.pos() < length)
 				return false;
+			Common::String text;
 			for (int j = 0; j < length; j++)
-				variable.real += static_cast<char>(stream.readByte());
-		} else if (variable.type < 0 || 4 < variable.type) {
+				text += static_cast<char>(stream.readByte());
+			var.real = StringParser::parseDoublePrefix(text.c_str());
+		} else if (var.type < 0 || 4 < var.type) {
 			return false;
 		}
-		variable.range = readInt(stream, bigEndian);
-		variable.reference = readInt(stream, bigEndian);
-		variable.count = readInt(stream, bigEndian);
-		variable.indirect = readInt(stream, bigEndian);
-		if (!readString(stream, bigEndian, variable.name) || !readString(stream, bigEndian, variable.extra))
+		var.range = readInt(stream, bigEndian);
+		var.reference = readInt(stream, bigEndian);
+		var.count = readInt(stream, bigEndian);
+		var.indirect = readInt(stream, bigEndian);
+		if (!readString(stream, bigEndian, var.name) || !readString(stream, bigEndian, var.extra))
 			return false;
 		int32 size = readInt(stream, bigEndian);
 		if (size < -1 || stream.size() - stream.pos() < static_cast<int64>(size) * 2)
 			return false;
 		for (int32 j = 0; j < size; j++)
-			variable.array.push_back(readShort(stream, bigEndian));
+		var.array.push_back(readShort(stream, bigEndian));
 	}
 	return !stream.err() && !stream.eos() && stream.pos() == stream.size();
 }
 
 const Script::Variable *Script::find(const Common::String &name) const {
-	for (uint i = 0; i < _variables.size(); i++) {
-		if (_variables[i].name == name)
-			return &_variables[i];
+	for (uint i = 0; i < _vars.size(); i++) {
+		if (_vars[i].name.equals(name))
+			return &_vars[i];
 	}
 	return nullptr;
 }

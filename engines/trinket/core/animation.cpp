@@ -37,13 +37,13 @@ bool AnimationPlayer::start(const Animation &animation, uint sequence, int repea
 		first += 1;
 	if (first == steps.size())
 		return false;
-	_animation = &animation;
+	_anim = &animation;
 	_steps = steps;
 	_fps = animation.fps();
 	_position = steps[0].picture == -4 ? 1 : 0;
 	_picture = steps[first].picture;
-	_picturePosition = first;
-	_offset = Common::Point(steps[first].x, steps[first].y);
+	_picPos = first;
+	_offset = steps[first].offset;
 	_repeat = repeat;
 	_deadline = 0;
 	_state = kPlaying01;
@@ -51,14 +51,14 @@ bool AnimationPlayer::start(const Animation &animation, uint sequence, int repea
 }
 
 bool AnimationPlayer::replaceSequence(const Common::Array<Animation::Step> &steps) {
-	if (!_animation || steps.empty())
+	if (!_anim || steps.empty())
 		return false;
 	bool hasPicture = false;
 	for (uint i = 0; i < steps.size(); i++) {
 		if (steps[i].picture == -1)
 			break;
 		if (0 <= steps[i].picture) {
-			if (_animation->frameCount() <= static_cast<uint>(steps[i].picture))
+			if (_anim->frameCount() <= static_cast<uint>(steps[i].picture))
 				return false;
 			hasPicture = true;
 		}
@@ -71,7 +71,7 @@ bool AnimationPlayer::replaceSequence(const Common::Array<Animation::Step> &step
 }
 
 void AnimationPlayer::insertSequenceEntry(uint position, const Animation::Step &step) {
-	if (!_animation || lastSequencePosition() < position)
+	if (!_anim || lastSequencePosition() < position)
 		return;
 	_steps.insert_at(position, step);
 	if (position <= _position)
@@ -79,7 +79,7 @@ void AnimationPlayer::insertSequenceEntry(uint position, const Animation::Step &
 }
 
 void AnimationPlayer::removeSequenceEntry(uint position) {
-	if (!_animation || lastSequencePosition() <= position)
+	if (!_anim || lastSequencePosition() <= position)
 		return;
 	_steps.remove_at(position);
 	if (position < _position)
@@ -96,7 +96,7 @@ void AnimationPlayer::pause(bool paused) {
 }
 
 uint AnimationPlayer::lastSequencePosition() const {
-	if (!_animation)
+	if (!_anim)
 		return 0;
 	const Common::Array<Animation::Step> &steps = _steps;
 	uint position = 0;
@@ -106,7 +106,7 @@ uint AnimationPlayer::lastSequencePosition() const {
 }
 
 void AnimationPlayer::setFrame(int frame) {
-	if (!_animation || frame <= 0)
+	if (!_anim || frame <= 0)
 		return;
 	const Common::Array<Animation::Step> &steps = _steps;
 	uint last = lastSequencePosition();
@@ -122,15 +122,15 @@ void AnimationPlayer::setFrame(int frame) {
 		position -= 1;
 	_position = position;
 	if (0 <= steps[position].picture) {
-		_picturePosition = position;
+		_picPos = position;
 		_picture = steps[position].picture;
-		_offset = Common::Point(steps[position].x, steps[position].y);
+		_offset = steps[position].offset;
 	}
 	_state = kPaused02;
 }
 
 uint AnimationPlayer::getFrame() const {
-	if (!_animation)
+	if (!_anim)
 		return 0;
 	const Common::Array<Animation::Step> &steps = _steps;
 	uint frame = 0;
@@ -142,7 +142,7 @@ uint AnimationPlayer::getFrame() const {
 }
 
 uint AnimationPlayer::getNumberOfFrames() const {
-	if (!_animation)
+	if (!_anim)
 		return 0;
 	const Common::Array<Animation::Step> &steps = _steps;
 	uint count = 0;
@@ -157,7 +157,7 @@ uint AnimationPlayer::getNumberOfFrames() const {
 
 uint AnimationPlayer::displayedFrame() const {
 	uint frame = 0;
-	for (uint i = 0; i <= _picturePosition && i < _steps.size(); i++) {
+	for (uint i = 0; i <= _picPos && i < _steps.size(); i++) {
 		if (0 <= _steps[i].picture)
 			frame += 1;
 	}
@@ -165,7 +165,7 @@ uint AnimationPlayer::displayedFrame() const {
 }
 
 bool AnimationPlayer::update(uint32 time, Common::Array<uint16> &sounds) {
-	if (!_animation || _state != kPlaying01 || (_deadline && static_cast<int32>(time - _deadline) < 0))
+	if (!_anim || _state != kPlaying01 || (_deadline && static_cast<int32>(time - _deadline) < 0))
 		return true;
 	const Common::Array<Animation::Step> &steps = _steps;
 	if (steps.size() <= _position) {
@@ -188,9 +188,9 @@ bool AnimationPlayer::update(uint32 time, Common::Array<uint16> &sounds) {
 			break;
 		const Animation::Step &step = steps[_position];
 		if (0 <= step.picture) {
-			_picturePosition = _position;
+			_picPos = _position;
 			_picture = step.picture;
-			_offset = Common::Point(step.x, step.y);
+			_offset = step.offset;
 			if (_state == kPlaying01)
 				_position += 1;
 			return true;
@@ -249,6 +249,7 @@ uint32 Animation::readUint32(uint32 offset) const {
 }
 
 bool Animation::load(Common::SeekableReadStream &stream) {
+	clearPictures();
 	_hasPalette = false;
 	_pictures.clear();
 	_sequences.clear();
@@ -289,8 +290,8 @@ bool Animation::load(Common::SeekableReadStream &stream) {
 		Common::Array<Step> sequence;
 		for (int j = 0; j < count; j++) {
 			Step step;
-			step.x = static_cast<int16>(readUint16(pos));
-			step.y = static_cast<int16>(readUint16(pos + 2));
+			step.offset.x = static_cast<int16>(readUint16(pos));
+			step.offset.y = static_cast<int16>(readUint16(pos + 2));
 			step.picture = static_cast<int16>(readUint16(pos + 4));
 			step.duration = static_cast<int16>(readUint16(pos + 6));
 			if (pictures <= step.picture)
@@ -308,7 +309,30 @@ bool Animation::load(Common::SeekableReadStream &stream) {
 	return true;
 }
 
+void Animation::clearPictures() {
+	_decodedPics.clear();
+	_pictureBytes = 0;
+}
+
+const Graphics::Surface *Animation::picture(uint frame) const {
+	if (_pictures.size() <= frame)
+		return nullptr;
+	if (_decodedPics.empty())
+		_decodedPics.resize(_pictures.size());
+	if (_decodedPics[frame]) {
+		_pictureHits += 1;
+		return &_decodedPics[frame]->surface;
+	}
+	Common::SharedPtr<Picture> decoded(new Picture());
+	if (!decode(frame, decoded->surface))
+		return nullptr;
+	_pictureBytes += static_cast<uint64>(decoded->surface.pitch) * decoded->surface.h;
+	_decodedPics[frame] = decoded;
+	return &decoded->surface;
+}
+
 bool Animation::decode(uint frame, Graphics::Surface &surface, const byte *palette) const {
+	_decodeCount += 1;
 	if (!palette && _hasPalette)
 		palette = _palette;
 	if (_pictures.size() <= frame)
@@ -338,7 +362,8 @@ bool Animation::decode(uint frame, Graphics::Surface &surface, const byte *palet
 		}
 		int x = 0;
 		while (x < width) {
-			uint opcode, count;
+			uint opcode;
+			uint count;
 			byte index = 0;
 			if (type == 2) {
 				if (!contains(pos, 4))
@@ -370,7 +395,10 @@ bool Animation::decode(uint frame, Graphics::Surface &surface, const byte *palet
 			if (!count || static_cast<uint>(width - x) < count)
 				return false;
 			for (uint i = 0; i < count; i++) {
-				byte r = 0, g = 0, b = 0, a = 0;
+				byte r = 0;
+				byte g = 0;
+				byte b = 0;
+				byte a = 0;
 				if (opcode && type == 2) {
 					uint bytes = opcode == 2 ? 3 : 2;
 					if (!contains(pos, bytes))
@@ -407,6 +435,7 @@ bool Animation::decode(uint frame, Graphics::Surface &surface, const byte *palet
 bool Animation::loadPalette(Common::SeekableReadStream &stream) {
 	if (stream.size() - stream.pos() != 1536)
 		return false;
+	clearPictures();
 	for (uint i = 0; i < 768; i++) {
 		_palette[i] = stream.readByte();
 		stream.readByte();

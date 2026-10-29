@@ -29,34 +29,93 @@
 namespace Trinket {
 namespace Shell {
 
-/** RCreditText layout and scrolling; the owner handles music and completion links. */
+class Scene;
+
+/** Lay out and scroll credit text and images within a fixed viewport. */
 class CreditText {
 public:
+	/** Configure the visible width and height of scrolling credits. */
 	CreditText(int width, int height);
+	/** Free the rendered credit-content pixels. */
 	~CreditText() { _content.free(); }
+	/** Render XML credit entries using the supplied font and image resources. */
 	bool load(Common::SeekableReadStream &xml, const OM::NFNTFont &font, const OM::ResourceProvider &resources, const char *imagePattern);
+	/** Begin scrolling after a millisecond delay. */
 	void start(uint32 now, uint32 delay);
+	/** Advance scrolling at a millisecond timestamp and report whether it remains active. */
 	bool update(uint32 now);
+	/** Pause scrolling and record the millisecond timestamp. */
 	void pause(uint32 now);
+	/** Resume scrolling while excluding the paused interval from timing. */
 	void resume(uint32 now);
+	/** Draw the visible credit content at a game-pixel position. */
 	void draw(OM::Canvas &canvas, int x, int y) const;
+	/** Return the vertical scrolling position in pixels. */
 	int position() const { return _position; }
+	/** Return the scrolling position at which the credits finish. */
 	int finishPosition() const { return _finish; }
+	/** Return the maximum number of pixels advanced in one update. */
 	int maximumStep() const { return _maximumStep; }
 
 private:
+	/** XML element or attribute name for root Element/Section. */
+	static constexpr const char *kXMLRootElementSection = "Root_Element/Section";
+	/** XML element or attribute name for title. */
+	static constexpr const char *kXMLTitle = "title";
+	/** XML element or attribute name for root Element/Section/member. */
+	static constexpr const char *kXMLRootElementSectionMember = "Root_Element/Section/member";
+	/** XML element or attribute name for name. */
+	static constexpr const char *kXMLName = "name";
+	/** XML element or attribute name for root Element/case1. */
+	static constexpr const char *kXMLRootElementCase1 = "Root_Element/case1";
+	/** XML element or attribute name for root Element/case1/text. */
+	static constexpr const char *kXMLRootElementCase1Text = "Root_Element/case1/text";
+	/** XML element or attribute name for root Element/case1/imgpair. */
+	static constexpr const char *kXMLRootElementCase1Imgpair = "Root_Element/case1/imgpair";
+
 	struct Entry {
-		Common::String text, name;
-		int y = 0, x = 0, image = -1;
+		/** Text displayed by this credit entry. */
+		Common::String text;
+		/** Optional authored entry name used for credit layout. */
+		Common::String name;
+		/** Vertical position of this entry in the scrolling content, in pixels. */
+		int y = 0;
+		/** Horizontal position of this entry in the scrolling content, in pixels. */
+		int x = 0;
+		/** Image resource ID, or minus one for a text-only entry. */
+		int image = -1;
 	};
+	/** Pre-rendered surface containing the complete scrolling credits. */
 	Graphics::Surface _content;
-	int _width, _height;
-	int _position = 0, _finish = 0, _maximumStep = 24;
-	uint32 _deadline = 0, _lastUpdate = 0, _pauseTime = 0;
-	bool _running = false, _paused = false, _started = false;
+	/** Visible credit viewport width in pixels. */
+	int _width;
+	/** Visible credit viewport height in pixels. */
+	int _height;
+	/** Current vertical scroll position in pixels. */
+	int _position = 0;
+	/** Vertical scroll position that ends playback. */
+	int _finish = 0;
+	/** Maximum scrolling distance in pixels per update. */
+	int _maximumStep = 24;
+	/** Millisecond timestamp when the initial delay ends. */
+	uint32 _deadline = 0;
+	/** Millisecond timestamp used to calculate the next scrolling step. */
+	uint32 _lastUpdate = 0;
+	/** Millisecond timestamp when scrolling was paused. */
+	uint32 _pauseTime = 0;
+	/** Whether credit playback remains active. */
+	bool _running = false;
+	/** Whether scrolling is temporarily suspended. */
+	bool _paused = false;
+	/** Whether the initial delay has elapsed and scrolling has begun. */
+	bool _started = false;
+	/** Decode the supported markup within a credit text entry. */
 	static Common::String textContent(const Common::String &source);
-	static bool loadImage(const OM::ResourceProvider &resources, const char *pattern, uint image, Graphics::Surface &surface);
+	/** Copy a cached credit image into the supplied composition surface. */
+	static bool loadImage(Scene &images, const char *pattern, uint image, Graphics::Surface &surface);
+	/** Prevent accidental copies of this stateful object. */
 	CreditText(const CreditText &) = delete;
+	/** Prevent accidental copies of this stateful object. */
 	CreditText &operator=(const CreditText &) = delete;
 };
 

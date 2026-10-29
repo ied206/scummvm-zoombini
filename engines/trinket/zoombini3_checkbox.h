@@ -35,21 +35,37 @@ public:
 		kClicked01 = 1,
 		kClickSound02 = 2,
 	};
+	/** Connect a music checkbox to the options scene. */
 	explicit OptionsCheckbox(Shell::Scene &scene) : _scene(scene) {}
+	/** Remove the checkbox sprite from the scene. */
 	~OptionsCheckbox() { _scene.remove(_sprite); }
+	/** Create the checkbox with its action, initial state and practice-mode appearance. */
 	bool load(int z, int action, bool on, bool practice);
+	/** Handle pointer interaction and report a checkbox state change. */
 	uint event(const Common::Event &event);
+	/** Return whether the checkbox is selected. */
 	bool isOn() const { return _on; }
+	/** Return the checkbox sprite's height in pixels, or zero before loading. */
 	int height() const { return _sprite ? _sprite->height() : 0; }
+	/** Set the selected state and refresh feedback for the current pointer position. */
 	void setOn(bool on, Common::Point pointer);
 
 private:
+	/** Resource path of the options checkbox animation. */
 	static constexpr const char *kAsset = "/z3options/422.ao";
+	/** Scene displaying the checkbox sprite. */
 	Shell::Scene &_scene;
+	/** Sprite whose frame displays checkbox state and pointer feedback. */
 	Shell::Sprite *_sprite = nullptr;
-	bool _on = true, _tracking = false;
+	/** Whether the checkbox is selected. */
+	bool _on = true;
+	/** Whether a pointer press began on this checkbox. */
+	bool _tracking = false;
+	/** Select the sprite frame for the selected and hover states. */
 	void showState(bool hover);
+	/** Prevent accidental copies of this stateful object. */
 	OptionsCheckbox(const OptionsCheckbox &) = delete;
+	/** Prevent accidental copies of this stateful object. */
 	OptionsCheckbox &operator=(const OptionsCheckbox &) = delete;
 };
 

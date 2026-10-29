@@ -24,26 +24,28 @@
 namespace Trinket {
 namespace Zoombini3 {
 
-Shell::Action *AttribChWalkAction::create(Shell::ActionSystem &system, const Core::ScriptArguments &arguments, bool interruptible) {
-	if (arguments.empty() || (4 < arguments.size() && (arguments.size() - 4) % 3) ||
-		!system.resolve(arguments[0], "RAttributeCharacter"))
+constexpr const char *AttribChWalkAction::kRAttributeCharacterName;
+
+Shell::Action *AttribChWalkAction::create(Shell::ActionSystem &system, const Core::ScriptArguments &sargs, bool interruptible) {
+	if (sargs.empty() || (4 < sargs.size() && (sargs.size() - 4) % 3) ||
+		!system.resolve(sargs[0], kRAttributeCharacterName))
 		return nullptr;
-	bool clearPath = arguments.size() < 2 || arguments[1].integer() != 0;
-	bool keepPosition = 2 < arguments.size() && arguments[2].integer() != 0;
-	if (3 < arguments.size())
-		interruptible = arguments[3].integer() != 0;
-	AttribChWalkAction *action = new AttribChWalkAction(system, arguments[0], clearPath, keepPosition, interruptible);
-	for (uint i = 4; i < arguments.size(); i += 3) {
+	bool clearPath = sargs.size() < 2 || sargs[1].toInt32() != 0;
+	bool keepPosition = 2 < sargs.size() && sargs[2].toInt32() != 0;
+	if (3 < sargs.size())
+		interruptible = sargs[3].toInt32() != 0;
+	AttribChWalkAction *action = new AttribChWalkAction(system, sargs[0], clearPath, keepPosition, interruptible);
+	for (uint i = 4; i < sargs.size(); i += 3) {
 		Waypoint waypoint;
-		waypoint.position = Common::Point(arguments[i].integer(), arguments[i + 1].integer());
-		waypoint.absolute = arguments[i + 2].integer() != 0;
+		waypoint.position = Common::Point(sargs[i].toInt32(), sargs[i + 1].toInt32());
+		waypoint.absolute = sargs[i + 2].toInt32() != 0;
 		action->_waypoints.push_back(waypoint);
 	}
 	return action;
 }
 
 AttributeCharacter *AttribChWalkAction::target() const {
-	return static_cast<AttributeCharacter *>(_system.resolve(_target, "RAttributeCharacter"));
+	return static_cast<AttributeCharacter *>(_system.resolve(_target, kRAttributeCharacterName));
 }
 
 AttribChWalkAction::~AttribChWalkAction() {

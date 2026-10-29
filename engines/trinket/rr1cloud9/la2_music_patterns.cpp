@@ -27,6 +27,146 @@
 namespace Trinket {
 namespace RR1Cloud9 {
 
+constexpr const char *MusicPatterns::kNameSignedIndexFormat;
+constexpr const char *MusicPatterns::kUnsignedIndexFormat;
+constexpr const char *MusicPatterns::kKNameCharIDsSignedIndexFormat;
+constexpr const char *MusicPatterns::kKNameSpchIDsSignedIndexFormat;
+constexpr const char *MusicPatterns::kPropertyGrid;
+constexpr const char *MusicPatterns::kLocalKey;
+constexpr const char *MusicPatterns::kPropertyZ;
+constexpr const char *MusicPatterns::kGridZKey;
+constexpr const char *MusicPatterns::kPropertyAnimateSettled;
+constexpr const char *MusicPatterns::kR1LA2LevelKey;
+constexpr const char *MusicPatterns::kR1LA2DatasetKey;
+constexpr const char *MusicPatterns::kR1LA2CountKey;
+constexpr const char *MusicPatterns::kR1LA2StateKey;
+constexpr const char *MusicPatterns::kR1LA2PillowHereKey;
+constexpr const char *MusicPatterns::kR1LA2MarbleSignedIndexCountKey;
+constexpr const char *MusicPatterns::kDoorIDSignedIndexKey;
+constexpr const char *MusicPatterns::kDoorZKey;
+constexpr const char *MusicPatterns::kColumnLightsIDKey;
+constexpr const char *MusicPatterns::kColumnLightXKey;
+constexpr const char *MusicPatterns::kColumnLightDeltaXKey;
+constexpr const char *MusicPatterns::kColumnLightYKey;
+constexpr const char *MusicPatterns::kLockIDKey;
+constexpr const char *MusicPatterns::kLockZKey;
+constexpr const char *MusicPatterns::kGridXKey;
+constexpr const char *MusicPatterns::kGridDeltaXKey;
+constexpr const char *MusicPatterns::kGridYKey;
+constexpr const char *MusicPatterns::kGridDeltaYKey;
+constexpr const char *MusicPatterns::kButtonIDKey;
+constexpr const char *MusicPatterns::kDoorLightsIDKey;
+constexpr const char *MusicPatterns::kActivateDoorIDKey;
+constexpr const char *MusicPatterns::kSpinIDKey;
+constexpr const char *MusicPatterns::kSpinZKey;
+constexpr const char *MusicPatterns::kPillowIDKey;
+constexpr const char *MusicPatterns::kPillowZKey;
+constexpr const char *MusicPatterns::kJewelIDKey;
+constexpr const char *MusicPatterns::kJewelZKey;
+constexpr const char *MusicPatterns::kSparkleIDKey;
+constexpr const char *MusicPatterns::kTrayMaskIDKey;
+constexpr const char *MusicPatterns::kTrayMaskZKey;
+constexpr const char *MusicPatterns::kSparkleDeltaYKey;
+constexpr const char *MusicPatterns::kJewelDeltaYKey;
+constexpr const char *MusicPatterns::kReEnterSpchIDs41Key;
+constexpr const char *MusicPatterns::kLocalSpchIDs411Key;
+constexpr const char *MusicPatterns::kLocalName;
+constexpr const char *MusicPatterns::kLocalCharIDs16Key;
+constexpr const char *MusicPatterns::kLocalSpchIDs18Key;
+constexpr const char *MusicPatterns::kMaxLightsKey;
+constexpr const char *MusicPatterns::kReaderName;
+constexpr const char *MusicPatterns::kReEnterSpchIDs31Key;
+constexpr const char *MusicPatterns::kReEnterSpchIDsSignedIndexSignedIndexKey;
+constexpr const char *MusicPatterns::kSamName;
+constexpr const char *MusicPatterns::kReEnterSpchIDs42Key;
+constexpr const char *MusicPatterns::kReEnterSpchIDs51Key;
+constexpr const char *MusicPatterns::kReEnterSpchIDs61Key;
+constexpr const char *MusicPatterns::kPropertyDataSetLevelSignedIndexWordListSignedIndexSet1;
+constexpr const char *MusicPatterns::kNumGivenKey;
+constexpr const char *MusicPatterns::kMarbleIDSignedIndexKey;
+constexpr const char *MusicPatterns::kMarbleZKey;
+constexpr const char *MusicPatterns::kMarbleDeltaZKey;
+constexpr const char *MusicPatterns::kMarbleXKey;
+constexpr const char *MusicPatterns::kMarbleDeltaXKey;
+constexpr const char *MusicPatterns::kMarbleYKey;
+constexpr const char *MusicPatterns::kMarbleDeltaYKey;
+constexpr const char *MusicPatterns::kINV1Marble1Key;
+constexpr const char *MusicPatterns::kItemUnsignedIndexFormat;
+constexpr const char *MusicPatterns::kSceneSfxIDKey;
+constexpr const char *MusicPatterns::kGoHomeSfxIDKey;
+constexpr const char *MusicPatterns::kSnapSfxIDKey;
+constexpr const char *MusicPatterns::kColumnLightBadIDKey;
+constexpr const char *MusicPatterns::kMarbleSingFrameKey;
+constexpr const char *MusicPatterns::kMarbleIDKey;
+constexpr const char *MusicPatterns::kBlankSfxIDKey;
+constexpr const char *MusicPatterns::kMarbleEyeCloseFrameKey;
+constexpr const char *MusicPatterns::kWrongSpchIDsSignedIndexKey;
+constexpr const char *MusicPatterns::kSceneCharIDs2Key;
+constexpr const char *MusicPatterns::kSceneSpchIDs2Key;
+constexpr const char *MusicPatterns::kNoMoveSpchIDSignedIndexKey;
+constexpr const char *MusicPatterns::kR1LA2StreakKindKey;
+constexpr const char *MusicPatterns::kR1LA2StreakKey;
+constexpr const char *MusicPatterns::kAutolevelDownCountKey;
+constexpr const char *MusicPatterns::kAutolevelUpCountKey;
+constexpr const char *MusicPatterns::kR1LA2Key;
+constexpr const char *MusicPatterns::kR1LA2FixedLevelKey;
+constexpr const char *MusicPatterns::kHaveSpch11Key;
+constexpr const char *MusicPatterns::kGChesterOpenIDName;
+constexpr const char *MusicPatterns::kGClosedChesterZName;
+constexpr const char *MusicPatterns::kItemSignedIndexKey;
+constexpr const char *MusicPatterns::kHaveSpch21Key;
+constexpr const char *MusicPatterns::kHaveSpch31Key;
+constexpr const char *MusicPatterns::kHaveSpch22Key;
+constexpr const char *MusicPatterns::kHaveSpch32Key;
+constexpr const char *MusicPatterns::kSceneSpchIDs1SignedIndexKey;
+constexpr const char *MusicPatterns::kEmptyGridSfxIDKey;
+constexpr const char *MusicPatterns::kCongratsSpchIDSignedIndexKey;
+constexpr const char *MusicPatterns::kDoorSfxID1Key;
+constexpr const char *MusicPatterns::kDoorSfxID2Key;
+constexpr const char *MusicPatterns::kDoorOpenName;
+constexpr const char *MusicPatterns::kFanFareSfxIDKey;
+constexpr const char *MusicPatterns::kLastDoorCharIDsKey;
+constexpr const char *MusicPatterns::kLastDoorSpchIDsKey;
+constexpr const char *MusicPatterns::kDoorOpenCharIDs4SignedIndexKey;
+constexpr const char *MusicPatterns::kDoorOpenSpchIDs4Key;
+constexpr const char *MusicPatterns::kNewPatternSfxIDKey;
+constexpr const char *MusicPatterns::kIdleSignedIndexKey;
+constexpr const char *MusicPatterns::kCharIDSignedIndexFormat;
+constexpr const char *MusicPatterns::kSpchIDSignedIndexFormat;
+constexpr const char *MusicPatterns::kPaigeName;
+constexpr const char *MusicPatterns::kPaigeSpchIDs2SignedIndexKey;
+constexpr const char *MusicPatterns::kPaigeSpchIDs3Key;
+constexpr const char *MusicPatterns::kPaigeSpchIDs42Key;
+constexpr const char *MusicPatterns::kPaigeSpchIDs411Key;
+constexpr const char *MusicPatterns::kPaigeSpchIDs412Key;
+constexpr const char *MusicPatterns::kPaigeSpchIDs413Key;
+constexpr const char *MusicPatterns::kWrongSfxIDKey;
+constexpr const char *MusicPatterns::kPlayName;
+constexpr const char *MusicPatterns::kPickUpSfxIDKey;
+constexpr const char *MusicPatterns::kCOMSoftClickSfxIDKey;
+constexpr const char *MusicPatterns::kDoorClkSpchIDs4Key;
+constexpr const char *MusicPatterns::kLocalSpchIDs31Key;
+constexpr const char *MusicPatterns::kLocalSpchIDs32Key;
+constexpr const char *MusicPatterns::kDoorClkName;
+constexpr const char *MusicPatterns::kMaxDoorClkSpchKey;
+constexpr const char *MusicPatterns::kINV1PillowKey;
+constexpr const char *MusicPatterns::kJewelDropSfxIDKey;
+constexpr const char *MusicPatterns::kPillowSpchIDKey;
+constexpr const char *MusicPatterns::kLightSpchIDKey;
+constexpr const char *MusicPatterns::kJewelName;
+constexpr const char *MusicPatterns::kNumJewelSpchsKey;
+constexpr const char *MusicPatterns::kSceneName;
+constexpr const char *MusicPatterns::kLocalSpchIDs511Key;
+constexpr const char *MusicPatterns::kLocalSpchIDs512Key;
+constexpr const char *MusicPatterns::kLocalSpchIDs52SignedIndexKey;
+constexpr const char *MusicPatterns::kSppName;
+constexpr const char *MusicPatterns::kRgName;
+constexpr const char *MusicPatterns::kRggName;
+constexpr const char *MusicPatterns::kSgrName;
+constexpr const char *MusicPatterns::kMainSpchIDsSignedIndexSignedIndexUnsignedIndexKey;
+
+constexpr const char *MusicPatterns::kDataXML;
+
 MusicPatterns::~MusicPatterns() {
 	for (auto *note : _notes)
 		delete note;
@@ -34,7 +174,7 @@ MusicPatterns::~MusicPatterns() {
 
 int MusicPatterns::number(const Common::String &key) const { return _host._page->number(key); }
 
-int MusicPatterns::indexed(const char *key, int index) const { return number(Common::String::format("%s.%d", key, index)); }
+int MusicPatterns::indexed(const char *key, int index) const { return number(Common::String::format(kNameSignedIndexFormat, key, index)); }
 
 Shell::Sprite *MusicPatterns::sprite(const Common::String &key, int depth) {
 	return _host._scene.add(_host.characterResource(number(key), Shell::Character::Resources::kAnimation), depth);
@@ -50,7 +190,7 @@ void MusicPatterns::speech(const Common::String &actor, uint resource) {
 
 void MusicPatterns::speeches(const Common::String &actors, const Common::String &resources, uint count) {
 	for (uint i = 1; i <= count; i++) {
-		Common::String suffix = Common::String::format(".%u", i);
+		Common::String suffix = Common::String::format(kUnsignedIndexFormat, i);
 		speech(_host._page->text(actors + suffix), number(resources + suffix));
 	}
 }
@@ -58,22 +198,22 @@ void MusicPatterns::speeches(const Common::String &actors, const Common::String 
 void MusicPatterns::sound(const Common::String &key) { _host.playSounds({static_cast<uint16>(number(key))}); }
 
 void MusicPatterns::group(const char *prefix, int index, int count) {
-	speeches(Common::String::format("k%sCharIDs.%d", prefix, index), Common::String::format("k%sSpchIDs.%d", prefix, index), count);
+	speeches(Common::String::format(kKNameCharIDsSignedIndexFormat, prefix, index), Common::String::format(kKNameSpchIDsSignedIndexFormat, prefix, index), count);
 }
 
 bool MusicPatterns::enter() {
-	if (!_data.loadStream(_host._vm.resources().open("r1la2.xml")) || !_data.parse() || !_host.actor("grid", "kLocal", false))
+	if (!_data.loadStream(_host._vm.resources().open(kDataXML)) || !_data.parse() || !_host.actor(kPropertyGrid, kLocalKey, false))
 		return false;
-	_host._actors["grid"]->set("z", {}, Core::ScriptValue(number("kGridZ")));
-	_host._actors["grid"]->set("animateSettled", {}, Core::ScriptValue(0));
+	_host._actors[kPropertyGrid]->set(kPropertyZ, {}, Core::ScriptValue(number(kGridZKey)));
+	_host._actors[kPropertyGrid]->set(kPropertyAnimateSettled, {}, Core::ScriptValue(0));
 	World &world = _host._world;
-	_level = CLIP(world.get("R1LA2Level"), 1, 3);
-	_dataset = CLIP(world.get("R1LA2Dataset"), 1, 9);
-	_count = CLIP(world.get("R1LA2Count"), 0, 1000000);
-	_state = CLIP(world.get("R1LA2State"), 3, 5);
-	_pillowHere = !world.get("R1LA2State") || world.get("R1LA2PillowHere");
+	_level = CLIP(world.get(kR1LA2LevelKey), 1, 3);
+	_dataset = CLIP(world.get(kR1LA2DatasetKey), 1, 9);
+	_count = CLIP(world.get(kR1LA2CountKey), 0, 1000000);
+	_state = CLIP(world.get(kR1LA2StateKey), 3, 5);
+	_pillowHere = !world.get(kR1LA2StateKey) || world.get(kR1LA2PillowHereKey);
 	for (int row = 0; row < 5; row++) {
-		_bank[row] = CLIP(world.get(Common::String::format("R1LA2Marble%dCount", row + 1)), 0, 8);
+		_bank[row] = CLIP(world.get(Common::String::format(kR1LA2MarbleSignedIndexCountKey, row + 1)), 0, 8);
 		_notes[row] = new OM::Sound(_host._vm.mixer());
 	}
 	if (_host._practice) {
@@ -86,69 +226,81 @@ bool MusicPatterns::enter() {
 			_host._chester->visible = false;
 	}
 	for (int i = 0; i < 3; i++) {
-		_doors[i] = sprite(Common::String::format("kDoorID.%d", i + 1), indexed("kDoorZ", i + 1));
+		_doors[i] = sprite(Common::String::format(kDoorIDSignedIndexKey, i + 1), indexed(kDoorZKey, i + 1));
 		if (!_doors[i])
 			return false;
 		_doors[i]->boxTouchy = true;
 	}
 	for (int column = 0; column < 12; column++) {
-		_lights[column] = sprite("kColumnLightsID", 20);
+		_lights[column] = sprite(kColumnLightsIDKey, 20);
 		if (!_lights[column])
 			return false;
-		_lights[column]->x = number("kColumnLightX") + column * number("kColumnLightDeltaX");
-		_lights[column]->y = number("kColumnLightY");
+		_lights[column]->x = number(kColumnLightXKey) + column * number(kColumnLightDeltaXKey);
+		_lights[column]->y = number(kColumnLightYKey);
 		if (8 <= column)
 			continue;
 		for (int row = 0; row < 5; row++) {
-			_locks[row][column] = sprite("kLockID", number("kLockZ"));
+			_locks[row][column] = sprite(kLockIDKey, number(kLockZKey));
 			if (!_locks[row][column])
 				return false;
-			_locks[row][column]->x = number("kGridX") + column * number("kGridDeltaX");
-			_locks[row][column]->y = number("kGridY") + row * number("kGridDeltaY");
+			_locks[row][column]->x = number(kGridXKey) + column * number(kGridDeltaXKey);
+			_locks[row][column]->y = number(kGridYKey) + row * number(kGridDeltaYKey);
 		}
 	}
-	_button = sprite("kButtonID", 20);
-	_doorLights = sprite("kDoorLightsID", 20);
-	_activate = sprite("kActivateDoorID", 20);
-	_spin = sprite("kSpinID", number("kSpinZ"));
-	_pillow = sprite("kPillowID", number("kPillowZ"));
-	_jewel = sprite("kJewelID", number("kJewelZ"));
-	_sparkle = sprite("kSparkleID", number("kJewelZ") + 1);
-	if (!_button || !_doorLights || !_activate || !_spin || !_pillow || !_jewel || !_sparkle || !sprite("kTrayMaskID", number("kTrayMaskZ")))
+	_button = sprite(kButtonIDKey, 20);
+	_doorLights = sprite(kDoorLightsIDKey, 20);
+	_activate = sprite(kActivateDoorIDKey, 20);
+	_spin = sprite(kSpinIDKey, number(kSpinZKey));
+	_pillow = sprite(kPillowIDKey, number(kPillowZKey));
+	_jewel = sprite(kJewelIDKey, number(kJewelZKey));
+	_sparkle = sprite(kSparkleIDKey, number(kJewelZKey) + 1);
+	if (!_button || !_doorLights || !_activate || !_spin || !_pillow || !_jewel || !_sparkle || !sprite(kTrayMaskIDKey, number(kTrayMaskZKey)))
 		return false;
 	_activate->visible = _spin->visible = false;
 	_pillow->visible = _pillowHere;
-	_sparkle->y += number("kSparkleDeltaY");
+	_sparkle->y += number(kSparkleDeltaYKey);
 	if (!_pillowHere) {
-		_jewel->y += number("kJewelDeltaY");
-		_sparkle->y += number("kJewelDeltaY");
+		_jewel->y += number(kJewelDeltaYKey);
+		_sparkle->y += number(kJewelDeltaYKey);
 	}
 	_jewel->visible = _sparkle->visible = !_host._practice;
 	_sparkle->startAnimation(-1);
 	doors();
 	if (!setup())
 		return false;
-	const bool firstVisit = !world.visits("r1la2");
+	const bool firstVisit = !world.visits(Page::kPageLA2);
 	_inventoryHelp = !_host._practice && (firstVisit || _state != 5);
 	_playOnEntry = !firstVisit && _state == 5;
 	if (_host._practice && firstVisit) {
-		say("grid", "kReEnterSpchIDs.4.1");
-		say("grid", "kLocalSpchIDs.4.1.1");
+		say(kPropertyGrid, kReEnterSpchIDs41Key);
+		say(kPropertyGrid, kLocalSpchIDs411Key);
 	} else if (firstVisit) {
-		group("Local", 1, 7);
-		speech(_host._page->text("kLocalCharIDs.1.6"), number("kLocalSpchIDs.1.8"));
+		group(kLocalName, 1, 7);
+		speech(_host._page->text(kLocalCharIDs16Key), number(kLocalSpchIDs18Key));
 	} else {
-		int greeting = _host._vm.rnd().number(2, _count < number("kMaxLights") ? 4 : 3);
+		int greeting = _host._vm.rnd().number(2, _count < number(kMaxLightsKey) ? 4 : 3);
 		if (greeting == 3)
-			say("reader", "kReEnterSpchIDs.3.1");
-		say("grid", Common::String::format("kReEnterSpchIDs.%d.%d", greeting, greeting == 3 ? 2 : 1));
+			say(kReaderName, kReEnterSpchIDs31Key);
+		say(kPropertyGrid, Common::String::format(kReEnterSpchIDsSignedIndexSignedIndexKey, greeting, greeting == 3 ? 2 : 1));
 		if (greeting == 4)
-			say("sam", "kReEnterSpchIDs.4.2");
+			say(kSamName, kReEnterSpchIDs42Key);
 		if (_inventoryHelp)
-			say(_state == 3 ? "grid" : "sam", _state == 3 ? "kReEnterSpchIDs.5.1" : "kReEnterSpchIDs.6.1");
+			say(_state == 3 ? kPropertyGrid : kSamName, _state == 3 ? kReEnterSpchIDs51Key : kReEnterSpchIDs61Key);
 	}
 	_idle = _host._time;
 	return true;
+}
+
+void MusicPatterns::draw(OM::Canvas &canvas) {
+	_host._scene.drawBackground(canvas);
+	const int x = number(kGridXKey);
+	const int height = number(kGridDeltaYKey);
+	const int width = 12 * number(kGridDeltaXKey);
+	for (uint row = 0; row < 5; row++) {
+		const int y = number(kGridYKey) + row * height;
+		canvas.recolorRect(Common::Rect(x, y, x + width, y + height), PageScene::marbleColor(row));
+	}
+	_host._scene.drawSprites(canvas, INT_MIN, INT_MAX);
 }
 
 void MusicPatterns::clearMarbles() {
@@ -159,15 +311,15 @@ void MusicPatterns::clearMarbles() {
 }
 
 bool MusicPatterns::setup() {
-	Common::StringTokenizer tokens(_data.get(Common::String::format("DataSet/Level_%d/WordList_%d/Set_1", _level, _dataset)));
+	Common::StringTokenizer tokens(_data.get(Common::String::format(kPropertyDataSetLevelSignedIndexWordListSignedIndexSet1, _level, _dataset)));
 	memset(_target, 0, sizeof(_target));
 	memset(_needed, 0, sizeof(_needed));
 	_given = 0;
-	for (int column = 0; column < indexed("kNumGiven", _level); column++) {
+	for (int column = 0; column < indexed(kNumGivenKey, _level); column++) {
 		if (tokens.empty())
 			return false;
 		Common::String chord = tokens.nextToken();
-		if (chord == "0")
+		if (chord.equals("0"))
 			continue;
 		// Authored nonempty columns form a prefix, followed by zero padding.
 		if (column != _given)
@@ -196,9 +348,10 @@ bool MusicPatterns::setup() {
 			marble.row = row;
 			marble.column = column;
 			marble.fixed = true;
-			marble.sprite = sprite(Common::String::format("kMarbleID.%d", row + 1), 5);
+			marble.sprite = sprite(Common::String::format(kMarbleIDSignedIndexKey, row + 1), 5);
 			if (!marble.sprite)
 				return false;
+			marble.sprite->colorRemap = PageScene::marbleColor(row);
 			marble.sprite->x = _locks[row][column]->x;
 			marble.sprite->y = _locks[row][column]->y;
 			_marbles.push_back(marble);
@@ -206,12 +359,13 @@ bool MusicPatterns::setup() {
 		for (int i = 0; i < _bank[row]; i++) {
 			Marble marble;
 			marble.row = row;
-			marble.depth = number("kMarbleZ") - i * number("kMarbleDeltaZ");
-			marble.home = Common::Point(indexed("kMarbleX", row + 1) - i * number("kMarbleDeltaX"),
-										number("kMarbleY") - i * number("kMarbleDeltaY"));
-			marble.sprite = sprite(Common::String::format("kMarbleID.%d", row + 1), marble.depth);
+			marble.depth = number(kMarbleZKey) - i * number(kMarbleDeltaZKey);
+			marble.home = Common::Point(indexed(kMarbleXKey, row + 1) - i * number(kMarbleDeltaXKey),
+										number(kMarbleYKey) - i * number(kMarbleDeltaYKey));
+			marble.sprite = sprite(Common::String::format(kMarbleIDSignedIndexKey, row + 1), marble.depth);
 			if (!marble.sprite)
 				return false;
+			marble.sprite->colorRemap = PageScene::marbleColor(row);
 			marble.sprite->x = marble.home.x;
 			marble.sprite->y = marble.home.y;
 			_marbles.push_back(marble);
@@ -219,9 +373,10 @@ bool MusicPatterns::setup() {
 	}
 	if (3 < _state) {
 		_state = 5;
-		for (int row = 0; row < 5; row++)
+		for (int row = 0; row < 5; row++) {
 			if (_bank[row] < _needed[row])
 				_state = 4;
+		}
 	}
 	lights();
 	persist();
@@ -232,24 +387,24 @@ void MusicPatterns::persist() {
 	if (_host._practice)
 		return;
 	World &world = _host._world;
-	world.set("R1LA2Level", _level);
-	world.set("R1LA2Dataset", _dataset);
-	world.set("R1LA2Count", _count);
-	world.set("R1LA2State", _state);
-	world.set("R1LA2PillowHere", _pillowHere);
+	world.set(kR1LA2LevelKey, _level);
+	world.set(kR1LA2DatasetKey, _dataset);
+	world.set(kR1LA2CountKey, _count);
+	world.set(kR1LA2StateKey, _state);
+	world.set(kR1LA2PillowHereKey, _pillowHere);
 	for (int row = 0; row < 5; row++)
-		world.set(Common::String::format("R1LA2Marble%dCount", row + 1), _bank[row]);
+		world.set(Common::String::format(kR1LA2MarbleSignedIndexCountKey, row + 1), _bank[row]);
 }
 
 bool MusicPatterns::donate(uint item) {
-	uint first = number("kINV1Marble1");
+	uint first = number(kINV1Marble1Key);
 	if (_host._practice || item < first || first + 5 <= item)
 		return false;
 	_host.interrupt();
 	_donated = false;
 	_firstDonation = _state == 3;
 	for (int row = 0; row < 5; row++) {
-		Common::String key = Common::String::format("item:%u", first + row);
+		Common::String key = Common::String::format(kItemUnsignedIndexFormat, first + row);
 		int available = MAX(0, _host._world.get(key));
 		int take = MIN(available, 8 - _bank[row]);
 		_donated |= 0 < take;
@@ -260,7 +415,7 @@ bool MusicPatterns::donate(uint item) {
 		_state = 4;
 		if (!setup())
 			error("RR1: cannot reset LA2 pattern");
-		sound("kSceneSfxID");
+		sound(kSceneSfxIDKey);
 	}
 	closeInventory();
 	return true;
@@ -287,9 +442,10 @@ void MusicPatterns::resume(uint32 elapsed) {
 }
 
 int MusicPatterns::resident(int row, int column) const {
-	for (uint i = 0; i < _marbles.size(); i++)
+	for (uint i = 0; i < _marbles.size(); i++) {
 		if (_marbles[i].row == row && _marbles[i].column == column)
 			return i;
+	}
 	return -1;
 }
 
@@ -305,11 +461,13 @@ void MusicPatterns::home(int index) {
 void MusicPatterns::drop() {
 	Marble &marble = _marbles[_dragged];
 	Common::Rect picture(marble.sprite->x, marble.sprite->y, marble.sprite->x + marble.sprite->width(), marble.sprite->y + marble.sprite->height());
-	int best = 0, column = -1;
+	int best = 0;
+	int column = -1;
 	for (int c = _given; c < 12; c++) {
 		for (int row = 0; row < 5; row++) {
-			int x = number("kGridX") + c * number("kGridDeltaX"), y = number("kGridY") + row * number("kGridDeltaY");
-			Common::Rect overlap(x, y, x + number("kGridDeltaX"), y + number("kGridDeltaY"));
+			int x = number(kGridXKey) + c * number(kGridDeltaXKey);
+			int y = number(kGridYKey) + row * number(kGridDeltaYKey);
+			Common::Rect overlap(x, y, x + number(kGridDeltaXKey), y + number(kGridDeltaYKey));
 			if (!overlap.intersects(picture))
 				continue;
 			overlap.clip(picture);
@@ -322,17 +480,17 @@ void MusicPatterns::drop() {
 	}
 	if (column < 0) {
 		home(_dragged);
-		sound("kGoHomeSfxID");
+		sound(kGoHomeSfxIDKey);
 	} else {
 		int previous = resident(marble.row, column);
 		if (0 <= previous)
 			home(previous);
 		marble.column = column;
-		marble.sprite->x = number("kGridX") + column * number("kGridDeltaX");
-		marble.sprite->y = number("kGridY") + marble.row * number("kGridDeltaY");
+		marble.sprite->x = number(kGridXKey) + column * number(kGridDeltaXKey);
+		marble.sprite->y = number(kGridYKey) + marble.row * number(kGridDeltaYKey);
 		marble.sprite->setFrame(1);
-		_host._scene.setDepth(marble.sprite, number("kGridZ") + 1);
-		sound("kSnapSfxID");
+		_host._scene.setDepth(marble.sprite, number(kGridZKey) + 1);
+		sound(kSnapSfxIDKey);
 	}
 	_dragged = -1;
 	lights();
@@ -340,15 +498,19 @@ void MusicPatterns::drop() {
 
 void MusicPatterns::lights() {
 	for (int column = 0; column < 12; column++) {
-		int count = 0, frame = 1;
+		int count = 0;
+		int frame = 1;
 		for (int row = 0; row < 5; row++) {
 			if (0 <= resident(row, column)) {
 				count += 1;
 				frame = row + 2;
 			}
 		}
+		_lights[column]->colorRemap = OM::Canvas::ColorRemap::kNone;
+		if (count == 1)
+			_lights[column]->colorRemap = PageScene::marbleColor(frame - 2);
 		_lights[column]->visible = _level != 3;
-		_lights[column]->setFrame(1 < count ? number("kColumnLightBadID") : frame);
+		_lights[column]->setFrame(1 < count ? number(kColumnLightBadIDKey) : frame);
 	}
 }
 
@@ -378,20 +540,22 @@ void MusicPatterns::playColumn() {
 		if (index < 0)
 			continue;
 		empty = false;
-		_marbles[index].sprite->setFrame(number("kMarbleSingFrame"));
-		_notes[row]->play(_host._vm.resources(), _host.characterResource(indexed("kMarbleID", row + 1), Shell::Character::Resources::kSound), Audio::Mixer::kSFXSoundType);
+		_marbles[index].sprite->setFrame(number(kMarbleSingFrameKey));
+		_notes[row]->play(_host._vm.resources(), _host.characterResource(indexed(kMarbleIDKey, row + 1), Shell::Character::Resources::kSound),
+			Audio::Mixer::kSFXSoundType);
 	}
 	if (empty)
-		_notes[0]->play(_host._vm.resources(), _host.characterResource(number("kBlankSfxID"), Shell::Character::Resources::kSound), Audio::Mixer::kSFXSoundType);
+		_notes[0]->play(_host._vm.resources(), _host.characterResource(number(kBlankSfxIDKey), Shell::Character::Resources::kSound), Audio::Mixer::kSFXSoundType);
 	_lights[_column]->setFrame(_lights[_column]->getFrame() + 7);
 }
 
 void MusicPatterns::endColumn() {
 	for (auto *note : _notes)
 		note->stop();
-	for (auto &marble : _marbles)
+	for (auto &marble : _marbles) {
 		if (marble.column == _column)
-			marble.sprite->setFrame(number("kMarbleEyeCloseFrame"));
+			marble.sprite->setFrame(number(kMarbleEyeCloseFrameKey));
+	}
 	lights();
 }
 
@@ -401,15 +565,15 @@ void MusicPatterns::finishPlayback() {
 		_spin->startAnimation(1);
 		_phase = kSpin;
 	} else if (_result == kWrong) {
-		say("grid", Common::String::format("kWrongSpchIDs.%d", _host._vm.rnd().number(1, 3)));
+		say(kPropertyGrid, Common::String::format(kWrongSpchIDsSignedIndexKey, _host._vm.rnd().number(1, 3)));
 		_phase = kWrongSpeech;
 	} else {
 		if (_result == kListen && _helpAfterPlayback) {
-			speeches("kSceneCharIDs.2", "kSceneSpchIDs.2", 3);
+			speeches(kSceneCharIDs2Key, kSceneSpchIDs2Key, 3);
 			_helpAfterPlayback = false;
 		}
 		if (_result == kLocked)
-			say("grid", Common::String::format("kNoMoveSpchID.%d", _host._vm.rnd().number(1, 2)));
+			say(kPropertyGrid, Common::String::format(kNoMoveSpchIDSignedIndexKey, _host._vm.rnd().number(1, 2)));
 		_phase = kIdle;
 		_idle = _host._time;
 	}
@@ -420,12 +584,12 @@ void MusicPatterns::assess() {
 		return;
 	World &world = _host._world;
 	int outcome = _mistakes ? 3 : 1;
-	int streak = world.get("R1LA2StreakKind") == outcome ? world.get("R1LA2Streak") + 1 : 1;
-	int threshold = indexed(_mistakes ? "kAutolevelDownCount" : "kAutolevelUpCount", _level);
-	world.recordAssessment("R1LA2", _level, outcome, indexed("kAutolevelUpCount", _level), indexed("kAutolevelDownCount", _level), streak);
-	world.set("R1LA2StreakKind", outcome);
-	world.set("R1LA2Streak", threshold <= streak ? 0 : streak);
-	if (threshold <= streak && !world.get("R1LA2FixedLevel"))
+	int streak = world.get(kR1LA2StreakKindKey) == outcome ? world.get(kR1LA2StreakKey) + 1 : 1;
+	int threshold = indexed(_mistakes ? kAutolevelDownCountKey : kAutolevelUpCountKey, _level);
+	world.recordAssessment(kR1LA2Key, _level, outcome, indexed(kAutolevelUpCountKey, _level), indexed(kAutolevelDownCountKey, _level), streak);
+	world.set(kR1LA2StreakKindKey, outcome);
+	world.set(kR1LA2StreakKey, threshold <= streak ? 0 : streak);
+	if (threshold <= streak && !world.get(kR1LA2FixedLevelKey))
 		_level = CLIP(_level + (_mistakes ? -1 : 1), 1, 3);
 }
 
@@ -438,7 +602,7 @@ void MusicPatterns::accept() {
 	if (_count <= 9) {
 		_activate->visible = true;
 		_activate->startAnimation(1);
-		sound("kActivateDoorID");
+		sound(kActivateDoorIDKey);
 		_phase = kDoor;
 	} else {
 		_phase = kNext;
@@ -455,7 +619,7 @@ void MusicPatterns::update(uint32 time) {
 		return;
 	if (_phase == kEntryGreeting) {
 		if (_inventoryHelp) {
-			say("reader", "kHaveSpch.1.1");
+			say(kReaderName, kHaveSpch11Key);
 			_phase = kInventoryStart;
 		} else if (_playOnEntry) {
 			play(kListen);
@@ -463,7 +627,7 @@ void MusicPatterns::update(uint32 time) {
 			_phase = kIdle;
 		}
 	} else if (_phase == kInventoryStart) {
-		_chestOpening = sprite("gChesterOpenID", number("gClosedChesterZ"));
+		_chestOpening = sprite(kGChesterOpenIDName, number(kGClosedChesterZName));
 		if (_chestOpening) {
 			_chestOpening->startAnimation(1);
 			if (_host._chester)
@@ -482,9 +646,9 @@ void MusicPatterns::update(uint32 time) {
 			return;
 		_haveMarbles = false;
 		for (int row = 0; row < 5; row++)
-			_haveMarbles |= 0 < _host._world.get(Common::String::format("item:%d", number("kINV1Marble1") + row));
-		say("sam", _haveMarbles ? "kHaveSpch.2.1" : "kHaveSpch.3.1");
-		say("reader", _haveMarbles ? "kHaveSpch.2.2" : "kHaveSpch.3.2");
+			_haveMarbles |= 0 < _host._world.get(Common::String::format(kItemSignedIndexKey, number(kINV1Marble1Key) + row));
+		say(kSamName, _haveMarbles ? kHaveSpch21Key : kHaveSpch31Key);
+		say(kReaderName, _haveMarbles ? kHaveSpch22Key : kHaveSpch32Key);
 		_phase = kInventorySpeech;
 	} else if (_phase == kInventorySpeech) {
 		if (_haveMarbles) {
@@ -503,7 +667,7 @@ void MusicPatterns::update(uint32 time) {
 		if (_donated) {
 			if (_firstDonation) {
 				for (int i = 1; i <= 3; i++)
-					say("grid", Common::String::format("kSceneSpchIDs.1.%d", i));
+					say(kPropertyGrid, Common::String::format(kSceneSpchIDs1SignedIndexKey, i));
 			}
 			_helpAfterPlayback = _state == 4;
 			_donated = false;
@@ -518,9 +682,10 @@ void MusicPatterns::update(uint32 time) {
 		playColumn();
 		_phase = kPlayback;
 	} else if (_phase == kPlayback) {
-		for (auto *note : _notes)
+		for (auto *note : _notes) {
 			if (note->isPlaying())
 				return;
+		}
 		endColumn();
 		_column += 1;
 		if (_column < _lastColumn)
@@ -534,41 +699,48 @@ void MusicPatterns::update(uint32 time) {
 			if (!marble.fixed && 0 <= marble.column && !_target[marble.row][marble.column])
 				home(i);
 		}
-		sound("kEmptyGridSfxID");
+		sound(kEmptyGridSfxIDKey);
 		lights();
 		_phase = kIdle;
 	} else if (_phase == kSpin && !_spin->isRunning()) {
 		_spin->visible = false;
-		say("grid", Common::String::format("kCongratsSpchID.%d", _host._vm.rnd().number(1, 4)));
+		say(kPropertyGrid, Common::String::format(kCongratsSpchIDSignedIndexKey, _host._vm.rnd().number(1, 4)));
 		_phase = kCongratulations;
 	} else if (_phase == kCongratulations) {
 		accept();
 	} else if (_phase == kDoor && !_activate->isRunning()) {
 		_activate->visible = false;
 		doors();
-		sound(_count % 3 ? "kDoorSfxID.1" : "kDoorSfxID.2");
+		sound(_count % 3 ? kDoorSfxID1Key : kDoorSfxID2Key);
 		if (_count <= 3)
-			group("DoorOpen", _count, _count == 2 ? 2 : 4);
+			group(kDoorOpenName, _count, _count == 2 ? 2 : 4);
 		else if (_count == 9 && _pillowHere) {
-			sound("kFanFareSfxID");
-			speeches("kLastDoorCharIDs", "kLastDoorSpchIDs", 4);
+			sound(kFanFareSfxIDKey);
+			speeches(kLastDoorCharIDsKey, kLastDoorSpchIDsKey, 4);
 		} else {
 			int line = _host._vm.rnd().number(1, 3);
-			speech(_host._page->text(Common::String::format("kDoorOpenCharIDs.4.%d", line)), indexed("kDoorOpenSpchIDs.4", line));
+			speech(_host._page->text(Common::String::format(kDoorOpenCharIDs4SignedIndexKey, line)), indexed(kDoorOpenSpchIDs4Key, line));
 		}
 		_phase = kNext;
 	} else if (_phase == kNext) {
 		_mistakes = 0;
 		if (!setup())
 			error("RR1: cannot load LA2 pattern");
-		sound("kNewPatternSfxID");
+		sound(kNewPatternSfxIDKey);
 		_phase = kIntroduction;
 	} else if (!_host._practice && _phase == kIdle && !_host._chestOpen && 30000 <= time - _idle) {
 		bool enough = _state == 5;
 		_idleIndex = _idleIndex % (enough ? 3 : 2) + 1;
-		Common::String prefix = Common::String::format("kIdle%d", enough ? 2 : 1);
-		speeches(prefix + Common::String::format("CharID.%d", _idleIndex), prefix + Common::String::format("SpchID.%d", _idleIndex),
-				 (enough ? _idleIndex == 1 : _idleIndex == 2) ? 1 : 2);
+		Common::String prefix = Common::String::format(kIdleSignedIndexKey, enough ? 2 : 1);
+		int count = 2;
+		if (enough) {
+			if (_idleIndex == 1)
+				count = 1;
+		} else if (_idleIndex == 2) {
+			count = 1;
+		}
+		speeches(prefix + Common::String::format(kCharIDSignedIndexFormat, _idleIndex),
+				 prefix + Common::String::format(kSpchIDSignedIndexFormat, _idleIndex), count);
 		_idle = time;
 	}
 }
@@ -576,17 +748,17 @@ void MusicPatterns::update(uint32 time) {
 void MusicPatterns::hint() {
 	_paigeClicks = _paigeClicks % 2 + 1;
 	if (_state == 3) {
-		say("paige", Common::String::format("kPaigeSpchIDs.2.%d", _paigeClicks));
+		say(kPaigeName, Common::String::format(kPaigeSpchIDs2SignedIndexKey, _paigeClicks));
 	} else if (_state == 4) {
-		say("paige", "kPaigeSpchIDs.3");
+		say(kPaigeName, kPaigeSpchIDs3Key);
 	} else {
 		if (_paigeClicks == 2 && _level != 3)
-			say("paige", "kPaigeSpchIDs.4.2");
+			say(kPaigeName, kPaigeSpchIDs42Key);
 		else {
-			say("paige", "kPaigeSpchIDs.4.1.1");
+			say(kPaigeName, kPaigeSpchIDs411Key);
 			if (_level != 3)
-				say("paige", "kPaigeSpchIDs.4.1.2");
-			say("sam", "kPaigeSpchIDs.4.1.3");
+				say(kPaigeName, kPaigeSpchIDs412Key);
+			say(kSamName, kPaigeSpchIDs413Key);
 		}
 	}
 	_idle = _host._time;
@@ -595,10 +767,12 @@ void MusicPatterns::hint() {
 bool MusicPatterns::click(Common::Point point) {
 	_idle = _host._time;
 	if (_button->covers(point)) {
-		sound("kButtonID");
-		bool complete = true, correct = true;
+		sound(kButtonIDKey);
+		bool complete = true;
+		bool correct = true;
 		for (int column = 0; column < 12; column++) {
-			int count = 0, needed = 0;
+			int count = 0;
+			int needed = 0;
 			for (int row = 0; row < 5; row++) {
 				bool present = 0 <= resident(row, column);
 				count += present;
@@ -609,7 +783,7 @@ bool MusicPatterns::click(Common::Point point) {
 			complete &= 0 < count && (_level != 3 || needed <= count);
 		}
 		if (complete && !correct)
-			sound("kWrongSfxID");
+			sound(kWrongSfxIDKey);
 		if (!complete) {
 			_playClicks = _playClicks % 3 + 1;
 			int lines = 2;
@@ -617,7 +791,7 @@ bool MusicPatterns::click(Common::Point point) {
 				lines = _level == 3 ? 3 : 4;
 			else if (_playClicks == 2)
 				lines = 1;
-			group("Play", _playClicks, lines);
+			group(kPlayName, _playClicks, lines);
 		}
 		Result result = kListen;
 		if (complete)
@@ -638,92 +812,92 @@ bool MusicPatterns::click(Common::Point point) {
 			marble.column = -1;
 			marble.sprite->setFrame(2);
 			_host._scene.setDepth(marble.sprite, 190);
-			sound("kPickUpSfxID");
+			sound(kPickUpSfxIDKey);
 			lights();
 		}
 		return true;
 	}
 	for (auto *door : _doors) {
 		if (door->visible && door->covers(point)) {
-			sound("kCOMSoftClickSfxID");
+			sound(kCOMSoftClickSfxIDKey);
 			_doorClicks = _doorClicks % 3 + 1;
 			if (_state == 3) {
-				say("sam", "kDoorClkSpchIDs.4");
-				say("grid", "kLocalSpchIDs.3.1");
-				say("grid", "kLocalSpchIDs.3.2");
+				say(kSamName, kDoorClkSpchIDs4Key);
+				say(kPropertyGrid, kLocalSpchIDs31Key);
+				say(kPropertyGrid, kLocalSpchIDs32Key);
 			} else {
-				group("DoorClk", _doorClicks, indexed("kMaxDoorClkSpch", _doorClicks));
+				group(kDoorClkName, _doorClicks, indexed(kMaxDoorClkSpchKey, _doorClicks));
 			}
 			return true;
 		}
 	}
 	if (9 <= _count && _pillowHere && _pillow->covers(point)) {
 		_pillowHere = _pillow->visible = false;
-		Common::String key = Common::String::format("item:%d", number("kINV1Pillow"));
+		Common::String key = Common::String::format(kItemSignedIndexKey, number(kINV1PillowKey));
 		_host._world.set(key, MIN(25, _host._world.get(key) + 1));
 		_host.putAway();
-		_jewel->y += number("kJewelDeltaY");
-		_sparkle->y += number("kJewelDeltaY");
-		sound("kJewelDropSfxID");
-		say("reader", "kPillowSpchID");
+		_jewel->y += number(kJewelDeltaYKey);
+		_sparkle->y += number(kJewelDeltaYKey);
+		sound(kJewelDropSfxIDKey);
+		say(kReaderName, kPillowSpchIDKey);
 		persist();
 		return true;
 	}
 	for (auto *light : _lights) {
 		if (light->visible && light->covers(point)) {
-			say("grid", "kLightSpchID");
+			say(kPropertyGrid, kLightSpchIDKey);
 			return true;
 		}
 	}
 	if (_jewel->visible && _jewel->covers(point)) {
 		_jewelClicks = MIN(_jewelClicks + 1, 4);
-		sound("kCOMSoftClickSfxID");
-		group("Jewel", _jewelClicks, indexed("kNumJewelSpchs", _jewelClicks));
+		sound(kCOMSoftClickSfxIDKey);
+		group(kJewelName, _jewelClicks, indexed(kNumJewelSpchsKey, _jewelClicks));
 		return true;
 	}
-	if (_host._actors["paige"]->bounds().contains(point)) {
+	if (_host._actors[kPaigeName]->bounds().contains(point)) {
 		hint();
 		return true;
 	}
-	if (_host._actors["grid"]->bounds().contains(point)) {
+	if (_host._actors[kPropertyGrid]->bounds().contains(point)) {
 		_localClicks += 1;
 		if (_state == 3) {
-			say("grid", "kLocalSpchIDs.3.1");
-			say("grid", "kLocalSpchIDs.3.2");
+			say(kPropertyGrid, kLocalSpchIDs31Key);
+			say(kPropertyGrid, kLocalSpchIDs32Key);
 		} else if (_localClicks == 1 || _state == 4) {
-			say("grid", "kLocalSpchIDs.4.1.1");
+			say(kPropertyGrid, kLocalSpchIDs411Key);
 			if (_state == 4)
-				group("Scene", 2, 2);
+				group(kSceneName, 2, 2);
 		} else if (_localClicks == 2) {
-			say("grid", "kLocalSpchIDs.5.1.1");
+			say(kPropertyGrid, kLocalSpchIDs511Key);
 			if (_level != 3)
-				say("grid", "kLocalSpchIDs.5.1.2");
+				say(kPropertyGrid, kLocalSpchIDs512Key);
 		} else {
-			say("grid", Common::String::format("kLocalSpchIDs.5.2.%d", _host._vm.rnd().number(1, 6)));
+			say(kPropertyGrid, Common::String::format(kLocalSpchIDs52SignedIndexKey, _host._vm.rnd().number(1, 6)));
 		}
 		return true;
 	}
-	if (!_host._practice && (_host._actors["reader"]->bounds().contains(point) || _host._actors["sam"]->bounds().contains(point))) {
+	if (!_host._practice && (_host._actors[kReaderName]->bounds().contains(point) || _host._actors[kSamName]->bounds().contains(point))) {
 		if (_state == 4) {
-			group("Scene", 2, 2);
+			group(kSceneName, 2, 2);
 		} else {
 			_mainClicks = _mainClicks % (_state == 5 ? 3 : 2) + 1;
 			const char *actors = nullptr;
 			if (_state == 3)
-				actors = _mainClicks == 1 ? "spp" : "rg";
+				actors = _mainClicks == 1 ? kSppName : kRgName;
 			else if (_mainClicks == 1)
-				actors = "rgg";
+				actors = kRggName;
 			else
-				actors = _mainClicks == 2 ? "rg" : "sgr";
+				actors = _mainClicks == 2 ? kRgName : kSgrName;
 			for (uint i = 0; actors[i]; i++) {
-				const char *actor = "grid";
+				const char *actor = kPropertyGrid;
 				if (actors[i] == 'r')
-					actor = "reader";
+					actor = kReaderName;
 				else if (actors[i] == 's')
-					actor = "sam";
+					actor = kSamName;
 				else if (actors[i] == 'p')
-					actor = "paige";
-				say(actor, Common::String::format("kMainSpchIDs.%d.%d.%u", _state == 3 ? 3 : 4, _mainClicks, i + 1));
+					actor = kPaigeName;
+				say(actor, Common::String::format(kMainSpchIDsSignedIndexSignedIndexUnsignedIndexKey, _state == 3 ? 3 : 4, _mainClicks, i + 1));
 			}
 		}
 		return true;
@@ -746,17 +920,19 @@ bool MusicPatterns::event(const Common::Event &event) {
 	if (_phase == kIdle && event.type == Common::EVENT_MOUSEMOVE) {
 		Shell::Sprite *hit = _host._scene.hitSprite(event.mouse);
 		_button->setFrame(hit == _button ? 2 : 1);
-		for (auto &marble : _marbles)
+		for (auto &marble : _marbles) {
 			if (!marble.fixed)
 				marble.sprite->setFrame(hit == marble.sprite ? 2 : 1);
+		}
 	}
 	return false;
 }
 
 void MusicPatterns::pause(bool paused) {
-	for (auto *note : _notes)
+	for (auto *note : _notes) {
 		if (note)
 			note->pause(paused);
+	}
 	if (paused) {
 		_pausedSprites.clear();
 		for (auto *animation : {_spin, _activate, _sparkle, _chestOpening}) {

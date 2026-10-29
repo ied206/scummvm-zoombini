@@ -23,11 +23,15 @@
 
 #include "common/config-manager.h"
 #include "common/debug.h"
+#include "trinket/metaengine.h"
 #include "trinket/trinket.h"
 #include "trinket/zoombini3_script_session.h"
 
 namespace Trinket {
 namespace Zoombini3 {
+
+constexpr const char *Game::kPracticeSuffix;
+constexpr const char *Game::kBootPracticeName;
 
 Common::String Game::debugPageCommand(const Common::String &command) {
 	return _session ? _session->debugCommand(command) : "No puzzle is active.\n";
@@ -45,17 +49,17 @@ bool Game::prepareState(Common::SeekableReadStream *save, const Common::String &
 	if (save && !_world.read(*save))
 		return false;
 	_playerName = playerName;
-	_practice = playerName.hasSuffix("_Practice");
+	_practice = playerName.hasSuffix(kPracticeSuffix);
 	if (save)
 		return true;
 	_world.resetNative();
 	_world.initializeNewGame(_practice);
 	// ScummVM deliberately inherits launcher preferences instead of the original defaults.
 	SoundSettings settings = {
-		ConfMan.getInt("music_volume"),
-		ConfMan.getInt("sfx_volume"),
-		ConfMan.getInt("speech_volume"),
-		ConfMan.getBool("mute"),
+		ConfMan.getInt(TrinketMetaEngine::kOptionMusicVolume),
+		ConfMan.getInt(TrinketMetaEngine::kOptionSfxVolume),
+		ConfMan.getInt(TrinketMetaEngine::kOptionSpeechVolume),
+		ConfMan.getBool(TrinketMetaEngine::kOptionMute),
 	};
 	setSoundSettings(settings);
 	if (_session)
@@ -90,7 +94,7 @@ bool Game::prepareBoot(int bootParam) {
 		warning("Zoombini3: boot target %d is not implemented yet", static_cast<int>(location));
 		return false;
 	}
-	if (!prepareState(nullptr, "Boot_Practice"))
+	if (!prepareState(nullptr, kBootPracticeName))
 		return false;
 	_world.setLevel(location - kCatapult01, level);
 	_world.setLocation(location);
@@ -137,11 +141,11 @@ void Game::applySoundSettings() {
 	_vm.music().setVolume(CLIP(_world.musicVolume(), 0, 100));
 }
 
-bool Game::canReturnToLauncher() const {
+bool Game::canQuitWithEscape() const {
 	return !_session || !_session->hasModal();
 }
 
-bool Game::takeReturnToLauncherRequest() {
+bool Game::takeQuitRequest() {
 	bool requested = _quitRequested;
 	_quitRequested = false;
 	return requested;

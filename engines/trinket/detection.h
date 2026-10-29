@@ -40,7 +40,9 @@ enum TrinketGameFeatures {
 };
 
 struct TrinketGameDescription {
+	/** Detector metadata identifying the selected game release. */
 	ADGameDescription desc;
+	/** Release-family feature flags used to select the subengine. */
 	uint32 features;
 
 	AD_GAME_DESCRIPTION_HELPERS(desc);

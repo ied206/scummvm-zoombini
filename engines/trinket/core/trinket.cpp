@@ -24,12 +24,30 @@
 namespace Trinket {
 namespace Core {
 
+constexpr const char *Trinket::kEventMouseDown;
+constexpr const char *Trinket::kEventMouseUp;
+constexpr const char *Trinket::kEventDblClick;
+constexpr const char *Trinket::kEventFlyOn;
+constexpr const char *Trinket::kEventFlyOff;
+constexpr const char *Trinket::kPropertyX;
+constexpr const char *Trinket::kPropertyY;
+constexpr const char *Trinket::kPropertyZ;
+constexpr const char *Trinket::kPropertyVisible;
+constexpr const char *Trinket::kPropertyTouchy;
+constexpr const char *Trinket::kPropertyMovable;
+constexpr const char *Trinket::kPropertyTag;
+constexpr const char *Trinket::kPropertyWidth;
+constexpr const char *Trinket::kPropertyHeight;
+constexpr const char *Trinket::kMethodSetAOCursor;
+constexpr const char *Trinket::kMethodPlace;
+constexpr const char *Trinket::kOffsetName;
+
 Trinket::Trinket() {
-	addEvent("mouseDown");
-	addEvent("mouseUp");
-	addEvent("dblClick");
-	addEvent("flyOn");
-	addEvent("flyOff");
+	addEvent(kEventMouseDown);
+	addEvent(kEventMouseUp);
+	addEvent(kEventDblClick);
+	addEvent(kEventFlyOn);
+	addEvent(kEventFlyOff);
 }
 
 Trinket::~Trinket() {
@@ -42,66 +60,66 @@ void Trinket::attach(Trinket *parent, ChildObserver *observer) {
 	_childObserver = observer;
 }
 
-bool Trinket::get(const Common::String &property, const ScriptArguments &arguments, ScriptValue &result) {
-	if (property == "x")
+bool Trinket::get(const Common::String &property, const ScriptArguments &sargs, ScriptValue &result) {
+	if (property.equals(kPropertyX))
 		result = ScriptValue(x);
-	else if (property == "y")
+	else if (property.equals(kPropertyY))
 		result = ScriptValue(y);
-	else if (property == "z")
+	else if (property.equals(kPropertyZ))
 		result = ScriptValue(z);
-	else if (property == "visible")
+	else if (property.equals(kPropertyVisible))
 		result = ScriptValue(static_cast<int32>(visible));
-	else if (property == "touchy")
+	else if (property.equals(kPropertyTouchy))
 		result = ScriptValue(static_cast<int32>(enabled));
-	else if (property == "movable")
+	else if (property.equals(kPropertyMovable))
 		result = ScriptValue(static_cast<int32>(movable));
-	else if (property == "tag")
+	else if (property.equals(kPropertyTag))
 		result = ScriptValue(tag);
-	else if (property == "width")
+	else if (property.equals(kPropertyWidth))
 		result = ScriptValue(width());
-	else if (property == "height")
+	else if (property.equals(kPropertyHeight))
 		result = ScriptValue(height());
 	else
-		return ScriptableObject::get(property, arguments, result);
+		return ScriptableObject::get(property, sargs, result);
 	return true;
 }
 
-bool Trinket::set(const Common::String &property, const ScriptArguments &arguments, const ScriptValue &value) {
-	if (property == "x")
-		x = value.integer();
-	else if (property == "y")
-		y = value.integer();
-	else if (property == "z") {
-		z = value.integer();
+bool Trinket::set(const Common::String &property, const ScriptArguments &sargs, const ScriptValue &value) {
+	if (property.equals(kPropertyX))
+		x = value.toInt32();
+	else if (property.equals(kPropertyY))
+		y = value.toInt32();
+	else if (property.equals(kPropertyZ)) {
+		z = value.toInt32();
 		if (_childObserver)
 			_childObserver->childDepthChanged(*this);
-	} else if (property == "visible")
-		visible = value.integer() != 0;
-	else if (property == "touchy")
-		enabled = value.integer() != 0;
-	else if (property == "movable")
-		movable = value.integer() != 0;
-	else if (property == "tag")
-		tag = value.integer();
+	} else if (property.equals(kPropertyVisible))
+		visible = value.toInt32() != 0;
+	else if (property.equals(kPropertyTouchy))
+		enabled = value.toInt32() != 0;
+	else if (property.equals(kPropertyMovable))
+		movable = value.toInt32() != 0;
+	else if (property.equals(kPropertyTag))
+		tag = value.toInt32();
 	else
-		return ScriptableObject::set(property, arguments, value);
+		return ScriptableObject::set(property, sargs, value);
 	return true;
 }
 
-bool Trinket::play(const Common::String &method, const ScriptArguments &arguments, ScriptValue &result) {
-	if (method == "setAOCursor" && !arguments.empty() && arguments.size() <= 2) {
-		spotCursor = arguments[0].text();
-		if (1 < arguments.size())
-			grabCursor = arguments[1].text();
+bool Trinket::play(const Common::String &method, const ScriptArguments &sargs, ScriptValue &result) {
+	if (method.equals(kMethodSetAOCursor) && !sargs.empty() && sargs.size() <= 2) {
+		spotCursor = sargs[0].toText();
+		if (1 < sargs.size())
+			grabCursor = sargs[1].toText();
 		return true;
 	}
-	if ((method != "place" && method != "offset") || arguments.size() != 2)
-		return ScriptableObject::play(method, arguments, result);
-	if (method == "place") {
-		return set("x", ScriptArguments(), arguments[0]) && set("y", ScriptArguments(), arguments[1]);
+	if ((!method.equals(kMethodPlace) && !method.equals(kOffsetName)) || sargs.size() != 2)
+		return ScriptableObject::play(method, sargs, result);
+	if (method.equals(kMethodPlace)) {
+		return set(kPropertyX, ScriptArguments(), sargs[0]) && set(kPropertyY, ScriptArguments(), sargs[1]);
 	} else {
-		return set("x", ScriptArguments(), ScriptValue(static_cast<int32>(x + arguments[0].integer()))) &&
-			   set("y", ScriptArguments(), ScriptValue(static_cast<int32>(y + arguments[1].integer())));
+		return set(kPropertyX, ScriptArguments(), ScriptValue(static_cast<int32>(x + sargs[0].toInt32()))) &&
+			   set(kPropertyY, ScriptArguments(), ScriptValue(static_cast<int32>(y + sargs[1].toInt32())));
 	}
 }
 

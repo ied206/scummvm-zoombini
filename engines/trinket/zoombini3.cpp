@@ -38,20 +38,26 @@ static OM::ResourceProvider *createResources() {
 }
 
 static bool loadResources(OM::ResourceProvider &resources, Common::Path &dataPath) {
+	static constexpr const char *kResourceDirectory = "rsc";
+	static constexpr const char *kInstalledDirectory = "HD";
+	static constexpr const char *kResourceIndex = "root.inx";
+	static constexpr const char *kInstalledSearchArchive = "trinket-installed-rsc";
+	static constexpr const char *kScriptDirectory = "scripts";
+
 	Common::FSNode directory(dataPath);
-	SearchMan.addSubDirectoryMatching(directory, "rsc");
-	Common::FSNode installed = directory.getChild("HD");
-	if (installed.getChild("rsc").getChild("root.inx").exists()) {
+	SearchMan.addSubDirectoryMatching(directory, kResourceDirectory);
+	Common::FSNode installed = directory.getChild(kInstalledDirectory);
+	if (installed.getChild(kResourceDirectory).getChild(kResourceIndex).exists()) {
 		directory = installed;
-		SearchMan.addDirectory("trinket-installed-rsc", directory.getChild("rsc"));
+		SearchMan.addDirectory(kInstalledSearchArchive, directory.getChild(kResourceDirectory));
 	}
 	dataPath = directory.getPath();
-	SearchMan.addSubDirectoryMatching(directory, "scripts");
-	return static_cast<Shell::IndexedResources &>(resources).load(Common::Path("root.inx"));
+	SearchMan.addSubDirectoryMatching(directory, kScriptDirectory);
+	return static_cast<Shell::IndexedResources &>(resources).load(Common::Path(kResourceIndex));
 }
 
 const Subengine &getSubengine() {
-	static const Subengine subengine = {
+	static constexpr Subengine subengine = {
 		&Game::create, &createResources, &loadResources,
 		"Zoombinis: Island Odyssey", &SaveFiles::create,
 		OriginalVersions::kWindowsGame, Launcher::OriginalVersions::kUSInstalled,

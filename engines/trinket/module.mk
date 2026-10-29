@@ -2,6 +2,7 @@ MODULE := engines/trinket
 
 MODULE_OBJS := \
 	metaengine.o \
+	string_parser.o \
 	trinket.o \
 	dialogs.o \
 	compression/lzo1x.o \
@@ -72,8 +73,10 @@ ifdef ENABLE_RR1CLOUD9
 MODULE_OBJS += \
 	compression/nc1.o \
 	rr1cloud9/rr1cloud9.o \
+	rr1cloud9/dialogs.o \
 	rr1cloud9/resources.o \
 	rr1cloud9/savefiles.o \
+	rr1cloud9/saves.o \
 	rr1cloud9/page.o \
 	rr1cloud9/page_scene.o \
 	rr1cloud9/cn2_queen.o \

@@ -18,6 +18,29 @@
 namespace Trinket {
 namespace Zoombini3 {
 
+constexpr const char *BarnMachine::kEventDropped;
+constexpr const char *BarnMachine::kEventPickedUp;
+constexpr const char *BarnMachine::kEventSolved;
+constexpr const char *BarnMachine::kEventWrong;
+constexpr const char *BarnMachine::kEventOutOfTurns;
+constexpr const char *BarnMachine::kPropertySolvedZerbleTag;
+constexpr const char *BarnMachine::kPropertyDebugMode;
+constexpr const char *BarnMachine::kPropertyPieceGrabAOCursorID;
+constexpr const char *BarnMachine::kPropertyPieceSpotAOCursorID;
+constexpr const char *BarnMachine::kPropertyNextZerbleTrait;
+constexpr const char *BarnMachine::kPropertyEnabled;
+constexpr const char *BarnMachine::kMethodGeneratePuzzle;
+constexpr const char *BarnMachine::kMethodAddNextZerble;
+constexpr const char *BarnMachine::kMethodPause;
+constexpr const char *BarnMachine::kMethodResume;
+constexpr const char *BarnMachine::kMethodForceDrop;
+constexpr const char *BarnMachine::kMethodClearPuzzle;
+constexpr const char *BarnMachine::kMethodInterrupt;
+constexpr const char *BarnMachine::kSingleName;
+constexpr const char *BarnMachine::kCorrectName;
+constexpr const char *BarnMachine::kTailName;
+constexpr const char *BarnMachine::kFeetName;
+
 BarnRules::BarnRules() = default;
 
 Common::Point BarnRules::home(uint index) {
@@ -45,16 +68,22 @@ bool BarnRules::generatePuzzle(uint pairs, uint trait, bool showGenes, uint limi
 							   Generator *generator) {
 	if (pairs < 1 || 6 < pairs || trait < 1 || 2 < trait || limit < 1)
 		return false;
-	_level = trait == 2 ? 3 : (showGenes ? 1 : 2);
+	if (trait == 2)
+		_level = 3;
+	else if (showGenes)
+		_level = 1;
+	else
+		_level = 2;
 	_trait = trait;
 	_showGenes = showGenes;
 	_pairs = pairs;
 	_wrong = _completed = 0;
 	_selected[0] = _selected[1] = -1;
 	_limit = limit;
-	for (uint side = 0; side < 2; side++)
+	for (uint side = 0; side < 2; side++) {
 		for (uint i = 0; i < _pairs; i++)
 			_choices[side][i] = random.draw() % (_pairs - i);
+	}
 	for (uint i = 0; i < this->party(); i++) {
 		Parent &parent = _parents[i];
 		parent.side = i % 2;
@@ -138,7 +167,8 @@ bool BarnRules::matches(uint first, uint second) const {
 		return false;
 	int values[4];
 	offspring(first, second, values);
-	uint counts[3] = {}, wanted[3] = {};
+	uint counts[3] = {};
+	uint wanted[3] = {};
 	for (uint i = 0; i < 4; i++) {
 		counts[values[i]] += 1;
 		wanted[_target[i]] += 1;
@@ -217,11 +247,11 @@ constexpr const char *BarnMachine::kSound;
 
 BarnMachine::BarnMachine(TrinketEngine &vm, Shell::Scene &scene, int depth) : _vm(vm), _scene(scene), _depth(depth), _reelSound(vm.mixer()) {
 	const char *events[] = {
-		"dropped",
-		"pickedUp",
-		"solved",
-		"wrong",
-		"outOfTurns",
+		kEventDropped,
+		kEventPickedUp,
+		kEventSolved,
+		kEventWrong,
+		kEventOutOfTurns,
 	};
 	for (uint i = 0; i < ARRAYSIZE(events); i++)
 		addEvent(events[i]);
@@ -241,9 +271,10 @@ void BarnMachine::clearPuzzle() {
 		_scene.remove(_owned[i]);
 	_owned.clear();
 	_pausedSprites.clear();
-	for (uint side = 0; side < 2; side++)
+	for (uint side = 0; side < 2; side++) {
 		for (uint i = 0; i < 2; i++)
 			_geneFaces[side][i] = nullptr;
+	}
 	for (uint i = 0; i < 4; i++)
 		_children[i] = nullptr;
 	_generated = false;
@@ -252,16 +283,18 @@ void BarnMachine::clearPuzzle() {
 void BarnMachine::removeSprite(Shell::Sprite *sprite) {
 	if (!sprite)
 		return;
-	for (uint i = 0; i < _pausedSprites.size(); i++)
+	for (uint i = 0; i < _pausedSprites.size(); i++) {
 		if (_pausedSprites[i] == sprite) {
 			_pausedSprites.remove_at(i);
 			break;
 		}
-	for (uint i = 0; i < _owned.size(); i++)
+	}
+	for (uint i = 0; i < _owned.size(); i++) {
 		if (_owned[i] == sprite) {
 			_owned.remove_at(i);
 			break;
 		}
+	}
 	_scene.remove(sprite);
 }
 
@@ -278,78 +311,80 @@ Shell::Sprite *BarnMachine::add(uint id, int depth, bool cd) {
 	return sprite;
 }
 
-bool BarnMachine::get(const Common::String &property, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if (property == "solvedZerbleTag" && arguments.size() == 1) {
-		int index = arguments[0].integer();
+bool BarnMachine::get(const Common::String &property, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if (property.equals(kPropertySolvedZerbleTag) && sargs.size() == 1) {
+		int index = sargs[0].toInt32();
 		result = Core::ScriptValue(index < 0 || 1 < index ? 0 : _solvedTags[index]);
 		return true;
 	}
-	if (arguments.empty() && property == "debugMode")
+	if (sargs.empty() && property.equals(kPropertyDebugMode))
 		result = Core::ScriptValue(_debugMode);
-	else if (arguments.empty() && property == "pieceGrabAOCursorID")
+	else if (sargs.empty() && property.equals(kPropertyPieceGrabAOCursorID))
 		result = Core::ScriptValue(_grabCursor);
-	else if (arguments.empty() && property == "pieceSpotAOCursorID")
+	else if (sargs.empty() && property.equals(kPropertyPieceSpotAOCursorID))
 		result = Core::ScriptValue(_spotCursor);
 	else
-		return ScriptableObject::get(property, arguments, result);
+		return ScriptableObject::get(property, sargs, result);
 	return true;
 }
 
-bool BarnMachine::set(const Common::String &property, const Core::ScriptArguments &arguments, const Core::ScriptValue &value) {
-	if (property == "nextZerbleTrait" && arguments.size() == 2) {
-		int index = arguments[0].integer(), attribute = arguments[1].integer();
+bool BarnMachine::set(const Common::String &property, const Core::ScriptArguments &sargs, const Core::ScriptValue &value) {
+	if (property.equals(kPropertyNextZerbleTrait) && sargs.size() == 2) {
+		int index = sargs[0].toInt32();
+		int attribute = sargs[1].toInt32();
 		if (0 <= index && static_cast<uint>(index) < _inputs.size() && 0 <= attribute && attribute < 3)
-			_inputs[index].traits[attribute] = value.integer();
+			_inputs[index].traits[attribute] = value.toInt32();
 		return true;
 	}
-	if (!arguments.empty())
-		return ScriptableObject::set(property, arguments, value);
-	if (property == "debugMode")
-		_debugMode = value.integer();
-	else if (property == "enabled")
-		_enabled = value.integer() != 0;
-	else if (property == "pieceGrabAOCursorID")
-		_grabCursor = value.text();
-	else if (property == "pieceSpotAOCursorID")
-		_spotCursor = value.text();
+	if (!sargs.empty())
+		return ScriptableObject::set(property, sargs, value);
+	if (property.equals(kPropertyDebugMode))
+		_debugMode = value.toInt32();
+	else if (property.equals(kPropertyEnabled))
+		_enabled = value.toInt32() != 0;
+	else if (property.equals(kPropertyPieceGrabAOCursorID))
+		_grabCursor = value.toText();
+	else if (property.equals(kPropertyPieceSpotAOCursorID))
+		_spotCursor = value.toText();
 	else
-		return ScriptableObject::set(property, arguments, value);
+		return ScriptableObject::set(property, sargs, value);
 	return true;
 }
 
-bool BarnMachine::play(const Common::String &method, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
+bool BarnMachine::play(const Common::String &method, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
 	_time = callTime();
-	if (method == "generatePuzzle" && arguments.size() == 4)
-		return setup(arguments[0].integer(), arguments[1].integer(), arguments[2].integer() != 0, arguments[3].integer());
-	if (method == "addNextZerble" && arguments.size() == 1) {
+	_clock.update(_time, !_paused);
+	if (method.equals(kMethodGeneratePuzzle) && sargs.size() == 4)
+		return setup(sargs[0].toInt32(), sargs[1].toInt32(), sargs[2].toInt32() != 0, sargs[3].toInt32());
+	if (method.equals(kMethodAddNextZerble) && sargs.size() == 1) {
 		BarnRules::Input input;
-		input.tag = arguments[0].integer();
+		input.tag = sargs[0].toInt32();
 		uint at = 0;
 		while (at < _inputs.size() && _inputs[at].tag < input.tag)
 			at += 1;
 		_inputs.insert_at(at, input);
 		return true;
 	}
-	if (!arguments.empty())
-		return ScriptableObject::play(method, arguments, result);
-	if (method == "pause" || method == "resume") {
-		pause(method == "pause", _time);
+	if (!sargs.empty())
+		return ScriptableObject::play(method, sargs, result);
+	if (method.equals(kMethodPause) || method.equals(kMethodResume)) {
+		pause(method.equals(kMethodPause), _time);
 		return true;
 	}
-	if (method == "forceDrop") {
+	if (method.equals(kMethodForceDrop)) {
 		forceDrop();
 		return true;
 	}
-	if (method == "clearPuzzle") {
+	if (method.equals(kMethodClearPuzzle)) {
 		clearPuzzle();
 		return true;
 	}
-	if (method == "interrupt") {
+	if (method.equals(kMethodInterrupt)) {
 		if (_state == kExitDelay05)
 			_stateTime -= 700;
 		return true;
 	}
-	return ScriptableObject::play(method, arguments, result);
+	return ScriptableObject::play(method, sargs, result);
 }
 
 bool BarnMachine::barnParentGenerated(uint index) {
@@ -386,7 +421,8 @@ bool BarnMachine::setup(uint pairs, uint trait, bool showGenes, uint limit) {
 	if (!_valid)
 		return false;
 	_celebration->visible = false;
-	static constexpr int geneX[2][2] = {{417, 587}, {325, 315}}, geneY[2][2] = {{245, 245}, {316, 488}};
+	static constexpr int geneX[2][2] = {{417, 587}, {325, 315}};
+	static constexpr int geneY[2][2] = {{245, 245}, {316, 488}};
 	for (uint side = 0; side < 2; side++) {
 		for (uint i = 0; i < 2; i++) {
 			_genes[side][i] = add(side ? 21065 : 21052, 0);
@@ -401,13 +437,13 @@ bool BarnMachine::setup(uint pairs, uint trait, bool showGenes, uint limit) {
 		216,
 		257,
 		296,
-	},
-						 targetY[] = {
-							 212,
-							 185,
-							 159,
-							 137,
-						 };
+	};
+	static constexpr int targetY[] = {
+		212,
+		185,
+		159,
+		137,
+	};
 	for (uint side = 0; side < 2; side++) {
 		_emphasis[side] = add(21095 + side, 2);
 		if (!_valid)
@@ -438,7 +474,7 @@ bool BarnMachine::setup(uint pairs, uint trait, bool showGenes, uint limit) {
 void BarnMachine::startSpin() {
 	_state = kSpinning00;
 	_spinWaiting = true;
-	_stateTime = _time;
+	_stateTime = _clock.now();
 	_step = 0;
 	clearChildren();
 	static constexpr int targetX[] = {
@@ -446,13 +482,13 @@ void BarnMachine::startSpin() {
 		216,
 		257,
 		296,
-	},
-						 targetY[] = {
-							 212,
-							 185,
-							 159,
-							 137,
-						 };
+	};
+	static constexpr int targetY[] = {
+		212,
+		185,
+		159,
+		137,
+	};
 	for (uint i = 0; i < 4; i++) {
 		_target[i]->setFrame(_rules.target(i) + 1);
 		_target[i]->x = targetX[i] - _target[i]->width() / 2;
@@ -464,9 +500,10 @@ void BarnMachine::startSpin() {
 }
 
 int BarnMachine::hitParent(Common::Point point) const {
-	for (int i = _rules.party() - 1; 0 <= i; i--)
+	for (int i = _rules.party() - 1; 0 <= i; i--) {
 		if (!_rules.parent(i).paired && _parents[i]->bounds().contains(point))
 			return i;
+	}
 	return -1;
 }
 
@@ -476,7 +513,10 @@ void BarnMachine::pick(uint index, Common::Point point) {
 	_selected = index;
 	_pickup = _parents[index]->position();
 	_grab = point - _pickup;
-	_previousSlot = _rules.selected(_rules.parent(index).side) == static_cast<int>(index) ? _rules.parent(index).side : -1;
+	const uint side = _rules.parent(index).side;
+	_previousSlot = -1;
+	if (_rules.selected(side) == static_cast<int>(index))
+		_previousSlot = static_cast<int>(side);
 	if (0 <= _previousSlot) {
 		if (0 <= _rules.selected(0) && 0 <= _rules.selected(1) && _drained < _rules.wrong())
 			drainWater();
@@ -486,13 +526,15 @@ void BarnMachine::pick(uint index, Common::Point point) {
 	}
 	_parents[index]->setDepth(200);
 	playEffect(kResSound21099_StoneMove);
-	emitEvent("pickedUp");
+	emitEvent(kEventPickedUp);
 }
 
 void BarnMachine::drainWater() {
 	_drained = _rules.wrong();
 	uint intervals = _water->getNumberOfFrames() - 1;
-	uint count = MIN(_rules.limit(), intervals), step = intervals / count, remainder = intervals % count;
+	uint count = MIN(_rules.limit(), intervals);
+	uint step = intervals / count;
+	uint remainder = intervals % count;
 	_waterFrame = 1;
 	for (uint i = 0; i < _drained; i++)
 		_waterFrame += step + (count - i <= remainder ? 1 : 0);
@@ -501,11 +543,12 @@ void BarnMachine::drainWater() {
 }
 
 void BarnMachine::drop() {
-	uint index = _selected, side = _rules.parent(index).side;
+	uint index = _selected;
+	uint side = _rules.parent(index).side;
 	bool exhaustedOnRemoval = 0 <= _previousSlot && !_rules.chances();
 	if (exhaustedOnRemoval) {
 		_exhausted = true;
-		emitEvent("outOfTurns");
+		emitEvent(kEventOutOfTurns);
 	}
 	_selected = -1;
 	_parents[index]->setDepth(1);
@@ -517,18 +560,22 @@ void BarnMachine::drop() {
 		_parents[index]->setPosition(stonePosition(side));
 		_correct = result == BarnRules::kCorrect03;
 		if (result == BarnRules::kWrong02)
-			emitEvent("wrong");
+			emitEvent(kEventWrong);
 		playEffect(kResSound21100_GeneReveal);
 		if (_rules.showGenes()) {
 			updateGenes(side, true);
 			_state = kGenes02;
-			_stateTime = _time;
+			_stateTime = _clock.now();
 		} else
 			startPreview();
-		debug(1, "Barn parent %u placed on stone %u: %s, chances %u", index + 1, side + 1,
-			  result == BarnRules::kSingle01 ? "single" : _correct ? "correct"
-																   : "wrong",
-			  _rules.chances());
+		const char *status;
+		if (result == BarnRules::kSingle01)
+			status = kSingleName;
+		else if (_correct)
+			status = kCorrectName;
+		else
+			status = kEventWrong;
+		debug(1, "Barn parent %u placed on stone %u: %s, chances %u", index + 1, side + 1, status, _rules.chances());
 	} else {
 		Common::Point point = _parents[index]->position();
 		Common::Rect pen = penBounds(side);
@@ -540,22 +587,23 @@ void BarnMachine::drop() {
 				_rules.restore(index);
 				updateGenes(side, true, false);
 				clearChildren();
-				if (0 <= _rules.selected(0) && 0 <= _rules.selected(1))
+				if (0 <= _rules.selected(0) && 0 <= _rules.selected(1)) {
 					for (uint i = 0; i < 4; i++)
 						showChild(i);
+				}
 				for (uint i = 0; i < 2; i++)
 					_emphasis[i]->visible = false;
 			}
 		}
 		playEffect(kResSound21101_GeneClose);
 	}
-	emitEvent("dropped");
+	emitEvent(kEventDropped);
 }
 
 void BarnMachine::updateGenes(uint side, bool opening, bool animated) {
 	if (_level != 1)
 		return;
-	_geneTime[side] = _time;
+	_geneTime[side] = _clock.now();
 	_geneOpening[side] = opening;
 	for (uint i = 0; i < 2; i++) {
 		_geneStarted[side][i] = false;
@@ -578,7 +626,14 @@ void BarnMachine::updateGenes(uint side, bool opening, bool animated) {
 		_geneFaces[side][i] = add(base + parent.genes[i] + (i && parent.genes[0] != parent.genes[1] ? 3 : 0), 1);
 		if (!_geneFaces[side][i])
 			continue;
-		_geneFaces[side][i]->x += side ? (i ? -10 : 0) : (i ? 170 : 0);
+		int offsetX = 0;
+		if (side) {
+			if (i)
+				offsetX = -10;
+		} else if (i) {
+			offsetX = 170;
+		}
+		_geneFaces[side][i]->x += offsetX;
 		_geneFaces[side][i]->y += side && i ? 172 : 0;
 		_genes[side][i]->startAnimation(1);
 		_genes[side][i]->setFrame(1);
@@ -609,7 +664,7 @@ void BarnMachine::startPreview() {
 		return;
 	}
 	_state = kPreview03;
-	_stateTime = _time - 400;
+	_stateTime = _clock.now() - 400;
 	_step = 0;
 	playEffect(_correct ? kResSound21093_CorrectPair : kResSound21081_WrongPair);
 }
@@ -628,15 +683,22 @@ void BarnMachine::showChild(uint index) {
 		585,
 		480,
 		596,
-	},
-						 y[] = {
-							 392,
-							 392,
-							 490,
-							 490,
-						 };
+	};
+	static constexpr int y[] = {
+		392,
+		392,
+		490,
+		490,
+	};
 	_children[index]->x += x[index] - 50;
-	_children[index]->y += y[index] - 50 + (_rules.trait() == 2 ? (index < 2 ? 8 : 10) : 0);
+	int offsetY = 0;
+	if (_rules.trait() == 2) {
+		if (index < 2)
+			offsetY = 8;
+		else
+			offsetY = 10;
+	}
+	_children[index]->y += y[index] - 50 + offsetY;
 	if (_rules.showGenes()) {
 		for (uint side = 0; side < 2; side++) {
 			uint gene = side ? index / 2 : index % 2;
@@ -649,7 +711,8 @@ void BarnMachine::showChild(uint index) {
 }
 
 void BarnMachine::commitPair() {
-	int first = _rules.selected(0), second = _rules.selected(1);
+	int first = _rules.selected(0);
+	int second = _rules.selected(1);
 	if (first < 0 || second < 0)
 		return;
 	int chosen[] = {
@@ -669,7 +732,7 @@ void BarnMachine::commitPair() {
 		_solvedTags[side] = _rules.parent(chosen[side]).tag;
 	}
 	_rules.commitPair();
-	emitEvent("solved");
+	emitEvent(kEventSolved);
 	clearChildren();
 	_state = kExiting06;
 	if (_rules.completed() < _rules.pairs())
@@ -678,19 +741,20 @@ void BarnMachine::commitPair() {
 }
 
 void BarnMachine::updateState() {
-	for (uint i = 0; i < _rules.party(); i++)
+	for (uint i = 0; i < _rules.party(); i++) {
 		if (_rules.parent(i).paired && !_parents[i]->isWalking())
 			_parents[i]->setVisible(false, _time);
+	}
 	if (_state == kSpinning00) {
-		if (_spinWaiting && _stateTime + 500 <= _time) {
+		if (_spinWaiting && 500 <= _clock.elapsed(_stateTime)) {
 			_spinWaiting = false;
-			_stateTime = _time;
+			_stateTime = _clock.now();
 			playEffect(kResSound21097_ParentExit);
-		} else if (!_spinWaiting && _stateTime + 400 <= _time) {
+		} else if (!_spinWaiting && 400 <= _clock.elapsed(_stateTime)) {
 			_reels[_step]->visible = false;
 			_reels[_step]->pauseAnimation(true);
 			_step += 1;
-			_stateTime = _time;
+			_stateTime = _clock.now();
 			if (_step == 4) {
 				_reelSound.stop();
 				_state = kPlaying01;
@@ -702,7 +766,7 @@ void BarnMachine::updateState() {
 		if (!_geneOpening[side])
 			continue;
 		for (uint i = 0; i < 2; i++) {
-			if (_geneStarted[side][i] || _time < _geneTime[side] + 500 * i)
+			if (_geneStarted[side][i] || _clock.elapsed(_geneTime[side]) < 500 * i)
 				continue;
 			_geneStarted[side][i] = true;
 			_genes[side][i]->pauseAnimation(false);
@@ -714,13 +778,14 @@ void BarnMachine::updateState() {
 	}
 	if (_state == kGenes02) {
 		bool ready = true;
-		for (uint side = 0; side < 2; side++)
+		for (uint side = 0; side < 2; side++) {
 			if (0 <= _rules.selected(side) && (!_geneStarted[side][1] || _genes[side][1]->isRunning()))
 				ready = false;
+		}
 		if (ready)
 			startPreview();
-	} else if (_state == kPreview03 && _stateTime + 400 <= _time) {
-		_stateTime = _time;
+	} else if (_state == kPreview03 && 400 <= _clock.elapsed(_stateTime)) {
+		_stateTime = _clock.now();
 		if (_step < 4) {
 			showChild(_step);
 			_step += 1;
@@ -733,19 +798,21 @@ void BarnMachine::updateState() {
 	} else if (_state == kCelebrating04 && !_celebration->isRunning()) {
 		_celebration->visible = false;
 		_state = kExitDelay05;
-		_stateTime = _time;
+		_stateTime = _clock.now();
 		playEffect(kResSound2726_CommonGo);
-	} else if (_state == kExitDelay05 && _stateTime + 700 <= _time)
+	} else if (_state == kExitDelay05 && 700 <= _clock.elapsed(_stateTime))
 		commitPair();
 	else if (_state == kExiting06) {
 		bool walking = false;
-		for (uint i = 0; i < _rules.party(); i++)
+		for (uint i = 0; i < _rules.party(); i++) {
 			if (_rules.parent(i).paired && _parents[i]->isWalking())
 				walking = true;
+		}
 		if (!walking) {
-			for (uint i = 0; i < _rules.party(); i++)
+			for (uint i = 0; i < _rules.party(); i++) {
 				if (_rules.parent(i).paired)
 					_parents[i]->setVisible(false, _time);
+			}
 			if (_rules.completed() == _rules.pairs())
 				_state = kPlaying01;
 			else
@@ -759,16 +826,18 @@ void BarnMachine::updateState() {
 void BarnMachine::forceDrop() {
 	if (_selected < 0)
 		return;
-	uint index = _selected, side = _rules.parent(index).side;
+	uint index = _selected;
+	uint side = _rules.parent(index).side;
 	_parents[index]->setPosition(_pickup);
 	_parents[index]->setDepth(1);
 	if (0 <= _previousSlot) {
 		_rules.restore(index);
 		updateGenes(side, true, false);
 		clearChildren();
-		if (0 <= _rules.selected(0) && 0 <= _rules.selected(1))
+		if (0 <= _rules.selected(0) && 0 <= _rules.selected(1)) {
 			for (uint i = 0; i < 4; i++)
 				showChild(i);
+		}
 		for (uint i = 0; i < 2; i++)
 			_emphasis[i]->visible = false;
 	}
@@ -778,6 +847,7 @@ void BarnMachine::forceDrop() {
 
 void BarnMachine::event(const Common::Event &event, uint32 time) {
 	_time = time;
+	_clock.update(time, !_paused);
 	if (!_generated || _paused || !_enabled)
 		return;
 	if (_exhausted || (_state != kPlaying01 && !((_state == kGenes02 || _state == kPreview03) && !_correct)))
@@ -803,6 +873,7 @@ void BarnMachine::event(const Common::Event &event, uint32 time) {
 
 void BarnMachine::update(uint32 time) {
 	_time = time;
+	_clock.update(time, !_paused);
 	if (!_generated || _paused)
 		return;
 	Common::Array<uint16> sounds;
@@ -816,34 +887,33 @@ void BarnMachine::update(uint32 time) {
 void BarnMachine::pause(bool paused, uint32 time) {
 	if (!_generated || _paused == paused)
 		return;
+	_clock.update(time, !_paused);
 	_paused = paused;
 	for (uint i = 0; i < _rules.party(); i++)
 		_parents[i]->pause(paused, time);
 	_reelSound.pause(paused);
 	if (paused) {
-		_pauseTime = time;
 		Common::Array<Shell::Sprite *> sprites;
 		sprites.push_back(_water);
 		sprites.push_back(_celebration);
 		for (uint i = 0; i < 4; i++)
 			sprites.push_back(_reels[i]);
-		for (uint side = 0; side < 2; side++)
+		for (uint side = 0; side < 2; side++) {
 			for (uint i = 0; i < 2; i++) {
 				sprites.push_back(_genes[side][i]);
 				if (_geneFaces[side][i])
 					sprites.push_back(_geneFaces[side][i]);
 			}
+		}
 		for (uint side = 0; side < 2; side++)
 			sprites.push_back(_emphasis[side]);
-		for (uint i = 0; i < sprites.size(); i++)
+		for (uint i = 0; i < sprites.size(); i++) {
 			if (sprites[i]->isRunning()) {
 				_pausedSprites.push_back(sprites[i]);
 				sprites[i]->pauseAnimation(true);
 			}
+		}
 	} else {
-		_stateTime += time - _pauseTime;
-		for (uint side = 0; side < 2; side++)
-			_geneTime[side] += time - _pauseTime;
 		for (uint i = 0; i < _pausedSprites.size(); i++)
 			_pausedSprites[i]->pauseAnimation(false);
 		_pausedSprites.clear();
@@ -866,7 +936,7 @@ bool BarnMachine::pollSound(uint16 &sound) {
 
 Common::String BarnMachine::debugAnswer() const {
 	Common::String result = Common::String::format("Barn level %u: target %s [%u,%u,%u,%u], dominance 0>1>2>0.\n", _level,
-												   _level == 3 ? "tail" : "feet", _rules.target(0), _rules.target(1), _rules.target(2), _rules.target(3));
+												   _level == 3 ? kTailName : kFeetName, _rules.target(0), _rules.target(1), _rules.target(2), _rules.target(3));
 	if (_state != kPlaying01)
 		return result + "Wait for machine, genes, offspring or departing parents.\n";
 	Common::Array<BarnRules::Pair> plan;

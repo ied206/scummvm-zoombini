@@ -21,8 +21,24 @@
 
 #include "trinket/zoombini3_world.h"
 
+#include "common/textconsole.h"
+#include "trinket/string_parser.h"
+
 namespace Trinket {
 namespace Zoombini3 {
+
+constexpr const char *World::kZ3AUnsignedIndexHighestLevelFormat;
+constexpr const char *World::kIsBackgroundMusicOffName;
+constexpr const char *World::kIsPrinterOffName;
+constexpr const char *World::kBeenLeveledName;
+constexpr const char *World::kAreBackgroundAnimationsOffName;
+constexpr const char *World::kIsClosedCaptioningOnName;
+constexpr const char *World::kIsControllerFXOffName;
+constexpr const char *World::kCompletedGameName;
+constexpr const char *World::kZ3A1Level1DS1DoneName;
+constexpr const char *World::kZ3A1DSUnsignedIndexDoneFormat;
+constexpr const char *World::kXMLPLAYEREND;
+constexpr const char *World::kIsHelpAudioOffName;
 
 constexpr uint World::kTokenCount;
 constexpr uint World::kPartyLimit;
@@ -52,24 +68,24 @@ void World::resetNative() {
 		_activities[i][11] = 1;
 		_activities[i][27] = 1;
 		Property property;
-		property.name = Common::String::format("Z3A%uHighestLevel", i + 1);
+		property.name = Common::String::format(kZ3AUnsignedIndexHighestLevelFormat, i + 1);
 		property.value = "0";
 		_properties.push_back(property);
 	}
 	setMusicVolume(0);
 	setDialogueVolume(0);
 	setEffectsVolume(0);
-	setIntegerProperty("isBackgroundMusicOff", 0);
-	setIntegerProperty("isPrinterOff", 0);
-	setIntegerProperty("beenLeveled", 0);
-	setIntegerProperty("areBackgroundAnimationsOff", 0);
-	setIntegerProperty("isClosedCaptioningOn", 0);
-	setIntegerProperty("isControllerFXOff", 0);
-	setIntegerProperty("completedGame", 0);
+	setIntegerProperty(kIsBackgroundMusicOffName, 0);
+	setIntegerProperty(kIsPrinterOffName, 0);
+	setIntegerProperty(kBeenLeveledName, 0);
+	setIntegerProperty(kAreBackgroundAnimationsOffName, 0);
+	setIntegerProperty(kIsClosedCaptioningOnName, 0);
+	setIntegerProperty(kIsControllerFXOffName, 0);
+	setIntegerProperty(kCompletedGameName, 0);
 	setHelpAudioOff(false);
-	setIntegerProperty("Z3A1Level1DS1Done", 0);
+	setIntegerProperty(kZ3A1Level1DS1DoneName, 0);
 	for (uint i = 1; i <= 13; i++) {
-		Common::String name = Common::String::format("Z3A1DS%uDone", i);
+		Common::String name = Common::String::format(kZ3A1DSUnsignedIndexDoneFormat, i);
 		setIntegerProperty(name.c_str(), 0);
 	}
 	for (uint i = 0; i < kTokenCount; i++) {
@@ -131,7 +147,7 @@ void World::initializeNewGame(bool practice) {
 	for (uint i = 0; i < 7; i++) {
 		_activities[i][27] = 1;
 		_activities[i][28] = practice ? kPartyLimit : 0;
-		Common::String name = Common::String::format("Z3A%uHighestLevel", i + 1);
+		Common::String name = Common::String::format(kZ3AUnsignedIndexHighestLevelFormat, i + 1);
 		setIntegerProperty(name.c_str(), practice ? 3 : 1);
 		if (practice)
 			setLevel(i, 1);
@@ -144,9 +160,9 @@ void World::initializeNewGame(bool practice) {
 	setMusicVolume(50);
 	setDialogueVolume(100);
 	setEffectsVolume(80);
-	setIntegerProperty("Z3A1Level1DS1Done", 0);
+	setIntegerProperty(kZ3A1Level1DS1DoneName, 0);
 	for (uint i = 1; i <= 13; i++) {
-		Common::String name = Common::String::format("Z3A1DS%uDone", i);
+		Common::String name = Common::String::format(kZ3A1DSUnsignedIndexDoneFormat, i);
 		setIntegerProperty(name.c_str(), 0);
 	}
 }
@@ -174,12 +190,14 @@ bool World::readState(Common::SeekableReadStream &stream) {
 	_location = stream.readSint32LE();
 	for (uint i = 0; i < 2; i++)
 		_flags[i] = stream.readSint32LE();
-	for (uint i = 0; i < 3; i++)
+	for (uint i = 0; i < 3; i++) {
 		for (uint j = 0; j < 3; j++)
 			_scenes[i][j] = stream.readSint32LE();
-	for (uint i = 0; i < 7; i++)
+	}
+	for (uint i = 0; i < 7; i++) {
 		for (uint j = 0; j < 32; j++)
 			_activities[i][j] = stream.readSint32LE();
+	}
 	for (uint i = 0; i < 10; i++)
 		_seenMovies[i] = stream.readSint32LE();
 	for (uint i = 0; i < kTokenCount; i++) {
@@ -193,7 +211,7 @@ bool World::readState(Common::SeekableReadStream &stream) {
 		Property property;
 		if (!readLine(stream, property.name))
 			return false;
-		if (property.name == "PLAYER_END") {
+		if (property.name.equals(kXMLPLAYEREND)) {
 			restoreLegacyAudioSettings();
 			return true;
 		}
@@ -210,7 +228,7 @@ void World::restoreLegacyAudioSettings() {
 	if (_properties.size() != 7)
 		return;
 	for (uint i = 0; i < 7; i++) {
-		if (_properties[i].name != Common::String::format("Z3A%uHighestLevel", i + 1))
+		if (!_properties[i].name.equals(Common::String::format(kZ3AUnsignedIndexHighestLevelFormat, i + 1)))
 			return;
 	}
 	setMusicVolume(50);
@@ -222,12 +240,14 @@ bool World::write(Common::WriteStream &stream) const {
 	stream.writeSint32LE(_location);
 	for (uint i = 0; i < 2; i++)
 		stream.writeSint32LE(_flags[i]);
-	for (uint i = 0; i < 3; i++)
+	for (uint i = 0; i < 3; i++) {
 		for (uint j = 0; j < 3; j++)
 			stream.writeSint32LE(_scenes[i][j]);
-	for (uint i = 0; i < 7; i++)
+	}
+	for (uint i = 0; i < 7; i++) {
 		for (uint j = 0; j < 32; j++)
 			stream.writeSint32LE(_activities[i][j]);
+	}
 	for (uint i = 0; i < 10; i++)
 		stream.writeSint32LE(_seenMovies[i]);
 	for (uint i = 0; i < kTokenCount; i++) {
@@ -347,18 +367,25 @@ void World::visit(Location location) {
 }
 
 bool World::isHelpAudioOff() const {
-	return integerProperty("isHelpAudioOff") != 0;
+	return integerProperty(kIsHelpAudioOffName) != 0;
 }
 
 int World::integerProperty(const char *name) const {
 	Common::String value;
-	return stringProperty(name, value) ? atoi(value.c_str()) : 0;
+	if (!stringProperty(name, value))
+		return 0;
+	int32 parsedValue = 0;
+	if (StringParser::parseSignedInt(value.c_str(), parsedValue, StringParser::kDecimalProfile) != StringParser::Result::kSuccess) {
+		warning("Trinket: invalid integer world property %s=%s", name, value.c_str());
+		return 0;
+	}
+	return parsedValue;
 }
 
 bool World::stringProperty(const Common::String &name, Common::String &value) const {
 	// Restoring repeated property pairs leaves the last assignment in effect.
 	for (uint i = _properties.size(); 0 < i; i--) {
-		if (_properties[i - 1].name == name) {
+		if (_properties[i - 1].name.equals(name)) {
 			value = _properties[i - 1].value;
 			return true;
 		}
@@ -367,7 +394,7 @@ bool World::stringProperty(const Common::String &name, Common::String &value) co
 }
 
 void World::setHelpAudioOff(bool off) {
-	setIntegerProperty("isHelpAudioOff", off ? 1 : 0);
+	setIntegerProperty(kIsHelpAudioOffName, off ? 1 : 0);
 }
 
 void World::setIntegerProperty(const char *name, int value) {
@@ -376,7 +403,7 @@ void World::setIntegerProperty(const char *name, int value) {
 
 void World::setStringProperty(const Common::String &name, const Common::String &value) {
 	for (uint i = _properties.size(); 0 < i; i--) {
-		if (_properties[i - 1].name == name) {
+		if (_properties[i - 1].name.equals(name)) {
 			_properties[i - 1].value = value;
 			return;
 		}
@@ -388,12 +415,12 @@ void World::setStringProperty(const Common::String &name, const Common::String &
 }
 
 int World::highestLevel(uint activity) const {
-	Common::String name = Common::String::format("Z3A%uHighestLevel", activity + 1);
+	Common::String name = Common::String::format(kZ3AUnsignedIndexHighestLevelFormat, activity + 1);
 	for (uint i = 0; i < _properties.size(); i++) {
-		if (_properties[i].name == name) {
-			if (_properties[i].value == "3")
+		if (_properties[i].name.equals(name)) {
+			if (_properties[i].value.equals("3"))
 				return 3;
-			if (_properties[i].value == "2")
+			if (_properties[i].value.equals("2"))
 				return 2;
 		}
 	}
@@ -465,9 +492,10 @@ bool World::moveToken(uint index, int destination) {
 			return false;
 		next = destination;
 		// An explicit reroute clears traits throughout the world, including other parties.
-		for (uint i = 0; i < kTokenCount; i++)
+		for (uint i = 0; i < kTokenCount; i++) {
 			for (uint j = 0; j < 6; j++)
 				_tokens[i].attributes[j] = -1;
+		}
 	}
 	if (!next)
 		return false;
@@ -533,7 +561,8 @@ void World::autoLevel(uint activity, uint successes, uint failures) {
 	int32 *state = _activities[activity];
 	if (state[11] < 1 || 3 < state[11] || state[15] < 0 || 20 < state[15])
 		return;
-	uint correct = 0, incorrect = 0;
+	uint correct = 0;
+	uint incorrect = 0;
 	for (int i = state[15] - 1; 0 <= i; i--) {
 		if (historyEntry(state, i)) {
 			correct += 1;

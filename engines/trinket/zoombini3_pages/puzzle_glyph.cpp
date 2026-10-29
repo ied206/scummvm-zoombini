@@ -20,6 +20,41 @@
 namespace Trinket {
 namespace Zoombini3 {
 
+constexpr const char *GlyphMachine::kValueCountName;
+constexpr const char *GlyphMachine::kGlyphCountName;
+constexpr const char *GlyphMachine::kRowCountName;
+constexpr const char *GlyphMachine::kCharCountPerTileName;
+constexpr const char *GlyphMachine::kTileCountName;
+constexpr const char *GlyphMachine::kEventTilePickedUp;
+constexpr const char *GlyphMachine::kEventTileDropped;
+constexpr const char *GlyphMachine::kEventTileSolved;
+constexpr const char *GlyphMachine::kEventTileWrong;
+constexpr const char *GlyphMachine::kEventAnimFinished;
+constexpr const char *GlyphMachine::kPropertyEnabled;
+constexpr const char *GlyphMachine::kClusterName;
+constexpr const char *GlyphMachine::kDoStampName;
+constexpr const char *GlyphMachine::kNeedToRestoreStampName;
+constexpr const char *GlyphMachine::kPieceGrabAOCursorIDName;
+constexpr const char *GlyphMachine::kPieceSpotAOCursorIDName;
+constexpr const char *GlyphMachine::kDebugModeName;
+constexpr const char *GlyphMachine::kMethodDbgReadPuzzleAttributes;
+constexpr const char *GlyphMachine::kMethodSelectNode;
+constexpr const char *GlyphMachine::kMethodZ3A2Data;
+constexpr const char *GlyphMachine::kPropertyNodeTag;
+constexpr const char *GlyphMachine::kPropertyAttributeValue;
+constexpr const char *GlyphMachine::kMethodPause;
+constexpr const char *GlyphMachine::kMethodResume;
+constexpr const char *GlyphMachine::kMethodForceDrop;
+constexpr const char *GlyphMachine::kMethodClearPuzzle;
+constexpr const char *GlyphMachine::kMethodGeneratePuzzle;
+constexpr const char *GlyphMachine::kMethodSetIndentAO;
+constexpr const char *GlyphMachine::kMethodSetTileAO;
+constexpr const char *GlyphMachine::kMethodSetTileCharactersAO;
+constexpr const char *GlyphMachine::kMethodSetTileLightsAO;
+constexpr const char *GlyphMachine::kMethodSetGlyphsAO;
+constexpr const char *GlyphMachine::kMethodSetHighlightAO;
+constexpr const char *GlyphMachine::kNameSignedIndexFormat;
+
 bool GlyphRules::findSolution(int *slots) const {
 	GlyphRules state = *this;
 	for (uint i = 0; i < kTileCount; i++) {
@@ -31,7 +66,8 @@ bool GlyphRules::findSolution(int *slots) const {
 }
 
 bool GlyphRules::solveRemaining(const GlyphRules &state, int *slots) {
-	uint selected = kTileCount, fewest = kMaximumGlyphs + 1;
+	uint selected = kTileCount;
+	uint fewest = kMaximumGlyphs + 1;
 	int candidates[kMaximumGlyphs];
 	for (uint i = 0; i < kTileCount; i++) {
 		if (state.tile(i).solved)
@@ -110,7 +146,8 @@ bool GlyphRules::generate(uint level, Shell::Random &random) {
 	for (uint i = 0; i < kValueCount; i++)
 		_alphabet[i] = i;
 	shuffleByPairs(_alphabet, kValueCount, random);
-	int starts[kTileCount], positions[kTileCount];
+	int starts[kTileCount];
+	int positions[kTileCount];
 	for (uint i = 0; i < kTileCount; i++) {
 		starts[i] = i * _characters;
 		positions[i] = i;
@@ -143,7 +180,8 @@ void GlyphRules::addDuplicatePatterns(int *starts, Shell::Random &random) {
 	int markers[kMaximumGlyphs] = {};
 	static constexpr uint tilesPerRow = kTileCount / kRowCount;
 	uint gaps = (_glyphCount - _characters * kTileCount) / kRowCount;
-	uint cell = 0, tile = 0;
+	uint cell = 0;
+	uint tile = 0;
 	for (uint row = 0; row < kRowCount; row++) {
 		uint gapCounts[tilesPerRow + 1] = {};
 		for (uint i = 0; i < gaps; i++)
@@ -180,7 +218,8 @@ void GlyphRules::addDuplicatePatterns(int *starts, Shell::Random &random) {
 		Common::Array<Range> ranges;
 		int total = 0;
 		for (uint row = 0; row < kRowCount; row++) {
-			int first = row * columns(), available = 0;
+			int first = row * columns();
+			int available = 0;
 			uint position = first;
 			while (position < (row + 1) * columns()) {
 				if (markers[position] == kDuplicateStart) {
@@ -244,9 +283,10 @@ bool GlyphRules::canPlace(uint index, int cell) const {
 		return false;
 	if (columns() < cell % columns() + _characters || (clustered() && cell % _characters))
 		return false;
-	for (uint i = 0; i < _characters; i++)
+	for (uint i = 0; i < _characters; i++) {
 		if (0 <= _occupancy[cell + i])
 			return false;
+	}
 	return true;
 }
 
@@ -289,7 +329,12 @@ GlyphMachine::GlyphMachine(Shell::Scene &scene, const GlyphRules &rules) : _scen
 	_symbolID = 12400;
 	_lightID = 12410;
 	_glyphID = 12401;
-	_indentID = rules.clustered() ? 12427 : (rules.charactersPerTile() == 3 ? 12430 : 12428);
+	if (rules.clustered())
+		_indentID = 12427;
+	else if (rules.charactersPerTile() == 3)
+		_indentID = 12430;
+	else
+		_indentID = 12428;
 	_highlightID = rules.charactersPerTile() == 3 ? 12433 : 12429;
 	_indentOffset = Common::Point(rules.clustered() ? 3 : 5, rules.clustered() ? 4 : 3);
 	for (uint i = 0; i < ARRAYSIZE(_reveals); i++) {
@@ -303,15 +348,15 @@ GlyphMachine::GlyphMachine(Shell::Scene &scene, Shell::Random &random, Common::P
 	y = position.y;
 	z = depth;
 	initializeEvents();
-	static const char *const properties[] = {
-		"valueCount",
-		"glyphCount",
-		"rowCount",
-		"charCountPerTile",
-		"tileCount",
+	static constexpr const char *properties[] = {
+		kValueCountName,
+		kGlyphCountName,
+		kRowCountName,
+		kCharCountPerTileName,
+		kTileCountName,
 	};
 	for (uint i = 0; i < ARRAYSIZE(properties); i++)
-		_configuration[properties[i]] = 1;
+		_configMap[properties[i]] = 1;
 	for (uint i = 0; i < ARRAYSIZE(_reveals); i++) {
 		_reveals[i].owner = this;
 		_reveals[i].cell = i;
@@ -323,12 +368,12 @@ GlyphMachine::~GlyphMachine() {
 }
 
 void GlyphMachine::initializeEvents() {
-	static const char *const events[] = {
-		"tilePickedUp",
-		"tileDropped",
-		"tileSolved",
-		"tileWrong",
-		"animFinished",
+	static constexpr const char *events[] = {
+		kEventTilePickedUp,
+		kEventTileDropped,
+		kEventTileSolved,
+		kEventTileWrong,
+		kEventAnimFinished,
 	};
 	for (uint i = 0; i < ARRAYSIZE(events); i++)
 		addEvent(events[i]);
@@ -339,7 +384,7 @@ void GlyphMachine::clearPuzzle() {
 		_scene.remove(_owned[i]);
 	_owned.clear();
 	_sounds.clear();
-	_soundChannels.clear();
+	_soundChans.clear();
 	for (uint i = 0; i < ARRAYSIZE(_pieces); i++)
 		_pieces[i] = Piece();
 	for (uint i = 0; i < ARRAYSIZE(_glyphs); i++) {
@@ -348,133 +393,134 @@ void GlyphMachine::clearPuzzle() {
 		_reveals[i].started = false;
 	}
 	_highlight = nullptr;
-	_dragged = _previousSlot = _target = -1;
+	_dragged = _prevSlot = _target = -1;
 }
 
-bool GlyphMachine::get(const Common::String &property, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if (property == "enabled")
+bool GlyphMachine::get(const Common::String &property, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if (property.equals(kPropertyEnabled))
 		result = Core::ScriptValue(static_cast<int32>(enabled));
-	else if (_configuration.contains(property))
-		result = Core::ScriptValue(_configuration[property]);
+	else if (_configMap.contains(property))
+		result = Core::ScriptValue(_configMap[property]);
 	else
-		return Core::Trinket::get(property, arguments, result);
-	return arguments.empty();
+		return Core::Trinket::get(property, sargs, result);
+	return sargs.empty();
 }
 
-bool GlyphMachine::set(const Common::String &property, const Core::ScriptArguments &arguments, const Core::ScriptValue &value) {
-	if (!arguments.empty())
-		return Core::Trinket::set(property, arguments, value);
-	if (property == "enabled") {
-		setEnabled(value.integer() != 0);
+bool GlyphMachine::set(const Common::String &property, const Core::ScriptArguments &sargs, const Core::ScriptValue &value) {
+	if (!sargs.empty())
+		return Core::Trinket::set(property, sargs, value);
+	if (property.equals(kPropertyEnabled)) {
+		setEnabled(value.toInt32() != 0);
 		return true;
 	}
-	static const char *const properties[] = {
-		"valueCount",
-		"glyphCount",
-		"rowCount",
-		"charCountPerTile",
-		"tileCount",
-		"cluster",
-		"doStamp",
-		"needToRestoreStamp",
-		"pieceGrabAOCursorID",
-		"pieceSpotAOCursorID",
-		"debugMode",
+	static constexpr const char *properties[] = {
+		kValueCountName,
+		kGlyphCountName,
+		kRowCountName,
+		kCharCountPerTileName,
+		kTileCountName,
+		kClusterName,
+		kDoStampName,
+		kNeedToRestoreStampName,
+		kPieceGrabAOCursorIDName,
+		kPieceSpotAOCursorIDName,
+		kDebugModeName,
 	};
 	for (uint i = 0; i < ARRAYSIZE(properties); i++) {
-		if (property == properties[i]) {
-			_configuration[property] = value.integer();
+		if (property.equals(properties[i])) {
+			_configMap[property] = value.toInt32();
 			return true;
 		}
 	}
-	return Core::Trinket::set(property, arguments, value);
+	return Core::Trinket::set(property, sargs, value);
 }
 
-bool GlyphMachine::play(const Common::String &method, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if (arguments.empty()) {
-		if (method == "dbgReadPuzzleAttributes") {
-			if (!_configuration["debugMode"])
+bool GlyphMachine::play(const Common::String &method, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	_clock.update(callTime(), !_paused);
+	if (sargs.empty()) {
+		if (method.equals(kMethodDbgReadPuzzleAttributes)) {
+			if (!_configMap[kDebugModeName])
 				return true;
 			Shell::XMLFile file;
 			if (!file.load(kDebugInput))
 				return false;
-			file.play("selectNode", {Core::ScriptValue(Common::String("Z3A2Data"))}, result);
-			file.get("nodeTag", {}, result);
-			if (result.text() != "Z3A2Data")
+			file.play(kMethodSelectNode, {Core::ScriptValue(Common::String(kMethodZ3A2Data))}, result);
+			file.get(kPropertyNodeTag, {}, result);
+			if (!result.toText().equals(kMethodZ3A2Data))
 				return true;
 			clearPuzzle();
-			static const char *const properties[] = {
-				"valueCount",
-				"rowCount",
-				"glyphCount",
-				"tileCount",
-				"charCountPerTile",
-				"cluster",
+			static constexpr const char *properties[] = {
+				kValueCountName,
+				kRowCountName,
+				kGlyphCountName,
+				kTileCountName,
+				kCharCountPerTileName,
+				kClusterName,
 			};
 			for (const char *property : properties) {
-				file.get("attributeValue", {Core::ScriptValue(Common::String(property))}, result);
-				_configuration[property] = result.integer();
+				file.get(kPropertyAttributeValue, {Core::ScriptValue(Common::String(property))}, result);
+				_configMap[property] = result.toInt32();
 			}
 			return true;
 		}
-		if (method == "pause" || method == "resume") {
-			pause(method == "pause", callTime());
+		if (method.equals(kMethodPause) || method.equals(kMethodResume)) {
+			pause(method.equals(kMethodPause), callTime());
 			return true;
 		}
-		if (method == "forceDrop") {
+		if (method.equals(kMethodForceDrop)) {
 			forceDrop();
 			return true;
 		}
-		if (method == "clearPuzzle") {
+		if (method.equals(kMethodClearPuzzle)) {
 			clearPuzzle();
 			return true;
 		}
-		if (method == "generatePuzzle") {
-			if (!_random || _configuration["valueCount"] != 10 || _configuration["rowCount"] != 2 || _configuration["tileCount"] != 12)
+		if (method.equals(kMethodGeneratePuzzle)) {
+			if (!_random || _configMap[kValueCountName] != 10 || _configMap[kRowCountName] != 2 || _configMap[kTileCountName] != 12)
 				return false;
 			uint level = 0;
 			for (uint candidate = 1; candidate <= 3; candidate++) {
-				if (_configuration["glyphCount"] == (candidate == 2 ? 56 : 48) &&
-					_configuration["charCountPerTile"] == (candidate == 3 ? 3 : 4) &&
-					(_configuration["cluster"] != 0) == (candidate == 1))
+				if (_configMap[kGlyphCountName] == (candidate == 2 ? 56 : 48) &&
+					_configMap[kCharCountPerTileName] == (candidate == 3 ? 3 : 4) &&
+					(_configMap[kClusterName] != 0) == (candidate == 1))
 					level = candidate;
 			}
 			if (!level)
 				return false;
 			clearPuzzle();
-			_resourceError = false;
+			_resError = false;
 			return _rules.generate(level, *_random) && load();
 		}
 	}
-	if (method == "setIndentAO" && arguments.size() == 3) {
-		_indentID = arguments[0].integer();
-		_indentOffset = Common::Point(arguments[1].integer(), arguments[2].integer());
+	if (method.equals(kMethodSetIndentAO) && sargs.size() == 3) {
+		_indentID = sargs[0].toInt32();
+		_indentOffset = Common::Point(sargs[1].toInt32(), sargs[2].toInt32());
 		return true;
 	}
-	if (arguments.size() == 1) {
+	if (sargs.size() == 1) {
 		uint *resource = nullptr;
-		if (method == "setTileAO")
+		if (method.equals(kMethodSetTileAO))
 			resource = &_tileID;
-		else if (method == "setTileCharactersAO")
+		else if (method.equals(kMethodSetTileCharactersAO))
 			resource = &_symbolID;
-		else if (method == "setTileLightsAO")
+		else if (method.equals(kMethodSetTileLightsAO))
 			resource = &_lightID;
-		else if (method == "setGlyphsAO")
+		else if (method.equals(kMethodSetGlyphsAO))
 			resource = &_glyphID;
-		else if (method == "setHighlightAO")
+		else if (method.equals(kMethodSetHighlightAO))
 			resource = &_highlightID;
 		if (resource) {
-			*resource = arguments[0].integer();
+			*resource = sargs[0].toInt32();
 			return true;
 		}
 	}
-	return Core::Trinket::play(method, arguments, result);
+	return Core::Trinket::play(method, sargs, result);
 }
 
 Shell::Sprite *GlyphMachine::add(uint id, int depth, int frame) {
 	Shell::Sprite *sprite = _scene.add(Common::String::format(kAnimation, id), depth);
 	if (!sprite) {
-		_resourceError = true;
+		_resError = true;
 		return nullptr;
 	}
 	_owned.push_back(sprite);
@@ -495,27 +541,27 @@ void GlyphMachine::remove(Shell::Sprite *sprite) {
 
 int GlyphMachine::boardWidth() const {
 	uint groups = (_rules.columns() + _rules.charactersPerTile() - 1) / _rules.charactersPerTile();
-	return groups * _contentWidth + (_rules.clustered() ? (groups - 1) * 10 : 0);
+	return groups * _contentW + (_rules.clustered() ? (groups - 1) * 10 : 0);
 }
 
 Common::Point GlyphMachine::slotPosition(uint cell) const {
 	uint column = cell % _rules.columns();
 	uint group = column / _rules.charactersPerTile();
-	float width = static_cast<float>(_contentWidth) / _rules.charactersPerTile();
-	int anchorX = x + group * _contentWidth + static_cast<int>((column % _rules.charactersPerTile()) * width) - 1;
+	float width = static_cast<float>(_contentW) / _rules.charactersPerTile();
+	int anchorX = x + group * _contentW + static_cast<int>((column % _rules.charactersPerTile()) * width) - 1;
 	if (_rules.clustered())
 		anchorX += group * 10;
-	return Common::Point(anchorX, y + _tileHeight / 2 + cell / _rules.columns() * rowStride());
+	return Common::Point(anchorX, y + _tileH / 2 + cell / _rules.columns() * rowStride());
 }
 
 Common::Point GlyphMachine::glyphPosition(uint cell, Shell::Sprite &sprite) const {
 	uint column = cell % _rules.columns();
 	uint group = column / _rules.charactersPerTile();
-	float width = static_cast<float>(_contentWidth) / _rules.charactersPerTile();
-	int anchorX = x + group * _contentWidth + static_cast<int>((column % _rules.charactersPerTile()) * width + width * 0.5 - sprite.width() * 0.5);
+	float width = static_cast<float>(_contentW) / _rules.charactersPerTile();
+	int anchorX = x + group * _contentW + static_cast<int>((column % _rules.charactersPerTile()) * width + width * 0.5f - sprite.width() * 0.5f);
 	if (_rules.clustered())
 		anchorX += group * 10;
-	int anchorY = y + _tileHeight / 2 - (_tileHeight / 2) / 2 + cell / _rules.columns() * rowStride();
+	int anchorY = y + _tileH / 2 - (_tileH / 2) / 2 + cell / _rules.columns() * rowStride();
 	anchorY += (column % 2 ? 4 : -4) - sprite.height() / 2;
 	return Common::Point(anchorX, anchorY);
 }
@@ -554,15 +600,15 @@ bool GlyphMachine::load() {
 		piece.base = add(_tileID, z);
 		if (!piece.base)
 			return false;
-		_tileWidth = piece.base->width();
-		_tileHeight = piece.base->height();
-		_contentWidth = _tileWidth - 3;
-		float width = static_cast<float>(_contentWidth) / _rules.charactersPerTile();
+		_tileW = piece.base->width();
+		_tileH = piece.base->height();
+		_contentW = _tileW - 3;
+		float width = static_cast<float>(_contentW) / _rules.charactersPerTile();
 		for (uint j = 0; j < _rules.charactersPerTile(); j++) {
 			Shell::Sprite *symbol = add(_symbolID, z, _rules.tile(i).values[j] + 1);
 			if (!symbol)
 				return false;
-			symbol->x = piece.base->x + 1 + static_cast<int>(j * width + width * 0.5 - symbol->width() * 0.5);
+			symbol->x = piece.base->x + 1 + static_cast<int>(j * width + width * 0.5f - symbol->width() * 0.5f);
 			symbol->y = piece.base->y + 16 - symbol->height() / 2;
 			piece.symbols[j] = symbol;
 			if (_rules.clustered()) {
@@ -572,7 +618,7 @@ bool GlyphMachine::load() {
 			}
 		}
 		uint position = _rules.tile(i).supplyPosition;
-		movePiece(i, Common::Point(supplyX[position], supplyY[position]), supplyY[position] + _tileHeight + z - 375);
+		movePiece(i, Common::Point(supplyX[position], supplyY[position]), supplyY[position] + _tileH + z - 375);
 	}
 	for (uint row = 0; row < GlyphRules::kRowCount; row++) {
 		uint groups = _rules.clustered() ? _rules.columns() / _rules.charactersPerTile() : 1;
@@ -580,8 +626,8 @@ bool GlyphMachine::load() {
 			Shell::Sprite *indent = add(_indentID, z);
 			if (!indent)
 				return false;
-			indent->x = x + group * (_contentWidth + 10) - _indentOffset.x;
-			indent->y = y + _tileHeight / 2 + row * rowStride() - _indentOffset.y;
+			indent->x = x + group * (_contentW + 10) - _indentOffset.x;
+			indent->y = y + _tileH / 2 + row * rowStride() - _indentOffset.y;
 		}
 	}
 	for (uint i = 0; i < _rules.glyphCount(); i++) {
@@ -601,7 +647,8 @@ bool GlyphMachine::load() {
 
 void GlyphMachine::movePiece(uint index, Common::Point position, int depth) {
 	Piece &piece = _pieces[index];
-	int dx = position.x - piece.base->x, dy = position.y - piece.base->y;
+	int dx = position.x - piece.base->x;
+	int dy = position.y - piece.base->y;
 	Shell::Sprite *members[9] = {
 		piece.base,
 		piece.symbols[0],
@@ -624,7 +671,7 @@ void GlyphMachine::movePiece(uint index, Common::Point position, int depth) {
 
 Common::Rect GlyphMachine::tileBounds(uint index) const {
 	const Shell::Sprite *base = _pieces[index].base;
-	return Common::Rect(base->x, base->y, base->x + _tileWidth, base->y + _tileHeight);
+	return Common::Rect(base->x, base->y, base->x + _tileW, base->y + _tileH);
 }
 
 int GlyphMachine::hitTile(Common::Point point) const {
@@ -645,11 +692,12 @@ int GlyphMachine::overlapArea(const Common::Rect &first, const Common::Rect &sec
 
 void GlyphMachine::updateTarget() {
 	_target = -1;
-	int row = -1, area = 0;
+	int row = -1;
+	int area = 0;
 	Common::Rect tile = tileBounds(_dragged);
 	for (uint i = 0; i < GlyphRules::kRowCount; i++) {
-		int anchorY = y + _tileHeight / 2 + i * rowStride();
-		int candidate = overlapArea(tile, Common::Rect(x, anchorY, x + boardWidth(), anchorY + _tileHeight));
+		int anchorY = y + _tileH / 2 + i * rowStride();
+		int candidate = overlapArea(tile, Common::Rect(x, anchorY, x + boardWidth(), anchorY + _tileH));
 		if (area < candidate) {
 			area = candidate;
 			row = i;
@@ -661,15 +709,15 @@ void GlyphMachine::updateTarget() {
 			for (uint column = 0; column < _rules.columns(); column += _rules.charactersPerTile()) {
 				int cell = row * _rules.columns() + column;
 				Common::Point position = slotPosition(cell);
-				int candidate = overlapArea(tile, Common::Rect(position.x + 1, position.y, position.x + 1 + _contentWidth, position.y + _tileHeight));
+				int candidate = overlapArea(tile, Common::Rect(position.x + 1, position.y, position.x + 1 + _contentW, position.y + _tileH));
 				if (area < candidate && _rules.canPlace(_dragged, cell)) {
 					area = candidate;
 					_target = cell;
 				}
 			}
 		} else {
-			float width = static_cast<float>(_contentWidth) / _rules.charactersPerTile();
-			int column = static_cast<int>((tile.left + 1 + width * 0.5 - x) / width);
+			float width = static_cast<float>(_contentW) / _rules.charactersPerTile();
+			int column = static_cast<int>((tile.left + 1 + width * 0.5f - x) / width);
 			column = CLIP<int>(column, 0, _rules.columns() - _rules.charactersPerTile());
 			int cell = row * _rules.columns() + column;
 			if (_rules.canPlace(_dragged, cell))
@@ -685,7 +733,7 @@ void GlyphMachine::updateTarget() {
 }
 
 bool GlyphMachine::event(const Common::Event &event, uint32 time) {
-	_time = time;
+	_clock.update(time, !_paused);
 	if (_paused)
 		return false;
 	if (event.type == Common::EVENT_LBUTTONDOWN && _dragged < 0) {
@@ -693,19 +741,19 @@ bool GlyphMachine::event(const Common::Event &event, uint32 time) {
 		if (tile < 0)
 			return false;
 		_dragged = tile;
-		_previousSlot = _rules.tile(tile).slot;
-		_previousPosition = Common::Point(_pieces[tile].base->x, _pieces[tile].base->y);
-		_grabOffset = event.mouse - _previousPosition;
+		_prevSlot = _rules.tile(tile).slot;
+		_prevPos = Common::Point(_pieces[tile].base->x, _pieces[tile].base->y);
+		_grabOffset = event.mouse - _prevPos;
 		_rules.pickUp(tile);
 		_pieces[tile].feedback = false;
 		_pieces[tile].lit = 0;
 		updateLights(tile);
-		movePiece(tile, _previousPosition, 10000);
+		movePiece(tile, _prevPos, 10000);
 		updateTarget();
 		queueSound(12408, 0);
 		if (_listener)
 			_listener->glyphPickedUp();
-		emitEvent("tilePickedUp");
+		emitEvent(kEventTilePickedUp);
 		return true;
 	}
 	if (0 <= _dragged && (event.type == Common::EVENT_MOUSEMOVE || event.type == Common::EVENT_LBUTTONUP)) {
@@ -721,11 +769,11 @@ bool GlyphMachine::event(const Common::Event &event, uint32 time) {
 void GlyphMachine::forceDrop() {
 	if (_dragged < 0)
 		return;
-	if (0 <= _previousSlot) {
-		_rules.place(_dragged, _previousSlot);
-		movePiece(_dragged, slotPosition(_previousSlot), z + 1);
+	if (0 <= _prevSlot) {
+		_rules.place(_dragged, _prevSlot);
+		movePiece(_dragged, slotPosition(_prevSlot), z + 1);
 	} else {
-		movePiece(_dragged, _previousPosition, _previousPosition.y + _tileHeight + z - 375);
+		movePiece(_dragged, _prevPos, _prevPos.y + _tileH + z - 375);
 	}
 	_pieces[_dragged].lit = _rules.tile(_dragged).matches;
 	updateLights(_dragged);
@@ -741,12 +789,12 @@ void GlyphMachine::drop() {
 		if (!overlapArea(bounds, Common::Rect(106, 375, 800, 600))) {
 			forceDrop();
 		} else {
-			Common::Point position(CLIP<int>(bounds.left, 106, 800 - _tileWidth), CLIP<int>(bounds.top, 375, 600 - _tileHeight));
-			movePiece(tile, position, position.y + _tileHeight + z - 375);
+			Common::Point position(CLIP<int>(bounds.left, 106, 800 - _tileW), CLIP<int>(bounds.top, 375, 600 - _tileH));
+			movePiece(tile, position, position.y + _tileH + z - 375);
 			_dragged = -1;
 		}
 		queueSound(12409, 0);
-		emitEvent("tileDropped");
+		emitEvent(kEventTileDropped);
 		return;
 	}
 	_rules.place(tile, _target);
@@ -756,15 +804,15 @@ void GlyphMachine::drop() {
 	Piece &piece = _pieces[tile];
 	piece.lit = 0;
 	piece.feedback = _rules.clustered() && 0 < _rules.tile(tile).matches;
-	piece.stepTime = _time - 500;
+	piece.stepTime = _clock.now() - 500;
 	updateLights(tile);
 	bool correct = _rules.tile(tile).solved;
 	if (correct && !_rules.clustered())
 		reveal(tile);
 	if (_listener)
 		_listener->glyphPlaced(correct);
-	emitEvent(correct ? "tileSolved" : "tileWrong");
-	emitEvent("tileDropped");
+	emitEvent(correct ? kEventTileSolved : kEventTileWrong);
+	emitEvent(kEventTileDropped);
 }
 
 void GlyphMachine::updateLights(uint index) {
@@ -825,16 +873,16 @@ void GlyphMachine::revealPaused(uint cell) {
 	if (count == _rules.charactersPerTile()) {
 		if (_listener)
 			_listener->glyphRevealed();
-		emitEvent("animFinished");
+		emitEvent(kEventAnimFinished);
 	}
 }
 
 void GlyphMachine::update(uint32 time) {
-	_time = time;
+	_clock.update(time, !_paused);
 	if (!_paused) {
 		for (uint i = 0; i < GlyphRules::kTileCount; i++) {
 			Piece &piece = _pieces[i];
-			if (!piece.feedback || time - piece.stepTime < 500)
+			if (!piece.feedback || _clock.elapsed(piece.stepTime) < 500)
 				continue;
 			piece.lit += 1;
 			queueSound(12399 + piece.lit, 2 + i);
@@ -844,13 +892,13 @@ void GlyphMachine::update(uint32 time) {
 				if (_rules.tile(i).solved)
 					reveal(i);
 			} else {
-				piece.stepTime = time;
+				piece.stepTime = _clock.now();
 			}
 		}
 	}
 	_scene.update(time, _sounds);
-	while (_soundChannels.size() < _sounds.size())
-		_soundChannels.push_back(-1);
+	while (_soundChans.size() < _sounds.size())
+		_soundChans.push_back(-1);
 	if (!_paused) {
 		for (uint i = 0; i < _rules.glyphCount(); i++) {
 			Reveal &reveal = _reveals[i];
@@ -865,22 +913,17 @@ void GlyphMachine::update(uint32 time) {
 void GlyphMachine::pause(bool paused, uint32 time) {
 	if (_paused == paused)
 		return;
+	_clock.update(time, !_paused);
 	_paused = paused;
-	if (paused) {
-		_pauseTime = time;
-	} else {
-		for (uint i = 0; i < GlyphRules::kTileCount; i++)
-			if (_pieces[i].feedback)
-				_pieces[i].stepTime += time - _pauseTime;
-	}
-	for (uint i = 0; i < _rules.glyphCount(); i++)
+	for (uint i = 0; i < _rules.glyphCount(); i++) {
 		if (_reveals[i].sprite && _reveals[i].started)
 			_reveals[i].sprite->pauseAnimation(paused);
+	}
 }
 
 void GlyphMachine::queueSound(uint16 sound, int channel) {
 	_sounds.push_back(sound);
-	_soundChannels.push_back(channel);
+	_soundChans.push_back(channel);
 }
 
 bool GlyphMachine::pollSound(uint16 &sound, int *channel) {
@@ -888,9 +931,9 @@ bool GlyphMachine::pollSound(uint16 &sound, int *channel) {
 		return false;
 	sound = _sounds[0];
 	if (channel)
-		*channel = _soundChannels[0];
+		*channel = _soundChans[0];
 	_sounds.remove_at(0);
-	_soundChannels.remove_at(0);
+	_soundChans.remove_at(0);
 	return true;
 }
 
@@ -907,7 +950,7 @@ Common::String GlyphMachine::debugAnswer(uint level) const {
 		Common::Point target = slotPosition(slots[i]);
 		result += Common::String::format("Tile %u%s [", i + 1, tile.solved ? " solved" : "");
 		for (uint j = 0; j < rules.charactersPerTile(); j++)
-			result += Common::String::format("%s%d", j ? "," : "", tile.values[j]);
+			result += Common::String::format(kNameSignedIndexFormat, j ? "," : "", tile.values[j]);
 		result += Common::String::format("] -> row %u column %u; drag (%d,%d) to (%d,%d)\n",
 										 slots[i] / rules.columns() + 1, slots[i] % rules.columns() + 1, bounds.left + 10, bounds.top + 10, target.x + 10, target.y + 10);
 	}

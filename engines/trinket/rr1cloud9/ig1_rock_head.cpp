@@ -26,6 +26,122 @@
 namespace Trinket {
 namespace RR1Cloud9 {
 
+constexpr const char *RockHead::kSignedIndexFormat;
+constexpr const char *RockHead::kSetIDName;
+constexpr const char *RockHead::kLipsIDName;
+constexpr const char *RockHead::kZName;
+constexpr const char *RockHead::kRegisterFidgetsToSettleName;
+constexpr const char *RockHead::kRegisterSpeechToSettleName;
+constexpr const char *RockHead::kLoadSpeechAnimsInBkgdName;
+constexpr const char *RockHead::kAnimateSettledName;
+constexpr const char *RockHead::kMethodSetSpeechAnims;
+constexpr const char *RockHead::kBodyIDSuffix;
+constexpr const char *RockHead::kMethodAddFidgetGroup;
+constexpr const char *RockHead::kMethodAddFidget;
+constexpr const char *RockHead::kFidg1IDName;
+constexpr const char *RockHead::kFidgetIDSuffixFormat;
+constexpr const char *RockHead::kSamName;
+constexpr const char *RockHead::kSamKey;
+constexpr const char *RockHead::kPaigeName;
+constexpr const char *RockHead::kPaigeKey;
+constexpr const char *RockHead::kChesterFidgIDSignedIndexKey;
+constexpr const char *RockHead::kGClosedChesterZName;
+constexpr const char *RockHead::kR1IG1HatHereKey;
+constexpr const char *RockHead::kRockActor;
+constexpr const char *RockHead::kRockKey;
+constexpr const char *RockHead::kMethodRemoveFidgetGroup;
+constexpr const char *RockHead::kRockFdgtIDKey;
+constexpr const char *RockHead::kR1IG1StateKey;
+constexpr const char *RockHead::kR1IG1HoopHereKey;
+constexpr const char *RockHead::kItem6Key;
+constexpr const char *RockHead::kR1IG1LadderHereKey;
+constexpr const char *RockHead::kR1IG1PendingKey;
+constexpr const char *RockHead::kReaderName;
+constexpr const char *RockHead::kReaderKey;
+constexpr const char *RockHead::kLadderIDKey;
+constexpr const char *RockHead::kLadderZKey;
+constexpr const char *RockHead::kHatIDKey;
+constexpr const char *RockHead::kHatZKey;
+constexpr const char *RockHead::kHoop2IDKey;
+constexpr const char *RockHead::kHoopZKey;
+constexpr const char *RockHead::kPreviousLocationKey;
+constexpr const char *RockHead::kReaderWalkInIDKey;
+constexpr const char *RockHead::kSamWalkInIDKey;
+constexpr const char *RockHead::kEnterCharIDKey;
+constexpr const char *RockHead::kEnterSpchIDKey;
+constexpr const char *RockHead::kMaxEntrySpchsKey;
+constexpr const char *RockHead::kR1IG1RainbowSlideCountKey;
+constexpr const char *RockHead::kReEnterCharIDsKey;
+constexpr const char *RockHead::kReEnterSpchIDsKey;
+constexpr const char *RockHead::kMaxReEnterSpchsKey;
+constexpr const char *RockHead::kReaderClimbIDKey;
+constexpr const char *RockHead::kReaderDecendIDKey;
+constexpr const char *RockHead::kSamClimbIDKey;
+constexpr const char *RockHead::kSamDecendIDKey;
+constexpr const char *RockHead::kLadderCharIDKey;
+constexpr const char *RockHead::kLadderSpchIDKey;
+constexpr const char *RockHead::kHatCharIDKey;
+constexpr const char *RockHead::kHatSpchIDKey;
+constexpr const char *RockHead::kNumHatSpchsKey;
+constexpr const char *RockHead::kHoopPresentedIDKey;
+constexpr const char *RockHead::kHoopPresentedCharIDKey;
+constexpr const char *RockHead::kHoopPresentedSpchIDKey;
+constexpr const char *RockHead::kItem2Key;
+constexpr const char *RockHead::kGIdleHelpTimeName;
+constexpr const char *RockHead::kMaxIdleIndexKey;
+constexpr const char *RockHead::kIdleCharIDKey;
+constexpr const char *RockHead::kIdleSpchIDKey;
+constexpr const char *RockHead::kMaxIdleIndexSpeechesKey;
+constexpr const char *RockHead::k1SignedIndexFormat;
+constexpr const char *RockHead::kMainSpchCharIDsKey;
+constexpr const char *RockHead::kMainSpchIDsKey;
+constexpr const char *RockHead::kMaxMainSpchsKey;
+constexpr const char *RockHead::kMainSpchCharIDs2Key;
+constexpr const char *RockHead::kMainSpchIDs2Key;
+constexpr const char *RockHead::k3SignedIndexFormat;
+constexpr const char *RockHead::kTalkedToRockHeadKey;
+constexpr const char *RockHead::k21Name;
+constexpr const char *RockHead::kRockCharID31Key;
+constexpr const char *RockHead::kRockSpchID31Key;
+constexpr const char *RockHead::kR1IG1RockClicksKey;
+constexpr const char *RockHead::kR1LN2StateKey;
+constexpr const char *RockHead::kItem8Key;
+constexpr const char *RockHead::k32SignedIndexFormat;
+constexpr const char *RockHead::k4SignedIndexFormat;
+constexpr const char *RockHead::kRockCharIDKey;
+constexpr const char *RockHead::kRockSpchIDKey;
+constexpr const char *RockHead::kMaxRockSpchKey;
+constexpr const char *RockHead::kWAVECOMSOFTCLICKName;
+constexpr const char *RockHead::kMaxHoopSpchsKey;
+constexpr const char *RockHead::kHoopCharIDKey;
+constexpr const char *RockHead::kHoopSpchIDKey;
+constexpr const char *RockHead::kNumHoopSpchsKey;
+constexpr const char *RockHead::kWAVECOMPICKUPName;
+constexpr const char *RockHead::kGetHoopCharIDKey;
+constexpr const char *RockHead::kGetHoopSpchIDKey;
+constexpr const char *RockHead::kHSX1Name;
+constexpr const char *RockHead::kHSY1Name;
+constexpr const char *RockHead::kHSX2Name;
+constexpr const char *RockHead::kHSY2Name;
+constexpr const char *RockHead::kHoopKey;
+constexpr const char *RockHead::kMaxHelpSpchsSignedIndexKey;
+constexpr const char *RockHead::kSignedIndexSignedIndexFormat;
+constexpr const char *RockHead::kHelpSpchCharIDsKey;
+constexpr const char *RockHead::kHelpSpchIDsKey;
+constexpr const char *RockHead::kLadderKey;
+constexpr const char *RockHead::k1Name;
+constexpr const char *RockHead::k2Name;
+constexpr const char *RockHead::k3Name;
+constexpr const char *RockHead::kItemUnsignedIndexFormat;
+constexpr const char *RockHead::kRockCharID211Key;
+constexpr const char *RockHead::kRockSpchID211Key;
+constexpr const char *RockHead::kMaxWrongColorSpchsKey;
+constexpr const char *RockHead::kWrongColorCharIDKey;
+constexpr const char *RockHead::kWrongColorSpchIDKey;
+constexpr const char *RockHead::kMaxItemSpchsKey;
+constexpr const char *RockHead::kItemCharSpchKey;
+constexpr const char *RockHead::kItemSpchsIDKey;
+
 int RockHead::number(const Common::String &key) const { return _host._page->number(key); }
 
 void RockHead::line(const Common::String &actors, const Common::String &sounds) {
@@ -41,94 +157,95 @@ bool RockHead::character(const char *name, const char *prefix, int pose) {
 		delete _host._actors[name];
 		_host._actors.erase(name);
 	}
-	Common::String suffix = Common::String::format(".%d", pose);
+	Common::String suffix = Common::String::format(kSignedIndexFormat, pose);
 	Common::String base(prefix);
-	int settle = number(base + "SetID" + suffix);
-	int lips = number(base + "LipsID" + suffix);
+	int settle = number(base + kSetIDName + suffix);
+	int lips = number(base + kLipsIDName + suffix);
 	if (!lips)
 		lips = settle;
 	Common::ScopedPtr<Shell::Character> actor(new Shell::Character(_host._scene, _host._vm.mixer(), _host._vm.resources(), _host._vm.rnd(), _host));
-	if (!actor->create(settle ? settle : lips, number(base + "Z")))
+	if (!actor->create(settle ? settle : lips, number(base + kZName)))
 		return false;
 	actor->movable = false;
-	for (const char *key : {"registerFidgetsToSettle", "registerSpeechToSettle", "loadSpeechAnimsInBkgd", "animateSettled"})
+	for (const char *key : {kRegisterFidgetsToSettleName, kRegisterSpeechToSettleName, kLoadSpeechAnimsInBkgdName, kAnimateSettledName})
 		actor->set(key, {}, Core::ScriptValue(0));
 	Core::ScriptValue result;
-	actor->play("setSpeechAnims", {Core::ScriptValue(lips), Core::ScriptValue(1), Core::ScriptValue(1), Core::ScriptValue(number(base + "BodyID" + suffix)), Core::ScriptValue(0), Core::ScriptValue(0)}, result);
-	actor->play("addFidgetGroup", {Core::ScriptValue(1), Core::ScriptValue(5), Core::ScriptValue(10)}, result);
-	actor->play("addFidget", {Core::ScriptValue(1), Core::ScriptValue(settle ? settle : lips)}, result);
-	if (number(base + "Fidg1ID" + suffix)) {
-		actor->play("addFidgetGroup", {Core::ScriptValue(2), Core::ScriptValue(15), Core::ScriptValue(30)}, result);
+	actor->play(kMethodSetSpeechAnims, {Core::ScriptValue(lips), Core::ScriptValue(1), Core::ScriptValue(1),
+						 Core::ScriptValue(number(base + kBodyIDSuffix + suffix)), Core::ScriptValue(0), Core::ScriptValue(0)}, result);
+	actor->play(kMethodAddFidgetGroup, {Core::ScriptValue(1), Core::ScriptValue(5), Core::ScriptValue(10)}, result);
+	actor->play(kMethodAddFidget, {Core::ScriptValue(1), Core::ScriptValue(settle ? settle : lips)}, result);
+	if (number(base + kFidg1IDName + suffix)) {
+		actor->play(kMethodAddFidgetGroup, {Core::ScriptValue(2), Core::ScriptValue(15), Core::ScriptValue(30)}, result);
 		for (int i = 1; i <= 2; i++)
-			actor->play("addFidget", {Core::ScriptValue(2), Core::ScriptValue(number(base + Common::String::format("Fidg%dID", i) + suffix))}, result);
+			actor->play(kMethodAddFidget, {Core::ScriptValue(2), Core::ScriptValue(number(base + Common::String::format(kFidgetIDSuffixFormat, i) + suffix))}, result);
 	}
 	_host._actors[name] = actor.release();
 	return true;
 }
 
 bool RockHead::companions(int pose) {
-	if (!character("sam", "kSam", pose) || !character("paige", "kPaige", pose))
+	if (!character(kSamName, kSamKey, pose) || !character(kPaigeName, kPaigeKey, pose))
 		return false;
 	if (_host._chester)
 		_host._scene.remove(_host._chester);
-	_host._chester = _host._scene.add(_host.characterResource(number(Common::String::format("kChesterFidgID.%d", pose)),
+	_host._chester = _host._scene.add(_host.characterResource(number(Common::String::format(kChesterFidgIDSignedIndexKey, pose)),
 															  Shell::Character::Resources::kAnimation),
-									  number("gClosedChesterZ"));
+									  number(kGClosedChesterZName));
 	return _host._chester != nullptr;
 }
 
 bool RockHead::rock() {
-	int pose = _host._world.get("R1IG1HatHere") ? 2 : 1;
-	if (!character("rock", "kRock", pose))
+	int pose = _host._world.get(kR1IG1HatHereKey) ? 2 : 1;
+	if (!character(kRockActor, kRockKey, pose))
 		return false;
 	Core::ScriptValue result;
-	_host._actors["rock"]->play("removeFidgetGroup", {Core::ScriptValue(1)}, result);
+	_host._actors[kRockActor]->play(kMethodRemoveFidgetGroup, {Core::ScriptValue(1)}, result);
 	if (pose == 1) {
-		_host._actors["rock"]->play("addFidgetGroup", {Core::ScriptValue(1), Core::ScriptValue(5), Core::ScriptValue(10)}, result);
-		_host._actors["rock"]->play("addFidget", {Core::ScriptValue(1), Core::ScriptValue(number("kRockFdgtID"))}, result);
+		_host._actors[kRockActor]->play(kMethodAddFidgetGroup, {Core::ScriptValue(1), Core::ScriptValue(5), Core::ScriptValue(10)}, result);
+		_host._actors[kRockActor]->play(kMethodAddFidget, {Core::ScriptValue(1), Core::ScriptValue(number(kRockFdgtIDKey))}, result);
 	}
 	return true;
 }
 
 bool RockHead::enter() {
 	World &world = _host._world;
-	if (!world.get("R1IG1State")) {
-		world.set("R1IG1State", 1);
-		world.set("R1IG1HoopHere", 1);
+	if (!world.get(kR1IG1StateKey)) {
+		world.set(kR1IG1StateKey, 1);
+		world.set(kR1IG1HoopHereKey, 1);
 	}
-	_state = CLIP(world.get("R1IG1State"), 1, 4);
-	if (_state == 1 && world.get("item:6"))
+	_state = CLIP(world.get(kR1IG1StateKey), 1, 4);
+	if (_state == 1 && world.get(kItem6Key))
 		_state = 2;
-	if (_state < 3 && world.get("R1IG1LadderHere"))
+	if (_state < 3 && world.get(kR1IG1LadderHereKey))
 		_state = 3;
-	if (_state == 3 && !world.get("R1IG1HoopHere"))
+	if (_state == 3 && !world.get(kR1IG1HoopHereKey))
 		_state = 4;
-	world.set("R1IG1State", _state);
-	_firstVisit = !world.visits("r1ig1");
-	int pending = world.get("R1IG1Pending");
+	world.set(kR1IG1StateKey, _state);
+	_firstVisit = !world.visits(Page::kPageIG1);
+	int pending = world.get(kR1IG1PendingKey);
 	_pose = pending == 8 || pending == 2 ? 2 : 1;
-	if (!character("reader", "kReader", _pose) || !companions(_pose) || !rock())
+	if (!character(kReaderName, kReaderKey, _pose) || !companions(_pose) || !rock())
 		return false;
 	auto sprite = [this](const char *key, const char *depth) {
 		return _host._scene.add(_host.characterResource(number(key), Shell::Character::Resources::kAnimation), number(depth));
 	};
-	_ladder = sprite("kLadderID", "kLadderZ");
-	_hat = sprite("kHatID", "kHatZ");
-	_hoop = sprite("kHoop2ID", "kHoopZ");
+	_ladder = sprite(kLadderIDKey, kLadderZKey);
+	_hat = sprite(kHatIDKey, kHatZKey);
+	_hoop = sprite(kHoop2IDKey, kHoopZKey);
 	if (!_ladder || !_hat || !_hoop)
 		return false;
-	_ladder->visible = world.get("R1IG1LadderHere");
-	_hat->visible = world.get("R1IG1HatHere");
-	_hoop->visible = _hat->visible && world.get("R1IG1HoopHere");
+	_ladder->visible = world.get(kR1IG1LadderHereKey);
+	_hat->visible = world.get(kR1IG1HatHereKey);
+	_hoop->visible = _hat->visible && world.get(kR1IG1HoopHereKey);
 	_hoop->boxTouchy = true;
 	if (pending == 6 || pending == 8)
 		_phase = pending == 6 ? kLadderWait : kHatWait;
 	else if (pending == 2)
 		_phase = kCollect;
-	else if (world.get("previousLocation") == 20) {
-		_host._actors["reader"]->playAnim(number("kReaderWalkInID"));
-		_host._actors["sam"]->playAnim(number("kSamWalkInID"));
-		_host._actors["paige"]->setVisible(false);
+	else if (world.get(kPreviousLocationKey) == 20) {
+		_host._actors[kReaderName]->playAnim(number(kReaderWalkInIDKey));
+		_host._actors[kSamName]->playAnim(number(kSamWalkInIDKey));
+		_host._actors[kPaigeName]->setVisible(false);
 		_host._chester->visible = false;
 		_phase = kArrival;
 	} else
@@ -139,18 +256,18 @@ bool RockHead::enter() {
 void RockHead::entrySpeech() {
 	World &world = _host._world;
 	if (_firstVisit)
-		group("kEnterCharID", "kEnterSpchID", number("kMaxEntrySpchs"));
-	else if (world.get("previousLocation") == 20) {
-		int count = world.get("R1IG1RainbowSlideCount") + 1;
-		world.set("R1IG1RainbowSlideCount", count);
-		Common::String suffix = Common::String::format(".%d", count == 1 ? 1 : _host._vm.rnd().number(2, 3));
-		group("kReEnterCharIDs" + suffix, "kReEnterSpchIDs" + suffix, number("kMaxReEnterSpchs" + suffix));
+		group(kEnterCharIDKey, kEnterSpchIDKey, number(kMaxEntrySpchsKey));
+	else if (world.get(kPreviousLocationKey) == 20) {
+		int count = world.get(kR1IG1RainbowSlideCountKey) + 1;
+		world.set(kR1IG1RainbowSlideCountKey, count);
+		Common::String suffix = Common::String::format(kSignedIndexFormat, count == 1 ? 1 : _host._vm.rnd().number(2, 3));
+		group(kReEnterCharIDsKey + suffix, kReEnterSpchIDsKey + suffix, number(kMaxReEnterSpchsKey + suffix));
 	}
 }
 
 void RockHead::climb() {
 	_host.closeChest();
-	_host._actors["reader"]->playAnim(number(_pose == 1 ? "kReaderClimbID" : "kReaderDecendID"));
+	_host._actors[kReaderName]->playAnim(number(_pose == 1 ? kReaderClimbIDKey : kReaderDecendIDKey));
 	_phase = kReaderClimb;
 }
 
@@ -165,21 +282,21 @@ void RockHead::update(uint32 time) {
 	}
 	World &world = _host._world;
 	if (_phase == kArrival) {
-		if (_host._actors["reader"]->isBusy() || _host._actors["sam"]->isBusy())
+		if (_host._actors[kReaderName]->isBusy() || _host._actors[kSamName]->isBusy())
 			return;
-		_host._actors["paige"]->setVisible(true);
+		_host._actors[kPaigeName]->setVisible(true);
 		_host._chester->visible = true;
 		entrySpeech();
 		_phase = kIdle;
 	} else if (_phase == kReaderClimb) {
-		if (_host._actors["reader"]->isBusy())
+		if (_host._actors[kReaderName]->isBusy())
 			return;
-		if (!character("reader", "kReader", 3 - _pose))
+		if (!character(kReaderName, kReaderKey, 3 - _pose))
 			error("RR1: cannot load Reader's climbing pose");
-		_host._actors["sam"]->playAnim(number(_pose == 1 ? "kSamClimbID" : "kSamDecendID"));
+		_host._actors[kSamName]->playAnim(number(_pose == 1 ? kSamClimbIDKey : kSamDecendIDKey));
 		_phase = kSamClimb;
 	} else if (_phase == kSamClimb) {
-		if (_host._actors["sam"]->isBusy())
+		if (_host._actors[kSamName]->isBusy())
 			return;
 		_pose = 3 - _pose;
 		if (!companions(_pose))
@@ -190,110 +307,115 @@ void RockHead::update(uint32 time) {
 			return;
 		if (_phase == kLadderWait) {
 			_ladder->visible = true;
-			world.set("R1IG1LadderHere", 1);
-			world.set("R1IG1Pending", 0);
+			world.set(kR1IG1LadderHereKey, 1);
+			world.set(kR1IG1PendingKey, 0);
 			_state = 3;
-			world.set("R1IG1State", _state);
-			group("kLadderCharID", "kLadderSpchID", 2);
+			world.set(kR1IG1StateKey, _state);
+			group(kLadderCharIDKey, kLadderSpchIDKey, 2);
 			_phase = kSpeech;
 		} else {
 			_hat->visible = true;
 			Core::ScriptValue result;
-			_host._actors["rock"]->play("removeFidgetGroup", {Core::ScriptValue(1)}, result);
-			group("kHatCharID", "kHatSpchID", number("kNumHatSpchs"));
+			_host._actors[kRockActor]->play(kMethodRemoveFidgetGroup, {Core::ScriptValue(1)}, result);
+			group(kHatCharIDKey, kHatSpchIDKey, number(kNumHatSpchsKey));
 			_phase = kHatSpeech;
 		}
 	} else if (_phase == kHatSpeech) {
-		world.set("R1IG1HatHere", 1);
-		world.set("R1IG1Pending", 0);
-		_hoop->visible = world.get("R1IG1HoopHere");
-		_host.playSounds({static_cast<uint16>(number("kHoopPresentedID"))});
+		world.set(kR1IG1HatHereKey, 1);
+		world.set(kR1IG1PendingKey, 0);
+		_hoop->visible = world.get(kR1IG1HoopHereKey);
+		_host.playSounds({static_cast<uint16>(number(kHoopPresentedIDKey))});
 		if (!rock())
 			error("RR1: cannot load Rock Head's hat pose");
-		line("kHoopPresentedCharID", "kHoopPresentedSpchID");
+		line(kHoopPresentedCharIDKey, kHoopPresentedSpchIDKey);
 		_phase = kSpeech;
 	} else if (_phase == kCollect) {
-		if (world.get("R1IG1Pending") == 2) {
-			world.set("item:2", MIN(25, world.get("item:2") + 1));
+		if (world.get(kR1IG1PendingKey) == 2) {
+			world.set(kItem2Key, MIN(25, world.get(kItem2Key) + 1));
 			_host.putAway();
-			world.set("R1IG1HoopHere", 0);
-			world.set("R1IG1Pending", 0);
+			world.set(kR1IG1HoopHereKey, 0);
+			world.set(kR1IG1PendingKey, 0);
 		}
 		_hoop->visible = false;
 		_state = 4;
-		world.set("R1IG1State", _state);
+		world.set(kR1IG1StateKey, _state);
 		_phase = kIdle;
 	} else if (_phase == kSpeech)
 		_phase = kIdle;
-	else if (_phase == kIdle && !_host._practice && static_cast<uint32>(number("gIdleHelpTime")) <= time - _idle) {
-		Common::String suffix = Common::String::format(".%d", _state < 3 ? 1 : _pose + 1);
-		suffix += Common::String::format(".%d", _host._vm.rnd().number(1, number("kMaxIdleIndex" + suffix)));
-		group("kIdleCharID" + suffix, "kIdleSpchID" + suffix, number("kMaxIdleIndexSpeeches" + suffix));
+	else if (_phase == kIdle && !_host._practice && static_cast<uint32>(number(kGIdleHelpTimeName)) <= time - _idle) {
+		Common::String suffix = Common::String::format(kSignedIndexFormat, _state < 3 ? 1 : _pose + 1);
+		suffix += Common::String::format(kSignedIndexFormat, _host._vm.rnd().number(1, number(kMaxIdleIndexKey + suffix)));
+		group(kIdleCharIDKey + suffix, kIdleSpchIDKey + suffix, number(kMaxIdleIndexSpeechesKey + suffix));
 		_idle = time;
 	}
 }
 
 void RockHead::mainSpeech() {
 	if (_state == 1) {
-		int choice = _host._vm.rnd().number(1, _host._world.visits("r1ca1") ? 4 : 3);
-		if (!_host._world.visits("r1ca1") && choice == 3)
+		int choice = _host._vm.rnd().number(1, _host._world.visits(Page::kPageCA1) ? 4 : 3);
+		if (!_host._world.visits(Page::kPageCA1) && choice == 3)
 			choice = 4;
-		Common::String suffix = Common::String::format(".1.%d", choice);
-		group("kMainSpchCharIDs" + suffix, "kMainSpchIDs" + suffix, number("kMaxMainSpchs" + suffix));
+		Common::String suffix = Common::String::format(k1SignedIndexFormat, choice);
+		group(kMainSpchCharIDsKey + suffix, kMainSpchIDsKey + suffix, number(kMaxMainSpchsKey + suffix));
 	} else if (_state == 2)
-		line("kMainSpchCharIDs.2", "kMainSpchIDs.2");
+		line(kMainSpchCharIDs2Key, kMainSpchIDs2Key);
 	else if (_state == 3 && _pose == 1) {
-		Common::String suffix = Common::String::format(".3.%d", _host._vm.rnd().number(1, 2));
-		line("kMainSpchCharIDs" + suffix, "kMainSpchIDs" + suffix);
+		Common::String suffix = Common::String::format(k3SignedIndexFormat, _host._vm.rnd().number(1, 2));
+		line(kMainSpchCharIDsKey + suffix, kMainSpchIDsKey + suffix);
 	} else
 		rockSpeech();
 }
 
 void RockHead::rockSpeech() {
 	World &world = _host._world;
-	world.set("talkedToRockHead", 1);
+	world.set(kTalkedToRockHeadKey, 1);
 	if (_state == 1) {
 		mainSpeech();
 		return;
 	}
 	Common::String suffix;
 	if (_state == 2)
-		suffix = ".2.1";
-	else if (_state == 3 && !world.get("R1IG1HatHere")) {
+		suffix = k21Name;
+	else if (_state == 3 && !world.get(kR1IG1HatHereKey)) {
 		if (_pose == 1) {
-			line("kRockCharID.3.1", "kRockSpchID.3.1");
+			line(kRockCharID31Key, kRockSpchID31Key);
 			return;
 		}
-		int count = world.get("R1IG1RockClicks") + 1;
-		world.set("R1IG1RockClicks", count);
+		int count = world.get(kR1IG1RockClicksKey) + 1;
+		world.set(kR1IG1RockClicksKey, count);
 		int choice;
 		if (count == 1)
-			choice = 1 < world.get("R1LN2State") ? 2 : 1;
+			choice = 1 < world.get(kR1LN2StateKey) ? 2 : 1;
 		else {
-			if (_moreClicks == 1)
-				choice = world.get("item:8") ? 5 : (world.visits("r1cn3") ? 4 : 3);
-			else {
+			if (_moreClicks == 1) {
+				if (world.get(kItem8Key))
+					choice = 5;
+				else if (world.visits(Page::kPageCN3))
+					choice = 4;
+				else
+					choice = 3;
+			} else {
 				if (4 < _moreClicks)
 					_moreClicks = 2;
 				choice = _moreClicks + 4;
 			}
 			_moreClicks += 1;
 		}
-		suffix = Common::String::format(".3.2.%d", choice);
+		suffix = Common::String::format(k32SignedIndexFormat, choice);
 	} else
-		suffix = Common::String::format(".4.%d", _pose);
-	group("kRockCharID" + suffix, "kRockSpchID" + suffix, number("kMaxRockSpch" + suffix));
+		suffix = Common::String::format(k4SignedIndexFormat, _pose);
+	group(kRockCharIDKey + suffix, kRockSpchIDKey + suffix, number(kMaxRockSpchKey + suffix));
 }
 
 void RockHead::hoopClick() {
 	if (_pose == 1) {
-		_host.playSounds({static_cast<uint16>(number("WAVE_COMSOFTCLICK"))});
-		Common::String suffix = Common::String::format(".%d", _host._vm.rnd().number(1, number("kMaxHoopSpchs")));
-		group("kHoopCharID" + suffix, "kHoopSpchID" + suffix, number("kNumHoopSpchs" + suffix));
-	} else if (_host._world.get("R1IG1HatHere") && !_host._practice) {
-		_host.playSounds({static_cast<uint16>(number("WAVE_COMPICKUP"))});
-		_host._world.set("R1IG1Pending", 2);
-		line("kGetHoopCharID", "kGetHoopSpchID");
+		_host.playSounds({static_cast<uint16>(number(kWAVECOMSOFTCLICKName))});
+		Common::String suffix = Common::String::format(kSignedIndexFormat, _host._vm.rnd().number(1, number(kMaxHoopSpchsKey)));
+		group(kHoopCharIDKey + suffix, kHoopSpchIDKey + suffix, number(kNumHoopSpchsKey + suffix));
+	} else if (_host._world.get(kR1IG1HatHereKey) && !_host._practice) {
+		_host.playSounds({static_cast<uint16>(number(kWAVECOMPICKUPName))});
+		_host._world.set(kR1IG1PendingKey, 2);
+		line(kGetHoopCharIDKey, kGetHoopSpchIDKey);
 		_phase = kCollect;
 	} else
 		rockSpeech();
@@ -301,8 +423,8 @@ void RockHead::hoopClick() {
 
 bool RockHead::hotspot(const char *prefix, const Common::String &suffix, Common::Point point) const {
 	Common::String base(prefix);
-	return Common::Rect(number(base + "HSX1" + suffix), number(base + "HSY1" + suffix),
-						number(base + "HSX2" + suffix), number(base + "HSY2" + suffix))
+	return Common::Rect(number(base + kHSX1Name + suffix), number(base + kHSY1Name + suffix),
+						number(base + kHSX2Name + suffix), number(base + kHSY2Name + suffix))
 		.contains(point);
 }
 
@@ -310,30 +432,30 @@ bool RockHead::click(Common::Point point) {
 	_idle = _host._time;
 	if (busy())
 		return true;
-	if (_host._world.get("R1IG1HoopHere") && (_hoop->covers(point) ||
-											  (!_host._world.get("R1IG1HatHere") && hotspot("kHoop", "", point)))) {
+	if (_host._world.get(kR1IG1HoopHereKey) && (_hoop->covers(point) ||
+											  (!_host._world.get(kR1IG1HatHereKey) && hotspot(kHoopKey, "", point)))) {
 		hoopClick();
 		return true;
 	}
 	for (auto &entry : _host._actors) {
 		if (!entry._value->bounds().contains(point))
 			continue;
-		if (entry._key == "rock")
+		if (entry._key.equals(kRockActor))
 			rockSpeech();
-		else if (entry._key == "paige") {
+		else if (entry._key.equals(kPaigeName)) {
 			int state = _state;
-			int choice = _host._vm.rnd().number(1, number(Common::String::format("kMaxHelpSpchs.%d", state)));
-			if (state == 3 && _host._world.get("R1IG1HatHere")) {
+			int choice = _host._vm.rnd().number(1, number(Common::String::format(kMaxHelpSpchsSignedIndexKey, state)));
+			if (state == 3 && _host._world.get(kR1IG1HatHereKey)) {
 				state = 4;
 				choice = 1;
 			}
-			Common::String suffix = Common::String::format(".%d.%d", state, choice);
-			line("kHelpSpchCharIDs" + suffix, "kHelpSpchIDs" + suffix);
+			Common::String suffix = Common::String::format(kSignedIndexSignedIndexFormat, state, choice);
+			line(kHelpSpchCharIDsKey + suffix, kHelpSpchIDsKey + suffix);
 		} else
 			mainSpeech();
 		return true;
 	}
-	if (_ladder->visible && (hotspot("kLadder", _pose == 1 ? ".1" : ".2", point) || hotspot("kLadder", ".3", point))) {
+	if (_ladder->visible && (hotspot(kLadderKey, _pose == 1 ? k1Name : k2Name, point) || hotspot(kLadderKey, k3Name, point))) {
 		climb();
 		return true;
 	}
@@ -354,11 +476,11 @@ bool RockHead::donate(uint item) {
 	_host.interrupt();
 	World &world = _host._world;
 	if ((item == 6 && !_ladder->visible) || (item == 8 && _pose == 2 && !_hat->visible)) {
-		Common::String key = Common::String::format("item:%u", item);
+		Common::String key = Common::String::format(kItemUnsignedIndexFormat, item);
 		if (world.get(key) <= 0)
 			return false;
 		world.set(key, world.get(key) - 1);
-		world.set("R1IG1Pending", item);
+		world.set(kR1IG1PendingKey, item);
 		_host.closeChest();
 		_start = _host._time;
 		_clock = true;
@@ -366,13 +488,13 @@ bool RockHead::donate(uint item) {
 		return true;
 	}
 	if (_pose == 1 && item == 8)
-		line("kRockCharID.2.1.1", "kRockSpchID.2.1.1");
-	else if (_pose == 2 && world.get("talkedToRockHead")) {
-		Common::String suffix = Common::String::format(".%d", _host._vm.rnd().number(1, number("kMaxWrongColorSpchs")));
-		line("kWrongColorCharID" + suffix, "kWrongColorSpchID" + suffix);
+		line(kRockCharID211Key, kRockSpchID211Key);
+	else if (_pose == 2 && world.get(kTalkedToRockHeadKey)) {
+		Common::String suffix = Common::String::format(kSignedIndexFormat, _host._vm.rnd().number(1, number(kMaxWrongColorSpchsKey)));
+		line(kWrongColorCharIDKey + suffix, kWrongColorSpchIDKey + suffix);
 	} else {
-		Common::String suffix = Common::String::format(".%d", _host._vm.rnd().number(1, number("kMaxItemSpchs")));
-		line("kItemCharSpch" + suffix, "kItemSpchsID" + suffix);
+		Common::String suffix = Common::String::format(kSignedIndexFormat, _host._vm.rnd().number(1, number(kMaxItemSpchsKey)));
+		line(kItemCharSpchKey + suffix, kItemSpchsIDKey + suffix);
 	}
 	return false;
 }

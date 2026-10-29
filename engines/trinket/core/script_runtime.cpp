@@ -22,9 +22,27 @@
 #include "trinket/core/script_runtime.h"
 
 #include "common/debug.h"
+#include "trinket/string_parser.h"
+
+#include <stdint.h>
 
 namespace Trinket {
 namespace Core {
+
+constexpr const char *ScriptRuntime::kConstantPrefix;
+constexpr const char *ScriptRuntime::kSYSTEMWINName;
+constexpr const char *ScriptRuntime::kRECEIVERName;
+constexpr const char *ScriptRuntime::kRESULTName;
+constexpr const char *ScriptRuntime::kScheduleName;
+constexpr const char *ScriptRuntime::kIdleName;
+constexpr const char *ScriptRuntime::kRandomNumberName;
+constexpr const char *ScriptRuntime::kStackName;
+constexpr const char *ScriptRuntime::kWaitName;
+constexpr const char *ScriptRuntime::kTrinketsName;
+constexpr const char *ScriptRuntime::kVarName;
+constexpr const char *ScriptRuntime::kScriptName;
+constexpr const char *ScriptRuntime::kDefaultName;
+constexpr const char *ScriptRuntime::kNameProperty;
 
 ScriptRuntime::~ScriptRuntime() {
 	clear();
@@ -57,7 +75,7 @@ void ScriptRuntime::clear() {
 	_schedule = Timer();
 	_interrupt = Interrupt();
 	_request = kNoRequest;
-	_requestVariable = -1;
+	_requestVar = -1;
 	_error.clear();
 }
 
@@ -71,9 +89,9 @@ bool ScriptRuntime::load(Common::SeekableReadStream &stream) {
 		if (value.classification != 0 || value.name.empty())
 			continue;
 		if (value.type == 3)
-			_values[value.name] = ScriptValue(value.integer);
+			_values[value.name] = ScriptValue::fromLiteral(value.integer, value.extra);
 		else if (value.type == 4)
-			_values[value.name] = ScriptValue(atof(value.real.c_str()));
+			_values[value.name] = ScriptValue::fromLiteral(value.real, value.extra);
 		else if (value.type == 2)
 			_values[value.name] = ScriptValue(value.extra);
 		if (value.extra.hasPrefix("+") && value.type == 3 &&
@@ -82,11 +100,11 @@ bool ScriptRuntime::load(Common::SeekableReadStream &stream) {
 			_values[value.name] = ScriptValue(value.extra);
 		}
 	}
-	initializeConstants();
+	initConstants();
 	return _error.empty();
 }
 
-void ScriptRuntime::initializeConstants() {
+void ScriptRuntime::initConstants() {
 	// Materialize literal constants and earlier constant aliases without executing scene setup.
 	const Common::Array<Script::Instruction> &instructions = _image.instructions();
 	const Common::Array<Script::Variable> &variables = _image.variables();
@@ -109,14 +127,14 @@ void ScriptRuntime::initializeConstants() {
 			}
 		}
 		bool constantSource = source.classification == 1;
-		if (source.classification == 0 && source.name.hasPrefix("k") && _values.contains(source.name))
+		if (source.classification == 0 && source.name.hasPrefix(kConstantPrefix) && _values.contains(source.name))
 			constantSource = true;
-		if (fixedTarget && target.name.hasPrefix("k") && constantSource) {
+		if (fixedTarget && target.name.hasPrefix(kConstantPrefix) && constantSource) {
 			ScriptValue value;
 			Common::String name;
 			if (!evaluate(indices[1], value) || !variableName(indices[0], name))
 				return;
-			_values[name] = value;
+			setVariable(name, value);
 		}
 	}
 }
@@ -128,7 +146,9 @@ ScriptValue ScriptRuntime::variable(const Common::String &name) const {
 
 void ScriptRuntime::setVariable(const Common::String &name, const ScriptValue &value) {
 	_values[name] = value;
-	if (value.kind() == ScriptValue::kObject && name != "SYSTEMWIN" && name != "RECEIVER" && name != "RESULT" &&
+	if (value.kind() != ScriptValue::kObject && value.kind() != ScriptValue::kVoid)
+		_values[name] = ScriptValue::fromText(value.toText());
+	if (value.kind() == ScriptValue::kObject && !name.equals(kSYSTEMWINName) && !name.equals(kRECEIVERName) && !name.equals(kRESULTName) &&
 		!_objectNames.contains(value.reference()))
 		_objectNames[value.reference()] = name;
 }
@@ -145,7 +165,7 @@ bool ScriptRuntime::bindEvent(ScriptableObject &object, const Common::String &ev
 		return fail("Unknown object event: " + event);
 	uint32 reference = _objects.bind(object);
 	for (uint i = 0; i < _bindings.size(); i++) {
-		if (_bindings[i].reference == reference && _bindings[i].event == event)
+		if (_bindings[i].reference == reference && _bindings[i].event.equals(event))
 			return true;
 	}
 	Binding binding;
@@ -227,18 +247,18 @@ bool ScriptRuntime::enterInterrupt(const PendingEvent &event) {
 	_suspended = false;
 	_pc = destination + 1;
 	if (event.reference)
-		setVariable("RECEIVER", ScriptValue::object(event.reference));
+		setVariable(kRECEIVERName, ScriptValue::object(event.reference));
 	else if (!event.name.empty())
-		setVariable("RECEIVER", ScriptValue(event.name));
-	if (!event.arguments.empty()) {
+		setVariable(kRECEIVERName, ScriptValue(event.name));
+	if (!event.sargs.empty()) {
 		Common::Array<int16> indices;
 		if (!operands(_image.instructions()[destination].operand, indices))
 			return false;
-		for (uint i = 1; i < indices.size() && i <= event.arguments.size(); i++) {
+		for (uint i = 1; i < indices.size() && i <= event.sargs.size(); i++) {
 			Common::String name;
 			if (!variableName(indices[i], name))
 				return false;
-			setVariable(name, event.arguments[i - 1]);
+			setVariable(name, event.sargs[i - 1]);
 		}
 	}
 	return true;
@@ -275,7 +295,7 @@ bool ScriptRuntime::age() {
 	if (!_schedule.procedure.empty() && _schedule.limit < _schedule.elapsed) {
 		PendingEvent event;
 		event.procedure = _schedule.procedure;
-		event.name = "schedule";
+		event.name = kScheduleName;
 		_schedule.procedure.clear();
 		_idle.elapsed = _schedule.elapsed = 0;
 		if (_eventsEnabled && !_blocked) {
@@ -288,7 +308,7 @@ bool ScriptRuntime::age() {
 	if (!_idle.procedure.empty() && _idle.limit < _idle.elapsed) {
 		PendingEvent event;
 		event.procedure = _idle.procedure;
-		event.name = "idle";
+		event.name = kIdleName;
 		_idle.elapsed = 0;
 		if (_eventsEnabled && !_blocked) {
 			if (!enterInterrupt(event) || !step())
@@ -337,16 +357,18 @@ int ScriptRuntime::procedure(const Common::String &name) const {
 		if (found != _procedures.end())
 			return found->_value;
 		if (target.hasPrefix("+")) {
-			int address = atoi(target.c_str() + 1);
+			int32 address = 0;
+			if (StringParser::parseSignedInt(target.c_str() + 1, address, StringParser::kDecimalProfile) != StringParser::Result::kSuccess)
+				return -1;
 			const Common::Array<Script::Instruction> &instructions = _image.instructions();
 			if (0 <= address && static_cast<uint>(address) < instructions.size() && instructions[address].opcode == kProcedure07)
 				return address;
 			return -1;
 		}
 		auto value = _values.find(target);
-		if (value == _values.end() || value->_value.text() == target)
+		if (value == _values.end() || value->_value.toText().equals(target))
 			return -1;
-		target = value->_value.text();
+		target = value->_value.toText();
 	}
 	return -1;
 }
@@ -358,11 +380,11 @@ bool ScriptRuntime::fail(const Common::String &message) {
 	return false;
 }
 
-bool ScriptRuntime::runProcedure(const Common::String &name, const ScriptArguments &parameters) {
+bool ScriptRuntime::runProcedure(const Common::String &name, const ScriptArguments &params) {
 	if (_scheduled) {
 		PendingEvent event;
 		event.procedure = name;
-		event.arguments = parameters;
+		event.sargs = params;
 		if (!name.empty())
 			_events.push_back(event);
 		return _executing || advance(_time);
@@ -371,7 +393,7 @@ bool ScriptRuntime::runProcedure(const Common::String &name, const ScriptArgumen
 		return fail("Reentrant procedure invocation");
 	_executing = true;
 	_error.clear();
-	bool success = name.empty() || execute(name, parameters);
+	bool success = name.empty() || execute(name, params);
 	uint eventCount = 0;
 	while (success && !_events.empty()) {
 		if (1024 <= eventCount) {
@@ -383,10 +405,10 @@ bool ScriptRuntime::runProcedure(const Common::String &name, const ScriptArgumen
 		_events.remove_at(0);
 		if (!_objects.resolve(event.reference))
 			continue;
-		ScriptValue previous = variable("RECEIVER");
-		setVariable("RECEIVER", ScriptValue::object(event.reference));
+		ScriptValue previous = variable(kRECEIVERName);
+		setVariable(kRECEIVERName, ScriptValue::object(event.reference));
 		success = execute(event.procedure, ScriptArguments());
-		setVariable("RECEIVER", previous);
+		setVariable(kRECEIVERName, previous);
 	}
 	if (!success)
 		_events.clear();
@@ -394,14 +416,14 @@ bool ScriptRuntime::runProcedure(const Common::String &name, const ScriptArgumen
 	return success;
 }
 
-bool ScriptRuntime::execute(const Common::String &name, const ScriptArguments &parameters) {
+bool ScriptRuntime::execute(const Common::String &name, const ScriptArguments &params) {
 	_pc = procedure(name);
 	if (_pc < 0)
 		return fail("Unknown procedure: " + name);
 	_frames.clear();
 	_loops.clear();
 	Frame frame;
-	frame.arguments = parameters;
+	frame.sargs = params;
 	_frames.push_back(frame);
 	uint count = 0;
 	_yielded = false;
@@ -448,7 +470,7 @@ bool ScriptRuntime::variableName(int index, Common::String &name, uint depth) {
 		ScriptValue segment;
 		if (!evaluate(variable.array[i], segment, depth + 1))
 			return false;
-		Common::String text = segment.text();
+		Common::String text = segment.toText();
 		if (!text.empty())
 			name += "." + text;
 	}
@@ -472,15 +494,15 @@ bool ScriptRuntime::evaluate(int index, ScriptValue &value, uint depth) {
 	}
 	if (variable.classification == 1) {
 		if (variable.name.hasPrefix("?")) {
-			ScriptArguments arguments;
-			arguments.push_back(ScriptValue(0));
-			arguments.push_back(ScriptValue(9));
-			if (!_functions || !_functions->invoke("RandomNumber", arguments, value))
+			ScriptArguments sargs;
+			sargs.push_back(ScriptValue(0));
+			sargs.push_back(ScriptValue(9));
+			if (!_functions || !_functions->invoke(kRandomNumberName, sargs, value))
 				return fail("Random literal requires an original RNG binding");
 		} else if (variable.type == 3)
-			value = ScriptValue(variable.integer);
+			value = ScriptValue::fromLiteral(variable.integer, variable.name);
 		else if (variable.type == 4)
-			value = ScriptValue(atof(variable.real.c_str()));
+			value = ScriptValue::fromLiteral(variable.real, variable.name);
 		else if (variable.name.hasPrefix("\"") || variable.name.hasPrefix("'")) {
 			if (variable.name.size() < 2)
 				return fail("Malformed string literal");
@@ -493,22 +515,24 @@ bool ScriptRuntime::evaluate(int index, ScriptValue &value, uint depth) {
 	if (variable.classification == 3) {
 		if (variable.count < 1 || 2 < variable.count || variable.array.size() < static_cast<uint>(variable.count + 1))
 			return fail("Invalid string slice operands");
-		ScriptValue source, start, length;
+		ScriptValue source;
+		ScriptValue start;
+		ScriptValue length;
 		if (!evaluate(variable.array[0], source, depth + 1))
 			return false;
-		Common::String text = source.text();
+		Common::String text = source.toText();
 		if (variable.count == 2) {
-			if (!evaluate(variable.array[2], length, depth + 1))
+			if (!evaluateNumber(variable.array[2], length, depth + 1))
 				return false;
-			uint count = MIN<uint>(MAX<int32>(0, length.integer()), text.size());
+			uint count = MIN<uint>(MAX<int32>(0, integer(variable.array[2], length)), text.size());
 			if (variable.array[1] == -1) {
-				value = ScriptValue(text.substr(text.size() - count));
+				value = ScriptValue::fromText(text.substr(text.size() - count));
 				return true;
 			}
 		}
-		if (!evaluate(variable.array[1], start, depth + 1))
+		if (!evaluateNumber(variable.array[1], start, depth + 1))
 			return false;
-		int32 position = start.integer();
+		int32 position = integer(variable.array[1], start);
 		if (static_cast<int64>(text.size()) < position) {
 			value = ScriptValue(Common::String());
 			return true;
@@ -516,8 +540,8 @@ bool ScriptRuntime::evaluate(int index, ScriptValue &value, uint depth) {
 		uint offset = position < 2 ? 0 : static_cast<uint>(position - 1);
 		uint count = text.size() - offset;
 		if (variable.count == 2)
-			count = MIN<uint>(count, MAX<int32>(0, length.integer()));
-		value = ScriptValue(text.substr(offset, count));
+			count = MIN<uint>(count, MAX<int32>(0, integer(variable.array[2], length)));
+		value = ScriptValue::fromText(text.substr(offset, count));
 		return true;
 	}
 	if (variable.classification == 4) {
@@ -529,9 +553,51 @@ bool ScriptRuntime::evaluate(int index, ScriptValue &value, uint depth) {
 			return false;
 		if (position != variable.extra.size() || operand)
 			return fail("Unconsumed expression data");
+		if (value.kind() != ScriptValue::kObject)
+			value = ScriptValue::fromText(value.toText());
 		return true;
 	}
 	return fail("Unsupported variable classification");
+}
+
+bool ScriptRuntime::evaluateNumber(int index, ScriptValue &value, uint depth) {
+	const Common::Array<Script::Variable> &variables = _image.variables();
+	if (128 <= depth || index < 0 || variables.size() <= static_cast<uint>(index))
+		return fail("Invalid or recursive numeric value");
+	const Script::Variable &variable = variables[index];
+	if (variable.indirect == -1 && variable.reference)
+		return evaluateNumber(variable.reference, value, depth + 1);
+	if (variable.classification != 1) {
+		if (!evaluate(index, value, depth))
+			return false;
+		if (2 <= variable.classification && variable.classification <= 4) {
+			Common::String text = value.toText();
+			value = ScriptValue::fromLiteral(StringParser::parseDoublePrefix(text.c_str()), text);
+		}
+		return true;
+	}
+	if (variable.type == 3)
+		value = ScriptValue::fromLiteral(variable.integer, variable.name);
+	else if (variable.type == 4)
+		value = ScriptValue::fromLiteral(variable.real, variable.name);
+	else
+		value = ScriptValue(0);
+	return true;
+}
+
+int32 ScriptRuntime::integer(int index, const ScriptValue &value) const {
+	const Common::Array<Script::Variable> &variables = _image.variables();
+	for (uint depth = 0; depth < 128 && 0 <= index && static_cast<uint>(index) < variables.size(); depth++) {
+		const Script::Variable &variable = variables[index];
+		if (variable.indirect == -1 && variable.reference) {
+			index = variable.reference;
+			continue;
+		}
+		if (variable.classification == 0 || variable.classification == 1)
+			return value.toInt32Rounded();
+		return value.toInt32();
+	}
+	return 0;
 }
 
 bool ScriptRuntime::expression(const Script::Variable &variable, uint &position, int &operand, ScriptValue &value, uint depth) {
@@ -546,20 +612,25 @@ bool ScriptRuntime::expression(const Script::Variable &variable, uint &position,
 		if (operand <= 0)
 			return fail("Expression operand underflow");
 		operand -= 1;
-		return evaluate(variable.array[operand], value, depth + 1);
+		if (!evaluate(variable.array[operand], value, depth + 1))
+			return false;
+		if (value.kind() != ScriptValue::kObject)
+			value = ScriptValue::fromText(value.toText());
+		return true;
 	}
 	if (token != 's' || variable.extra.size() <= position)
 		return fail("Unknown expression token");
 	char operation = variable.extra[position++];
-	ScriptValue right, left;
+	ScriptValue right;
+	ScriptValue left;
 	if (!expression(variable, position, operand, right, depth + 1))
 		return false;
 	if (operation == '`') {
-		value = ScriptValue(right.text());
+		value = ScriptValue(right.toText());
 		return true;
 	}
 	if (operation == '~') {
-		value = ScriptValue(static_cast<int32>(right.text().size()));
+		value = ScriptValue(static_cast<int32>(right.toText().size()));
 		return true;
 	}
 	if (operation == '$')
@@ -575,16 +646,25 @@ bool ScriptRuntime::operate(char operation, const ScriptValue &left, const Scrip
 		return true;
 	}
 	bool numeric = left.isNumeric() && right.isNumeric();
-	double a = left.number(), b = right.number();
+	double a = left.toFloat64();
+	double b = right.toFloat64();
 	if (operation == '+' && !numeric) {
-		Common::String text = left.text() + right.text();
+		Common::String text = left.toText() + right.toText();
 		if (1024 <= text.size())
 			return fail("Expression string exceeds the native limit");
 		result = ScriptValue(text);
 		return true;
 	}
 	if (operation == '=' || operation == '#' || operation == '<' || operation == '>') {
-		int comparison = numeric ? (a < b ? -1 : (b < a ? 1 : 0)) : left.text().compareTo(right.text());
+		int comparison = 0;
+		if (numeric) {
+			if (a < b)
+				comparison = -1;
+			else if (b < a)
+				comparison = 1;
+		} else {
+			comparison = left.toText().compareTo(right.toText());
+		}
 		bool matches = false;
 		if (operation == '=')
 			matches = comparison == 0;
@@ -598,12 +678,13 @@ bool ScriptRuntime::operate(char operation, const ScriptValue &left, const Scrip
 		return true;
 	}
 	if (operation == '@') {
-		uint position = right.text().find(left.text());
+		uint position = right.toText().find(left.toText());
 		result = ScriptValue(position == Common::String::npos ? 0 : static_cast<int32>(position + 1));
 		return true;
 	}
 	if (!numeric)
 		return fail("Numeric operation on a nonnumeric value");
+	// Arithmetic results format fresh text: 1e3 + 0 -> numeric 1000 -> text "1000".
 	if (operation == '+')
 		result = ScriptValue(a + b);
 	else if (operation == '-')
@@ -615,12 +696,12 @@ bool ScriptRuntime::operate(char operation, const ScriptValue &left, const Scrip
 			return fail("Negative base with a fractional exponent");
 		result = ScriptValue(pow(a, b));
 	} else if (operation == '/') {
-		if (b * b < 0.00000001)
+		if (b * b < 1e-8)
 			return fail("Division by a near-zero value");
 		result = ScriptValue(a / b);
 	} else if (operation == '%' || operation == '\\') {
-		int32 divisor = right.integer();
-		int32 dividend = left.integer();
+		int32 divisor = right.toInt32Trunc();
+		int32 dividend = left.toInt32Trunc();
 		if (!divisor || (dividend == INT_MIN && divisor == -1))
 			return fail("Invalid integer division");
 		result = ScriptValue(operation == '%' ? dividend % divisor : dividend / divisor);
@@ -738,12 +819,12 @@ bool ScriptRuntime::step() {
 			_pc += 1;
 			return true;
 		}
-		const ScriptArguments &parameters = _frames.back().arguments;
-		for (uint i = 1; i < indices.size() && i <= parameters.size(); i++) {
+		const ScriptArguments &params = _frames.back().sargs;
+		for (uint i = 1; i < indices.size() && i <= params.size(); i++) {
 			Common::String name;
 			if (!variableName(indices[i], name))
 				return false;
-			setVariable(name, parameters[i - 1]);
+			setVariable(name, params[i - 1]);
 		}
 		return true;
 	}
@@ -760,15 +841,15 @@ bool ScriptRuntime::step() {
 	}
 	if (instruction.opcode == kIdle23 || instruction.opcode == kSchedule24) {
 		ScriptValue duration;
-		if (!evaluate(indices[0], duration))
+		if (!evaluateNumber(indices[0], duration))
 			return false;
 		Timer &timer = instruction.opcode == kIdle23 ? _idle : _schedule;
 		timer = Timer();
-		if (duration.number() != 0 && 1 < indices.size()) {
+		if (duration.toFloat64() != 0 && 1 < indices.size()) {
 			if (!variableName(indices[1], timer.procedure) || procedure(timer.procedure) < 0)
 				return fail("Unknown timer procedure");
-			double ticks = duration.number() * 9.0;
-			if (!(-2147483648.0 <= ticks && ticks <= 2147483647.0))
+			double ticks = duration.toFloat64() * 9.0;
+			if (!(INT32_MIN <= ticks && ticks <= INT32_MAX))
 				return fail("Timer duration outside the native range");
 			timer.limit = static_cast<int32>(ticks);
 		}
@@ -776,10 +857,10 @@ bool ScriptRuntime::step() {
 	}
 	if (instruction.opcode == kPause28) {
 		ScriptValue duration;
-		if (!evaluate(indices[0], duration))
+		if (!evaluateNumber(indices[0], duration))
 			return false;
-		double delay = duration.number() * 900.0;
-		if (!(0 <= delay && delay <= 2147483647.0))
+		double delay = duration.toFloat64() * 900.0;
+		if (!(0 <= delay && delay <= INT32_MAX))
 			return fail("Sleep duration outside the supported range");
 		uint32 &sleepUntil = _scheduler ? _scheduler->_sleepUntil : _sleepUntil;
 		sleepUntil = _time + static_cast<uint32>(delay);
@@ -790,12 +871,12 @@ bool ScriptRuntime::step() {
 		ScriptValue value;
 		if (!evaluate(indices[0], value))
 			return false;
-		_yielded = value.text().size() == 2;
+		_yielded = value.toText().size() == 2;
 		return true;
 	}
 	if (instruction.opcode == kRelay45 || instruction.opcode == kQuit46) {
 		_request = instruction.opcode == kRelay45 ? kRelayScript : kQuitApplication;
-		_requestVariable = indices[0];
+		_requestVar = indices[0];
 		return true;
 	}
 	if (instruction.opcode == kDrop19) {
@@ -803,22 +884,22 @@ bool ScriptRuntime::step() {
 			Common::String name;
 			if (!variableName(indices[i], name))
 				return false;
-			if (name == "schedule" || name == "idle") {
-				(name == "schedule" ? _schedule : _idle).procedure.clear();
+			if (name.equals(kScheduleName) || name.equals(kIdleName)) {
+				(name.equals(kScheduleName) ? _schedule : _idle).procedure.clear();
 				_inInterrupt = false;
-			} else if (name == "stack") {
+			} else if (name.equals(kStackName)) {
 				_frames.clear();
 				_interrupt.frames.clear();
-			} else if (name == "wait") {
+			} else if (name.equals(kWaitName)) {
 				_suspended = _interrupt.suspended = false;
-			} else if (name == "[" && i + 1 < indices.size()) {
+			} else if (name.equals("[") && i + 1 < indices.size()) {
 				i += 1;
 				ScriptValue value;
 				Common::String prefix;
 				if (!evaluate(indices[i], value) || !variableName(indices[i], prefix))
 					return false;
 				if (value.kind() != ScriptValue::kVoid)
-					prefix = value.text();
+					prefix = value.toText();
 				prefix += ".";
 				Common::Array<Common::String> names;
 				for (auto it = _values.begin(); it != _values.end(); ++it) {
@@ -827,7 +908,7 @@ bool ScriptRuntime::step() {
 				}
 				for (uint j = 0; j < names.size(); j++)
 					dropVariable(names[j]);
-			} else if (name == "trinkets") {
+			} else if (name.equals(kTrinketsName)) {
 				Common::Array<Common::String> names;
 				for (auto it = _values.begin(); it != _values.end(); ++it) {
 					if (it->_value.kind() == ScriptValue::kObject)
@@ -836,14 +917,14 @@ bool ScriptRuntime::step() {
 				for (uint j = 0; j < names.size(); j++)
 					dropVariable(names[j]);
 				_events.clear();
-			} else if ((name == "var" || name == "script") && i + 1 < indices.size()) {
+			} else if ((name.equals(kVarName) || name.equals(kScriptName)) && i + 1 < indices.size()) {
 				i += 1;
 				ScriptValue value;
 				if (!evaluate(indices[i], value))
 					return false;
-				if (name == "var")
-					dropVariable(value.text());
-				else if (_scheduler && value.text() == "stack")
+				if (name.equals(kVarName))
+					dropVariable(value.toText());
+				else if (_scheduler && value.toText().equals(kStackName))
 					_scheduler->_calledScripts.clear();
 			} else {
 				dropVariable(name);
@@ -857,7 +938,7 @@ bool ScriptRuntime::step() {
 			return false;
 		Common::String text;
 		for (uint i = 0; i < values.size(); i++)
-			text += values[i].text();
+			text += values[i].toText();
 		debug("MPS: %s", text.c_str());
 		return true;
 	}
@@ -867,12 +948,21 @@ bool ScriptRuntime::step() {
 		if (indices.size() < 2 || instructions.size() <= static_cast<uint>(_pc + 1))
 			return fail("Malformed for loop");
 		ScriptArguments values;
-		if (!arguments(indices, 1, indices.size(), values))
-			return false;
+		for (uint i = 1; i < indices.size(); i++) {
+			ScriptValue value;
+			if (!evaluateNumber(indices[i], value))
+				return false;
+			values.push_back(value);
+		}
 		Loop loop;
-		loop.current = static_cast<int16>(values[0].integer());
-		loop.limit = values.size() < 2 ? 0 : static_cast<int16>(values[1].integer());
-		loop.step = values.size() < 2 ? -1 : (values.size() < 3 ? 1 : static_cast<int16>(values[2].integer()));
+		loop.current = static_cast<int16>(integer(indices[1], values[0]));
+		loop.limit = values.size() < 2 ? 0 : static_cast<int16>(integer(indices[2], values[1]));
+		if (values.size() < 2)
+			loop.step = -1;
+		else if (values.size() < 3)
+			loop.step = 1;
+		else
+			loop.step = static_cast<int16>(integer(indices[3], values[2]));
 		loop.direction = loop.current < loop.limit ? 1 : -1;
 		loop.endPC = instructions[_pc + 1].operand;
 		loop.current = static_cast<int16>(loop.current - loop.step);
@@ -884,7 +974,7 @@ bool ScriptRuntime::step() {
 			ScriptValue value;
 			if (!evaluate(indices[0], value))
 				return false;
-			Common::String text = value.text();
+			Common::String text = value.toText();
 			_condition = text.empty() || text[0] != '0';
 			return true;
 		}
@@ -906,7 +996,7 @@ bool ScriptRuntime::step() {
 		ScriptValue value;
 		if (!evaluate(indices[0], value))
 			return false;
-		Common::String text = value.text();
+		Common::String text = value.toText();
 		_condition = text.empty() || text[0] != '0';
 		return true;
 	}
@@ -917,16 +1007,16 @@ bool ScriptRuntime::step() {
 		ScriptValue value;
 		if (!variableName(indices[0], name) || !evaluate(indices[1], value))
 			return false;
-		if (_objects.hasClass(value.text())) {
-			ScriptArguments parameters;
-			if (!arguments(indices, 2, indices.size(), parameters))
+		if (_objects.hasClass(value.toText())) {
+			ScriptArguments params;
+			if (!arguments(indices, 2, indices.size(), params))
 				return false;
-			uint32 reference = _objects.create(value.text(), parameters);
+			uint32 reference = _objects.create(value.toText(), params);
 			if (!reference)
-				return fail("Native object construction failed: " + value.text());
+				return fail("Native object construction failed: " + value.toText());
 			value = ScriptValue::object(reference);
 		} else if (indices.size() != 2) {
-			return fail("Unregistered native class: " + value.text());
+			return fail("Unregistered native class: " + value.toText());
 		} else if (value.kind() == ScriptValue::kObject && indices[0] != indices[1] &&
 				   !_image.variables()[indices[0]].indirect) {
 			uint32 reference = _objects.clone(value.reference());
@@ -947,87 +1037,94 @@ bool ScriptRuntime::step() {
 			return false;
 		int destination = procedure(name);
 		for (uint depth = 0; destination < 0 && depth < 128; depth++) {
-			Common::String alias = variable(name).text();
+			Common::String alias = variable(name).toText();
 			if (alias.hasPrefix("+")) {
-				int address = atoi(alias.c_str() + 1);
+				int32 address = 0;
+				if (StringParser::parseSignedInt(alias.c_str() + 1, address, StringParser::kDecimalProfile) != StringParser::Result::kSuccess)
+					break;
 				if (0 <= address && static_cast<uint>(address) < instructions.size() && instructions[address].opcode == kProcedure07)
 					destination = address;
 				break;
 			}
-			if (alias == name || !_values.contains(alias))
+			if (alias.equals(name) || !_values.contains(alias))
 				break;
 			name = alias;
 			destination = procedure(name);
 		}
 		if (destination < 0) {
 			_request = kCallScript;
-			_requestVariable = indices[0];
+			_requestVar = indices[0];
 			return true;
 		}
 		if (128 <= _frames.size())
 			return fail("Call stack overflow: " + name);
 		Frame frame;
 		frame.returnPC = _pc;
-		if (!arguments(indices, 1, indices.size(), frame.arguments))
+		if (!arguments(indices, 1, indices.size(), frame.sargs))
 			return false;
 		_frames.push_back(frame);
 		_pc = destination;
 		return true;
 	}
 	if (instruction.opcode == kInvoke21) {
-		ScriptValue name, result;
-		ScriptArguments parameters;
-		if (!evaluate(indices[0], name) || !arguments(indices, 1, indices.size(), parameters))
+		ScriptValue name;
+		ScriptValue result;
+		ScriptArguments params;
+		if (!evaluate(indices[0], name) || !arguments(indices, 1, indices.size(), params))
 			return false;
-		if (!_functions || !_functions->invoke(name.text(), parameters, result))
-			return fail("Unbound native function: " + name.text());
-		setVariable("RESULT", result);
+		if (!_functions || !_functions->invoke(name.toText(), params, result))
+			return fail("Unbound native function: " + name.toText());
+		setVariable(kRESULTName, result);
 		return true;
 	}
 	if (instruction.opcode == kSet35 || instruction.opcode == kGet36 || instruction.opcode == kPlay40) {
 		if (indices.size() < 2 && instruction.opcode != kPlay40)
 			return fail("Missing object property or method");
-		ScriptValue target, property, result;
+		ScriptValue target;
+		ScriptValue property;
+		ScriptValue result;
 		if (!evaluate(indices[0], target) || (1 < indices.size() && !evaluate(indices[1], property)))
 			return false;
 		ScriptableObject *object = target.kind() == ScriptValue::kObject ? _objects.resolve(target.reference()) : nullptr;
 		if (!object)
-			return fail("Missing native object for " + property.text());
+			return fail("Missing native object for " + property.toText());
 		object->setCallTime(_time);
-		ScriptArguments parameters;
+		// Native bindings consume the argument's text representation, including numeric spellings.
+		// Keep "1e3" intact: a native integer parameter reads 1 while VM arithmetic reads 1000.
+		ScriptArguments params;
 		uint end = instruction.opcode == kPlay40 ? indices.size() : indices.size() - 1;
 		bool blocking = false;
 		if (instruction.opcode == kPlay40) {
-			Common::String method = property.text();
+			Common::String method = property.toText();
 			if (indices.size() == 1 || method.empty() || method.hasPrefix("}")) {
 				blocking = method.hasPrefix("}");
-				property = ScriptValue(Common::String("default"));
+				property = ScriptValue(Common::String(kDefaultName));
 			}
 			for (uint i = 2; i < end; i++) {
 				ScriptValue value;
 				if (!evaluate(indices[i], value))
 					return false;
-				if (value.text().hasPrefix("}")) {
+				if (value.toText().hasPrefix("}")) {
 					blocking = true;
 					break;
 				}
-				parameters.push_back(value);
+				params.push_back(value);
 			}
-		} else if (!arguments(indices, 2, end, parameters)) {
+		} else if (!arguments(indices, 2, end, params)) {
 			return false;
 		}
 		if (instruction.opcode == kGet36) {
 			if (indices.size() < 3)
 				return fail("Missing get destination");
-			if (property.text() == "name") {
+			if (property.toText().equals(kNameProperty)) {
 				Common::String name;
 				if (!variableName(indices[0], name))
 					return false;
 				if (_objectNames.contains(target.reference()))
 					name = _objectNames[target.reference()];
 				result = ScriptValue(name);
-			} else if (!object->get(property.text(), parameters, result)) {
-				return fail("Unknown readable property: " + property.text());
+			} else if (!object->get(property.toText(), params, result)) {
+				return fail("Unknown readable property: " + property.toText());
 			}
 			Common::String name;
 			if (!variableName(indices.back(), name))
@@ -1035,17 +1132,17 @@ bool ScriptRuntime::step() {
 			setVariable(name, result);
 		} else if (instruction.opcode == kSet35) {
 			if (indices.size() == 2) {
-				if (!object->bindEvent(property.text(), nullptr))
-					return fail("Unknown event: " + property.text());
+				if (!object->bindEvent(property.toText(), nullptr))
+					return fail("Unknown event: " + property.toText());
 			} else {
 				Common::String name;
 				if (!variableName(indices.back(), name))
 					return false;
 				if (0 <= procedure(name))
-					return bindEvent(*object, property.text(), name);
+					return bindEvent(*object, property.toText(), name);
 				ScriptValue value;
-				if (!evaluate(indices.back(), value) || !object->set(property.text(), parameters, value))
-					return fail("Unknown writable property: " + property.text());
+				if (!evaluate(indices.back(), value) || !object->set(property.toText(), params, value))
+					return fail("Unknown writable property: " + property.toText());
 			}
 		} else {
 			if (blocking) {
@@ -1055,19 +1152,19 @@ bool ScriptRuntime::step() {
 				CompletionLink link(*this);
 				object->bindCompletion(&link);
 			}
-			if (!object->play(property.text(), parameters, result)) {
+			if (!object->play(property.toText(), params, result)) {
 				if (blocking)
 					unblock();
 				else
-					return fail("Unknown object method: " + property.text());
+					return fail("Unknown object method: " + property.toText());
 			}
 		}
 		return true;
 	}
-	ScriptArguments parameters;
-	if (!arguments(indices, 0, indices.size(), parameters))
+	ScriptArguments params;
+	if (!arguments(indices, 0, indices.size(), params))
 		return false;
-	if (!_functions || !_functions->command(instruction.opcode, parameters)) {
+	if (!_functions || !_functions->command(instruction.opcode, params)) {
 		_pc -= 1;
 		_yielded = true;
 	}
@@ -1124,11 +1221,11 @@ bool ScriptScheduler::tick(uint32 time) {
 			}
 		} else {
 			ScriptValue target;
-			if (!runtime.evaluate(runtime._requestVariable, target)) {
+			if (!runtime.evaluate(runtime._requestVar, target)) {
 				success = false;
 				break;
 			}
-			name = target.text();
+			name = target.toText();
 			if (request == ScriptRuntime::kCallScript)
 				_calledScripts.push_back(_threads[i].name);
 		}

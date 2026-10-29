@@ -31,66 +31,72 @@ void PageScene::music(uint resource) {
 	_vm.music().reset();
 	_vm.music().setEnabled(enabled);
 	if (resource)
-		_vm.music().start(Common::String::format("%stunz/%u.wav", _name.c_str(), resource), volume);
+		_vm.music().start(Common::String::format(kPageMusicFormat, _name.c_str(), resource), volume);
 }
 
 bool PageScene::enterQueen() {
-	if (!actor("queen", "kQueen"))
+	if (!actor(kQueenName, kQueenKey))
 		return false;
-	const int savedState = MAX(1, _world.get("R1CN2State"));
+	const int savedState = MAX(1, _world.get(kR1CN2StateKey));
 	int state = savedState;
-	if (state == 2 && _world.visits("r1in4"))
+	if (state == 2 && _world.visits(Page::kPageIN4))
 		state = 3;
-	if (state == 3 && _world.get("talkedToInventor"))
+	if (state == 3 && _world.get(kTalkedToInventorKey))
 		state = 4;
 	uint collected = 0;
 	const char *const items[] = {
-		"RBands",
-		"HulaHoop",
-		"Pillow",
+		kRBandsName,
+		kHulaHoopName,
+		kPillowName,
 	};
 	for (const char *item : items) {
-		int id = _page->number(Common::String("kINV1") + item);
-		if (_world.get(Common::String::format("item:%d", id)) || _world.get(Common::String("R1LN2") + item + "Delivered"))
+		int id = _page->number(Common::String(kINV1Key) + item);
+		if (_world.get(Common::String::format(kItemSignedIndexKey, id)) || _world.get(Common::String(kR1LN2Key) + item + kDeliveredKey))
 			collected += 1;
 	}
 	if (4 <= state)
 		state = MAX(state, 4 + static_cast<int>(collected));
-	const int reentry = state == savedState ? _world.get("R1CN2Reentry") + 1 : 0;
-	_world.set("R1CN2State", state);
-	_world.set("R1CN2Reentry", reentry);
+	const int reentry = state == savedState ? _world.get(kR1CN2ReentryKey) + 1 : 0;
+	_world.set(kR1CN2StateKey, state);
+	_world.set(kR1CN2ReentryKey, reentry);
 	// The portable save route index for the catapult return page, r1rss.
-	const bool fromCatapult = _world.get("previousLocation") == 20;
+	const bool fromCatapult = _world.get(kPreviousLocationKey) == 20;
 	if (fromCatapult)
-		_world.set("R1CN2CatapultReentry", _world.get("R1CN2CatapultReentry") + 1);
-	_world.set("R1CN3FromStreet", 1);
-	Shell::Sprite *litter = _scene.add(characterResource(_page->number("kLitterID"), kAnimation), _page->number("kLitterZ"));
-	Shell::Sprite *sign = _scene.add(characterResource(_page->number("kSignID"), kAnimation), _page->number("kSignZ"));
+		_world.set(kR1CN2CatapultReentryKey, _world.get(kR1CN2CatapultReentryKey) + 1);
+	_world.set(kR1CN3FromStreetKey, 1);
+	Shell::Sprite *litter = _scene.add(characterResource(_page->number(kLitterIDKey), kAnimation), _page->number(kLitterZKey));
+	Shell::Sprite *sign = _scene.add(characterResource(_page->number(kSignIDKey), kAnimation), _page->number(kSignZKey));
 	if (!litter || !sign)
 		return false;
 	litter->visible = 3 <= state;
-	litter->setFrame(state < 5 ? 1 : state < 7 ? 2
-											   : 3);
-	_ambient = _scene.add(characterResource(_page->number("kAmbientIDs.1"), kAnimation), _page->number("kAmbientZ"));
+	int frame;
+	if (state < 5)
+		frame = 1;
+	else if (state < 7)
+		frame = 2;
+	else
+		frame = 3;
+	litter->setFrame(frame);
+	_ambient = _scene.add(characterResource(_page->number(kAmbientIDs1Key), kAnimation), _page->number(kAmbientZKey));
 	if (!_ambient)
 		return false;
 	if (fromCatapult) {
-		_actors["reader"]->playAnim(_page->number("kReaderWalkInID"));
-		_actors["sam"]->playAnim(_page->number("kSamWalkInID"));
+		_actors[kReaderName]->playAnim(_page->number(kReaderWalkInIDKey));
+		_actors[kSamName]->playAnim(_page->number(kSamWalkInIDKey));
 		_queenArriving = true;
 	}
-	int pending = _world.get("R1CN2WelcomePending");
-	if (_world.get("R1CN2ExitPending")) {
-		say("reader", _page->number("kByeID"));
+	int pending = _world.get(kR1CN2WelcomePendingKey);
+	if (_world.get(kR1CN2ExitPendingKey)) {
+		say(kReaderName, _page->number(kByeIDKey));
 		_queenPhase = kQueenExitSpeech;
 	} else if (pending == 3) {
 		queenMovieFinished();
 	} else if (pending == 2) {
 		_queenPhase = kQueenMovie;
 	} else if (pending || state == 1) {
-		say("sam", _page->number("kEnterSpchIDs"));
+		say(kSamName, _page->number(kEnterSpchIDsKey));
 		_queenPhase = kQueenGreeting;
-		_world.set("R1CN2WelcomePending", 1);
+		_world.set(kR1CN2WelcomePendingKey, 1);
 	} else {
 		queenReentry(state, reentry, fromCatapult);
 	}
@@ -112,12 +118,13 @@ void PageScene::updateQueenAmbient(uint32 time) {
 		_ambientWaiting = true;
 		_ambientStart = time;
 	}
-	if (_ambientWaiting && static_cast<uint32>(_page->number("kDelayTime")) <= time - _ambientStart) {
+	if (_ambientWaiting && static_cast<uint32>(_page->number(kDelayTimeKey)) <= time - _ambientStart) {
 		_queenAmbientChoice = chooseAction(_ambientChoices);
 		if (_queenAmbientChoice == 1) {
 			_ambient->startAnimation(1);
 		} else {
-			_queenAmbient = _scene.add(characterResource(_page->number(Common::String::format("kAmbientIDs.%u", _queenAmbientChoice)), kAnimation), _page->number("kAmbientZ"));
+			_queenAmbient = _scene.add(characterResource(_page->number(Common::String::format(kAmbientIDsUnsignedIndexKey, _queenAmbientChoice)),
+				kAnimation), _page->number(kAmbientZKey));
 			if (_queenAmbient)
 				_queenAmbient->startAnimation(1);
 		}
@@ -127,78 +134,78 @@ void PageScene::updateQueenAmbient(uint32 time) {
 
 void PageScene::queenGroup(uint group, const char *actors) {
 	for (uint i = 0; actors[i]; i++) {
-		const char *actor = "queen";
+		const char *actor = kQueenName;
 		if (actors[i] == 'r')
-			actor = "reader";
+			actor = kReaderName;
 		else if (actors[i] == 's')
-			actor = "sam";
-		say(actor, _page->number(Common::String::format("kReEnterSpchIDs.%u.%u", group, i + 1)));
+			actor = kSamName;
+		say(actor, _page->number(Common::String::format(kReEnterSpchIDsUnsignedIndexUnsignedIndexKey, group, i + 1)));
 	}
 }
 
 void PageScene::queenReentry(int state, int reentry, bool fromCatapult) {
 	if (fromCatapult) {
-		int count = _world.get("R1CN2CatapultReentry");
+		int count = _world.get(kR1CN2CatapultReentryKey);
 		if (4 < count)
 			count = 1;
 		if (count == 1)
-			queenGroup(1, "rsr");
+			queenGroup(1, kRsrName);
 		else
-			say(count == 3 ? "reader" : "sam", _page->number(Common::String::format("kReEnterSpchIDs.%d", count)));
-		_world.set("R1CN2CatapultReentry", count == 4 ? 1 : count);
+			say(count == 3 ? kReaderName : kSamName, _page->number(Common::String::format(kReEnterSpchIDsSignedIndexKey, count)));
+		_world.set(kR1CN2CatapultReentryKey, count == 4 ? 1 : count);
 	}
 	// Catapult dialogue precedes, rather than replaces, the progress report.
 	if (state == 2 && reentry == 1) {
-		queenGroup(5, "qrq");
+		queenGroup(5, kQrqName);
 	} else if (state == 3 && reentry == 0) {
-		queenGroup(6, "qrq");
+		queenGroup(6, kQrqName);
 	} else if (state == 4) {
 		if (reentry == 0) {
-			queenGroup(7, "qsrsrsrsrsq");
+			queenGroup(7, kQsrsrsrsrsqName);
 		} else if (reentry == 1) {
-			queenGroup(8, "qr");
+			queenGroup(8, kQrName);
 		} else if (reentry == 2) {
-			queenGroup(9, "qr");
-			_world.set("R1CN2Reentry", 0);
+			queenGroup(9, kQrName);
+			_world.set(kR1CN2ReentryKey, 0);
 		}
 	} else if (state == 5 && reentry == 0) {
-		queenGroup(10, "qrs");
+		queenGroup(10, kQrsName);
 	} else if (state == 6) {
 		uint missing = 0;
-		if (!hasItem("HulaHoop", "R1LN2HulaHoopDelivered"))
+		if (!hasItem(kHulaHoopName, kR1LN2HulaHoopDeliveredKey))
 			missing = 1;
-		else if (!hasItem("RBands", "R1LN2RBandsDelivered"))
+		else if (!hasItem(kRBandsName, kR1LN2RBandsDeliveredKey))
 			missing = 2;
-		else if (!hasItem("Pillow", "R1LN2PillowDelivered"))
+		else if (!hasItem(kPillowName, kR1LN2PillowDeliveredKey))
 			missing = 3;
 		if (reentry == 0) {
-			say("queen", _page->number("kReEnterSpchIDs.11.1"));
+			say(kQueenName, _page->number(kReEnterSpchIDs111Key));
 			if (missing)
-				say(missing == 2 ? "sam" : "reader", _page->number(Common::String::format("kReEnterSpchIDs.11.%u", missing + 1)));
-			say("queen", _page->number("kReEnterSpchIDs.11.5"));
+				say(missing == 2 ? kSamName : kReaderName, _page->number(Common::String::format(kReEnterSpchIDs11UnsignedIndexKey, missing + 1)));
+			say(kQueenName, _page->number(kReEnterSpchIDs115Key));
 		} else if (missing) {
-			say("queen", _page->number(Common::String::format("kReEnterSpchIDs.12.%u", missing)));
-			say("reader", _page->number("kReEnterSpchIDs.12.4"));
+			say(kQueenName, _page->number(Common::String::format(kReEnterSpchIDs12UnsignedIndexKey, missing)));
+			say(kReaderName, _page->number(kReEnterSpchIDs124Key));
 		}
 	} else if (state == 7) {
-		queenGroup(reentry == 0 ? 13 : 14, reentry == 0 ? "qqsrq" : "qqr");
+		queenGroup(reentry == 0 ? 13 : 14, reentry == 0 ? kQqsrqName : kQqrName);
 	}
 }
 
 void PageScene::queenWelcome() {
-	_world.set("R1CN2State", 2);
-	_world.set("R1CN2Reentry", 0);
+	_world.set(kR1CN2StateKey, 2);
+	_world.set(kR1CN2ReentryKey, 0);
 	_speech.clear();
 	_nextSpeech = 0;
-	speeches("kWelcomeCharID.1", "kWelcomeSpchID.1", _page->number("kNumWelcomeSpch.1"));
-	speeches("kWelcomeCharID.2", "kWelcomeSpchID.2", _page->number("kNumWelcomeSpch.2"));
+	speeches(kWelcomeCharID1Key, kWelcomeSpchID1Key, _page->number(kNumWelcomeSpch1Key));
+	speeches(kWelcomeCharID2Key, kWelcomeSpchID2Key, _page->number(kNumWelcomeSpch2Key));
 	_queenSongIndex = _speech.empty() ? 0 : _speech.size() - 1;
 	_queenPhase = kQueenWelcome;
 }
 
 void PageScene::updateQueen() {
 	if (_queenPhase == kQueenWelcome && !_queenSongStarted && _queenSongIndex <= _nextSpeech) {
-		music(_page->number("kSongIntroID"));
+		music(_page->number(kSongIntroIDKey));
 		_queenSongStarted = true;
 	}
 	if (_nextSpeech < _speech.size())
@@ -207,10 +214,10 @@ void PageScene::updateQueen() {
 		queenWelcome();
 	} else if (_queenPhase == kQueenWelcome) {
 		_queenPhase = kQueenMovie;
-		_world.set("R1CN2WelcomePending", 2);
+		_world.set(kR1CN2WelcomePendingKey, 2);
 	} else if (_queenPhase == kQueenAfterMovie) {
 		_queenPhase = kQueenIdle;
-		_world.set("R1CN2WelcomePending", 0);
+		_world.set(kR1CN2WelcomePendingKey, 0);
 	} else if (_queenPhase == kQueenExitSpeech) {
 		_queenPhase = kQueenExitReady;
 	}
@@ -226,121 +233,139 @@ void PageScene::queenIdle(uint32 time) {
 		_idleStart = time;
 		return;
 	}
-	if (time - _idleStart < static_cast<uint32>(_page->number("gIdleHelpTime")))
+	if (time - _idleStart < static_cast<uint32>(_page->number(kGIdleHelpTimeName)))
 		return;
 	interrupt();
-	uint choice = _vm.rnd().number(1, _world.get("R1CN2State") == 1 ? 2 : 3);
+	uint choice = _vm.rnd().number(1, _world.get(kR1CN2StateKey) == 1 ? 2 : 3);
 	uint group = choice == 1 ? 1 : 5 - choice;
-	Common::String prefix = Common::String::format("kIdleSpchIDs.%u", group);
-	say(choice == 1 ? "reader" : "sam", _page->number(prefix + ".1"));
-	say(choice == 1 ? "sam" : "reader", _page->number(prefix + ".2"));
+	Common::String prefix = Common::String::format(kIdleSpchIDsUnsignedIndexKey, group);
+	say(choice == 1 ? kReaderName : kSamName, _page->number(prefix + k1Name));
+	say(choice == 1 ? kSamName : kReaderName, _page->number(prefix + k2Name));
 }
 
 void PageScene::queenMovieFinished() {
 	interrupt();
-	music(_page->number("kBackgroundMusicIDs.2"));
-	speeches("kWelcomeCharID.4", "kWelcomeSpchID.4", _page->number("kNumWelcomeSpch.4"));
-	speeches("kWelcomeCharID.5", "kWelcomeSpchID.5", _page->number("kNumWelcomeSpch.5"));
+	music(_page->number(kBackgroundMusicIDs2Key));
+	speeches(kWelcomeCharID4Key, kWelcomeSpchID4Key, _page->number(kNumWelcomeSpch4Key));
+	speeches(kWelcomeCharID5Key, kWelcomeSpchID5Key, _page->number(kNumWelcomeSpch5Key));
 	_queenPhase = kQueenAfterMovie;
-	_world.set("R1CN2WelcomePending", 3);
+	_world.set(kR1CN2WelcomePendingKey, 3);
 }
 
 Common::String PageScene::queenClick(Common::Point point) {
-	if (!_world.get("R1CN2SignClickCount")) {
-		int direction = _page->number("kNavLocCN3Sign");
-		int count = _page->number(Common::String::format("kNumNavHotspots.%d", direction));
+	if (!_world.get(kR1CN2SignClickCountKey)) {
+		int direction = _page->number(kNavLocCN3SignKey);
+		int count = _page->number(Common::String::format(kNumNavHotspotsSignedIndexKey, direction));
 		for (int i = 1; i <= count; i++) {
-			Common::String suffix = Common::String::format(".%d.%d", direction, i);
-			Common::Rect rect(_page->number("kNavHSX1" + suffix), _page->number("kNavHSY1" + suffix),
-							  _page->number("kNavHSX2" + suffix), _page->number("kNavHSY2" + suffix));
+			Common::String suffix = Common::String::format(kSignedIndexSignedIndexFormat, direction, i);
+			Common::Rect rect(_page->number(kNavHSX1Key + suffix), _page->number(kNavHSY1Key + suffix),
+							  _page->number(kNavHSX2Key + suffix), _page->number(kNavHSY2Key + suffix));
 			if (!rect.contains(point))
 				continue;
-			_world.set("R1CN2SignClickCount", 1);
-			_world.set("R1CN2ExitPending", 1);
-			say("reader", _page->number("kByeID"));
+			_world.set(kR1CN2SignClickCountKey, 1);
+			_world.set(kR1CN2ExitPendingKey, 1);
+			say(kReaderName, _page->number(kByeIDKey));
 			_queenPhase = kQueenExitSpeech;
-			return "handled";
+			return kHandledName;
 		}
 	}
-	int state = _world.get("R1CN2State");
-	if (_actors["queen"]->bounds().contains(point)) {
+	int state = _world.get(kR1CN2StateKey);
+	if (_actors[kQueenName]->bounds().contains(point)) {
 		if (state == 1) {
 			queenWelcome();
 		} else if (state == 2 && !_queenClicks) {
 			const char *const actors[] = {
-				"queen",
-				"reader",
-				"queen",
-				"sam",
+				kQueenName,
+				kReaderName,
+				kQueenName,
+				kSamName,
 			};
 			for (uint i = 0; i < ARRAYSIZE(actors); i++)
-				say(actors[i], _page->number(Common::String::format("kInstrSpchIDs.2.%u", i + 1)));
+				say(actors[i], _page->number(Common::String::format(kInstrSpchIDs2UnsignedIndexKey, i + 1)));
 		} else if (state == 3 && !_queenClicks) {
-			say("queen", _page->number("kInstrSpchIDs.3"));
+			say(kQueenName, _page->number(kInstrSpchIDs3Key));
 		} else if (!_queenClicks) {
 			uint group = 0;
 			if (state == 7)
 				group = 9;
-			else if (!hasItem("HulaHoop", "R1LN2HulaHoopDelivered"))
+			else if (!hasItem(kHulaHoopName, kR1LN2HulaHoopDeliveredKey))
 				group = 4;
-			else if (_world.visits("r1cg1") && !hasItem("Whistle"))
+			else if (_world.visits(Page::kPageCG1) && !hasItem(kWhistleKey))
 				group = 6;
-			else if (!hasItem("RBands", "R1LN2RBandsDelivered"))
+			else if (!hasItem(kRBandsName, kR1LN2RBandsDeliveredKey))
 				group = 7;
-			else if (!hasItem("Pillow", "R1LN2PillowDelivered"))
+			else if (!hasItem(kPillowName, kR1LN2PillowDeliveredKey))
 				group = 8;
 			if (group) {
-				const char *first = group == 9 ? "queen" : group == 4 || group == 8 ? "sam"
-																					: "reader";
-				say(first, _page->number(Common::String::format("kInstrSpchIDs.%u.1", group)));
-				say(group == 9 ? "reader" : "queen", _page->number(Common::String::format("kInstrSpchIDs.%u.2", group)));
+				const char *first;
+				if (group == 9)
+					first = kQueenName;
+				else if (group == 4 || group == 8)
+					first = kSamName;
+				else
+					first = kReaderName;
+				say(first, _page->number(Common::String::format(kInstrSpchIDsUnsignedIndex1Key, group)));
+				say(group == 9 ? kReaderName : kQueenName, _page->number(Common::String::format(kInstrSpchIDsUnsignedIndex2Key, group)));
 			}
 			if (group == 4) {
-				say("queen", _page->number("kInstrSpchIDs.4.3"));
-				if (_world.get("talkedToRockHead") && !hasItem("Ladder", "R1IG1LadderHere")) {
-					say("reader", _page->number("kInstrSpchIDs.5.1"));
-					say("queen", _page->number("kInstrSpchIDs.5.2"));
+				say(kQueenName, _page->number(kInstrSpchIDs43Key));
+				if (_world.get(kTalkedToRockHeadKey) && !hasItem(kLadderKey, kR1IG1LadderHereKey)) {
+					say(kReaderName, _page->number(kInstrSpchIDs51Key));
+					say(kQueenName, _page->number(kInstrSpchIDs52Key));
 				}
-			} else if (group == 7 && _world.visits("r1cn4") && !hasItem("Wagon", "R1CN4WagonHere")) {
-				say("sam", _page->number("kInstrSpchIDs.7.3"));
-				say("queen", _page->number("kInstrSpchIDs.7.4"));
+			} else if (group == 7 && _world.visits(Page::kPageCN4) && !hasItem(kWagonKey, kR1CN4WagonHereKey)) {
+				say(kSamName, _page->number(kInstrSpchIDs73Key));
+				say(kQueenName, _page->number(kInstrSpchIDs74Key));
 			}
 		} else if (_queenClicks) {
 			uint group = (_queenClicks - 1) % 3 + 10;
-			say(group == 11 ? "reader" : "sam", _page->number(Common::String::format("kInstrSpchIDs.%u.1", group)));
-			say(group == 12 ? "queen" : "reader", _page->number(Common::String::format("kInstrSpchIDs.%u.2", group)));
+			say(group == 11 ? kReaderName : kSamName, _page->number(Common::String::format(kInstrSpchIDsUnsignedIndex1Key, group)));
+			say(group == 12 ? kQueenName : kReaderName, _page->number(Common::String::format(kInstrSpchIDsUnsignedIndex2Key, group)));
 			if (group != 12)
-				say("queen", _page->number(Common::String::format("kInstrSpchIDs.%u.3", group)));
+				say(kQueenName, _page->number(Common::String::format(kInstrSpchIDsUnsignedIndex3Key, group)));
 		}
 		_queenClicks += 1;
-		return "handled";
+		return kHandledName;
 	}
-	if (_actors["paige"]->bounds().contains(point)) {
-		uint group = state == 2 ? 1 : state == 7 ? 5
-												 : _paigeClicks % 3 + 2;
-		say("paige", _page->number(Common::String::format("kHelpSpchIDs.%u", group)));
+	if (_actors[kPaigeName]->bounds().contains(point)) {
+		uint group;
+		if (state == 2)
+			group = 1;
+		else if (state == 7)
+			group = 5;
+		else
+			group = _paigeClicks % 3 + 2;
+		say(kPaigeName, _page->number(Common::String::format(kHelpSpchIDsUnsignedIndexKey, group)));
 		_paigeClicks += 1;
-		return "handled";
+		return kHandledName;
 	}
-	if (_actors["reader"]->bounds().contains(point) || _actors["sam"]->bounds().contains(point)) {
+	if (_actors[kReaderName]->bounds().contains(point) || _actors[kSamName]->bounds().contains(point)) {
 		if (!_mainClicks && (state == 2 || state == 3 || state == 7)) {
 			uint group = state == 7 ? 10 : state - 1;
-			say(state == 3 ? "sam" : "reader", _page->number(Common::String::format("kMainSpchIDs.%u", group)));
+			say(state == 3 ? kSamName : kReaderName, _page->number(Common::String::format(kMainSpchIDsUnsignedIndexKey, group)));
 		} else if (state != 7) {
-			uint group = _mainClicks ? _vm.rnd().number(6, state < 4 ? 7 : 9) : state - 1;
+			uint group;
+			if (_mainClicks) {
+				int last = 9;
+				if (state < 4)
+					last = 7;
+				group = _vm.rnd().number(6, last);
+			} else {
+				group = state - 1;
+			}
 			bool readerFirst = group == 3 || group == 6 || group == 8;
-			say(readerFirst ? "reader" : "sam", _page->number(Common::String::format("kMainSpchIDs.%u.1", group)));
-			say(readerFirst ? "sam" : "reader", _page->number(Common::String::format("kMainSpchIDs.%u.2", group)));
+			say(readerFirst ? kReaderName : kSamName, _page->number(Common::String::format(kMainSpchIDsUnsignedIndex1Key, group)));
+			say(readerFirst ? kSamName : kReaderName, _page->number(Common::String::format(kMainSpchIDsUnsignedIndex2Key, group)));
 		}
 		_mainClicks += 1;
-		return "handled";
+		return kHandledName;
 	}
 	return Common::String();
 }
 
 bool PageScene::hasItem(const Common::String &name, const Common::String &delivered) const {
-	uint id = _page->number("kINV1" + name);
-	return _world.get(Common::String::format("item:%u", id)) > 0 || (!delivered.empty() && _world.get(delivered) > 0);
+	uint id = _page->number(kINV1Key + name);
+	return _world.get(Common::String::format(kItemUnsignedIndexKey, id)) > 0 || (!delivered.empty() && _world.get(delivered) > 0);
 }
 
 } // namespace RR1Cloud9

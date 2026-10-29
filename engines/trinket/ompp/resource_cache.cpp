@@ -28,9 +28,11 @@ namespace OM {
 
 class CachedReadStream : public Common::MemoryReadStream {
 public:
+	/** Retain payload ownership while maintaining this stream's own read position. */
 	explicit CachedReadStream(const Common::SharedPtr<Common::Array<byte>> &data) : Common::MemoryReadStream(data->empty() ? nullptr : &(*data)[0], data->size()), _data(data) {}
 
 private:
+	/** Immutable payload retained even after the cache releases its reference. */
 	Common::SharedPtr<Common::Array<byte>> _data;
 };
 
@@ -40,28 +42,51 @@ void ResourceCache::clear() {
 }
 
 Common::SeekableReadStream *ResourceCache::open(const Common::String &name) const {
-	Common::String key = name;
-	key.toLowercase();
-	key.replace('\\', '/');
-	while (key.hasPrefix("/"))
-		key.erase(0, 1);
+	_statistics.requests += 1;
+	Common::String key = cacheKey(name);
 	auto found = _entries.find(key);
+	if (found != _entries.end()) {
+		_statistics.hits += 1;
+		return new CachedReadStream(found->_value);
+	}
+	_statistics.reads += 1;
+	Common::ScopedPtr<Common::SeekableReadStream> stream(_source.open(name));
+	if (!stream || stream->size() < 0) {
+		_statistics.failures += 1;
+		return nullptr;
+	}
+	// A provider may learn the selected common-library alias during the first open.
+	key = cacheKey(name);
+	found = _entries.find(key);
 	if (found != _entries.end())
 		return new CachedReadStream(found->_value);
-	Common::ScopedPtr<Common::SeekableReadStream> stream(_source.open(name));
-	if (!stream || stream->size() < 0)
-		return nullptr;
 	// Array and stream reads use 32-bit sizes. Larger streams stay with the provider.
 	if (0xFFFFFFFFULL < static_cast<uint64>(stream->size()))
 		return stream.release();
 	Data data(new Common::Array<byte>());
 	data->resize(stream->size());
 	uint32 size = data->size();
-	if (size && (stream->read(&(*data)[0], size) != size || stream->err()))
+	if (size && (stream->read(&(*data)[0], size) != size || stream->err())) {
+		_statistics.failures += 1;
 		return nullptr;
-	_bytes += size;
-	_entries[key] = data;
+	}
+	if (!key.empty()) {
+		_bytes += size;
+		_entries[key] = data;
+	}
 	return new CachedReadStream(data);
+}
+
+bool ResourceCache::contains(const Common::String &name) const {
+	return _entries.contains(cacheKey(name)) || _source.contains(name);
+}
+
+void ResourceCache::release(const Common::String &name) {
+	auto found = _entries.find(cacheKey(name));
+	if (found == _entries.end())
+		return;
+	_bytes -= found->_value->size();
+	_entries.erase(found);
 }
 
 } // namespace OM

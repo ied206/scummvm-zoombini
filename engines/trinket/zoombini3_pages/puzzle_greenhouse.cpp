@@ -13,11 +13,28 @@
 #include "common/system.h"
 #include "common/tokenizer.h"
 #include "common/util.h"
+#include "trinket/math.h"
+#include "trinket/metaengine.h"
+#include "trinket/string_parser.h"
 #include "trinket/trinket.h"
-#include <math.h>
 
 namespace Trinket {
 namespace Zoombini3 {
+
+constexpr const char *GreenhouseMachine::kEventMothDone;
+constexpr const char *GreenhouseMachine::kEventMothStuck;
+constexpr const char *GreenhouseMachine::kPropertySeed;
+constexpr const char *GreenhouseMachine::kPropertyWand;
+constexpr const char *GreenhouseMachine::kMethodStart;
+constexpr const char *GreenhouseMachine::kMethodStop;
+constexpr const char *GreenhouseMachine::kMethodPause;
+constexpr const char *GreenhouseMachine::kMethodResume;
+
+constexpr const char *GreenhouseRules::kZ3A4DataTemplateUnsignedIndexFormat;
+constexpr const char *GreenhouseRules::kNumName;
+constexpr const char *GreenhouseRules::kTUnsignedIndexFormat;
+constexpr const char *GreenhouseRules::kBEName;
+constexpr const char *GreenhouseRules::kLineUnsignedIndexFormat;
 
 GreenhouseRules::GreenhouseRules() = default;
 
@@ -32,39 +49,51 @@ void GreenhouseRules::shuffle(uint *values, uint count, uint first, Shell::Rando
 }
 
 bool GreenhouseRules::loadTemplate(const OM::XMLParser &templates, uint family, uint attribute, int orientation, Shell::Random &random) {
-	Common::String path = Common::String::format("Z3A4Data/Template%u", family);
+	Common::String path = Common::String::format(kZ3A4DataTemplateUnsignedIndexFormat, family);
 	const Common::Array<OM::XMLParser::Element> &elements = templates.elements();
-	uint count = 0;
-	for (uint i = 0; i < elements.size(); i++)
-		if (elements[i].path == path)
-			count = atoi(elements[i].attributes.getValOrDefault("Num").c_str());
+	uint32 count = 0;
+	for (uint i = 0; i < elements.size(); i++) {
+		if (elements[i].path.equals(path)) {
+			Common::String countText = elements[i].attrs.getValOrDefault(kNumName);
+			if (StringParser::parseUnsignedInt(countText.c_str(), count, StringParser::kDecimalProfile) != StringParser::Result::kSuccess)
+				return false;
+		}
+	}
 	if (!count)
 		return false;
-	path += Common::String::format("/T%u", random.draw() % count + 1);
+	path += Common::String::format(kTUnsignedIndexFormat, random.draw() % count + 1);
 	const OM::XMLParser::Element *selected = nullptr;
-	for (uint i = 0; i < elements.size(); i++)
-		if (elements[i].path == path)
+	for (uint i = 0; i < elements.size(); i++) {
+		if (elements[i].path.equals(path))
 			selected = &elements[i];
+	}
 	if (!selected)
 		return false;
-	Common::String beetles = selected->attributes.getValOrDefault("BE");
+	Common::String beetles = selected->attrs.getValOrDefault(kBEName);
 	if (!beetles.empty()) {
 		Common::StringTokenizer tokens(beetles);
 		for (uint i = 0; i < 3; i++) {
 			if (tokens.empty())
 				return false;
-			_beetleEntries[i] = atoi(tokens.nextToken().c_str());
-			if (_beetleEntries[i] < 0 || 12 <= _beetleEntries[i])
+			Common::String entryText = tokens.nextToken();
+			int32 entry = 0;
+			if (StringParser::parseSignedInt(entryText.c_str(), entry, StringParser::kDecimalProfile) != StringParser::Result::kSuccess ||
+				entry < 0 || 12 <= entry)
 				return false;
+			_beetleEntries[i] = entry;
 		}
 	}
 	uint values[144];
 	for (uint row = 0; row < 12; row++) {
-		Common::StringTokenizer tokens(selected->attributes.getValOrDefault(Common::String::format("line%u", row + 1)));
+		Common::StringTokenizer tokens(selected->attrs.getValOrDefault(Common::String::format(kLineUnsignedIndexFormat, row + 1)));
 		for (uint column = 0; column < 12; column++) {
 			if (tokens.empty())
 				return false;
-			values[row * 12 + column] = atoi(tokens.nextToken().c_str());
+			Common::String valueText = tokens.nextToken();
+			uint32 value = 0;
+			if (StringParser::parseUnsignedInt(valueText.c_str(), value, StringParser::kDecimalProfile) != StringParser::Result::kSuccess)
+				return false;
+			values[row * 12 + column] = value;
 			if (family < values[row * 12 + column])
 				return false;
 		}
@@ -78,7 +107,8 @@ bool GreenhouseRules::loadTemplate(const OM::XMLParser &templates, uint family, 
 	};
 	for (uint row = 0; row < 12; row++) {
 		for (uint column = 0; column < 12; column++) {
-			uint targetRow = row, targetColumn = column;
+			uint targetRow = row;
+			uint targetColumn = column;
 			if (orientation == 1 || orientation == 3)
 				targetColumn = 11 - column;
 			if (orientation == 2 || orientation == 3)
@@ -129,7 +159,8 @@ bool GreenhouseRules::generate(uint level, const OM::XMLParser &templates, Shell
 	}
 	if (1 < level) {
 		while (_scramble.size() < 20) {
-			uint a = random.draw() % 144, b = random.draw() % 144;
+			uint a = random.draw() % 144;
+			uint b = random.draw() % 144;
 			if (a == b || (level == 3 && (_cells[a] & 3) != (_cells[b] & 3)))
 				continue;
 			SWAP(_cells[a], _cells[b]);
@@ -138,7 +169,10 @@ bool GreenhouseRules::generate(uint level, const OM::XMLParser &templates, Shell
 		}
 	}
 	calculateFlow();
-	uint leaves[3], shapeOrder[6], colorOrder[6], unusedOrder[12];
+	uint leaves[3];
+	uint shapeOrder[6];
+	uint colorOrder[6];
+	uint unusedOrder[12];
 	shuffle(leaves, 3, 1, random);
 	shuffle(shapeOrder, shapes, 1, random);
 	shuffle(colorOrder, colors, 1, random);
@@ -178,9 +212,9 @@ bool GreenhouseRules::canEnter(uint index, int row) const {
 	return index < 12 && _moths[index].state == kSupply00 && traversable(_moths[index].trait, 0, row);
 }
 
-void GreenhouseRules::logVisit(Moth &moth, uint32 tick) {
+void GreenhouseRules::logVisit(Moth &moth, uint32 step) {
 	uint cell = moth.row * 12 + moth.column;
-	moth.visits[cell] = tick;
+	moth.visits[cell] = step;
 	if (!_swaps) {
 		moth.counts[cell] += 1;
 		if (moth.counts[cell] == 5)
@@ -219,15 +253,17 @@ GreenhouseRules::Direction GreenhouseRules::nextDirection(uint index, int &colum
 		0,
 	};
 	static constexpr uint priorities[4][3] = {{3, 4, 2}, {4, 3, 1}, {2, 1, 4}, {1, 2, 3}};
-	uint32 oldest = UINT_MAX, visits[5] = {
-								  UINT_MAX,
-								  UINT_MAX,
-								  UINT_MAX,
-								  UINT_MAX,
-								  UINT_MAX,
-							  };
+	uint32 oldest = UINT_MAX;
+	uint32 visits[5] = {
+		UINT_MAX,
+		UINT_MAX,
+		UINT_MAX,
+		UINT_MAX,
+		UINT_MAX,
+	};
 	for (uint direction = 1; direction <= 4; direction++) {
-		int x = column + dx[direction], y = row + dy[direction];
+		int x = column + dx[direction];
+		int y = row + dy[direction];
 		if (traversable(moth.trait, x, y)) {
 			visits[direction] = 12 <= x ? 0 : moth.visits[y * 12 + x];
 			oldest = MIN(oldest, visits[direction]);
@@ -250,11 +286,12 @@ GreenhouseRules::Direction GreenhouseRules::nextDirection(uint index, int &colum
 	return static_cast<Direction>(direction);
 }
 
-bool GreenhouseRules::advance(uint index, uint32 tick) {
+bool GreenhouseRules::advance(uint index, uint32 step) {
 	if (12 <= index || _moths[index].state != kCrossing01)
 		return false;
 	Moth &moth = _moths[index];
-	int column, row;
+	int column;
+	int row;
 	Direction direction = nextDirection(index, column, row);
 	if (direction == kNone00) {
 		moth.stuck = true;
@@ -271,7 +308,7 @@ bool GreenhouseRules::advance(uint index, uint32 tick) {
 		moth.state = kPassed02;
 		_passed += 1;
 	} else {
-		logVisit(moth, tick);
+		logVisit(moth, step);
 		_mothOccupancy[row * 12 + column] = true;
 	}
 	return true;
@@ -331,7 +368,10 @@ bool GreenhouseRules::traverseFlow(int index, uint back, FlowNode *nodes, uint &
 	FlowNode &node = nodes[index];
 	bool reaches = false;
 	if (node.children) {
-		uint mask = 0, down = back, left = back, right = back;
+		uint mask = 0;
+		uint down = back;
+		uint left = back;
+		uint right = back;
 		if (0 <= node.down) {
 			depth += 1;
 			if (traverseFlow(node.down, 8, nodes, depth, maximum)) {
@@ -391,7 +431,8 @@ void GreenhouseRules::calculateFlow() {
 	for (uint i = 0; i < 144; i++) {
 		if (!types[i])
 			continue;
-		uint depth = 1, maximum = 1;
+		uint depth = 1;
+		uint maximum = 1;
 		int root = buildFlow(types[i], i % 12, i / 12, types, nodes, depth, maximum);
 		depth = 1;
 		traverseFlow(root, 0, nodes, depth, maximum);
@@ -403,7 +444,9 @@ bool GreenhouseRules::findPath(uint index, Common::Array<uint> &path) const {
 	if (12 <= index || _moths[index].state == kPassed02)
 		return false;
 	int previous[144];
-	uint queue[144], head = 0, tail = 0;
+	uint queue[144];
+	uint head = 0;
+	uint tail = 0;
 	for (uint i = 0; i < 144; i++)
 		previous[i] = -2;
 	const Moth &moth = _moths[index];
@@ -424,13 +467,13 @@ bool GreenhouseRules::findPath(uint index, Common::Array<uint> &path) const {
 		0,
 		0,
 		-1,
-	},
-						 dy[] = {
-							 0,
-							 1,
-							 -1,
-							 0,
-						 };
+	};
+	static constexpr int dy[] = {
+		0,
+		1,
+		-1,
+		0,
+	};
 	while (head < tail) {
 		uint cell = queue[head++];
 		if (cell % 12 == 11) {
@@ -439,7 +482,8 @@ bool GreenhouseRules::findPath(uint index, Common::Array<uint> &path) const {
 			return true;
 		}
 		for (uint direction = 0; direction < 4; direction++) {
-			int x = cell % 12 + dx[direction], y = cell / 12 + dy[direction];
+			int x = cell % 12 + dx[direction];
+			int y = cell / 12 + dy[direction];
 			if (x < 0 || 12 <= x || y < 0 || 12 <= y)
 				continue;
 			uint next = y * 12 + x;
@@ -558,9 +602,23 @@ uint GreenhouseMachine::traitResource(uint index) {
 constexpr const char *GreenhouseMachine::kAnimation;
 constexpr const char *GreenhouseMachine::kTemplate;
 
+OM::Canvas::ColorRemap GreenhouseMachine::flowerColor(uint color) {
+	static constexpr OM::Canvas::ColorRemap colors[] = {
+		OM::Canvas::ColorRemap::kNone,                        // Red.
+		OM::Canvas::ColorRemap::kOrangeToDarkGray,            // Orange.
+		OM::Canvas::ColorRemap::kNone,                        // Yellow.
+		OM::Canvas::ColorRemap::kNone,                        // Turquoise.
+		OM::Canvas::ColorRemap::kPurpleOrMagentaToDarkPurple, // Magenta.
+		OM::Canvas::ColorRemap::kNone,                        // Blue.
+	};
+	if (ARRAYSIZE(colors) <= color)
+		return OM::Canvas::ColorRemap::kNone;
+	return colors[color];
+}
+
 GreenhouseMachine::GreenhouseMachine(TrinketEngine &vm, Shell::Scene &scene, uint level) : _vm(vm), _scene(scene), _level(level) {
-	addEvent("mothDone");
-	addEvent("mothStuck");
+	addEvent(kEventMothDone);
+	addEvent(kEventMothStuck);
 }
 
 GreenhouseMachine::~GreenhouseMachine() {
@@ -593,40 +651,40 @@ void GreenhouseMachine::clearSprites() {
 	_sounds.clear();
 }
 
-bool GreenhouseMachine::get(const Common::String &property, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if (property == "seed" && arguments.empty()) {
+bool GreenhouseMachine::get(const Common::String &property, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if (property.equals(kPropertySeed) && sargs.empty()) {
 		result = Core::ScriptValue(static_cast<int32>(_seed));
 		return true;
 	}
-	return Core::ScriptableObject::get(property, arguments, result);
+	return Core::ScriptableObject::get(property, sargs, result);
 }
 
-bool GreenhouseMachine::set(const Common::String &property, const Core::ScriptArguments &arguments, const Core::ScriptValue &value) {
-	if (property == "wand" && arguments.empty()) {
+bool GreenhouseMachine::set(const Common::String &property, const Core::ScriptArguments &sargs, const Core::ScriptValue &value) {
+	if (property.equals(kPropertyWand) && sargs.empty()) {
 		if (_wand) {
-			_wand->visible = value.integer() != 0;
+			_wand->visible = value.toInt32() != 0;
 			if (_wand->visible)
 				_wand->setFrame(MIN<uint>(21, 23 - (_rules.remainingSwaps() + 1) * 20 / 30));
 		}
 		return true;
 	}
-	return Core::ScriptableObject::set(property, arguments, value);
+	return Core::ScriptableObject::set(property, sargs, value);
 }
 
-bool GreenhouseMachine::play(const Common::String &method, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if (method == "start" && arguments.size() == 1) {
-		_time = _lastTime = callTime();
-		return start(arguments[0].integer());
+bool GreenhouseMachine::play(const Common::String &method, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if (method.equals(kMethodStart) && sargs.size() == 1) {
+		_time = callTime();
+		return start(sargs[0].toInt32());
 	}
-	if (method == "stop" && arguments.empty()) {
+	if (method.equals(kMethodStop) && sargs.empty()) {
 		_running = false;
 		return true;
 	}
-	if ((method == "pause" || method == "resume") && arguments.empty()) {
-		pause(method == "pause", callTime());
+	if ((method.equals(kMethodPause) || method.equals(kMethodResume)) && sargs.empty()) {
+		pause(method.equals(kMethodPause), callTime());
 		return true;
 	}
-	return Core::ScriptableObject::play(method, arguments, result);
+	return Core::ScriptableObject::play(method, sargs, result);
 }
 
 Shell::Sprite *GreenhouseMachine::add(uint id, int depth, int frame) {
@@ -653,7 +711,8 @@ bool GreenhouseMachine::start(uint32 seed) {
 	clearSprites();
 	_valid = true;
 	_paused = false;
-	_gameTime = _tick = 0;
+	_clock.reset(_time);
+	_step = 0;
 	_nextBeetle = 10000;
 	OM::XMLParser templates;
 	if (!templates.loadFile(Common::Path(kTemplate)) || !templates.parse())
@@ -668,8 +727,8 @@ bool GreenhouseMachine::start(uint32 seed) {
 		TimeDate date;
 		g_system->getTimeAndDate(date);
 		seed = static_cast<uint32>(Common::DateTime::dateTimeToInt64(date));
-		if (ConfMan.hasKey("random_seed"))
-			seed = ConfMan.getInt("random_seed");
+		if (ConfMan.hasKey(TrinketMetaEngine::kConfigRandomSeed))
+			seed = ConfMan.getInt(TrinketMetaEngine::kConfigRandomSeed);
 	}
 	_seed = seed;
 	_vm.rnd().setSeed(seed);
@@ -683,6 +742,9 @@ bool GreenhouseMachine::start(uint32 seed) {
 		moth.trait = add(traitResource(_rules.moth(i).animation), 6);
 		if (!moth.trait)
 			return false;
+		const uint color = (_rules.moth(i).trait >> 5) & 7;
+		if (color)
+			moth.trait->colorRemap = flowerColor(color - 1);
 		moth.trait->managed = true;
 		moth.body->x = _rules.moth(i).supply.x;
 		moth.body->y = _rules.moth(i).supply.y;
@@ -711,11 +773,14 @@ void GreenhouseMachine::rebuildPlant(uint index) {
 	if (_leaves[index])
 		remove(_leaves[index]);
 	uint value = _rules.cell(index);
-	uint leaves = (value & 3) - 1, shape = ((value >> 2) & 7) - 1, color = ((value >> 5) & 7) - 1;
+	uint leaves = (value & 3) - 1;
+	uint shape = ((value >> 2) & 7) - 1;
+	uint color = ((value >> 5) & 7) - 1;
 	Shell::Sprite *leaf = _leaves[index] = add(16220 + leaves, 1);
 	Shell::Sprite *flower = _flowers[index] = add(kFlowers[color * 6 + shape], 2);
 	if (!leaf || !flower)
 		return;
+	flower->colorRemap = flowerColor(color);
 	Common::Point offset = leaf->asset->origin() - flower->asset->origin();
 	Common::Rect combined(0, 0, flower->width(), flower->height());
 	combined.extend(Common::Rect(offset.x, offset.y, offset.x + leaf->width(), offset.y + leaf->height()));
@@ -746,14 +811,14 @@ void GreenhouseMachine::beginMotion(Moving &motion, Common::Point target, uint d
 	motion.from = Common::Point(motion.body->x, motion.body->y);
 	motion.to = target;
 	motion.duration = MAX<uint>(duration, 1);
-	motion.started = _gameTime;
+	motion.started = _clock.now();
 	motion.direction = direction;
 	motion.active = true;
 }
 
 void GreenhouseMachine::updateMotion(Moving &motion, bool beetle) {
-	uint elapsed = _gameTime - motion.started;
-	uint frame = MIN<uint>(elapsed * 12 / 1000, motion.duration * 12 / 1000);
+	uint elapsed = _clock.elapsed(motion.started);
+	uint frame = MIN<uint>(FrameClock::frames(elapsed, 12), FrameClock::frames(motion.duration, 12));
 	static constexpr uint offsets[] = {
 		0,
 		31,
@@ -781,7 +846,7 @@ void GreenhouseMachine::finishMoth(uint index) {
 	moth.done = true;
 	_pots[moth.destination]->visible = true;
 	_pots[moth.destination]->setFrame(2);
-	emitEvent("mothDone");
+	emitEvent(kEventMothDone);
 }
 
 void GreenhouseMachine::updateMoths() {
@@ -789,10 +854,10 @@ void GreenhouseMachine::updateMoths() {
 		Moving &motion = _moths[i];
 		if (motion.done) {
 			if (motion.pollinating) {
-				uint elapsed = _gameTime - motion.started;
-				motion.body->setFrame(1 + MIN<uint>(9, elapsed * 12 / 1000));
+				uint elapsed = _clock.elapsed(motion.started);
+				motion.body->setFrame(1 + MIN<uint>(9, FrameClock::frames(elapsed, 12)));
 				positionTrait(motion);
-				if (10000 / 12 <= elapsed) {
+				if (FrameClock::milliseconds(10, 12) <= elapsed) {
 					motion.pollinating = false;
 					Common::Point target(799 + motion.body->width(), motion.body->y);
 					beginMotion(motion, target, (target.x - motion.body->x) * 25, 3);
@@ -810,7 +875,7 @@ void GreenhouseMachine::updateMoths() {
 			if (!motion.active && motion.flying) {
 				motion.flying = false;
 				motion.pollinating = true;
-				motion.started = _gameTime;
+				motion.started = _clock.now();
 				playSound(kResSound16240_SwapComplete);
 				finishMoth(i);
 			}
@@ -818,23 +883,24 @@ void GreenhouseMachine::updateMoths() {
 		}
 		if (_rules.moth(i).state != GreenhouseRules::kCrossing01)
 			continue;
-		if (!_rules.advance(i, _tick))
+		if (!_rules.advance(i, _step))
 			continue;
 		const GreenhouseRules::Moth &moth = _rules.moth(i);
 		if (moth.state == GreenhouseRules::kPassed02) {
 			motion.destination = _rules.passed() - 1;
 			Common::Point target(730, 90 + 42 * motion.destination);
-			int dx = target.x - motion.body->x, dy = target.y - motion.body->y;
-			uint frames = static_cast<uint>(sqrt(static_cast<double>(dx * dx + dy * dy)) * 0.3);
+			int dx = target.x - motion.body->x;
+			int dy = target.y - motion.body->y;
+			uint frames = static_cast<uint>(Math::distance(dx, dy) * 0.025f * 12.0f);
 			uint direction = 3;
 			if (dx * 2 <= dy)
 				direction = 2;
 			if (dy <= -dx * 2)
 				direction = 1;
 			motion.flying = true;
-			beginMotion(motion, target, frames * 1000 / 12, direction);
+			beginMotion(motion, target, FrameClock::milliseconds(frames, 12), direction);
 		} else {
-			beginMotion(motion, GreenhouseRules::cellOrigin(moth.column, moth.row), 10000 / 12, moth.direction);
+			beginMotion(motion, GreenhouseRules::cellOrigin(moth.column, moth.row), FrameClock::milliseconds(10, 12), moth.direction);
 		}
 	}
 }
@@ -842,14 +908,15 @@ void GreenhouseMachine::updateMoths() {
 void GreenhouseMachine::updateBeetles() {
 	if (_level != 3)
 		return;
-	if (_nextBeetle < _gameTime) {
+	if (FrameClock::reached(_clock.now(), _nextBeetle + 1)) {
 		uint order[] = {
 			0,
 			1,
 			2,
 		};
 		for (uint i = 0; i < 30; i++) {
-			uint a = _vm.rnd().draw() % 3, b = _vm.rnd().draw() % 3;
+			uint a = _vm.rnd().draw() % 3;
+			uint b = _vm.rnd().draw() % 3;
 			SWAP(order[a], order[b]);
 		}
 		for (uint i = 0; i < 3; i++) {
@@ -861,7 +928,7 @@ void GreenhouseMachine::updateBeetles() {
 			beetle.row = 0;
 			beetle.direction = 2;
 			beetle.trait = _rules.beetleOccupied(column) ? 0 : _rules.cell(column) & 3;
-			beetle.deadline = _gameTime + 500;
+			beetle.deadline = _clock.now() + 500;
 			beetle.exiting = false;
 			beetle.motion.body = add(16104, 5);
 			beetle.motion.direction = 2;
@@ -878,7 +945,7 @@ void GreenhouseMachine::updateBeetles() {
 			_beetles.push_back(beetle);
 			break;
 		}
-		_nextBeetle = _gameTime + 8000;
+		_nextBeetle = _clock.now() + 8000;
 	}
 	for (uint i = 0; i < _beetles.size();) {
 		Beetle &beetle = _beetles[i];
@@ -892,10 +959,11 @@ void GreenhouseMachine::updateBeetles() {
 				_beetles.remove_at(i);
 				continue;
 			}
-		} else if (beetle.deadline < _gameTime) {
-			beetle.deadline = _gameTime + 500;
+		} else if (FrameClock::reached(_clock.now(), beetle.deadline + 1)) {
+			beetle.deadline = _clock.now() + 500;
 			uint cell = beetle.row * 12 + beetle.column;
-			int x = beetle.column, y = beetle.row;
+			int x = beetle.column;
+			int y = beetle.row;
 			uint direction = beetle.direction;
 			uint flow = beetle.trait ? _rules.beetleFlow(cell) : 1;
 			if (flow == 6)
@@ -931,7 +999,7 @@ void GreenhouseMachine::updateBeetles() {
 				beetle.exiting = true;
 				if (motion.trait)
 					motion.trait->visible = false;
-				beginMotion(motion, GreenhouseRules::cellOrigin(x, y), 10000 / 12, 2);
+				beginMotion(motion, GreenhouseRules::cellOrigin(x, y), FrameClock::milliseconds(10, 12), 2);
 			} else {
 				uint next = y * 12 + x;
 				if (!_rules.mothOccupied(next) && !(_rules.beetleOccupied(next) && beetle.trait)) {
@@ -946,7 +1014,7 @@ void GreenhouseMachine::updateBeetles() {
 					beetle.column = x;
 					beetle.row = y;
 					motion.body->visible = !_rules.beetleOccupied(next) || beetle.trait;
-					beginMotion(motion, GreenhouseRules::cellOrigin(x, y), 10000 / 12, direction);
+					beginMotion(motion, GreenhouseRules::cellOrigin(x, y), FrameClock::milliseconds(10, 12), direction);
 				}
 			}
 		}
@@ -961,9 +1029,10 @@ int GreenhouseMachine::hitCell(Common::Point point) {
 }
 
 int GreenhouseMachine::hitMoth(Common::Point point) const {
-	for (int i = 11; 0 <= i; i--)
+	for (int i = 11; 0 <= i; i--) {
 		if (_rules.moth(i).state == GreenhouseRules::kSupply00 && bounds(_moths[i].body).contains(point))
 			return i;
+	}
 	return -1;
 }
 
@@ -976,7 +1045,8 @@ void GreenhouseMachine::releaseMoth() {
 		return;
 	Moving &motion = _moths[_dragged];
 	Common::Rect rect = bounds(motion.body);
-	int bestRow = -1, bestArea = 0;
+	int bestRow = -1;
+	int bestArea = 0;
 	for (uint row = 0; row < 12; row++) {
 		Common::Rect cell(165, 90 + 42 * row, 209, 132 + 42 * row);
 		if (!rect.intersects(cell))
@@ -1113,11 +1183,9 @@ void GreenhouseMachine::event(const Common::Event &event) {
 
 void GreenhouseMachine::update(uint32 time) {
 	_time = time;
+	_clock.update(time, _running && !_paused && _selected < 0);
 	if (!_running)
 		return;
-	if (!_paused && _selected < 0)
-		_gameTime += time - _lastTime;
-	_lastTime = time;
 	if (!_paused) {
 		if (0 <= _swapSecond && 500 <= time - _swapStarted) {
 			if (_rules.swapPlants(_selected, _swapSecond)) {
@@ -1138,13 +1206,13 @@ void GreenhouseMachine::update(uint32 time) {
 			}
 		}
 		if (_selected < 0) {
-			_tick += 1;
+			_step += 1;
 			updateBeetles();
 			// The task tests the previous stuck flags before advancing the moths.
 			bool allStuck = _rules.allMothsStuck();
 			updateMoths();
 			if (allStuck)
-				emitEvent("mothStuck");
+				emitEvent(kEventMothStuck);
 		}
 	}
 }
@@ -1162,7 +1230,8 @@ void GreenhouseMachine::pause(bool paused, uint32 time) {
 		}
 		cancelWand();
 	}
-	_time = _lastTime = time;
+	_time = time;
+	_clock.update(time, false);
 	_paused = paused;
 }
 

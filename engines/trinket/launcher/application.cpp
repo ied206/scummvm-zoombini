@@ -33,9 +33,152 @@
 #include "graphics/font.h"
 #include "graphics/fontman.h"
 #include "trinket/shell/text.h"
+#include "trinket/string_parser.h"
+#include "trinket/trinket.h"
 
 namespace Trinket {
 namespace Launcher {
+
+constexpr const char *Application::kPropertyStartupMusic;
+constexpr const char *Application::kPropertyStartupSigninExecute;
+constexpr const char *Application::kPropertyNo;
+constexpr const char *Application::kLXMLName;
+constexpr const char *Application::kASEQName;
+constexpr const char *Application::kRRGBName;
+constexpr const char *Application::kJPEGName;
+constexpr const char *Application::kWAVEName;
+constexpr const char *Application::kNFNTName;
+constexpr const char *Application::kCommonName;
+constexpr const char *Application::kLauncherCBarCmdButtonsBrandOrderIdName;
+constexpr const char *Application::kLauncherCBarCmdButtonsName;
+constexpr const char *Application::kCbName;
+constexpr const char *Application::kLauncherCBarCmdButtonAreaXName;
+constexpr const char *Application::kLauncherCBarCmdButtonAreaYName;
+constexpr const char *Application::kIdName;
+constexpr const char *Application::kLauncherStartupScreenName;
+constexpr const char *Application::kLauncherMusicName;
+constexpr const char *Application::kXMLCondition;
+constexpr const char *Application::kFileMacName;
+constexpr const char *Application::kNoFileMacName;
+constexpr const char *Application::kInstallName;
+constexpr const char *Application::kFileName;
+constexpr const char *Application::kFileWinName;
+constexpr const char *Application::kNoFileName;
+constexpr const char *Application::kNoFileWinName;
+constexpr const char *Application::kXMLFilename;
+constexpr const char *Application::kXMLType;
+constexpr const char *Application::kClassMusic;
+constexpr const char *Application::kXMLId;
+constexpr const char *Application::kClassText;
+constexpr const char *Application::kClassToon;
+constexpr const char *Application::kClassFob;
+constexpr const char *Application::kXMLTarget;
+constexpr const char *Application::kXMLParameters;
+constexpr const char *Application::kXMLX;
+constexpr const char *Application::kXMLY;
+constexpr const char *Application::kXMLClass;
+constexpr const char *Application::kXMLCheckbox;
+constexpr const char *Application::kXMLCheckedIfValue;
+constexpr const char *Application::kXMLAuto;
+constexpr const char *Application::kXMLStartFrame;
+constexpr const char *Application::kXMLInitScript;
+constexpr const char *Application::kXMLXml;
+constexpr const char *Application::kXMLXmlFile;
+constexpr const char *Application::kXMLDest;
+constexpr const char *Application::kLauncherCBarLeftIdName;
+constexpr const char *Application::kLauncherCBarLeftXName;
+constexpr const char *Application::kLauncherCBarLeftYName;
+constexpr const char *Application::kLauncherCBarRightIdName;
+constexpr const char *Application::kLauncherCBarRightXName;
+constexpr const char *Application::kLauncherCBarRightYName;
+constexpr const char *Application::kBrandName;
+constexpr const char *Application::kDemosName;
+constexpr const char *Application::kInitMyCDRROMsName;
+constexpr const char *Application::kProductStartupName;
+constexpr const char *Application::kProductName;
+constexpr const char *Application::kInitUpdatesName;
+constexpr const char *Application::kInitRRWorldName;
+constexpr const char *Application::kInitSFWorldName;
+constexpr const char *Application::kInitCFWorldName;
+constexpr const char *Application::kInitZOWorldName;
+constexpr const char *Application::kInitOTWorldName;
+constexpr const char *Application::kInitCSWorldName;
+constexpr const char *Application::kRscriptHomeButtHandlerName;
+constexpr const char *Application::kRscriptInitParentsAreaName;
+constexpr const char *Application::kLauncherContentMainmenuName;
+constexpr const char *Application::kRscriptInitProductGridName;
+constexpr const char *Application::kLauncherContentProductGrid3to7Name;
+constexpr const char *Application::kRscriptSetUpdatesAutoName;
+constexpr const char *Application::kRscriptSetUpdatesManualName;
+constexpr const char *Application::kRscriptGoBackName;
+constexpr const char *Application::kStartupName;
+constexpr const char *Application::kRscriptStopMovieName;
+constexpr const char *Application::kBinkName;
+constexpr const char *Application::kLauncherStartupName;
+constexpr const char *Application::kLauncherContentName;
+constexpr const char *Application::kXName;
+constexpr const char *Application::kYName;
+constexpr const char *Application::kStartupScreenName;
+constexpr const char *Application::kAllName;
+constexpr const char *Application::kClassScene;
+constexpr const char *Application::kXMLPlay;
+constexpr const char *Application::kXMLLink;
+constexpr const char *Application::kXMLExternal;
+constexpr const char *Application::kClassProductSignedIndexJpg;
+constexpr const char *Application::kBackgroundName;
+constexpr const char *Application::kSigninName;
+constexpr const char *Application::kNameBoxName;
+constexpr const char *Application::kOkName;
+constexpr const char *Application::kNewNameName;
+constexpr const char *Application::kCancelName;
+constexpr const char *Application::kUpArrowName;
+constexpr const char *Application::kDnArrowName;
+constexpr const char *Application::kBackspaceName;
+constexpr const char *Application::kSpaceName;
+constexpr const char *Application::kNameListXName;
+constexpr const char *Application::kNameListYName;
+constexpr const char *Application::kNameListWName;
+constexpr const char *Application::kNameListHName;
+constexpr const char *Application::kLauncherStartupHelpName;
+constexpr const char *Application::kLauncherContentWhatsNewName;
+constexpr const char *Application::kRrBrandName;
+constexpr const char *Application::kSfBrandName;
+constexpr const char *Application::kCfBrandName;
+constexpr const char *Application::kZoBrandName;
+constexpr const char *Application::kOtBrandName;
+constexpr const char *Application::kCsBrandName;
+constexpr const char *Application::kNameListName;
+constexpr const char *Application::kRName;
+constexpr const char *Application::kGName;
+constexpr const char *Application::kBName;
+constexpr const char *Application::kBcName;
+constexpr const char *Application::kStcName;
+constexpr const char *Application::kNtcName;
+constexpr const char *Application::kHbcName;
+constexpr const char *Application::kMtcName;
+constexpr const char *Application::kPropertyDialogsDeleteMsg;
+constexpr const char *Application::kXMLW;
+constexpr const char *Application::kXMLH;
+constexpr const char *Application::kXMLFont;
+constexpr const char *Application::kXMLContent;
+constexpr const char *Application::kXMLColorR;
+constexpr const char *Application::kXMLColorG;
+constexpr const char *Application::kXMLColorB;
+constexpr const char *Application::kXMLCenter;
+constexpr const char *Application::kXMLTrue;
+
+constexpr const char *Application::kUsersFileSuffix;
+constexpr const char *Application::kResourceDirectory;
+constexpr const char *Application::kAnimationExtension;
+constexpr const char *Application::kPaletteExtension;
+constexpr const char *Application::kImageExtension;
+constexpr const char *Application::kSoundExtension;
+constexpr const char *Application::kFontExtension;
+constexpr const char *Application::kSigninLibraryPrefix;
+constexpr const char *Application::kProductLibraryPrefix;
+constexpr const char *Application::kCommonLibraryPrefix;
+constexpr const char *Application::kParentsXMLName;
+constexpr const char *Application::kHomeXMLName;
 
 constexpr const char *Application::kRoot;
 constexpr const char *Application::kCursorExecutable;
@@ -64,8 +207,9 @@ constexpr const char *Application::kEnterSpeech;
 constexpr const char *Application::kRemoveSpeech;
 constexpr const char *Application::kDialogFont;
 
-Application::Application(Common::SaveFileManager &manager, const Common::String &target, Audio::Mixer &mixer) : _manager(manager), _saveName(target + ".trinket-launcher-users.xml"),
-																												_frameScene(*this), _scene(*this), _dialogScene(*this), _voice(mixer), _music(mixer), _click(mixer) {
+Application::Application(TrinketEngine &vm, Common::SaveFileManager &manager, const Common::String &target, Audio::Mixer &mixer)
+	: _vm(vm), _manager(manager), _saveName(target + kUsersFileSuffix),
+	  _fonts(*this), _frameScene(*this), _scene(*this), _dialogScene(*this), _voice(mixer), _music(mixer), _click(mixer) {
 }
 
 bool Application::loadUsers() {
@@ -96,19 +240,25 @@ bool Application::load(const Common::Path &gamePath, const char *product) {
 	_listFont = FontMan.getFontByUsage(Graphics::FontManager::kBigGUIFont);
 	Common::Path root = gamePath.join(kRoot);
 	_root = root;
-	delete _arrowCursor;
-	_arrowCursor = Graphics::makeDefaultWinCursor();
 	delete _hoverCursor;
 	_hoverCursor = nullptr;
 	Common::PEResources executable;
 	if (executable.loadFromEXE(Common::FSNode(root.join(kCursorExecutable)).createReadStream()))
 		_hoverCursor = Graphics::WinCursorGroup::createCursorGroup(&executable, 1);
-	_pointerOverButton = false;
-	CursorMan.replaceCursor(_arrowCursor);
+	_overButton = false;
+	_vm.setDefaultCursor();
 	OM::XMLParser startup;
 	if (!startup.loadFile(Common::FSNode(root.join(kStartupXML))) || !startup.parse())
 		return false;
-	_defaultMusic = startup.number("startup/music");
+	Common::String defaultMusicText = startup.get(kPropertyStartupMusic);
+	_defaultMusic = 0;
+	if (!defaultMusicText.empty()) {
+		int32 defaultMusic = 0;
+		if (StringParser::parseSignedInt(defaultMusicText.c_str(), defaultMusic, StringParser::kDecimalProfile) !=
+			StringParser::Result::kSuccess || defaultMusic < 0)
+			return false;
+		_defaultMusic = static_cast<uint>(defaultMusic);
+	}
 	if (!_common.loadFromEXE(Common::FSNode(root.join(kCommon)).createReadStream()) ||
 		!_signin.loadFromEXE(Common::FSNode(root.join(kSignin)).createReadStream()) ||
 		!_brands.loadFromEXE(Common::FSNode(root.join(kBrands)).createReadStream()) ||
@@ -129,16 +279,16 @@ bool Application::load(const Common::Path &gamePath, const char *product) {
 		warning("Trinket: failed to load launcher users");
 		return false;
 	}
-	_gameSignin = _startupLayout.get("startup/signin/execute") == "no";
+	_gameSignin = _startupLayout.get(kPropertyStartupSigninExecute).equals(kPropertyNo);
 	for (uint i = 0; i < ARRAYSIZE(kDemoXML); i++) {
-		if (!_worldLibraries[i].loadFromEXE(Common::FSNode(root.join(kWorldLibraries[i])).createReadStream()))
+		if (!_worldLibs[i].loadFromEXE(Common::FSNode(root.join(kWorldLibraries[i])).createReadStream()))
 			return false;
-		if (!_demoLayouts[i].loadFile(Common::FSNode(root.join("rsc").join(kDemoXML[i]))) || !_demoLayouts[i].parse())
+		if (!_demoLayouts[i].loadFile(Common::FSNode(root.join(kResourceDirectory).join(kDemoXML[i]))) || !_demoLayouts[i].parse())
 			return false;
 	}
 	if (!_news.loadFromEXE(Common::FSNode(root.join(kNews)).createReadStream()))
 		return false;
-	Common::ScopedPtr<Common::SeekableReadStream> news(_news.getResource(Common::String("LXML"), 10002));
+	Common::ScopedPtr<Common::SeekableReadStream> news(_news.getResource(Common::String(kLXMLName), 10002));
 	if (!news)
 		return false;
 	Common::String newsXML;
@@ -150,8 +300,7 @@ bool Application::load(const Common::Path &gamePath, const char *product) {
 	}
 	if (!_newsLayout.loadBuffer(reinterpret_cast<const byte *>(newsXML.c_str()), newsXML.size()) || !_newsLayout.parse())
 		return false;
-	Common::ScopedPtr<Common::SeekableReadStream> fontStream(open(kDialogFont));
-	_dialogFont.reset(fontStream ? OM::NFNTFont::load(*fontStream) : nullptr);
+	_dialogFont = _fonts.load(kDialogFont);
 	if (!_dialogFont) {
 		warning("Trinket: failed to load launcher dialog font %s", kDialogFont);
 		return false;
@@ -167,24 +316,30 @@ Common::SeekableReadStream *Application::open(const Common::String &name) const 
 	uint slash = name.find('/');
 	if (slash == Common::String::npos)
 		return nullptr;
-	uint id = atoi(name.c_str() + slash + 1);
+	Common::String idText = name.substr(slash + 1);
+	uint extension = idText.find('.');
+	if (extension != Common::String::npos)
+		idText = idText.substr(0, extension);
+	uint32 id = 0;
+	if (StringParser::parseUnsignedInt(idText.c_str(), id, StringParser::kDecimalProfile) != StringParser::Result::kSuccess)
+		return nullptr;
 	const char *tag = nullptr;
-	if (name.hasSuffix(".ao"))
-		tag = "ASEQ";
-	else if (name.hasSuffix(".rgb"))
-		tag = "RRGB";
-	else if (name.hasSuffix(".jpg"))
-		tag = "JPEG";
-	else if (name.hasSuffix(".wav"))
-		tag = "WAVE";
-	else if (name.hasSuffix(".nfnt"))
-		tag = "NFNT";
+	if (name.hasSuffix(kAnimationExtension))
+		tag = kASEQName;
+	else if (name.hasSuffix(kPaletteExtension))
+		tag = kRRGBName;
+	else if (name.hasSuffix(kImageExtension))
+		tag = kJPEGName;
+	else if (name.hasSuffix(kSoundExtension))
+		tag = kWAVEName;
+	else if (name.hasSuffix(kFontExtension))
+		tag = kNFNTName;
 	if (!tag || !id)
 		return nullptr;
 	const Common::WinResourceID type = Common::String(tag);
-	if (name.hasPrefix("signin/"))
+	if (name.hasPrefix(kSigninLibraryPrefix))
 		return _signin.getResource(type, id);
-	if (name.hasPrefix("product/")) {
+	if (name.hasPrefix(kProductLibraryPrefix)) {
 		Common::SeekableReadStream *stream = _product.getResource(type, id);
 		if (stream)
 			return stream;
@@ -198,8 +353,8 @@ Common::SeekableReadStream *Application::open(const Common::String &name) const 
 		stream = _audio.getResource(type, id);
 	if (!stream)
 		stream = _news.getResource(type, id);
-	for (uint i = 0; !stream && i < ARRAYSIZE(_worldLibraries); i++)
-		stream = _worldLibraries[i].getResource(type, id);
+	for (uint i = 0; !stream && i < ARRAYSIZE(_worldLibs); i++)
+		stream = _worldLibs[i].getResource(type, id);
 	return stream;
 }
 
@@ -211,7 +366,7 @@ void Application::configureButton(Shell::Sprite &sprite) {
 }
 
 Shell::Sprite *Application::addFrameObject(Shell::Scene &scene, int id, int x, int y, int action) {
-	Shell::Sprite *sprite = scene.add(Common::String::format(kAnimation, "common", id), action ? 1 : 0, action, action != 0);
+	Shell::Sprite *sprite = scene.add(Common::String::format(kAnimation, kCommonName, id), action ? 1 : 0, action, action != 0);
 	if (sprite) {
 		sprite->x = x;
 		sprite->y = y;
@@ -229,7 +384,8 @@ bool Application::buildFrame() {
 		{3002, 37, 61},
 		{3001, 37, 32},
 		{3003, 37, 407},
-		{3005, 406, 5}};
+		{3005, 406, 5},
+	};
 	for (uint i = 0; i < ARRAYSIZE(stamps); i++) {
 		if (!addFrameObject(_frameScene, stamps[i][0], stamps[i][1], stamps[i][2]))
 			return false;
@@ -241,29 +397,36 @@ bool Application::buildFrame() {
 		!addFrameObject(_frameScene, 3058, 686, 287, 1004) ||
 		!addFrameObject(_frameScene, 3059, 686, 369, 1005))
 		return false;
-	_verticalTab = addFrameObject(_frameScene, 3006, 665, 61);
-	_horizontalTab = addFrameObject(_frameScene, 3007, 8, 443);
+	_vertTab = addFrameObject(_frameScene, 3006, 665, 61);
+	_horizTab = addFrameObject(_frameScene, 3007, 8, 443);
 	_playCD = addFrameObject(_frameScene, 3051, 685, 15, 1006);
-	if (!_verticalTab || !_horizontalTab || !_playCD)
+	if (!_vertTab || !_horizTab || !_playCD)
 		return false;
 	_playCD->visible = _content;
-	_horizontalTab->visible = false;
-	Common::String branch = "launcher/cBar/cmdButtons/brandOrder/id";
+	_horizTab->visible = false;
+	Common::String branch = kLauncherCBarCmdButtonsBrandOrderIdName;
 	const Common::Array<OM::XMLParser::Element> &elements = _parentsLayout.elements();
-	int index = 0;
+	int brandOrderIdx = 0;
 	for (uint i = 0; i < elements.size(); i++) {
-		if (elements[i].path != branch)
+		if (!elements[i].path.equals(branch))
 			continue;
-		Common::String button = "launcher/cBar/cmdButtons/" + elements[i].value + "/cb";
-		int x = _parentsLayout.number("launcher/cBar/cmdButtonArea/x") + 115 * index;
-		int y = _parentsLayout.number("launcher/cBar/cmdButtonArea/y");
-		if (!addFrameObject(_frameScene, _parentsLayout.number(button + "/id"), x, y, 1010 + index))
+		Common::String button = kLauncherCBarCmdButtonsName + elements[i].value + kCbName;
+		int32 areaX = 0;
+		int32 y = 0;
+		int32 id = 0;
+		if (_parentsLayout.number(kLauncherCBarCmdButtonAreaXName, areaX) != StringParser::Result::kSuccess ||
+			_parentsLayout.number(kLauncherCBarCmdButtonAreaYName, y) != StringParser::Result::kSuccess ||
+			_parentsLayout.number(button + kIdName, id) != StringParser::Result::kSuccess)
 			return false;
-		index += 1;
+		int x = areaX + 115 * brandOrderIdx;
+		int action = 1010 + brandOrderIdx;
+		if (!addFrameObject(_frameScene, id, x, y, action))
+			return false;
+		brandOrderIdx += 1;
 	}
-	if (index != 6)
-		warning("Trinket: launcher brand order contains %d entries", index);
-	return index == 6;
+	if (brandOrderIdx != kMaxBrandOrderButtonCount)
+		warning("Trinket: launcher brand order contains %d entries", brandOrderIdx);
+	return brandOrderIdx == kMaxBrandOrderButtonCount;
 }
 
 void Application::startMusic() {
@@ -283,7 +446,7 @@ void Application::selectMusic(uint id, const char *library) {
 	// A zero ID keeps the current ditty; selecting the same track preserves its position.
 	if (id) {
 		Common::String path = Common::String::format(kMusicResource, library, id);
-		if (_musicPath != path) {
+		if (!_musicPath.equals(path)) {
 			_music.stop();
 			_musicPath = path;
 		}
@@ -302,14 +465,14 @@ void Application::suspend() {
 bool Application::showContent(const OM::XMLParser &xml, const Common::String &branch) {
 	bool found = false;
 	for (uint i = 0; i < xml.elements().size(); i++)
-		found |= xml.elements()[i].path == branch;
+		found |= xml.elements()[i].path.equals(branch);
 	if (!found) {
 		warning("Trinket: missing launcher content %s", branch.c_str());
 		return false;
 	}
 	_previousLayout = _contentLayout;
 	_previousBranch = _contentBranch;
-	if (_contentLayout != &xml || _contentBranch != branch)
+	if (_contentLayout != &xml || !_contentBranch.equals(branch))
 		_gridPage = 0;
 	_contentLayout = &xml;
 	_contentBranch = branch;
@@ -320,62 +483,88 @@ bool Application::showContent(const OM::XMLParser &xml, const Common::String &br
 	_ok = _newButton = nullptr;
 	_content = _startup = true;
 	_textBlocks.clear();
+	_fonts.removeUnused();
 	_links.clear();
 	_linkParameters.clear();
 	_playCD->visible = true;
 	if (!_scene.setBackground(kBackground))
 		return false;
 	const Common::Array<OM::XMLParser::Element> &elements = xml.elements();
-	uint music = branch == "launcher/startup/screen" ? xml.number("launcher/music") : 0;
+	uint music = 0;
+	if (branch.equals(kLauncherStartupScreenName)) {
+		Common::String musicText = xml.get(kLauncherMusicName);
+		if (!musicText.empty()) {
+			int32 parsedMusic = 0;
+			if (StringParser::parseSignedInt(musicText.c_str(), parsedMusic, StringParser::kDecimalProfile) !=
+				StringParser::Result::kSuccess || parsedMusic < 0)
+				return false;
+			music = static_cast<uint>(parsedMusic);
+		}
+	}
 	for (uint i = 0; i < elements.size(); i++) {
-		if (elements[i].parent < 0 || elements[elements[i].parent].path != branch)
+		if (elements[i].parent < 0 || !elements[elements[i].parent].path.equals(branch))
 			continue;
-		Common::String condition = xml.child(i, "condition");
-		if (condition == "fileMac" || condition == "noFileMac" || condition == "install")
+		Common::String condition = xml.child(i, kXMLCondition);
+		if (condition.equals(kFileMacName) || condition.equals(kNoFileMacName) || condition.equals(kInstallName))
 			continue;
-		if (condition == "file" || condition == "fileWin" || condition == "noFile" || condition == "noFileWin") {
-			bool exists = Common::FSNode(_root.getParent().getParent().join(kMovieDirectory).join(xml.child(i, "filename"))).exists();
-			if (exists == condition.hasPrefix("noFile"))
+		if (condition.equals(kFileName) || condition.equals(kFileWinName) || condition.equals(kNoFileName) || condition.equals(kNoFileWinName)) {
+			bool exists = Common::FSNode(_root.getParent().getParent().join(kMovieDirectory).join(xml.child(i, kXMLFilename))).exists();
+			if (exists == condition.hasPrefix(kNoFileName))
 				continue;
 		}
-		Common::String type = xml.child(i, "type");
-		if (type == "music") {
-			music = atoi(xml.child(i, "id").c_str());
-		} else if (type == "text") {
+		Common::String type = xml.child(i, kXMLType);
+		if (type.equals(kClassMusic)) {
+			int32 parsedMusic = 0;
+			Common::String musicText = xml.child(i, kXMLId);
+			if (StringParser::parseSignedInt(musicText.c_str(), parsedMusic, StringParser::kDecimalProfile) != StringParser::Result::kSuccess ||
+				parsedMusic < 0)
+				return false;
+			music = static_cast<uint>(parsedMusic);
+		} else if (type.equals(kClassText)) {
 			if (!addContentText(xml, i))
 				return false;
-		} else if (type == "toon" || type == "fob") {
+		} else if (type.equals(kClassToon) || type.equals(kClassFob)) {
 			int action = 0;
-			if (type == "fob") {
+			if (type.equals(kClassFob)) {
 				action = kContentLink2000 + _links.size();
-				_links.push_back(xml.child(i, "target"));
-				_linkParameters.push_back(xml.child(i, "parameters"));
+				_links.push_back(xml.child(i, kXMLTarget));
+				_linkParameters.push_back(xml.child(i, kXMLParameters));
 			}
-			Shell::Sprite *sprite = addFrameObject(_scene, atoi(xml.child(i, "id").c_str()),
-												   atoi(xml.child(i, "x").c_str()), atoi(xml.child(i, "y").c_str()), action);
+			int32 id = 0;
+			int32 x = 0;
+			int32 y = 0;
+			if (StringParser::parseSignedInt(xml.child(i, kXMLId).c_str(), id, StringParser::kDecimalProfile) != StringParser::Result::kSuccess ||
+				StringParser::parseSignedInt(xml.child(i, kXMLX).c_str(), x, StringParser::kDecimalProfile) != StringParser::Result::kSuccess ||
+				StringParser::parseSignedInt(xml.child(i, kXMLY).c_str(), y, StringParser::kDecimalProfile) != StringParser::Result::kSuccess)
+				return false;
+			Shell::Sprite *sprite = addFrameObject(_scene, id, x, y, action);
 			if (!sprite)
 				return false;
-			if (xml.child(i, "class") == "checkbox") {
-				bool checked = (xml.child(i, "checkedIf/value") == "auto") == _updatesAutomatic;
+			if (xml.child(i, kXMLClass).equals(kXMLCheckbox)) {
+				bool checked = (xml.child(i, kXMLCheckedIfValue).equals(kXMLAuto)) == _updatesAutomatic;
 				// The selected option is disabled and displays its checked frame.
 				sprite->enabled = !checked;
 				sprite->disabledFrame = 4;
 			}
-			if (type == "toon") {
-				int frame = atoi(xml.child(i, "startFrame").c_str());
+			if (type.equals(kClassToon)) {
+				int32 frame = 0;
+				Common::String frameText = xml.child(i, kXMLStartFrame);
+				if (!frameText.empty() && StringParser::parseSignedInt(frameText.c_str(), frame, StringParser::kDecimalProfile) !=
+					StringParser::Result::kSuccess)
+					return false;
 				if (0 < frame)
 					sprite->setFrame(frame);
 			}
 		}
 	}
 	for (uint i = 0; i < elements.size(); i++) {
-		if (0 <= elements[i].parent && elements[elements[i].parent].path == branch && xml.child(i, "type") == "initScript") {
-			if (!addContentScript(xml, xml.child(i, "target")))
+		if (0 <= elements[i].parent && elements[elements[i].parent].path.equals(branch) && xml.child(i, kXMLType).equals(kXMLInitScript)) {
+			if (!addContentScript(xml, xml.child(i, kXMLTarget)))
 				return false;
 		}
 	}
 	_musicVolume = 100;
-	selectMusic(music, "common");
+	selectMusic(music, kCommonName);
 	debug(1, "Trinket launcher content: %s", branch.c_str());
 	return true;
 }
@@ -389,7 +578,7 @@ bool Application::addContentGrid(const OM::XMLParser &xml) {
 	Common::Array<uint> buttons;
 	const Common::Array<OM::XMLParser::Element> &elements = xml.elements();
 	for (uint i = 0; i < elements.size(); i++) {
-		if (elements[i].path.hasPrefix("launcher/cBar/cmdButtons/") && elements[i].path.hasSuffix("/cb"))
+		if (elements[i].path.hasPrefix(kLauncherCBarCmdButtonsName) && elements[i].path.hasSuffix(kCbName))
 			buttons.push_back(i);
 	}
 	uint first = MIN<uint>(_gridPage * 6, buttons.size());
@@ -404,17 +593,33 @@ bool Application::addContentGrid(const OM::XMLParser &xml) {
 	for (uint i = 0; i < count; i++) {
 		uint node = buttons[first + i];
 		int action = kContentLink2000 + _links.size();
-		_links.push_back("xml:" + xml.child(node, "xmlFile"));
-		_linkParameters.push_back(xml.child(node, "dest"));
-		if (!addFrameObject(_scene, atoi(xml.child(node, "id").c_str()), positions[count - 1][i * 2] - 20,
-							positions[count - 1][i * 2 + 1], action))
+		_links.push_back(kXMLXml + xml.child(node, kXMLXmlFile));
+		_linkParameters.push_back(xml.child(node, kXMLDest));
+		Common::String idText = xml.child(node, kXMLId);
+		int32 id = 0;
+		if (StringParser::parseSignedInt(idText.c_str(), id, StringParser::kDecimalProfile) != StringParser::Result::kSuccess)
+			return false;
+		int x = positions[count - 1][i * 2] - 20;
+		int y = positions[count - 1][i * 2 + 1];
+		if (!addFrameObject(_scene, id, x, y, action))
 			return false;
 	}
 	if (6 < buttons.size()) {
-		Shell::Sprite *left = addFrameObject(_scene, xml.number("launcher/cBar/left/id"),
-											 xml.number("launcher/cBar/left/x"), xml.number("launcher/cBar/left/y"), kGridPrevious1900);
-		Shell::Sprite *right = addFrameObject(_scene, xml.number("launcher/cBar/right/id"),
-											  xml.number("launcher/cBar/right/x"), xml.number("launcher/cBar/right/y"), kGridNext1901);
+		int32 leftId = 0;
+		int32 leftX = 0;
+		int32 leftY = 0;
+		int32 rightId = 0;
+		int32 rightX = 0;
+		int32 rightY = 0;
+		if (xml.number(kLauncherCBarLeftIdName, leftId) != StringParser::Result::kSuccess ||
+			xml.number(kLauncherCBarLeftXName, leftX) != StringParser::Result::kSuccess ||
+			xml.number(kLauncherCBarLeftYName, leftY) != StringParser::Result::kSuccess ||
+			xml.number(kLauncherCBarRightIdName, rightId) != StringParser::Result::kSuccess ||
+			xml.number(kLauncherCBarRightXName, rightX) != StringParser::Result::kSuccess ||
+			xml.number(kLauncherCBarRightYName, rightY) != StringParser::Result::kSuccess)
+			return false;
+		Shell::Sprite *left = addFrameObject(_scene, leftId, leftX, leftY, kGridPrevious1900);
+		Shell::Sprite *right = addFrameObject(_scene, rightId, rightX, rightY, kGridNext1901);
 		if (!left || !right)
 			return false;
 		left->visible = 0 < first;
@@ -424,21 +629,21 @@ bool Application::addContentGrid(const OM::XMLParser &xml) {
 }
 
 bool Application::addContentScript(const OM::XMLParser &xml, const Common::String &script) {
-	if (script.hasSuffix("Brand")) {
+	if (script.hasSuffix(kBrandName)) {
 		// Demo sparkles only appear after a new download; the local catalogue starts clear.
 		return true;
 	}
-	if (script.hasSuffix("Demos"))
+	if (script.hasSuffix(kDemosName))
 		return addContentGrid(xml);
-	if (script == "initMyCDRROMs") {
+	if (script.equals(kInitMyCDRROMsName)) {
 		// Disc-only product packs have no installed-product icon.
-		Common::ScopedPtr<Common::SeekableReadStream> icon(_product.getResource(Common::String("ASEQ"), 2051));
+		Common::ScopedPtr<Common::SeekableReadStream> icon(_product.getResource(Common::String(kASEQName), 2051));
 		if (!icon)
 			return true;
 		int action = kContentLink2000 + _links.size();
-		_links.push_back("product:startup");
+		_links.push_back(kProductStartupName);
 		_linkParameters.push_back("");
-		Shell::Sprite *button = _scene.add(Common::String::format(kAnimation, "product", 2051), 1, action, true);
+		Shell::Sprite *button = _scene.add(Common::String::format(kAnimation, kProductName, 2051), 1, action, true);
 		if (!button)
 			return false;
 		button->x = 290;
@@ -446,10 +651,9 @@ bool Application::addContentScript(const OM::XMLParser &xml, const Common::Strin
 		configureButton(*button);
 		return true;
 	}
-	if (script == "initUpdates") {
+	if (script.equals(kInitUpdatesName)) {
 		TextBlock block;
-		Common::ScopedPtr<Common::SeekableReadStream> stream(open(kDialogFont));
-		block.font.reset(stream ? OM::NFNTFont::load(*stream) : nullptr);
+		block.font = _fonts.load(kDialogFont);
 		if (!block.font)
 			return false;
 		block.lines.push_back("Your products are all up to date.");
@@ -462,15 +666,15 @@ bool Application::addContentScript(const OM::XMLParser &xml, const Common::Strin
 		return true;
 	}
 	static constexpr const char *worlds[] = {
-		"initRRWorld",
-		"initSFWorld",
-		"initCFWorld",
-		"initZOWorld",
-		"initOTWorld",
-		"initCSWorld",
+		kInitRRWorldName,
+		kInitSFWorldName,
+		kInitCFWorldName,
+		kInitZOWorldName,
+		kInitOTWorldName,
+		kInitCSWorldName,
 	};
 	for (uint i = 0; i < ARRAYSIZE(worlds); i++) {
-		if (script == worlds[i])
+		if (script.equals(worlds[i]))
 			return showWorld(i);
 	}
 	warning("Trinket: unknown launcher content script %s", script.c_str());
@@ -498,9 +702,33 @@ void Application::playContentMovie(const Common::String &name, int x, int y) {
 
 bool Application::showWorld(uint world) {
 	static constexpr int characters[][5] = {
-		{0, 24051, 528, 293, 3}, {0, 24059, 453, 254, 2}, {1, 25051, 605, 245, 3}, {1, 25055, 70, 167, 1}, {1, 25060, 557, 143, 2}, {1, 25067, 565, 52, 1}, {2, 26051, 488, 149, 1}, {2, 26058, 87, 131, 1}, {2, 26064, 551, 167, 2}, {2, 26069, 49, 184, 2}, {3, 27051, 276, 372, 1}, {3, 27052, 558, 378, 1}, {3, 27054, 630, 341, 1}, {3, 27055, 117, 381, 1}, {4, 29051, 56, 98, 3}, {4, 29053, 561, 140, 1}, {4, 29054, 599, 158, 2}, {4, 29055, 547, 199, 2}};
+		{0, 24051, 528, 293, 3},
+		{0, 24059, 453, 254, 2},
+		{1, 25051, 605, 245, 3},
+		{1, 25055, 70, 167, 1},
+		{1, 25060, 557, 143, 2},
+		{1, 25067, 565, 52, 1},
+		{2, 26051, 488, 149, 1},
+		{2, 26058, 87, 131, 1},
+		{2, 26064, 551, 167, 2},
+		{2, 26069, 49, 184, 2},
+		{3, 27051, 276, 372, 1},
+		{3, 27052, 558, 378, 1},
+		{3, 27054, 630, 341, 1},
+		{3, 27055, 117, 381, 1},
+		{4, 29051, 56, 98, 3},
+		{4, 29053, 561, 140, 1},
+		{4, 29054, 599, 158, 2},
+		{4, 29055, 547, 199, 2},
+	};
 	static constexpr int screens[6][6] = {
-		{24100, 383, 409, 15, 114, 84}, {25100, 49, 251, 9, 246, 149}, {26100, 310, 68, 37, 200, 59}, {27100, 121, 215, 31, 271, 69}, {29100, 63, 47, 4, 175, 105}, {28100, 57, 402, 20, 98, 88}};
+		{24100, 383, 409, 15, 114, 84},
+		{25100, 49, 251, 9, 246, 149},
+		{26100, 310, 68, 37, 200, 59},
+		{27100, 121, 215, 31, 271, 69},
+		{29100, 63, 47, 4, 175, 105},
+		{28100, 57, 402, 20, 98, 88},
+	};
 	_world = world;
 	for (uint i = 0; i < ARRAYSIZE(characters); i++) {
 		if (characters[i][0] != static_cast<int>(world))
@@ -521,11 +749,11 @@ bool Application::showWorld(uint world) {
 }
 
 void Application::followLink(const Common::String &link, const Common::String &parameters) {
-	if (link.hasPrefix("xml:")) {
+	if (link.hasPrefix(kXMLXml)) {
 		Common::String file = link.substr(4);
-		if (file.equalsIgnoreCase("TLCParents.xml"))
+		if (file.equalsIgnoreCase(kParentsXMLName))
 			showContent(_parentsLayout, parameters);
-		else if (file.equalsIgnoreCase("TLCHome.xml"))
+		else if (file.equalsIgnoreCase(kHomeXMLName))
 			showContent(_homeLayout, parameters);
 		else {
 			for (uint i = 0; i < ARRAYSIZE(kDemoXML); i++) {
@@ -538,58 +766,69 @@ void Application::followLink(const Common::String &link, const Common::String &p
 		}
 		return;
 	}
-	if (link == "rscript:homeButtHandler")
-		showContent(_homeLayout, "launcher/startup/screen");
-	else if (link == "rscript:initParentsArea")
-		showContent(_parentsLayout, "launcher/content/mainmenu");
-	else if (link == "rscript:initProductGrid")
-		showContent(_parentsLayout, "launcher/content/productGrid3to7");
-	else if (link == "rscript:setUpdatesAuto" || link == "rscript:setUpdatesManual") {
-		_updatesAutomatic = link == "rscript:setUpdatesAuto";
+	if (link.equals(kRscriptHomeButtHandlerName))
+		showContent(_homeLayout, kLauncherStartupScreenName);
+	else if (link.equals(kRscriptInitParentsAreaName))
+		showContent(_parentsLayout, kLauncherContentMainmenuName);
+	else if (link.equals(kRscriptInitProductGridName))
+		showContent(_parentsLayout, kLauncherContentProductGrid3to7Name);
+	else if (link.equals(kRscriptSetUpdatesAutoName) || link.equals(kRscriptSetUpdatesManualName)) {
+		_updatesAutomatic = link.equals(kRscriptSetUpdatesAutoName);
 		if (!storeUsers())
 			warning("Trinket: could not save launcher update preference");
 		Common::String branch = _contentBranch;
 		showContent(*_contentLayout, branch);
-	} else if (link == "rscript:goBack" && _previousLayout) {
+	} else if (link.equals(kRscriptGoBackName) && _previousLayout) {
 		Common::String branch = _previousBranch;
 		showContent(*_previousLayout, branch);
-	} else if (link.hasPrefix("startup:"))
+	} else if (link.hasPrefix(kStartupName))
 		showProductScreen(link.substr(8));
-	else if (link == "product:startup")
+	else if (link.equals(kProductStartupName))
 		showStartup();
-	else if (link == "rscript:stopMovie")
+	else if (link.equals(kRscriptStopMovieName))
 		stopContentMovie();
-	else if (link.hasPrefix("bink:"))
-		playContentMovie(link.substr(5), atoi(parameters.c_str()), 75);
-	else if (link.hasPrefix("launcher/startup/"))
+	else if (link.hasPrefix(kBinkName)) {
+		int32 movieId = 0;
+		if (StringParser::parseSignedInt(parameters.c_str(), movieId, StringParser::kDecimalProfile) == StringParser::Result::kSuccess &&
+			movieId >= 0)
+			playContentMovie(link.substr(5), movieId, 75);
+		else
+			warning("Trinket: invalid launcher movie ID %s", parameters.c_str());
+	} else if (link.hasPrefix(kLauncherStartupName))
 		showContent(_homeLayout, link);
-	else if (link.hasPrefix("launcher/content/"))
+	else if (link.hasPrefix(kLauncherContentName))
 		showContent(_contentLayout ? *_contentLayout : _parentsLayout, link);
 	else
 		notifyNotImplemented();
 }
 
 Shell::Sprite *Application::add(const OM::XMLParser &xml, const Common::String &branch, const char *library, int action) {
-	int id = xml.number(branch + "/id");
+	int32 id = 0;
+	int32 x = 0;
+	int32 y = 0;
+	if (xml.number(branch + kIdName, id) != StringParser::Result::kSuccess ||
+		xml.number(branch + kXName, x) != StringParser::Result::kSuccess ||
+		xml.number(branch + kYName, y) != StringParser::Result::kSuccess)
+		return nullptr;
 	if (id < 1)
 		return nullptr;
 	Shell::Sprite *sprite = _scene.add(Common::String::format(kAnimation, library, id), 1, action, action != 0);
 	if (sprite) {
-		sprite->x = xml.number(branch + "/x");
-		sprite->y = xml.number(branch + "/y");
+		sprite->x = x;
+		sprite->y = y;
 		configureButton(*sprite);
 	}
 	return sprite;
 }
 
 bool Application::showStartup() {
-	return showProductScreen("startup/screen");
+	return showProductScreen(kStartupScreenName);
 }
 
 bool Application::showProductScreen(const Common::String &branch) {
 	bool found = false;
 	for (const OM::XMLParser::Element &element : _startupLayout.elements())
-		found |= element.path == branch;
+		found |= element.path.equals(branch);
 	if (!found)
 		return false;
 	stopContentMovie();
@@ -597,12 +836,13 @@ bool Application::showProductScreen(const Common::String &branch) {
 	_scene.clear();
 	_content = false;
 	_textBlocks.clear();
+	_fonts.removeUnused();
 	_links.clear();
 	_linkParameters.clear();
 	_playCD->visible = false;
-	_verticalTab->setFrame(1);
-	_horizontalTab->setFrame(1);
-	_horizontalTab->visible = false;
+	_vertTab->setFrame(1);
+	_horizTab->setFrame(1);
+	_horizTab->visible = false;
 	_ok = _newButton = nullptr;
 	_startup = true;
 	_productPlay = false;
@@ -610,69 +850,98 @@ bool Application::showProductScreen(const Common::String &branch) {
 		return false;
 	const auto &elements = _startupLayout.elements();
 	for (uint i = 0; i < elements.size(); i++) {
-		if (elements[i].parent < 0 || elements[elements[i].parent].path != branch)
+		if (elements[i].parent < 0 || !elements[elements[i].parent].path.equals(branch))
 			continue;
-		Common::String condition = _startupLayout.child(i, "condition");
-		if (!condition.empty() && condition != "all")
+		Common::String condition = _startupLayout.child(i, kXMLCondition);
+		if (!condition.empty() && !condition.equals(kAllName))
 			continue;
-		Common::String type = _startupLayout.child(i, "type");
-		if (type != "scene" && type != "toon" && type != "fob")
+		Common::String type = _startupLayout.child(i, kXMLType);
+		if (!type.equals(kClassScene) && !type.equals(kClassToon) && !type.equals(kClassFob))
 			continue;
-		int id = atoi(_startupLayout.child(i, "id").c_str());
+		int32 id = 0;
+		int32 x = 0;
+		int32 y = 0;
+		int32 frame = 0;
+		Common::String idText = _startupLayout.child(i, kXMLId);
+		Common::String xText = _startupLayout.child(i, kXMLX);
+		Common::String yText = _startupLayout.child(i, kXMLY);
+		Common::String frameText = _startupLayout.child(i, kXMLStartFrame);
+		if (StringParser::parseSignedInt(idText.c_str(), id, StringParser::kDecimalProfile) != StringParser::Result::kSuccess ||
+			StringParser::parseSignedInt(xText.c_str(), x, StringParser::kDecimalProfile) != StringParser::Result::kSuccess ||
+			StringParser::parseSignedInt(yText.c_str(), y, StringParser::kDecimalProfile) != StringParser::Result::kSuccess ||
+			(!frameText.empty() && StringParser::parseSignedInt(frameText.c_str(), frame, StringParser::kDecimalProfile) !=
+				StringParser::Result::kSuccess))
+			return false;
 		int action = 0;
-		if (type == "fob") {
-			if (_startupLayout.child(i, "class") == "play") {
+		if (type.equals(kClassFob)) {
+			if (_startupLayout.child(i, kXMLClass).equals(kXMLPlay)) {
 				action = 1;
 				_productPlay = true;
 			} else {
 				action = kContentLink2000 + _links.size();
-				_links.push_back(_startupLayout.child(i, "class") == "link" ? _startupLayout.child(i, "target") : "external:");
-				_linkParameters.push_back(_startupLayout.child(i, "parameters"));
+				_links.push_back(_startupLayout.child(i, kXMLClass).equals(kXMLLink) ? _startupLayout.child(i, kXMLTarget) : kXMLExternal);
+				_linkParameters.push_back(_startupLayout.child(i, kXMLParameters));
 			}
 		}
-		Shell::Sprite *sprite = _scene.add(Common::String::format(kAnimation, "product", id), 1, action, action != 0);
+		Shell::Sprite *sprite = _scene.add(Common::String::format(kAnimation, kProductName, id), 1, action, action != 0);
 		if (!sprite) {
-			if (type == "scene" && _scene.setBackground(Common::String::format("product/%d.jpg", id)))
+			if (type.equals(kClassScene) && _scene.setBackground(Common::String::format(kClassProductSignedIndexJpg, id)))
 				continue;
 			return false;
 		}
-		sprite->x = atoi(_startupLayout.child(i, "x").c_str());
-		sprite->y = atoi(_startupLayout.child(i, "y").c_str());
+		sprite->x = x;
+		sprite->y = y;
 		configureButton(*sprite);
-		int frame = atoi(_startupLayout.child(i, "startFrame").c_str());
 		if (0 < frame)
 			sprite->setFrame(frame);
 	}
 	_musicVolume = 100;
-	Common::String music = _startupLayout.get("startup/music");
-	selectMusic(music.empty() ? _defaultMusic : atoi(music.c_str()), "product");
+	Common::String music = _startupLayout.get(kPropertyStartupMusic);
+	uint musicId = _defaultMusic;
+	if (!music.empty()) {
+		int32 parsedMusicId = 0;
+		if (StringParser::parseSignedInt(music.c_str(), parsedMusicId, StringParser::kDecimalProfile) != StringParser::Result::kSuccess ||
+			parsedMusicId < 0)
+			return false;
+		musicId = static_cast<uint>(parsedMusicId);
+	}
+	selectMusic(musicId, kProductName);
 	return true;
 }
 
 bool Application::showSignin() {
 	_scene.clear();
 	_textBlocks.clear();
+	_fonts.removeUnused();
 	_links.clear();
 	_startup = false;
 	_content = false;
 	_playCD->visible = false;
 	Common::String branch(kSigninBranch);
-	if (!_scene.setBackground(kBackground) || !add(_layout, branch + "background", "signin", 0) ||
-		!add(_layout, branch + "nameBox", "signin", 0))
+	if (!_scene.setBackground(kBackground) || !add(_layout, branch + kBackgroundName, kSigninName, 0) ||
+		!add(_layout, branch + kNameBoxName, kSigninName, 0))
 		return false;
-	_ok = add(_layout, branch + "ok", "signin", 1);
-	_newButton = add(_layout, branch + "newName", "signin", 2);
-	if (!_ok || !_newButton || !add(_layout, branch + "cancel", "signin", 3) ||
-		!add(_layout, branch + "upArrow", "signin", 4) || !add(_layout, branch + "dnArrow", "signin", 5))
+	_ok = add(_layout, branch + kOkName, kSigninName, 1);
+	_newButton = add(_layout, branch + kNewNameName, kSigninName, 2);
+	if (!_ok || !_newButton || !add(_layout, branch + kCancelName, kSigninName, 3) ||
+		!add(_layout, branch + kUpArrowName, kSigninName, 4) || !add(_layout, branch + kDnArrowName, kSigninName, 5))
 		return false;
-	add(_layout, branch + "backspace", "signin", 6);
-	add(_layout, branch + "space", "signin", 7);
+	add(_layout, branch + kBackspaceName, kSigninName, 6);
+	add(_layout, branch + kSpaceName, kSigninName, 7);
 	for (char c = 'a'; c <= 'z'; c++) {
-		if (!add(_layout, branch + Common::String(c), "signin", c))
+		if (!add(_layout, branch + Common::String(c), kSigninName, c))
 			return false;
 	}
-	int x = _layout.number(branch + "nameList/x"), y = _layout.number(branch + "nameList/y");
-	_listRect = Common::Rect(x, y, x + _layout.number(branch + "nameList/w"), y + _layout.number(branch + "nameList/h"));
+	int32 x = 0;
+	int32 y = 0;
+	int32 width = 0;
+	int32 height = 0;
+	if (_layout.number(branch + kNameListXName, x) != StringParser::Result::kSuccess ||
+		_layout.number(branch + kNameListYName, y) != StringParser::Result::kSuccess ||
+		_layout.number(branch + kNameListWName, width) != StringParser::Result::kSuccess ||
+		_layout.number(branch + kNameListHName, height) != StringParser::Result::kSuccess)
+		return false;
+	_listRect = Common::Rect(x, y, x + width, y + height);
 	_newEntry = _users.empty();
 	if (!_users.empty() && _selected < 0)
 		select(0);
@@ -738,7 +1007,7 @@ bool Application::valid() const {
 	if (_users.size() >= 99)
 		return false;
 	for (uint i = 0; i < _users.size(); i++) {
-		if (_users[i].name == _typed)
+		if (_users[i].name.equals(_typed))
 			return false;
 	}
 	return true;
@@ -749,7 +1018,7 @@ bool Application::commitName() {
 		return false;
 	Common::String name = selectedName();
 	for (uint i = 0; i < _users.size(); i++) {
-		if (_users[i].name == name)
+		if (_users[i].name.equals(name))
 			return true;
 	}
 	User user;
@@ -788,13 +1057,13 @@ bool Application::removeName() {
 }
 
 void Application::updateCursor(bool overButton) {
-	if (_pointerOverButton == overButton)
+	if (_overButton == overButton)
 		return;
-	_pointerOverButton = overButton;
+	_overButton = overButton;
 	if (overButton && _hoverCursor && !_hoverCursor->cursors.empty())
 		CursorMan.replaceCursor(_hoverCursor->cursors[0].cursor);
-	else if (_arrowCursor)
-		CursorMan.replaceCursor(_arrowCursor);
+	else
+		_vm.setDefaultCursor();
 }
 
 Application::Request Application::event(const Common::Event &event) {
@@ -812,8 +1081,9 @@ Application::Request Application::event(const Common::Event &event) {
 		if (frameAction == 1000)
 			return kQuit05;
 		if (frameAction == 1001 || frameAction == 1002) {
-			uint vertical = _verticalTab->getFrame(), horizontal = _horizontalTab->getFrame();
-			bool horizontalVisible = _horizontalTab->visible;
+			uint vertical = _vertTab->getFrame();
+			uint horizontal = _horizTab->getFrame();
+			bool horizVisible = _horizTab->visible;
 			if (frameAction == 1001) {
 				_musicEnabled = !_musicEnabled;
 				// The original volume toggle does not rewind the looping ditty.
@@ -829,35 +1099,35 @@ Application::Request Application::event(const Common::Event &event) {
 			}
 			if (!buildFrame())
 				error("Could not restore launcher controls");
-			_verticalTab->setFrame(vertical ? vertical : 1);
-			_horizontalTab->setFrame(horizontal ? horizontal : 1);
-			_horizontalTab->visible = horizontalVisible;
+			_vertTab->setFrame(vertical ? vertical : 1);
+			_horizTab->setFrame(horizontal ? horizontal : 1);
+			_horizTab->visible = horizVisible;
 			if (!storeUsers())
 				warning("Trinket: could not save launcher audio preferences");
 		} else if (frameAction == 1003 || frameAction == 1005) {
-			showContent(_homeLayout, frameAction == 1003 ? "launcher/startup/screen" : "launcher/startup/help");
-			_verticalTab->setFrame(frameAction == 1003 ? 2 : 4);
-			_horizontalTab->setFrame(1);
-			_horizontalTab->visible = false;
+			showContent(_homeLayout, frameAction == 1003 ? kLauncherStartupScreenName : kLauncherStartupHelpName);
+			_vertTab->setFrame(frameAction == 1003 ? 2 : 4);
+			_horizTab->setFrame(1);
+			_horizTab->visible = false;
 		} else if (frameAction == 1004) {
-			showContent(_newsLayout, "launcher/content/whatsNew");
-			_verticalTab->setFrame(3);
-			_horizontalTab->visible = false;
+			showContent(_newsLayout, kLauncherContentWhatsNewName);
+			_vertTab->setFrame(3);
+			_horizTab->visible = false;
 		} else if (frameAction == 1006) {
 			showStartup();
 		} else if (1010 <= frameAction && frameAction < 1016) {
-			static const char *const destinations[] = {
-				"rrBrand",
-				"sfBrand",
-				"cfBrand",
-				"zoBrand",
-				"otBrand",
-				"csBrand",
+			static constexpr const char *destinations[] = {
+				kRrBrandName,
+				kSfBrandName,
+				kCfBrandName,
+				kZoBrandName,
+				kOtBrandName,
+				kCsBrandName,
 			};
-			showContent(_parentsLayout, Common::String("launcher/content/") + destinations[frameAction - 1010]);
-			_verticalTab->setFrame(1);
-			_horizontalTab->setFrame(frameAction - 1010 + 2);
-			_horizontalTab->visible = true;
+			showContent(_parentsLayout, Common::String(kLauncherContentName) + destinations[frameAction - 1010]);
+			_vertTab->setFrame(1);
+			_horizTab->setFrame(frameAction - 1010 + 2);
+			_horizTab->visible = true;
 		}
 		if (frameAction)
 			return kNone00;
@@ -912,8 +1182,8 @@ Application::Request Application::event(const Common::Event &event) {
 			if (!showSignin())
 				warning("Trinket: could not load the sign-in screen");
 		} else if (action == 4 || key == Common::KEYCODE_ESCAPE) {
-			showContent(_homeLayout, "launcher/startup/screen");
-			_verticalTab->setFrame(2);
+			showContent(_homeLayout, kLauncherStartupScreenName);
+			_vertTab->setFrame(2);
 		} else if (kContentLink2000 <= action && action - kContentLink2000 < static_cast<int>(_links.size())) {
 			Common::String link = _links[action - kContentLink2000];
 			Common::String parameters = _linkParameters[action - kContentLink2000];
@@ -971,9 +1241,9 @@ Application::Request Application::event(const Common::Event &event) {
 
 void Application::showDeleteDialog() {
 	_dialogScene.clear();
-	Shell::Sprite *box = _dialogScene.add(Common::String::format(kAnimation, "common", 1042), 0);
-	Shell::Sprite *yes = _dialogScene.add(Common::String::format(kAnimation, "common", 1045), 1, 1, true);
-	Shell::Sprite *no = _dialogScene.add(Common::String::format(kAnimation, "common", 1046), 1, 2, true);
+	Shell::Sprite *box = _dialogScene.add(Common::String::format(kAnimation, kCommonName, 1042), 0);
+	Shell::Sprite *yes = _dialogScene.add(Common::String::format(kAnimation, kCommonName, 1045), 1, 1, true);
+	Shell::Sprite *no = _dialogScene.add(Common::String::format(kAnimation, kCommonName, 1046), 1, 2, true);
 	if (!box || !yes || !no) {
 		_dialogScene.clear();
 		warning("Trinket: failed to load the launcher delete dialog");
@@ -994,9 +1264,17 @@ void Application::showDeleteDialog() {
 }
 
 uint32 Application::listColor(const OM::Canvas &canvas, const char *name) const {
-	Common::String path = Common::String(kSigninBranch) + "nameList/" + name;
-	return canvas.surface().format.RGBToColor(_layout.number(path + "/r") >> 8,
-											  _layout.number(path + "/g") >> 8, _layout.number(path + "/b") >> 8);
+	Common::String path = Common::String(kSigninBranch) + kNameListName + name;
+	int32 red = 0;
+	int32 green = 0;
+	int32 blue = 0;
+	if (_layout.number(path + kRName, red) != StringParser::Result::kSuccess ||
+		_layout.number(path + kGName, green) != StringParser::Result::kSuccess ||
+		_layout.number(path + kBName, blue) != StringParser::Result::kSuccess) {
+		warning("Trinket: invalid launcher list color at %s", path.c_str());
+		return canvas.surface().format.RGBToColor(0, 0, 0);
+	}
+	return canvas.surface().format.RGBToColor(red >> 8, green >> 8, blue >> 8);
 }
 
 void Application::draw(OM::Canvas &canvas) {
@@ -1027,13 +1305,14 @@ void Application::draw(OM::Canvas &canvas) {
 		canvas.blit(_movieFrame, _moviePosition.x, _moviePosition.y);
 	if (!_startup) {
 		Graphics::Surface list = canvas.surface().getSubArea(_listRect);
-		list.fillRect(Common::Rect(list.w, list.h), listColor(canvas, "bc"));
+		list.fillRect(Common::Rect(list.w, list.h), listColor(canvas, kBcName));
 		int lineHeight = _listFont->getFontHeight();
 		int descent = lineHeight - _listFont->getFontAscent();
 		Common::Array<Common::String> names;
 		for (uint i = 0; i < _users.size(); i++)
 			names.push_back(_users[i].name);
-		int selected = _selected, first = _first;
+		int selected = _selected;
+		int first = _first;
 		if (_newEntry || selected < 0) {
 			selected = 0;
 			while (selected < static_cast<int>(names.size()) && names[selected] < _typed)
@@ -1048,22 +1327,22 @@ void Application::draw(OM::Canvas &canvas) {
 			if (static_cast<int>(names.size()) <= index)
 				break;
 			int y = descent + row * lineHeight;
-			uint32 color = listColor(canvas, index == selected ? "stc" : "ntc");
+			uint32 color = listColor(canvas, index == selected ? kStcName : kNtcName);
 			if (index == selected)
-				list.fillRect(Common::Rect(0, y, list.w, MIN<int>(list.h, y + lineHeight)), listColor(canvas, "hbc"));
-			bool matched = index == selected && !_newEntry && _selected >= 0 && _typed != names[index];
+				list.fillRect(Common::Rect(0, y, list.w, MIN<int>(list.h, y + lineHeight)), listColor(canvas, kHbcName));
+			bool matched = index == selected && !_newEntry && _selected >= 0 && !_typed.equals(names[index]);
 			if (matched)
-				color = listColor(canvas, "mtc");
+				color = listColor(canvas, kMtcName);
 			_listFont->drawString(&list, names[index], 10, y, list.w - 10, color, Graphics::kTextAlignLeft, 0, false);
 			if (matched)
-				_listFont->drawString(&list, _typed, 10, y, list.w - 10, listColor(canvas, "stc"), Graphics::kTextAlignLeft, 0, false);
+				_listFont->drawString(&list, _typed, 10, y, list.w - 10, listColor(canvas, kStcName), Graphics::kTextAlignLeft, 0, false);
 		}
 	}
 	if (_confirmDelete) {
 		_dialogScene.drawSprites(canvas, INT_MIN, INT_MAX);
 		Graphics::Surface textArea = canvas.surface().getSubArea(Common::Rect(277, 218, 522, 336));
 		Common::Array<Common::String> lines;
-		if (!Shell::Text::wrap(*_dialogFont, _layout.get(Common::String(kSigninBranch) + "dialogs/delete/msg"), textArea.w,
+		if (!Shell::Text::wrap(*_dialogFont, _layout.get(Common::String(kSigninBranch) + kPropertyDialogsDeleteMsg), textArea.w,
 							   lines, Shell::Text::kLauncher))
 			return;
 		int count = lines.size();
@@ -1090,25 +1369,38 @@ void Application::drawContentText(OM::Canvas &canvas) {
 
 bool Application::addContentText(const OM::XMLParser &xml, uint node) {
 	TextBlock block;
-	int x = atoi(xml.child(node, "x").c_str()), y = atoi(xml.child(node, "y").c_str());
-	int w = atoi(xml.child(node, "w").c_str()), h = atoi(xml.child(node, "h").c_str());
-	block.rect = Common::Rect(x, y, x + w, y + h);
+	int32 x = 0;
+	int32 y = 0;
+	int32 width = 0;
+	int32 height = 0;
+	int32 red = 0;
+	int32 green = 0;
+	int32 blue = 0;
+	if (StringParser::parseSignedInt(xml.child(node, kXMLX).c_str(), x, StringParser::kDecimalProfile) != StringParser::Result::kSuccess ||
+		StringParser::parseSignedInt(xml.child(node, kXMLY).c_str(), y, StringParser::kDecimalProfile) != StringParser::Result::kSuccess ||
+		StringParser::parseSignedInt(xml.child(node, kXMLW).c_str(), width, StringParser::kDecimalProfile) != StringParser::Result::kSuccess ||
+		StringParser::parseSignedInt(xml.child(node, kXMLH).c_str(), height, StringParser::kDecimalProfile) != StringParser::Result::kSuccess)
+		return false;
+	block.rect = Common::Rect(x, y, x + width, y + height);
 	block.rect.clip(Common::Rect(800, 600));
 	if (block.rect.isEmpty())
 		return false;
-	Common::ScopedPtr<Common::SeekableReadStream> stream(open("common/" + xml.child(node, "font") + ".nfnt"));
-	block.font.reset(stream ? OM::NFNTFont::load(*stream) : nullptr);
+	block.font = _fonts.load(kCommonLibraryPrefix + xml.child(node, kXMLFont) + kFontExtension);
 	if (!block.font)
 		return false;
-	Common::String text = xml.child(node, "content");
+	Common::String text = xml.child(node, kXMLContent);
 	if (text.size() >= 2 && text.firstChar() == '"' && text.lastChar() == '"')
 		text = text.substr(1, text.size() - 2);
 	if (!Shell::Text::wrap(*block.font, text, block.rect.width(), block.lines, Shell::Text::kLauncher))
 		return false;
-	block.red = atoi(xml.child(node, "color/r").c_str()) >> 8;
-	block.green = atoi(xml.child(node, "color/g").c_str()) >> 8;
-	block.blue = atoi(xml.child(node, "color/b").c_str()) >> 8;
-	block.centered = xml.child(node, "center") == "true";
+	if (StringParser::parseSignedInt(xml.child(node, kXMLColorR).c_str(), red, StringParser::kDecimalProfile) != StringParser::Result::kSuccess ||
+		StringParser::parseSignedInt(xml.child(node, kXMLColorG).c_str(), green, StringParser::kDecimalProfile) != StringParser::Result::kSuccess ||
+		StringParser::parseSignedInt(xml.child(node, kXMLColorB).c_str(), blue, StringParser::kDecimalProfile) != StringParser::Result::kSuccess)
+		return false;
+	block.red = red >> 8;
+	block.green = green >> 8;
+	block.blue = blue >> 8;
+	block.centered = xml.child(node, kXMLCenter).equals(kXMLTrue);
 	_textBlocks.push_back(block);
 	return true;
 }

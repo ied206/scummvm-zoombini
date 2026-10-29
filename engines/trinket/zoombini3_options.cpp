@@ -28,6 +28,9 @@
 namespace Trinket {
 namespace Zoombini3 {
 
+constexpr const char *Options::kNameUnsignedIndexFormat;
+constexpr const char *Options::k1Suffix;
+
 constexpr const char *Options::kAsset;
 constexpr const char *Options::kSound;
 constexpr const char *Options::kCreditsXML;
@@ -39,8 +42,10 @@ constexpr int Options::kPanelAction;
 constexpr int Options::kCheckboxAction;
 constexpr int Options::kFirstSliderAction;
 
-Options::Options(const OM::ResourceProvider &resources, Audio::Mixer &mixer, World &world) : _resources(resources), _world(world),
-																							 _scene(resources), _checkbox(_scene), _music(_scene), _dialogue(_scene), _effects(_scene), _click(mixer), _preview(mixer) {
+Options::Options(const OM::ResourceProvider &resources, OM::FontCache &fonts, Audio::Mixer &mixer, World &world)
+	: _resources(resources), _fonts(fonts), _world(world),
+	  _scene(resources), _checkbox(_scene), _music(_scene),
+	  _dialogue(_scene), _effects(_scene), _click(mixer), _preview(mixer) {
 }
 
 bool Options::addButton(uint resource, Action action, int verticalOffset) {
@@ -62,8 +67,8 @@ bool Options::load(bool practice, int currentMusicVolume, const Shell::SaveFiles
 	if (!practice && (!player.count || 6 < player.count || !player.current || player.count < player.current))
 		return false;
 	_player = player;
-	_currentMusicVolume = currentMusicVolume;
-	_currentSaveName = Common::String::format("%s_%u", player.name.c_str(), player.current);
+	_curMusicVol = currentMusicVolume;
+	_curSaveName = Common::String::format(kNameUnsignedIndexFormat, player.name.c_str(), player.current);
 	const uint panels[] = {
 		437,
 		405,
@@ -107,7 +112,7 @@ void Options::playClick() {
 }
 
 void Options::syncVolumes(int musicVolume) {
-	_currentMusicVolume = musicVolume;
+	_curMusicVol = musicVolume;
 	_music.setPercentage(musicVolume);
 	_dialogue.setPercentage(_world.dialogueVolume());
 	_effects.setPercentage(_world.effectsVolume());
@@ -166,7 +171,7 @@ Options::Result Options::event(const Common::Event &event, uint32 time) {
 		if (notification & OptionsSlider::kValueChanged01) {
 			int volume = sliders[i]->percentage();
 			if (i == OptionsSlider::kMusic00) {
-				_currentMusicVolume = volume;
+				_curMusicVol = volume;
 				_world.setMusicVolume(volume);
 				result.volumeChanges |= kMusic01;
 			} else {
@@ -216,8 +221,7 @@ bool Options::overControl(Common::Point point) const {
 
 bool Options::openCredits(uint32 time) {
 	Common::File xml;
-	Common::ScopedPtr<Common::SeekableReadStream> fontStream(_resources.open(kCreditsFont));
-	Common::ScopedPtr<OM::NFNTFont> font(fontStream ? OM::NFNTFont::load(*fontStream) : nullptr);
+	Common::SharedPtr<OM::NFNTFont> font = _fonts.load(kCreditsFont);
 	if (!xml.open(Common::Path(kCreditsXML)) || !font)
 		return false;
 	Common::ScopedPtr<Shell::CreditText> credits(new Shell::CreditText(520, 420));
@@ -232,8 +236,7 @@ bool Options::openCredits(uint32 time) {
 }
 
 bool Options::openNewGame() {
-	Common::ScopedPtr<Common::SeekableReadStream> stream(_resources.open(kNewGameFont));
-	Common::SharedPtr<OM::NFNTFont> font(stream ? OM::NFNTFont::load(*stream) : nullptr);
+	Common::SharedPtr<OM::NFNTFont> font = _fonts.load(kNewGameFont);
 	if (!font)
 		return false;
 	Common::ScopedPtr<Shell::Scene> scene(new Shell::Scene(_resources));
@@ -315,7 +318,7 @@ void Options::returnToMain(Common::Point pointer, uint32 time) {
 	_slotScene.reset();
 	_slotHover = _slotSelection = nullptr;
 	_checkbox.setOn(!_world.isHelpAudioOff(), pointer);
-	_music.setPercentage(_currentMusicVolume);
+	_music.setPercentage(_curMusicVol);
 	_dialogue.setPercentage(_world.dialogueVolume());
 	_effects.setPercentage(_world.effectsVolume());
 	// Reestablish hover without sending the closing press into the restored panel.
@@ -333,7 +336,7 @@ void Options::returnToMain(Common::Point pointer, uint32 time) {
 void Options::draw(OM::Canvas &canvas, uint32 time) {
 	if (_slotScene) {
 		_slotScene->drawSprites(canvas, INT_MIN, INT_MAX);
-		drawLabel(canvas, *_slotHeadingFont, Common::String::format("%s's Saved Games", _player.name.c_str()), _slotHeadingRect);
+		drawLabel(canvas, *_slotHdrFont, Common::String::format("%s's Saved Games", _player.name.c_str()), _slotHdrRect);
 		for (uint i = 0; i < _slotLabels.size(); i++)
 			drawLabel(canvas, *_slotFont, _slotLabels[i], _slotLabelRects[i]);
 		return;
@@ -341,7 +344,7 @@ void Options::draw(OM::Canvas &canvas, uint32 time) {
 	if (_newGameScene) {
 		_newGameScene->drawSprites(canvas, INT_MIN, INT_MAX);
 		// RText's rectangle constructor centers this unwrapped, read-only save name.
-		drawLabel(canvas, *_newGameFont, _currentSaveName, Common::Rect(0, 260, 800, 300));
+		drawLabel(canvas, *_newGameFont, _curSaveName, Common::Rect(0, 260, 800, 300));
 		return;
 	}
 	if (_credits) {
@@ -379,10 +382,8 @@ uint Options::slotThumbnail(int location) {
 }
 
 bool Options::openSlots(bool replace) {
-	Common::ScopedPtr<Common::SeekableReadStream> heading(_resources.open(kSlotHeadingFont));
-	Common::ScopedPtr<Common::SeekableReadStream> font(_resources.open(kCreditsFont));
-	Common::SharedPtr<OM::NFNTFont> headingFont(heading ? OM::NFNTFont::load(*heading) : nullptr);
-	Common::SharedPtr<OM::NFNTFont> slotFont(font ? OM::NFNTFont::load(*font) : nullptr);
+	Common::SharedPtr<OM::NFNTFont> headingFont = _fonts.load(kSlotHeadingFont);
+	Common::SharedPtr<OM::NFNTFont> slotFont = _fonts.load(kCreditsFont);
 	if (!headingFont || !slotFont)
 		return false;
 	Common::ScopedPtr<Shell::Scene> scene(new Shell::Scene(_resources));
@@ -428,10 +429,10 @@ bool Options::openSlots(bool replace) {
 		picture->actionOnMouseDown = true;
 		int top = origin.y + card->height() - 12;
 		if (!i) {
-			while (!name.empty() && card->width() < slotFont->getStringWidth(name + "_1"))
+			while (!name.empty() && card->width() < slotFont->getStringWidth(name + k1Suffix))
 				name.deleteLastChar();
 		}
-		labels.push_back(Common::String::format("%s_%u", name.c_str(), i + 1));
+		labels.push_back(Common::String::format(kNameUnsignedIndexFormat, name.c_str(), i + 1));
 		rects.push_back(Common::Rect(origin.x, top, origin.x + card->width(), top + 25));
 	}
 	Shell::Sprite *hover = scene->add(Common::String::format(kAsset, 414), 3);
@@ -466,17 +467,17 @@ bool Options::openSlots(bool replace) {
 	_preview.stop();
 	_newGameButtons.clear();
 	_newGameScene.reset();
-	_slotHeadingFont = headingFont;
+	_slotHdrFont = headingFont;
 	_slotFont = slotFont;
 	_slotScene.reset(scene.release());
 	_slotButtons = buttons;
 	_slotLabels = labels;
 	_slotLabelRects = rects;
-	_slotHeadingRect = headingRect;
+	_slotHdrRect = headingRect;
 	_slotHover = hover;
 	_slotSelection = selection;
 	_selectedSlot = _player.current;
-	_replaceSelectedGame = replace;
+	_replaceSelGame = replace;
 	if (replace)
 		_preview.play(_resources, Common::String::format(kSound, static_cast<uint>(kResSound402_Replace)), Audio::Mixer::kSFXSoundType);
 	return true;
@@ -513,12 +514,12 @@ Options::Result Options::slotEvent(const Common::Event &event, uint32 time) {
 		_slotSelection->x = origin.x + 4;
 		_slotSelection->y = origin.y - 1;
 	} else if (action == kAcceptSlot01) {
-		if (_selectedSlot == _player.current && !_replaceSelectedGame) {
+		if (_selectedSlot == _player.current && !_replaceSelGame) {
 			result.action = kClose05;
 		} else {
 			result.action = kLoadGame02;
 			result.selectedSlot = _selectedSlot;
-			result.replaceSelectedGame = _replaceSelectedGame;
+			result.replaceSelGame = _replaceSelGame;
 		}
 	} else if (action == kReturnSlots02) {
 		returnToMain(event.mouse, time);

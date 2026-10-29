@@ -18,18 +18,35 @@
 namespace Trinket {
 namespace RR1Cloud9 {
 
+constexpr const char *Signin::kBackground;
+constexpr const char *Signin::kButtonFormat;
+constexpr const char *Signin::kNameFont;
+constexpr const char *Signin::kSpeechFormat;
+constexpr const char *Signin::kRecordedNames;
+constexpr const char *Signin::kNameSpeechPrefix;
+constexpr const char *Signin::kSoundExtension;
+constexpr const char *Signin::kNameSpeechPause;
+constexpr const char *Signin::kDialogBackground;
+constexpr const char *Signin::kRemovePrompt;
+constexpr const char *Signin::kNameLimitPrompt;
+constexpr const char *Signin::kDialogAccept;
+constexpr const char *Signin::kDialogCancel;
+constexpr const char *Signin::kDialogDismiss;
+constexpr const char *Signin::kDialogActorFormat;
+constexpr const char *Signin::kClickSound;
+
 Signin::Signin(TrinketEngine &vm, Shell::Scene &scene) : _vm(vm), _scene(scene), _dialog(vm.resources()),
 														 _voice(vm.mixer()), _effect(vm.mixer()) {}
 
 bool Signin::enter() {
 	_scene.clear();
-	if (!_scene.setBackground("signin/5000.bk16"))
+	if (!_scene.setBackground(kBackground))
 		return false;
 	for (int i = 1; i <= 34; i++) {
 		int id = i <= 6 ? 5003 + i : 5004 + i;
 		if (i == 34)
 			id = 5065;
-		auto *button = _scene.add(Common::String::format("sipre/%d.ao", id), 1, i, true);
+		auto *button = _scene.add(Common::String::format(kButtonFormat, id), 1, i, true);
 		if (!button)
 			return false;
 		if (i == 4)
@@ -37,9 +54,7 @@ bool Signin::enter() {
 		if (i == 5)
 			_start = button;
 	}
-	Common::ScopedPtr<Common::SeekableReadStream> font(_vm.resources().open("common/1018.nfnt"));
-	if (font)
-		_font.reset(OM::NFNTFont::load(*font));
+	_font = _vm.fonts().load(kNameFont);
 	if (!_font)
 		return false;
 	_rowHeight = _font->ascent() + _font->descent() + _font->getFontLeading() - 3;
@@ -86,7 +101,7 @@ void Signin::newEntry() {
 		_typed.clear();
 		_selected = _first = 0;
 	}
-	_valid = !_typed.empty() && (_entries.empty() || _typed != _entries[_selected]);
+	_valid = !_typed.empty() && (_entries.empty() || !_typed.equals(_entries[_selected]));
 	_entries.insert_at(_selected, _typed);
 	_mode = kNew03;
 	buttons();
@@ -129,10 +144,12 @@ void Signin::addCharacter(char character) {
 	} else {
 		_entries[_selected] = _typed;
 		_valid = true;
-		if (_mode == kNew03)
-			for (uint i = 0; i < _entries.size(); i++)
-				if (static_cast<int>(i) != _selected && _entries[i] == _typed)
+		if (_mode == kNew03) {
+			for (uint i = 0; i < _entries.size(); i++) {
+				if (static_cast<int>(i) != _selected && _entries[i].equals(_typed))
 					_valid = false;
+			}
+		}
 	}
 	buttons();
 	if ('A' <= character && character <= 'Z')
@@ -157,9 +174,10 @@ void Signin::deleteCharacter() {
 	} else {
 		_entries[_selected] = _typed;
 		_valid = true;
-		for (uint i = 0; i < _entries.size(); i++)
-			if (static_cast<int>(i) != _selected && _entries[i] == _typed)
+		for (uint i = 0; i < _entries.size(); i++) {
+			if (static_cast<int>(i) != _selected && _entries[i].equals(_typed))
 				_valid = false;
+		}
 	}
 	centerSelection();
 	buttons();
@@ -185,14 +203,14 @@ void Signin::stopSound() {
 
 void Signin::speak(uint16 id) {
 	stopSound();
-	_voice.play(_vm.resources(), Common::String::format("signin/%u.wav", id), Audio::Mixer::kSpeechSoundType, 1, 77);
+	_voice.play(_vm.resources(), Common::String::format(kSpeechFormat, id), Audio::Mixer::kSpeechSoundType, 1, 77);
 }
 
 void Signin::start() {
 	if (!_valid)
 		return;
 	speak(5000);
-	Common::ScopedPtr<Common::SeekableReadStream> names(_vm.resources().open("signinnames/8888.txt"));
+	Common::ScopedPtr<Common::SeekableReadStream> names(_vm.resources().open(kRecordedNames));
 	if (names) {
 		while (names->pos() < names->size()) {
 			Common::String line = names->readLine();
@@ -201,11 +219,11 @@ void Signin::start() {
 				continue;
 			Common::String id = line.substr(separator + 1);
 			id.trim();
-			_speech.push_back("signinnames/" + id + ".wav");
+			_speech.push_back(kNameSpeechPrefix + id + kSoundExtension);
 			break;
 		}
 	}
-	_speech.push_back("signin/5001.wav");
+	_speech.push_back(kNameSpeechPause);
 	_starting = true;
 }
 
@@ -229,12 +247,12 @@ void Signin::dialog(int kind) {
 	_dialogKind = kind;
 	if (kind == 1) {
 		_deleted = selectedName();
-		_dialog.add("common/1905.ao", 0);
-		_dialog.add("signin/5150.ao", 1);
-		_dialog.add("common/1861.ao", 3, 1, true);
-		_dialog.add("common/1862.ao", 3, 2, true);
+		_dialog.add(kDialogBackground, 0);
+		_dialog.add(kRemovePrompt, 1);
+		_dialog.add(kDialogAccept, 3, 1, true);
+		_dialog.add(kDialogCancel, 3, 2, true);
 		for (int i = 0; i < 2; i++) {
-			_dialogActors[i] = _dialog.add(Common::String::format("common/%d.ao", 1902 + i), 2, i + 1);
+			_dialogActors[i] = _dialog.add(Common::String::format(kDialogActorFormat, 1902 + i), 2, i + 1);
 			if (_dialogActors[i]) {
 				_dialogActors[i]->startAnimation(-1);
 				_dialogActors[i]->pauseAnimation(true);
@@ -242,8 +260,8 @@ void Signin::dialog(int kind) {
 		}
 		speak(5150);
 	} else {
-		_dialog.add("signin/5152.ao", 0);
-		_dialog.add("common/1863.ao", 2, 2, true);
+		_dialog.add(kNameLimitPrompt, 0);
+		_dialog.add(kDialogDismiss, 2, 2, true);
 		speak(5152);
 	}
 }
@@ -289,7 +307,7 @@ Signin::Request Signin::event(const Common::Event &event, uint32 time) {
 	if (event.type == Common::EVENT_KEYDOWN || event.type == Common::EVENT_LBUTTONDOWN)
 		stopSound();
 	if (action)
-		_effect.play(_vm.resources(), "common/1801.wav", Audio::Mixer::kSFXSoundType, 1, 65);
+		_effect.play(_vm.resources(), kClickSound, Audio::Mixer::kSFXSoundType, 1, 65);
 	if (action == 1)
 		move(-1, false);
 	else if (action == 2)

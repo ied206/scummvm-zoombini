@@ -29,17 +29,22 @@ namespace Trinket {
 /** Shared PuzzleEngine.dll family; game-specific activity rules belong to subengines. */
 namespace Puzzle {
 
-/** Non-owning interfaces: scene objects retain the lifetime of answers and containers. */
+/** Answer state used by shared puzzle completion checks. */
 class Answer {
 public:
+	/** Allow destruction through the puzzle-answer interface. */
 	virtual ~Answer() {}
+	/** Return whether this answer has been assigned to a puzzle container. */
 	virtual bool isUsed() const = 0;
 };
 
 class Container {
 public:
+	/** Allow destruction through the puzzle-container interface. */
 	virtual ~Container() {}
+	/** Return whether the container has all of its required answers. */
 	virtual bool isFull() const = 0;
+	/** Return whether the container's current answers satisfy its rule. */
 	virtual bool isSolved() const = 0;
 };
 
@@ -49,14 +54,21 @@ public:
  */
 class Controller {
 public:
+	/** Answers whose usage contributes to puzzle completion. */
 	Common::Array<Answer *> answers;
+	/** Containers checked for fullness and correctness. */
 	Common::Array<Container *> containers;
+	/** Alternative groups of containers that can satisfy completion. */
 	Common::Array<Common::Array<Container *>> solvedGroups;
+	/** Return whether every registered answer is in use. */
 	bool areAnswersUsed() const;
+	/** Return whether every registered container is full. */
 	bool areContainersFull() const;
+	/** Evaluate completion from the registered containers and alternative solved groups. */
 	bool isSolved() const;
 
 private:
+	/** Return whether every container in the supplied group reports solved. */
 	static bool allSolved(const Common::Array<Container *> &group);
 };
 

@@ -28,6 +28,134 @@
 namespace Trinket {
 namespace RR1Cloud9 {
 
+constexpr const char *CloudFloors::kNameSignedIndexFormat;
+constexpr const char *CloudFloors::kUnsignedIndexFormat;
+constexpr const char *CloudFloors::kPropertyWorker;
+constexpr const char *CloudFloors::kCWSetIDKey;
+constexpr const char *CloudFloors::kCWZKey;
+constexpr const char *CloudFloors::kRegisterFidgetsToSettleName;
+constexpr const char *CloudFloors::kRegisterSpeechToSettleName;
+constexpr const char *CloudFloors::kLoadSpeechAnimsInBkgdName;
+constexpr const char *CloudFloors::kAnimateSettledName;
+constexpr const char *CloudFloors::kMethodSetSpeechAnims;
+constexpr const char *CloudFloors::kCWLipsIDKey;
+constexpr const char *CloudFloors::kCWBodyIDKey;
+constexpr const char *CloudFloors::kMethodAddFidgetGroup;
+constexpr const char *CloudFloors::kMethodAddFidget;
+constexpr const char *CloudFloors::kCWFidgIDSignedIndexSignedIndexKey;
+constexpr const char *CloudFloors::kCA1WordsIDKey;
+constexpr const char *CloudFloors::kTileBoxIDKey;
+constexpr const char *CloudFloors::kPropertyCenter;
+constexpr const char *CloudFloors::kPropertyColor;
+constexpr const char *CloudFloors::kTEXTCA1WTILESName;
+constexpr const char *CloudFloors::kTEXTCA1WORDSName;
+constexpr const char *CloudFloors::kR1CA1LevelKey;
+constexpr const char *CloudFloors::kR1CA1DatasetKey;
+constexpr const char *CloudFloors::kR1CA1SetKey;
+constexpr const char *CloudFloors::kNumSetsKey;
+constexpr const char *CloudFloors::kMaxDataSetsKey;
+constexpr const char *CloudFloors::kR1CA1StateKey;
+constexpr const char *CloudFloors::kR1CA1RoundKey;
+constexpr const char *CloudFloors::kR1CA1LadderHereKey;
+constexpr const char *CloudFloors::kCloudHiliteIDKey;
+constexpr const char *CloudFloors::kBelt1IDKey;
+constexpr const char *CloudFloors::kMask1IDSignedIndexKey;
+constexpr const char *CloudFloors::kCloudPieceIDSignedIndexKey;
+constexpr const char *CloudFloors::kWordTileIDKey;
+constexpr const char *CloudFloors::kBrickIDKey;
+constexpr const char *CloudFloors::kCloudBrickZKey;
+constexpr const char *CloudFloors::kReachIDSignedIndexKey;
+constexpr const char *CloudFloors::kCloudBrickXName;
+constexpr const char *CloudFloors::kCloudBrickYName;
+constexpr const char *CloudFloors::kNumElevatorsKey;
+constexpr const char *CloudFloors::kElevator0IDKey;
+constexpr const char *CloudFloors::kCatcherIDKey;
+constexpr const char *CloudFloors::kLadderIDKey;
+constexpr const char *CloudFloors::kMarbleIDKey;
+constexpr const char *CloudFloors::kDownLadderIDKey;
+constexpr const char *CloudFloors::kTossIDKey;
+constexpr const char *CloudFloors::kMarbleXKey;
+constexpr const char *CloudFloors::kMarbleYKey;
+constexpr const char *CloudFloors::kPEnterSpchIDSignedIndexKey;
+constexpr const char *CloudFloors::kEnterCharIDKey;
+constexpr const char *CloudFloors::kEnterSpchIDKey;
+constexpr const char *CloudFloors::kMaxEntrySpchsKey;
+constexpr const char *CloudFloors::kReEnterSpchIDs1SignedIndexKey;
+constexpr const char *CloudFloors::kR1CA1ReentryKey;
+constexpr const char *CloudFloors::kReEnterSpchIDs21Key;
+constexpr const char *CloudFloors::kPropertyDataSetLevelSignedIndexWordListSignedIndexSetSignedIndex;
+constexpr const char *CloudFloors::kNumWordsKey;
+constexpr const char *CloudFloors::kTargetXSignedIndexSignedIndexKey;
+constexpr const char *CloudFloors::kTargetYKey;
+constexpr const char *CloudFloors::kAnswerStartXKey;
+constexpr const char *CloudFloors::kAnswerYKey;
+constexpr const char *CloudFloors::kR1CA1StreakKindKey;
+constexpr const char *CloudFloors::kR1CA1StreakKey;
+constexpr const char *CloudFloors::kR1CA1Key;
+constexpr const char *CloudFloors::kR1CA1FixedLevelKey;
+constexpr const char *CloudFloors::kEndPtKey;
+constexpr const char *CloudFloors::kXSignedIndexSignedIndexFormat;
+constexpr const char *CloudFloors::kYSignedIndexSignedIndexFormat;
+constexpr const char *CloudFloors::kX36Name;
+constexpr const char *CloudFloors::kY36Name;
+constexpr const char *CloudFloors::kPathDXKey;
+constexpr const char *CloudFloors::kPathDYKey;
+constexpr const char *CloudFloors::kPaigeName;
+constexpr const char *CloudFloors::kReaderName;
+constexpr const char *CloudFloors::kSamName;
+constexpr const char *CloudFloors::kLadderHSWKey;
+constexpr const char *CloudFloors::kLadderHSHKey;
+constexpr const char *CloudFloors::kCorrectSfxIDKey;
+constexpr const char *CloudFloors::kCongratsCharIDSignedIndexKey;
+constexpr const char *CloudFloors::kCongratsSpchIDKey;
+constexpr const char *CloudFloors::kMaxOopsSpeechesKey;
+constexpr const char *CloudFloors::kOopsCharIDSignedIndexKey;
+constexpr const char *CloudFloors::kOopsSpchIDKey;
+constexpr const char *CloudFloors::kCA1SFX10IDSignedIndexKey;
+constexpr const char *CloudFloors::kPropertyVisible;
+constexpr const char *CloudFloors::kReachSfxIDSignedIndexKey;
+constexpr const char *CloudFloors::kAlreadySpchID1Key;
+constexpr const char *CloudFloors::kAlreadySpchID2Key;
+constexpr const char *CloudFloors::kMaxMarbleSpeechesKey;
+constexpr const char *CloudFloors::kHaveMarbleSpchIDSignedIndexKey;
+constexpr const char *CloudFloors::kDropSfxIDKey;
+constexpr const char *CloudFloors::kGoHomeSfxIDKey;
+constexpr const char *CloudFloors::kItemSignedIndexFormat;
+constexpr const char *CloudFloors::kCOMPickUpSfxIDKey;
+constexpr const char *CloudFloors::kR1CA1MarbleClickKey;
+constexpr const char *CloudFloors::kCOMSomeUseIDKey;
+constexpr const char *CloudFloors::kINV1Marble5Key;
+constexpr const char *CloudFloors::kLadderCharID1Key;
+constexpr const char *CloudFloors::kLadderSpchID1Key;
+constexpr const char *CloudFloors::kLadderSpchID1SignedIndexKey;
+constexpr const char *CloudFloors::kLadderCharID2Key;
+constexpr const char *CloudFloors::kLadderSpchID2Key;
+constexpr const char *CloudFloors::kINV1LadderKey;
+constexpr const char *CloudFloors::kPickUpSfxIDKey;
+constexpr const char *CloudFloors::kCWSpchIDSignedIndexKey;
+constexpr const char *CloudFloors::kPaigeHelpIDKey;
+constexpr const char *CloudFloors::kMaxMainCharIndexKey;
+constexpr const char *CloudFloors::kSignedIndexSignedIndexFormat;
+constexpr const char *CloudFloors::kMainCharIDKey;
+constexpr const char *CloudFloors::kMainSpchIDKey;
+constexpr const char *CloudFloors::kDoneSpchIDKey;
+constexpr const char *CloudFloors::kCA1SFX07IDKey;
+constexpr const char *CloudFloors::kThanksSpchID1Key;
+constexpr const char *CloudFloors::kThanksSpchID2Key;
+constexpr const char *CloudFloors::kMarble5IDKey;
+constexpr const char *CloudFloors::kMaxIdleIndexKey;
+constexpr const char *CloudFloors::kIdleCharIDSignedIndexKey;
+constexpr const char *CloudFloors::kIdleSpchIDKey;
+constexpr const char *CloudFloors::kPropertyText;
+constexpr const char *CloudFloors::kPropertyX;
+constexpr const char *CloudFloors::kPropertyY;
+constexpr const char *CloudFloors::kTextOffsetYKey;
+
+constexpr const char *CloudFloors::kTextFormat;
+constexpr const char *CloudFloors::kDigitFormat;
+constexpr const char *CloudFloors::kFont;
+constexpr const char *CloudFloors::kDataXML;
+
 CloudFloors::CloudFloors(PageScene &host) : _host(host), _paths(host._vm.resources()) {}
 CloudFloors::~CloudFloors() {
 	releaseCursor();
@@ -35,14 +163,15 @@ CloudFloors::~CloudFloors() {
 		cursor.free();
 	for (auto &answer : _answers)
 		delete answer.text;
-	for (auto &floor : _slots)
+	for (auto &floor : _slots) {
 		for (auto &slot : floor)
 			delete slot.tile.text;
+	}
 }
 
 int CloudFloors::number(const Common::String &key) const { return _host._page->number(key); }
 
-int CloudFloors::indexed(const char *key, int i) const { return number(Common::String::format("%s.%d", key, i)); }
+int CloudFloors::indexed(const char *key, int i) const { return number(Common::String::format(kNameSignedIndexFormat, key, i)); }
 
 void CloudFloors::say(const char *actor, const Common::String &key) { speech(actor, number(key)); }
 
@@ -54,7 +183,7 @@ void CloudFloors::speech(const Common::String &actor, uint resource) {
 
 void CloudFloors::speeches(const Common::String &actors, const Common::String &resources, uint count) {
 	for (uint i = 1; i <= count; i++) {
-		Common::String suffix = Common::String::format(".%u", i);
+		Common::String suffix = Common::String::format(kUnsignedIndexFormat, i);
 		speech(_host._page->text(actors + suffix), number(resources + suffix));
 	}
 }
@@ -70,29 +199,30 @@ Common::Rect CloudFloors::bounds(Shell::Sprite *sprite) {
 }
 
 bool CloudFloors::worker(int pose) {
-	if (_host._actors.contains("worker")) {
-		delete _host._actors["worker"];
-		_host._actors.erase("worker");
+	if (_host._actors.contains(kPropertyWorker)) {
+		delete _host._actors[kPropertyWorker];
+		_host._actors.erase(kPropertyWorker);
 	}
 	Common::ScopedPtr<Shell::Character> actor(new Shell::Character(_host._scene, _host._vm.mixer(), _host._vm.resources(), _host._vm.rnd(), _host));
-	if (!actor->create(indexed("kCWSetID", pose), number("kCWZ")))
+	if (!actor->create(indexed(kCWSetIDKey, pose), number(kCWZKey)))
 		return false;
 	actor->movable = false;
-	for (const char *key : {"registerFidgetsToSettle", "registerSpeechToSettle", "loadSpeechAnimsInBkgd", "animateSettled"})
+	for (const char *key : {kRegisterFidgetsToSettleName, kRegisterSpeechToSettleName, kLoadSpeechAnimsInBkgdName, kAnimateSettledName})
 		actor->set(key, {}, Core::ScriptValue(0));
 	Core::ScriptValue result;
-	actor->play("setSpeechAnims", {Core::ScriptValue(indexed("kCWLipsID", pose)), Core::ScriptValue(1), Core::ScriptValue(1), Core::ScriptValue(indexed("kCWBodyID", pose)), Core::ScriptValue(0), Core::ScriptValue(0)}, result);
-	actor->play("addFidgetGroup", {Core::ScriptValue(1), Core::ScriptValue(5), Core::ScriptValue(10)}, result);
-	actor->play("addFidget", {Core::ScriptValue(1), Core::ScriptValue(indexed("kCWSetID", pose))}, result);
-	actor->play("addFidgetGroup", {Core::ScriptValue(2), Core::ScriptValue(15), Core::ScriptValue(30)}, result);
+	actor->play(kMethodSetSpeechAnims, {Core::ScriptValue(indexed(kCWLipsIDKey, pose)), Core::ScriptValue(1), Core::ScriptValue(1),
+						 Core::ScriptValue(indexed(kCWBodyIDKey, pose)), Core::ScriptValue(0), Core::ScriptValue(0)}, result);
+	actor->play(kMethodAddFidgetGroup, {Core::ScriptValue(1), Core::ScriptValue(5), Core::ScriptValue(10)}, result);
+	actor->play(kMethodAddFidget, {Core::ScriptValue(1), Core::ScriptValue(indexed(kCWSetIDKey, pose))}, result);
+	actor->play(kMethodAddFidgetGroup, {Core::ScriptValue(2), Core::ScriptValue(15), Core::ScriptValue(30)}, result);
 	for (int i = 1; i <= (pose == 1 ? 3 : 2); i++)
-		actor->play("addFidget", {Core::ScriptValue(2), Core::ScriptValue(number(Common::String::format("kCWFidgID.%d.%d", pose, i)))}, result);
-	_host._actors["worker"] = actor.release();
+		actor->play(kMethodAddFidget, {Core::ScriptValue(2), Core::ScriptValue(number(Common::String::format(kCWFidgIDSignedIndexSignedIndexKey, pose, i)))}, result);
+	_host._actors[kPropertyWorker] = actor.release();
 	return true;
 }
 
 bool CloudFloors::loadList(int resource, Common::StringArray &list) {
-	Common::ScopedPtr<Common::SeekableReadStream> stream(_host._vm.resources().open(Common::String::format("r1ca1/%d.txt", resource)));
+	Common::ScopedPtr<Common::SeekableReadStream> stream(_host._vm.resources().open(Common::String::format(kTextFormat, resource)));
 	if (!stream || 65536 < stream->size())
 		return false;
 	Common::String line;
@@ -111,20 +241,21 @@ bool CloudFloors::loadList(int resource, Common::StringArray &list) {
 }
 
 int CloudFloors::index(const Common::StringArray &list, const Common::String &word) {
-	for (uint i = 0; i < list.size(); i++)
+	for (uint i = 0; i < list.size(); i++) {
 		if (word.equalsIgnoreCase(list[i]))
 			return i;
+	}
 	return -1;
 }
 
 void CloudFloors::sayWord(const Common::String &word) {
 	int at = index(_words, word);
 	if (0 <= at)
-		speech("worker", number("kCA1WordsID") + at);
+		speech(kPropertyWorker, number(kCA1WordsIDKey) + at);
 }
 
 bool CloudFloors::createTile(Tile &tile, const Common::String &value, int length, Common::Point position, int depth) {
-	tile.sprite = sprite("kTileBoxID", depth);
+	tile.sprite = sprite(kTileBoxIDKey, depth);
 	if (!tile.sprite)
 		return false;
 	tile.sprite->setFrame(length);
@@ -132,10 +263,10 @@ bool CloudFloors::createTile(Tile &tile, const Common::String &value, int length
 	tile.sprite->y = position.y;
 	tile.home = position;
 	tile.value = value;
-	tile.text = new Shell::TextObject(_paths, _font);
+	tile.text = new Shell::TextObject(_paths, _host._vm.fonts(), _font);
 	tile.text->create({Core::ScriptValue::fromText(" "), Core::ScriptValue(0), Core::ScriptValue(0), Core::ScriptValue(1)});
-	tile.text->set("center", {}, Core::ScriptValue(1));
-	tile.text->set("color", {Core::ScriptValue(6317), Core::ScriptValue(4212)}, Core::ScriptValue(2106));
+	tile.text->set(kPropertyCenter, {}, Core::ScriptValue(1));
+	tile.text->set(kPropertyColor, {Core::ScriptValue(6317), Core::ScriptValue(4212)}, Core::ScriptValue(2106));
 	return true;
 }
 
@@ -161,29 +292,27 @@ void CloudFloors::clearFloor(int floor) {
 
 bool CloudFloors::enter() {
 	for (uint i = 0; i < ARRAYSIZE(_cursors); i++) {
-		Core::Animation animation;
-		Common::String path = Common::String::format("common/%u.ao", 4061 + i);
-		Common::ScopedPtr<Common::SeekableReadStream> stream(_host._vm.resources().open(path));
-		Common::ScopedPtr<Common::SeekableReadStream> palette(_host._vm.resources().open(Common::String::format("common/%u.rgb", 4061 + i)));
-		if (!stream || !animation.load(*stream) || (palette && !animation.loadPalette(*palette)) || !animation.decode(0, _cursors[i]))
+		Common::String path = Common::String::format(kDigitFormat, 4061 + i);
+		const Core::Animation *animation = _host._scene.loadAnimation(path);
+		if (!animation || !animation->picture(0))
 			return false;
+		_cursors[i].copyFrom(*animation->picture(0));
 	}
-	Common::ScopedPtr<Common::SeekableReadStream> font(_host._vm.resources().open("common/1024.nfnt"));
-	_font.reset(font ? OM::NFNTFont::load(*font) : nullptr);
-	if (!_font || !_data.loadStream(_host._vm.resources().open("r1ca1.xml")) || !_data.parse() ||
-		!loadList(number("TEXT_CA1WTILES"), _pictures) || !loadList(number("TEXT_CA1WORDS"), _words))
+	_font = _host._vm.fonts().load(kFont);
+	if (!_font || !_data.loadStream(_host._vm.resources().open(kDataXML)) || !_data.parse() ||
+		!loadList(number(kTEXTCA1WTILESName), _pictures) || !loadList(number(kTEXTCA1WORDSName), _words))
 		return false;
 	World &world = _host._world;
-	_level = CLIP(world.get("R1CA1Level"), 1, 3);
-	_dataset = world.get("R1CA1Dataset");
-	_set = CLIP(world.get("R1CA1Set"), 1, indexed("kNumSets", _level));
-	if (_dataset < 1 || indexed("kMaxDataSets", _level) < _dataset) {
-		_dataset = _host._vm.rnd().number(1, indexed("kMaxDataSets", _level));
-		_set = _host._vm.rnd().number(1, indexed("kNumSets", _level));
+	_level = CLIP(world.get(kR1CA1LevelKey), 1, 3);
+	_dataset = world.get(kR1CA1DatasetKey);
+	_set = CLIP(world.get(kR1CA1SetKey), 1, indexed(kNumSetsKey, _level));
+	if (_dataset < 1 || indexed(kMaxDataSetsKey, _level) < _dataset) {
+		_dataset = _host._vm.rnd().number(1, indexed(kMaxDataSetsKey, _level));
+		_set = _host._vm.rnd().number(1, indexed(kNumSetsKey, _level));
 	}
-	_state = CLIP(world.get("R1CA1State"), 1, 3);
-	_brickCount = CLIP(world.get("R1CA1Round"), 0, 3);
-	_ladderHere = !world.get("R1CA1State") || world.get("R1CA1LadderHere");
+	_state = CLIP(world.get(kR1CA1StateKey), 1, 3);
+	_brickCount = CLIP(world.get(kR1CA1RoundKey), 0, 3);
+	_ladderHere = !world.get(kR1CA1StateKey) || world.get(kR1CA1LadderHereKey);
 	if (_host._practice) {
 		_state = 2;
 		_ladderHere = false;
@@ -192,48 +321,50 @@ bool CloudFloors::enter() {
 	}
 	if (!worker(_state == 1 ? 1 : 2))
 		return false;
-	_highlight = sprite("kCloudHiliteID", 5);
+	_highlight = sprite(kCloudHiliteIDKey, 5);
 	for (int i = 0; i < 3; i++) {
-		_belts[i] = _host._scene.add(_host.characterResource(number("kBelt1ID") + i, Shell::Character::Resources::kAnimation), 3);
-		_masks[i] = sprite(Common::String::format("kMask1ID.%d", i + 1), 4);
-		_pieces[i] = sprite(Common::String::format("kCloudPieceID.%d", i + 1), 17);
-		_picturesAO[i] = sprite("kWordTileID", 5);
-		_bricks[i] = sprite("kBrickID", indexed("kCloudBrickZ", i + 1));
-		_reaches[i] = sprite(Common::String::format("kReachID.%d", i + 1), 75);
+		_belts[i] = _host._scene.add(_host.characterResource(number(kBelt1IDKey) + i, Shell::Character::Resources::kAnimation), 3);
+		_masks[i] = sprite(Common::String::format(kMask1IDSignedIndexKey, i + 1), 4);
+		_pieces[i] = sprite(Common::String::format(kCloudPieceIDSignedIndexKey, i + 1), 17);
+		_picturesAO[i] = sprite(kWordTileIDKey, 5);
+		_bricks[i] = sprite(kBrickIDKey, indexed(kCloudBrickZKey, i + 1));
+		_reaches[i] = sprite(Common::String::format(kReachIDSignedIndexKey, i + 1), 75);
 		if (!_belts[i] || !_masks[i] || !_pieces[i] || !_picturesAO[i] || !_bricks[i] || !_reaches[i])
 			return false;
 		_picturesAO[i]->visible = _reaches[i]->visible = false;
-		_bricks[i]->x = indexed("cloudBrickX", i + 1);
-		_bricks[i]->y = number("cloudBrickY");
+		_bricks[i]->x = indexed(kCloudBrickXName, i + 1);
+		_bricks[i]->y = number(kCloudBrickYName);
 		_bricks[i]->visible = i < _brickCount;
 	}
-	for (int i = 0; i < number("kNumElevators"); i++)
-		if (!_host._scene.add(_host.characterResource(number("kElevator0ID") + i, Shell::Character::Resources::kAnimation), 12))
+	for (int i = 0; i < number(kNumElevatorsKey); i++) {
+		if (!_host._scene.add(_host.characterResource(number(kElevator0IDKey) + i, Shell::Character::Resources::kAnimation), 12))
 			return false;
-	if (!sprite("kCatcherID", 12))
+	}
+	if (!sprite(kCatcherIDKey, 12))
 		return false;
-	_brick = sprite("kBrickID", 7);
-	_ladder = sprite("kLadderID", 60);
-	_marble = sprite("kMarbleID", 100);
-	_descend = sprite("kDownLadderID", 75);
-	_toss = sprite("kTossID", 75);
+	_brick = sprite(kBrickIDKey, 7);
+	_ladder = sprite(kLadderIDKey, 60);
+	_marble = sprite(kMarbleIDKey, 100);
+	_descend = sprite(kDownLadderIDKey, 75);
+	_toss = sprite(kTossIDKey, 75);
 	if (!_brick || !_highlight || !_ladder || !_marble || !_descend || !_toss)
 		return false;
 	_brick->visible = _descend->visible = _toss->visible = false;
 	_ladder->visible = _ladderHere;
 	_marble->visible = _state == 3;
-	_marble->x = number("kMarbleX");
-	_marble->y = number("kMarbleY");
+	_marble->colorRemap = PageScene::marbleColor(4);
+	_marble->x = number(kMarbleXKey);
+	_marble->y = number(kMarbleYKey);
 	if (_host._practice) {
 		for (int i = 1; i <= 3; i++)
-			say("worker", Common::String::format("kPEnterSpchID.%d", i));
-	} else if (world.visits("r1ca1") == 0) {
-		speeches("kEnterCharID", "kEnterSpchID", number("kMaxEntrySpchs"));
+			say(kPropertyWorker, Common::String::format(kPEnterSpchIDSignedIndexKey, i));
+	} else if (world.visits(Page::kPageCA1) == 0) {
+		speeches(kEnterCharIDKey, kEnterSpchIDKey, number(kMaxEntrySpchsKey));
 	} else if (_state == 1) {
-		say("worker", Common::String::format("kReEnterSpchIDs.1.%d", _host._vm.rnd().number(1, 2)));
-	} else if (world.get("R1CA1Reentry")) {
-		say("worker", "kReEnterSpchIDs.2.1");
-		world.set("R1CA1Reentry", 0);
+		say(kPropertyWorker, Common::String::format(kReEnterSpchIDs1SignedIndexKey, _host._vm.rnd().number(1, 2)));
+	} else if (world.get(kR1CA1ReentryKey)) {
+		say(kPropertyWorker, kReEnterSpchIDs21Key);
+		world.set(kR1CA1ReentryKey, 0);
 	}
 	return setup();
 }
@@ -241,23 +372,24 @@ bool CloudFloors::enter() {
 void CloudFloors::persist() {
 	if (_host._practice)
 		return;
-	_host._world.set("R1CA1State", _state);
-	_host._world.set("R1CA1Round", _brickCount);
-	_host._world.set("R1CA1Level", _level);
-	_host._world.set("R1CA1Dataset", _dataset);
-	_host._world.set("R1CA1Set", _set);
-	_host._world.set("R1CA1LadderHere", _ladderHere);
+	_host._world.set(kR1CA1StateKey, _state);
+	_host._world.set(kR1CA1RoundKey, _brickCount);
+	_host._world.set(kR1CA1LevelKey, _level);
+	_host._world.set(kR1CA1DatasetKey, _dataset);
+	_host._world.set(kR1CA1SetKey, _set);
+	_host._world.set(kR1CA1LadderHereKey, _ladderHere);
 }
 
 bool CloudFloors::setup() {
-	Common::StringTokenizer tokens(_data.get(Common::String::format("DataSet/Level_%d/WordList_%d/Set_%d", _level, _dataset, _set)));
+	Common::StringTokenizer tokens(_data.get(Common::String::format(kPropertyDataSetLevelSignedIndexWordListSignedIndexSetSignedIndex, _level, _dataset, _set)));
 	Common::StringArray words;
 	// The script reads a fixed field count; some US records have an extra trailing zero.
-	while (!tokens.empty() && words.size() < static_cast<uint>(indexed("kNumWords", _level)))
+	while (!tokens.empty() && words.size() < static_cast<uint>(indexed(kNumWordsKey, _level)))
 		words.push_back(tokens.nextToken());
-	if (words.size() != static_cast<uint>(indexed("kNumWords", _level)))
+	if (words.size() != static_cast<uint>(indexed(kNumWordsKey, _level)))
 		return false;
-	Common::String pattern = words[0], target;
+	Common::String pattern = words[0];
+	Common::String target;
 	Common::StringArray parts;
 	uint missing = 1;
 	int letters = 0;
@@ -273,20 +405,22 @@ bool CloudFloors::setup() {
 	}
 	if (target.size() < 3 || 7 < target.size() || index(_pictures, target) < 0 || index(_words, target) < 0)
 		return false;
-	for (uint i = 1; i < words.size(); i++)
-		if (words[i] != "0") {
+	for (uint i = 1; i < words.size(); i++) {
+		if (!words[i].equals("0")) {
 			if (words[i].empty() || 2 < words[i].size())
 				return false;
 			letters += words[i].size();
 		}
+	}
 	if (letters < 5 || 8 < letters)
 		return false;
 	clearAnswers();
-	if (_floor == 1)
+	if (_floor == 1) {
 		for (int i = 0; i < 3; i++)
 			clearFloor(i);
-	else
+	} else {
 		clearFloor(_floor - 1);
+	}
 	int frame = target.size() - 2;
 	_masks[_floor - 1]->setFrame(frame);
 	_pieces[_floor - 1]->setFrame(frame);
@@ -300,7 +434,8 @@ bool CloudFloors::setup() {
 	picture->y = center.y - picture->height() / 2;
 	picture->visible = true;
 	_targets[_floor - 1] = target;
-	int x = number(Common::String::format("kTargetX.%d.%d", _floor, frame)), y = indexed("kTargetY", _floor);
+	int x = number(Common::String::format(kTargetXSignedIndexSignedIndexKey, _floor, frame));
+	int y = indexed(kTargetYKey, _floor);
 	for (uint i = 0; i < parts.size(); i++) {
 		Slot slot;
 		slot.expected = parts[i];
@@ -311,7 +446,7 @@ bool CloudFloors::setup() {
 		x += parts[i].size() == 2 ? 55 : 28;
 	}
 	for (uint i = 1; i < words.size(); i++) {
-		if (words[i] == "0")
+		if (words[i].equals("0"))
 			continue;
 		Tile tile;
 		if (!createTile(tile, words[i], words[i].size(), Common::Point(), 27))
@@ -332,9 +467,9 @@ bool CloudFloors::setup() {
 		for (uint i = 1; i < order.size(); i++)
 			adjacent |= order[i - 1] + 1 == order[i];
 	} while (adjacent);
-	x = indexed("kAnswerStartX", letters);
+	x = indexed(kAnswerStartXKey, letters);
 	for (int i : order) {
-		_answers[i].home = Common::Point(x, number("kAnswerY"));
+		_answers[i].home = Common::Point(x, number(kAnswerYKey));
 		home(i);
 		x += _answers[i].value.size() == 2 ? 57 : 30;
 	}
@@ -351,32 +486,33 @@ void CloudFloors::assess(bool correct) {
 		return;
 	World &world = _host._world;
 	int outcome = correct ? 1 : 3;
-	int streak = world.get("R1CA1StreakKind") == outcome ? world.get("R1CA1Streak") + 1 : 1;
-	world.recordAssessment("R1CA1", _level, outcome, 3, 3, streak);
-	world.set("R1CA1StreakKind", outcome);
-	world.set("R1CA1Streak", streak == 3 ? 0 : streak);
+	int streak = world.get(kR1CA1StreakKindKey) == outcome ? world.get(kR1CA1StreakKey) + 1 : 1;
+	world.recordAssessment(kR1CA1Key, _level, outcome, 3, 3, streak);
+	world.set(kR1CA1StreakKindKey, outcome);
+	world.set(kR1CA1StreakKey, streak == 3 ? 0 : streak);
 	int previous = _level;
-	if (3 <= streak && !world.get("R1CA1FixedLevel"))
+	if (3 <= streak && !world.get(kR1CA1FixedLevelKey))
 		_level = CLIP(_level + (correct ? 1 : -1), 1, 3);
 	if (previous != _level) {
-		_dataset = _host._vm.rnd().number(1, indexed("kMaxDataSets", _level));
-		_set = _host._vm.rnd().number(1, indexed("kNumSets", _level));
+		_dataset = _host._vm.rnd().number(1, indexed(kMaxDataSetsKey, _level));
+		_set = _host._vm.rnd().number(1, indexed(kNumSetsKey, _level));
 	}
 }
 
 void CloudFloors::initPath() {
-	_end = indexed("kEndPt", _floor);
+	_end = indexed(kEndPtKey, _floor);
 	for (int i = 0; i <= _end; i++)
-		_points[i] = Common::Point(number(Common::String::format("x.%d.%d", _floor, i + 1)),
-								   number(Common::String::format("y.%d.%d", _floor, i + 1)));
+		_points[i] = Common::Point(number(Common::String::format(kXSignedIndexSignedIndexFormat, _floor, i + 1)),
+								   number(Common::String::format(kYSignedIndexSignedIndexFormat, _floor, i + 1)));
 	if (_floor == 3 && _brickCount == 3)
-		_points[_end] = Common::Point(number("x.3.6"), number("y.3.6"));
+		_points[_end] = Common::Point(number(kX36Name), number(kY36Name));
 	_correctRoute = false;
 	_nextTick = _host._time + 42;
 	segment(0, 1);
-	for (auto *belt : _belts)
+	for (auto *belt : _belts) {
 		if (!belt->isRunning())
 			belt->startAnimation(-1);
+	}
 	_phase = kTravelling;
 	_idle = _host._time;
 }
@@ -399,13 +535,14 @@ void CloudFloors::advance(uint32 time) {
 	_nextTick += 42;
 	if (21 < static_cast<int32>(time - _nextTick))
 		_nextTick = time + 42;
-	Common::Point start = _points[_from], end = _points[_to];
+	Common::Point start = _points[_from];
+	Common::Point end = _points[_to];
 	bool reached;
 	if (start.y == end.y) {
-		_brick->x += start.x < end.x ? number("kPathDX") : -number("kPathDX");
+		_brick->x += start.x < end.x ? number(kPathDXKey) : -number(kPathDXKey);
 		reached = start.x < end.x ? end.x <= _brick->x : _brick->x <= end.x;
 	} else {
-		_brick->y += start.y < end.y ? number("kPathDY") : -number("kPathDY");
+		_brick->y += start.y < end.y ? number(kPathDYKey) : -number(kPathDYKey);
 		reached = start.y < end.y ? end.y <= _brick->y : _brick->y <= end.y;
 	}
 	if (!reached)
@@ -450,7 +587,7 @@ void CloudFloors::updateCursor() {
 				cursor = 3;
 		}
 		if (cursor == 0) {
-			for (const char *name : {"worker", "paige", "reader", "sam"}) {
+			for (const char *name : {kPropertyWorker, kPaigeName, kReaderName, kSamName}) {
 				if (_host._actors[name]->visible && _host._actors[name]->bounds().contains(_mouse))
 					cursor = 1;
 			}
@@ -464,7 +601,7 @@ void CloudFloors::updateCursor() {
 			}
 		}
 		if ((_marble->visible && _marble->covers(_mouse)) ||
-			(_ladderHere && Common::Rect(_ladder->x, _ladder->y, _ladder->x + number("kLadderHSW"), _ladder->y + number("kLadderHSH")).contains(_mouse)) ||
+			(_ladderHere && Common::Rect(_ladder->x, _ladder->y, _ladder->x + number(kLadderHSWKey), _ladder->y + number(kLadderHSHKey)).contains(_mouse)) ||
 			(_host._chester && _host._chester->visible && _host._chester->covers(_mouse)))
 			cursor = 2;
 		Shell::Sprite *map = _host._scene.hitSprite(_mouse, 100, 100, true);
@@ -488,7 +625,8 @@ void CloudFloors::updateCursor() {
 }
 
 void CloudFloors::checkpoint() {
-	int occupied = 0, correct = 0;
+	int occupied = 0;
+	int correct = 0;
 	Common::String word;
 	for (auto &slot : _slots[_floor - 1]) {
 		Common::String value = slot.tile.value;
@@ -496,7 +634,7 @@ void CloudFloors::checkpoint() {
 			value = _answers[slot.answer].value;
 		if (!value.empty())
 			occupied += 1;
-		if (value == slot.expected) {
+		if (value.equals(slot.expected)) {
 			slot.locked = true;
 			correct += 1;
 		}
@@ -511,10 +649,10 @@ void CloudFloors::checkpoint() {
 		if (!_mistakes)
 			assess(true);
 		sayWord(word);
-		sound("kCorrectSfxID");
+		sound(kCorrectSfxIDKey);
 		if (_floor == 3) {
 			int i = _host._vm.rnd().number(1, 5);
-			speech(_host._page->text(Common::String::format("kCongratsCharID.%d", i)), indexed("kCongratsSpchID", i));
+			speech(_host._page->text(Common::String::format(kCongratsCharIDSignedIndexKey, i)), indexed(kCongratsSpchIDKey, i));
 		}
 		_phase = kCorrect;
 	} else {
@@ -535,15 +673,15 @@ void CloudFloors::reject() {
 	}
 	_alternateOops = !_alternateOops;
 	if (_alternateOops) {
-		_oops = _oops % number("kMaxOopsSpeeches") + 1;
-		speech(_host._page->text(Common::String::format("kOopsCharID.%d", _oops)), indexed("kOopsSpchID", _oops));
+		_oops = _oops % number(kMaxOopsSpeechesKey) + 1;
+		speech(_host._page->text(Common::String::format(kOopsCharIDSignedIndexKey, _oops)), indexed(kOopsSpchIDKey, _oops));
 	}
 	sayWord(_targets[_floor - 1]);
 	_phase = kWrongTarget;
 }
 
 void CloudFloors::fall() {
-	sound(Common::String::format("kCA1SFX10ID.%d", _floor));
+	sound(Common::String::format(kCA1SFX10IDSignedIndexKey, _floor));
 	segment(1, 2);
 	_phase = kTravelling;
 }
@@ -559,19 +697,19 @@ void CloudFloors::finish() {
 		// The third brick earns the ladder even if a save interrupts the descent.
 		if (_brickCount == 3)
 			_state = 2;
-		_host._actors["worker"]->set("visible", {}, Core::ScriptValue(0));
+		_host._actors[kPropertyWorker]->set(kPropertyVisible, {}, Core::ScriptValue(0));
 		_reaches[_brickCount - 1]->visible = true;
 		_reaches[_brickCount - 1]->startAnimation();
-		sound(Common::String::format("kReachSfxID.%d", _brickCount));
+		sound(Common::String::format(kReachSfxIDSignedIndexKey, _brickCount));
 		_phase = kReach;
 	} else if (_state == 3) {
-		say("worker", "kAlreadySpchID.1");
-		say("worker", "kAlreadySpchID.2");
+		say(kPropertyWorker, kAlreadySpchID1Key);
+		say(kPropertyWorker, kAlreadySpchID2Key);
 		_phase = kNext;
 	} else {
 		_state = 3;
-		_marbleSpeech = _marbleSpeech % number("kMaxMarbleSpeeches") + 1;
-		say("worker", Common::String::format("kHaveMarbleSpchID.%d", _marbleSpeech));
+		_marbleSpeech = _marbleSpeech % number(kMaxMarbleSpeechesKey) + 1;
+		say(kPropertyWorker, Common::String::format(kHaveMarbleSpchIDSignedIndexKey, _marbleSpeech));
 		_phase = kRewardSpeech;
 	}
 	persist();
@@ -584,9 +722,9 @@ void CloudFloors::next() {
 	}
 	_floor = _floor % 3 + 1;
 	_dataset += 1;
-	if (indexed("kMaxDataSets", _level) < _dataset) {
+	if (indexed(kMaxDataSetsKey, _level) < _dataset) {
 		_dataset = 1;
-		_set = _set % indexed("kNumSets", _level) + 1;
+		_set = _set % indexed(kNumSetsKey, _level) + 1;
 	}
 	if (!setup())
 		warning("RR1: cannot load CA1 level %d dataset %d set %d", _level, _dataset, _set);
@@ -602,7 +740,8 @@ void CloudFloors::home(int answer) {
 
 void CloudFloors::drop() {
 	Tile &tile = _answers[_dragged];
-	int best = -1, area = 0;
+	int best = -1;
+	int area = 0;
 	for (uint i = 0; i < _slots[_floor - 1].size(); i++) {
 		Slot &slot = _slots[_floor - 1][i];
 		if (slot.locked || slot.expected.size() != tile.value.size())
@@ -626,19 +765,19 @@ void CloudFloors::drop() {
 		tile.sprite->x = slot.tile.home.x;
 		tile.sprite->y = slot.tile.home.y;
 		_host._scene.setDepth(tile.sprite, 27);
-		sound("kDropSfxID");
+		sound(kDropSfxIDKey);
 	} else {
 		home(_dragged);
-		sound("kGoHomeSfxID");
+		sound(kGoHomeSfxIDKey);
 	}
 	_dragged = -1;
 }
 
 void CloudFloors::collect(const char *item) {
-	Common::String key = Common::String::format("item:%d", number(item));
+	Common::String key = Common::String::format(kItemSignedIndexFormat, number(item));
 	_host._world.set(key, MIN(25, _host._world.get(key) + 1));
 	_host.putAway();
-	sound("kCOMPickUpSfxID");
+	sound(kCOMPickUpSfxIDKey);
 	persist();
 }
 
@@ -651,24 +790,24 @@ bool CloudFloors::click(Common::Point point) {
 	if (_marble->visible && _marble->covers(point)) {
 		_state = 2;
 		_marble->visible = false;
-		if (!_host._world.get("R1CA1MarbleClick")) {
-			_host._world.set("R1CA1MarbleClick", 1);
-			say("sam", "kCOMSomeUseID");
+		if (!_host._world.get(kR1CA1MarbleClickKey)) {
+			_host._world.set(kR1CA1MarbleClickKey, 1);
+			say(kSamName, kCOMSomeUseIDKey);
 		}
-		collect("kINV1Marble5");
+		collect(kINV1Marble5Key);
 		return true;
 	}
-	if (_ladderHere && Common::Rect(_ladder->x, _ladder->y, _ladder->x + number("kLadderHSW"), _ladder->y + number("kLadderHSH")).contains(point)) {
+	if (_ladderHere && Common::Rect(_ladder->x, _ladder->y, _ladder->x + number(kLadderHSWKey), _ladder->y + number(kLadderHSHKey)).contains(point)) {
 		if (_state == 1) {
 			_ladderClicks = _ladderClicks == 3 ? 2 : _ladderClicks + 1;
 			if (_ladderClicks == 1)
-				speeches("kLadderCharID.1", "kLadderSpchID.1", 2);
+				speeches(kLadderCharID1Key, kLadderSpchID1Key, 2);
 			else
-				say("worker", Common::String::format("kLadderSpchID.1.%d", _ladderClicks + 1));
+				say(kPropertyWorker, Common::String::format(kLadderSpchID1SignedIndexKey, _ladderClicks + 1));
 		} else {
-			speeches("kLadderCharID.2", "kLadderSpchID.2", 2);
+			speeches(kLadderCharID2Key, kLadderSpchID2Key, 2);
 			_ladderHere = _ladder->visible = false;
-			collect("kINV1Ladder");
+			collect(kINV1LadderKey);
 		}
 		return true;
 	}
@@ -682,25 +821,25 @@ bool CloudFloors::click(Common::Point point) {
 		_dragged = i;
 		_dragOffset = point - Common::Point(tile.sprite->x, tile.sprite->y);
 		_host._scene.setDepth(tile.sprite, 100);
-		sound("kPickUpSfxID");
+		sound(kPickUpSfxIDKey);
 		sayWord(tile.value);
 		return true;
 	}
-	if (_host._actors["worker"]->bounds().contains(point)) {
+	if (_host._actors[kPropertyWorker]->bounds().contains(point)) {
 		_workerClicks = _workerClicks % 4 + 1;
-		say("worker", Common::String::format("kCWSpchID.%d", _workerClicks));
+		say(kPropertyWorker, Common::String::format(kCWSpchIDSignedIndexKey, _workerClicks));
 		return true;
 	}
-	if (_host._actors["paige"]->bounds().contains(point)) {
+	if (_host._actors[kPaigeName]->bounds().contains(point)) {
 		_paigeClicks = (_paigeClicks + 1) % 3;
-		speech("paige", number("kPaigeHelpID") + _paigeClicks);
+		speech(kPaigeName, number(kPaigeHelpIDKey) + _paigeClicks);
 		return true;
 	}
-	if (!_host._practice && (_host._actors["reader"]->bounds().contains(point) || _host._actors["sam"]->bounds().contains(point))) {
-		int group = _ladderHere && _host._world.visits("r1ig1") ? 1 : 2;
-		_mainClicks = _mainClicks % indexed("kMaxMainCharIndex", group) + 1;
-		Common::String suffix = Common::String::format(".%d.%d", group, _mainClicks);
-		speech(_host._page->text("kMainCharID" + suffix), number("kMainSpchID" + suffix));
+	if (!_host._practice && (_host._actors[kReaderName]->bounds().contains(point) || _host._actors[kSamName]->bounds().contains(point))) {
+		int group = _ladderHere && _host._world.visits(Page::kPageIG1) ? 1 : 2;
+		_mainClicks = _mainClicks % indexed(kMaxMainCharIndexKey, group) + 1;
+		Common::String suffix = Common::String::format(kSignedIndexSignedIndexFormat, group, _mainClicks);
+		speech(_host._page->text(kMainCharIDKey + suffix), number(kMainSpchIDKey + suffix));
 		return true;
 	}
 	for (int i = 0; i < _floor; i++) {
@@ -708,11 +847,12 @@ bool CloudFloors::click(Common::Point point) {
 			sayWord(_targets[i]);
 			return true;
 		}
-		for (auto &slot : _slots[i])
+		for (auto &slot : _slots[i]) {
 			if (slot.locked && bounds(slot.tile.sprite).contains(point)) {
 				sayWord(_targets[i]);
 				return true;
 			}
+		}
 	}
 	return false;
 }
@@ -757,19 +897,19 @@ void CloudFloors::update(uint32 time) {
 			break;
 		_reaches[_brickCount - 1]->visible = false;
 		_bricks[_brickCount - 1]->visible = true;
-		_host._actors["worker"]->set("visible", {}, Core::ScriptValue(1));
+		_host._actors[kPropertyWorker]->set(kPropertyVisible, {}, Core::ScriptValue(1));
 		if (_brickCount == 3) {
-			say("worker", "kDoneSpchID");
+			say(kPropertyWorker, kDoneSpchIDKey);
 			_phase = kDoneSpeech;
 		} else {
 			next();
 		}
 		break;
 	case kDoneSpeech:
-		_host._actors["worker"]->set("visible", {}, Core::ScriptValue(0));
+		_host._actors[kPropertyWorker]->set(kPropertyVisible, {}, Core::ScriptValue(0));
 		_descend->visible = true;
 		_descend->startAnimation();
-		sound("kCA1SFX07ID");
+		sound(kCA1SFX07IDKey);
 		_phase = kDescend;
 		break;
 	case kDescend:
@@ -778,16 +918,16 @@ void CloudFloors::update(uint32 time) {
 		_state = 2;
 		_descend->visible = false;
 		worker(2);
-		say("worker", "kThanksSpchID.1");
-		say("worker", "kThanksSpchID.2");
+		say(kPropertyWorker, kThanksSpchID1Key);
+		say(kPropertyWorker, kThanksSpchID2Key);
 		persist();
 		_phase = kNext;
 		break;
 	case kRewardSpeech:
-		_host._actors["worker"]->set("visible", {}, Core::ScriptValue(0));
+		_host._actors[kPropertyWorker]->set(kPropertyVisible, {}, Core::ScriptValue(0));
 		_toss->visible = true;
 		_toss->startAnimation();
-		sound("kTossID");
+		sound(kTossIDKey);
 		_phase = kToss;
 		break;
 	case kToss:
@@ -796,8 +936,8 @@ void CloudFloors::update(uint32 time) {
 		_toss->visible = false;
 		_marble->visible = true;
 		_marble->setFrame(3);
-		_host._actors["worker"]->set("visible", {}, Core::ScriptValue(1));
-		_host.queueSound(number("kMarble5ID"));
+		_host._actors[kPropertyWorker]->set(kPropertyVisible, {}, Core::ScriptValue(1));
+		_host.queueSound(number(kMarble5IDKey));
 		_phase = kMarbleFlash;
 		break;
 	case kMarbleFlash:
@@ -810,8 +950,8 @@ void CloudFloors::update(uint32 time) {
 	case kTravelling:
 		if (!_host._practice && !_correctRoute && _dragged < 0 && 30000 <= time - _idle) {
 			_idle = time;
-			_idleIndex = _idleIndex % number("kMaxIdleIndex") + 1;
-			_host.say(_host._page->text(Common::String::format("kIdleCharID.%d", _idleIndex)), indexed("kIdleSpchID", _idleIndex));
+			_idleIndex = _idleIndex % number(kMaxIdleIndexKey) + 1;
+			_host.say(_host._page->text(Common::String::format(kIdleCharIDSignedIndexKey, _idleIndex)), indexed(kIdleSpchIDKey, _idleIndex));
 		}
 		break;
 	default:
@@ -826,21 +966,23 @@ void CloudFloors::drawTile(Tile &tile, OM::Canvas &canvas) {
 	if (value.size() == 2)
 		value = value.substr(0, 1) + "  " + value.substr(1);
 	Common::Point center = bounds(tile.sprite).center();
-	tile.text->set("text", {}, Core::ScriptValue::fromText(value));
-	tile.text->set("x", {}, Core::ScriptValue(center.x));
-	tile.text->set("y", {}, Core::ScriptValue(center.y - number("kTextOffsetY")));
+	tile.text->set(kPropertyText, {}, Core::ScriptValue::fromText(value));
+	tile.text->set(kPropertyX, {}, Core::ScriptValue(center.x));
+	tile.text->set(kPropertyY, {}, Core::ScriptValue(center.y - number(kTextOffsetYKey)));
 	tile.text->draw(canvas);
 }
 
 void CloudFloors::draw(OM::Canvas &canvas) {
 	_host._scene.drawBackground(canvas);
 	_host._scene.drawSprites(canvas, INT_MIN, 27);
-	for (auto &floor : _slots)
+	for (auto &floor : _slots) {
 		for (auto &slot : floor)
 			drawTile(slot.tile, canvas);
-	for (uint i = 0; i < _answers.size(); i++)
+	}
+	for (uint i = 0; i < _answers.size(); i++) {
 		if (static_cast<int>(i) != _dragged)
 			drawTile(_answers[i], canvas);
+	}
 	_host._scene.drawSprites(canvas, 28, 100);
 	if (0 <= _dragged)
 		drawTile(_answers[_dragged], canvas);
@@ -853,11 +995,12 @@ void CloudFloors::pause(bool paused) {
 		releaseCursor();
 	if (paused) {
 		_pausedSprites.clear();
-		for (auto *sprite : {_belts[0], _belts[1], _belts[2], _reaches[0], _reaches[1], _reaches[2], _descend, _toss})
+		for (auto *sprite : {_belts[0], _belts[1], _belts[2], _reaches[0], _reaches[1], _reaches[2], _descend, _toss}) {
 			if (sprite && sprite->isRunning()) {
 				_pausedSprites.push_back(sprite);
 				sprite->pauseAnimation(true);
 			}
+		}
 	} else {
 		for (auto *sprite : _pausedSprites)
 			sprite->pauseAnimation(false);

@@ -26,9 +26,10 @@ namespace Trinket {
 namespace RR1Cloud9 {
 
 uint PageScene::chooseAction(Common::Array<uint> &choices, uint count) {
-	if (choices.empty())
+	if (choices.empty()) {
 		for (uint i = 1; i <= count; i++)
 			choices.push_back(i);
+	}
 	// Even the last remaining candidate consumes a native rand() draw.
 	uint index = _vm.rnd().excluding(choices.size());
 	uint choice = choices[index];
@@ -37,33 +38,33 @@ uint PageScene::chooseAction(Common::Array<uint> &choices, uint count) {
 }
 
 bool PageScene::enterHub() {
-	_ambient = _scene.add(characterResource(_page->number("kAmbientID"), kAnimation), _page->number("kAmbientZ"));
+	_ambient = _scene.add(characterResource(_page->number(kAmbientIDKey), kAnimation), _page->number(kAmbientZKey));
 	if (!_ambient)
 		return false;
 	_ambient->visible = false;
 	_ambientSound = new OM::Sound(_vm.mixer());
 	if (!_world.visits(_name)) {
-		say("sam", _page->number("kEnterSpchIDs.1"));
-		say("sam", _page->number("kEnterSpchIDs.2"));
-		say("reader", _page->number("kEnterSpchIDs.3"));
-	} else if (!_world.visits("r1ln2")) {
-		say("sam", _page->number("kReEnterSpchIDsA.1"));
-		say("reader", _page->number("kReEnterSpchIDsA.2"));
+		say(kSamName, _page->number(kEnterSpchIDs1Key));
+		say(kSamName, _page->number(kEnterSpchIDs2Key));
+		say(kReaderName, _page->number(kEnterSpchIDs3Key));
+	} else if (!_world.visits(Page::kPageLN2)) {
+		say(kSamName, _page->number(kReEnterSpchIDsA1Key));
+		say(kReaderName, _page->number(kReEnterSpchIDsA2Key));
 	} else if (_vm.rnd().number(1, 2) == 2) {
 		switch (_vm.rnd().number(1, 4)) {
 		case 1:
-			say("reader", _page->number("kReEnterSpchIDs.1.1"));
-			say("sam", _page->number("kReEnterSpchIDs.1.2"));
-			say("reader", _page->number("kReEnterSpchIDs.1.3"));
+			say(kReaderName, _page->number(kReEnterSpchIDs11Key));
+			say(kSamName, _page->number(kReEnterSpchIDs12Key));
+			say(kReaderName, _page->number(kReEnterSpchIDs13Key));
 			break;
 		case 2:
-			say("reader", _page->number("kReEnterSpchIDs.2"));
+			say(kReaderName, _page->number(kReEnterSpchIDs2Key));
 			break;
 		case 3:
-			say("sam", _page->number("kReEnterSpchIDsA.1"));
+			say(kSamName, _page->number(kReEnterSpchIDsA1Key));
 			break;
 		case 4:
-			say("reader", _page->number("kReEnterSpchIDs.4"));
+			say(kReaderName, _page->number(kReEnterSpchIDs4Key));
 			break;
 		}
 	}
@@ -81,10 +82,10 @@ void PageScene::updateHub(uint32 time) {
 		_ambientStart = time;
 		_ambient->visible = false;
 	}
-	if (_ambientWaiting && static_cast<uint32>(_page->number("kDelayTime")) <= time - _ambientStart) {
+	if (_ambientWaiting && static_cast<uint32>(_page->number(kDelayTimeKey)) <= time - _ambientStart) {
 		uint choice = chooseAction(_ambientChoices);
-		_ambientSound->play(_vm.resources(), characterResource(_page->number(Common::String::format("kAmbientIDs.%u", choice)), kSound),
-							Audio::Mixer::kSFXSoundType, 1, _page->number("kAmbientVolume"));
+		_ambientSound->play(_vm.resources(), characterResource(_page->number(Common::String::format(kAmbientIDsUnsignedIndexKey, choice)), kSound),
+							Audio::Mixer::kSFXSoundType, 1, _page->number(kAmbientVolumeKey));
 		_ambient->visible = true;
 		_ambient->startAnimation(1);
 		_ambientWaiting = false;
@@ -107,41 +108,41 @@ void PageScene::hubIdle(uint32 time) {
 	interrupt();
 	_idleWaiting = false;
 	uint choice = chooseAction(_idleChoices);
-	Common::String prefix = Common::String::format("kIdleSpchIDs.%u", choice);
-	say(choice == 3 ? "reader" : "sam", _page->number(prefix + ".1"));
-	say(choice == 3 ? "sam" : "reader", _page->number(prefix + ".2"));
+	Common::String prefix = Common::String::format(kIdleSpchIDsUnsignedIndexKey, choice);
+	say(choice == 3 ? kReaderName : kSamName, _page->number(prefix + k1Name));
+	say(choice == 3 ? kSamName : kReaderName, _page->number(prefix + k2Name));
 	if (choice == 3)
-		say("sam", _page->number(prefix + ".3"));
+		say(kSamName, _page->number(prefix + k3Name));
 }
 
 Common::String PageScene::hubClick(Common::Point point) {
 	for (const auto &actor : _actors) {
 		if (!actor._value->bounds().contains(point))
 			continue;
-		if (actor._key == "paige") {
-			if (!_world.visits("r1ln2"))
-				say("paige", _page->number("kPaigeHelpID.1"));
+		if (actor._key.equals(kPaigeName)) {
+			if (!_world.visits(Page::kPageLN2))
+				say(kPaigeName, _page->number(kPaigeHelpID1Key));
 			else {
-				if (static_cast<uint>(_page->number("kMaxPaigeIndex")) < _paigeClicks)
+				if (static_cast<uint>(_page->number(kMaxPaigeIndexKey)) < _paigeClicks)
 					_paigeClicks = 0;
-				say("paige", _page->number("kPaigeHelpID.2.1") + _paigeClicks);
+				say(kPaigeName, _page->number(kPaigeHelpID21Key) + _paigeClicks);
 				_paigeClicks += 1;
 			}
 		} else {
 			_mainClicks += 1;
 			if (_mainClicks == 3) {
-				say("reader", _page->number("kReEnterSpchIDs.1.1"));
-				say("sam", _page->number("kReEnterSpchIDs.1.2"));
-				say("reader", _page->number("kReEnterSpchIDs.1.3"));
+				say(kReaderName, _page->number(kReEnterSpchIDs11Key));
+				say(kSamName, _page->number(kReEnterSpchIDs12Key));
+				say(kReaderName, _page->number(kReEnterSpchIDs13Key));
 				_mainClicks = 0;
 			} else {
-				Common::String prefix = Common::String::format("kMainSpchIDs.%u", _mainClicks);
-				say(_mainClicks == 1 ? "reader" : "sam", _page->number(prefix + ".1"));
-				say(_mainClicks == 1 ? "sam" : "reader", _page->number(prefix + ".2"));
+				Common::String prefix = Common::String::format(kMainSpchIDsUnsignedIndexKey, _mainClicks);
+				say(_mainClicks == 1 ? kReaderName : kSamName, _page->number(prefix + k1Name));
+				say(_mainClicks == 1 ? kSamName : kReaderName, _page->number(prefix + k2Name));
 			}
 		}
 		_idleWaiting = false;
-		return "handled";
+		return kHandledName;
 	}
 	return Common::String();
 }
@@ -150,17 +151,17 @@ Common::String PageScene::groveClick(Common::Point point) {
 	for (const auto &actor : _actors) {
 		if (!actor._value->bounds().contains(point))
 			continue;
-		if (actor._key == "paige") {
-			say("paige", _page->number("kPaigeHelpID"));
+		if (actor._key.equals(kPaigeName)) {
+			say(kPaigeName, _page->number(kPaigeHelpIDKey));
 		} else {
 			_mainClicks += 1;
-			if (static_cast<uint>(_page->number("kMaxMainCharIndex")) < _mainClicks)
+			if (static_cast<uint>(_page->number(kMaxMainCharIndexKey)) < _mainClicks)
 				_mainClicks = 1;
-			Common::String prefix = Common::String::format("kMainSpchID.%u", _mainClicks);
-			say(_page->text("kMainCharID.1"), _page->number(prefix + ".1"));
-			say(_page->text("kMainCharID.2"), _page->number(prefix + ".2"));
+			Common::String prefix = Common::String::format(kMainSpchIDUnsignedIndexKey, _mainClicks);
+			say(_page->text(kMainCharID1Key), _page->number(prefix + k1Name));
+			say(_page->text(kMainCharID2Key), _page->number(prefix + k2Name));
 		}
-		return "handled";
+		return kHandledName;
 	}
 	return Common::String();
 }

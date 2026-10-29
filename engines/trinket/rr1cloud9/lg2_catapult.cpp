@@ -26,53 +26,131 @@
 namespace Trinket {
 namespace RR1Cloud9 {
 
+constexpr const char *Catapult::kSignedIndexFormat;
+constexpr const char *Catapult::kR1LG2PetSleepingKey;
+constexpr const char *Catapult::kR1LG2CatapultReadyKey;
+constexpr const char *Catapult::kR1LG2FeedPendingKey;
+constexpr const char *Catapult::kPropertyPet1;
+constexpr const char *Catapult::kGPetName;
+constexpr const char *Catapult::kPropertyZ;
+constexpr const char *Catapult::kPetZKey;
+constexpr const char *Catapult::kBowlIDKey;
+constexpr const char *Catapult::kBowlZKey;
+constexpr const char *Catapult::kSandwichIDKey;
+constexpr const char *Catapult::kSandwichZKey;
+constexpr const char *Catapult::kEatingIDKey;
+constexpr const char *Catapult::kGPetSleepIDName;
+constexpr const char *Catapult::kClumpStaticIDKey;
+constexpr const char *Catapult::kClumpZKey;
+constexpr const char *Catapult::kClumpIDKey;
+constexpr const char *Catapult::kCatapultIDKey;
+constexpr const char *Catapult::kCatapultZKey;
+constexpr const char *Catapult::kExitAnimIDKey;
+constexpr const char *Catapult::kR1LG2ExitPendingKey;
+constexpr const char *Catapult::kEnterCharIDKey;
+constexpr const char *Catapult::kEnterSpchIDKey;
+constexpr const char *Catapult::kMaxEntrySpchsKey;
+constexpr const char *Catapult::kReEnterCharIDsKey;
+constexpr const char *Catapult::kReEnterSpchIDsKey;
+constexpr const char *Catapult::kMaxReEnterSpchsKey;
+constexpr const char *Catapult::kPetSleepIDKey;
+constexpr const char *Catapult::kFeedingSFXIDKey;
+constexpr const char *Catapult::kR1LG2FeedCreatureKey;
+constexpr const char *Catapult::kSandwichCharIDKey;
+constexpr const char *Catapult::kSandwichSpchIDKey;
+constexpr const char *Catapult::kMaxSandwichSpchsKey;
+constexpr const char *Catapult::kPostEatCharIDKey;
+constexpr const char *Catapult::kPostEatSpchIDKey;
+constexpr const char *Catapult::kMaxPostEatSpchsKey;
+constexpr const char *Catapult::kLetsGoCharIDKey;
+constexpr const char *Catapult::kLetsGoSpchIDKey;
+constexpr const char *Catapult::kReaderName;
+constexpr const char *Catapult::kSamName;
+constexpr const char *Catapult::kGIdleHelpTimeName;
+constexpr const char *Catapult::kIdleCharIDKey;
+constexpr const char *Catapult::kIdleSpchIDKey;
+constexpr const char *Catapult::kMaxIdleSpchsKey;
+constexpr const char *Catapult::kINV1FoodKey;
+constexpr const char *Catapult::kItem9Key;
+constexpr const char *Catapult::kItemCharSpch2Key;
+constexpr const char *Catapult::kItemSpchsID2Key;
+constexpr const char *Catapult::kMaxItemSpchs2Key;
+constexpr const char *Catapult::kItemCharSpchKey;
+constexpr const char *Catapult::kItemSpchsIDKey;
+constexpr const char *Catapult::kItemSpchCountKey;
+constexpr const char *Catapult::kMaxItemSpchsKey;
+constexpr const char *Catapult::kR1LG2RodeCatapultKey;
+constexpr const char *Catapult::kFirstExitCharIDKey;
+constexpr const char *Catapult::kFirstExitSpchIDKey;
+constexpr const char *Catapult::kSubSeqExitCharIDKey;
+constexpr const char *Catapult::kSubSeqExitSpchIDKey;
+constexpr const char *Catapult::kBowlCharIDKey;
+constexpr const char *Catapult::kBowlSpchIDKey;
+constexpr const char *Catapult::kMaxBowlSpchsKey;
+constexpr const char *Catapult::kPetCharIDsKey;
+constexpr const char *Catapult::kPetSpchIDsKey;
+constexpr const char *Catapult::kMaxPetSpchsKey;
+constexpr const char *Catapult::kPaigeName;
+constexpr const char *Catapult::k21Name;
+constexpr const char *Catapult::k1SignedIndexFormat;
+constexpr const char *Catapult::kMaxHelpSpchs1Key;
+constexpr const char *Catapult::kHelpSpchCharIDsKey;
+constexpr const char *Catapult::kHelpSpchIDsKey;
+constexpr const char *Catapult::kMainSpchCharIDsKey;
+constexpr const char *Catapult::kMainSpchIDsKey;
+constexpr const char *Catapult::kMaxMainSpchsKey;
+constexpr const char *Catapult::kDontExitCharIDsKey;
+constexpr const char *Catapult::kDontExitSpchIDsKey;
+constexpr const char *Catapult::kMaxDontExitSpchsKey;
+constexpr const char *Catapult::kNumDontExitSpchsKey;
+
 int Catapult::number(const Common::String &key) const { return _host._page->number(key); }
 
 void Catapult::line(const char *actors, const char *sounds, int index) {
-	Common::String suffix = index ? Common::String::format(".%d", index) : Common::String();
+	Common::String suffix = index ? Common::String::format(kSignedIndexFormat, index) : Common::String();
 	_host.say(_host._page->text(Common::String(actors) + suffix), number(Common::String(sounds) + suffix));
 }
 
 void Catapult::group(const char *actors, const char *sounds, const char *count, int index) {
-	Common::String suffix = index ? Common::String::format(".%d", index) : Common::String();
+	Common::String suffix = index ? Common::String::format(kSignedIndexFormat, index) : Common::String();
 	_host.speeches(Common::String(actors) + suffix, Common::String(sounds) + suffix, number(Common::String(count) + suffix));
 }
 
 bool Catapult::enter() {
 	World &world = _host._world;
-	_sleeping = world.get("R1LG2PetSleeping") && world.get("R1LG2CatapultReady") && !world.get("R1LG2FeedPending");
-	if (!world.get("R1LG2FeedPending"))
-		world.set("R1LG2PetSleeping", _sleeping);
-	if (!_host.actor("pet.1", "gPet"))
+	_sleeping = world.get(kR1LG2PetSleepingKey) && world.get(kR1LG2CatapultReadyKey) && !world.get(kR1LG2FeedPendingKey);
+	if (!world.get(kR1LG2FeedPendingKey))
+		world.set(kR1LG2PetSleepingKey, _sleeping);
+	if (!_host.actor(kPropertyPet1, kGPetName))
 		return false;
-	_host._actors["pet.1"]->set("z", {}, Core::ScriptValue(number("kPetZ")));
-	_host._actors["pet.1"]->setVisible(!_sleeping);
+	_host._actors[kPropertyPet1]->set(kPropertyZ, {}, Core::ScriptValue(number(kPetZKey)));
+	_host._actors[kPropertyPet1]->setVisible(!_sleeping);
 	auto sprite = [this](const char *key, const char *depth) {
 		return _host._scene.add(_host.characterResource(number(key), Shell::Character::Resources::kAnimation), number(depth));
 	};
-	_bowl = sprite("kBowlID", "kBowlZ");
-	_sandwich = sprite("kSandwichID", "kSandwichZ");
-	_eating = sprite("kEatingID", "kPetZ");
-	_sleep = sprite("gPetSleepID", "kPetZ");
-	_clump = sprite("kClumpStaticID", "kClumpZ");
-	_clumpAnim = sprite("kClumpID", "kClumpZ");
-	_catapult = sprite("kCatapultID", "kCatapultZ");
-	_exit = sprite("kExitAnimID", "kCatapultZ");
+	_bowl = sprite(kBowlIDKey, kBowlZKey);
+	_sandwich = sprite(kSandwichIDKey, kSandwichZKey);
+	_eating = sprite(kEatingIDKey, kPetZKey);
+	_sleep = sprite(kGPetSleepIDName, kPetZKey);
+	_clump = sprite(kClumpStaticIDKey, kClumpZKey);
+	_clumpAnim = sprite(kClumpIDKey, kClumpZKey);
+	_catapult = sprite(kCatapultIDKey, kCatapultZKey);
+	_exit = sprite(kExitAnimIDKey, kCatapultZKey);
 	if (!_bowl || !_sandwich || !_eating || !_sleep || !_clump || !_clumpAnim || !_catapult || !_exit)
 		return false;
 	_bowl->visible = !_sleeping;
 	_sleep->visible = _sleeping;
 	_sandwich->visible = _eating->visible = _clumpAnim->visible = _exit->visible = false;
-	if (world.get("R1LG2ExitPending")) {
+	if (world.get(kR1LG2ExitPendingKey)) {
 		_phase = kExitSpeech;
-	} else if (world.get("R1LG2FeedPending")) {
+	} else if (world.get(kR1LG2FeedPendingKey)) {
 		_phase = kFeedWait;
-	} else if (!world.visits("r1lg2"))
-		group("kEnterCharID", "kEnterSpchID", "kMaxEntrySpchs");
-	else if (!_sleeping && world.visits("r1lg2") < 4)
-		group("kReEnterCharIDs", "kReEnterSpchIDs", "kMaxReEnterSpchs", world.visits("r1lg2"));
+	} else if (!world.visits(Page::kPageLG2))
+		group(kEnterCharIDKey, kEnterSpchIDKey, kMaxEntrySpchsKey);
+	else if (!_sleeping && world.visits(Page::kPageLG2) < 4)
+		group(kReEnterCharIDsKey, kReEnterSpchIDsKey, kMaxReEnterSpchsKey, world.visits(Page::kPageLG2));
 	else if (_sleeping)
-		group("kReEnterCharIDs", "kReEnterSpchIDs", "kMaxReEnterSpchs", 4);
+		group(kReEnterCharIDsKey, kReEnterSpchIDsKey, kMaxReEnterSpchsKey, 4);
 	return true;
 }
 
@@ -101,7 +179,7 @@ void Catapult::advance(uint32 time) {
 			_sleepStart = time;
 		} else if (!_snoring && 5000 <= time - _sleepStart) {
 			_sleep->startAnimation(1);
-			_host.playSounds({static_cast<uint16>(number("kPetSleepID"))});
+			_host.playSounds({static_cast<uint16>(number(kPetSleepIDKey))});
 			_snoring = true;
 		}
 	}
@@ -116,20 +194,20 @@ void Catapult::update(uint32 time) {
 	if (_phase == kFeedWait) {
 		if (time - _start < 1500)
 			return;
-		_host.playSounds({static_cast<uint16>(number("kFeedingSFXID"))});
+		_host.playSounds({static_cast<uint16>(number(kFeedingSFXIDKey))});
 		_sandwich->visible = true;
-		if (world.get("R1LG2FeedPending") == 1) {
-			world.set("R1LG2FeedCreature", world.get("R1LG2FeedCreature") + 1);
-			world.set("R1LG2PetSleeping", 1);
-			world.set("R1LG2CatapultReady", 1);
-			world.set("R1LG2FeedPending", 2);
+		if (world.get(kR1LG2FeedPendingKey) == 1) {
+			world.set(kR1LG2FeedCreatureKey, world.get(kR1LG2FeedCreatureKey) + 1);
+			world.set(kR1LG2PetSleepingKey, 1);
+			world.set(kR1LG2CatapultReadyKey, 1);
+			world.set(kR1LG2FeedPendingKey, 2);
 		}
-		int count = world.get("R1LG2FeedCreature");
-		line("kSandwichCharID", "kSandwichSpchID", count == 1 ? 1 : _host._vm.rnd().number(1, number("kMaxSandwichSpchs")));
+		int count = world.get(kR1LG2FeedCreatureKey);
+		line(kSandwichCharIDKey, kSandwichSpchIDKey, count == 1 ? 1 : _host._vm.rnd().number(1, number(kMaxSandwichSpchsKey)));
 		_phase = kFeedSpeech;
 	} else if (_phase == kFeedSpeech) {
 		_eating->visible = true;
-		_host._actors["pet.1"]->setVisible(false);
+		_host._actors[kPropertyPet1]->setVisible(false);
 		_sandwich->visible = _bowl->visible = false;
 		_eating->startAnimation(1);
 		_phase = kEating;
@@ -140,11 +218,11 @@ void Catapult::update(uint32 time) {
 		_sleep->visible = true;
 		_sleepStart = time;
 		_sleeping = true;
-		world.set("R1LG2FeedPending", 0);
-		int count = world.get("R1LG2FeedCreature");
-		line("kPostEatCharID", "kPostEatSpchID", _host._vm.rnd().number(1, number("kMaxPostEatSpchs")));
+		world.set(kR1LG2FeedPendingKey, 0);
+		int count = world.get(kR1LG2FeedCreatureKey);
+		line(kPostEatCharIDKey, kPostEatSpchIDKey, _host._vm.rnd().number(1, number(kMaxPostEatSpchsKey)));
 		if (count == 1)
-			line("kLetsGoCharID", "kLetsGoSpchID");
+			line(kLetsGoCharIDKey, kLetsGoSpchIDKey);
 		_phase = kSpeech;
 	} else if (_phase == kSpeech)
 		_phase = kIdle;
@@ -152,15 +230,15 @@ void Catapult::update(uint32 time) {
 		_clumpAnim->stopAnimation();
 		_clumpAnim->visible = _catapult->visible = false;
 		_clump->visible = _exit->visible = true;
-		_host._actors["reader"]->setVisible(false);
-		_host._actors["sam"]->setVisible(false);
+		_host._actors[kReaderName]->setVisible(false);
+		_host._actors[kSamName]->setVisible(false);
 		_exit->startAnimation(1);
 		_phase = kExiting;
 	} else if (_phase == kExiting) {
 		if (!_exit->isRunning())
 			_phase = kExitReady;
-	} else if (_phase == kIdle && !_host._practice && static_cast<uint32>(number("gIdleHelpTime")) <= time - _idle) {
-		group("kIdleCharID", "kIdleSpchID", "kMaxIdleSpchs", _sleeping ? 4 : _host._vm.rnd().number(1, 3));
+	} else if (_phase == kIdle && !_host._practice && static_cast<uint32>(number(kGIdleHelpTimeName)) <= time - _idle) {
+		group(kIdleCharIDKey, kIdleSpchIDKey, kMaxIdleSpchsKey, _sleeping ? 4 : _host._vm.rnd().number(1, 3));
 		_idle = time;
 	}
 }
@@ -169,31 +247,31 @@ bool Catapult::donate(uint item) {
 	if (busy() || _host._practice)
 		return false;
 	_host.interrupt();
-	if (!_sleeping && item == static_cast<uint>(number("kINV1Food")) && 0 < _host._world.get("item:9")) {
-		_host._world.set("item:9", _host._world.get("item:9") - 1);
-		_host._world.set("R1LG2FeedPending", 1);
+	if (!_sleeping && item == static_cast<uint>(number(kINV1FoodKey)) && 0 < _host._world.get(kItem9Key)) {
+		_host._world.set(kItem9Key, _host._world.get(kItem9Key) - 1);
+		_host._world.set(kR1LG2FeedPendingKey, 1);
 		_host.closeChest();
 		_start = _host._time;
 		_phase = kFeedWait;
 		return true;
 	}
 	if (_sleeping)
-		line("kItemCharSpch2", "kItemSpchsID2", _host._vm.rnd().number(1, number("kMaxItemSpchs2")));
+		line(kItemCharSpch2Key, kItemSpchsID2Key, _host._vm.rnd().number(1, number(kMaxItemSpchs2Key)));
 	else
-		group("kItemCharSpch", "kItemSpchsID", "kItemSpchCount", _host._vm.rnd().number(1, number("kMaxItemSpchs")));
+		group(kItemCharSpchKey, kItemSpchsIDKey, kItemSpchCountKey, _host._vm.rnd().number(1, number(kMaxItemSpchsKey)));
 	return false;
 }
 
 void Catapult::ride() {
 	World &world = _host._world;
-	int count = world.get("R1LG2RodeCatapult") + 1;
-	world.set("R1LG2RodeCatapult", count);
-	world.set("R1LG2CatapultReady", 0);
-	world.set("R1LG2ExitPending", 1);
+	int count = world.get(kR1LG2RodeCatapultKey) + 1;
+	world.set(kR1LG2RodeCatapultKey, count);
+	world.set(kR1LG2CatapultReadyKey, 0);
+	world.set(kR1LG2ExitPendingKey, 1);
 	if (count == 1)
-		line("kFirstExitCharID", "kFirstExitSpchID");
+		line(kFirstExitCharIDKey, kFirstExitSpchIDKey);
 	else
-		line("kSubSeqExitCharID", "kSubSeqExitSpchID", _host._vm.rnd().number(1, 2));
+		line(kSubSeqExitCharIDKey, kSubSeqExitSpchIDKey, _host._vm.rnd().number(1, 2));
 	_phase = kExitSpeech;
 }
 
@@ -201,44 +279,44 @@ bool Catapult::click(Common::Point point) {
 	_idle = _host._time;
 	if (_bowl->visible && _bowl->covers(point)) {
 		int choice = _host._vm.rnd().number(1, 2);
-		if (choice == 2 && !_host._world.get("item:9"))
+		if (choice == 2 && !_host._world.get(kItem9Key))
 			choice = 3;
-		group("kBowlCharID", "kBowlSpchID", "kMaxBowlSpchs", choice);
+		group(kBowlCharIDKey, kBowlSpchIDKey, kMaxBowlSpchsKey, choice);
 		return true;
 	}
 	if (_sleep->visible && _sleep->covers(point))
 		return true;
 	for (auto &entry : _host._actors) {
-		if (entry._key == "pet.1" && _sleeping)
+		if (entry._key.equals(kPropertyPet1) && _sleeping)
 			continue;
 		if (!entry._value->bounds().contains(point))
 			continue;
-		if (entry._key == "pet.1")
-			group("kPetCharIDs", "kPetSpchIDs", "kMaxPetSpchs", _host._vm.rnd().number(1, 3));
-		else if (entry._key == "paige") {
-			Common::String suffix = _sleeping ? ".2.1" : Common::String::format(".1.%d", _host._vm.rnd().number(1, number("kMaxHelpSpchs.1")));
-			_host.say(_host._page->text("kHelpSpchCharIDs" + suffix), number("kHelpSpchIDs" + suffix));
+		if (entry._key.equals(kPropertyPet1))
+			group(kPetCharIDsKey, kPetSpchIDsKey, kMaxPetSpchsKey, _host._vm.rnd().number(1, 3));
+		else if (entry._key.equals(kPaigeName)) {
+			Common::String suffix = _sleeping ? k21Name : Common::String::format(k1SignedIndexFormat, _host._vm.rnd().number(1, number(kMaxHelpSpchs1Key)));
+			_host.say(_host._page->text(kHelpSpchCharIDsKey + suffix), number(kHelpSpchIDsKey + suffix));
 		} else {
 			int choice = 7;
 			if (!_sleeping) {
-				if (_host._world.get("R1LG2RodeCatapult"))
+				if (_host._world.get(kR1LG2RodeCatapultKey))
 					choice = _host._vm.rnd().number(4, 6);
 				else {
 					choice = _host._vm.rnd().number(1, 2) == 2 ? 3 : 1;
-					if (choice == 1 && _host._world.get("item:9"))
+					if (choice == 1 && _host._world.get(kItem9Key))
 						choice = 2;
 				}
 			}
-			group("kMainSpchCharIDs", "kMainSpchIDs", "kMaxMainSpchs", choice);
+			group(kMainSpchCharIDsKey, kMainSpchIDsKey, kMaxMainSpchsKey, choice);
 		}
 		return true;
 	}
 	for (const auto &exit : _host._page->exits()) {
-		if (exit.destination == "r1rss" && exit.rect.contains(point)) {
+		if (exit.destination.equals(Page::kPageRSS) && exit.rect.contains(point)) {
 			if (_sleeping)
 				ride();
 			else
-				group("kDontExitCharIDs", "kDontExitSpchIDs", "kMaxDontExitSpchs", _host._vm.rnd().number(1, number("kNumDontExitSpchs")));
+				group(kDontExitCharIDsKey, kDontExitSpchIDsKey, kMaxDontExitSpchsKey, _host._vm.rnd().number(1, number(kNumDontExitSpchsKey)));
 			return true;
 		}
 	}
@@ -257,7 +335,7 @@ void Catapult::pause(bool paused, uint32 elapsed) {
 }
 
 Common::String Catapult::destination() const {
-	return _phase == kExitReady ? "r1rss" : Common::String();
+	return _phase == kExitReady ? Page::kPageRSS : Common::String();
 }
 } // namespace RR1Cloud9
 } // namespace Trinket

@@ -26,16 +26,25 @@
 namespace Trinket {
 namespace RR1Cloud9 {
 
+constexpr const char *SkyRide::kPreviousLocationKey;
+constexpr const char *SkyRide::kAnimIDSignedIndexKey;
+constexpr const char *SkyRide::kAmbientZKey;
+constexpr const char *SkyRide::kSamSpchIDKey;
+constexpr const char *SkyRide::kRRSpchIDKey;
+constexpr const char *SkyRide::kNameSignedIndexFormat;
+constexpr const char *SkyRide::kAmbientVolumeKey;
+constexpr const char *SkyRide::kPreviousLocationsSignedIndexKey;
+
 SkyRide::~SkyRide() {
 	for (auto *voice : _voices)
 		delete voice;
 }
 
 bool SkyRide::enter() {
-	_route = _host._world.get("previousLocation") == 10 ? 2 : 1;
-	uint resource = _host._page->number(Common::String::format("kAnimID.%d", _route));
-	_animation = _host._scene.add(_host.characterResource(resource, Shell::Character::Resources::kAnimation), _host._page->number("kAmbientZ"));
-	if (!_animation)
+	_route = _host._world.get(kPreviousLocationKey) == 10 ? 2 : 1;
+	uint resource = _host._page->number(Common::String::format(kAnimIDSignedIndexKey, _route));
+	_anim = _host._scene.add(_host.characterResource(resource, Shell::Character::Resources::kAnimation), _host._page->number(kAmbientZKey));
+	if (!_anim)
 		return false;
 	for (auto &voice : _voices)
 		voice = new OM::Sound(_host._vm.mixer());
@@ -44,20 +53,20 @@ bool SkyRide::enter() {
 
 void SkyRide::update(uint32 time) {
 	if (!_started) {
-		_animation->startAnimation(1);
+		_anim->startAnimation(1);
 		const char *keys[] = {
-			"kSamSpchID",
-			"kRRSpchID",
+			kSamSpchIDKey,
+			kRRSpchIDKey,
 		};
 		for (uint i = 0; i < 2; i++) {
-			int id = _host._page->number(Common::String::format("%s.%d", keys[i], _route));
+			int id = _host._page->number(Common::String::format(kNameSignedIndexFormat, keys[i], _route));
 			_voices[i]->play(_host._vm.resources(), _host.characterResource(id, Shell::Character::Resources::kSound),
-							 Audio::Mixer::kSpeechSoundType, 1, _host._page->number("kAmbientVolume"));
+							 Audio::Mixer::kSpeechSoundType, 1, _host._page->number(kAmbientVolumeKey));
 		}
 		_started = true;
 		return;
 	}
-	if (_animation->isRunning() || _voices[0]->isPlaying() || _voices[1]->isPlaying())
+	if (_anim->isRunning() || _voices[0]->isPlaying() || _voices[1]->isPlaying())
 		return;
 	if (!_waiting) {
 		_start = time;
@@ -67,7 +76,7 @@ void SkyRide::update(uint32 time) {
 }
 
 void SkyRide::pause(bool paused, uint32 elapsed) {
-	_animation->pauseAnimation(paused);
+	_anim->pauseAnimation(paused);
 	for (auto *voice : _voices)
 		voice->pause(paused);
 	if (!paused && _waiting)
@@ -75,7 +84,7 @@ void SkyRide::pause(bool paused, uint32 elapsed) {
 }
 
 Common::String SkyRide::destination() const {
-	return _ready ? _host._page->text(Common::String::format("kPreviousLocations.%d", _route)) : Common::String();
+	return _ready ? _host._page->text(Common::String::format(kPreviousLocationsSignedIndexKey, _route)) : Common::String();
 }
 } // namespace RR1Cloud9
 } // namespace Trinket

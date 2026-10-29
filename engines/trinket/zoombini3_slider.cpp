@@ -74,7 +74,8 @@ bool OptionsSlider::load(Channel channel, int z, int actionBase) {
 		parts[i]->managed = true;
 		parts[i]->setFrame(1);
 	}
-	int width = _thumb->width(), height = _thumb->height();
+	int width = _thumb->width();
+	int height = _thumb->height();
 	_minimum = _track->x + 10;
 	_maximum = _track->x + _track->width() - width - (channel == kMusic00 ? 8 : 10);
 	if (_maximum <= _minimum || width <= 0 || height <= 0) {

@@ -27,6 +27,43 @@
 namespace Trinket {
 namespace OM {
 
+Common::SharedPtr<NFNTFont> FontCache::load(const Common::String &path) {
+	Common::String key = _resources.cacheKey(path);
+	if (key.empty())
+		return Common::SharedPtr<NFNTFont>();
+	auto found = _fonts.find(key);
+	if (found != _fonts.end()) {
+		_hits += 1;
+		return found->_value;
+	}
+	Common::ScopedPtr<Common::SeekableReadStream> stream(_resources.open(key));
+	key = _resources.cacheKey(path);
+	found = _fonts.find(key);
+	if (found != _fonts.end()) {
+		_hits += 1;
+		return found->_value;
+	}
+	Common::SharedPtr<NFNTFont> font;
+	if (stream)
+		font.reset(NFNTFont::load(*stream));
+	if (font) {
+		_fonts[key] = font;
+		_decodes += 1;
+	}
+	return font;
+}
+
+void FontCache::removeUnused() {
+	for (auto it = _fonts.begin(); it != _fonts.end();) {
+		if (it->_value.unique()) {
+			auto unused = it++;
+			_fonts.erase(unused);
+		} else {
+			++it;
+		}
+	}
+}
+
 NFNTFont *NFNTFont::load(Common::SeekableReadStream &stream) {
 	byte raw[26];
 	if (stream.read(raw, sizeof(raw)) != sizeof(raw))
@@ -39,7 +76,8 @@ NFNTFont *NFNTFont::load(Common::SeekableReadStream &stream) {
 	uint last = header[2];
 	if (first != 0 || last < 1 || 255 < last)
 		return nullptr;
-	uint rows = header[7], rowBytes = header[12] * 2;
+	uint rows = header[7];
+	uint rowBytes = header[12] * 2;
 	uint count = last - first + 3;
 	uint32 metricsOffset = 16 + header[8] * 2;
 	uint64 bitmapBytes = static_cast<uint64>(rowBytes) * rows;

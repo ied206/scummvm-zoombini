@@ -24,16 +24,27 @@
 namespace Trinket {
 namespace Zoombini3 {
 
+constexpr const char *RadioGroup::kEventChanged;
+constexpr const char *RadioGroup::kMouseDownName;
+constexpr const char *RadioGroup::kFlyOnName;
+constexpr const char *RadioGroup::kFlyOffName;
+constexpr const char *RadioGroup::kPropertySelection;
+constexpr const char *RadioGroup::kPropertyLast;
+constexpr const char *RadioGroup::kPropertyGroupName;
+constexpr const char *RadioGroup::kMethodAdd;
+constexpr const char *RadioGroup::kRAnimationName;
+constexpr const char *RadioGroup::kMethodClear;
+
 RadioGroup::RadioGroup(Core::ScriptRuntime *runtime) : _runtime(runtime) {
-	addEvent("changed");
+	addEvent(kEventChanged);
 }
 
 RadioGroup::~RadioGroup() {
 	for (uint i = 0; i < _members.size(); i++) {
 		if (_members[i]) {
-			_members[i]->bindEvent("mouseDown", nullptr);
-			_members[i]->bindEvent("flyOn", nullptr);
-			_members[i]->bindEvent("flyOff", nullptr);
+			_members[i]->bindEvent(kMouseDownName, nullptr);
+			_members[i]->bindEvent(kFlyOnName, nullptr);
+			_members[i]->bindEvent(kFlyOffName, nullptr);
 			_members[i]->removeObserver(*this);
 		}
 	}
@@ -47,10 +58,11 @@ void RadioGroup::add(Shell::Sprite &member) {
 	_members.push_back(&member);
 	member.addObserver(*this);
 	MemberLink link(*this);
-	member.bindEvent("mouseDown", &link);
-	MemberLink on(*this, 1), off(*this, -1);
-	member.bindEvent("flyOn", &on);
-	member.bindEvent("flyOff", &off);
+	member.bindEvent(kMouseDownName, &link);
+	MemberLink on(*this, 1);
+	MemberLink off(*this, -1);
+	member.bindEvent(kFlyOnName, &on);
+	member.bindEvent(kFlyOffName, &off);
 }
 
 void RadioGroup::MemberLink::execute(Core::ScriptableObject &source) {
@@ -67,7 +79,7 @@ void RadioGroup::MemberLink::execute(Core::ScriptableObject &source) {
 
 void RadioGroup::clicked(uint index) {
 	if (_selected != static_cast<int>(index) && select(index))
-		emitEvent("changed");
+		emitEvent(kEventChanged);
 }
 
 bool RadioGroup::select(int index) {
@@ -91,44 +103,44 @@ void RadioGroup::clearSelection() {
 	}
 }
 
-bool RadioGroup::get(const Common::String &property, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if (property == "selection")
+bool RadioGroup::get(const Common::String &property, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if (property.equals(kPropertySelection))
 		result = Core::ScriptValue(_selected);
-	else if (property == "last")
+	else if (property.equals(kPropertyLast))
 		result = Core::ScriptValue(_previous);
-	else if (property == "groupName")
+	else if (property.equals(kPropertyGroupName))
 		result = Core::ScriptValue(_name);
 	else
-		return ScriptableObject::get(property, arguments, result);
+		return ScriptableObject::get(property, sargs, result);
 	return true;
 }
 
-bool RadioGroup::set(const Common::String &property, const Core::ScriptArguments &arguments, const Core::ScriptValue &value) {
-	if (property == "selection")
-		return select(value.integer());
-	if (property == "groupName") {
-		_name = value.text();
+bool RadioGroup::set(const Common::String &property, const Core::ScriptArguments &sargs, const Core::ScriptValue &value) {
+	if (property.equals(kPropertySelection))
+		return select(value.toInt32());
+	if (property.equals(kPropertyGroupName)) {
+		_name = value.toText();
 		return true;
 	}
-	return ScriptableObject::set(property, arguments, value);
+	return ScriptableObject::set(property, sargs, value);
 }
 
-bool RadioGroup::play(const Common::String &method, const Core::ScriptArguments &arguments, Core::ScriptValue &result) {
-	if (method == "add" && arguments.size() == 1 && _runtime) {
-		Core::ScriptValue member = arguments[0];
+bool RadioGroup::play(const Common::String &method, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
+	if (method.equals(kMethodAdd) && sargs.size() == 1 && _runtime) {
+		Core::ScriptValue member = sargs[0];
 		if (member.kind() != Core::ScriptValue::kObject)
-			member = _runtime->variable(member.text());
-		Shell::Sprite *sprite = static_cast<Shell::Sprite *>(_runtime->objects().resolve(member.reference(), "RAnimation"));
+			member = _runtime->variable(member.toText());
+		Shell::Sprite *sprite = static_cast<Shell::Sprite *>(_runtime->objects().resolve(member.reference(), kRAnimationName));
 		if (!sprite)
 			return false;
 		add(*sprite);
 		return true;
 	}
-	if (method == "clear") {
+	if (method.equals(kMethodClear)) {
 		clearSelection();
 		return true;
 	}
-	return ScriptableObject::play(method, arguments, result);
+	return ScriptableObject::play(method, sargs, result);
 }
 
 void RadioGroup::objectDestroyed(Core::ScriptableObject &object) {

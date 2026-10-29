@@ -29,10 +29,22 @@ namespace Trinket {
 
 /** Calendar build time with one-based months and no assumed time zone. A zero year means unknown. */
 struct BuildDateTime {
+	/** Calendar year, or zero when the build time is unknown. */
 	uint16 year;
-	byte month, day, hour, minute, second;
+	/** One-based calendar month. */
+	byte month;
+	/** One-based day of the month. */
+	byte day;
+	/** Hour on a 24-hour clock. */
+	byte hour;
+	/** Minute within the hour. */
+	byte minute;
+	/** Second within the minute. */
+	byte second;
 
+	/** Return whether a build year was recorded. */
 	bool isKnown() const { return year != 0; }
+	/** Format the recorded local build time, or return unknown when no year was recorded. */
 	Common::String toString() const {
 		if (!isKnown())
 			return "unknown";
@@ -47,8 +59,11 @@ struct BuildDateTime {
  * The build time is independent of the version and may be unknown for a known version.
  */
 struct ComponentVersion {
+	/** Native module name, or null when that component is absent. */
 	const char *module;
+	/** Version label, or null when its version is unknown. */
 	const char *version;
+	/** Recorded build time, independent of the version label. */
 	BuildDateTime builtAt;
 };
 
@@ -56,8 +71,18 @@ struct ComponentVersion {
  * These describe native binaries, not ScummVM's version or detected compatibility capabilities.
  */
 struct RuntimeVersions {
+	/** Name of the application and release described by these components. */
 	const char *label;
-	ComponentVersion om, core, shell, puzzle, application;
+	/** Identity of the native OM graphics and resource module. */
+	ComponentVersion om;
+	/** Identity of the native Trinket Core module. */
+	ComponentVersion core;
+	/** Identity of the native Shell application framework module. */
+	ComponentVersion shell;
+	/** Identity of the native reusable puzzle framework module. */
+	ComponentVersion puzzle;
+	/** Identity of the native game or launcher executable. */
+	ComponentVersion application;
 };
 
 } // End of namespace Trinket

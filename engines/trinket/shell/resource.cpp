@@ -30,6 +30,8 @@
 namespace Trinket {
 namespace Shell {
 
+constexpr const char *IndexedResources::kBulkFilesName;
+
 bool IndexedResources::contains(uint32 offset, uint32 size) const {
 	return offset <= _index.size() && size <= _index.size() - offset;
 }
@@ -54,7 +56,7 @@ bool IndexedResources::readName(uint32 offset, Common::String &name) const {
 		byte c = _index[offset];
 		offset += 1;
 		if (!c)
-			return !name.empty() && name != "." && name != "..";
+			return !name.empty() && !name.equals(".") && !name.equals("..");
 		if (c < 32 || c == '/' || c == '\\' || c == ':' || 255 <= name.size())
 			return false;
 		name += static_cast<char>(c);
@@ -83,7 +85,7 @@ bool IndexedResources::parseNode(uint32 offset, const Common::String &prefix, ui
 		if (!leaf) {
 			if (bulkList)
 				return fail("Nested INX bulk list");
-			bool isBulkList = depth == 0 && name == "*bulkFiles";
+			bool isBulkList = depth == 0 && name.equals(kBulkFilesName);
 			if (!parseNode(READ_LE_UINT32(&_index[record + 2]), prefix + name + "/", depth + 1, isBulkList))
 				return false;
 		} else {
@@ -142,26 +144,39 @@ bool IndexedResources::load(const Common::Path &indexPath) {
 	return true;
 }
 
-Common::SeekableReadStream *IndexedResources::open(const Common::String &name) const {
+bool IndexedResources::locate(const Common::String &name, Common::File &file, uint32 &size) const {
 	Common::String key = normalize(name);
 	auto it = _entries.find(key);
 	if (it == _entries.end())
-		return nullptr;
+		return false;
 	const Entry &entry = it->_value;
 	const Bulk &bulk = _bulks[entry.bulk];
-	Common::File file;
 	if (!file.open(Common::Path(bulk.name)) || file.size() < 4 || file.readUint32LE() != bulk.checksum)
-		return nullptr;
+		return false;
 	if (entry.offset < 4 || file.size() < entry.offset || file.size() - entry.offset < entry.size)
-		return nullptr;
+		return false;
 	file.seek(entry.offset);
 	for (uint i = 0; i < entry.name.size(); i++) {
 		if (file.readByte() != static_cast<byte>(entry.name[i]))
-			return nullptr;
+			return false;
 	}
 	if (file.readByte() != 0 || file.err())
+		return false;
+	size = entry.size - entry.name.size() - 1;
+	return true;
+}
+
+bool IndexedResources::contains(const Common::String &name) const {
+	Common::File file;
+	uint32 size = 0;
+	return locate(name, file, size);
+}
+
+Common::SeekableReadStream *IndexedResources::open(const Common::String &name) const {
+	Common::File file;
+	uint32 size = 0;
+	if (!locate(name, file, size))
 		return nullptr;
-	uint32 size = entry.size - entry.name.size() - 1;
 	if (!size)
 		return new Common::MemoryReadStream(nullptr, 0);
 	Common::ScopedPtr<Common::SeekableReadStream> payload(file.readStream(size));

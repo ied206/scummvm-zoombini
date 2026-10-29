@@ -31,13 +31,17 @@ namespace Core {
 bool Background16::decode(Common::SeekableReadStream &stream, Graphics::Surface &surface) {
 	if (stream.size() < 32 || stream.readUint32LE() != 32)
 		return false;
-	uint32 width = stream.readUint32LE(), height = stream.readUint32LE();
-	uint32 version = stream.readUint32LE(), unpacked = stream.readUint32LE(), packed = stream.readUint32LE();
+	uint32 width = stream.readUint32LE();
+	uint32 height = stream.readUint32LE();
+	uint32 version = stream.readUint32LE();
+	uint32 unpacked = stream.readUint32LE();
+	uint32 packed = stream.readUint32LE();
 	if (!width || !height || 4096 < width || 4096 < height || version != 1 || unpacked != width * height * 2 ||
 		!packed || stream.size() - 32 < packed || 32 * 1024 * 1024 < packed)
 		return false;
 	stream.seek(32);
-	Common::Array<byte> input, pixels;
+	Common::Array<byte> input;
+	Common::Array<byte> pixels;
 	input.resize(packed);
 	pixels.resize(unpacked);
 	size_t decodedSize = 0;
@@ -50,7 +54,9 @@ bool Background16::decode(Common::SeekableReadStream &stream, Graphics::Surface 
 		uint32 *row = static_cast<uint32 *>(surface.getBasePtr(0, y));
 		for (uint x = 0; x < width; x++) {
 			uint16 pixel = READ_BE_UINT16(pixels.data() + (y * width + x) * 2);
-			byte red = (pixel >> 10) & 31, green = (pixel >> 5) & 31, blue = pixel & 31;
+			byte red = (pixel >> 10) & 31;
+			byte green = (pixel >> 5) & 31;
+			byte blue = pixel & 31;
 			row[x] = surface.format.RGBToColor((red << 3) | (red >> 2), (green << 3) | (green >> 2), (blue << 3) | (blue >> 2));
 		}
 	}

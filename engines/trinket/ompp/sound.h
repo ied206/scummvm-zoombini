@@ -28,21 +28,32 @@
 namespace Trinket {
 namespace OM {
 
-/** Owns one sound's playback handle; the mixer owns the submitted decoded stream. */
+/** Load a sound resource and control its playback through the mixer. */
 class Sound {
 public:
+	/** Bind a playback handle to the mixer. */
 	explicit Sound(Audio::Mixer &mixer) : _mixer(mixer) {}
+	/** Stop playback before releasing the sound wrapper. */
 	~Sound() { stop(); }
+	/** Decode a resource and submit its repetitions at a zero-to-one-hundred volume, returning false on failure. */
 	bool play(const ResourceProvider &resources, const Common::String &path, Audio::Mixer::SoundType type, uint count = 1, uint volume = 100);
+	/** Stop playback on this sound's mixer handle. */
 	void stop() { _mixer.stopHandle(_handle); }
+	/** Pause or resume this sound's mixer handle. */
 	void pause(bool paused) { _mixer.pauseHandle(_handle, paused); }
+	/** Set this sound's channel volume, clamped to zero through one hundred. */
 	void setVolume(uint volume) { _mixer.setChannelVolume(_handle, MIN<uint>(volume, 100) * 255 / 100); }
+	/** Return whether the mixer still has an active stream for this sound. */
 	bool isPlaying() const { return _mixer.isSoundHandleActive(_handle); }
 
 private:
+	/** Mixer used to play and control this sound. */
 	Audio::Mixer &_mixer;
+	/** Mixer handle identifying this sound's current playback. */
 	Audio::SoundHandle _handle;
+	/** Prevent accidental copies of this stateful object. */
 	Sound(const Sound &) = delete;
+	/** Prevent accidental copies of this stateful object. */
 	Sound &operator=(const Sound &) = delete;
 };
 

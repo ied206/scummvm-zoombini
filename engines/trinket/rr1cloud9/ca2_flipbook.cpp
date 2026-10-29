@@ -31,6 +31,65 @@
 namespace Trinket {
 namespace RR1Cloud9 {
 
+constexpr const char *Flipbook::kR1CA2Key;
+constexpr const char *Flipbook::kUsedKey;
+constexpr const char *Flipbook::kReaderName;
+constexpr const char *Flipbook::kSamName;
+constexpr const char *Flipbook::kPaigeName;
+constexpr const char *Flipbook::kNameUnsignedIndexFormat;
+constexpr const char *Flipbook::kR1CA2DatasetKey;
+constexpr const char *Flipbook::kR1CA2PicUsedSignedIndexKey;
+constexpr const char *Flipbook::kR1CA2PicMaxSignedIndexKey;
+constexpr const char *Flipbook::kBrushCursorKey;
+constexpr const char *Flipbook::kFillCursorKey;
+constexpr const char *Flipbook::kEraserCursorKey;
+constexpr const char *Flipbook::kFingerCursorIDKey;
+constexpr const char *Flipbook::kPropertyAnimateSettled;
+constexpr const char *Flipbook::kR1CA2EnterSignedIndexCountKey;
+constexpr const char *Flipbook::kEnterSpchIDsSignedIndexKey;
+constexpr const char *Flipbook::kRName;
+constexpr const char *Flipbook::kSrName;
+constexpr const char *Flipbook::kSName;
+constexpr const char *Flipbook::kSignedIndexSignedIndexFormat;
+constexpr const char *Flipbook::kReEnterCharIDsKey;
+constexpr const char *Flipbook::kReEnterSpchIDsKey;
+constexpr const char *Flipbook::kR1CN3NumFramesKey;
+constexpr const char *Flipbook::kR1CN3FromStreetKey;
+constexpr const char *Flipbook::kR1CN31stEditKey;
+constexpr const char *Flipbook::kTwoPagesName;
+constexpr const char *Flipbook::kPageFlipIDKey;
+constexpr const char *Flipbook::kR1CA2NextClicksKey;
+constexpr const char *Flipbook::kArrowSpchIDs1Key;
+constexpr const char *Flipbook::kPsrName;
+constexpr const char *Flipbook::kArrowSpchIDs21Key;
+constexpr const char *Flipbook::kPaintName;
+constexpr const char *Flipbook::kFillName;
+constexpr const char *Flipbook::kStampName;
+constexpr const char *Flipbook::kPlayName;
+constexpr const char *Flipbook::kUnsignedIndexFormat;
+constexpr const char *Flipbook::kIdleCharIDKey;
+constexpr const char *Flipbook::kIdleSpchIDKey;
+constexpr const char *Flipbook::kHelpSpchIDsUnsignedIndexKey;
+constexpr const char *Flipbook::kEraseName;
+constexpr const char *Flipbook::kPaintSFXIDKey;
+constexpr const char *Flipbook::kFillSFXIDKey;
+constexpr const char *Flipbook::kEraseSFXIDKey;
+constexpr const char *Flipbook::kStampSFXIDKey;
+constexpr const char *Flipbook::kR1CA2PaigeClicksKey;
+constexpr const char *Flipbook::kPaigeSpchIDsSignedIndexKey;
+constexpr const char *Flipbook::kColorSFXIDSignedIndexKey;
+constexpr const char *Flipbook::kPickShapeSFXIDKey;
+constexpr const char *Flipbook::kBombName;
+constexpr const char *Flipbook::kExplodeSFXIDKey;
+constexpr const char *Flipbook::kUndoSFXIDKey;
+constexpr const char *Flipbook::kIsPrinterOffKey;
+constexpr const char *Flipbook::kRsName;
+constexpr const char *Flipbook::kSrrName;
+constexpr const char *Flipbook::kMainSpchIDsSignedIndexKey;
+
+constexpr const char *Flipbook::kFont;
+constexpr const char *Flipbook::kPaletteFormat;
+
 Flipbook::~Flipbook() {
 	releaseCursor();
 	if (_ready)
@@ -49,23 +108,29 @@ int Flipbook::number(const Common::String &key) const { return _host._page->numb
 
 void Flipbook::used(const char *key) {
 	if (!_host._practice)
-		_host._world.set(Common::String("R1CA2") + key + "Used", 1);
+		_host._world.set(Common::String(kR1CA2Key) + key + kUsedKey, 1);
 }
 
 void Flipbook::say(const char *actor, const Common::String &key) { _host.say(actor, number(key)); }
 
 void Flipbook::group(const Common::String &key, const char *actors) {
-	for (uint i = 0; actors[i]; i++)
-		say(actors[i] == 'r' ? "reader" : actors[i] == 's' ? "sam"
-														   : "paige",
-			Common::String::format("%s.%u", key.c_str(), i + 1));
+	for (uint i = 0; actors[i]; i++) {
+		const char *actor;
+		if (actors[i] == 'r')
+			actor = kReaderName;
+		else if (actors[i] == 's')
+			actor = kSamName;
+		else
+			actor = kPaigeName;
+		say(actor, Common::String::format(kNameUnsignedIndexFormat, key.c_str(), i + 1));
+	}
 }
 
 bool Flipbook::enter() {
 	World &world = _host._world;
-	_book = world.visits("r1ca2") ? CLIP(world.get("R1CA2Dataset"), 1, 5) : 4;
+	_book = world.visits(Page::kPageCA2) ? CLIP(world.get(kR1CA2DatasetKey), 1, 5) : 4;
 	_state = _book <= 3 ? 1 : 2;
-	if (world.get(Common::String::format("R1CA2PicUsed%d", _book)))
+	if (world.get(Common::String::format(kR1CA2PicUsedSignedIndexKey, _book)))
 		_state = 3;
 	static constexpr int defaults[] = {
 		18,
@@ -74,7 +139,7 @@ bool Flipbook::enter() {
 		1,
 		1,
 	};
-	_maximum = world.get(Common::String::format("R1CA2PicMax%d", _book));
+	_maximum = world.get(Common::String::format(kR1CA2PicMaxSignedIndexKey, _book));
 	_maximum = _maximum ? CLIP(_maximum, 1, 18) : defaults[_book - 1];
 	auto sprite = [this](int id, int depth) {
 		Shell::Sprite *s = _host._scene.add(_host.characterResource(id, Shell::Character::Resources::kAnimation), depth);
@@ -107,57 +172,61 @@ bool Flipbook::enter() {
 	if (!_next || !_previous || !_play || !_print || !_bomb || !_undoButton || !_flip)
 		return false;
 	_flip->visible = false;
-	Common::ScopedPtr<Common::SeekableReadStream> font(_host._vm.resources().open("common/1018.nfnt"));
-	_font.reset(font ? OM::NFNTFont::load(*font) : nullptr);
+	_font = _host._vm.fonts().load(kFont);
 	if (!_font || !loadFrame())
 		return false;
-	static const char *const cursorKeys[] = {
-		"kBrushCursor",
-		"kFillCursor",
-		"kEraserCursor",
-		"kFingerCursorID",
+	static constexpr const char *cursorKeys[] = {
+		kBrushCursorKey,
+		kFillCursorKey,
+		kEraserCursorKey,
+		kFingerCursorIDKey,
 	};
 	for (uint i = 0; i < ARRAYSIZE(cursorKeys); i++) {
-		Core::Animation animation;
 		Common::String path = _host.characterResource(number(cursorKeys[i]), Shell::Character::Resources::kAnimation);
-		Common::ScopedPtr<Common::SeekableReadStream> stream(_host._vm.resources().open(path));
-		Common::ScopedPtr<Common::SeekableReadStream> palette(_host._vm.resources().open(path.substr(0, path.size() - 3) + ".rgb"));
-		if (!stream || !animation.load(*stream) || (palette && !animation.loadPalette(*palette)) || !animation.decode(0, _cursors[i]))
+		const Core::Animation *animation = _host._scene.loadAnimation(path);
+		if (!animation || !animation->picture(0))
 			return false;
+		_cursors[i].copyFrom(*animation->picture(0));
 		if (i == 3)
 			_cursorHotspots[i] = Common::Point(7, 1);
 		else {
-			if (!animation.celCount())
+			if (!animation->celCount())
 				return false;
 			Common::Point first;
 			uint pictures = 0;
-			for (const auto &step : animation.sequence(0)) {
+			for (const auto &step : animation->sequence(0)) {
 				if (step.picture < 0)
 					continue;
 				if (!pictures)
-					first = Common::Point(step.x, step.y);
+					first = step.offset;
 				else {
-					_cursorHotspots[i] = Common::Point(step.x, step.y) - first;
+					_cursorHotspots[i] = step.offset - first;
 					break;
 				}
 				pictures += 1;
 			}
 		}
 	}
-	for (const char *name : {"reader", "sam"})
-		_host._actors[name]->set("animateSettled", {}, Core::ScriptValue(0));
-	Common::String entry = Common::String::format("R1CA2Enter%dCount", _state);
-	if (!world.get(entry))
-		group(Common::String::format("kEnterSpchIDs.%d", _state), _state == 1 ? "r" : _state == 2 ? "sr"
-																								  : "s");
-	else {
+	for (const char *name : {kReaderName, kSamName})
+		_host._actors[name]->set(kPropertyAnimateSettled, {}, Core::ScriptValue(0));
+	Common::String entry = Common::String::format(kR1CA2EnterSignedIndexCountKey, _state);
+	if (!world.get(entry)) {
+		const char *actors;
+		if (_state == 1)
+			actors = kRName;
+		else if (_state == 2)
+			actors = kSrName;
+		else
+			actors = kSName;
+		group(Common::String::format(kEnterSpchIDsSignedIndexKey, _state), actors);
+	} else {
 		int choice = _host._vm.rnd().number(1, 3);
-		Common::String suffix = Common::String::format(".%d.%d", _state, choice);
-		_host.say(_host._page->text("kReEnterCharIDs" + suffix), number("kReEnterSpchIDs" + suffix));
+		Common::String suffix = Common::String::format(kSignedIndexSignedIndexFormat, _state, choice);
+		_host.say(_host._page->text(kReEnterCharIDsKey + suffix), number(kReEnterSpchIDsKey + suffix));
 	}
 	if (!_host._practice) {
 		world.set(entry, world.get(entry) + 1);
-		world.set("R1CA2Dataset", _book);
+		world.set(kR1CA2DatasetKey, _book);
 	}
 	_ready = true;
 	buttons();
@@ -183,23 +252,24 @@ void Flipbook::checkpoint() {
 	}
 	if (_painted)
 		frame.marked = true;
-	for (int i = 1; i <= 18; i++)
+	for (int i = 1; i <= 18; i++) {
 		if (artwork().frame(_book, i).marked)
 			_maximum = MAX(_maximum, i);
+	}
 	if (_host._practice)
 		return;
 	World &world = _host._world;
 	int count = artwork().markedCount();
-	world.set("R1CN3NumFrames", count);
-	world.set("R1CN3FromStreet", 0);
-	world.set(Common::String::format("R1CA2PicMax%d", _book), _maximum);
+	world.set(kR1CN3NumFramesKey, count);
+	world.set(kR1CN3FromStreetKey, 0);
+	world.set(Common::String::format(kR1CA2PicMaxSignedIndexKey, _book), _maximum);
 	if (count) {
-		world.set(Common::String::format("R1CA2PicUsed%d", _book), 1);
-		if (!world.get("R1CN31stEdit"))
-			world.set("R1CN31stEdit", 1);
+		world.set(Common::String::format(kR1CA2PicUsedSignedIndexKey, _book), 1);
+		if (!world.get(kR1CN31stEditKey))
+			world.set(kR1CN31stEditKey, 1);
 	}
 	if (1 < count)
-		used("TwoPages");
+		used(kTwoPagesName);
 }
 
 void Flipbook::buttons() {
@@ -230,10 +300,10 @@ void Flipbook::buttons() {
 		_next->setFrame(2);
 	else if (_helpIndex == 3)
 		_tools[1]->setFrame(2);
-	else if (_helpIndex == 4)
+	else if (_helpIndex == 4) {
 		for (auto *stamp : _stamps)
 			stamp->setFrame(2);
-	else if (_helpIndex == 5)
+	} else if (_helpIndex == 5)
 		_play->setFrame(2);
 	for (int i = 0; i < 8; i++)
 		coloredImage(*(i < 6 ? _stamps[i] : _tools[i - 6]), i < 6 ? 11180 + i : 11150 + (i - 6) * 2, _colored[i]);
@@ -265,18 +335,22 @@ void Flipbook::updateCursor() {
 	if (_tool != kStamp && Common::Rect(162, 83, 482, 295).contains(_mouse) && !_playing && !_turn)
 		cursor = _tool;
 	else {
-		for (auto *sprite : {_next, _previous, _print, _bomb, _undoButton, _play})
+		for (auto *sprite : {_next, _previous, _print, _bomb, _undoButton, _play}) {
 			if (sprite->visible && sprite->covers(_mouse))
 				cursor = 3;
-		for (auto *sprite : _colors)
+		}
+		for (auto *sprite : _colors) {
 			if (sprite->covers(_mouse))
 				cursor = 3;
-		for (auto *sprite : _tools)
+		}
+		for (auto *sprite : _tools) {
 			if (sprite->covers(_mouse))
 				cursor = 3;
-		for (auto *sprite : _stamps)
+		}
+		for (auto *sprite : _stamps) {
 			if (sprite->visible && sprite->covers(_mouse))
 				cursor = 3;
+		}
 	}
 	if (cursor == _cursor)
 		return;
@@ -306,7 +380,7 @@ void Flipbook::turn(int direction) {
 	_turn = direction;
 	_flip->visible = true;
 	_flip->startAnimation(1);
-	_host.playSounds({static_cast<uint16>(number("kPageFlipID"))});
+	_host.playSounds({static_cast<uint16>(number(kPageFlipIDKey))});
 }
 
 void Flipbook::advance(uint32 time) {
@@ -320,13 +394,13 @@ void Flipbook::advance(uint32 time) {
 		loadFrame();
 		buttons();
 		if (forward && !_host._practice) {
-			int clicks = _host._world.get("R1CA2NextClicks");
+			int clicks = _host._world.get(kR1CA2NextClicksKey);
 			if (!clicks) {
-				_host._world.set("R1CA2NextClicks", 1);
-				group("kArrowSpchIDs.1", "psr");
+				_host._world.set(kR1CA2NextClicksKey, 1);
+				group(kArrowSpchIDs1Key, kPsrName);
 			} else if (clicks == 1 && _frame == 3) {
-				_host._world.set("R1CA2NextClicks", 2);
-				say("reader", "kArrowSpchIDs.2.1");
+				_host._world.set(kR1CA2NextClicksKey, 2);
+				say(kReaderName, kArrowSpchIDs21Key);
 			}
 		}
 	}
@@ -342,15 +416,15 @@ void Flipbook::update(uint32 time) {
 		return;
 	if (_helpPending) {
 		_helpPending = false;
-		static const char *const usedKeys[] = {
-			"Paint",
-			"TwoPages",
-			"Fill",
-			"Stamp",
-			"Play",
+		static constexpr const char *usedKeys[] = {
+			kPaintName,
+			kTwoPagesName,
+			kFillName,
+			kStampName,
+			kPlayName,
 		};
 		for (uint i = 0; i < ARRAYSIZE(usedKeys); i++) {
-			if (!_host._world.get(Common::String("R1CA2") + usedKeys[i] + "Used")) {
+			if (!_host._world.get(Common::String(kR1CA2Key) + usedKeys[i] + kUsedKey)) {
 				_helpIndex = i + 1;
 				_helpPhase = 1;
 				_helpStart = time;
@@ -370,8 +444,8 @@ void Flipbook::update(uint32 time) {
 	if (!busy() && !_playing && !_host._practice && 60000 <= time - _idle) {
 		_idle = time;
 		_idleWaiting = false;
-		Common::String suffix = Common::String::format(".%u", _host._vm.rnd().number(1, 4));
-		_host.say(_host._page->text("kIdleCharID" + suffix), number("kIdleSpchID" + suffix));
+		Common::String suffix = Common::String::format(kUnsignedIndexFormat, _host._vm.rnd().number(1, 4));
+		_host.say(_host._page->text(kIdleCharIDKey + suffix), number(kIdleSpchIDKey + suffix));
 	}
 }
 
@@ -386,7 +460,7 @@ void Flipbook::updateHelp(uint32 time) {
 	if (_helpPhase == 1 && (!blink || 500 <= time - _helpStart)) {
 		_helpPhase = 2;
 		buttons();
-		say("paige", Common::String::format("kHelpSpchIDs.%u", _helpIndex));
+		say(kPaigeName, Common::String::format(kHelpSpchIDsUnsignedIndexKey, _helpIndex));
 	} else if (_helpPhase == 2) {
 		if (blink) {
 			_helpPhase = 3;
@@ -478,7 +552,7 @@ bool Flipbook::stampImage() {
 }
 
 bool Flipbook::coloredImage(Shell::Sprite &sprite, int resource, Graphics::Surface &image) const {
-	Common::ScopedPtr<Common::SeekableReadStream> rgb(_host._vm.resources().open(Common::String::format("r1ca2/%d.rgb", resource)));
+	Common::ScopedPtr<Common::SeekableReadStream> rgb(_host._vm.resources().open(Common::String::format(kPaletteFormat, resource)));
 	if (!rgb || rgb->size() != 1536)
 		return false;
 	byte palette[768];
@@ -496,15 +570,20 @@ bool Flipbook::coloredImage(Shell::Sprite &sprite, int resource, Graphics::Surfa
 }
 
 void Flipbook::stroke(Common::Point from, Common::Point to) {
-	int dx = ABS(to.x - from.x), dy = -ABS(to.y - from.y), error = dx + dy;
-	int sx = from.x < to.x ? 1 : -1, sy = from.y < to.y ? 1 : -1;
+	int dx = ABS(to.x - from.x);
+	int dy = -ABS(to.y - from.y);
+	int error = dx + dy;
+	int sx = from.x < to.x ? 1 : -1;
+	int sy = from.y < to.y ? 1 : -1;
 	int radius = _tool == kErase ? 8 : 2;
 	uint16 ink = _tool == kErase ? Artwork::kWhite : color();
 	for (;;) {
-		for (int y = MAX(0, from.y - radius); y < MIN(Artwork::kVisibleHeight, from.y + radius); y++)
-			for (int x = MAX(0, from.x - radius); x < MIN(Artwork::kWidth, from.x + radius); x++)
+		for (int y = MAX(0, from.y - radius); y < MIN(Artwork::kVisibleHeight, from.y + radius); y++) {
+			for (int x = MAX(0, from.x - radius); x < MIN(Artwork::kWidth, from.x + radius); x++) {
 				if ((x - from.x) * (x - from.x) + (y - from.y) * (y - from.y) <= radius * radius)
 					_pixels[y * Artwork::kWidth + x] = ink;
+			}
+		}
 		if (from == to)
 			break;
 		int twice = error * 2;
@@ -520,7 +599,8 @@ void Flipbook::stroke(Common::Point from, Common::Point to) {
 }
 
 void Flipbook::fill(Common::Point point) {
-	uint16 old = _pixels[point.y * Artwork::kWidth + point.x], ink = color();
+	uint16 old = _pixels[point.y * Artwork::kWidth + point.x];
+	uint16 ink = color();
 	if (old == ink)
 		return;
 	Common::Array<int> pending;
@@ -529,30 +609,37 @@ void Flipbook::fill(Common::Point point) {
 	while (!pending.empty()) {
 		int index = pending.back();
 		pending.pop_back();
-		int x = index % Artwork::kWidth, y = index / Artwork::kWidth;
+		int x = index % Artwork::kWidth;
+		int y = index / Artwork::kWidth;
 		int neighbors[] = {
 			x ? index - 1 : -1,
 			x + 1 < Artwork::kWidth ? index + 1 : -1,
 			y ? index - Artwork::kWidth : -1,
 			y + 1 < Artwork::kVisibleHeight ? index + Artwork::kWidth : -1,
 		};
-		for (int next : neighbors)
+		for (int next : neighbors) {
 			if (0 <= next && _pixels[next] == old) {
 				_pixels[next] = ink;
 				pending.push_back(next);
 			}
+		}
 	}
 }
 
 void Flipbook::stamp(Common::Point point) {
-	int left = point.x - _stampImage.w / 2, top = point.y - _stampImage.h / 2;
-	for (int y = MAX(0, top); y < MIN(Artwork::kVisibleHeight, top + _stampImage.h); y++)
+	int left = point.x - _stampImage.w / 2;
+	int top = point.y - _stampImage.h / 2;
+	for (int y = MAX(0, top); y < MIN(Artwork::kVisibleHeight, top + _stampImage.h); y++) {
 		for (int x = MAX(0, left); x < MIN(Artwork::kWidth, left + _stampImage.w); x++) {
-			byte a, r, g, b;
+			byte a;
+			byte r;
+			byte g;
+			byte b;
 			_stampImage.format.colorToARGB(_stampImage.getPixel(x - left, y - top), a, r, g, b);
 			if (a)
 				_pixels[y * Artwork::kWidth + x] = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
 		}
+	}
 }
 
 bool Flipbook::event(const Common::Event &event) {
@@ -598,23 +685,23 @@ bool Flipbook::event(const Common::Event &event) {
 	Common::Point point = event.mouse - Common::Point(162, 83);
 	if (_tool == kStamp) {
 		stamp(point);
-		used("Stamp");
+		used(kStampName);
 	} else if (_tool == kFill) {
 		fill(point);
-		used("Fill");
+		used(kFillName);
 	} else {
 		_last = point;
 		_dragging = true;
 		stroke(point, point + Common::Point(1, 1));
-		used(_tool == kErase ? "Erase" : "Paint");
+		used(_tool == kErase ? kEraseName : kPaintName);
 	}
 	if (_tool != kErase)
 		_painted = true;
-	static const char *const sounds[] = {
-		"kPaintSFXID",
-		"kFillSFXID",
-		"kEraseSFXID",
-		"kStampSFXID",
+	static constexpr const char *sounds[] = {
+		kPaintSFXIDKey,
+		kFillSFXIDKey,
+		kEraseSFXIDKey,
+		kStampSFXIDKey,
 	};
 	_host.playSounds({static_cast<uint16>(number(sounds[_tool]))});
 	return true;
@@ -622,17 +709,18 @@ bool Flipbook::event(const Common::Event &event) {
 
 void Flipbook::paige() {
 	checkpoint();
-	int count = artwork().markedCount(), choice;
+	int count = artwork().markedCount();
+	int choice;
 	World &world = _host._world;
-	if (1 < _frame && artwork().frame(_book, _frame - 1).marked && !world.get("R1CA2PaigeClicks")) {
+	if (1 < _frame && artwork().frame(_book, _frame - 1).marked && !world.get(kR1CA2PaigeClicksKey)) {
 		choice = 1;
 		if (!_host._practice)
-			world.set("R1CA2PaigeClicks", 1);
+			world.set(kR1CA2PaigeClicksKey, 1);
 	} else if (count == 1)
 		choice = _host._vm.rnd().number(2, 3);
 	else
 		choice = count < 4 && !_host._practice ? 4 : 5;
-	say("paige", Common::String::format("kPaigeSpchIDs.%d", choice));
+	say(kPaigeName, Common::String::format(kPaigeSpchIDsSignedIndexKey, choice));
 }
 
 bool Flipbook::click(Common::Point point) {
@@ -643,9 +731,10 @@ bool Flipbook::click(Common::Point point) {
 	_helpPending = false;
 	cancelHelp();
 	_pressed = nullptr;
-	for (auto *sprite : {_next, _previous, _print, _bomb, _undoButton, _play})
+	for (auto *sprite : {_next, _previous, _print, _bomb, _undoButton, _play}) {
 		if (sprite->visible && sprite->covers(point))
 			_pressed = sprite;
+	}
 	buttons();
 	if (_play->covers(point)) {
 		if (_playing)
@@ -656,7 +745,7 @@ bool Flipbook::click(Common::Point point) {
 			_frame = 1;
 			_nextFrame = _host._time;
 			loadFrame();
-			used("Play");
+			used(kPlayName);
 			buttons();
 		}
 		return true;
@@ -670,21 +759,23 @@ bool Flipbook::click(Common::Point point) {
 		turn(-1);
 		return true;
 	}
-	for (int i = 0; i < 12; i++)
+	for (int i = 0; i < 12; i++) {
 		if (_colors[i]->covers(point)) {
 			_color = i;
 			if (_tool == kStamp)
 				stampImage();
 			buttons();
-			_host.playSounds({static_cast<uint16>(number(Common::String::format("kColorSFXID.%d", i + 1)))});
+			_host.playSounds({static_cast<uint16>(number(Common::String::format(kColorSFXIDSignedIndexKey, i + 1)))});
 			return true;
 		}
-	for (int i = 0; i < 3; i++)
+	}
+	for (int i = 0; i < 3; i++) {
 		if (_tools[i]->covers(point)) {
 			selectTool(static_cast<Tool>(i));
 			return true;
 		}
-	for (int i = 0; i < 6; i++)
+	}
+	for (int i = 0; i < 6; i++) {
 		if (_stamps[i]->visible && _stamps[i]->covers(point)) {
 			if (_tool != kStamp)
 				_previousTool = _tool;
@@ -694,9 +785,10 @@ bool Flipbook::click(Common::Point point) {
 			else
 				_stamp = -1;
 			buttons();
-			_host.playSounds({static_cast<uint16>(number("kPickShapeSFXID"))});
+			_host.playSounds({static_cast<uint16>(number(kPickShapeSFXIDKey))});
 			return true;
 		}
+	}
 	if (_tool == kStamp)
 		selectTool(_previousTool);
 	if (_bomb->covers(point)) {
@@ -704,8 +796,8 @@ bool Flipbook::click(Common::Point point) {
 		artwork().frame(_book, _frame).pixels.clear();
 		loadFrame();
 		_undo = previous;
-		used("Bomb");
-		_host.playSounds({static_cast<uint16>(number("kExplodeSFXID"))});
+		used(kBombName);
+		_host.playSounds({static_cast<uint16>(number(kExplodeSFXIDKey))});
 		return true;
 	}
 	if (_undoButton->covers(point)) {
@@ -713,33 +805,33 @@ bool Flipbook::click(Common::Point point) {
 			SWAP(_pixels, _undo);
 			_dirty = true;
 		}
-		_host.playSounds({static_cast<uint16>(number("kUndoSFXID"))});
+		_host.playSounds({static_cast<uint16>(number(kUndoSFXIDKey))});
 		return true;
 	}
 	if (_print->covers(point)) {
-		if (!_host._world.get("isPrinterOff")) {
+		if (!_host._world.get(kIsPrinterOffKey)) {
 			checkpoint();
 			Print::book(artwork(), _host._vm.resources(), _book);
 		}
 		return true;
 	}
-	if (_host._actors["paige"]->bounds().contains(point)) {
+	if (_host._actors[kPaigeName]->bounds().contains(point)) {
 		paige();
 		return true;
 	}
-	if (_host._actors["reader"]->bounds().contains(point) || _host._actors["sam"]->bounds().contains(point)) {
+	if (_host._actors[kReaderName]->bounds().contains(point) || _host._actors[kSamName]->bounds().contains(point)) {
 		if (!_host._practice) {
 			_mainClicks = _mainClicks % 7 + 1;
-			static const char *const actors[] = {
-				"s",
-				"rs",
-				"srr",
-				"r",
-				"s",
-				"r",
-				"s",
+			static constexpr const char *actors[] = {
+				kSName,
+				kRsName,
+				kSrrName,
+				kRName,
+				kSName,
+				kRName,
+				kSName,
 			};
-			group(Common::String::format("kMainSpchIDs.%d", _mainClicks), actors[_mainClicks - 1]);
+			group(Common::String::format(kMainSpchIDsSignedIndexKey, _mainClicks), actors[_mainClicks - 1]);
 		}
 		return true;
 	}
@@ -750,24 +842,28 @@ void Flipbook::draw(OM::Canvas &canvas) {
 	_host._scene.drawBackground(canvas);
 	if (!_turn) {
 		Common::Array<uint16> display = _pixels;
-		if (!_onion.empty())
-			for (uint i = 0; i < display.size(); i++)
+		if (!_onion.empty()) {
+			for (uint i = 0; i < display.size(); i++) {
 				if (display[i] == Artwork::kWhite && _onion[i] != Artwork::kWhite) {
 					uint c = _onion[i];
 					display[i] = (MIN(28U, ((c >> 10) & 31) + 25) << 10) | (MIN(28U, ((c >> 5) & 31) + 25) << 5) |
 								 MIN(28U, (c & 31) + 25);
 				}
+			}
+		}
 		Artwork::render(display, _image);
 		canvas.blit(_image, 162, 83);
 	}
 	_host._scene.drawSprites(canvas, INT_MIN, 10);
-	for (int i = 0; i < 6; i++)
+	for (int i = 0; i < 6; i++) {
 		if (_stamps[i]->visible && _colored[i].getPixels())
 			canvas.blit(_colored[i], _stamps[i]->x, _stamps[i]->y);
+	}
 	_host._scene.drawSprites(canvas, 11, 60);
-	for (int i = 0; i < 2; i++)
+	for (int i = 0; i < 2; i++) {
 		if (_colored[i + 6].getPixels())
 			canvas.blit(_colored[i + 6], _tools[i]->x, _tools[i]->y);
+	}
 	_host._scene.drawSprites(canvas, 61, INT_MAX);
 	_font->drawString(&canvas.surface(), Common::String::format("%d", _frame), 295, 48, 60,
 					  canvas.surface().format.RGBToColor(6317 >> 8, 4212 >> 8, 2106 >> 8), Graphics::kTextAlignCenter);

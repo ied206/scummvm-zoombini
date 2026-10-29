@@ -36,21 +36,21 @@ static bool loadResources(OM::ResourceProvider &resources, Common::Path &path) {
 }
 
 const Subengine &getSubengine() {
-	static const RuntimeVersions game = {
+	static constexpr RuntimeVersions game = {
 		"RR1 Cloud Nine Windows, 2002 CD",
 		{"ompp32x.dll", nullptr, {}},
 		{"trinketcore.dll", nullptr, {}},
 		{"shelldll.dll", nullptr, {}},
 		{"PuzzleEngine.dll", nullptr, {}},
 		{"RR1.EXE", nullptr, {}}};
-	static const RuntimeVersions launcher = {
+	static constexpr RuntimeVersions launcher = {
 		"RR1 Cloud Nine TLC launcher, 2002 CD",
 		{"ompp32x.tlc", "4.01d", {2002, 2, 5, 11, 58, 47}},
 		{"TLCLLTrinketcore.dll", "1.00a", {2002, 2, 11, 18, 29, 12}},
 		{"TLCLLShelldll.dll", nullptr, {}},
 		{nullptr, nullptr, {}},
 		{"TLCLauncher.exe", nullptr, {}}};
-	static const Subengine subengine = {
+	static constexpr Subengine subengine = {
 		&Game::create, &createResources, &loadResources,
 		"Reader Rabbit 1st Grade: Capers on Cloud Nine!", &SaveFiles::create, game, launcher, "sku381489-CD", 1, 640, 480};
 	return subengine;

@@ -24,6 +24,16 @@
 namespace Trinket {
 namespace RR1Cloud9 {
 
+constexpr const char *SaveFiles::kRegistryHeader;
+constexpr const char *SaveFiles::kLegacyRegistryMagic;
+constexpr const char *SaveFiles::kRegistryMagic;
+constexpr const char *SaveFiles::kVersionName;
+constexpr const char *SaveFiles::k12Name;
+constexpr const char *SaveFiles::kGLOBALENDName;
+constexpr const char *SaveFiles::k1Name;
+
+constexpr const char *SaveFiles::kSlotFileFormat;
+
 bool SaveFiles::readRegistry(Common::SeekableReadStream *stream, Common::Array<Player> &players) {
 	if (!stream)
 		return true;
@@ -31,11 +41,11 @@ bool SaveFiles::readRegistry(Common::SeekableReadStream *stream, Common::Array<P
 	if (!line(*stream, value))
 		return false;
 	// Import the first navigation prototype's registry without changing its checkpoint files.
-	bool legacy = value == "Version";
+	bool legacy = value.equals(kVersionName);
 	if (legacy) {
-		if (!line(*stream, value) || value != "12" || !line(*stream, value) || value != "GLOBAL_END")
+		if (!line(*stream, value) || !value.equals(k12Name) || !line(*stream, value) || !value.equals(kGLOBALENDName))
 			return false;
-	} else if ((value != "RR1Cloud9 saves" && value != "RR1Cloud9 profiles") || !line(*stream, value) || value != "1") {
+	} else if ((!value.equals(kRegistryMagic) && !value.equals(kLegacyRegistryMagic)) || !line(*stream, value) || !value.equals(k1Name)) {
 		return false;
 	}
 	while (stream->pos() < stream->size()) {
@@ -57,7 +67,7 @@ bool SaveFiles::readRegistry(Common::SeekableReadStream *stream, Common::Array<P
 		if (legacy)
 			stream->skip(20);
 		for (const Player &other : players) {
-			if (other.id == player.id || other.name == player.name)
+			if (other.id == player.id || other.name.equals(player.name))
 				return false;
 		}
 		players.push_back(player);
@@ -66,7 +76,7 @@ bool SaveFiles::readRegistry(Common::SeekableReadStream *stream, Common::Array<P
 }
 
 bool SaveFiles::writeRegistry(Common::WriteStream &stream, const Common::Array<Player> &players) const {
-	stream.writeString("RR1Cloud9 saves\n1\n");
+	stream.writeString(kRegistryHeader);
 	for (const Player &player : players) {
 		stream.writeString(player.name + "\n");
 		stream.writeString(Common::String::format("%u\n", player.id));
@@ -76,7 +86,7 @@ bool SaveFiles::writeRegistry(Common::WriteStream &stream, const Common::Array<P
 }
 
 Common::String SaveFiles::slotFileName(uint32 id, uint slot) const {
-	return Common::String::format("User%03u_%uGZ.dat", id, slot);
+	return Common::String::format(kSlotFileFormat, id, slot);
 }
 
 } // namespace RR1Cloud9
