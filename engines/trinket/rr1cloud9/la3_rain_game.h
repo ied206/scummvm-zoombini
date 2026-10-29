@@ -226,8 +226,8 @@ private:
 	OM::XMLParser _data;
 	/** Resource-path resolver for the activity's current page. */
 	Shell::ResourcePaths _paths;
-	/** Font used for activity text and labels. */
-	Common::SharedPtr<OM::NFNTFont> _font;
+	/** FontMan-owned font used for activity text and labels. */
+	const Graphics::Font *_font = nullptr;
 	/** Text displaying the current catching score. */
 	Shell::TextObject *_scoreText = nullptr;
 	/** Movable catcher sprite beneath the falling answers. */

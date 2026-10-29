@@ -54,7 +54,7 @@ bool TextObject::create(const Core::ScriptArguments &sargs) {
 void TextObject::updateBox() {
 	if (!_usePoint)
 		return;
-	Common::Rect box = font().inkBounds(_text);
+	Common::Rect box = Text::inkBounds(font(), _text);
 	box.right += 2;
 	if (_outline)
 		box.grow(1);
@@ -71,7 +71,7 @@ void TextObject::updateBox() {
 
 bool TextObject::setFont(const Common::String &resource) {
 	Common::String path = _resources.resourcePath(resource, kFontExtension);
-	Common::SharedPtr<OM::NFNTFont> font = _fonts.load(path);
+	const Graphics::Font *font = _fonts.load(path);
 	if (!font)
 		return false;
 	_resourceFont = font;
@@ -105,11 +105,11 @@ bool TextObject::get(const Common::String &property, const Core::ScriptArguments
 	else if (property.equals(kPropertyPointY) || (_usePoint && property.equals(kPropertyY)))
 		result = Core::ScriptValue(static_cast<int32>(_point.y));
 	else if (property.equals(kPropertyFontAscent))
-		result = Core::ScriptValue(font().ascent());
+		result = Core::ScriptValue(font().getFontAscent());
 	else if (property.equals(kPropertyFontDescent))
-		result = Core::ScriptValue(font().descent());
+		result = Core::ScriptValue(font().getFontDescent());
 	else if (property.equals(kPropertyFontLeading))
-		result = Core::ScriptValue(font().getFontHeight() - font().ascent() - font().descent());
+		result = Core::ScriptValue(font().getFontHeight() - font().getFontAscent() - font().getFontDescent());
 	else
 		return Core::Trinket::get(property, sargs, result);
 	return true;
@@ -188,8 +188,8 @@ void TextObject::draw(OM::Canvas &canvas) const {
 	Common::Array<Common::String> lines;
 	if (!Text::wrap(font(), _text, _width, lines, Text::kGame, _wrap, _outline))
 		return;
-	int leading = font().getFontHeight() - font().ascent() - font().descent();
-	int baseline = y - box.top + Text::firstBaseline(_height, lines.size(), font().ascent(), font().descent(), leading);
+	int leading = font().getFontHeight() - font().getFontAscent() - font().getFontDescent();
+	int baseline = y - box.top + Text::firstBaseline(_height, lines.size(), font().getFontAscent(), font().getFontDescent(), leading);
 	uint32 color = surface.format.RGBToColor(_color[0] / 256, _color[1] / 256, _color[2] / 256);
 	uint32 outline = surface.format.RGBToColor(_outlineColor[0] / 256, _outlineColor[1] / 256, _outlineColor[2] / 256);
 	for (uint i = 0; i < lines.size(); i++) {
@@ -200,12 +200,12 @@ void TextObject::draw(OM::Canvas &canvas) const {
 			for (int dy = -1; dy <= 1; dy++) {
 				for (int dx = -1; dx <= 1; dx++) {
 					if (dx || dy)
-						font().drawString(&surface, lines[i], left + dx, baseline - font().ascent() + dy, _width + 2, outline,
+						font().drawString(&surface, lines[i], left + dx, baseline - font().getFontAscent() + dy, _width + 2, outline,
 										  Graphics::kTextAlignLeft, 0, false, true);
 				}
 			}
 		}
-		font().drawString(&surface, lines[i], left, baseline - font().ascent(), _width + 2, color, Graphics::kTextAlignLeft, 0, false, true);
+		font().drawString(&surface, lines[i], left, baseline - font().getFontAscent(), _width + 2, color, Graphics::kTextAlignLeft, 0, false, true);
 		baseline += font().getFontHeight();
 	}
 }

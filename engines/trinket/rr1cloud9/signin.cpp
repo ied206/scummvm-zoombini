@@ -57,7 +57,7 @@ bool Signin::enter() {
 	_font = _vm.fonts().load(kNameFont);
 	if (!_font)
 		return false;
-	_rowHeight = _font->ascent() + _font->descent() + _font->getFontLeading() - 3;
+	_rowHeight = _font->getFontAscent() + _font->getFontDescent() + _font->getFontLeading() - 3;
 	refresh();
 	speak(5100);
 	return true;
@@ -374,9 +374,9 @@ void Signin::draw(OM::Canvas &canvas, uint32 time) {
 		bool selected = _first + i == _selected;
 		int y = 126 + i * _rowHeight;
 		if (selected)
-			surface.fillRect(Common::Rect(119, y + _font->descent(), 464, y + _font->descent() + _rowHeight),
+			surface.fillRect(Common::Rect(119, y + _font->getFontDescent(), 464, y + _font->getFontDescent() + _rowHeight),
 							 surface.format.RGBToColor(165, 232, 255));
-		y += _rowHeight - _font->ascent();
+		y += _rowHeight - _font->getFontAscent();
 		uint32 color = surface.format.RGBToColor(12, 25, 35);
 		if (selected)
 			color = _mode < kDraft02 ? surface.format.RGBToColor(7, 56, 112) : surface.format.RGBToColor(107, 7, 5);

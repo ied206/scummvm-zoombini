@@ -134,7 +134,7 @@ private:
 	static constexpr int kFirstSliderAction = 30;
 	/** Provider used for options images, animations, fonts and sounds. */
 	const OM::ResourceProvider &_resources;
-	/** Shared game strikes; panels retain their selected fonts independently. */
+	/** Game FontMan loader whose registrations outlive these panels. */
 	OM::FontCache &_fonts;
 	/** Saved preferences and progress modified by the options screen. */
 	World &_world;
@@ -162,8 +162,8 @@ private:
 	Common::ScopedPtr<Shell::Scene> _newGameScene;
 	/** Actions available in the new-game confirmation panel. */
 	Common::Array<Shell::Sprite *> _newGameButtons;
-	/** Font used to draw new-game confirmation text. */
-	Common::SharedPtr<OM::NFNTFont> _newGameFont;
+	/** FontMan-owned font used to draw new-game confirmation text. */
+	const Graphics::Font *_newGameFont = nullptr;
 	/** Current player's name displayed by the options menu. */
 	Common::String _curSaveName;
 	/** Player registry record used to populate save slots. */
@@ -176,10 +176,10 @@ private:
 	Shell::Sprite *_slotHover = nullptr;
 	/** Sprite marking the currently selected slot. */
 	Shell::Sprite *_slotSelection = nullptr;
-	/** Font used for the slot panel heading. */
-	Common::SharedPtr<OM::NFNTFont> _slotHdrFont;
-	/** Font used for individual slot labels. */
-	Common::SharedPtr<OM::NFNTFont> _slotFont;
+	/** FontMan-owned font used for the slot panel heading. */
+	const Graphics::Font *_slotHdrFont = nullptr;
+	/** FontMan-owned font used for individual slot labels. */
+	const Graphics::Font *_slotFont = nullptr;
 	/** Game-pixel rectangle of the slot panel heading. */
 	Common::Rect _slotHdrRect;
 	/** Game-pixel rectangles used to draw each slot label. */
@@ -215,7 +215,7 @@ private:
 	/** Map a saved location to its thumbnail resource ID. */
 	static uint slotThumbnail(int location);
 	/** Draw a text label within its game-pixel rectangle. */
-	static void drawLabel(OM::Canvas &canvas, const OM::NFNTFont &font, const Common::String &text, const Common::Rect &rect);
+	static void drawLabel(OM::Canvas &canvas, const Graphics::Font &font, const Common::String &text, const Common::Rect &rect);
 	/** Close the current subpanel and refresh pointer feedback on the main panel. */
 	void returnToMain(Common::Point pointer, uint32 time);
 	/** Prevent accidental copies of this stateful object. */

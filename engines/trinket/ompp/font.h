@@ -23,9 +23,6 @@
 #define TRINKET_OMPP_FONT_H
 
 #include "common/array.h"
-#include "common/hash-str.h"
-#include "common/hashmap.h"
-#include "common/ptr.h"
 #include "common/stream.h"
 #include "graphics/fonts/macfont.h"
 #include "trinket/ompp/resource.h"
@@ -44,12 +41,6 @@ public:
 	Common::Rect getBoundingBox(uint32 character) const override;
 	/** Draw a glyph into the surface at its bearing-adjusted pixel position. */
 	void drawChar(Graphics::Surface *surface, uint32 character, int x, int y, uint32 color) const override;
-	/** Return the strike height in pixels above the text baseline. */
-	int ascent() const { return getFontAscent(); }
-	/** Return the strike height in pixels below the text baseline. */
-	int descent() const { return getFontDescent(); }
-	/** Return a byte string's ink bounds relative to its baseline. */
-	Common::Rect inkBounds(const Common::String &text) const;
 
 private:
 	using Graphics::MacFONTFont::loadFont;
@@ -73,19 +64,19 @@ private:
 	uint glyph(uint32 character) const;
 };
 
-/** Share immutable NFNT strikes within one game's or launcher's resource namespace. */
+/** Load NFNT strikes into FontMan for one game's or launcher's resource lifetime. */
 class FontCache {
 public:
-	/** Create a font cache for the supplied resource provider. */
+	/** Create an isolated FontMan namespace for the supplied resource provider. */
 	explicit FontCache(const ResourceProvider &resources) : _resources(resources) {}
-	/** Load a strike once; callers retain it independently of cache eviction. */
-	Common::SharedPtr<NFNTFont> load(const Common::String &path);
-	/** Remove strikes no longer referenced outside the cache. */
-	void removeUnused();
-	/** Release all cache references; active callers keep their strikes alive. */
-	void clear() { _fonts.clear(); }
-	/** Return the number of retained strikes. */
-	uint size() const { return _fonts.size(); }
+	/** Remove this namespace's FontMan registrations after all font consumers have been destroyed. */
+	~FontCache() { clear(); }
+	/** Return a FontMan-owned strike valid until clear() or destruction, or null on load failure. */
+	const Graphics::Font *load(const Common::String &path);
+	/** Remove all registered names, invalidating borrowed fonts without other FontMan aliases. */
+	void clear();
+	/** Return the number of strikes registered by this loader. */
+	uint size() const { return _fontNames.size(); }
 	/** Return cumulative successful strike decodes. */
 	uint64 decodes() const { return _decodes; }
 	/** Return cumulative requests satisfied by existing strikes. */
@@ -94,12 +85,18 @@ public:
 private:
 	/** Resource provider used to load font strikes within this cache's namespace. */
 	const ResourceProvider &_resources;
-	/** Normalized provider identities mapped to shared immutable strikes. */
-	Common::HashMap<Common::String, Common::SharedPtr<NFNTFont>> _fonts;
+	/** FontMan names registered by this loader; FontMan owns the corresponding strikes. */
+	Common::Array<Common::String> _fontNames;
 	/** Successful decodes over this cache instance's lifetime. */
 	uint64 _decodes = 0;
 	/** Cache hits over this cache instance's lifetime. */
 	uint64 _hits = 0;
+	/** Prevent copying the namespace and its registration cleanup responsibility. */
+	FontCache(const FontCache &) = delete;
+	/** Prevent replacing the namespace and its registration cleanup responsibility. */
+	FontCache &operator=(const FontCache &) = delete;
+	/** Qualify a resolved provider key with this loader's identity to isolate simultaneous resource sets. */
+	Common::String cacheName(const Common::String &key) const;
 };
 
 } // End of namespace OM

@@ -335,10 +335,10 @@ private:
 	Shell::ResourcePaths _paths;
 	/** Parsed XML data used to construct the current activity round. */
 	OM::XMLParser _data;
-	/** Font used for activity text and labels. */
-	Common::SharedPtr<OM::NFNTFont> _font;
-	/** Font used for word labels beside the transformation pots. */
-	Common::SharedPtr<OM::NFNTFont> _potFont;
+	/** FontMan-owned font used for activity text and labels. */
+	const Graphics::Font *_font = nullptr;
+	/** FontMan-owned font used for word labels beside the transformation pots. */
+	const Graphics::Font *_potFont = nullptr;
 	/** Word list used to resolve spoken word resources. */
 	Common::StringArray _words;
 	/** Word categories used to locate the corresponding pictures. */

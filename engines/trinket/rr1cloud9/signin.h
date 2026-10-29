@@ -101,8 +101,8 @@ private:
 	OM::Sound _voice;
 	/** Playback state for sign-in control sounds. */
 	OM::Sound _effect;
-	/** Sign-in strike shared with other game consumers of the same resource. */
-	Common::SharedPtr<OM::NFNTFont> _font;
+	/** FontMan-owned sign-in strike shared with other consumers of the same resource. */
+	const Graphics::Font *_font = nullptr;
 	/** Registered player names in list order. */
 	Common::Array<Common::String> _entries;
 	/** Player name currently being edited. */

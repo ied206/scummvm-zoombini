@@ -483,7 +483,6 @@ bool Application::showContent(const OM::XMLParser &xml, const Common::String &br
 	_ok = _newButton = nullptr;
 	_content = _startup = true;
 	_textBlocks.clear();
-	_fonts.removeUnused();
 	_links.clear();
 	_linkParameters.clear();
 	_playCD->visible = true;
@@ -836,7 +835,6 @@ bool Application::showProductScreen(const Common::String &branch) {
 	_scene.clear();
 	_content = false;
 	_textBlocks.clear();
-	_fonts.removeUnused();
 	_links.clear();
 	_linkParameters.clear();
 	_playCD->visible = false;
@@ -912,7 +910,6 @@ bool Application::showProductScreen(const Common::String &branch) {
 bool Application::showSignin() {
 	_scene.clear();
 	_textBlocks.clear();
-	_fonts.removeUnused();
 	_links.clear();
 	_startup = false;
 	_content = false;
@@ -1346,10 +1343,10 @@ void Application::draw(OM::Canvas &canvas) {
 							   lines, Shell::Text::kLauncher))
 			return;
 		int count = lines.size();
-		int leading = _dialogFont->getFontHeight() - _dialogFont->ascent() - _dialogFont->descent();
-		int baseline = Shell::Text::firstBaseline(textArea.h, count, _dialogFont->ascent(), _dialogFont->descent(), leading);
+		int leading = _dialogFont->getFontHeight() - _dialogFont->getFontAscent() - _dialogFont->getFontDescent();
+		int baseline = Shell::Text::firstBaseline(textArea.h, count, _dialogFont->getFontAscent(), _dialogFont->getFontDescent(), leading);
 		for (int i = 0; i < count; i++) {
-			_dialogFont->drawString(&textArea, lines[i], 0, baseline - _dialogFont->ascent(), textArea.w,
+			_dialogFont->drawString(&textArea, lines[i], 0, baseline - _dialogFont->getFontAscent(), textArea.w,
 									canvas.surface().format.RGBToColor(57, 12, 107), Graphics::kTextAlignLeft, 0, false, true);
 			baseline += _dialogFont->getFontHeight();
 		}

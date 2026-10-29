@@ -39,7 +39,7 @@ public:
 	/** Free the rendered credit-content pixels. */
 	~CreditText() { _content.free(); }
 	/** Render XML credit entries using the supplied font and image resources. */
-	bool load(Common::SeekableReadStream &xml, const OM::NFNTFont &font, const OM::ResourceProvider &resources, const char *imagePattern);
+	bool load(Common::SeekableReadStream &xml, const Graphics::Font &font, const OM::ResourceProvider &resources, const char *imagePattern);
 	/** Begin scrolling after a millisecond delay. */
 	void start(uint32 now, uint32 delay);
 	/** Advance scrolling at a millisecond timestamp and report whether it remains active. */

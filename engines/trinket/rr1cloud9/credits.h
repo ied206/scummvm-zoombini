@@ -103,8 +103,8 @@ private:
 	Shell::Scene _scene;
 	/** Animation sprites positioned within the scrolling content. */
 	Shell::Scene _images;
-	/** Font used for credit text rows. */
-	Common::SharedPtr<OM::NFNTFont> _font;
+	/** FontMan-owned font used for credit text rows. */
+	const Graphics::Font *_font = nullptr;
 	/** Credit rows in scrolling order. */
 	Common::Array<Row> _rows;
 	/** Intermediate canvas used to clip credit content to its viewport. */

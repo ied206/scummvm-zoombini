@@ -359,8 +359,8 @@ private:
 	Shell::ResourcePaths _paths;
 	/** Parsed XML data used to construct the current activity round. */
 	OM::XMLParser _data;
-	/** Font used for activity text and labels. */
-	Common::SharedPtr<OM::NFNTFont> _font;
+	/** FontMan-owned font used for activity text and labels. */
+	const Graphics::Font *_font = nullptr;
 	/** Picture values available in the current dataset. */
 	Common::StringArray _pictures;
 	/** Word values available in the current dataset. */

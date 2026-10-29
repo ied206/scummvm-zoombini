@@ -380,8 +380,8 @@ private:
 	Common::ScopedPtr<OM::Sound> _glyphSounds[10];
 	/** Quit-confirmation interface while its modal is active. */
 	Common::ScopedPtr<QuitDialog> _quitDialog;
-	/** Default font used by script-created text objects. */
-	Common::SharedPtr<OM::NFNTFont> _font;
+	/** FontMan-owned default font used by script-created text objects. */
+	const Graphics::Font *_font = nullptr;
 	/** Playback state for the catapult chute mechanism. */
 	OM::Sound _chuteSound;
 	/** Playback state for the catapult drive mechanism. */

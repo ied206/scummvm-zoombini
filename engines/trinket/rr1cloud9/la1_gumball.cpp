@@ -22,6 +22,7 @@
 #include "trinket/rr1cloud9/la1_gumball.h"
 
 #include "trinket/rr1cloud9/page_scene.h"
+#include "trinket/shell/text.h"
 #include "trinket/trinket.h"
 
 namespace Trinket {
@@ -514,8 +515,8 @@ void Gumball::sentence(int slot) {
 	Common::String blank = _parts[1];
 	if (slot) {
 		blank = " _";
-		int spaces = _font->inkBounds("  ").width() + 2;
-		while (_font->inkBounds(blank).width() + 2 + spaces < _font->inkBounds(_words[slot - 1]).width() + 2)
+		int spaces = Shell::Text::inkBounds(*_font, "  ").width() + 2;
+		while (Shell::Text::inkBounds(*_font, blank).width() + 2 + spaces < Shell::Text::inkBounds(*_font, _words[slot - 1]).width() + 2)
 			blank += '_';
 		blank += "_  ";
 	}

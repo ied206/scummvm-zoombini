@@ -443,7 +443,6 @@ void PageScene::clear() {
 	_queenAmbient = nullptr;
 	_queenAmbientChoice = 0;
 	_arrivalIdleIdx = 0;
-	_vm.fonts().removeUnused();
 }
 
 Common::String PageScene::characterResource(uint resource, Kind kind, uint part) const {

@@ -846,8 +846,8 @@ private:
 	Common::Array<Shell::Sprite *> _items;
 	/** Resource-path resolver used to create inventory count labels. */
 	Shell::ResourcePaths _chestPaths;
-	/** Font used for inventory item quantities. */
-	Common::SharedPtr<OM::NFNTFont> _chestFont;
+	/** FontMan-owned font used for inventory item quantities. */
+	const Graphics::Font *_chestFont = nullptr;
 	/** Text labels showing inventory quantities greater than one. */
 	Common::Array<Shell::TextObject *> _itemCounts;
 	/** Whether an item-collection chest presentation is waiting to begin. */

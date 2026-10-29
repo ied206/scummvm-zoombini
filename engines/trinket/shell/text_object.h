@@ -20,8 +20,9 @@ namespace Shell {
 /** Display script-controlled text with its font, bounds and alignment. */
 class TextObject : public Core::Trinket {
 public:
-	/** Create text using resource-path and font services and the supplied default font. */
-	TextObject(const ResourcePaths &resources, OM::FontCache &fonts, const Common::SharedPtr<OM::NFNTFont> &defaultFont) : _resources(resources), _fonts(fonts), _defaultFont(defaultFont) {}
+	/** Create text borrowing the default font and resource fonts until this object's destruction. */
+	TextObject(const ResourcePaths &resources, OM::FontCache &fonts, const Graphics::Font *defaultFont)
+		: _resources(resources), _fonts(fonts), _defaultFont(defaultFont) {}
 	/** Configure text, font and positioning from the script constructor arguments. */
 	bool create(const Core::ScriptArguments &sargs);
 	/** Read text, font, color, alignment and inherited geometry properties. */
@@ -74,12 +75,12 @@ private:
 
 	/** Resource-path resolver used to select text fonts. */
 	const ResourcePaths &_resources;
-	/** Shared strike cache belonging to this resource namespace. */
+	/** FontMan loader whose registrations must outlive this object. */
 	OM::FontCache &_fonts;
-	/** Font used when no explicit font resource was selected. */
-	Common::SharedPtr<OM::NFNTFont> _defaultFont;
-	/** Decoded font selected by the current font resource path. */
-	Common::SharedPtr<OM::NFNTFont> _resourceFont;
+	/** FontMan-owned font used when no explicit font resource was selected. */
+	const Graphics::Font *_defaultFont = nullptr;
+	/** FontMan-owned font selected by the current font resource path. */
+	const Graphics::Font *_resourceFont = nullptr;
 	/** Explicit font resource path, empty when using the default font. */
 	Common::String _fontPath;
 	/** Text content displayed by the object. */
@@ -107,7 +108,7 @@ private:
 	/** Outline RGB components in the zero-to-65535 script color range. */
 	uint16 _outlineColor[3] = {};
 	/** Return the selected resource font or the default font. */
-	const OM::NFNTFont &font() const { return _fontPath.empty() ? *_defaultFont : *_resourceFont; }
+	const Graphics::Font &font() const { return _fontPath.empty() ? *_defaultFont : *_resourceFont; }
 	/** Recalculate text bounds from the content, font and positioning mode. */
 	void updateBox();
 	/** Load and select a font resource, returning false if it cannot be decoded. */

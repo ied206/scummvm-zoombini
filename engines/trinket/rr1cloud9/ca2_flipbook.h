@@ -210,8 +210,8 @@ private:
 	bool _paused = false;
 	/** Whether the activity temporarily hides the pointer. */
 	bool _cursorHidden = false;
-	/** Label strike retained independently of the shared font cache. */
-	Common::SharedPtr<OM::NFNTFont> _font;
+	/** FontMan-owned strike used for frame labels. */
+	const Graphics::Font *_font = nullptr;
 	/** Color palette button sprites. */
 	Shell::Sprite *_colors[12] = {};
 	/** Stamp-selection button sprites. */
