@@ -319,7 +319,7 @@ bool AttributeCharacter::create(uint type, const int32 *traits, uint pose, Commo
 }
 
 void AttributeCharacter::schedule(Timer &timer, uint32 time) {
-	uint seconds = timer.minimum + _vm.rnd().draw() % (timer.maximum - timer.minimum);
+	uint seconds = timer.minimum + _vm._rnd->getRandomNumber(32767) % (timer.maximum - timer.minimum);
 	timer.deadline = ticks(time) + 60 * seconds;
 }
 
@@ -611,7 +611,7 @@ void AttributeCharacter::beginSegment() {
 	_distance = Math::distance(_delta);
 	_travelled = 0;
 	_lastMove = 0;
-	double angle = atan2(-static_cast<double>(_delta.y), static_cast<double>(_delta.x)) * 180.0f * (1.0 / M_PI);
+	double angle = atan2(-static_cast<double>(_delta.y), _delta.x) * 180.0f * (1.0 / M_PI);
 	if (angle < 0)
 		angle += 360;
 	static const int zmbDirections[][2] = {
@@ -791,7 +791,7 @@ bool AttributeCharacter::update(uint32 time, Common::Array<uint16> &sounds) {
 			if (_paused || _dragging || !_feedback.empty() || 0 <= _activeTimer) {
 				schedule(timer, time);
 			} else if (!timer.available.empty()) {
-				uint choice = _vm.rnd().draw() % timer.available.size();
+				uint choice = _vm._rnd->getRandomNumber(timer.available.size() - 1);
 				startVariant(i, timer.available[choice]);
 				timer.available.remove_at(choice);
 				if (timer.available.empty()) {

@@ -40,23 +40,28 @@ ScriptValue ScriptValue::object(uint32 reference) {
 }
 
 ScriptValue ScriptValue::fromText(const Common::String &text) {
-	ScriptValue value(text);
-	if (text.empty() || (!Common::isDigit(text[0]) && text[0] != '.' && text[0] != '-' && text[0] != '+'))
-		return value;
-	value._hasText = true;
+	ScriptValue val(text);
+	if (text.empty())
+		return val;
+
+	char firstChar = text[0];
+	if (!Common::isDigit(firstChar) && firstChar != '.' && firstChar != '-' && firstChar != '+')
+		return val;
+
+	val._hasText = true;
 	if (text.size() <= 10) {
 		int32 integer = 0;
 		if (StringParser::parseSignedInt(text.c_str(), integer, StringParser::kDecimalProfile) == StringParser::Result::kSuccess &&
-			-kIntegerLimit <= integer && integer <= kIntegerLimit) {
-			value._kind = kInteger;
-			value._integer = integer;
-			return value;
+			kIntegerLimitMin <= integer && integer <= kIntegerLimitMax) {
+			val._kind = kInteger;
+			val._integer = integer;
+			return val;
 		}
 	}
-	value._kind = kReal;
-	value._real = StringParser::parseDoublePrefix(text.c_str());
-	value.reduce(text.size());
-	return value;
+	val._kind = kReal;
+	val._real = StringParser::parseDoublePrefix(text.c_str());
+	val.reduce(text.size());
+	return val;
 }
 
 ScriptValue ScriptValue::fromLiteral(int32 number, const Common::String &text) {
@@ -76,21 +81,21 @@ ScriptValue ScriptValue::fromLiteral(double number, const Common::String &text) 
 }
 
 void ScriptValue::reduce(uint length) {
-	if (_kind != kReal || 10 < length || !(-kIntegerLimit <= _real && _real <= kIntegerLimit))
+	if (_kind != kReal || 10 < length || !(kIntegerLimitMin <= _real && _real <= kIntegerLimitMax))
 		return;
-	int32 integer = static_cast<int32>(_real);
-	if (integer == _real) {
+	int32 intVal = static_cast<int32>(_real);
+	if (intVal == _real) {
 		_kind = kInteger;
-		_integer = integer;
+		_integer = intVal;
 	}
 }
 
 int32 ScriptValue::truncate(double value) {
-	if (!(static_cast<double>(INT64_MIN) <= value && value < -static_cast<double>(INT64_MIN)))
+	if (!(INT64_MIN <= value && value < INT64_MAX))
 		return 0;
 	uint32 bits = static_cast<uint32>(static_cast<int64>(value));
 	if (INT32_MAX < bits)
-		return INT32_MIN + static_cast<int32>(bits - static_cast<uint32>(INT32_MAX) - 1);
+		return INT32_MIN + static_cast<int32>(bits - INT32_MAX - 1);
 	return static_cast<int32>(bits);
 }
 
@@ -107,7 +112,7 @@ int32 ScriptValue::toInt32Rounded() const {
 		return 0;
 	int32 lower = truncate(floor(_real));
 	int32 upper = truncate(ceil(_real));
-	if (static_cast<double>(upper) - _real < _real - static_cast<double>(lower))
+	if (upper - _real < _real - lower)
 		return upper;
 	return lower;
 }

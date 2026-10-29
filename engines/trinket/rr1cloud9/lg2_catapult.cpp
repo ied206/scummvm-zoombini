@@ -203,7 +203,7 @@ void Catapult::update(uint32 time) {
 			world.set(kR1LG2FeedPendingKey, 2);
 		}
 		int count = world.get(kR1LG2FeedCreatureKey);
-		line(kSandwichCharIDKey, kSandwichSpchIDKey, count == 1 ? 1 : _host._vm.rnd().number(1, number(kMaxSandwichSpchsKey)));
+		line(kSandwichCharIDKey, kSandwichSpchIDKey, count == 1 ? 1 : _host._vm._rnd->getRandomNumberRng(1, number(kMaxSandwichSpchsKey)));
 		_phase = kFeedSpeech;
 	} else if (_phase == kFeedSpeech) {
 		_eating->visible = true;
@@ -220,7 +220,7 @@ void Catapult::update(uint32 time) {
 		_sleeping = true;
 		world.set(kR1LG2FeedPendingKey, 0);
 		int count = world.get(kR1LG2FeedCreatureKey);
-		line(kPostEatCharIDKey, kPostEatSpchIDKey, _host._vm.rnd().number(1, number(kMaxPostEatSpchsKey)));
+		line(kPostEatCharIDKey, kPostEatSpchIDKey, _host._vm._rnd->getRandomNumberRng(1, number(kMaxPostEatSpchsKey)));
 		if (count == 1)
 			line(kLetsGoCharIDKey, kLetsGoSpchIDKey);
 		_phase = kSpeech;
@@ -238,7 +238,7 @@ void Catapult::update(uint32 time) {
 		if (!_exit->isRunning())
 			_phase = kExitReady;
 	} else if (_phase == kIdle && !_host._practice && static_cast<uint32>(number(kGIdleHelpTimeName)) <= time - _idle) {
-		group(kIdleCharIDKey, kIdleSpchIDKey, kMaxIdleSpchsKey, _sleeping ? 4 : _host._vm.rnd().number(1, 3));
+		group(kIdleCharIDKey, kIdleSpchIDKey, kMaxIdleSpchsKey, _sleeping ? 4 : _host._vm._rnd->getRandomNumberRng(1, 3));
 		_idle = time;
 	}
 }
@@ -256,9 +256,9 @@ bool Catapult::donate(uint item) {
 		return true;
 	}
 	if (_sleeping)
-		line(kItemCharSpch2Key, kItemSpchsID2Key, _host._vm.rnd().number(1, number(kMaxItemSpchs2Key)));
+		line(kItemCharSpch2Key, kItemSpchsID2Key, _host._vm._rnd->getRandomNumberRng(1, number(kMaxItemSpchs2Key)));
 	else
-		group(kItemCharSpchKey, kItemSpchsIDKey, kItemSpchCountKey, _host._vm.rnd().number(1, number(kMaxItemSpchsKey)));
+		group(kItemCharSpchKey, kItemSpchsIDKey, kItemSpchCountKey, _host._vm._rnd->getRandomNumberRng(1, number(kMaxItemSpchsKey)));
 	return false;
 }
 
@@ -271,14 +271,14 @@ void Catapult::ride() {
 	if (count == 1)
 		line(kFirstExitCharIDKey, kFirstExitSpchIDKey);
 	else
-		line(kSubSeqExitCharIDKey, kSubSeqExitSpchIDKey, _host._vm.rnd().number(1, 2));
+		line(kSubSeqExitCharIDKey, kSubSeqExitSpchIDKey, _host._vm._rnd->getRandomNumberRng(1, 2));
 	_phase = kExitSpeech;
 }
 
 bool Catapult::click(Common::Point point) {
 	_idle = _host._time;
 	if (_bowl->visible && _bowl->covers(point)) {
-		int choice = _host._vm.rnd().number(1, 2);
+		int choice = _host._vm._rnd->getRandomNumberRng(1, 2);
 		if (choice == 2 && !_host._world.get(kItem9Key))
 			choice = 3;
 		group(kBowlCharIDKey, kBowlSpchIDKey, kMaxBowlSpchsKey, choice);
@@ -292,17 +292,21 @@ bool Catapult::click(Common::Point point) {
 		if (!entry._value->bounds().contains(point))
 			continue;
 		if (entry._key.equals(kPropertyPet1))
-			group(kPetCharIDsKey, kPetSpchIDsKey, kMaxPetSpchsKey, _host._vm.rnd().number(1, 3));
+			group(kPetCharIDsKey, kPetSpchIDsKey, kMaxPetSpchsKey, _host._vm._rnd->getRandomNumberRng(1, 3));
 		else if (entry._key.equals(kPaigeName)) {
-			Common::String suffix = _sleeping ? k21Name : Common::String::format(k1SignedIndexFormat, _host._vm.rnd().number(1, number(kMaxHelpSpchs1Key)));
+			Common::String suffix;
+			if (_sleeping)
+				suffix = k21Name;
+			else
+				suffix = Common::String::format(k1SignedIndexFormat, _host._vm._rnd->getRandomNumberRng(1, number(kMaxHelpSpchs1Key)));
 			_host.say(_host._page->text(kHelpSpchCharIDsKey + suffix), number(kHelpSpchIDsKey + suffix));
 		} else {
 			int choice = 7;
 			if (!_sleeping) {
 				if (_host._world.get(kR1LG2RodeCatapultKey))
-					choice = _host._vm.rnd().number(4, 6);
+					choice = _host._vm._rnd->getRandomNumberRng(4, 6);
 				else {
-					choice = _host._vm.rnd().number(1, 2) == 2 ? 3 : 1;
+					choice = _host._vm._rnd->getRandomNumberRng(1, 2) == 2 ? 3 : 1;
 					if (choice == 1 && _host._world.get(kItem9Key))
 						choice = 2;
 				}
@@ -316,7 +320,7 @@ bool Catapult::click(Common::Point point) {
 			if (_sleeping)
 				ride();
 			else
-				group(kDontExitCharIDsKey, kDontExitSpchIDsKey, kMaxDontExitSpchsKey, _host._vm.rnd().number(1, number(kNumDontExitSpchsKey)));
+				group(kDontExitCharIDsKey, kDontExitSpchIDsKey, kMaxDontExitSpchsKey, _host._vm._rnd->getRandomNumberRng(1, number(kNumDontExitSpchsKey)));
 			return true;
 		}
 	}

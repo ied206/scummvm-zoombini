@@ -31,7 +31,7 @@ uint PageScene::chooseAction(Common::Array<uint> &choices, uint count) {
 			choices.push_back(i);
 	}
 	// Even the last remaining candidate consumes a native rand() draw.
-	uint index = _vm.rnd().excluding(choices.size());
+	uint index = _vm._rnd->getRandomNumberExcluding(choices.size());
 	uint choice = choices[index];
 	choices.remove_at(index);
 	return choice;
@@ -50,8 +50,8 @@ bool PageScene::enterHub() {
 	} else if (!_world.visits(Page::kPageLN2)) {
 		say(kSamName, _page->number(kReEnterSpchIDsA1Key));
 		say(kReaderName, _page->number(kReEnterSpchIDsA2Key));
-	} else if (_vm.rnd().number(1, 2) == 2) {
-		switch (_vm.rnd().number(1, 4)) {
+	} else if (_vm._rnd->getRandomNumberRng(1, 2) == 2) {
+		switch (_vm._rnd->getRandomNumberRng(1, 4)) {
 		case 1:
 			say(kReaderName, _page->number(kReEnterSpchIDs11Key));
 			say(kSamName, _page->number(kReEnterSpchIDs12Key));

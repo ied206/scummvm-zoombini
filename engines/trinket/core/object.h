@@ -90,11 +90,19 @@ public:
 	bool isNumeric() const { return _kind == kInteger || _kind == kReal; }
 
 private:
-	/** Largest magnitude eligible for real-to-integer reduction. */
-	static constexpr int32 kIntegerLimit = 2000000000;
+	/** Smallest value eligible for real-to-integer reduction. */
+	static constexpr int32 kIntegerLimitMin = -2000000000;
+	/** Largest value eligible for real-to-integer reduction. */
+	static constexpr int32 kIntegerLimitMax = 2000000000;
 	/** Reduce an exact real to an integer when its original text length and value permit it. */
 	void reduce(uint length);
-	/** Truncate through the original signed 64-bit temporary and retain its low 32 bits. */
+	/**
+	 * Truncate @p value toward zero through a signed 64-bit temporary.
+	 * @ref Trinket::Core::ScriptValue::toInt32Trunc uses this for VM integer division and remainder operands.
+	 * @ref Trinket::Core::ScriptValue::toInt32Rounded uses this for floor/ceil candidates,
+	 * including FOR bounds/steps and substring positions/lengths.
+	 * @return The signed low 32 bits, or zero for nonfinite inputs or inputs outside the signed 64-bit conversion range.
+	 */
 	static int32 truncate(double value);
 	/** Value kind selecting the payload; retained text can coexist with a numeric payload. */
 	Kind _kind = kVoid;

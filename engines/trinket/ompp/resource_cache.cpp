@@ -61,7 +61,7 @@ Common::SeekableReadStream *ResourceCache::open(const Common::String &name) cons
 	if (found != _entries.end())
 		return new CachedReadStream(found->_value);
 	// Array and stream reads use 32-bit sizes. Larger streams stay with the provider.
-	if (0xFFFFFFFFULL < static_cast<uint64>(stream->size()))
+	if (UINT32_MAX < static_cast<uint64>(stream->size()))
 		return stream.release();
 	Data data(new Common::Array<byte>());
 	data->resize(stream->size());

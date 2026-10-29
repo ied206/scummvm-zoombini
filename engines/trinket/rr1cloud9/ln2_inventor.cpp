@@ -95,7 +95,7 @@ bool PageScene::enterInventor() {
 	} else if (state == 5) {
 		inventorGroup(reentry == 0 ? kReEnterSpchIDs7Key : kReEnterSpchIDs8Key, reentry == 0 ? kSiiName : kIrName);
 	} else {
-		uint choice = _vm.rnd().number(1, 6);
+		uint choice = _vm._rnd->getRandomNumberRng(1, 6);
 		if (choice <= 3)
 			inventorGroup(Common::String::format(kReEnterSpchIDsUnsignedIndexKey, choice + 3).c_str(), choice == 1 ? kIirName : kRiName);
 	}
@@ -325,7 +325,7 @@ void PageScene::inventorIdle(uint32 time) {
 	_idleWaiting = false;
 	if (_world.get(kR1LN2StateKey) == 5)
 		say(kReaderName, _page->number(kIdleSpchIDs3Key));
-	else if (_vm.rnd().number(1, 2) == 1)
+	else if (_vm._rnd->getRandomNumberRng(1, 2) == 1)
 		inventorGroup(kIdleSpchIDs1Key, kRsName);
 	else
 		inventorGroup(kIdleSpchIDs2Key, kSrsName);

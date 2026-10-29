@@ -51,7 +51,7 @@ bool Registry::parseID(const Common::String &value, uint &id) {
 		if (value[i] < '0' || '9' < value[i])
 			return false;
 		uint digit = value[i] - '0';
-		if ((2147483647u - digit) / 10 < id)
+		if ((INT32_MAX - digit) / 10 < id)
 			return false;
 		id = id * 10 + digit;
 	}

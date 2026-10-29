@@ -220,7 +220,7 @@ bool Flipbook::enter() {
 			actors = kSName;
 		group(Common::String::format(kEnterSpchIDsSignedIndexKey, _state), actors);
 	} else {
-		int choice = _host._vm.rnd().number(1, 3);
+		int choice = _host._vm._rnd->getRandomNumberRng(1, 3);
 		Common::String suffix = Common::String::format(kSignedIndexSignedIndexFormat, _state, choice);
 		_host.say(_host._page->text(kReEnterCharIDsKey + suffix), number(kReEnterSpchIDsKey + suffix));
 	}
@@ -444,7 +444,7 @@ void Flipbook::update(uint32 time) {
 	if (!busy() && !_playing && !_host._practice && 60000 <= time - _idle) {
 		_idle = time;
 		_idleWaiting = false;
-		Common::String suffix = Common::String::format(kUnsignedIndexFormat, _host._vm.rnd().number(1, 4));
+		Common::String suffix = Common::String::format(kUnsignedIndexFormat, static_cast<uint>(_host._vm._rnd->getRandomNumberRng(1, 4)));
 		_host.say(_host._page->text(kIdleCharIDKey + suffix), number(kIdleSpchIDKey + suffix));
 	}
 }
@@ -717,7 +717,7 @@ void Flipbook::paige() {
 		if (!_host._practice)
 			world.set(kR1CA2PaigeClicksKey, 1);
 	} else if (count == 1)
-		choice = _host._vm.rnd().number(2, 3);
+		choice = _host._vm._rnd->getRandomNumberRng(2, 3);
 	else
 		choice = count < 4 && !_host._practice ? 4 : 5;
 	say(kPaigeName, Common::String::format(kPaigeSpchIDsSignedIndexKey, choice));

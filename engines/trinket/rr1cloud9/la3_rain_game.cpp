@@ -297,18 +297,18 @@ bool RainGame::setup() {
 			_labels[i + 3]->visible = 1 < _level;
 		}
 		for (int n = 0; n < group.count; n++) {
-			int slot = _host._vm.rnd().draw() % (count - 1);
+			int slot = _host._vm._rnd->getRandomNumber(count - 2);
 			while (_answers[slot].sprite)
 				slot = (slot + 1) % count;
 			int shape = 0 <= group.first.shape ? group.first.shape : group.second.shape;
 			int color = 0 <= group.first.color ? group.first.color : group.second.color;
 			int object = 0 <= group.first.object ? group.first.object : group.second.object;
 			if (shape < 0)
-				shape = _host._vm.rnd().draw() % 4;
+				shape = _host._vm._rnd->getRandomNumber(3);
 			if (color < 0)
-				color = _host._vm.rnd().draw() % 4;
+				color = _host._vm._rnd->getRandomNumber(3);
 			if (object < 0)
-				object = _host._vm.rnd().draw() % 4;
+				object = _host._vm._rnd->getRandomNumber(3);
 			Answer &answer = _answers[slot];
 			answer.sprite = sprite(27158, 100);
 			if (!answer.sprite)
@@ -469,7 +469,7 @@ void RainGame::advance(uint32 time) {
 		_emitted += 1;
 		if (_emitted < static_cast<int>(_answers.size())) {
 			auto *answer = _answers[_emitted].sprite;
-			answer->x = 100 + _host._vm.rnd().draw() % 400;
+			answer->x = 100 + _host._vm._rnd->getRandomNumber(399);
 			answer->y = -answer->height();
 			answer->visible = true;
 			_host.playSounds({27158});
@@ -567,7 +567,7 @@ void RainGame::finish() {
 		}
 	} else {
 		say(kReaderName, kLessSpchIDs1Key);
-		int choice = _host._vm.rnd().number(1, 4);
+		int choice = _host._vm._rnd->getRandomNumberRng(1, 4);
 		say(kPaigeName, Common::String::format(kLessSpchIDsSignedIndexKey, choice * 2));
 		say(kSamName, Common::String::format(kLessSpchIDsSignedIndexKey, choice * 2 + 1));
 	}
@@ -583,11 +583,11 @@ void RainGame::finish() {
 	}
 	_phase = _wins == 6 ? kEnding : kFeedback;
 	if (_wins < 6) {
-		int choice = _host._vm.rnd().number(1, 3);
+		int choice = _host._vm._rnd->getRandomNumberRng(1, 3);
 		say(choice == 2 ? kSamName : kReaderName, Common::String::format(kDevSpchIDsSignedIndexKey, choice));
 		say(kSamName, kSoonSpchIDKey);
 		_round += 1;
-		_dataset = 15 < _round ? _host._vm.rnd().number(1, 15) : _dataset % 15 + 1;
+		_dataset = 15 < _round ? _host._vm._rnd->getRandomNumberRng(1, 15) : _dataset % 15 + 1;
 	}
 	persist();
 }
@@ -623,9 +623,9 @@ void RainGame::click(Common::Point point) {
 		return;
 	_highlight->visible = false;
 	if (paige) {
-		say(kPaigeName, Common::String::format(kHelpSpchIDsSignedIndexKey, _host._vm.rnd().number(1, 3)));
+		say(kPaigeName, Common::String::format(kHelpSpchIDsSignedIndexKey, _host._vm._rnd->getRandomNumberRng(1, 3)));
 	} else if (_host._actors[kReaderName]->bounds().contains(point) || _host._actors[kSamName]->bounds().contains(point)) {
-		int choice = _host._vm.rnd().number(1, 2);
+		int choice = _host._vm._rnd->getRandomNumberRng(1, 2);
 		say(choice == 1 ? kReaderName : kSamName, Common::String::format(kMainSpchIDsSignedIndex1Key, choice));
 		say(choice == 1 ? kSamName : kReaderName, Common::String::format(kMainSpchIDsSignedIndex2Key, choice));
 	}

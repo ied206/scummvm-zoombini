@@ -139,13 +139,13 @@ int32 StringParser::parseInt32Prefix(const char *text) {
 	// Native integer parameters stop at the first nondigit: "1e3" -> digits "1" -> 1.
 	// Parsing a real first would turn the same text into 1000.
 	while (Common::isDigit(*text)) {
-		value = value * 10 + static_cast<uint32>(*text - '0');
+		value = value * 10 + (*text - '0');
 		text += 1;
 	}
 	if (negative)
 		value = 0U - value;
 	if (INT32_MAX < value)
-		return INT32_MIN + static_cast<int32>(value - static_cast<uint32>(INT32_MAX) - 1);
+		return INT32_MIN + static_cast<int32>(value - INT32_MAX - 1);
 	return static_cast<int32>(value);
 }
 

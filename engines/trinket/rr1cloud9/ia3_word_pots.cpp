@@ -284,7 +284,7 @@ bool WordPots::enter() {
 	_dataset = CLIP(_host._world.get(kR1IA3DatasetKey), 1, indexed(kMaxDataSetsKey, _level));
 	_set = _host._world.get(kR1IA3SetKey);
 	if (_set < 1 || 3 < _set)
-		_set = _host._vm.rnd().number(1, 3);
+		_set = _host._vm._rnd->getRandomNumberRng(1, 3);
 	_state = CLIP(_host._world.get(kR1IA3StateKey), 1, 4);
 	if (_state == 3)
 		_state = 2;
@@ -346,7 +346,7 @@ bool WordPots::enter() {
 		say(kReaderName, kEnterSpchIDsKey);
 		_phase = kIntroduction;
 	} else {
-		int choice = _host._vm.rnd().number(1, 3);
+		int choice = _host._vm._rnd->getRandomNumberRng(1, 3);
 		if (choice == 3)
 			group(kRbName, kReEnterSpchIDs3Key);
 		else
@@ -561,15 +561,15 @@ void WordPots::solved() {
 		if (4 < _round && _round % 4 == 0)
 			_showMarble = true;
 	}
-	_dataset = _round == 1 ? _host._vm.rnd().number(1, indexed(kMaxDataSetsKey, _level)) : _dataset + 1;
+	_dataset = _round == 1 ? _host._vm._rnd->getRandomNumberRng(1, indexed(kMaxDataSetsKey, _level)) : _dataset + 1;
 	if (indexed(kMaxDataSetsKey, _level) < _dataset)
 		_dataset = 1;
-	_set = _host._vm.rnd().number(1, 3);
+	_set = _host._vm._rnd->getRandomNumberRng(1, 3);
 	_round += 1;
 	// Save the next problem together with its reward so a reload cannot award it twice.
 	persist();
 	_host.queueSound(number(kCorrectSfxIDKey));
-	say(kBloomName, Common::String::format(kCorrectSpchIDsSignedIndexKey, _host._vm.rnd().number(1, 4)));
+	say(kBloomName, Common::String::format(kCorrectSpchIDsSignedIndexKey, _host._vm._rnd->getRandomNumberRng(1, 4)));
 	_phase = kCorrect;
 }
 
@@ -627,7 +627,7 @@ void WordPots::bloomHelp() {
 	} else if (_state < 4) {
 		say(kBloomName, _state == 2 ? kInstrSpchIDs2Key : kInstrSpchIDs4Key);
 	} else {
-		int choice = _host._vm.rnd().number(1, 7);
+		int choice = _host._vm._rnd->getRandomNumberRng(1, 7);
 		if (choice <= 5)
 			say(kBloomName, Common::String::format(kInstrSpchIDsSignedIndexKey, choice == 1 ? 12 : choice + 4));
 		else
@@ -692,7 +692,7 @@ bool WordPots::click(Common::Point point) {
 		return true;
 	}
 	if (!_host._practice && (_host._actors[kReaderName]->bounds().contains(point) || _host._actors[kSamName]->bounds().contains(point))) {
-		int choice = _host._vm.rnd().number(1, 4);
+		int choice = _host._vm._rnd->getRandomNumberRng(1, 4);
 		static constexpr const char *actors[] = {
 			kRbName,
 			kSbrName,
@@ -776,7 +776,7 @@ void WordPots::update(uint32 time) {
 		if (step < 12)
 			return;
 		if (_completedRound % 4 == 0) {
-			say(kBloomName, Common::String::format(kCorrectSpchIDsSignedIndexKey, _host._vm.rnd().number(6, 7)));
+			say(kBloomName, Common::String::format(kCorrectSpchIDsSignedIndexKey, _host._vm._rnd->getRandomNumberRng(6, 7)));
 		} else {
 			say(kBloomName, kCorrectSpchIDs5Key);
 		}
@@ -836,7 +836,7 @@ void WordPots::update(uint32 time) {
 	} else if (_phase == kNextSpeech) {
 		present();
 		sound(kPackageOpenIDKey);
-		if (_host._vm.rnd().number(1, 4) == 1) {
+		if (_host._vm._rnd->getRandomNumberRng(1, 4) == 1) {
 			_nextSpeechIdx += 1;
 			if (number(kMaxCorrectSpeechKey) < _nextSpeechIdx)
 				_nextSpeechIdx = 2;

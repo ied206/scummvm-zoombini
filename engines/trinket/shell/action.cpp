@@ -322,7 +322,8 @@ void RandomDelayAction::start() {
 		finished();
 		return;
 	}
-	_remaining = _minimum + _random.draw() % (_maximum - _minimum);
+	// Delay bounds retain their full unsigned subtraction and exclusive upper limit.
+	_remaining = _minimum + _random.getRandomNumber(32767) % (_maximum - _minimum);
 	_started = _system.currentTime();
 }
 

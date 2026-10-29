@@ -82,7 +82,7 @@ const int PlanetariumRules::kMoonHiddenHours[28][2] = {
 PlanetariumRules::PlanetariumRules() = default;
 
 int PlanetariumRules::randomExcept(Shell::Random &random, uint bound, int excluded) {
-	int value = random.draw() % bound;
+	int value = random.getRandomNumber(bound - 1);
 	return value == excluded ? (value + 1) % bound : value;
 }
 
@@ -134,21 +134,21 @@ bool PlanetariumRules::generate(uint level, Shell::Random &random) {
 		2,
 	};
 	if (_level == 3) {
-		_targetDay = random.draw() % 28;
+		_targetDay = random.getRandomNumber(27);
 		for (uint i = 0; i < 2; i++) {
 			_day[i] = randomExcept(random, 28, _targetDay);
 			addPieces(i, kDay01, dayValues, ARRAYSIZE(dayValues));
 		}
 	} else if (_level == 2) {
-		_day[0] = _day[1] = 7 * (random.draw() % 4);
+		_day[0] = _day[1] = 7 * (random.getRandomNumber(3));
 	}
-	_targetHour = random.draw() % 24;
+	_targetHour = random.getRandomNumber(23);
 	for (uint i = 0; i < 2; i++) {
 		int low = showMoon() ? kMoonHiddenHours[_day[i]][0] : -1;
 		int high = showMoon() ? kMoonHiddenHours[_day[i]][1] : -1;
 		if (i == 1 && showMoon() && low != -1) {
 			int span = high - low + 1;
-			int hour = random.draw() % (24 - span);
+			int hour = random.getRandomNumber(23 - span);
 			if (low <= hour && hour <= high) {
 				hour = (hour + span) % 24;
 				while (hour == _targetHour || (low <= hour && hour <= high))
@@ -937,7 +937,7 @@ bool Incubator::setPopulation(uint row, uint count) {
 	for (uint i = 0; i < count; i++) {
 		Pupa &pupa = _pupae[row][i];
 		pupa = Pupa();
-		pupa.sprite = add(14048, z + 1, _vm.rnd().draw() % 4 + 1);
+		pupa.sprite = add(14048, z + 1, _vm._rnd->getRandomNumber(3) + 1);
 		if (!pupa.sprite)
 			return false;
 		Common::Point position = kPupaPositions[_rows == 6 ? 1 : 0][row][i];
@@ -1035,11 +1035,11 @@ void Incubator::update(uint32 time) {
 			pupa.start = Common::Point(pupa.sprite->x, pupa.sprite->y);
 			static constexpr float twoPi = 2.0f * static_cast<float>(M_PI);
 			static constexpr float randScale = 1.0f / 32767.0f;
-			pupa.phase = static_cast<float>(_vm.rnd().draw() * twoPi * randScale);
-			pupa.amplitude = static_cast<float>(_vm.rnd().draw() * 2.0f * randScale + 8.0f);
-			pupa.frequency = static_cast<float>(_vm.rnd().draw() * 0.004f * randScale + 0.008f);
-			int sign = (_vm.rnd().draw() % 2) ? 1 : -1;
-			pupa.destination = Common::Point(800, pupa.start.y + sign * (_vm.rnd().draw() % 60));
+			pupa.phase = _vm._rnd->getRandomNumber(32767) * twoPi * randScale;
+			pupa.amplitude = _vm._rnd->getRandomNumber(32767) * 2.0f * randScale + 8.0f;
+			pupa.frequency = _vm._rnd->getRandomNumber(32767) * 0.004f * randScale + 0.008f;
+			int sign = (_vm._rnd->getRandomNumber(1)) ? 1 : -1;
+			pupa.destination = Common::Point(800, pupa.start.y + sign * (_vm._rnd->getRandomNumber(59)));
 			Common::Point delta = pupa.destination - pupa.start;
 			pupa.distance = Math::distance<float>(delta);
 			_scene.setDepth(pupa.sprite, z + 3);

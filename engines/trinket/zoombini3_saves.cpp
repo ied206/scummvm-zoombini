@@ -169,7 +169,7 @@ bool Saves::rename(uint player, const Common::String &name, bool clone) {
 		}
 	}
 	if (!found) {
-		if (99 <= _registry.users.size() || 2147483647u <= _registry.nextID)
+		if (99 <= _registry.users.size() || INT32_MAX <= _registry.nextID)
 			return finish(false);
 		Launcher::Registry::User user;
 		user.id = _registry.nextID;
@@ -215,7 +215,7 @@ bool Saves::importSlot(uint player, uint slot, Common::SeekableReadStream &strea
 
 bool Saves::importSave(const Common::String &name, Common::SeekableReadStream &stream) {
 	_rollbackFailed = false;
-	if (!validName(name) || 99 <= _registry.users.size() || 2147483647u <= _registry.nextID)
+	if (!validName(name) || 99 <= _registry.users.size() || INT32_MAX <= _registry.nextID)
 		return false;
 	for (const auto &player : players()) {
 		if (player.name.equals(name) || player.name.equals(name + kXMLPractice))

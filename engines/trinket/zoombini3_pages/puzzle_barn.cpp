@@ -82,7 +82,7 @@ bool BarnRules::generatePuzzle(uint pairs, uint trait, bool showGenes, uint limi
 	_limit = limit;
 	for (uint side = 0; side < 2; side++) {
 		for (uint i = 0; i < _pairs; i++)
-			_choices[side][i] = random.draw() % (_pairs - i);
+			_choices[side][i] = random.getRandomNumber(_pairs - i - 1);
 	}
 	for (uint i = 0; i < this->party(); i++) {
 		Parent &parent = _parents[i];
@@ -92,21 +92,21 @@ bool BarnRules::generatePuzzle(uint pairs, uint trait, bool showGenes, uint limi
 		for (uint a = 0; a < 3; a++) {
 			int count = a ? 3 : 1;
 			int value = i < inputs.size() ? inputs[i].traits[a] : -1;
-			parent.traits[a] = 0 <= value && value < count ? value : random.draw() % count;
+			parent.traits[a] = 0 <= value && value < count ? value : random.getRandomNumber(count - 1);
 		}
 		if (generator) {
 			if (!generator->barnParentGenerated(i))
 				return false;
 		} else {
-			random.draw();
-			random.draw();
+			random.getRandomNumber(32767);
+			random.getRandomNumber(32767);
 		}
 		parent.genes[0] = parent.traits[_trait];
-		uint recessive = parent.genes[0] + random.draw() % 2;
+		uint recessive = parent.genes[0] + random.getRandomNumber(1);
 		if (2 < recessive)
 			recessive = 0;
 		if (recessive == parent.genes[0]) {
-			recessive = parent.genes[0] + random.draw() % 2;
+			recessive = parent.genes[0] + random.getRandomNumber(1);
 			if (2 < recessive)
 				recessive = 0;
 		}
@@ -410,7 +410,7 @@ bool BarnMachine::setup(uint pairs, uint trait, bool showGenes, uint limit) {
 	_waterFrame = 1;
 	memset(_geneOpening, 0, sizeof(_geneOpening));
 	memset(_geneStarted, 0, sizeof(_geneStarted));
-	if (!_rules.generatePuzzle(pairs, trait, showGenes, limit, _vm.rnd(), _inputs, this))
+	if (!_rules.generatePuzzle(pairs, trait, showGenes, limit, *_vm._rnd, _inputs, this))
 		return false;
 	_inputs.clear();
 	_level = _rules.level();

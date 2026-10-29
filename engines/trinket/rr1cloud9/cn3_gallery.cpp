@@ -194,7 +194,7 @@ bool Gallery::artist(int pose) {
 		delete _host._actors[kArtistKey];
 		_host._actors.erase(kArtistKey);
 	}
-	Common::ScopedPtr<Shell::Character> actor(new Shell::Character(_host._scene, _host._vm.mixer(), _host._vm.resources(), _host._vm.rnd(), _host));
+	Common::ScopedPtr<Shell::Character> actor(new Shell::Character(_host._scene, _host._vm.mixer(), _host._vm.resources(), *_host._vm._rnd, _host));
 	if (!actor->create(indexed(kArtistSetIDKey, pose), number(kArtistZKey)))
 		return false;
 	actor->movable = false;
@@ -271,7 +271,7 @@ bool Gallery::enter() {
 			group(kReEnterSpchIDs2Key, kAsaName);
 		else if (_state == 3) {
 			say(kArtistKey, kReEnterSpchIDs31Key);
-			_host.say(kArtistKey, indexed(kReEnterSpchIDs3Key, _host._vm.rnd().number(2, 3)));
+			_host.say(kArtistKey, indexed(kReEnterSpchIDs3Key, _host._vm._rnd->getRandomNumberRng(2, 3)));
 			say(kArtistKey, kReEnterSpchIDs34Key);
 		} else if (!world.get(kR1CN3SaidSS4Key)) {
 			world.set(kR1CN3SaidSS4Key, 1);
@@ -389,7 +389,7 @@ void Gallery::artistSpeech() {
 	} else if (_state == 3) {
 		int edited = _host._world.get(kR1CN3NumFramesKey);
 		if (edited)
-			_host.say(kArtistKey, indexed(kArtistSpchIDs31Key, _host._vm.rnd().number(1, 2)));
+			_host.say(kArtistKey, indexed(kArtistSpchIDs31Key, _host._vm._rnd->getRandomNumberRng(1, 2)));
 		if (!edited || _host._world.get(kR1CN3FromSampleKey))
 			group(kArtistSpchIDs34Key, kAaName);
 		else if (edited == 1)
@@ -405,12 +405,12 @@ void Gallery::mainSpeech() {
 	if (_state == 1)
 		artistSpeech();
 	else if (_state < 4) {
-		int choice = _host._vm.rnd().number(1, 2);
+		int choice = _host._vm._rnd->getRandomNumberRng(1, 2);
 		_host.speeches(Common::String::format(kMainCharIDs2SignedIndexKey, choice), Common::String::format(kMainSpchIDs2SignedIndexKey, choice),
 					   indexed(kMaxMain2SpeechesKey, choice));
 	} else if (_state == 4 && _host._world.get(kTalkedToRockHeadKey))
 		say(kReaderName, kMainSpchIDs41Key);
-	else if (_host._vm.rnd().number(1, 2) == 1)
+	else if (_host._vm._rnd->getRandomNumberRng(1, 2) == 1)
 		group(kMainSpchIDs51Key, kSaName);
 	else
 		group(kMainSpchIDs52Key, kSrName);

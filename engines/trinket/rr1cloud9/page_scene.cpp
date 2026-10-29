@@ -484,7 +484,7 @@ bool PageScene::actor(const Common::String &name, const Common::String &prefix, 
 		settle = _page->number(prefix + kLipsIDName);
 	if (!settle)
 		return false;
-	Common::ScopedPtr<Shell::Character> character(new Shell::Character(_scene, _vm.mixer(), _vm.resources(), _vm.rnd(), *this));
+	Common::ScopedPtr<Shell::Character> character(new Shell::Character(_scene, _vm.mixer(), _vm.resources(), *_vm._rnd, *this));
 	if (!character->create(settle, _page->number(prefix + kZName)))
 		return false;
 	character->movable = false;
@@ -540,7 +540,7 @@ void PageScene::queueSound(uint resource) {
 
 void PageScene::arrivalSpeaker(uint group) {
 	if (!group)
-		group = _vm.rnd().number(1, _page->number(kMaxSpeakSpchsKey));
+		group = _vm._rnd->getRandomNumberRng(1, _page->number(kMaxSpeakSpchsKey));
 	Common::String suffix = Common::String::format(kUnsignedIndexFormat, group);
 	for (uint i = 1; i <= static_cast<uint>(_page->number(kMaxSpeakIdleSpchsKey + suffix)); i++)
 		say(kSpeakName, _page->number(kSpeakIdleSpchsIDKey + suffix + Common::String::format(kUnsignedIndexFormat, i)));
@@ -559,7 +559,7 @@ void PageScene::arrivalIdle(uint32 time) {
 	_arrivalIdleIdx = _arrivalIdleIdx % MAX(1, _page->number(kMaxIdleIndexKey) * 3) + 1;
 	arrivalSpeaker();
 	if (_arrivalIdleIdx % 3 == 2) {
-		Common::String group = Common::String::format(kUnsignedIndexFormat, _vm.rnd().number(1, 2));
+		Common::String group = Common::String::format(kUnsignedIndexFormat, static_cast<uint>(_vm._rnd->getRandomNumberRng(1, 2)));
 		for (uint i = 1; i <= static_cast<uint>(_page->number(kMaxIdleIndexSpeechesKey + group)); i++) {
 			delaySpeech(1500);
 			Common::String suffix = group + Common::String::format(kUnsignedIndexFormat, i);
@@ -1197,14 +1197,14 @@ Common::String PageScene::click(Common::Point point) {
 			Common::String group = _world.get(kR1CN1BellClickKey) ? k2Name : k1Name;
 			speeches(kHelpSpchCharIDsKey + group, kHelpSpchIDsKey + group, 2);
 		} else {
-			uint choice = _world.get(kR1CN1BellClickKey) ? _vm.rnd().number(2, 3) : 1;
+			uint choice = _world.get(kR1CN1BellClickKey) ? _vm._rnd->getRandomNumberRng(2, 3) : 1;
 			Common::String group = Common::String::format(kUnsignedIndexFormat, choice);
 			speeches(kMainSpchCharIDsKey + group, kMainSpchIDsKey + group, _page->number(kMaxMainSpchsKey + group));
 		}
 		return kHandledName;
 	}
 	if (!_practice && !_world.visits(Page::kPageCN2) && 350 <= point.x) {
-		uint choice = _vm.rnd().number(1, 2);
+		uint choice = _vm._rnd->getRandomNumberRng(1, 2);
 		Common::String suffix = Common::String::format(kUnsignedIndexFormat, choice);
 		say(_page->text(kDontExitSpchCharIDsKey + suffix), _page->number(kDontExitSpchIDsKey + suffix));
 		return kHandledName;
@@ -1227,7 +1227,7 @@ Common::String PageScene::gateClick(Common::Point point) {
 		int choice;
 		if (count) {
 			if (paige)
-				choice = _vm.rnd().number(4, 5);
+				choice = _vm._rnd->getRandomNumberRng(4, 5);
 			else
 				choice = 4;
 		} else {
@@ -1253,7 +1253,7 @@ Common::String PageScene::gateClick(Common::Point point) {
 		} else {
 			speeches(kSmSignCharIDs1Key, kSmSignIDs1Key, _page->number(kMaxSmSignSpchs1Key));
 			if (state < 3) {
-				Common::String group = Common::String::format(kSignedIndexFormat, state == 1 ? _vm.rnd().number(2, 3) : 4);
+				Common::String group = Common::String::format(kSignedIndexFormat, state == 1 ? _vm._rnd->getRandomNumberRng(2, 3) : 4);
 				speeches(kSmSignCharIDsKey + group, kSmSignIDsKey + group, _page->number(kMaxSmSignSpchsKey + group));
 			}
 		}
@@ -1263,7 +1263,7 @@ Common::String PageScene::gateClick(Common::Point point) {
 		for (const auto &exit : _page->exits()) {
 			if (exit.destination.equals(Page::kPageCN1) || !exit.rect.contains(point))
 				continue;
-			Common::String suffix = Common::String::format(kSignedIndexFormat, _vm.rnd().number(1, 2));
+			Common::String suffix = Common::String::format(kSignedIndexFormat, _vm._rnd->getRandomNumberRng(1, 2));
 			say(_page->text(kDontExitSpchCharIDsKey + suffix), _page->number(kDontExitSpchIDsKey + suffix));
 			return kHandledName;
 		}

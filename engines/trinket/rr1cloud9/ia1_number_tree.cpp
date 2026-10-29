@@ -228,8 +228,8 @@ bool NumberTree::enter() {
 			entrySpeech(number(kMaxEntrySpchsKey) - 1, number(kMaxEntrySpchsKey));
 		_host._world.set(kR1IA1StateKey, 2);
 	} else {
-		say(kSquirrelName, Common::String::format(kReentrySpchID1SignedIndexKey, _host._vm.rnd().number(1, 3)));
-		if (_host._vm.rnd().number(1, 2) == 1) {
+		say(kSquirrelName, Common::String::format(kReentrySpchID1SignedIndexKey, _host._vm._rnd->getRandomNumberRng(1, 3)));
+		if (_host._vm._rnd->getRandomNumberRng(1, 2) == 1) {
 			say(kReaderName, kReentrySpchID21Key);
 			say(kSamName, kReentrySpchID22Key);
 		}
@@ -262,8 +262,8 @@ int NumberTree::datasetCount() const {
 }
 
 void NumberTree::chooseDataset() {
-	_dataset = _host._vm.rnd().number(1, MAX(1, datasetCount()));
-	_set = _host._vm.rnd().number(1, number(kNumSetsKey));
+	_dataset = _host._vm._rnd->getRandomNumberRng(1, MAX(1, datasetCount()));
+	_set = _host._vm._rnd->getRandomNumberRng(1, number(kNumSetsKey));
 }
 
 void NumberTree::persist() {
@@ -499,13 +499,13 @@ void NumberTree::checkAnswer() {
 		_imperfect = true;
 		sound(kWrongSfxIDKey);
 		if (_subtract) {
-			say(kSquirrelName, Common::String::format(kOopsSpchIDSignedIndexKey, _host._vm.rnd().number(1, 4)));
+			say(kSquirrelName, Common::String::format(kOopsSpchIDSignedIndexKey, _host._vm._rnd->getRandomNumberRng(1, 4)));
 			_phase = kWrong;
 			_start = _host._time;
 			return;
 		}
-		if (_host._vm.rnd().number(1, 2) == 2)
-			say(kSquirrelName, Common::String::format(kWrongSpchIDSignedIndexKey, _host._vm.rnd().number(1, 2) + (total < _target ? 2 : 0)));
+		if (_host._vm._rnd->getRandomNumberRng(1, 2) == 2)
+			say(kSquirrelName, Common::String::format(kWrongSpchIDSignedIndexKey, _host._vm._rnd->getRandomNumberRng(1, 2) + (total < _target ? 2 : 0)));
 	}
 	_phase = kReady;
 }
@@ -553,7 +553,7 @@ void NumberTree::solved() {
 	_phase = kReward;
 	_rounds += 1;
 	sound(kCorrectSFXKey);
-	say(kSquirrelName, Common::String::format(kCharCongratSpchIDSignedIndexKey, _host._vm.rnd().number(1, 5)));
+	say(kSquirrelName, Common::String::format(kCharCongratSpchIDSignedIndexKey, _host._vm._rnd->getRandomNumberRng(1, 5)));
 	if (!_host._practice) {
 		if (_rounds % 3 == 0) {
 			say(kSquirrelName, _showMarble ? kRewardSpchID3Key : kRewardSpchID2Key);
@@ -651,7 +651,7 @@ bool NumberTree::event(const Common::Event &event) {
 }
 
 void NumberTree::help() {
-	if (_host._vm.rnd().number(1, 2) == 1)
+	if (_host._vm._rnd->getRandomNumberRng(1, 2) == 1)
 		say(kSquirrelName, kInstructionSpchID1Key);
 	if (1 < _level && _instruction == 1)
 		_instruction += 1;
@@ -718,11 +718,11 @@ bool NumberTree::click(Common::Point point) {
 		return true;
 	}
 	if (_host._actors[kPaigeName]->bounds().contains(point)) {
-		say(kPaigeName, Common::String::format(kHelpSpchIDSignedIndexKey, _host._vm.rnd().number(1, _subtract ? 6 : 5)));
+		say(kPaigeName, Common::String::format(kHelpSpchIDSignedIndexKey, _host._vm._rnd->getRandomNumberRng(1, _subtract ? 6 : 5)));
 		return true;
 	}
 	if (!_host._practice && (_host._actors[kReaderName]->bounds().contains(point) || _host._actors[kSamName]->bounds().contains(point))) {
-		switch (_host._vm.rnd().number(1, 4)) {
+		switch (_host._vm._rnd->getRandomNumberRng(1, 4)) {
 		case 1:
 			say(kSamName, kIdleSpchIDs31Key);
 			say(kReaderName, kIdleSpchIDs32Key);
@@ -809,7 +809,7 @@ void NumberTree::update(uint32 time) {
 			warning("RR1: cannot load IA1 level %d dataset %d set %d", _level, _dataset, _set);
 		sound(kPresentNewClustersSFXKey);
 		if (_rounds < 7)
-			say(kSquirrelName, Common::String::format(kResetSpchID1SignedIndexKey, _host._vm.rnd().number(2, 5)));
+			say(kSquirrelName, Common::String::format(kResetSpchID1SignedIndexKey, _host._vm._rnd->getRandomNumberRng(2, 5)));
 		if (_rounds == 1 || _rounds == 2) {
 			int group = _rounds + 1;
 			say(kReaderName, Common::String::format(kResetSpchIDSignedIndex1Key, group));
@@ -819,10 +819,10 @@ void NumberTree::update(uint32 time) {
 	} else if (_phase == kEating && !_eat->isRunning()) {
 		_eat->visible = false;
 		_host._actors[kSamName]->setVisible(true);
-		say(kSamName, Common::String::format(kEatNutSpchIDSignedIndexKey, _host._vm.rnd().number(2, 5)));
+		say(kSamName, Common::String::format(kEatNutSpchIDSignedIndexKey, _host._vm._rnd->getRandomNumberRng(2, 5)));
 		_phase = kReady;
 	} else if (!_host._practice && _phase == kReady && _dragged < 0 && 60000 <= time - _idle) {
-		int group = _host._vm.rnd().number(1, 3);
+		int group = _host._vm._rnd->getRandomNumberRng(1, 3);
 		say(group == 3 ? kSamName : kSquirrelName, Common::String::format(kIdleSpchIDsSignedIndex1Key, group));
 		say(group == 3 ? kReaderName : kSquirrelName, Common::String::format(kIdleSpchIDsSignedIndex2Key, group));
 		_idle = time;

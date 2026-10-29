@@ -22,61 +22,95 @@
 #include "trinket/shell/random.h"
 
 #include "common/config-manager.h"
+#include "common/textconsole.h"
 #include "common/util.h"
 #include "trinket/metaengine.h"
+
+#ifdef ENABLE_EVENTRECORDER
+#include "gui/EventRecorder.h"
+#endif
 
 namespace Trinket {
 namespace Shell {
 
-Random::PrngAlgorithm Random::getPrngAlgorithm(const Common::String &domain) {
-	const int prngAlgoVal = ConfMan.getInt(TrinketMetaEngine::kOptionPrngAlgorithm, domain);
-	const PrngAlgorithm prngAlgorithm = static_cast<PrngAlgorithm>(prngAlgoVal);
-	if (prngAlgorithm == PrngAlgorithm::kStandardPrng)
-		return prngAlgorithm;
-	return PrngAlgorithm::kOriginalPrng;
+Random::Random(const Common::String &name) : _scummRnd(name) {
+	const int prngAlgorithmVal = ConfMan.getInt(TrinketMetaEngine::kOptionPrngAlgorithm);
+	_prngAlgorithm = static_cast<PrngAlgorithmKind>(prngAlgorithmVal);
+
+#ifdef ENABLE_EVENTRECORDER
+	setSeed(g_eventRec.getRandomSeed(name));
+#else
+	setSeed(generateNewSeed());
+#endif
 }
 
-Random::Random() : _prngAlgorithm(getPrngAlgorithm()) {
-}
-
-void Random::setAlgorithm(PrngAlgorithm prngAlgorithm) {
+void Random::setAlgorithm(PrngAlgorithmKind prngAlgorithm) {
 	if (_prngAlgorithm == prngAlgorithm)
 		return;
 
 	_prngAlgorithm = prngAlgorithm;
-	setSeed(Common::RandomSource::generateNewSeed());
+	setSeed(generateNewSeed());
 }
 
 void Random::setSeed(uint32 seed) {
-	_state = seed;
-	_fallback.setSeed(seed);
+	_randState = seed;
+	_scummRnd.setSeed(seed);
 }
 
-uint32 Random::draw() {
-	if (_prngAlgorithm == PrngAlgorithm::kStandardPrng)
-		return _fallback.getRandomNumber(32767);
-	// The Windows MSVCRT generator wraps its state at 32 bits and returns 15 bits.
-	_state = _state * 214013u + 2531011u;
-	return (_state >> 16) & 32767u;
+uint32 Random::getSeed() const {
+	switch (_prngAlgorithm) {
+	case PrngAlgorithmKind::kStandardPrng:
+		return _scummRnd.getSeed();
+	case PrngAlgorithmKind::kOriginalPrng:
+	default:
+		return _randState;
+	}
 }
 
-int Random::excluding(int count, int excluded) {
+uint32 Random::generateNewSeed() {
+	return Common::RandomSource::generateNewSeed();
+}
+
+int32 Random::getOriginalRandomNumber(int32 max) {
+	assert(0 <= max);
+	// MSVC 6.0 CRT rand() advances this unsigned 32-bit LCG and returns bits 16 through 30.
+	_randState = 214013u * _randState + 2531011u;
+	const int32 result = static_cast<int32>((_randState >> 16) & 0x7FFFu);
+	if (max == INT32_MAX)
+		return result;
+	return result % (max + 1);
+}
+
+int32 Random::getRandomNumber(int32 max) {
+	assert(0 <= max);
+	switch (_prngAlgorithm) {
+	case PrngAlgorithmKind::kStandardPrng:
+		return static_cast<int32>(_scummRnd.getRandomNumber(static_cast<uint32>(max)));
+	case PrngAlgorithmKind::kOriginalPrng:
+	default:
+		return getOriginalRandomNumber(max);
+	}
+}
+
+int32 Random::getRandomNumberRng(int32 min, int32 max) {
+	if (min == max)
+		return min;
+	if (max < min)
+		SWAP(min, max);
+	// Unsigned endpoint subtraction preserves cross-zero spans without signed overflow.
+	const uint32 span = static_cast<uint32>(max) - static_cast<uint32>(min);
+	if (INT32_MAX < span)
+		error("Random::getRandomNumberRng: range exceeds INT32_MAX");
+	return min + getRandomNumber(static_cast<int32>(span));
+}
+
+int32 Random::getRandomNumberExcluding(int32 count, int32 excluded) {
 	if (count <= 0)
 		return 0;
-	int result = draw() % count;
+	int32 result = getRandomNumber(count - 1);
 	if (result == excluded)
 		result = (result + 1) % count;
 	return result;
 }
-
-int Random::number(int minimum, int maximum) {
-	if (minimum == maximum)
-		return minimum;
-	if (maximum < minimum)
-		SWAP(minimum, maximum);
-	assert(static_cast<int64>(maximum) - minimum < 2147483647);
-	return minimum + excluding(maximum - minimum + 1);
-}
-
 } // namespace Shell
 } // namespace Trinket

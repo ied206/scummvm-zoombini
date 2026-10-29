@@ -80,6 +80,7 @@ TrinketEngine::TrinketEngine(OSystem *system, const Subengine &subengine, Common
 	: Engine(system), _resources(subengine.createResources()), _fonts(*_resources), _music(*_mixer, *_resources),
 	  _saveFiles(subengine.createSaveFiles(*system->getSavefileManager(), _targetName)),
 	  _launcher(*this, *system->getSavefileManager(), _targetName, *_mixer), _subengine(subengine), _platform(platform) {
+	_rnd = new Shell::Random("trinket");
 	setDebugger(new TrinketDebugger(*this));
 	_mainMenuDialog = new TrinketMainMenuDialog(*this);
 	_dataPath = ConfMan.getPath(kConfigPath);
@@ -87,6 +88,7 @@ TrinketEngine::TrinketEngine(OSystem *system, const Subengine &subengine, Common
 
 TrinketEngine::~TrinketEngine() {
 	delete _game;
+	delete _rnd;
 }
 
 bool TrinketEngine::getGameSoundSettings(Shell::Game::SoundSettings &settings) const {
@@ -105,7 +107,9 @@ void TrinketEngine::setGameSoundSettings(const Shell::Game::SoundSettings &setti
 }
 
 void TrinketEngine::applyGameSettings() {
-	_random.setAlgorithm(Shell::Random::getPrngAlgorithm());
+	const int prngAlgorithmVal = ConfMan.getInt(TrinketMetaEngine::kOptionPrngAlgorithm);
+	const Shell::PrngAlgorithmKind prngAlgorithm = static_cast<Shell::PrngAlgorithmKind>(prngAlgorithmVal);
+	_rnd->setAlgorithm(prngAlgorithm);
 }
 
 void TrinketEngine::syncSoundSettings() {

@@ -173,8 +173,8 @@ OptionsWidget::OptionsWidget(GUI::GuiObject *boss, const Common::String &name,
 	_prngAlgoLabel = new GUI::StaticTextWidget(widgetsBoss(), "TrinketZoombini3Options.PrngAlgorithmLabel", _("PRNG algorithm:"), prngTooltip);
 	_prngAlgoLabel->setAlign(Graphics::TextAlign::kTextAlignEnd);
 	_prngAlgoPopUp = new GUI::PopUpWidget(widgetsBoss(), "TrinketZoombini3Options.PrngAlgorithm", prngTooltip);
-	_prngAlgoPopUp->appendEntry(_("Original PRNG"), static_cast<uint32>(Shell::Random::PrngAlgorithm::kOriginalPrng));
-	_prngAlgoPopUp->appendEntry(_("ScummVM Standard PRNG"), static_cast<uint32>(Shell::Random::PrngAlgorithm::kStandardPrng));
+	_prngAlgoPopUp->appendEntry(_("Original PRNG"), static_cast<uint32>(Shell::PrngAlgorithmKind::kOriginalPrng));
+	_prngAlgoPopUp->appendEntry(_("ScummVM Standard PRNG"), static_cast<uint32>(Shell::PrngAlgorithmKind::kStandardPrng));
 	_manage = new GUI::ButtonWidget(widgetsBoss(), "TrinketZoombini3Options.Saves", _("Manage"), Common::U32String(), kManageSaves);
 	_manage->setTarget(this);
 }
@@ -201,12 +201,12 @@ void OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common::String &
 
 void OptionsWidget::load() {
 	_colorBlindMode->setState(ConfMan.getBool(TrinketMetaEngine::kOptionColorBlindMode, _domain));
-	_prngAlgoPopUp->setSelectedTag(static_cast<uint32>(Shell::Random::getPrngAlgorithm(_domain)));
+	_prngAlgoPopUp->setSelectedTag(ConfMan.getInt(TrinketMetaEngine::kOptionPrngAlgorithm, _domain));
 }
 
 bool OptionsWidget::save() {
-	const Shell::Random::PrngAlgorithm prngAlgorithm = static_cast<Shell::Random::PrngAlgorithm>(_prngAlgoPopUp->getSelectedTag());
-	const bool changed = Shell::Random::getPrngAlgorithm(_domain) != prngAlgorithm ||
+	const Shell::PrngAlgorithmKind prngAlgorithm = static_cast<Shell::PrngAlgorithmKind>(_prngAlgoPopUp->getSelectedTag());
+	const bool changed = ConfMan.getInt(TrinketMetaEngine::kOptionPrngAlgorithm, _domain) != static_cast<int>(prngAlgorithm) ||
 		ConfMan.getBool(TrinketMetaEngine::kOptionColorBlindMode, _domain) != _colorBlindMode->getState();
 	ConfMan.setBool(TrinketMetaEngine::kOptionColorBlindMode, _colorBlindMode->getState(), _domain);
 	ConfMan.setInt(TrinketMetaEngine::kOptionPrngAlgorithm, static_cast<int>(prngAlgorithm), _domain);

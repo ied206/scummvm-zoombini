@@ -258,7 +258,7 @@ bool Sandwich::enter() {
 	_level = CLIP(_host._world.get(kR1IA2LevelKey), 1, 3);
 	_unlocked = _host._practice ? 0 : static_cast<uint32>(_host._world.get(kR1IA2ItemsUnlockedKey));
 	_showMarble = !_host._practice && _host._world.get(kR1IA2ShowMarbleKey);
-	_clawClicks = _host._vm.rnd().number(1, 3);
+	_clawClicks = _host._vm._rnd->getRandomNumberRng(1, 3);
 	if (!_host.actor(kLizardName, kLizardKey))
 		return false;
 	_bell = sprite(kBellIDKey, kBellZKey);
@@ -290,7 +290,7 @@ bool Sandwich::enter() {
 	if (_host._practice || !_host._world.visits(Page::kPageIA2))
 		_host.speeches(kEnterCharIDKey, kEnterSpchIDKey, number(kMaxEntrySpchsKey));
 	else
-		say(kLizardName, Common::String::format(kReEnterSpchIDSignedIndexKey, _host._vm.rnd().number(1, 2)));
+		say(kLizardName, Common::String::format(kReEnterSpchIDSignedIndexKey, _host._vm._rnd->getRandomNumberRng(1, 2)));
 	return showItem();
 }
 
@@ -335,8 +335,8 @@ bool Sandwich::showItem() {
 	_itemText->set(kPropertyText, {}, Core::ScriptValue::fromText(_names[_current - 1]));
 	_dataset = _itemDatasets[_current - 1];
 	if (!_dataset) {
-		_dataset = _host._vm.rnd().number(1, indexed(kMaxDataSetsKey, _level));
-		_set = _host._vm.rnd().number(1, indexed(kNumSetsKey, _level));
+		_dataset = _host._vm._rnd->getRandomNumberRng(1, indexed(kMaxDataSetsKey, _level));
+		_set = _host._vm._rnd->getRandomNumberRng(1, indexed(kNumSetsKey, _level));
 	}
 	if (!readData())
 		return false;
@@ -456,7 +456,7 @@ void Sandwich::ringBell() {
 		wrongPrice();
 		return;
 	}
-	say(kLizardName, Common::String::format(kCongratsSpchIDSignedIndexKey, _host._vm.rnd().number(1, 4)));
+	say(kLizardName, Common::String::format(kCongratsSpchIDSignedIndexKey, _host._vm._rnd->getRandomNumberRng(1, 4)));
 	sound(kCoinSfx1IDKey);
 	_phase = kPaying;
 }
@@ -466,7 +466,12 @@ void Sandwich::wrongPrice() {
 	bool shortfall = _total < _price;
 	bool &heard = shortfall ? _shortHelp : _excessHelp;
 	if (!heard) {
-		say(kLizardName, Common::String::format(kNameSignedIndexFormat, shortfall ? kNotEnoughSpchIDKey : kTooMuchSpchIDKey, _host._vm.rnd().number(1, 3)));
+		const char *speechKey;
+		if (shortfall)
+			speechKey = kNotEnoughSpchIDKey;
+		else
+			speechKey = kTooMuchSpchIDKey;
+		say(kLizardName, Common::String::format(kNameSignedIndexFormat, speechKey, _host._vm._rnd->getRandomNumberRng(1, 3)));
 		say(kLizardName, kWrongSpchIDKey);
 		sayPrice(_price);
 		if (_level == 1) {
@@ -482,7 +487,7 @@ void Sandwich::wrongPrice() {
 		sayPrice(ABS(_price - _total));
 	}
 	if (_wrong == 5) {
-		int choice = _host._vm.rnd().number(1, 2);
+		int choice = _host._vm._rnd->getRandomNumberRng(1, 2);
 		say(kLizardName, Common::String::format(kStumpedSpchIDSignedIndex1Key, choice));
 		if (choice == 2)
 			say(kLizardName, kStumpedSpchID22Key);
@@ -509,8 +514,8 @@ void Sandwich::assess() {
 		_level = next;
 		for (int &dataset : _itemDatasets)
 			dataset = 0;
-		_dataset = _host._vm.rnd().number(1, indexed(kMaxDataSetsKey, _level));
-		_set = _host._vm.rnd().number(1, indexed(kNumSetsKey, _level));
+		_dataset = _host._vm._rnd->getRandomNumberRng(1, indexed(kMaxDataSetsKey, _level));
+		_set = _host._vm._rnd->getRandomNumberRng(1, indexed(kNumSetsKey, _level));
 	}
 }
 
@@ -521,8 +526,8 @@ void Sandwich::unlock() {
 	_indicator->setFrame(3);
 	persist();
 	sound(kUnlockSfxIDKey);
-	if (_host._vm.rnd().number(1, 2) == 1)
-		say(kLizardName, Common::String::format(kCorrectSpchIDSignedIndexKey, _host._vm.rnd().number(1, 5)));
+	if (_host._vm._rnd->getRandomNumberRng(1, 2) == 1)
+		say(kLizardName, Common::String::format(kCorrectSpchIDSignedIndexKey, _host._vm._rnd->getRandomNumberRng(1, 5)));
 	uint count = 0;
 	for (uint i = 0; i < 30; i++) {
 		if (_unlocked & (1u << i))
@@ -642,7 +647,7 @@ void Sandwich::update(uint32 time) {
 			say(kLizardName, kStandSpchIDKey);
 			if (!_host._practice) {
 				bool visited = _host._world.visits(Page::kPageLG2);
-				int choice = _host._vm.rnd().number(1, visited ? 3 : 2);
+				int choice = _host._vm._rnd->getRandomNumberRng(1, visited ? 3 : 2);
 				Common::String suffix = Common::String::format(kSignedIndexFormat, choice);
 				_host.say(_host._page->text((visited ? kYesLG2CharIDKey : kNoLG2CharIDKey) + suffix),
 						  number((visited ? kYesLG2SpchIDKey : kNoLG2SpchIDKey) + suffix));
@@ -779,7 +784,7 @@ bool Sandwich::click(Common::Point point) {
 				say(kReaderName, kToppingSpchIDKey);
 				_firstTopping = true;
 			}
-			say(kLizardName, Common::String::format(kCommentSpchIDSignedIndexKey, _host._vm.rnd().number(1, 5)));
+			say(kLizardName, Common::String::format(kCommentSpchIDSignedIndexKey, _host._vm._rnd->getRandomNumberRng(1, 5)));
 			say(kLizardName, kCostSpchIDKey);
 			sayPrice(_price);
 			_phase = kSelecting;
