@@ -1628,7 +1628,7 @@ int Gfx::drawString(ManagedSurface32 *destSurface, const Common::String &text, c
 	if (!destSurface)
 		return 0;
 	if (conf.fontKind == FontKind::kBmtFont) {
-		BmtFont *bmtFont = _vm->_text->bmtFont();
+		const BmtFont *bmtFont = _vm->_text->bmtFont();
 		if (!bmtFont)
 			return 0;
 		return bmtFont->drawString(destSurface, pos, text, maxWidth, conf.fillColor);
@@ -1643,7 +1643,7 @@ int Gfx::drawString(ManagedSurface32 *destSurface, const Common::String &text, c
 
 int Gfx::getTextWidth(const Common::String &text, const TextConf &conf) const {
 	if (conf.fontKind == FontKind::kBmtFont) {
-		BmtFont *bmtFont = _vm->_text->bmtFont();
+		const BmtFont *bmtFont = _vm->_text->bmtFont();
 		if (!bmtFont)
 			return 0;
 		return bmtFont->getStringLayoutWidth(text);
@@ -1659,7 +1659,7 @@ void Gfx::drawZoombiniNameBox(ManagedSurface32 *destSurface, const Common::Strin
 		if (!_nameBoxSprite)
 			return;
 	}
-	BmtFont *bmtFont = _vm->_text->bmtFont();
+	const BmtFont *bmtFont = _vm->_text->bmtFont();
 	if (!bmtFont)
 		return;
 	const ZmbReleaseInfo::NameTooltipLayout layout = _vm->getRelInfo().getNameTooltipLayout();
@@ -2205,7 +2205,7 @@ void Gfx::wordWrapText(const Common::U32String &text, int maxWidth, Common::Arra
 		lines.clear();
 		if (!_vm->_text->loadTextFont())
 			return;
-		BmtFont *bmtFont = _vm->_text->bmtFont();
+		const BmtFont *bmtFont = _vm->_text->bmtFont();
 		if (!bmtFont)
 			return;
 		Common::Array<Common::String> encodedLines;
