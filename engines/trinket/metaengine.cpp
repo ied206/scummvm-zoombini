@@ -22,6 +22,7 @@
 #include "trinket/metaengine.h"
 #include "backends/keymapper/action.h"
 #include "backends/keymapper/keymap.h"
+#include "backends/keymapper/standard-actions.h"
 #include "base/plugins.h"
 #include "common/config-manager.h"
 #include "common/translation.h"
@@ -68,12 +69,104 @@ Common::Error TrinketMetaEngine::createInstance(OSystem *syst, Engine **engine, 
 }
 
 Common::KeymapArray TrinketMetaEngine::initKeymaps(const char *target) const {
-	Common::KeymapArray keymaps = AdvancedMetaEngine::initKeymaps(target);
+	(void)target;
+	Common::Keymap *defaultKeymap = new Common::Keymap(Common::Keymap::kKeymapTypeGame, "engine-default", _("Default game keymappings"));
+	defaultKeymap->setPartialMatchAllowed(false);
+
+	// The global keymap supplies left-stick cursor movement and RB cursor slowdown.
+	// Start remains reserved for the global menu.
+	Common::Action *act;
+
+	act = new Common::Action(Common::kStandardActionLeftClick, _("Left click"));
+	act->setLeftClickEvent();
+	act->addDefaultInputMapping("MOUSE_LEFT");
+	act->addDefaultInputMapping("JOY_A");
+	act->addDefaultInputMapping("JOY_RIGHT_TRIGGER");
+	defaultKeymap->addAction(act);
+
+	act = new Common::Action(Common::kStandardActionMiddleClick, _("Middle click"));
+	act->setMiddleClickEvent();
+	act->addDefaultInputMapping("MOUSE_MIDDLE");
+	defaultKeymap->addAction(act);
+
+	act = new Common::Action(Common::kStandardActionRightClick, _("Right click"));
+	act->setRightClickEvent();
+	act->addDefaultInputMapping("MOUSE_RIGHT");
+	act->addDefaultInputMapping("JOY_LEFT_TRIGGER");
+	defaultKeymap->addAction(act);
+
+	act = new Common::Action(Common::kStandardActionPause, _("Pause"));
+	act->setKeyEvent(Common::KeyState(Common::KEYCODE_SPACE, ' '));
+	act->addDefaultInputMapping("SPACE");
+	act->allowKbdRepeats();
+	defaultKeymap->addAction(act);
+
+	act = new Common::Action(Common::kStandardActionOpenMainMenu, _("Game menu"));
+	act->setKeyEvent(Common::KeyState(Common::KEYCODE_F5, Common::ASCII_F5));
+	act->addDefaultInputMapping("F5");
+	act->addDefaultInputMapping("JOY_LEFT_SHOULDER");
+	act->allowKbdRepeats();
+	defaultKeymap->addAction(act);
+
+	act = new Common::Action(Common::kStandardActionSkip, _("Skip"));
+	act->setKeyEvent(Common::KeyState(Common::KEYCODE_ESCAPE, Common::ASCII_ESCAPE));
+	act->addDefaultInputMapping("ESCAPE");
+	act->addDefaultInputMapping("JOY_B");
+	act->addDefaultInputMapping("JOY_Y");
+	act->allowKbdRepeats();
+	defaultKeymap->addAction(act);
+
+	act = new Common::Action("SKLI", _("Skip line"));
+	act->setKeyEvent(Common::KeyState(Common::KEYCODE_PERIOD, '.'));
+	act->addDefaultInputMapping("PERIOD");
+	act->allowKbdRepeats();
+	defaultKeymap->addAction(act);
+
+	act = new Common::Action("PIND", _("Predictive input dialog"));
+	act->setEvent(Common::EVENT_PREDICTIVE_DIALOG);
+	act->allowKbdRepeats();
+	defaultKeymap->addAction(act);
+
+	act = new Common::Action("RETURN", _("Confirm"));
+	act->setKeyEvent(Common::KeyState(Common::KEYCODE_RETURN, Common::ASCII_RETURN));
+	act->addDefaultInputMapping("RETURN");
+	act->addDefaultInputMapping("JOY_X");
+	act->allowKbdRepeats();
+	defaultKeymap->addAction(act);
+
+	act = new Common::Action(Common::kStandardActionMoveUp, _("Up"));
+	act->setKeyEvent(Common::KEYCODE_UP);
+	act->addDefaultInputMapping("UP");
+	act->addDefaultInputMapping("JOY_UP");
+	act->allowKbdRepeats();
+	defaultKeymap->addAction(act);
+
+	act = new Common::Action(Common::kStandardActionMoveDown, _("Down"));
+	act->setKeyEvent(Common::KEYCODE_DOWN);
+	act->addDefaultInputMapping("DOWN");
+	act->addDefaultInputMapping("JOY_DOWN");
+	act->allowKbdRepeats();
+	defaultKeymap->addAction(act);
+
+	act = new Common::Action(Common::kStandardActionMoveLeft, _("Left"));
+	act->setKeyEvent(Common::KEYCODE_LEFT);
+	act->addDefaultInputMapping("LEFT");
+	act->addDefaultInputMapping("JOY_LEFT");
+	act->allowKbdRepeats();
+	defaultKeymap->addAction(act);
+
+	act = new Common::Action(Common::kStandardActionMoveRight, _("Right"));
+	act->setKeyEvent(Common::KEYCODE_RIGHT);
+	act->addDefaultInputMapping("RIGHT");
+	act->addDefaultInputMapping("JOY_RIGHT");
+	act->allowKbdRepeats();
+	defaultKeymap->addAction(act);
+
 	Common::Action *remove = new Common::Action(kREMOVENAMEName, _("Remove player name"));
 	remove->setKeyEvent(Common::KeyState(Common::KEYCODE_r, 'r', Common::KBD_CTRL));
 	remove->addDefaultInputMapping("C+r");
-	keymaps[0]->addAction(remove);
-	return keymaps;
+	defaultKeymap->addAction(remove);
+	return Common::Keymap::arrayOf(defaultKeymap);
 }
 
 void TrinketMetaEngine::registerDefaultSettings(const Common::String &target) const {
