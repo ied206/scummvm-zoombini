@@ -21,7 +21,12 @@
 
 #include "base/plugins.h"
 
+#include "backends/keymapper/action.h"
+#include "backends/keymapper/keymap.h"
+#include "backends/keymapper/standard-actions.h"
+
 #include "common/config-manager.h"
+#include "common/translation.h"
 
 #include "zoombini2/dialogs.h"
 #include "zoombini2/graphics.h"
@@ -94,6 +99,93 @@ Common::Error Zoombini2MetaEngine::createInstance(OSystem *syst, Engine **engine
 
 bool Zoombini2MetaEngine::hasFeature(MetaEngineFeature f) const {
 	return false;
+}
+
+Common::Array<Common::Keymap *> Zoombini2MetaEngine::initKeymaps(const char *target) const {
+	using namespace Common;
+	(void)target;
+
+	Keymap *defaultKeymap = new Keymap(Keymap::kKeymapTypeGame, "engine-default", _("Default game keymappings"));
+	defaultKeymap->setPartialMatchAllowed(false);
+
+	// The global keymap supplies left-stick cursor movement, RB slowdown, Start and Back.
+	Action *act;
+
+	act = new Action(kStandardActionLeftClick, _("Left click"));
+	act->setLeftClickEvent();
+	act->addDefaultInputMapping("MOUSE_LEFT");
+	act->addDefaultInputMapping("JOY_A");
+	act->addDefaultInputMapping("JOY_RIGHT_TRIGGER");
+	defaultKeymap->addAction(act);
+
+	act = new Action(kStandardActionMiddleClick, _("Middle click"));
+	act->setMiddleClickEvent();
+	act->addDefaultInputMapping("MOUSE_MIDDLE");
+	defaultKeymap->addAction(act);
+
+	act = new Action(kStandardActionRightClick, _("Right click"));
+	act->setRightClickEvent();
+	act->addDefaultInputMapping("MOUSE_RIGHT");
+	act->addDefaultInputMapping("JOY_LEFT_TRIGGER");
+	defaultKeymap->addAction(act);
+
+	act = new Action(kStandardActionPause, _("Pause"));
+	act->setKeyEvent(KeyState(KEYCODE_SPACE, ' '));
+	act->addDefaultInputMapping("SPACE");
+	act->allowKbdRepeats();
+	defaultKeymap->addAction(act);
+
+	act = new Action(kStandardActionOpenMainMenu, _("Game menu"));
+	act->setKeyEvent(KeyState(KEYCODE_F5, ASCII_F5));
+	act->addDefaultInputMapping("F5");
+	act->addDefaultInputMapping("JOY_LEFT_SHOULDER");
+	act->allowKbdRepeats();
+	defaultKeymap->addAction(act);
+
+	act = new Action(kStandardActionSkip, _("Skip"));
+	act->setKeyEvent(KeyState(KEYCODE_ESCAPE, ASCII_ESCAPE));
+	act->addDefaultInputMapping("ESCAPE");
+	act->addDefaultInputMapping("JOY_B");
+	act->addDefaultInputMapping("JOY_Y");
+	act->allowKbdRepeats();
+	defaultKeymap->addAction(act);
+
+	act = new Action("RETURN", _("Confirm"));
+	act->setKeyEvent(KeyState(KEYCODE_RETURN, ASCII_RETURN));
+	act->addDefaultInputMapping("RETURN");
+	act->addDefaultInputMapping("JOY_X");
+	act->allowKbdRepeats();
+	defaultKeymap->addAction(act);
+
+	act = new Action(kStandardActionMoveUp, _("Up"));
+	act->setKeyEvent(KEYCODE_UP);
+	act->addDefaultInputMapping("UP");
+	act->addDefaultInputMapping("JOY_UP");
+	act->allowKbdRepeats();
+	defaultKeymap->addAction(act);
+
+	act = new Action(kStandardActionMoveDown, _("Down"));
+	act->setKeyEvent(KEYCODE_DOWN);
+	act->addDefaultInputMapping("DOWN");
+	act->addDefaultInputMapping("JOY_DOWN");
+	act->allowKbdRepeats();
+	defaultKeymap->addAction(act);
+
+	act = new Action(kStandardActionMoveLeft, _("Left"));
+	act->setKeyEvent(KEYCODE_LEFT);
+	act->addDefaultInputMapping("LEFT");
+	act->addDefaultInputMapping("JOY_LEFT");
+	act->allowKbdRepeats();
+	defaultKeymap->addAction(act);
+
+	act = new Action(kStandardActionMoveRight, _("Right"));
+	act->setKeyEvent(KEYCODE_RIGHT);
+	act->addDefaultInputMapping("RIGHT");
+	act->addDefaultInputMapping("JOY_RIGHT");
+	act->allowKbdRepeats();
+	defaultKeymap->addAction(act);
+
+	return Keymap::arrayOf(defaultKeymap);
 }
 
 void Zoombini2MetaEngine::registerDefaultSettings(const Common::String &target) const {

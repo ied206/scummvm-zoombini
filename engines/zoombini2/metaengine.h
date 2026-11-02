@@ -155,6 +155,8 @@ public:
 
 	/** Report the launcher and save-management features supported by this engine. */
 	bool hasFeature(MetaEngineFeature f) const override;
+	/** Map keyboard, mouse and gamepad inputs to the engine's existing input events. */
+	Common::Array<Common::Keymap *> initKeymaps(const char *target) const override;
 	/** Register engine-specific option defaults for the supplied target. */
 	void registerDefaultSettings(const Common::String &target) const override;
 	/** Create the engine-specific launcher options widget. */
