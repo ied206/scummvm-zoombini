@@ -28,54 +28,12 @@
 #include "common/savefile.h"
 #include "common/str-enc.h"
 
+#include "zoombini2/metaengine.h"
 #include "zoombini2/scripts.h"
 #include "zoombini2/state.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
-
-Common::String GameState::generateZoombiniName(Random &random) {
-	static constexpr const char *kVowelPairs[30] = {
-		"a ", "a ", "a ", "e ", "e ", "e ", "e ", "i ", "i ", "i ",
-		"o ", "o ", "o ", "u ", "u ", "y ", "ee", "oo", "yo", "ya",
-		"ye", "ei", "ie", "ai", "ia", "au", "ua", "uo", "ou", "ae"};
-	static constexpr char kSingleConsonants[] = "bbccdddfghjkkllmmnnprrssssttvwx";
-	static constexpr char kEndings[] = "aeiou";
-	static constexpr const char *kConsonantPairs[39] = {
-		"bl", "br", "ch", "cl", "cr", "dr", "dw", "fl", "fr", "gh",
-		"gl", "gr", "kl", "kn", "kr", "kw", "ld", "mp", "nd", "nh",
-		"nn", "ph", "pl", "pr", "qu", "qu", "rh", "rn", "sc", "sl",
-		"sm", "sn", "sp", "sr", "st", "sw", "th", "tr", "tw"};
-
-	Common::String name;
-	const uint targetLength = random.getRandomNumber(1) + 4;
-	bool useVowelPair = random.getRandomNumber(98) + 1 < 40;
-	while (name.size() < targetLength) {
-		bool usedConsonantPair = false;
-		if (useVowelPair) {
-			useVowelPair = false;
-			const char *pair = kVowelPairs[random.getRandomNumber(29)];
-			name += pair[0];
-			if (pair[1] != ' ')
-				name += pair[1];
-		} else {
-			useVowelPair = true;
-			if (1 < name.size() || random.getRandomNumber(98) + 1 <= 33) {
-				const char *pair = kConsonantPairs[random.getRandomNumber(38)];
-				name += pair[0];
-				name += pair[1];
-				usedConsonantPair = true;
-			} else {
-				name += kSingleConsonants[random.getRandomNumber(30)];
-			}
-		}
-		if (usedConsonantPair && targetLength <= name.size())
-			name.setChar(kEndings[random.getRandomNumber(4)], name.size() - 1);
-		if (name.size() == 2 && name[0] == name[1])
-			name.deleteLastChar();
-	}
-	return name;
-}
 
 byte ZmbTrait::getValue(TraitKind index) const {
 	switch (index) {
@@ -216,18 +174,16 @@ void TraitComboTable::reset() {
 	_combinationUseCounts[initialCombinationIndex] = 1;
 }
 
-bool TraitComboTable::read(Common::ReadStream *stream) {
-	_totalCount = stream->readSint32LE();
-	_uniqueCombinationCount = stream->readSint32LE();
-	_twiceRegisteredCombinationCount = stream->readSint32LE();
+bool TraitComboTable::read(Common::ReadStreamEndian *stream) {
+	_totalCount = stream->readSint32();
+	_uniqueCombinationCount = stream->readSint32();
+	_twiceRegisteredCombinationCount = stream->readSint32();
 	return stream->read(_combinationUseCounts, sizeof(_combinationUseCounts)) == sizeof(_combinationUseCounts) &&
 		   stream->read(_unusedTail, sizeof(_unusedTail)) == sizeof(_unusedTail);
 }
 
-void TraitComboTable::write(Common::WriteStream *stream) const {
-	stream->writeSint32LE(_totalCount);
-	stream->writeSint32LE(_uniqueCombinationCount);
-	stream->writeSint32LE(_twiceRegisteredCombinationCount);
+void TraitComboTable::write(Common::WriteStream *stream, FileEndianess endianess) const {
+	stream->writeMultipleEndian(endianess == FileEndianess::kLittleEndian, _totalCount, _uniqueCombinationCount, _twiceRegisteredCombinationCount);
 	stream->write(_combinationUseCounts, sizeof(_combinationUseCounts));
 	stream->write(_unusedTail, sizeof(_unusedTail));
 }
@@ -431,11 +387,26 @@ bool GameState::canRead(Common::SeekableReadStream *stream, uint64 bytes) {
 	return 0 <= position && position <= size && bytes <= static_cast<uint64>(size - position);
 }
 
-bool GameState::load(Common::SeekableReadStream *stream) {
+bool GameState::load(Common::SeekableReadStream *stream, Common::Platform targetPlatform) {
+	if (!canRead(stream, 4))
+		return false;
+	const uint32 magic = stream->readUint32LE();
+	bool bigEndian = false;
+	if (magic != kSaveFileMagic) {
+		if (SWAP_BYTES_32(magic) != kSaveFileMagic)
+			return false;
+		bigEndian = true;
+	}
+	Common::SeekableReadStreamEndianWrapper saveStream(stream, bigEndian);
 	GameState loaded(_vm);
-	if (!loaded.readState(stream))
+	if (!loaded.readState(&saveStream))
 		return false;
 	swapState(loaded);
+	if ((targetPlatform == Common::kPlatformWindows && bigEndian) || (targetPlatform == Common::kPlatformMacintosh && !bigEndian)) {
+		warning("GameState: Loaded a %s save for a %s target; subsequent saves will use the target's native byte order",
+				bigEndian ? "Macintosh (big-endian)" : "Windows (little-endian)",
+				targetPlatform == Common::kPlatformMacintosh ? "Macintosh" : "Windows");
+	}
 	return true;
 }
 
@@ -530,15 +501,15 @@ void GameState::transferRoster(Common::Array<ZoombiniRunner *> &src, Common::Arr
 	src.clear();
 }
 
-bool GameState::readStorage(Common::SeekableReadStream *stream, StorageRecord **storage) {
+bool GameState::readStorage(Common::SeekableReadStreamEndian *stream, StorageRecord **storage) {
 	if (!canRead(stream, 4))
 		return false;
-	const int32 count = stream->readSint32LE();
+	const int32 count = stream->readSint32();
 	if (count < 0 || kStorageRows * kStorageCols < count || !canRead(stream, static_cast<uint64>(count) * 28))
 		return false;
 	for (int32 i = 0; i < count; i++) {
-		const int32 row = stream->readSint32LE();
-		const int32 col = stream->readSint32LE();
+		const int32 row = stream->readSint32();
+		const int32 col = stream->readSint32();
 		if (row < 0 || kStorageRows <= row || col < 0 || kStorageCols <= col)
 			return false;
 		const int index = row * kStorageCols + col;
@@ -551,10 +522,10 @@ bool GameState::readStorage(Common::SeekableReadStream *stream, StorageRecord **
 	return !stream->err() && !stream->eos();
 }
 
-bool GameState::readState(Common::SeekableReadStream *stream) {
-	if (!canRead(stream, 8) || stream->readSint32LE() != kSaveFileMagic)
+bool GameState::readState(Common::SeekableReadStreamEndian *stream) {
+	if (!canRead(stream, 4))
 		return false;
-	const int32 nameLength = stream->readSint32LE();
+	const int32 nameLength = stream->readSint32();
 	// A valid name includes its terminator and leaves room for every fixed field and count.
 	if (nameLength < 1 || !canRead(stream, static_cast<uint64>(nameLength) + 2814))
 		return false;
@@ -567,20 +538,20 @@ bool GameState::readState(Common::SeekableReadStream *stream) {
 
 	if (stream->read(_pageVisitCounts, sizeof(_pageVisitCounts)) != sizeof(_pageVisitCounts))
 		return false;
-	_rescuedBoolieCount = stream->readSint32LE();
+	_rescuedBoolieCount = stream->readSint32();
 	for (int i = 0; i < ARRAYSIZE(_pageLevel); i++)
-		_pageLevel[i] = stream->readSint32LE();
+		_pageLevel[i] = stream->readSint32();
 	for (int i = 0; i < ARRAYSIZE(_perfectClearCount); i++)
-		_perfectClearCount[i] = stream->readSint32LE();
+		_perfectClearCount[i] = stream->readSint32();
 	_hasReachedRescue1 = stream->readByte();
 	_hasReachedRescue2 = stream->readByte();
 	_hasReachedBooliewood = stream->readByte();
 	_legacyStateFlag = stream->readByte();
-	_rescue1ArrivalCount = stream->readSint32LE();
-	_legacyStatistic = stream->readSint32LE();
-	_completedZoombiniCount = stream->readSint32LE();
+	_rescue1ArrivalCount = stream->readSint32();
+	_legacyStatistic = stream->readSint32();
+	_completedZoombiniCount = stream->readSint32();
 	for (int i = 0; i < kCompletedTraitHashCount; i++)
-		_completedTraitHashes[i] = stream->readSint32LE();
+		_completedTraitHashes[i] = stream->readSint32();
 	_rescue1MoviePlayed = stream->readByte();
 	_rescue2MoviePlayed = stream->readByte();
 	if (!_traitComboTable.read(stream))
@@ -588,7 +559,7 @@ bool GameState::readState(Common::SeekableReadStream *stream) {
 
 	if (!readStorage(stream, _rescue1Storage) || !readStorage(stream, _rescue2Storage) || !canRead(stream, 4))
 		return false;
-	const int32 count = stream->readSint32LE();
+	const int32 count = stream->readSint32();
 	if (count < 0 || !canRead(stream, static_cast<uint64>(count) * 20))
 		return false;
 	// The party is stored in two passes, unlike the interleaved sparse storage records.
@@ -613,17 +584,17 @@ bool GameState::readState(Common::SeekableReadStream *stream) {
 	return !stream->err() && !stream->eos();
 }
 
-int GameState::writeStorage(Common::WriteStream *stream, StorageRecord *const *storage) {
+int GameState::writeStorage(Common::WriteStream *stream, StorageRecord *const *storage, FileEndianess endianess) {
+	const bool isLE = endianess == FileEndianess::kLittleEndian;
 	int count = 0;
 	for (int i = 0; i < kStorageRows * kStorageCols; i++) {
 		if (storage[i])
 			count += 1;
 	}
-	stream->writeSint32LE(count);
+	stream->writeMultipleEndian(isLE, static_cast<int32>(count));
 	for (int i = 0; i < kStorageRows * kStorageCols; i++) {
 		if (storage[i]) {
-			stream->writeSint32LE(i / kStorageCols);
-			stream->writeSint32LE(i % kStorageCols);
+			stream->writeMultipleEndian(isLE, static_cast<int32>(i / kStorageCols), static_cast<int32>(i % kStorageCols));
 			storage[i]->write(stream);
 		}
 	}
@@ -649,39 +620,38 @@ Zoombini2PopulationSummary GameState::getPopulationSummary() const {
 	return summary;
 }
 
-bool GameState::save(Common::WriteStream *stream) const {
+bool GameState::save(Common::WriteStream *stream, Common::Platform platform) const {
 	if (!stream || stream->err())
 		return false;
+	const FileEndianess endianess = platform == Common::kPlatformMacintosh ? FileEndianess::kBigEndian : FileEndianess::kLittleEndian;
+	const bool isLE = endianess == FileEndianess::kLittleEndian;
 	const uint32 activeCount = PageId::kPageZombiniville_00 <= _currentPage && _currentPage <= PageId::kPageAquacube_03 ? _activeZoombinis.size() : 0;
 	const uint64 count = static_cast<uint64>(_savedRoster.size()) + activeCount;
 	if (static_cast<uint64>(INT32_MAX) < count || static_cast<uint32>(INT32_MAX) <= _playerName.size())
 		return false;
 	const uint32 nameLength = _playerName.size() + 1;
 	const int64 startPosition = stream->pos();
-	stream->writeSint32LE(kSaveFileMagic);
-	stream->writeUint32LE(nameLength);
+	stream->writeMultipleEndian(isLE, static_cast<int32>(kSaveFileMagic), nameLength);
 	stream->write(_playerName.c_str(), nameLength);
 	stream->write(_pageVisitCounts, sizeof(_pageVisitCounts));
-	stream->writeSint32LE(_rescuedBoolieCount);
+	stream->writeMultipleEndian(isLE, _rescuedBoolieCount);
 	for (int i = 0; i < ARRAYSIZE(_pageLevel); i++)
-		stream->writeSint32LE(_pageLevel[i]);
+		stream->writeMultipleEndian(isLE, _pageLevel[i]);
 	for (int i = 0; i < ARRAYSIZE(_perfectClearCount); i++)
-		stream->writeSint32LE(_perfectClearCount[i]);
+		stream->writeMultipleEndian(isLE, _perfectClearCount[i]);
 	stream->writeByte(_hasReachedRescue1);
 	stream->writeByte(_hasReachedRescue2);
 	stream->writeByte(_hasReachedBooliewood);
 	stream->writeByte(_legacyStateFlag);
-	stream->writeSint32LE(_rescue1ArrivalCount);
-	stream->writeSint32LE(_legacyStatistic);
-	stream->writeSint32LE(_completedZoombiniCount);
+	stream->writeMultipleEndian(isLE, _rescue1ArrivalCount, _legacyStatistic, _completedZoombiniCount);
 	for (int i = 0; i < kCompletedTraitHashCount; i++)
-		stream->writeSint32LE(_completedTraitHashes[i]);
+		stream->writeMultipleEndian(isLE, _completedTraitHashes[i]);
 	stream->writeByte(_rescue1MoviePlayed);
 	stream->writeByte(_rescue2MoviePlayed);
-	_traitComboTable.write(stream);
-	const int rescue1StorageCount = writeStorage(stream, _rescue1Storage);
-	const int rescue2StorageCount = writeStorage(stream, _rescue2Storage);
-	stream->writeUint32LE(static_cast<uint32>(count));
+	_traitComboTable.write(stream, endianess);
+	const int rescue1StorageCount = writeStorage(stream, _rescue1Storage, endianess);
+	const int rescue2StorageCount = writeStorage(stream, _rescue2Storage, endianess);
+	stream->writeMultipleEndian(isLE, static_cast<uint32>(count));
 	for (uint64 i = 0; i < count; i++) {
 		const ZoombiniRunner *zoombini;
 		if (i < _savedRoster.size())
@@ -743,22 +713,14 @@ int GameState::activatePageLevel(PageId pageId) {
 	return getLevel();
 }
 
-Zoombini2SavegameManager::Zoombini2SavegameManager(Common::SaveFileManager *saveFileManager, const Common::String &target, Common::Language language)
-	: _saveFileManager(saveFileManager), _target(target.empty() ? "zoombini2" : target), _language(language) {
+Zoombini2SavegameManager::Zoombini2SavegameManager(Common::SaveFileManager *saveFileManager, const Common::String &target, Common::Language lang, Common::Platform platform)
+	: _saveFileManager(saveFileManager), _target(target.empty() ? "zoombini2" : target), _lang(lang), _platform(platform) {
+	if (_platform == Common::kPlatformUnknown && ConfMan.hasKey("platform", _target))
+		_platform = Common::parsePlatform(ConfMan.get("platform", _target));
 }
 
 Common::String Zoombini2SavegameManager::makeSaveFileName(const Common::String &savefileName) const {
-	Common::String filesystemName = savefileName;
-	switch (_language) {
-	case Common::HE_ISR:
-		filesystemName = savefileName.decode(Common::kWindows1255).encode(Common::kUtf8);
-		break;
-	case Common::SV_SWE:
-		filesystemName = savefileName.decode(Common::kWindows1252).encode(Common::kUtf8);
-		break;
-	default:
-		break;
-	}
+	const Common::String filesystemName = decodeSavefileName(savefileName).encode(Common::kUtf8);
 	return Common::String::format("%s-%s.mk", _target.c_str(), filesystemName.c_str());
 }
 
@@ -774,8 +736,9 @@ bool Zoombini2SavegameManager::isValidSavefileName(const Common::String &savefil
 		const bool isDigit = !hebrew && '0' <= character && character <= '9';
 		const bool isHebrewLetter = hebrew && 0xE0 <= character && character <= 0xFA;
 		const bool isHebrewPunctuation = hebrew && (character == ',' || character == '.' || character == ';');
+		const bool isRussianLetter = language == Common::RU_RUS && (0xC0 <= character || character == '_');
 		const bool isSpace = character == ' ';
-		if ((!isLetter && !isDigit && !isHebrewLetter && !isHebrewPunctuation && !isSpace) ||
+		if ((!isLetter && !isDigit && !isHebrewLetter && !isHebrewPunctuation && !isRussianLetter && !isSpace) ||
 			(isSpace && previousWasSpace))
 			return false;
 		previousWasSpace = isSpace;
@@ -796,30 +759,13 @@ bool Zoombini2SavegameManager::isSafeStoredSavefileName(const Common::String &sa
 }
 
 bool Zoombini2SavegameManager::encodeSavefileName(const Common::U32String &displayName, Common::String &savefileName) const {
-	Common::CodePage codePage = Common::kUtf8;
-	switch (_language) {
-	case Common::HE_ISR:
-		codePage = Common::kWindows1255;
-		break;
-	case Common::SV_SWE:
-		codePage = Common::kWindows1252;
-		break;
-	default:
-		break;
-	}
+	const Common::CodePage codePage = ZmbReleaseInfo::getCodePage(_lang, _platform);
 	savefileName = displayName.encode(codePage);
 	return savefileName.decode(codePage) == displayName;
 }
 
 Common::U32String Zoombini2SavegameManager::decodeSavefileName(const Common::String &savefileName) const {
-	switch (_language) {
-	case Common::HE_ISR:
-		return savefileName.decode(Common::kWindows1255);
-	case Common::SV_SWE:
-		return savefileName.decode(Common::kWindows1252);
-	default:
-		return savefileName.decode(Common::kUtf8);
-	}
+	return savefileName.decode(ZmbReleaseInfo::getCodePage(_lang, _platform));
 }
 
 void Zoombini2SavegameManager::addSavefileSorted(Common::StringArray &savefiles, const Common::String &savefileName) {
@@ -847,20 +793,9 @@ Common::StringArray Zoombini2SavegameManager::listSavefiles() const {
 			continue;
 
 		const Common::String filesystemName = saveFileName.substr(prefix.size(), saveFileName.size() - prefix.size() - suffix.size());
-		Common::String savefileName = filesystemName;
-		switch (_language) {
-		case Common::HE_ISR:
-			savefileName = filesystemName.decode(Common::kUtf8).encode(Common::kWindows1255);
-			break;
-		case Common::SV_SWE:
-			savefileName = filesystemName.decode(Common::kUtf8).encode(Common::kWindows1252);
-			break;
-		default:
-			break;
-		}
-		const bool invalidEncoding = (_language == Common::HE_ISR && savefileName.decode(Common::kWindows1255).encode(Common::kUtf8) != filesystemName) ||
-									 (_language == Common::SV_SWE && savefileName.decode(Common::kWindows1252).encode(Common::kUtf8) != filesystemName);
-		if (invalidEncoding || !isSafeStoredSavefileName(savefileName)) {
+		Common::String savefileName;
+		if (!encodeSavefileName(filesystemName.decode(Common::kUtf8), savefileName) ||
+			decodeSavefileName(savefileName).encode(Common::kUtf8) != filesystemName || !isSafeStoredSavefileName(savefileName)) {
 			warning("Zoombini2SavegameManager: Ignoring invalid savefile '%s'", saveFileName.c_str());
 			continue;
 		}
@@ -915,11 +850,11 @@ bool Zoombini2SavegameManager::verifySaveData(const Common::String &saveFileName
 
 bool Zoombini2SavegameManager::writeSavefile(const Common::String &savefileName, const GameState &state) const {
 	if (!_saveFileManager || !isSafeStoredSavefileName(savefileName) ||
-		(!isValidSavefileName(savefileName, _language) && !_saveFileManager->exists(makeSaveFileName(savefileName))))
+		(!isValidSavefileName(savefileName, _lang) && !_saveFileManager->exists(makeSaveFileName(savefileName))))
 		return false;
 
 	Common::MemoryWriteStreamDynamic data(DisposeAfterUse::YES);
-	if (!state.save(&data))
+	if (!state.save(&data, _platform))
 		return false;
 
 	const Common::String saveFileName = makeSaveFileName(savefileName);
@@ -954,7 +889,7 @@ bool Zoombini2SavegameManager::loadSavefile(const Common::String &savefileName, 
 		return false;
 	}
 
-	const bool ok = state.load(stream);
+	const bool ok = state.load(stream, _platform);
 	delete stream;
 	if (ok)
 		debug(1, "Loaded Zoombini2 savefile from %s", saveFileName.c_str());
@@ -965,12 +900,12 @@ bool Zoombini2SavegameManager::loadSavefile(const Common::String &savefileName, 
 
 bool Zoombini2SavegameManager::importSavefile(const Common::String &savefileName, Common::SeekableReadStream *src, bool overwrite) const {
 	if (!_saveFileManager || !src ||
-		!isValidSavefileName(savefileName, _language) ||
+		!isValidSavefileName(savefileName, _lang) ||
 		(!overwrite && savefileExists(savefileName)))
 		return false;
 
 	GameState importedState;
-	if (!importedState.load(src)) {
+	if (!importedState.load(src, _platform)) {
 		warning("Zoombini2SavegameManager: Failed to validate imported savefile '%s'", savefileName.c_str());
 		return false;
 	}
@@ -1015,7 +950,7 @@ bool Zoombini2SavegameManager::deleteSavefile(const Common::String &savefileName
 bool Zoombini2SavegameManager::renameSavefile(const Common::String &oldSavefileName, const Common::String &newSavefileName) const {
 	if (!_saveFileManager ||
 		!isSafeStoredSavefileName(oldSavefileName) ||
-		!isValidSavefileName(newSavefileName, _language))
+		!isValidSavefileName(newSavefileName, _lang))
 		return false;
 	if (oldSavefileName == newSavefileName)
 		return true;
@@ -1038,7 +973,7 @@ bool Zoombini2SavegameManager::renameSavefile(const Common::String &oldSavefileN
 bool Zoombini2SavegameManager::duplicateSavefile(const Common::String &srcSavefileName, const Common::String &newSavefileName) const {
 	if (!_saveFileManager ||
 		!isSafeStoredSavefileName(srcSavefileName) ||
-		!isValidSavefileName(newSavefileName, _language) || srcSavefileName.equalsIgnoreCase(newSavefileName) || savefileExists(newSavefileName))
+		!isValidSavefileName(newSavefileName, _lang) || srcSavefileName.equalsIgnoreCase(newSavefileName) || savefileExists(newSavefileName))
 		return false;
 
 	GameState duplicatedState;

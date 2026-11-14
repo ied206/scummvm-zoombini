@@ -29,13 +29,16 @@
 
 namespace Zoombini2 {
 
-/** Release-family flags attached to one detected game description. */
+/** Release and packaging flags attached to one detected game description. */
 enum GameFeatures {
-	GF_NONE = 0, ///< No release-family feature flags.
+	/** No release or packaging feature flags. */
+	GF_NONE = 0,
+	/** Packaged installer requiring resource extraction before play. */
+	GF_Z2_INSTALLER = (1 << 0),
 	/** Help-sheet bitmaps use a solid background color instead of the frame gradient. */
-	GF_Z2_SOLID_HELP_PAGES = (1 << 0),
+	GF_Z2_SOLID_HELP_PAGES = (1 << 1),
 	/** The help frame resource stores a solid gray full-screen canvas. */
-	GF_Z2_SOLID_HELP_FRAME = (1 << 1),
+	GF_Z2_SOLID_HELP_FRAME = (1 << 2),
 	/**
 	 * Zoombinis: Mountain Rescue - v1.0 family.
 	 * - v1.0US
@@ -44,7 +47,7 @@ enum GameFeatures {
 	 *
 	 * Selects gameplay-tick reseeding when a puzzle calls @ref Zoombini2Engine::reseedRandomForV10.
 	 */
-	GF_Z2_V10 = (1 << 2),
+	GF_Z2_V10 = (1 << 3),
 	/**
 	 * Zoombinis: Mountain Rescue - v1.1 family.
 	 * - v1.1US
@@ -61,10 +64,10 @@ enum GameFeatures {
 	 * Successful flip-chain creation engages vsync; otherwise presentation falls back to blitting-wo-waiting.
 	 * ScummVM presentation remains backend-controlled, this flag does not affect any frame presentation.
 	 */
-	GF_Z2_V11 = (1 << 3),
+	GF_Z2_V11 = (1 << 4),
 };
 
-/** Detection record combining ScummVM metadata with Z2 release-family flags. */
+/** Detection record combining ScummVM metadata with Z2 release familty and packaging flags. */
 struct Zoombini2GameDescription {
 	/** Standard advanced-detector description. */
 	ADGameDescription desc;

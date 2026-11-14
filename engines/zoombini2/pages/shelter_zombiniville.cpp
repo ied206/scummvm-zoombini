@@ -28,6 +28,7 @@
 #include "zoombini2/scripts.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
+#include "zoombini2/text_manager.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
@@ -370,123 +371,6 @@ bool ShelterZombiniville::passesPackTraitLimits(const ZmbTrait &traits) const {
 	return true;
 }
 
-Common::String ShelterZombiniville::generateName() {
-	static constexpr const char *kVowelPairs[30] = {
-		"a ",
-		"a ",
-		"a ",
-		"e ",
-		"e ",
-		"e ",
-		"e ",
-		"i ",
-		"i ",
-		"i ",
-		"o ",
-		"o ",
-		"o ",
-		"u ",
-		"u ",
-		"y ",
-		"ee",
-		"oo",
-		"yo",
-		"ya",
-		"ye",
-		"ei",
-		"ie",
-		"ai",
-		"ia",
-		"au",
-		"ua",
-		"uo",
-		"ou",
-		"ae",
-	};
-	static constexpr char kSingleConsonants[] = "bbccdddfghjkkllmmnnprrssssttvwx";
-	static constexpr char kEndings[] = "aeiou";
-	static constexpr const char *kConsonantPairs[39] = {
-		"bl",
-		"br",
-		"ch",
-		"cl",
-		"cr",
-		"dr",
-		"dw",
-		"fl",
-		"fr",
-		"gh",
-		"gl",
-		"gr",
-		"kl",
-		"kn",
-		"kr",
-		"kw",
-		"ld",
-		"mp",
-		"nd",
-		"nh",
-		"nn",
-		"ph",
-		"pl",
-		"pr",
-		"qu",
-		"qu",
-		"rh",
-		"rn",
-		"sc",
-		"sl",
-		"sm",
-		"sn",
-		"sp",
-		"sr",
-		"st",
-		"sw",
-		"th",
-		"tr",
-		"tw",
-	};
-
-	char name[8] = {};
-	const int targetLength = _vm->_rnd->getRandomNumber(1) + 4;
-	bool useVowelPair = _vm->_rnd->getRandomNumber(98) + 1 < 40;
-	int length = 0;
-	while (length < targetLength) {
-		bool usedConsonantPair = false;
-		if (useVowelPair) {
-			useVowelPair = false;
-			const char *pair = kVowelPairs[_vm->_rnd->getRandomNumber(29)];
-			if (pair[1] != ' ') {
-				name[length] = pair[0];
-				length += 1;
-				name[length] = pair[1];
-				length += 1;
-			} else {
-				name[length] = pair[0];
-				length += 1;
-			}
-		} else {
-			useVowelPair = true;
-			if (1 < length || _vm->_rnd->getRandomNumber(98) + 1 <= 33) {
-				const char *pair = kConsonantPairs[_vm->_rnd->getRandomNumber(38)];
-				name[length] = pair[0];
-				length += 1;
-				name[length] = pair[1];
-				length += 1;
-				usedConsonantPair = true;
-			} else {
-				name[length] = kSingleConsonants[_vm->_rnd->getRandomNumber(30)];
-				length += 1;
-			}
-		}
-		if (usedConsonantPair && targetLength <= length)
-			name[length - 1] = kEndings[_vm->_rnd->getRandomNumber(4)];
-		if (length == 2 && name[0] == name[1])
-			length = 1;
-	}
-	return Common::String(name);
-}
-
 PathObject *ShelterZombiniville::createEntrancePath(const Common::Point32 &dest) const {
 	PathObject *path = new PathObject(_vm);
 	path->appendSegment(Common::Point32(-70, 400), Common::Point32(dest.x / 3, 420), Common::Point32(2 * (dest.x / 3), 450), dest, 2, 0);
@@ -601,7 +485,7 @@ bool ShelterZombiniville::createZoombini(bool allowConcurrentEntrances) {
 	const Common::Point32 dest = getSlotPosition(slotIndex);
 	ZoombiniRunner *zoombini = new ZoombiniRunner(_vm);
 	zoombini->setTraits(traits);
-	_currentName = generateName();
+	_currentName = _vm->_text->generateZoombiniName();
 	zoombini->setName(_currentName.c_str());
 	zoombini->setPosition(dest);
 	zoombini->setDefaultAnimation(ZmbAnimationKind::kBasic, 33);

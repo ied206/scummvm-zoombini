@@ -19,6 +19,10 @@
  *
  */
 
+#include "common/array.h"
+#include "common/ptr.h"
+#include "common/textconsole.h"
+#include "common/util.h"
 #include "graphics/fontman.h"
 #include "gui/ThemeEngine.h"
 #include "gui/gui-manager.h"
@@ -29,6 +33,8 @@
 namespace Zoombini2 {
 
 constexpr const char *TextManager::kTextFontPath;
+constexpr const char *TextManager::kBmtFontCacheName;
+constexpr const char *TextManager::kRussianExecutablePath;
 
 TextManager::TextManager(Zoombini2Engine *vm)
 	: _vm(vm) {
@@ -42,10 +48,12 @@ TextManager::TextManager(Zoombini2Engine *vm)
 		else
 			_strMap[entry->_key] = translations[Common::EN_USA];
 	}
+	if (language == Common::RU_RUS && !loadRussianTables())
+		error("TextManager: Failed to load Russian name and keyboard tables from %s", kRussianExecutablePath);
 }
 
 TextManager::~TextManager() {
-	FontMan.removeFontName(_bmtFontCacheName);
+	FontMan.removeFontName(kBmtFontCacheName);
 }
 
 TextManager::LocalizedStringMap TextManager::createLocalizedStrings() {
@@ -72,42 +80,133 @@ const Common::U32String &TextManager::getLocalizedString(Key key) const {
 	return _strMap[key];
 }
 
-Common::CodePage TextManager::gameCodePage(Common::Language language) {
-	switch (language) {
-	case Common::KO_KOR:
-		return Common::kWindows949;
-	case Common::PL_POL:
-		return Common::kWindows1250;
-	case Common::HE_ISR:
-		return Common::kWindows1255;
-	case Common::EN_ANY:
-	case Common::EN_GRB:
-	case Common::EN_USA:
-	default:
-		return Common::kWindows1252;
-	}
+Common::U32String TextManager::toU32String(const Common::String &str) const {
+	return str.decode(_vm->getRelInfo().getCodePage());
 }
 
-Common::U32String TextManager::toU32String(const Common::String &str, Common::Language language) {
-	return str.decode(gameCodePage(language));
-}
-
-Common::String TextManager::fromU32String(const Common::U32String &str, Common::Language language) {
-	return str.encode(gameCodePage(language));
+Common::String TextManager::fromU32String(const Common::U32String &str) const {
+	return str.encode(_vm->getRelInfo().getCodePage());
 }
 
 Common::String TextManager::getZoombiniDisplayName(const Common::String &name) const {
-	// The Hebrew strip replaces the Latin letter slots with Hebrew shapes.
+	// Hebrew: Render Latin alphabets will be rendered as correlated Hebrew alphabets.
 	if (_vm->isHebrew())
 		return name;
+
+	// Latin: Make every alphabet uppercase except 'i'.
 	Common::String displayName = name;
 	for (uint i = 0; i < displayName.size(); i++) {
-		const char letter = displayName[i];
-		// Make every Latin alphabet uppercase except 'i'.
-		if ('a' <= letter && letter <= 'z' && letter != 'i')
-			displayName.setChar(letter - 'a' + 'A', i);
+		const char ch = displayName[i];
+		if ('a' <= ch && ch <= 'z' && ch != 'i')
+			displayName.setChar(toupper(ch), i);
 	}
 	return displayName;
+}
+
+bool TextManager::loadRussianTables() {
+	static constexpr ExeTableSource kV11RussianSource = {kRussianExecutablePath, 790609, 0xB1000, 0xB1900};
+	static constexpr uint kNameEntrySize = 8;
+	Common::ScopedPtr<Common::SeekableReadStream> stream(_vm->openResourceFile(kV11RussianSource.fileName));
+	if (!stream || stream->size() != kV11RussianSource.expectedSize)
+		return false;
+
+	Common::Array<byte> data;
+	data.resize(kV11RussianSource.expectedSize);
+	if (!stream->seek(0) || stream->read(data.data(), data.size()) != data.size() || stream->err())
+		return false;
+	if (data.size() < kV11RussianSource.namesOffset + ARRAYSIZE(_russianNames) * kNameEntrySize || data.size() < kV11RussianSource.keyboardOffset + sizeof(_russianKeyboard))
+		return false;
+
+	const char *names = reinterpret_cast<const char *>(data.data() + kV11RussianSource.namesOffset);
+	for (uint i = 0; i < ARRAYSIZE(_russianNames); i++) {
+		const char *name = names + i * kNameEntrySize;
+		uint length = 0;
+		while (length < kNameEntrySize && name[length] != 0) {
+			if (static_cast<byte>(name[length]) < 0xC0)
+				return false;
+			length += 1;
+		}
+		if (length == 0 || length == kNameEntrySize)
+			return false;
+		_russianNames[i] = Common::String(name, length);
+	}
+	memcpy(_russianKeyboard, data.data() + kV11RussianSource.keyboardOffset, sizeof(_russianKeyboard));
+	return true;
+}
+
+Common::String TextManager::generateZoombiniName() const {
+	if (_vm->getLanguage() == Common::RU_RUS)
+		return generateRussianZoombiniName();
+	return generateLatinZoombiniName();
+}
+
+Common::String TextManager::generateLatinZoombiniName() const {
+	static constexpr const char *kVowelPairs[] = {
+		"a ", "a ", "a ", "e ", "e ", "e ", "e ", "i ", "i ", "i ",
+		"o ", "o ", "o ", "u ", "u ", "y ", "ee", "oo", "yo", "ya",
+		"ye", "ei", "ie", "ai", "ia", "au", "ua", "uo", "ou", "ae"};
+	static constexpr char kSingleConsonants[] = "bbccdddfghjkkllmmnnprrssssttvwx";
+	static constexpr char kEndings[] = "aeiou";
+	static constexpr const char *kConsonantPairs[] = {
+		"bl", "br", "ch", "cl", "cr", "dr", "dw", "fl", "fr", "gh",
+		"gl", "gr", "kl", "kn", "kr", "kw", "ld", "mp", "nd", "nh",
+		"nn", "ph", "pl", "pr", "qu", "qu", "rh", "rn", "sc", "sl",
+		"sm", "sn", "sp", "sr", "st", "sw", "th", "tr", "tw"};
+
+	Common::String name;
+	const uint targetLength = _vm->_rnd->getRandomNumber(1) + 4; // 4 or 5
+	bool useVowelPair = _vm->_rnd->getRandomNumber(98) + 1 < 40; // ~40%
+	while (name.size() < targetLength) {
+		bool usedConsonantPair = false;
+		if (useVowelPair) {
+			useVowelPair = false;
+			const char *pair = kVowelPairs[_vm->_rnd->getRandomNumber(ARRAYSIZE(kVowelPairs) - 1)];
+			name += pair[0];
+			if (pair[1] != ' ')
+				name += pair[1];
+		} else {
+			useVowelPair = true;
+			if (1 < name.size() || _vm->_rnd->getRandomNumber(98) + 1 <= 33) { // ~33%
+				const char *pair = kConsonantPairs[_vm->_rnd->getRandomNumber(ARRAYSIZE(kConsonantPairs) - 1)];
+				name += pair[0];
+				name += pair[1];
+				usedConsonantPair = true;
+			} else {
+				name += kSingleConsonants[_vm->_rnd->getRandomNumber(ARRAYSIZE(kSingleConsonants) - 2)];
+			}
+		}
+		if (usedConsonantPair && targetLength <= name.size())
+			name.setChar(kEndings[_vm->_rnd->getRandomNumber(ARRAYSIZE(kEndings) - 2)], name.size() - 1);
+		if (name.size() == 2 && name[0] == name[1])
+			name.deleteLastChar();
+	}
+	return name;
+}
+
+Common::String TextManager::generateRussianZoombiniName() const {
+	const uint index = _vm->_rnd->getRandomNumber(ARRAYSIZE(_russianNames) - 1);
+	return _russianNames[index];
+}
+
+uint32 TextManager::mapRussianNameKey(uint32 keyCode) const {
+	if (0x0410 <= keyCode && keyCode <= 0x044F)
+		return keyCode - 0x0410 + 0xC0;
+	if (32 <= keyCode && keyCode <= 127)
+		return _russianKeyboard[keyCode];
+	return keyCode;
+}
+
+bool TextManager::isValidNameCharacter(uint32 keyCode) const {
+	/** Allowed release-byte characters for savefile-name keyboard entry. */
+	static constexpr const char *kValidNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ";
+	/** Characters accepted by the Hebrew release in addition to its Hebrew byte range. */
+	static constexpr const char *kHebrewValidNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ,.; ";
+	const Common::Language language = _vm->getLanguage();
+	if (language == Common::HE_ISR)
+		return (0xE0 <= keyCode && keyCode <= 0xFA) || (keyCode < 128 && strchr(kHebrewValidNameCharacters, static_cast<char>(keyCode)));
+	if (language == Common::RU_RUS)
+		return (0xC0 <= keyCode && keyCode <= 0xFF) || ('0' <= keyCode && keyCode <= '9') || keyCode == ' ' || keyCode == '_';
+	return keyCode < 128 && strchr(kValidNameCharacters, static_cast<char>(keyCode));
 }
 
 bool TextManager::loadTextFont() {
@@ -118,9 +217,7 @@ bool TextManager::loadTextFont() {
 		delete font;
 		return false;
 	}
-	// The strip retains this game instance, so do not reuse another game's registration.
-	_bmtFontCacheName = Common::String::format("zoombini2-bmt-%p", static_cast<void *>(font));
-	FontMan.assignFontToName(_bmtFontCacheName, font);
+	FontMan.assignFontToName(kBmtFontCacheName, font);
 	return true;
 }
 
@@ -129,9 +226,7 @@ bool TextManager::hasTextFont() const {
 }
 
 const BmtFont *TextManager::bmtFont() const {
-	if (_bmtFontCacheName.empty())
-		return nullptr;
-	return static_cast<const BmtFont *>(FontMan.getFontByName(_bmtFontCacheName));
+	return static_cast<const BmtFont *>(FontMan.getFontByName(kBmtFontCacheName));
 }
 
 const Graphics::Font *TextManager::resolveFont(Gfx::FontKind kind) const {

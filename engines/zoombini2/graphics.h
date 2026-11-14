@@ -1547,7 +1547,8 @@ enum MenuButtonId {
  * Glyph A occupies pixel columns 1-3, and blank columns 4-5 separate it from glyph B in columns 6-8.
  *
  * The usual strip has 81 glyphs.
- * The v1.1SE strip has 84.
+ * The Norwegian and Swedish strips have 84.
+ * The Russian strip has 145, with CP1251 Cyrillic bytes selecting the appended 64 glyphs.
  * The v1.0HE strip has 80 and puts Hebrew shapes in both Latin letter ranges, while Hebrew bytes select matching slots directly.
  * Spaces advance by @ref BmtFont::kSpaceWidth.
  *
@@ -1571,8 +1572,6 @@ enum MenuButtonId {
  */
 class BmtFont : public Graphics::Font {
 public:
-	/** Maximum number of glyphs in the font-strip mapping. */
-	static constexpr int kNumGlyphs = 84;
 	/** Horizontal advance used for spaces. */
 	static constexpr int kSpaceWidth = 10;
 
@@ -1661,16 +1660,14 @@ private:
 	/** One extracted glyph: its coverage mask and dimensions. */
 	struct Glyph {
 		/** Per-pixel coverage, 0 (transparent) through 255 (opaque). */
-		byte *mask = nullptr;
+		Common::Array<byte> mask;
 		/** Glyph width in pixels. */
 		int width = 0;
 		/** Glyph height in pixels. */
 		int height = 0;
-		/** Release the coverage mask. */
-		~Glyph() { delete[] mask; }
 	};
-	/** Glyph coverage masks held by this font in character-mapping order. */
-	Glyph _glyphs[kNumGlyphs];
+	/** Extracted glyphs in character-mapping order, sized to the loaded strip. */
+	Common::Array<Glyph> _glyphs;
 
 	/**
 	 * Draw one glyph's coverage mask tinted with @p color at @p pos.

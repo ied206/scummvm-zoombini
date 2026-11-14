@@ -357,7 +357,7 @@ void InteractiveMap::createPracticeParty(Zoombini2Engine *vm, PageId pageId, uin
 	}
 
 	for (uint i = 0; i < vm->_state->_activeZoombinis.size(); i++) {
-		const Common::String name = GameState::generateZoombiniName(*vm->_rnd);
+		const Common::String name = vm->_text->generateZoombiniName();
 		vm->_state->_activeZoombinis[i]->setName(name.c_str());
 	}
 }

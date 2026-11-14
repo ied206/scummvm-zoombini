@@ -302,9 +302,11 @@ void Zoombini2SavefileNameDialog::handleCommand(GUI::CommandSender *sender, uint
 Zoombini2SaveManagementDialog::Zoombini2SaveManagementDialog(const Common::String &domain)
 	: GUI::Dialog(0, 0, 1, 1), _domain(domain), _savefileSelectionGroup(this, kSavefileSelectionChangedCommand) {
 	_language = Common::parseLanguage(ConfMan.get("language", _domain));
+	_platform = Common::parsePlatform(ConfMan.get("platform", _domain));
 	if (g_engine && ConfMan.getActiveDomainName() == _domain && Common::String(g_engine->getMetaEngine()->getName()) == "zoombini2") {
 		const Zoombini2Engine *vm = static_cast<const Zoombini2Engine *>(g_engine);
 		_language = vm->getLanguage();
+		_platform = vm->getPlatform();
 	}
 
 	_description = new GUI::StaticTextWidget(this, kDialogMargin, 8, kTableWidth, 24, true, _("Manage saved games"), Graphics::kTextAlignStart);
@@ -459,7 +461,7 @@ void Zoombini2SaveManagementDialog::refreshSavefiles(const Common::String &selec
 	if (savefileNameToSelect.empty() && 0 <= _selectedSavefileIndex && _selectedSavefileIndex < static_cast<int>(_savefileNames.size()))
 		savefileNameToSelect = _savefileNames[_selectedSavefileIndex];
 
-	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language);
+	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language, _platform);
 	const Common::Array<Zoombini2SavefileSummary> summaries = savegameManager.listSavefileSummaries();
 	_savefileNames.clear();
 	_savefileRowCount = MIN<int>(summaries.size(), kMaximumSavefileRows);
@@ -645,7 +647,7 @@ void Zoombini2SaveManagementDialog::renameSelectedSavefile() {
 	const Common::String oldSavefileName = _savefileNames[_selectedSavefileIndex];
 	if (isActiveSavefile(oldSavefileName))
 		return;
-	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language);
+	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language, _platform);
 	Zoombini2SavefileNameDialog nameDialog(_("Rename saved game"), savegameManager.decodeSavefileName(oldSavefileName), _language);
 	if (nameDialog.runModal() != GUI::kOKCmd)
 		return;
@@ -672,7 +674,7 @@ void Zoombini2SaveManagementDialog::duplicateSelectedSavefile() {
 	if (nameDialog.runModal() != GUI::kOKCmd)
 		return;
 
-	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language);
+	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language, _platform);
 	Common::String newSavefileName;
 	if (!savegameManager.encodeSavefileName(nameDialog.getSavefileName(), newSavefileName) ||
 		!savegameManager.duplicateSavefile(srcSavefileName, newSavefileName)) {
@@ -700,7 +702,7 @@ void Zoombini2SaveManagementDialog::importSavefile() {
 		return;
 	}
 
-	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language);
+	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language, _platform);
 	Common::String savefileName;
 	Common::U32String displayName = srcName.substr(0, extensionPosition).decode(Common::kUtf8);
 	bool validName = savegameManager.encodeSavefileName(displayName, savefileName) &&
@@ -762,7 +764,7 @@ void Zoombini2SaveManagementDialog::exportSelectedSavefile() {
 	}
 
 	const Common::String savefileName = _savefileNames[_selectedSavefileIndex];
-	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language);
+	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language, _platform);
 	const Common::String exportName = savegameManager.decodeSavefileName(savefileName).encode(Common::kUtf8) + ".mk";
 	const Common::FSNode dest = findChild(directory, exportName);
 	if (dest.exists()) {
@@ -801,7 +803,7 @@ void Zoombini2SaveManagementDialog::deleteSelectedSavefile() {
 	if (confirmation.runModal() != GUI::kMessageOK)
 		return;
 
-	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language);
+	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language, _platform);
 	if (!savegameManager.deleteSavefile(savefileName)) {
 		GUI::MessageDialog errorDialog(_("Error deleting saved game"));
 		errorDialog.runModal();

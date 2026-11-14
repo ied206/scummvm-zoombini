@@ -26,6 +26,7 @@
 #include "backends/keymapper/standard-actions.h"
 
 #include "common/config-manager.h"
+#include "common/textconsole.h"
 #include "common/translation.h"
 
 #include "zoombini2/dialogs.h"
@@ -39,7 +40,32 @@
 namespace Zoombini2 {
 
 ZmbReleaseInfo::ZmbReleaseInfo(const Zoombini2GameDescription &gameDesc)
-	: _features(gameDesc.features), _language(gameDesc.desc.language), _demo((gameDesc.desc.flags & ADGF_DEMO) != 0) {
+	: _features(gameDesc.features), _language(gameDesc.desc.language),
+	  _platform(gameDesc.desc.platform), _demo((gameDesc.desc.flags & ADGF_DEMO) != 0) {
+}
+
+Common::CodePage ZmbReleaseInfo::getCodePage(Common::Language language, Common::Platform platform) {
+	switch (platform) {
+	case Common::kPlatformMacintosh:
+		return Common::kMacRoman;
+	case Common::kPlatformWindows:
+	case Common::kPlatformUnknown:
+		switch (language) {
+		case Common::KO_KOR:
+			return Common::kWindows949;
+		case Common::PL_POL:
+			return Common::kWindows1250;
+		case Common::RU_RUS:
+			return Common::kWindows1251;
+		case Common::HE_ISR:
+			return Common::kWindows1255;
+		default:
+			return Common::kWindows1252;
+		}
+	default:
+		error("ZmbReleaseInfo::getCodePage: unsupported platform %d", static_cast<int>(platform));
+	}
+	return Common::kCodePageInvalid;
 }
 
 bool ZmbReleaseInfo::isFamily(Family family) const {
@@ -56,12 +82,19 @@ bool ZmbReleaseInfo::isFamily(Family family, Common::Language language) const {
 	return isFamily(family) && _language == language;
 }
 
+bool ZmbReleaseInfo::usesGameplayTickReseeding() const {
+	return _platform == Common::kPlatformWindows && isFamily(Family::kV10);
+}
+
 ZmbReleaseInfo::BitmapTextLayout ZmbReleaseInfo::getBitmapTextLayout() const {
 	switch (_language) {
 	case Common::HE_ISR:
 		return BitmapTextLayout::kHebrew;
+	case Common::NB_NOR:
 	case Common::SV_SWE:
-		return BitmapTextLayout::kSwedish;
+		return BitmapTextLayout::kScandinavian;
+	case Common::RU_RUS:
+		return BitmapTextLayout::kCyrillic;
 	default:
 		return BitmapTextLayout::kLatin;
 	}

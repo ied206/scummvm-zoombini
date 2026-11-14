@@ -227,26 +227,28 @@ Common::FSNode Zoombini2Engine::findChildDirectoryIgnoreCase(const Common::FSNod
 
 void Zoombini2Engine::initializePath(const Common::FSNode &gamePath) {
 	const Common::FSNode dataDir = findChildDirectoryIgnoreCase(gamePath, "Data");
-	const Common::FSNode dataBmpDir = findChildDirectoryIgnoreCase(dataDir, "Bmp");
 	const Common::FSNode installDir = findChildDirectoryIgnoreCase(gamePath, "INSTALL");
 	const Common::FSNode installHdDir = findChildDirectoryIgnoreCase(installDir, "HD");
-	const Common::FSNode rootBmpDir = findChildDirectoryIgnoreCase(gamePath, "Bmp");
 
+	// Normal Windows dumps keep CD assets in Data and installed assets in INSTALL/HD.
 	Common::FSNode cdDataRoot = dataDir;
 	Common::FSNode installedRoot = installHdDir;
-	switch (_gameDescription->desc.platform) {
+	switch (getPlatform()) {
 	case Common::kPlatformMacintosh:
 		// Macintosh discs keep CD assets at the volume root and installation payloads in Data.
 		cdDataRoot = gamePath;
 		installedRoot = dataDir;
 		break;
-	case Common::kPlatformWindows:
-	default:
-		if (!dataBmpDir.isDirectory() && rootBmpDir.isDirectory()) {
-			// Some supported installed releases already present both logical trees in one flattened directory.
-			cdDataRoot = gamePath;
+	case Common::kPlatformWindows: {
+		// Flattened dumps keep HD assets at the root; Russian installations may retain a separate Data tree.
+		if (!installHdDir.isDirectory() && findChildDirectoryIgnoreCase(gamePath, "Bmp").isDirectory()) {
 			installedRoot = gamePath;
+			if (!findChildDirectoryIgnoreCase(dataDir, "Bmp").isDirectory())
+				cdDataRoot = gamePath;
 		}
+		break;
+	}
+	default:
 		break;
 	}
 
@@ -265,7 +267,7 @@ void Zoombini2Engine::initializePath(const Common::FSNode &gamePath) {
 Zoombini2Engine::Zoombini2Engine(OSystem *syst, const Zoombini2GameDescription *desc)
 	: Engine(syst), _gameDescription(desc), _relInfo(*desc) {
 
-	_rnd = new Random("zoombini2");
+	_rnd = new Random("zoombini2", getPlatform());
 	_mainMenuDialog = new Zoombini2MenuDialog(this);
 
 	refreshEngineSettings();
@@ -358,7 +360,7 @@ bool Zoombini2Engine::toggleGameSaveWriteLock(const Common::String &savefileName
 }
 
 bool Zoombini2Engine::createGameSave(const Common::String &savefileName) {
-	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName(), getLanguage());
+	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName(), getLanguage(), getPlatform());
 	if (savegameManager.savefileExists(savefileName))
 		return false;
 	const bool saved = writeGameSavefile(savefileName);
@@ -382,14 +384,14 @@ bool Zoombini2Engine::overwriteGameSave(const Common::String &savefileName) {
 bool Zoombini2Engine::writeGameSavefile(const Common::String &savefileName) {
 	if (!_state)
 		return false;
-	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName(), getLanguage());
+	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName(), getLanguage(), getPlatform());
 	return savegameManager.writeSavefile(savefileName, *_state);
 }
 
 bool Zoombini2Engine::readGameSave(const Common::String &savefileName) {
 	if (!_state)
 		return false;
-	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName(), getLanguage());
+	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName(), getLanguage(), getPlatform());
 	const bool loaded = savegameManager.loadSavefile(savefileName, *_state);
 	if (loaded) {
 		_activeSavefileName = savefileName;
@@ -399,7 +401,7 @@ bool Zoombini2Engine::readGameSave(const Common::String &savefileName) {
 }
 
 bool Zoombini2Engine::deleteGameSave(const Common::String &savefileName) {
-	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName(), getLanguage());
+	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName(), getLanguage(), getPlatform());
 	const bool deleted = savegameManager.deleteSavefile(savefileName);
 	if (deleted && _activeSavefileName == savefileName) {
 		_activeSavefileName.clear();
@@ -411,12 +413,12 @@ bool Zoombini2Engine::deleteGameSave(const Common::String &savefileName) {
 }
 
 Common::StringArray Zoombini2Engine::listGameSaves() const {
-	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName(), getLanguage());
+	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName(), getLanguage(), getPlatform());
 	return savegameManager.listSavefiles();
 }
 
 bool Zoombini2Engine::isGameSaveReadOnly(const Common::String &savefileName) const {
-	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName(), getLanguage());
+	Zoombini2SavegameManager savegameManager(_saveFileMan, ConfMan.getActiveDomainName(), getLanguage(), getPlatform());
 	return savegameManager.isSavefileReadOnly(savefileName);
 }
 
@@ -860,8 +862,9 @@ void Zoombini2Engine::restartGoBlink() {
 }
 
 void Zoombini2Engine::reseedRandomForV10() {
-	if (_relInfo.isFamily(ZmbReleaseInfo::Family::kV10))
-		_rnd->setSeed(getTotalPlayTime());
+	// Repeated resets within one frame reuse the cached gameplay tick.
+	if (_relInfo.usesGameplayTickReseeding())
+		_rnd->setSeed(getFrameTickCount());
 }
 
 int Zoombini2Engine::getLogicPacingHz() const {

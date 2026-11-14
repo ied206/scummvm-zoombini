@@ -25,6 +25,7 @@
 #include "common/array.h"
 #include "common/language.h"
 #include "common/noncopyable.h"
+#include "common/platform.h"
 #include "common/scummsys.h"
 #include "common/str-array.h"
 #include "common/str.h"
@@ -40,12 +41,17 @@ namespace Zoombini2 {
 
 class ZoombiniRunner;
 class Zoombini2Engine;
-class Random;
 
 /** Runtime gameplay mode, independent of whether a savefile is attached. */
 enum class GameMode {
 	kPracticeMode, ///< Select and replay puzzles without recording journey progress.
 	kJourneyMode   ///< Advance a party along the route and retain its progress.
+};
+
+/** Byte order of multibyte integer fields in saved games. */
+enum class FileEndianess {
+	kLittleEndian, ///< Windows save format.
+	kBigEndian     ///< Macintosh save format.
 };
 
 /** Numeric page identifiers accepted by the engine dispatcher. */
@@ -293,9 +299,9 @@ struct TraitComboTable {
 	 * Read the aggregate counts, per-combination counts and unused tail without recomputing them.
 	 * Return false if the complete stored arrays cannot be read.
 	 */
-	bool read(Common::ReadStream *stream);
-	/** Write all counts and unused bytes in their saved-game order. */
-	void write(Common::WriteStream *stream) const;
+	bool read(Common::ReadStreamEndian *stream);
+	/** Write the counts in the selected byte order and preserve all stored byte arrays. */
+	void write(Common::WriteStream *stream, FileEndianess endianess) const;
 	/** Return the total number of accepted registrations, including repeated combinations. */
 	int32 getTotalCount() const { return _totalCount; }
 	/** Return the number of trait combinations registered exactly twice. */
@@ -345,8 +351,6 @@ public:
 	/** Number of completed-Zoombini trait hashes retained in one saved game. */
 	static constexpr int kCompletedTraitHashCount = 210;
 
-	/** Generate a short name for a newly created Zoombini. */
-	static Common::String generateZoombiniName(Random &random);
 	/** Construct a fresh state; @p vm is optional for data-only savefile operations. */
 	explicit GameState(Zoombini2Engine *vm = nullptr);
 	/** Release all storage records and local-roster entries. */
@@ -356,12 +360,13 @@ public:
 	void init();
 
 	/**
-	 * Load and validate a complete game state from @p stream without closing the stream.
+	 * Detect either save byte order and validate the complete state without closing @p stream.
+	 * Log a successful load from the other platform when @p targetPlatform is known.
 	 * @return True after replacing the state and releasing its previous storage records and runners; false leaves the state unchanged.
 	 */
-	bool load(Common::SeekableReadStream *stream);
-	/** Serialize this game state and the eligible active party to @p stream. */
-	bool save(Common::WriteStream *stream) const;
+	bool load(Common::SeekableReadStream *stream, Common::Platform targetPlatform);
+	/** Serialize this state and its eligible active party using @p platform's native byte order. */
+	bool save(Common::WriteStream *stream, Common::Platform platform) const;
 	/** Copy all progress, storage and roster identities, with fresh runners ready for page initialization. */
 	GameState *cloneForPageEntry() const;
 	/** Delete and clear the live party retained by this game state. */
@@ -512,14 +517,14 @@ private:
 	static void transferRoster(Common::Array<ZoombiniRunner *> &src, Common::Array<ZoombiniRunner *> &dest);
 	/** Exchange storage pointers, both rosters, and all scalar state with @p other. */
 	void swapState(GameState &other);
-	/** Parse the complete state body from @p stream. */
-	bool readState(Common::SeekableReadStream *stream);
+	/** Parse the state body after its magic using @p stream's detected byte order. */
+	bool readState(Common::SeekableReadStreamEndian *stream);
 	/** Return whether @p bytes can be read from the stream's current position. */
 	static bool canRead(Common::SeekableReadStream *stream, uint64 bytes);
 	/** Parse one sparse storage area from @p stream. */
-	static bool readStorage(Common::SeekableReadStream *stream, StorageRecord **storage);
-	/** Serialize one sparse storage area and return its occupied-cell count. */
-	static int writeStorage(Common::WriteStream *stream, StorageRecord *const *storage);
+	static bool readStorage(Common::SeekableReadStreamEndian *stream, StorageRecord **storage);
+	/** Serialize one sparse storage area in the selected byte order and return its occupied-cell count. */
+	static int writeStorage(Common::WriteStream *stream, StorageRecord *const *storage, FileEndianess endianess);
 	/** Count occupied storage cells, excluding the sentinel row. */
 	static int countStorageEntries(StorageRecord *const *storage);
 	/** Exchange two fixed-size arrays element by element. */
@@ -533,8 +538,8 @@ private:
 /**
  * Target-scoped storage for independent `.mk` savefiles.
  *
- * Public names use the detected language's single-byte game encoding.
- * @ref Zoombini2SavegameManager::makeSaveFileName converts Hebrew and Swedish names to UTF-8 at the filesystem boundary.
+ * Public names use the detected release's game encoding.
+ * @ref Zoombini2SavegameManager::makeSaveFileName converts names to UTF-8 at the filesystem boundary.
  * New names must pass the game's typing rules; existing names need only pass the length and path-safety checks.
  * Writes serialize @ref GameState and verify the stored bytes before reporting success.
  */
@@ -543,8 +548,8 @@ public:
 	/** Maximum number of characters accepted in a savefile name. */
 	static constexpr int kMaximumSavefileNameLength = 16;
 
-	/** Bind savefile operations to @p saveFileManager and @p target with @p language's name encoding. */
-	Zoombini2SavegameManager(Common::SaveFileManager *saveFileManager, const Common::String &target, Common::Language language);
+	/** Bind storage and name encoding; resolve an unspecified @p platform from @p target's configuration. */
+	Zoombini2SavegameManager(Common::SaveFileManager *saveFileManager, const Common::String &target, Common::Language lang, Common::Platform platform);
 
 	/** Return safe stored savefile names in case-insensitive sort order, including names unavailable through game input. */
 	Common::StringArray listSavefiles() const;
@@ -552,7 +557,7 @@ public:
 	bool isSavefileReadOnly(const Common::String &savefileName) const;
 	/** Return every listed savefile with counts parsed directly from its independent .mk file. */
 	Common::Array<Zoombini2SavefileSummary> listSavefileSummaries() const;
-	/** Serialize @p state and its eligible active party under @p savefileName. */
+	/** Serialize @p state and its eligible active party under @p savefileName in the target's native byte order. */
 	bool writeSavefile(const Common::String &savefileName, const GameState &state) const;
 	/** Load @p savefileName transactionally into @p state. */
 	bool loadSavefile(const Common::String &savefileName, GameState &state) const;
@@ -571,9 +576,9 @@ public:
 
 	/** Validate a new name against @p language's single-byte typing set. */
 	static bool isValidSavefileName(const Common::String &savefileName, Common::Language language);
-	/** Convert a GUI name to the language's single-byte form without losing characters. */
+	/** Convert a GUI name to the release encoding without losing characters. */
 	bool encodeSavefileName(const Common::U32String &displayName, Common::String &savefileName) const;
-	/** Convert a stored single-byte name for display in the ScummVM GUI. */
+	/** Convert a stored game-encoded name for display in the ScummVM GUI. */
 	Common::U32String decodeSavefileName(const Common::String &savefileName) const;
 
 private:
@@ -590,8 +595,10 @@ private:
 	Common::SaveFileManager *_saveFileManager;
 	/** ScummVM target identifier used as the save-file namespace. */
 	Common::String _target;
-	/** Language used to encode, decode, and validate savefile names. */
-	Common::Language _language;
+	/** Language selecting the save-name code page and typing rules. */
+	Common::Language _lang;
+	/** Target platform selecting name encoding, save byte order and cross-platform load diagnostics. */
+	Common::Platform _platform;
 };
 
 } // End of namespace Zoombini2

@@ -22,6 +22,7 @@
 #ifndef ZOOMBINI2_RANDOM_H
 #define ZOOMBINI2_RANDOM_H
 
+#include "common/platform.h"
 #include "common/random.h"
 #include "common/scummsys.h"
 #include "common/str.h"
@@ -30,7 +31,7 @@ namespace Zoombini2 {
 
 /** Persisted and runtime pseudo-random generator selection. */
 enum class PrngAlgorithmKind : uint32 {
-	/** Use the MSVC-compatible linear congruential stream. */
+	/** Use the target platform's original linear congruential stream. */
 	kOriginalPrng = 0,
 	/** Use @ref Common::RandomSource. */
 	kStandardPrng = 1,
@@ -39,19 +40,23 @@ enum class PrngAlgorithmKind : uint32 {
 /**
  * Provides the selectable random stream shared by game logic.
  *
- * The "prng_algorithm" option selects the MSVC-compatible 32-bit LCG or @ref Common::RandomSource.
+ * The "prng_algorithm" option selects the target platform's 32-bit LCG or @ref Common::RandomSource.
  * The compatibility stream advances once per request and bounds its 15-bit output with a remainder operation.
  * Consequently, large requested ranges do not expand its output beyond 32767.
  * Changing the algorithm starts a new sequence when engine settings are applied.
  */
 class Random {
 private:
-	/** Current 32-bit state of the MSVC-compatible LCG. */
+	/** Current 32-bit state of the target platform's original LCG. */
 	uint32 _randState = 0;
+	/** Detected game platform selecting the original recurrence and initial seed. */
+	const Common::Platform _platform;
 	/** ScummVM standard PRNG. */
 	Common::RandomSource _scummRnd;
 	/** Currently selected PRNG algorithm. */
 	PrngAlgorithmKind _prngAlgorithm;
+	/** Return one for Macintosh Original PRNG, or @p defaultSeed for the other selections. */
+	uint32 getInitialSeed(uint32 defaultSeed) const;
 
 	/**
 	 * Advance the compatibility state and return an inclusive value from zero through @p max.
@@ -60,8 +65,8 @@ private:
 	int32 getOriginalRandomNumber(int32 max);
 
 public:
-	/** Construct the shared game stream and select its algorithm from the target configuration. */
-	explicit Random(const Common::String &name);
+	/** Construct the shared stream for @p platform and select its algorithm from the target configuration. */
+	Random(const Common::String &name, Common::Platform platform);
 
 	/** Switch algorithms and start a new random sequence only when the selection changes. */
 	void setAlgorithm(PrngAlgorithmKind prngAlgorithm);

@@ -25,6 +25,7 @@
 #include "common/array.h"
 #include "common/fs.h"
 #include "common/language.h"
+#include "common/platform.h"
 #include "common/str-array.h"
 #include "engines/dialogs.h"
 #include "gui/dialog.h"
@@ -198,6 +199,8 @@ private:
 	Common::String _domain;
 	/** Language selected for savefile-name encoding and input validation. */
 	Common::Language _language = Common::UNK_LANG;
+	/** Target platform selecting save byte order and savefile-name encoding. */
+	Common::Platform _platform = Common::kPlatformUnknown;
 	/** Savefile names mirrored by the visible savefile rows. */
 	Common::StringArray _savefileNames;
 	/** Exclusive selection group for the savefile-table rows. */

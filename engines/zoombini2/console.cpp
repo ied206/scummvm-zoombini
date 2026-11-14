@@ -1334,7 +1334,7 @@ bool Zoombini2Console::CmdSub_DumpSave(int argc, const char **argv) {
 	const Common::String stem = "state_" + makeDebugDumpStem(_vm->_state->getPlayerName());
 	if (!openDebugDump(out, stem, "mk", path))
 		return true;
-	const bool okay = _vm->_state->save(&out) && out.flush() && !out.err();
+	const bool okay = _vm->_state->save(&out, _vm->getPlatform()) && out.flush() && !out.err();
 	const int64 size = out.pos();
 	out.close();
 	debugPrintf("%s live state to %s (%lld bytes).\n\n", okay ? "Exported" : "Failed to export",
@@ -1511,7 +1511,7 @@ bool Zoombini2Console::printDebugStateGroup(const Common::String &group) {
 				continue;
 			}
 			const Common::String encodedName = zoombini->getName();
-			const Common::String name = TextManager::toU32String(encodedName, _vm->getLanguage()).encode(Common::kUtf8);
+			const Common::String name = _vm->_text->toU32String(encodedName).encode(Common::kUtf8);
 			const ZmbTrait &traits = zoombini->getTraits();
 			debugPrintf("  [%u] %s: feet=%u nose=%u hair=%u eyes=%u\n", i, name.c_str(), traits._feet, traits._nose, traits._hair, traits._eyes);
 		}

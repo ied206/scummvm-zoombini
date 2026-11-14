@@ -1,2 +1,4 @@
+engines/zoombini2/detection.cpp
+engines/zoombini2/detection_tables.h
 engines/zoombini2/dialogs.cpp
 engines/zoombini2/metaengine.cpp

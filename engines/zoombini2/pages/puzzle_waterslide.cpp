@@ -22,6 +22,7 @@
 #include "zoombini2/pages/puzzle_waterslide.h"
 #include "zoombini2/graphics.h"
 #include "zoombini2/sound.h"
+#include "zoombini2/text_manager.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
@@ -143,7 +144,7 @@ void PuzzleWaterslide::createDemoParty() {
 		_vm->_state->_activeZoombinis.push_back(actor);
 	}
 	for (ZoombiniRunner *actor : _vm->_state->_activeZoombinis) {
-		const Common::String name = GameState::generateZoombiniName(*_vm->_rnd);
+		const Common::String name = _vm->_text->generateZoombiniName();
 		actor->setName(name.c_str());
 	}
 }

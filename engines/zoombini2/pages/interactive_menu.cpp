@@ -24,11 +24,11 @@
 #include "common/callback.h"
 #include "common/debug.h"
 #include "zoombini2/graphics.h"
-#include "zoombini2/text_manager.h"
 #include "zoombini2/pages/dialog_msgbox.h"
 #include "zoombini2/pages/interactive_menu.h"
 #include "zoombini2/sound.h"
 #include "zoombini2/state.h"
+#include "zoombini2/text_manager.h"
 #include "zoombini2/zoombini2.h"
 
 namespace Zoombini2 {
@@ -62,9 +62,6 @@ constexpr const char *InteractiveMenu::kQuitConfirmationPath;
 
 constexpr Common::Point32 InteractiveMenu::kFileListPos;
 constexpr Size32 InteractiveMenu::kSelectorSize;
-
-constexpr const char *InteractiveMenu::kValidNameCharacters;
-constexpr const char *InteractiveMenu::kHebrewValidNameCharacters;
 
 InteractiveMenu::InteractiveMenu(Zoombini2Engine *vm)
 	: InteractiveBase(vm) {
@@ -235,6 +232,10 @@ EventHandleResult InteractiveMenu::onKeyDown(const Common::KeyState &key, bool r
 		uint32 keyCode = key.ascii ? static_cast<uint32>(key.ascii) : static_cast<uint32>(key.keycode);
 		if (_vm->isHebrew() && 0x05D0 <= keyCode && keyCode <= 0x05EA)
 			keyCode = keyCode - 0x05D0 + 0xE0;
+		else if (_vm->getLanguage() == Common::RU_RUS && key.ascii)
+			keyCode = _vm->_text->mapRussianNameKey(keyCode);
+		if (keyCode == 0)
+			return EventHandleResult::kConsumed;
 		handleKeyInput(keyCode);
 		updateButtonAvailability();
 	}
@@ -339,13 +340,7 @@ void InteractiveMenu::handleButtonClick(int buttonId) {
 }
 
 void InteractiveMenu::handleKeyInput(uint32 keyCode) {
-	bool isNameCharacter = false;
-	if (_vm->isHebrew()) {
-		isNameCharacter = (0xE0 <= keyCode && keyCode <= 0xFA) || (keyCode < 128 && strchr(kHebrewValidNameCharacters, static_cast<char>(keyCode)));
-	} else {
-		isNameCharacter = keyCode < 128 && strchr(kValidNameCharacters, static_cast<char>(keyCode));
-	}
-	if (isNameCharacter) {
+	if (_vm->_text->isValidNameCharacter(keyCode)) {
 		const SaveFileList::TextInputResult result = _fileList->handleCharacter(static_cast<char>(keyCode));
 		switch (result) {
 		case SaveFileList::kTextAccepted01:
@@ -909,6 +904,9 @@ bool InteractiveMenu::SaveFileList::canAppendCharacter(char c) const {
 
 char InteractiveMenu::SaveFileList::normalizeCharacter(char c) const {
 	const bool capitalize = _editBuffer.empty() || _editBuffer.lastChar() == ' ';
+	const byte character = static_cast<byte>(c);
+	if (_vm->getLanguage() == Common::RU_RUS && 0xE0 <= character)
+		return capitalize ? character - 0x20 : c;
 	if ('a' <= c && c <= 'z')
 		return capitalize ? c - 'a' + 'A' : c;
 	return c;

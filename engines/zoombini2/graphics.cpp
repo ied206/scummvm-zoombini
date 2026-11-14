@@ -1633,7 +1633,7 @@ int Gfx::drawString(ManagedSurface32 *destSurface, const Common::String &text, c
 			return 0;
 		return bmtFont->drawString(destSurface, pos, text, maxWidth, conf.fillColor);
 	}
-	const Common::U32String decoded = TextManager::toU32String(text, _vm->getLanguage());
+	const Common::U32String decoded = _vm->_text->toU32String(text);
 	TextConf alignedConf = conf;
 	alignedConf.hAlign = Graphics::kTextAlignLeft;
 	drawString(destSurface, decoded, pos, maxWidth, alignedConf);
@@ -1648,7 +1648,7 @@ int Gfx::getTextWidth(const Common::String &text, const TextConf &conf) const {
 			return 0;
 		return bmtFont->getStringLayoutWidth(text);
 	}
-	return getTextWidth(TextManager::toU32String(text, _vm->getLanguage()), conf);
+	return getTextWidth(_vm->_text->toU32String(text), conf);
 }
 
 void Gfx::drawZoombiniNameBox(ManagedSurface32 *destSurface, const Common::String &name) {
@@ -2158,7 +2158,7 @@ void Gfx::drawString(ManagedSurface32 *destSurface, const Common::U32String &tex
 	if (!destSurface)
 		return;
 	if (conf.fontKind == FontKind::kBmtFont) {
-		drawString(destSurface, TextManager::fromU32String(text, _vm->getLanguage()), pos, maxWidth, conf);
+		drawString(destSurface, _vm->_text->fromU32String(text), pos, maxWidth, conf);
 		return;
 	}
 	const int effectiveMaxWidth = maxWidth == kNoMaxWidth ? destSurface->w : maxWidth;
@@ -2188,7 +2188,7 @@ void Gfx::drawString(ManagedSurface32 *destSurface, const Common::U32String &tex
 
 int Gfx::getTextWidth(const Common::U32String &text, const TextConf &conf) const {
 	if (conf.fontKind == FontKind::kBmtFont)
-		return getTextWidth(TextManager::fromU32String(text, _vm->getLanguage()), conf);
+		return getTextWidth(_vm->_text->fromU32String(text), conf);
 	const Graphics::Font *font = _vm->_text->resolveFont(conf.fontKind);
 	return font ? font->getStringWidth(text) : 0;
 }
@@ -2209,9 +2209,9 @@ void Gfx::wordWrapText(const Common::U32String &text, int maxWidth, Common::Arra
 		if (!bmtFont)
 			return;
 		Common::Array<Common::String> encodedLines;
-		bmtFont->wordWrapText(TextManager::fromU32String(text, _vm->getLanguage()), maxWidth, encodedLines);
+		bmtFont->wordWrapText(_vm->_text->fromU32String(text), maxWidth, encodedLines);
 		for (uint i = 0; i < encodedLines.size(); i++)
-			lines.push_back(TextManager::toU32String(encodedLines[i], _vm->getLanguage()));
+			lines.push_back(_vm->_text->toU32String(encodedLines[i]));
 		return;
 	}
 	const Graphics::Font *font = _vm->_text->resolveFont(conf.fontKind);
@@ -2812,12 +2812,7 @@ BmtFont::BmtFont(Zoombini2Engine *vm)
 }
 
 bool BmtFont::load(const Common::Path &basePath) {
-	for (int i = 0; i < kNumGlyphs; i++) {
-		delete[] _glyphs[i].mask;
-		_glyphs[i].mask = nullptr;
-		_glyphs[i].width = 0;
-		_glyphs[i].height = 0;
-	}
+	_glyphs.clear();
 	_loaded = false;
 	_maxCharWidth = kSpaceWidth;
 
@@ -2842,10 +2837,9 @@ bool BmtFont::load(const Common::Path &basePath) {
 
 	const Size32 size = alphaBB.getSize();
 
-	int glyphIndex = 0;
 	int col = 1;
 
-	while (col < size.width && glyphIndex < kNumGlyphs) {
+	while (col < size.width) {
 		while (col < size.width) {
 			bool blank = true;
 			for (int row = 0; row < size.height; row++) {
@@ -2878,38 +2872,41 @@ bool BmtFont::load(const Common::Path &basePath) {
 
 		const int glyphWidth = col - startCol + 2;
 
-		Glyph &glyph = _glyphs[glyphIndex];
+		_glyphs.emplace_back();
+		Glyph &glyph = _glyphs.back();
 		glyph.width = glyphWidth;
 		glyph.height = size.height;
 		if (_maxCharWidth < glyphWidth + 2)
 			_maxCharWidth = glyphWidth + 2;
-		glyph.mask = new byte[glyphWidth * size.height]();
+		glyph.mask.resize(glyphWidth * size.height);
 		const int copyWidth = MIN(glyphWidth, size.width - startCol);
 		for (int row = 0; row < size.height; row++) {
-			memcpy(glyph.mask + row * glyphWidth, srcAlpha + row * size.width + startCol, copyWidth);
+			memcpy(glyph.mask.data() + row * glyphWidth, srcAlpha + row * size.width + startCol, copyWidth);
 		}
-
-		glyphIndex += 1;
 	}
 
-	int expectedGlyphs = 81;
-	switch (_vm->getLanguage()) {
-	case Common::HE_ISR:
+	uint expectedGlyphs = 81;
+	switch (_vm->getRelInfo().getBitmapTextLayout()) {
+	case ZmbReleaseInfo::BitmapTextLayout::kHebrew:
 		expectedGlyphs = 80;
 		break;
-	case Common::SV_SWE:
+	case ZmbReleaseInfo::BitmapTextLayout::kScandinavian:
 		expectedGlyphs = 84;
 		break;
-	default:
+	case ZmbReleaseInfo::BitmapTextLayout::kCyrillic:
+		expectedGlyphs = 145;
+		break;
+	case ZmbReleaseInfo::BitmapTextLayout::kLatin:
 		break;
 	}
-	if (glyphIndex != expectedGlyphs) {
-		warning("BitmapFont: expected %d glyphs but found %d in '%s'", expectedGlyphs, glyphIndex, colorPath.toString().c_str());
+	const uint glyphCount = _glyphs.size();
+	if (glyphCount != expectedGlyphs) {
+		warning("BitmapFont: expected %d glyphs but found %u in '%s'", expectedGlyphs, glyphCount, colorPath.toString().c_str());
 		return false;
 	}
 
 	_loaded = true;
-	debug(1, "BitmapFont: Loaded %d glyphs from %s", glyphIndex, basePath.toString().c_str());
+	debug(1, "BitmapFont: Loaded %u glyphs from %s", glyphCount, basePath.toString().c_str());
 
 	return true;
 }
@@ -2924,8 +2921,8 @@ int BmtFont::charToGlyphIndex(uint32 character) const {
 	if ('0' <= character && character <= '9')
 		return character - '0' + 52;
 
-	switch (_vm->getLanguage()) {
-	case Common::HE_ISR:
+	switch (_vm->getRelInfo().getBitmapTextLayout()) {
+	case ZmbReleaseInfo::BitmapTextLayout::kHebrew:
 		if (0xE0 <= character && character <= 0xFA) {
 			static constexpr byte kHebrewGlyphs[] = {
 				45,
@@ -2959,8 +2956,8 @@ int BmtFont::charToGlyphIndex(uint32 character) const {
 			return kHebrewGlyphs[character - 0xE0];
 		}
 		break;
-	case Common::SV_SWE: {
-		static constexpr byte kSwedishCharacters[] = {
+	case ZmbReleaseInfo::BitmapTextLayout::kScandinavian: {
+		static constexpr byte kScandinavianCharacters[] = {
 			0xC6,
 			0xD8,
 			0xC5,
@@ -2972,13 +2969,17 @@ int BmtFont::charToGlyphIndex(uint32 character) const {
 			0xE4,
 			0xF6,
 		};
-		for (int i = 0; i < ARRAYSIZE(kSwedishCharacters); i++) {
-			if (character == kSwedishCharacters[i])
+		for (int i = 0; i < ARRAYSIZE(kScandinavianCharacters); i++) {
+			if (character == kScandinavianCharacters[i])
 				return 62 + i;
 		}
 		return -1;
 	}
-	default:
+	case ZmbReleaseInfo::BitmapTextLayout::kCyrillic:
+		if (0xC0 <= character)
+			return character - 0xC0 + 81;
+		break;
+	case ZmbReleaseInfo::BitmapTextLayout::kLatin:
 		break;
 	}
 
@@ -3010,33 +3011,33 @@ int BmtFont::getCharWidth(uint32 character) const {
 		return 0;
 	if (character == ' ')
 		return kSpaceWidth;
-	const int glyphIndex = charToGlyphIndex(character);
-	if (glyphIndex < 0 || kNumGlyphs <= glyphIndex || !_glyphs[glyphIndex].mask)
+	const int glyphIdx = charToGlyphIndex(character);
+	if (glyphIdx < 0 || _glyphs.size() <= static_cast<uint>(glyphIdx) || _glyphs[glyphIdx].mask.empty())
 		return 0;
-	return _glyphs[glyphIndex].width + 2;
+	return _glyphs[glyphIdx].width + 2;
 }
 
 Common::Rect BmtFont::getBoundingBox(uint32 character) const {
 	if (!_loaded)
 		return Common::Rect();
-	const int glyphIndex = charToGlyphIndex(character);
-	if (glyphIndex < 0 || kNumGlyphs <= glyphIndex || !_glyphs[glyphIndex].mask)
+	const int glyphIdx = charToGlyphIndex(character);
+	if (glyphIdx < 0 || _glyphs.size() <= static_cast<uint>(glyphIdx) || _glyphs[glyphIdx].mask.empty())
 		return Common::Rect();
-	return Common::Rect(_glyphs[glyphIndex].width, _glyphs[glyphIndex].height);
+	return Common::Rect(_glyphs[glyphIdx].width, _glyphs[glyphIdx].height);
 }
 
-void BmtFont::drawChar(Graphics::Surface *dst, uint32 character, int x, int y, uint32 color) const {
+void BmtFont::drawChar(Graphics::Surface *dst, uint32 codePoint, int x, int y, uint32 color) const {
 	if (!dst || !_loaded)
 		return;
-	const int glyphIndex = charToGlyphIndex(character);
-	if (glyphIndex < 0 || kNumGlyphs <= glyphIndex || !_glyphs[glyphIndex].mask)
+	const int glyphIdx = charToGlyphIndex(codePoint);
+	if (glyphIdx < 0 || _glyphs.size() <= static_cast<uint>(glyphIdx) || _glyphs[glyphIdx].mask.empty())
 		return;
 	const RGBColor tint = RGBColor::fromPixel(color, dst->format);
-	drawGlyph(dst, _glyphs[glyphIndex], Common::Point32(x, y), tint, _vm->getAlphaLUT());
+	drawGlyph(dst, _glyphs[glyphIdx], Common::Point32(x, y), tint, _vm->getAlphaLUT());
 }
 
 void BmtFont::drawGlyph(Graphics::Surface *dst, const Glyph &glyph, const Common::Point32 &pos, const RGBColor &color, const AlphaBlendLUT &alphaLUT) const {
-	if (!glyph.mask)
+	if (glyph.mask.empty())
 		return;
 	assert(dst->format.bytesPerPixel == 4);
 	const uint32 solidPixel = color.toPixel(dst->format);
@@ -3100,22 +3101,22 @@ int BmtFont::getStringLayoutWidth(const Common::String &text) const {
 	if (!_loaded)
 		return 0;
 	const bool hebrew = _vm->isHebrew();
-	const bool swedish = _vm->isSwedish();
-	if (!hebrew && !swedish)
+	const bool scandinavian = _vm->getRelInfo().getBitmapTextLayout() == ZmbReleaseInfo::BitmapTextLayout::kScandinavian;
+	if (!hebrew && !scandinavian)
 		return Graphics::Font::getStringWidth(text);
 
 	int width = 0;
-	// Game measurement deliberately differs from drawing in these two releases.
+	// Hebrew and Scandinavian measurement differs from drawing.
 	for (uint i = 0; i < text.size(); i++) {
 		const byte c = static_cast<byte>(text[i]);
-		if (swedish && 0x80 <= c)
+		if (scandinavian && 0x80 <= c)
 			continue;
 		int advance = getCharWidth(c);
-		if (swedish) {
-			// Punctuation contributes its ASCII-slot advance even though the Swedish drawing map rejects it.
-			const int glyphIndex = asciiPunctuationToGlyphIndex(c);
-			if (0 <= glyphIndex && glyphIndex < kNumGlyphs && _glyphs[glyphIndex].mask)
-				advance = _glyphs[glyphIndex].width + 2;
+		if (scandinavian) {
+			// Punctuation contributes its ASCII-slot advance even though the drawing map rejects it.
+			const int glyphIdx = asciiPunctuationToGlyphIndex(c);
+			if (0 <= glyphIdx && static_cast<uint>(glyphIdx) < _glyphs.size() && !_glyphs[glyphIdx].mask.empty())
+				advance = _glyphs[glyphIdx].width + 2;
 		}
 		if (hebrew && (('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z')))
 			width -= advance;

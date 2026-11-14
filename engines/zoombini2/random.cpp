@@ -35,15 +35,15 @@
 
 namespace Zoombini2 {
 
-Random::Random(const Common::String &name)
-	: _scummRnd(name) {
+Random::Random(const Common::String &name, Common::Platform platform)
+	: _platform(platform), _scummRnd(name) {
 	const int prngAlgorithmVal = ConfMan.getInt(Zoombini2MetaEngine::kConfigPrngAlgorithm);
 	_prngAlgorithm = static_cast<PrngAlgorithmKind>(prngAlgorithmVal);
 
 #ifdef ENABLE_EVENTRECORDER
-	setSeed(g_eventRec.getRandomSeed(name));
+	setSeed(getInitialSeed(g_eventRec.getRandomSeed(name)));
 #else
-	setSeed(generateNewSeed());
+	setSeed(getInitialSeed(generateNewSeed()));
 #endif
 }
 
@@ -52,7 +52,13 @@ void Random::setAlgorithm(PrngAlgorithmKind prngAlgorithm) {
 		return;
 
 	_prngAlgorithm = prngAlgorithm;
-	setSeed(generateNewSeed());
+	setSeed(getInitialSeed(generateNewSeed()));
+}
+
+uint32 Random::getInitialSeed(uint32 defaultSeed) const {
+	if (_platform == Common::kPlatformMacintosh && _prngAlgorithm == PrngAlgorithmKind::kOriginalPrng)
+		return 1;
+	return defaultSeed;
 }
 
 void Random::setSeed(uint32 seed) {
@@ -77,9 +83,19 @@ uint32 Random::generateNewSeed() {
 int32 Random::getOriginalRandomNumber(int32 max) {
 	assert(0 <= max);
 
-	// MSVC 6.0 CRT rand() advances this unsigned 32-bit LCG and returns bits 16 through 30.
+	// Original PRNG advances unsigned 32-bit LCG and returns bits 16 through 30.
 	// The state is advanced even though the max limit is 0.
-	_randState = 214013u * _randState + 2531011u;
+	switch (_platform) {
+	case Common::kPlatformMacintosh:
+		// Macintosh CRT rand(), matching the Metrowerks Standard Library (MSL) stream.
+		_randState = 1103515245u * _randState + 12345u;
+		break;
+	case Common::kPlatformWindows:
+	default:
+		// MSVC 6.0 CRT rand().
+		_randState = 214013u * _randState + 2531011u;
+		break;
+	}
 	const int32 result = static_cast<int32>((_randState >> 16) & 0x7FFFu);
 	if (max == INT_MAX)
 		return result;

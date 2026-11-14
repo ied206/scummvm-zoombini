@@ -28,6 +28,7 @@
 #include "common/events.h"
 #include "common/hashmap.h"
 #include "common/path.h"
+#include "common/platform.h"
 #include "common/rect.h"
 #include "common/scummsys.h"
 #include "common/str.h"
@@ -138,7 +139,7 @@ public:
 	/** Detected release descriptor retained for the engine lifetime. */
 	const Zoombini2GameDescription *_gameDescription;
 
-	/** Apply the v1.0 release-family puzzle-generation reseed from the current gameplay tick. */
+	/** Apply Windows v1.0 puzzle-generation reseeding from the cached gameplay tick. */
 	void reseedRandomForV10();
 	/** Return the most recently processed game-space mouse position. */
 	Common::Point32 getMousePos() const { return _mousePos; }
@@ -147,6 +148,8 @@ public:
 
 	/** Return the detected release language. */
 	Common::Language getLanguage() const { return _relInfo.getLanguage(); }
+	/** Return the detected game's platform. */
+	Common::Platform getPlatform() const { return _relInfo.getPlatform(); }
 	/** Return the immutable release identity and its resource/layout selections. */
 	const ZmbReleaseInfo &getRelInfo() const { return _relInfo; }
 	/** Return whether the detected game is the Korean release. */

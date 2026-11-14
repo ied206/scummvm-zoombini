@@ -220,8 +220,6 @@ private:
 	void resetSelectedFeatures();
 	/** Recount feature values in the current boarding party. */
 	void refreshFeatureCounts();
-	/** Generate the displayed name for the current selection. */
-	Common::String generateName();
 	/** Create an entrance path ending at @p dest. */
 	PathObject *createEntrancePath(const Common::Point32 &dest) const;
 	/** Create a return path from @p start to the left-side entrance. */

@@ -291,10 +291,6 @@ private:
 	static constexpr Common::Point32 kFileListPos = Common::Point32(157, 286);
 	/** Width and height in page pixels of the saved-game selector. */
 	static constexpr Size32 kSelectorSize = Size32(520, 201);
-	/** Allowed release-byte characters for savefile-name keyboard entry. */
-	static constexpr const char *kValidNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ";
-	/** Characters accepted by the Hebrew release in addition to its Hebrew byte range. */
-	static constexpr const char *kHebrewValidNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ,.; ";
 
 	/** Panel currently accepting input. */
 	MenuScreenState _state = MenuScreenState::kMain00;

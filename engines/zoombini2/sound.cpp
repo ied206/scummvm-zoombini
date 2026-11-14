@@ -111,7 +111,7 @@ int SoundManager::load(bool isStream, const Common::Path &filename, bool loop) {
 		Common::SeekableReadStream *file = _vm->openResourceFile(buf->path.toString('/'));
 		if (!file) {
 			// Restore the UK Macintosh menu blip from its identical copy on the disc.
-			const bool isMissingUKMacBlip = _vm->_gameDescription->desc.platform == Common::kPlatformMacintosh &&
+			const bool isMissingUKMacBlip = _vm->getPlatform() == Common::kPlatformMacintosh &&
 											_vm->getRelInfo().isFamily(ZmbReleaseInfo::Family::kV11, Common::EN_GRB) &&
 											Zoombini2Engine::normalizeResourcePath(buf->path.toString('/')).toString('/').equalsIgnoreCase(kBlipPath);
 			if (isMissingUKMacBlip) {

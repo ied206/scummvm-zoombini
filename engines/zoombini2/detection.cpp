@@ -20,8 +20,11 @@
  */
 
 #include "base/plugins.h"
+#include "common/translation.h"
 #include "common/util.h"
 #include "engines/advancedDetector.h"
+#include "gui/gui-manager.h"
+#include "gui/message.h"
 #include "zoombini2/detection_tables.h"
 
 static constexpr PlainGameDescriptor zoombini2Games[] = {
@@ -47,7 +50,7 @@ public:
 		: AdvancedMetaEngineDetection(Zoombini2::gameDescriptions, zoombini2Games) {
 		_maxScanDepth = 5; // Supports INSTALL/HD/Bmp/ZOMBIS and Data/Bmp/ZOMBIS
 		_directoryGlobs = directoryGlobs;
-		_flags = kADFlagMatchFullPaths;
+		_flags = kADFlagMatchFullPaths | kADFlagPreferFallbackDetection;
 	}
 
 	/** Return the engine identifier used by the launcher. */
@@ -67,10 +70,67 @@ public:
 
 	/** Add a normalized release tag to the preferred launcher target name. */
 	DetectedGame toDetectedGame(const ADDetectedGame &adGame, ADDetectedGameExtraInfo *extraInfo) const override;
+	/** Show installer extraction instructions during interactive detection, before registration. */
+	DetectedGames detectGames(const Common::FSList &fslist, uint32 skipADFlags = 0, bool skipIncomplete = false) override;
+	/**
+	 * Recognize the installer disc with manual extraction is required.
+	 * In that case, explain user how to unpack it.
+	 */
+	ADDetectedGame fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist, ADDetectedGameExtraInfo **extra) const override;
 };
+
+DetectedGames Zoombini2MetaEngineDetection::detectGames(const Common::FSList &fslist, uint32 skipADFlags, bool skipIncomplete) {
+	const DetectedGames matches = AdvancedMetaEngineDetection::detectGames(fslist, skipADFlags, skipIncomplete);
+	DetectedGames games;
+	for (const DetectedGame &game : matches) {
+		if (game.gameSupportLevel == kUnsupportedGame) {
+			if (skipADFlags & ADGF_UNSUPPORTED)
+				continue;
+			const Common::U32String &inst = _(game.extra);
+			if (GUI::GuiManager::hasInstance() && g_gui.isActive()) {
+				GUI::MessageDialog dialog(inst);
+				dialog.runModal();
+			} else {
+				warning("%s", inst.encode(Common::kUtf8).c_str());
+			}
+		}
+		games.push_back(game);
+	}
+	return games;
+}
+
+ADDetectedGame Zoombini2MetaEngineDetection::fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist, ADDetectedGameExtraInfo **extra) const {
+	for (const auto &installer : Zoombini2::kPackagedInstallers) {
+		ADDetectedGame game(&installer.desc);
+		bool allMatched = true;
+		for (const ADGameFileDescription *file = installer.desc.filesDescriptions; file->fileName; file++) {
+			const Common::Path path(file->fileName);
+			FileProperties properties;
+			if (!allFiles.contains(path) || !getFileProperties(allFiles, kMD5Head, path, properties) || properties.size != file->fileSize || properties.md5 != file->md5) {
+				allMatched = false;
+				break;
+			}
+			game.matchedFiles[path] = properties;
+		}
+		if (!allMatched)
+			continue;
+		if (extra) {
+			*extra = new ADDetectedGameExtraInfo();
+			(*extra)->gameName = Common::String::format("%s Installer", getEngineName());
+			(*extra)->targetID = "zoombini2-installer";
+		}
+		return game;
+	}
+	return ADDetectedGame();
+}
 
 DetectedGame Zoombini2MetaEngineDetection::toDetectedGame(const ADDetectedGame &adGame, ADDetectedGameExtraInfo *extraInfo) const {
 	DetectedGame game = AdvancedMetaEngineDetection::toDetectedGame(adGame, extraInfo);
+	const Zoombini2::Zoombini2GameDescription *gameDesc = reinterpret_cast<const Zoombini2::Zoombini2GameDescription *>(adGame.desc);
+	// Installer entries store extraction instructions in extra.
+	// Skip release suffix generation to keep those instructions out of the target ID.
+	if (gameDesc->features & Zoombini2::GF_Z2_INSTALLER)
+		return game;
 
 	if (game.gameId == "zoombini2" && adGame.desc->extra && *adGame.desc->extra) {
 		// Keep each release target stable when multiple versions share the same platform and language.

@@ -23,7 +23,9 @@
 #define ZOOMBINI2_METAENGINE_H
 
 #include "common/error.h"
+#include "common/platform.h"
 #include "common/rect.h"
+#include "common/str-enc.h"
 #include "common/str.h"
 
 #include "engines/advancedDetector.h"
@@ -56,14 +58,25 @@ public:
 		/** v1.1 releases, including the Macintosh ports. */
 		kV11,
 	};
-	/** Bitmap-font character and layout conventions. */
+	/**
+	 * Bitmap-font character mapping and text layout conventions.
+	 * Text advances forward and layout widths sum glyph advances except as noted below.
+	 */
 	enum class BitmapTextLayout {
-		/** Ordinary forward Latin text and positive layout widths. */
+		/** Latin glyph slots. */
 		kLatin,
-		/** Reversed byte traversal and signed Hebrew layout widths. */
+		/**
+		 * Reversed byte traversal.
+		 * Layout widths subtract ASCII letter advances and ignore Hebrew bytes and underscores.
+		 */
 		kHebrew,
-		/** Swedish character slots and layout-width exceptions. */
-		kSwedish,
+		/**
+		 * Norwegian and Swedish glyph slots.
+		 * Layout widths ignore high bytes and count ASCII punctuation slots even when drawing skips them.
+		 */
+		kScandinavian,
+		/** Cyrillic glyph slots. */
+		kCyrillic,
 	};
 	/** Page-pixel placement of the held Zoombini's name plate and measured text anchor. */
 	struct NameTooltipLayout {
@@ -73,14 +86,22 @@ public:
 		Common::Point32 textAnchor;
 	};
 
-	/** Snapshot the detector's family flags, language and demo status. */
+	/** Snapshot the detector's family flags, language, platform and demo status. */
 	explicit ZmbReleaseInfo(const Zoombini2GameDescription &gameDesc);
 	/** Match a release implementation lineage. */
 	bool isFamily(Family family) const;
 	/** Match both the implementation family and its language. */
 	bool isFamily(Family family, Common::Language language) const;
+	/** Return whether puzzle generators reseed from gameplay ticks (Windows v1.0 only). */
+	bool usesGameplayTickReseeding() const;
 	/** Return the detected game language. */
 	Common::Language getLanguage() const { return _language; }
+	/** Return the platform recorded by the detector. */
+	Common::Platform getPlatform() const { return _platform; }
+	/** Return the code page shared by this release's game text and save names. */
+	Common::CodePage getCodePage() const { return getCodePage(_language, _platform); }
+	/** Select the release code page; an unknown platform retains the Windows fallback. */
+	static Common::CodePage getCodePage(Common::Language language, Common::Platform platform);
 	/** Return the detector's unchanged feature bits. */
 	uint32 getFeatures() const { return _features; }
 	/** Return whether the detector identifies the playable demo. */
@@ -97,6 +118,8 @@ private:
 	const uint32 _features;
 	/** Detected language retained for localized resource and layout selection. */
 	const Common::Language _language;
+	/** Detected platform retained for release-specific text encodings. */
+	const Common::Platform _platform;
 	/** Whether the detector marked this release as a demo. */
 	const bool _demo;
 };

@@ -56,7 +56,7 @@ public:
 		kConfirmReadOnlyLoad
 	};
 
-	/** Create the text manager for @p vm and select its localized UI messages. */
+	/** Select localized UI messages and load required Russian name and keyboard tables for @p vm. */
 	explicit TextManager(Zoombini2Engine *vm);
 	/** Release cached messages and remove this game's bitmap-font registration. */
 	~TextManager();
@@ -64,18 +64,22 @@ public:
 	/** Return the cached message for @p key in the game language or English, valid until this text manager is destroyed. */
 	const Common::U32String &getLocalizedString(Key key) const;
 
-	/** Return the main text encoding for @p language. */
-	static Common::CodePage gameCodePage(Common::Language language);
 	/** Decode release-encoded game bytes to Unicode with the release encoding. */
-	static Common::U32String toU32String(const Common::String &str, Common::Language language);
+	Common::U32String toU32String(const Common::String &str) const;
 	/** Encode Unicode text to release-encoded game bytes with the release encoding. */
-	static Common::String fromU32String(const Common::U32String &str, Common::Language language);
+	Common::String fromU32String(const Common::U32String &str) const;
 	/**
 	 * Return a copy of @p name with the letter case visible in the bitmap-font name box.
 	 * Latin lowercase glyphs have capital shapes except 'i'.
 	 * Hebrew keeps its original bytes.
 	 */
 	Common::String getZoombiniDisplayName(const Common::String &name) const;
+	/** Generate a name using the release's Russian table or Latin syllables with the shared RNG. */
+	Common::String generateZoombiniName() const;
+	/** Map an ASCII keyboard key or Unicode Cyrillic letter to the Russian name-entry byte. */
+	uint32 mapRussianNameKey(uint32 keyCode) const;
+	/** Return whether @p keyCode is accepted for name entry in the release's game encoding. */
+	bool isValidNameCharacter(uint32 keyCode) const;
 
 	/** Load and register the shared text strip on demand; failed loads can be retried by the caller. */
 	bool loadTextFont();
@@ -87,6 +91,18 @@ public:
 	const Graphics::Font *resolveFont(Gfx::FontKind kind) const;
 
 private:
+	/** Russian table locations in one supported executable image. */
+	struct ExeTableSource {
+		/** Installed executable resource path. */
+		const char *fileName;
+		/** Exact byte size of the supported executable. */
+		uint32 expectedSize;
+		/** Raw file offset of the fixed-size name entries. */
+		uint32 namesOffset;
+		/** Raw file offset of the ASCII keyboard translation table. */
+		uint32 keyboardOffset;
+	};
+
 	/** Translations for one UI message, indexed by game language. */
 	typedef Common::HashMap<Common::Language, const char32_t *, Common::Hash<int>> LanguageStrings;
 	/** UI message translations indexed first by semantic key, then by language. */
@@ -96,11 +112,23 @@ private:
 
 	/** Build the UI message table, including an English fallback for every key. */
 	static LocalizedStringMap createLocalizedStrings();
+	/** Generate a Latin name from weighted syllables, preserving the shared RNG draw order. */
+	Common::String generateLatinZoombiniName() const;
+	/** Select one loaded Russian name with exactly one shared RNG draw. */
+	Common::String generateRussianZoombiniName() const;
+	/** Read and validate Russian name and keyboard tables at their declared executable offsets. */
+	bool loadRussianTables();
 
 	/** Bitmap strip shared by all UI text colors. */
 	static constexpr const char *kTextFontPath = "bmp/typo";
-	/** Registration name in @ref Graphics::FontManager for this game's loaded glyph set, empty until a load succeeds. */
-	Common::String _bmtFontCacheName;
+	/** FontMan registration for the active game's bitmap strip. */
+	static constexpr const char *kBmtFontCacheName = "zoombini2-bmt";
+	/** Installed executable containing the Russian localization tables. */
+	static constexpr const char *kRussianExecutablePath = "#zoombini2.exe";
+	/** Validated CP1251 names copied from the executable's fixed eight-byte entries. */
+	Common::String _russianNames[128];
+	/** ASCII-to-CP1251 keyboard translation, with zero for rejected keys. */
+	byte _russianKeyboard[128] = {};
 	/**
 	 * Whether the shared UI font load has been attempted once for this game instance.
 	 * This flag cache only the load decision so the font file loads once while callers query per frame.
