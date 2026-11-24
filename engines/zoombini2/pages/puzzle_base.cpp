@@ -51,9 +51,8 @@ void PuzzleBase::init() {
 	_vm->_gfx->getPageLayerStack()->addLayer(1);
 	if (_initialBackgroundPath) {
 		const Common::Path bgPath(_initialBackgroundPath);
-		if (!loadPrimaryLayerBackground(bgPath)) {
+		if (!loadPrimaryLayerBackground(bgPath))
 			debug(1, "Puzzle: Failed to load background for %s", getPageName());
-		}
 	}
 	_vm->_gfx->getPageLayerStack()->addLayer(1);
 

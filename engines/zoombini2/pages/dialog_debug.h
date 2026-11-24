@@ -104,10 +104,10 @@ struct DialogDebugCommand {
 		_curvePath = path;
 		_plotColor = color;
 	}
-	/** Plot @p point using @p color. */
-	void setPlotPoint(const Common::Point32 &point, const RGBColor &color) {
+	/** Plot @p pos32 using @p color. */
+	void setPlotPoint(const Common::Point32 &pos32, const RGBColor &color) {
 		_type = Type::kPlotPoint;
-		_plotStart = point;
+		_plotStart = pos32;
 		_plotColor = color;
 	}
 	/** Plot from @p start through @p end, including both endpoints, using @p color. */

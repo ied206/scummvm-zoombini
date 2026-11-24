@@ -859,7 +859,7 @@ private:
 	/** Copy a random layout into the active Norfs and reset their service state. */
 	void generateRules();
 	/** Process a completed pointer click in page coordinates. */
-	void handleClick(const Common::Point32 &pos);
+	void handleClick(const Common::Point32 &pos32);
 	/** Select the appropriate cursor sprite and hover state. */
 	void updateCursor();
 	/** Cancel the food and tray currently held by the player. */
@@ -888,8 +888,8 @@ private:
 	void dismissWaiter();
 	/** Allocate a transient path for the currently flying tray. */
 	void startTrayPath(const Common::Point32 &from, const Common::Point32 &to);
-	/** Draw @p meal on a tray whose upper-left position is @p pos. */
-	void drawTray(ManagedSurface32 *screen, const Common::Point32 &pos, const Meal &meal);
+	/** Draw @p meal on a tray whose upper-left position is @p pos32. */
+	void drawTray(ManagedSurface32 *screen, const Common::Point32 &pos32, const Meal &meal);
 	/** Draw the console-only answer overlay. */
 	void drawDebugOverlay(ManagedSurface32 *screen);
 	/** Draw the optional English caption for the currently playing direct clue. */
@@ -1319,14 +1319,14 @@ private:
 	bool motionActive(bool includeIdle = true) const;
 	/** Return whether the serialized speech queue is still active. */
 	bool speechPlaying() const;
-	/** Return whether @p pos lies inside a page-space rectangle. */
-	static bool inside(const Common::Point32 &pos, int x, int y, int width, int height);
+	/** Return whether @p pos32 lies inside a page-space rectangle. */
+	static bool inside(const Common::Point32 &pos32, int x, int y, int width, int height);
 	/** Return the food choice under the page-pixel point, or -1 when none is hit. */
-	int foodAt(const Common::Point32 &pos) const;
+	int foodAt(const Common::Point32 &pos32) const;
 	/** Return the tray slot under the page-pixel point, or -1 when none is hit. */
-	int trayAt(const Common::Point32 &pos) const;
+	int trayAt(const Common::Point32 &pos32) const;
 	/** Return the Norf under the page-pixel point, or -1 when none is hit. */
-	int norfAt(const Common::Point32 &pos) const;
+	int norfAt(const Common::Point32 &pos32) const;
 	/** Return the page-pixel position for a table column at the supplied Y coordinate. */
 	static Common::Point32 tablePosition(int index, int y);
 

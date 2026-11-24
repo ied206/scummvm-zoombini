@@ -387,36 +387,36 @@ public:
 	void copyToScreen(const ManagedSurface32 &srcSurface) const;
 	/** Copy @p srcRect from the current game screen to the origin of @p destSurface. */
 	void captureScreenRegion(ManagedSurface32 *destSurface, const Common::Rect &srcRect) const;
-	/** Copy @p srcSurface onto the current game screen at the destination position @p destSurface. */
-	void copyRegionToScreen(const ManagedSurface32 &srcSurface, const Common::Point &destSurface) const;
+	/** Copy @p srcSurface onto the current game screen at the destination position @p pos. */
+	void copyRegionToScreen(const ManagedSurface32 &srcSurface, const Common::Point &pos) const;
 
 	/** Draw an uncompressed bitmap through the shared Z2 rendering boundary. */
-	void drawBitBlock(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos) const;
+	void drawBitBlock(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos32) const;
 	/** Draw an uncompressed bitmap while treating its top-left pixel color as transparent. */
-	void drawBitBlockColorKey(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos) const;
+	void drawBitBlockColorKey(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos32) const;
 	/** Load and draw a bitmap from the current page cache. */
-	void drawPageBitBlock(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos) {
+	void drawPageBitBlock(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos32) {
 		if (destSurface)
-			drawBitBlock(destSurface, loadPageBitBlock(key), pos);
+			drawBitBlock(destSurface, loadPageBitBlock(key), pos32);
 	}
 	/** Load and draw a page bitmap using its top-left pixel as a transparency key. */
-	void drawPageBitBlockColorKey(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos) {
+	void drawPageBitBlockColorKey(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos32) {
 		if (destSurface)
-			drawBitBlockColorKey(destSurface, loadPageBitBlock(key), pos);
+			drawBitBlockColorKey(destSurface, loadPageBitBlock(key), pos32);
 	}
 	/** Load and draw a bitmap retained across page changes. */
-	void drawSharedBitBlock(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos) {
+	void drawSharedBitBlock(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos32) {
 		if (destSurface)
-			drawBitBlock(destSurface, loadSharedBitBlock(key), pos);
+			drawBitBlock(destSurface, loadSharedBitBlock(key), pos32);
 	}
 	/** Return a page bitmap's dimensions, or an empty size when it cannot be loaded. */
 	Size32 getPageBitBlockSize(const Common::String &key);
 	/** Draw one bitmap sub-rectangle through the shared Z2 rendering boundary. */
-	void drawBitBlockSubRect(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos, const Common::Rect &srcRect) const;
+	void drawBitBlockSubRect(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos32, const Common::Rect &srcRect) const;
 	/** Load and draw one sub-rectangle of a page bitmap. */
-	void drawPageBitBlockSubRect(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos, const Common::Rect &srcRect) {
+	void drawPageBitBlockSubRect(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos32, const Common::Rect &srcRect) {
 		if (destSurface)
-			drawBitBlockSubRect(destSurface, loadPageBitBlock(key), pos, srcRect);
+			drawBitBlockSubRect(destSurface, loadPageBitBlock(key), pos32, srcRect);
 	}
 	/** Decode the active background, optionally fixing its canvas size, without retaining a bitmap-cache entry. */
 	bool loadBackground(const Common::String &key, const Size32 &canvasSize = Size32());
@@ -436,66 +436,76 @@ public:
 	bool hasBackground() const { return _backSurface != nullptr; }
 	/** Borrow the active background for page-specific composition until it is replaced or cleared. */
 	ManagedSurface32 *getBackgroundSurface() const { return _backSurface; }
-	/** Draw the loaded page background at @p pos. */
-	void drawBackground(ManagedSurface32 *destSurface, const Common::Point32 &pos) const;
-	/** Draw a sub-rectangle of the loaded page background at @p pos. */
-	void drawBackgroundSubRect(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect &srcRect) const;
+	/** Draw the loaded page background at @p pos32. */
+	void drawBackground(ManagedSurface32 *destSurface, const Common::Point32 &pos32) const;
+	/** Draw a sub-rectangle of the loaded page background at @p pos32. */
+	void drawBackgroundSubRect(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const Common::Rect &srcRect) const;
 	/** Return the page layer collection released with the graphics interface. */
 	PageLayerStack *getPageLayerStack() const { return _pageLayerStack; }
 	/** Remove every page layer and reset transient stack state. */
 	void clearPageLayers();
 	/** Draw an RLE sprite through the shared Z2 rendering boundary. */
-	void drawRleBlock(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos) const;
+	void drawRleBlock(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos32) const;
 	/** Draw an RLE sprite while skipping opaque pixels matching @p colorKey. */
-	void drawRleBlockColorKey(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos, const RGBColor &colorKey) const;
+	void drawRleBlockColorKey(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos32, const RGBColor &colorKey) const;
 	/** Load and draw an RLE sprite from the current page cache. */
-	void drawPageRleBlock(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos) {
+	void drawPageRleBlock(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos32) {
 		if (destSurface)
-			drawRleBlock(destSurface, loadPageRleBlock(key), pos);
+			drawRleBlock(destSurface, loadPageRleBlock(key), pos32);
 	}
 	/** Load and draw an RLE sprite retained across page changes. */
-	void drawSharedRleBlock(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos) {
+	void drawSharedRleBlock(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos32) {
 		if (destSurface)
-			drawRleBlock(destSurface, loadSharedRleBlock(key), pos);
+			drawRleBlock(destSurface, loadSharedRleBlock(key), pos32);
 	}
 	/** Load and draw a shared RLE sprite while skipping one opaque RGB color. */
-	void drawSharedRleBlockColorKey(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos, const RGBColor &colorKey) {
+	void drawSharedRleBlockColorKey(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos32, const RGBColor &colorKey) {
 		if (destSurface)
-			drawRleBlockColorKey(destSurface, loadSharedRleBlock(key), pos, colorKey);
+			drawRleBlockColorKey(destSurface, loadSharedRleBlock(key), pos32, colorKey);
 	}
 	/** Return a page RLE sprite's dimensions, or an empty size when it cannot be loaded. */
 	Size32 getPageRleBlockSize(const Common::String &key);
 	/** Draw an RLE sprite inside an absolute screen clip. */
-	void drawRleBlockClipped(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos, const Common::Rect32 &clip) const;
+	void drawRleBlockClipped(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos32, const Common::Rect32 &clip) const;
 	/** Load and draw a page RLE sprite inside an absolute screen clip. */
-	void drawPageRleBlockClipped(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos, const Common::Rect32 &clip) {
+	void drawPageRleBlockClipped(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos32, const Common::Rect32 &clip) {
 		if (destSurface)
-			drawRleBlockClipped(destSurface, loadPageRleBlock(key), pos, clip);
+			drawRleBlockClipped(destSurface, loadPageRleBlock(key), pos32, clip);
 	}
 	/** Draw one frame from an animation through the shared Z2 rendering boundary. */
-	void drawAnimationFrame(ManagedSurface32 *destSurface, const Animation *animation, int frameIndex, const Common::Point32 &pos) const;
+	void drawAnimationFrame(ManagedSurface32 *destSurface, const Animation *animation, int frameIndex, const Common::Point32 &pos32) const;
 	/** Draw a nose-trait icon with the same display palette as Zoombini nose layers. */
-	void drawPageNoseTraitSprite(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos, byte value);
+	void drawPageNoseTraitSprite(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos32, byte value);
 	/** Draw and advance one general-object animation runner. */
 	void drawAndUpdateAnimationRunner(ManagedSurface32 *destSurface, AnimationRunner *runner, uint32 tickCount, int scrollX, int bgWidth) const;
 	/** Compose body, Feet, Nose, Hair and Eyes, retaining frame zero for single-frame entries. */
 	void drawZoombini(ManagedSurface32 *destSurface, const ZoombiniAnimation *animation, const ZmbTrait &traits,
-					  const Common::Point32 &pos, int cell, int frame, const Common::Rect32 *clip = nullptr) const;
+					  const Common::Point32 &pos32, int cell, int frame, const Common::Rect32 *clip = nullptr) const;
 	/** Compose a previously loaded common Zoombini grid. */
 	void drawZoombini(ManagedSurface32 *destSurface, ZmbAnimationKind animKind, const ZmbTrait &traits,
-					  const Common::Point32 &pos, int cell, int frame, const Common::Rect32 *clip = nullptr) const {
-		drawZoombini(destSurface, getCommonZoombiniAnimation(animKind), traits, pos, cell, frame, clip);
+					  const Common::Point32 &pos32, int cell, int frame, const Common::Rect32 *clip = nullptr) const {
+		drawZoombini(destSurface, getCommonZoombiniAnimation(animKind), traits, pos32, cell, frame, clip);
 	}
 	/** Compose the same layers with an explicit blend table for compatibility callers. */
 	static void drawZoombini(ManagedSurface32 *destSurface, const ZoombiniAnimation *animation, const ZmbTrait &traits,
-							 const Common::Point32 &pos, int cell, int frame, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip = nullptr);
+							 const Common::Point32 &pos32, int cell, int frame, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip = nullptr);
 	/**
-	 * Compose the large picker preview as body, Feet, Hair, Eyes and Nose at frame zero.
-	 * Unlike @ref Gfx::drawZoombini, only selected values 1 through 5 add feature layers.
+	 * Compose the large picker preview in body, feet, hair, eyes and nose order at frame zero.
+	 * @param destSurface Destination surface.
+	 * @param animation Preview animation grid.
+	 * @param traits Picker selections, with zero for an unselected trait.
+	 * @param pos32 Preview origin in destination pixels.
 	 */
-	void drawZoombiniPreview(ManagedSurface32 *destSurface, const ZoombiniAnimation *animation, const byte (&selectedValues)[ZmbTrait::kTraitKindCount], const Common::Point32 &pos) const;
-	/** Compose the same picker preview with an explicit blend table. */
-	static void drawZoombiniPreview(ManagedSurface32 *destSurface, const ZoombiniAnimation *animation, const byte (&selectedValues)[ZmbTrait::kTraitKindCount], const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT);
+	void drawZoombiniPreview(ManagedSurface32 *destSurface, const ZoombiniAnimation *animation, const ZmbTrait &traits, const Common::Point32 &pos32) const;
+	/**
+	 * Compose the picker preview with an explicit blend table.
+	 * @param destSurface Destination surface.
+	 * @param animation Preview animation grid.
+	 * @param traits Picker selections, with zero for an unselected trait.
+	 * @param pos32 Preview origin in destination pixels.
+	 * @param alphaLUT Alpha blending lookup table.
+	 */
+	static void drawZoombiniPreview(ManagedSurface32 *destSurface, const ZoombiniAnimation *animation, const ZmbTrait &traits, const Common::Point32 &pos32, const AlphaBlendLUT &alphaLUT);
 	/** Select the display color for a nose trait without changing its logical value. */
 	static bool noseColorRGB(ColorAssistMode mode, byte value, RGBColor &color);
 	/** Shift a nose pixel toward the display hue while retaining its value and saturation variation. */
@@ -625,20 +635,20 @@ public:
 	 * Draw @p text using @p conf, outlining the glyphs before the fill when @ref TextConf::outlineEffect is set.
 	 * The four one-pixel outline passes are drawn first so the main text does not move.
 	 * @p maxWidth limits the drawing area, or @ref Gfx::kNoMaxWidth uses the destination surface width.
-	 * Bitmap text is encoded to release bytes and drawn with the strip quirk path at @p pos, ignoring outline and alignment.
+	 * Bitmap text is encoded to release bytes and drawn with the strip quirk path at @p pos32, ignoring outline and alignment.
 	 * It still respects a positive @p maxWidth.
 	 * GUI and debug text use the standard API with outline and alignment.
 	 */
-	void drawString(ManagedSurface32 *destSurface, const Common::U32String &text, const Common::Point32 &pos, int maxWidth, const TextConf &conf) const;
+	void drawString(ManagedSurface32 *destSurface, const Common::U32String &text, const Common::Point32 &pos32, int maxWidth, const TextConf &conf) const;
 	/**
-	 * Draw text at @p pos within @p maxWidth and return its text width.
+	 * Draw text at @p pos32 within @p maxWidth and return its text width.
 	 * Use @ref Gfx::kNoMaxWidth to draw without a caller-specified width limit.
 	 * Bitmap text draws release-encoded game bytes with the strip quirk path and returns the signed pen displacement from @ref BmtFont::drawString.
 	 * The tint comes from @ref TextConf::fillColor.
-	 * GUI and debug text decode @p text with the release encoding and use the standard API left-aligned at @p pos, returning the standard width.
+	 * GUI and debug text decode @p text with the release encoding and use the standard API left-aligned at @p pos32, returning the standard width.
 	 * Alignment is ignored; use the @ref Common::U32String overload for aligned text.
 	 */
-	int drawString(ManagedSurface32 *destSurface, const Common::String &text, const Common::Point32 &pos, int maxWidth, const TextConf &conf) const;
+	int drawString(ManagedSurface32 *destSurface, const Common::String &text, const Common::Point32 &pos32, int maxWidth, const TextConf &conf) const;
 	/**
 	 * Measure game text for page alignment and name-input limits.
 	 * Bitmap text uses the strip quirk layout width from @ref BmtFont::getStringLayoutWidth; the result can be negative or omit drawn glyphs.
@@ -694,10 +704,10 @@ private:
 	 * @param[in] coverage Non-null CLUT8 surface storing how much of each pixel the shape covers: 0 = uncovered, 255 = fully covered.
 	 *                     Coverage is independent of the drawing color's opacity.
 	 *                     No color palette is needed.
-	 * @param[in] pos Destination pixel position corresponding to coverage pixel (0, 0).
+	 * @param[in] pos32 Destination pixel position corresponding to coverage pixel (0, 0).
 	 * @param[in] color Color encoded in the destination pixel format; its alpha is multiplied by coverage / 255.
 	 */
-	static void blitColorWithCoverage(ManagedSurface32 *destSurface, const Graphics::Surface *coverage, const Common::Point32 &pos, uint32 color);
+	static void blitColorWithCoverage(ManagedSurface32 *destSurface, const Graphics::Surface *coverage, const Common::Point32 &pos32, uint32 color);
 	/**
 	 * Draw one antialiased square-pen line through the shared line-batch renderer.
 	 *
@@ -980,27 +990,27 @@ public:
 	/** Allocate a zeroed bitmap and optionally a fully transparent alpha mask. */
 	void createEmpty(const Size32 &size, bool withAlpha);
 
-	/** Draw the full bitmap without alpha blending at @p pos. */
-	void drawToSurface(ManagedSurface32 *destSurface, const Common::Point32 &pos) const;
+	/** Draw the full bitmap without alpha blending at @p pos32. */
+	void drawToSurface(ManagedSurface32 *destSurface, const Common::Point32 &pos32) const;
 	/** Draw the full bitmap while treating its top-left pixel color as transparent. */
-	void drawToSurfaceColorKey(ManagedSurface32 *destSurface, const Common::Point32 &pos) const;
-	/** Draw @p srcRect from this bitmap without alpha blending at @p pos. */
-	void drawSubRect(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect &srcRect) const;
+	void drawToSurfaceColorKey(ManagedSurface32 *destSurface, const Common::Point32 &pos32) const;
+	/** Draw @p srcRect from this bitmap without alpha blending at @p pos32. */
+	void drawSubRect(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const Common::Rect &srcRect) const;
 	/**
-	 * Draw the full bitmap with the separate-mask `/255` blend rule at @p pos.
+	 * Draw the full bitmap with the separate-mask `/255` blend rule at @p pos32.
 	 *
 	 * The source channel is added as supplied, while the destSurface channel is
 	 * scaled by `(255 - mask) / 255`; this path intentionally does not use the
 	 * RLE `/256` lookup table.
 	 */
-	void drawAlphaBlend(ManagedSurface32 *destSurface, const Common::Point32 &pos) const;
+	void drawAlphaBlend(ManagedSurface32 *destSurface, const Common::Point32 &pos32) const;
 	/**
-	 * Draw a bitmap-mask pair at @p pos using the RLE premultiplied blend rule.
+	 * Draw a bitmap-mask pair at @p pos32 using the RLE premultiplied blend rule.
 	 *
 	 * @p alphaLUT scales the raw source channel by the mask and the destSurface
 	 * channel by the mask's inverse, using the renderer's `/256` rule.
 	 */
-	void drawRleMaskBlend(ManagedSurface32 *destSurface, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const;
+	void drawRleMaskBlend(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const AlphaBlendLUT &alphaLUT) const;
 
 	/** Return the bitmap dimensions in pixels. */
 	const Size32 &getSize() const { return _size; }
@@ -1030,7 +1040,7 @@ private:
 	Common::Path _alphaResourcePath;
 
 	/** Clip and convert a bitmap region, optionally treating the full bitmap's top-left color as transparent. */
-	void drawToSurfaceInternal(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &srcRect, bool useColorKey) const;
+	void drawToSurfaceInternal(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const Common::Rect32 &srcRect, bool useColorKey) const;
 	/** Decode a 24-bit BMP from @p stream through the shared image decoder. */
 	bool loadColorBMP(Common::SeekableReadStream *stream);
 	/** Decode the bounded BB pixel prefix and retain only rows containing recovered pixels. */
@@ -1113,30 +1123,30 @@ public:
 	bool loadAnimationFrame(Common::SeekableReadStream *stream, uint32 outerSize);
 
 	/**
-	 * Draw this frame at @p pos using opaque copies or lookup-table blending.
+	 * Draw this frame at @p pos32 using opaque copies or lookup-table blending.
 	 *
 	 * Mode 1 spans use their premultiplied BGR channels and inverse-alpha byte
 	 * with @p alphaLUT.
 	 */
-	void drawToScreen(ManagedSurface32 *destSurface, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const;
+	void drawToScreen(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const AlphaBlendLUT &alphaLUT) const;
 	/** Draw this frame while skipping opaque pixels matching @p colorKey. */
-	void drawToScreenColorKey(ManagedSurface32 *destSurface, const Common::Point32 &pos, const RGBColor &colorKey, const AlphaBlendLUT &alphaLUT) const;
+	void drawToScreenColorKey(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const RGBColor &colorKey, const AlphaBlendLUT &alphaLUT) const;
 	/**
 	 * Draw this frame inside @p clip using opaque copies or lookup-table blending.
 	 *
 	 * Mode 1 spans use their premultiplied BGR channels and inverse-alpha byte
 	 * with @p alphaLUT.
 	 */
-	void drawToScreenClipped(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &clip, const AlphaBlendLUT &alphaLUT) const;
+	void drawToScreenClipped(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const Common::Rect32 &clip, const AlphaBlendLUT &alphaLUT) const;
 	/** Draw this frame with its chromatic pixels shifted toward one RGB color, preserving shading and alpha. */
-	void drawToScreenRecolored(ManagedSurface32 *destSurface, const Common::Point32 &pos, const RGBColor &targetColor,
+	void drawToScreenRecolored(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const RGBColor &targetColor,
 							   const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip = nullptr, byte sourceBrightness = 255) const;
 	/** Draw this frame in a new hue while retaining each chromatic pixel's value and saturation variation. */
-	void drawToScreenRecoloredWithGradient(ManagedSurface32 *destSurface, const Common::Point32 &pos, const RGBColor &targetColor, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip = nullptr) const;
+	void drawToScreenRecoloredWithGradient(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const RGBColor &targetColor, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip = nullptr) const;
 	/** Draw this frame mirrored horizontally within its own width. */
-	void drawToScreenMirrored(ManagedSurface32 *destSurface, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const;
+	void drawToScreenMirrored(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const AlphaBlendLUT &alphaLUT) const;
 	/** Draw the RLE coverage using one color while retaining inverse-alpha edges. */
-	void drawToScreenSolidColor(ManagedSurface32 *destSurface, const Common::Point32 &pos, const RGBColor &color, const AlphaBlendLUT &alphaLUT) const;
+	void drawToScreenSolidColor(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const RGBColor &color, const AlphaBlendLUT &alphaLUT) const;
 
 	/** Return the frame dimensions in pixels. */
 	const Size32 &getSize() const { return _size; }
@@ -1147,7 +1157,7 @@ public:
 	/** Return whether frame data has been loaded. */
 	bool isValid() const { return _loaded; }
 	/** Sample an unscaled frame pixel as straight RGB and opacity; absent pixels are transparent. */
-	void samplePixel(const Common::Point32 &pos, RGBColor &color, byte &alpha) const;
+	void samplePixel(const Common::Point32 &pos32, RGBColor &color, byte &alpha) const;
 
 private:
 	/** Source pixel layout of decoded RLE frame data. */
@@ -1211,7 +1221,7 @@ private:
 	/** Recolor a BGR pixel while retaining neutral highlights and optionally preserving source saturation variation. */
 	static bool recolorPixel(const byte *source, bool premultiplied, const RGBColor &targetColor, byte sourceBrightness, bool preserveGradient, RGBColor &adjustedColor);
 	/** Draw this frame with clipping and an optional opaque-span color key. */
-	void drawToScreenInternal(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &clip, const AlphaBlendLUT &alphaLUT,
+	void drawToScreenInternal(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const Common::Rect32 &clip, const AlphaBlendLUT &alphaLUT,
 							  const RGBColor *colorKey = nullptr, const RecolorSettings *recolor = nullptr) const;
 	/** Exchange frame buffer state with @p other. */
 	void swapData(RleBlock &other);
@@ -1297,12 +1307,12 @@ public:
 	/** Return the number of marked base-mask pixels, excluding additive regions. */
 	uint32 countMarkedPixels() const;
 	/**
-	 * Return whether @p point belongs to an accepted mask byte.
+	 * Return whether @p pos32 belongs to an accepted mask byte.
 	 *
-	 * @param[in] point Page-space position to test.
+	 * @param[in] pos32 Page-space position to test.
 	 * @param[in] includeAdditional Include additional-mask bytes; false tests only the base mask.
 	 */
-	bool hasMarkedByteAt(const Common::Point32 &point, bool includeAdditional = true) const;
+	bool hasMarkedByteAt(const Common::Point32 &pos32, bool includeAdditional = true) const;
 
 private:
 	/** Packed additional rows with the base mask's layout; empty when no expansion is active. */
@@ -1381,7 +1391,7 @@ public:
 	/** Return the base layer's dimensions for one Zoombini cell and frame. */
 	Size32 getSpriteSize(int cell, int frame) const;
 	/** Forward legacy drawing calls to @ref Gfx::drawZoombini with the supplied blend table and clip. */
-	void drawZoombini(ManagedSurface32 *screen, const ZmbTrait &traits, const Common::Point32 &pos,
+	void drawZoombini(ManagedSurface32 *screen, const ZmbTrait &traits, const Common::Point32 &pos32,
 					  int cell, int frame, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip = nullptr) const;
 
 private:
@@ -1433,7 +1443,7 @@ public:
 							const Common::Path &disabledPath = Common::Path(), const Common::Path &disabledMask = Common::Path());
 
 	/** Set the button rectangle from a screen pos and size. */
-	void setRect(const Common::Point32 &pos, const Size32 &size);
+	void setRect(const Common::Point32 &pos32, const Size32 &size);
 	/** Replace the button rectangle with @p rect. */
 	void setRect(const Common::Rect &rect);
 	/** Enable or disable pointer interaction. */
@@ -1453,10 +1463,13 @@ public:
 	 */
 	int drawAndHitTest(ManagedSurface32 *destSurface, const Common::Point32 &mousePos, const AlphaBlendLUT &alphaLUT);
 
+	/** Return whether @p pos32 is inside the button rectangle. */
+	bool containsPoint(const Common::Point32 &pos32) const;
 	/** Return whether @p pos is inside the button rectangle. */
-	bool containsPoint(const Common::Point32 &pos) const;
-	/** Return whether @p point is inside the button rectangle. */
-	bool containsPoint(const Common::Point &point) const { return containsPoint(Common::Point32(point)); }
+	bool containsPoint(const Common::Point &pos) const {
+		const Common::Point32 pos32 = Common::Point32(pos);
+		return containsPoint(pos32);
+	}
 
 	/** Return the button rectangle. */
 	const Common::Rect &getRect() const { return _rect; }
@@ -1603,7 +1616,7 @@ public:
 	void drawChar(Graphics::Surface *destSurface, uint32 character, int x, int y, uint32 color) const override;
 	using Graphics::Font::drawString;
 	/**
-	 * Draw release-encoded game bytes from @p pos with a uniform tint inside @p maxWidth.
+	 * Draw release-encoded game bytes from @p pos32 with a uniform tint inside @p maxWidth.
 	 * Use @ref Gfx::kNoMaxWidth to draw without a caller-specified width limit.
 	 * @p color is packed in the destination surface format, matching @ref Graphics::Font::drawString.
 	 *
@@ -1620,7 +1633,7 @@ public:
 	 *
 	 * @return Signed horizontal pen displacement, or zero for an unloaded font or null destination.
 	 */
-	int drawString(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::String &text, int maxWidth, uint32 color) const;
+	int drawString(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const Common::String &text, int maxWidth, uint32 color) const;
 	/**
 	 * Return the width used to lay out release-encoded game text and check name-input limits.
 	 *
@@ -1670,13 +1683,13 @@ private:
 	Common::Array<Glyph> _glyphs;
 
 	/**
-	 * Draw one glyph's coverage mask tinted with @p color at @p pos.
+	 * Draw one glyph's coverage mask tinted with @p color at @p pos32.
 	 *
 	 * Full-coverage pixels copy the tint; partial-coverage pixels add the
 	 * tint scaled by the coverage and the destination scaled by its inverse,
 	 * matching the RLE premultiplied blend rule.
 	 */
-	void drawGlyph(Graphics::Surface *destSurface, const Glyph &glyph, const Common::Point32 &pos, const RGBColor &color, const AlphaBlendLUT &alphaLUT) const;
+	void drawGlyph(Graphics::Surface *destSurface, const Glyph &glyph, const Common::Point32 &pos32, const RGBColor &color, const AlphaBlendLUT &alphaLUT) const;
 };
 
 /**

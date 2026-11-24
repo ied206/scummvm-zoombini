@@ -291,9 +291,10 @@ bool BitBlock::loadBBStream(Common::SeekableReadStream &f, const Common::Path &b
 	}
 	if (bufferSize != expectedSize || dataSize != expectedSize)
 		warning("BitBlock: inconsistent BB size fields in '%s'; using declared dimensions", bbPath.toString().c_str());
-	if (recoveredSize != expectedSize)
+	if (recoveredSize != expectedSize) {
 		warning("BitBlock: salvaged %u of %u complete pixels from truncated BB '%s'", recoveredPixelCount, static_cast<uint32>(pixelCount64),
 				bbPath.toString().c_str());
+	}
 	if (expectedSize64 < static_cast<uint64>(availableSize64))
 		warning("BitBlock: ignoring %u trailing bytes in BB '%s'", static_cast<uint32>(availableSize64 - expectedSize64), bbPath.toString().c_str());
 
@@ -447,19 +448,19 @@ byte BitBlock::blendChannel(byte src, byte dest, byte mask) {
 	return static_cast<byte>(MIN(result, 255));
 }
 
-void BitBlock::drawToSurface(ManagedSurface32 *destSurface, const Common::Point32 &pos) const {
-	drawToSurfaceInternal(destSurface, pos, Common::Rect32(_size.width, _size.height), false);
+void BitBlock::drawToSurface(ManagedSurface32 *destSurface, const Common::Point32 &pos32) const {
+	drawToSurfaceInternal(destSurface, pos32, Common::Rect32(_size.width, _size.height), false);
 }
 
-void BitBlock::drawToSurfaceColorKey(ManagedSurface32 *destSurface, const Common::Point32 &pos) const {
-	drawToSurfaceInternal(destSurface, pos, Common::Rect32(_size.width, _size.height), true);
+void BitBlock::drawToSurfaceColorKey(ManagedSurface32 *destSurface, const Common::Point32 &pos32) const {
+	drawToSurfaceInternal(destSurface, pos32, Common::Rect32(_size.width, _size.height), true);
 }
 
-void BitBlock::drawSubRect(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect &srcRect) const {
-	drawToSurfaceInternal(destSurface, pos, Common::Rect32(srcRect.left, srcRect.top, srcRect.right, srcRect.bottom), false);
+void BitBlock::drawSubRect(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const Common::Rect &srcRect) const {
+	drawToSurfaceInternal(destSurface, pos32, Common::Rect32(srcRect.left, srcRect.top, srcRect.right, srcRect.bottom), false);
 }
 
-void BitBlock::drawToSurfaceInternal(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &srcRect, bool useColorKey) const {
+void BitBlock::drawToSurfaceInternal(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const Common::Rect32 &srcRect, bool useColorKey) const {
 	if (!_pixels || srcRect.isEmpty())
 		return;
 
@@ -467,8 +468,8 @@ void BitBlock::drawToSurfaceInternal(ManagedSurface32 *destSurface, const Common
 	if (src.isEmpty())
 		return;
 
-	const int32 left = pos.x + src.left - srcRect.left;
-	const int32 top = pos.y + src.top - srcRect.top;
+	const int32 left = pos32.x + src.left - srcRect.left;
+	const int32 top = pos32.y + src.top - srcRect.top;
 	const int32 right = left + src.width();
 	const int32 bottom = top + src.height();
 	if (right <= 0 || bottom <= 0 || destSurface->w <= left || destSurface->h <= top)
@@ -508,19 +509,19 @@ void BitBlock::drawToSurfaceInternal(ManagedSurface32 *destSurface, const Common
  * Keep the custom blend to preserve that source contribution, saturation, and /255 rounding.
  * Zero masks leave the destination untouched; other masks produce opaque output.
  */
-void BitBlock::drawAlphaBlend(ManagedSurface32 *dst, const Common::Point32 &pos) const {
+void BitBlock::drawAlphaBlend(ManagedSurface32 *dst, const Common::Point32 &pos32) const {
 	if (!_pixels || !_alphaMap)
 		return;
 	assert(dst->format.bytesPerPixel == 4);
 	static constexpr Graphics::PixelFormat kSourceFormat = Graphics::PixelFormat::createFormatRGBA32();
 
 	for (int row = 0; row < _size.height; row++) {
-		int dy = pos.y + row;
+		int dy = pos32.y + row;
 		if (dy < 0 || dst->h <= dy)
 			continue;
 
 		for (int col = 0; col < _size.width; col++) {
-			int dx = pos.x + col;
+			int dx = pos32.x + col;
 			if (dx < 0 || dst->w <= dx)
 				continue;
 
@@ -552,18 +553,18 @@ void BitBlock::drawAlphaBlend(ManagedSurface32 *dst, const Common::Point32 &pos)
  * The rounding order can change a channel by one, so retain @ref AlphaBlendLUT for exact pixels.
  * Zero masks skip the pixel, full masks copy RGB exactly, and every written pixel has alpha 255.
  */
-void BitBlock::drawRleMaskBlend(ManagedSurface32 *dst, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const {
+void BitBlock::drawRleMaskBlend(ManagedSurface32 *dst, const Common::Point32 &pos32, const AlphaBlendLUT &alphaLUT) const {
 	if (!_pixels || !_alphaMap)
 		return;
 	assert(dst->format.bytesPerPixel == 4);
 	static constexpr Graphics::PixelFormat kSourceFormat = Graphics::PixelFormat::createFormatRGBA32();
 
 	for (int row = 0; row < _size.height; row++) {
-		const int destY = pos.y + row;
+		const int destY = pos32.y + row;
 		if (destY < 0 || dst->h <= destY)
 			continue;
 		for (int column = 0; column < _size.width; column++) {
-			const int destX = pos.x + column;
+			const int destX = pos32.x + column;
 			if (destX < 0 || dst->w <= destX)
 				continue;
 
@@ -870,20 +871,20 @@ bool RleBlock::recolorPixel(const byte *source, bool premultiplied, const RGBCol
 	return true;
 }
 
-void RleBlock::samplePixel(const Common::Point32 &pos, RGBColor &color, byte &alpha) const {
+void RleBlock::samplePixel(const Common::Point32 &pos32, RGBColor &color, byte &alpha) const {
 	color = RGBColor(0, 0, 0);
 	alpha = 0;
-	if (!_loaded || pos.x < 0 || _size.width <= pos.x || pos.y < 0 || _size.height <= pos.y)
+	if (!_loaded || pos32.x < 0 || _size.width <= pos32.x || pos32.y < 0 || _size.height <= pos32.y)
 		return;
 	for (uint i = 0; i < _spans.size(); i++) {
 		const Span &span = _spans[i];
-		if (span.yOffset != pos.y || pos.x < span.xOffset || span.xOffset + static_cast<int32>(span.pixelCount) <= pos.x)
+		if (span.yOffset != pos32.y || pos32.x < span.xOffset || span.xOffset + static_cast<int32>(span.pixelCount) <= pos32.x)
 			continue;
-		const uint32 pixel = _pixels[span.pixelOffset + pos.x - span.xOffset];
+		const uint32 pixel = _pixels[span.pixelOffset + pos32.x - span.xOffset];
 		color = RGBColor::fromPixel(pixel, kSourceFormat);
 		alpha = 255;
 		if (span.mode == SpanMode::kInverseAlphaBgr01) {
-			const byte inverseAlpha = reinterpret_cast<const byte *>(_pixels + span.pixelOffset + pos.x - span.xOffset)[3];
+			const byte inverseAlpha = reinterpret_cast<const byte *>(_pixels + span.pixelOffset + pos32.x - span.xOffset)[3];
 			alpha = 255 - inverseAlpha;
 			if (alpha) {
 				const auto unpremultiplyChannel = [alpha](byte channel) { return MIN(255, (channel * 255 + alpha / 2) / alpha); };
@@ -897,35 +898,35 @@ void RleBlock::samplePixel(const Common::Point32 &pos, RGBColor &color, byte &al
 /**
  * Draw the RLE spans with opaque copying or lookup-table alpha blending.
  */
-void RleBlock::drawToScreen(ManagedSurface32 *destSurface, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const {
-	drawToScreenInternal(destSurface, pos, Common::Rect32(destSurface->w, destSurface->h), alphaLUT);
+void RleBlock::drawToScreen(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const AlphaBlendLUT &alphaLUT) const {
+	drawToScreenInternal(destSurface, pos32, Common::Rect32(destSurface->w, destSurface->h), alphaLUT);
 }
 
-void RleBlock::drawToScreenColorKey(ManagedSurface32 *destSurface, const Common::Point32 &pos, const RGBColor &colorKey, const AlphaBlendLUT &alphaLUT) const {
-	drawToScreenInternal(destSurface, pos, Common::Rect32(destSurface->w, destSurface->h), alphaLUT, &colorKey);
+void RleBlock::drawToScreenColorKey(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const RGBColor &colorKey, const AlphaBlendLUT &alphaLUT) const {
+	drawToScreenInternal(destSurface, pos32, Common::Rect32(destSurface->w, destSurface->h), alphaLUT, &colorKey);
 }
 
-void RleBlock::drawToScreenClipped(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &clip, const AlphaBlendLUT &alphaLUT) const {
-	drawToScreenInternal(destSurface, pos, clip, alphaLUT);
+void RleBlock::drawToScreenClipped(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const Common::Rect32 &clip, const AlphaBlendLUT &alphaLUT) const {
+	drawToScreenInternal(destSurface, pos32, clip, alphaLUT);
 }
 
-void RleBlock::drawToScreenRecolored(ManagedSurface32 *destSurface, const Common::Point32 &pos, const RGBColor &targetColor, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip, byte sourceBrightness) const {
+void RleBlock::drawToScreenRecolored(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const RGBColor &targetColor, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip, byte sourceBrightness) const {
 	if (!destSurface)
 		return;
 	const RecolorSettings recolor = {targetColor, sourceBrightness ? sourceBrightness : static_cast<byte>(1), false};
 	const Common::Rect32 drawClip = clip ? *clip : Common::Rect32(destSurface->w, destSurface->h);
-	drawToScreenInternal(destSurface, pos, drawClip, alphaLUT, nullptr, &recolor);
+	drawToScreenInternal(destSurface, pos32, drawClip, alphaLUT, nullptr, &recolor);
 }
 
-void RleBlock::drawToScreenRecoloredWithGradient(ManagedSurface32 *destSurface, const Common::Point32 &pos, const RGBColor &targetColor, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip) const {
+void RleBlock::drawToScreenRecoloredWithGradient(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const RGBColor &targetColor, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip) const {
 	if (!destSurface)
 		return;
 	const RecolorSettings recolor = {targetColor, 255, true};
 	const Common::Rect32 drawClip = clip ? *clip : Common::Rect32(destSurface->w, destSurface->h);
-	drawToScreenInternal(destSurface, pos, drawClip, alphaLUT, nullptr, &recolor);
+	drawToScreenInternal(destSurface, pos32, drawClip, alphaLUT, nullptr, &recolor);
 }
 
-void RleBlock::drawToScreenMirrored(ManagedSurface32 *destSurface, const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) const {
+void RleBlock::drawToScreenMirrored(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const AlphaBlendLUT &alphaLUT) const {
 	if (!_loaded || !destSurface)
 		return;
 	assert(destSurface->format.bytesPerPixel == 4);
@@ -934,8 +935,8 @@ void RleBlock::drawToScreenMirrored(ManagedSurface32 *destSurface, const Common:
 		assert(span.pixelOffset <= _pixelCount);
 		assert(span.pixelCount <= _pixelCount - span.pixelOffset);
 
-		const int32 screenX = pos.x + _size.width - span.xOffset - static_cast<int32>(span.pixelCount);
-		const int32 screenY = pos.y + span.yOffset;
+		const int32 screenX = pos32.x + _size.width - span.xOffset - static_cast<int32>(span.pixelCount);
+		const int32 screenY = pos32.y + span.yOffset;
 		if (screenY < 0 || destSurface->h <= screenY)
 			continue;
 		const int32 left = MAX<int32>(screenX, 0);
@@ -970,15 +971,15 @@ void RleBlock::drawToScreenMirrored(ManagedSurface32 *destSurface, const Common:
 	}
 }
 
-void RleBlock::drawToScreenSolidColor(ManagedSurface32 *destSurface, const Common::Point32 &pos, const RGBColor &color, const AlphaBlendLUT &alphaLUT) const {
+void RleBlock::drawToScreenSolidColor(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const RGBColor &color, const AlphaBlendLUT &alphaLUT) const {
 	if (!_loaded || !destSurface)
 		return;
 	assert(destSurface->format.bytesPerPixel == 4);
 	const uint32 solidPixel = color.toPixel(destSurface->format);
 	for (uint spanIndex = 0; spanIndex < _spans.size(); spanIndex++) {
 		const Span &span = _spans[spanIndex];
-		const int32 screenX = pos.x + span.xOffset;
-		const int32 screenY = pos.y + span.yOffset;
+		const int32 screenX = pos32.x + span.xOffset;
+		const int32 screenY = pos32.y + span.yOffset;
 		if (screenY < 0 || destSurface->h <= screenY)
 			continue;
 		const int32 left = MAX<int32>(screenX, 0);
@@ -1005,7 +1006,7 @@ void RleBlock::drawToScreenSolidColor(ManagedSurface32 *destSurface, const Commo
 	}
 }
 
-void RleBlock::drawToScreenInternal(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect32 &clip,
+void RleBlock::drawToScreenInternal(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const Common::Rect32 &clip,
 									const AlphaBlendLUT &alphaLUT, const RGBColor *colorKey, const RecolorSettings *recolor) const {
 	if (!_loaded || !clip.isValidRect())
 		return;
@@ -1021,8 +1022,8 @@ void RleBlock::drawToScreenInternal(ManagedSurface32 *destSurface, const Common:
 		assert(span.pixelOffset <= _pixelCount);
 		assert(span.pixelCount <= _pixelCount - span.pixelOffset);
 
-		const int32 screenX = pos.x + span.xOffset;
-		const int32 screenY = pos.y + span.yOffset;
+		const int32 screenX = pos32.x + span.xOffset;
+		const int32 screenY = pos32.y + span.yOffset;
 		if (screenY < destClip.top || destClip.bottom <= screenY)
 			continue;
 
@@ -1309,9 +1310,8 @@ uint64 Gfx::getCachedDataSize() const {
 			if (!bitmap)
 				continue;
 			const Common::String sourceKey = Zoombini2Engine::normalizeResourcePath(bitmap->getResourcePath().toString('/')).toString('/');
-			if (entry._key.equalsIgnoreCase(sourceKey)) {
+			if (entry._key.equalsIgnoreCase(sourceKey))
 				bytes += bitmap->getDataSize();
-			}
 		}
 	}
 	const RleBlockCache *spriteCaches[] = {&_pageRleBlocks, &_sharedRleBlocks};
@@ -1346,18 +1346,18 @@ void Gfx::captureScreenRegion(ManagedSurface32 *destSurface, const Common::Rect 
 	destSurface->copyRectToSurface(*_screen, 0, 0, srcRect);
 }
 
-void Gfx::copyRegionToScreen(const ManagedSurface32 &srcSurface, const Common::Point &destSurface) const {
-	_screen->copyRectToSurface(srcSurface, destSurface.x, destSurface.y, Common::Rect(srcSurface.w, srcSurface.h));
+void Gfx::copyRegionToScreen(const ManagedSurface32 &srcSurface, const Common::Point &pos) const {
+	_screen->copyRectToSurface(srcSurface, pos.x, pos.y, Common::Rect(srcSurface.w, srcSurface.h));
 }
 
-void Gfx::drawBitBlock(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos) const {
+void Gfx::drawBitBlock(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos32) const {
 	if (destSurface && bitmap)
-		bitmap->drawToSurface(destSurface, pos);
+		bitmap->drawToSurface(destSurface, pos32);
 }
 
-void Gfx::drawBitBlockColorKey(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos) const {
+void Gfx::drawBitBlockColorKey(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos32) const {
 	if (destSurface && bitmap)
-		bitmap->drawToSurfaceColorKey(destSurface, pos);
+		bitmap->drawToSurfaceColorKey(destSurface, pos32);
 }
 
 Size32 Gfx::getPageBitBlockSize(const Common::String &key) {
@@ -1365,9 +1365,9 @@ Size32 Gfx::getPageBitBlockSize(const Common::String &key) {
 	return bitmap ? bitmap->getSize() : Size32();
 }
 
-void Gfx::drawBitBlockSubRect(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos, const Common::Rect &srcRect) const {
+void Gfx::drawBitBlockSubRect(ManagedSurface32 *destSurface, const BitBlock *bitmap, const Common::Point32 &pos32, const Common::Rect &srcRect) const {
 	if (destSurface && bitmap)
-		bitmap->drawSubRect(destSurface, pos, srcRect);
+		bitmap->drawSubRect(destSurface, pos32, srcRect);
 }
 
 bool Gfx::loadBackground(const Common::String &key, const Size32 &canvasSize) {
@@ -1423,25 +1423,25 @@ void Gfx::clearAreaMask() {
 	_areaMask = nullptr;
 }
 
-void Gfx::drawBackground(ManagedSurface32 *destSurface, const Common::Point32 &pos) const {
+void Gfx::drawBackground(ManagedSurface32 *destSurface, const Common::Point32 &pos32) const {
 	if (destSurface && _backSurface)
-		destSurface->blitFrom(*_backSurface, pos);
+		destSurface->blitFrom(*_backSurface, pos32);
 }
 
-void Gfx::drawBackgroundSubRect(ManagedSurface32 *destSurface, const Common::Point32 &pos, const Common::Rect &srcRect) const {
+void Gfx::drawBackgroundSubRect(ManagedSurface32 *destSurface, const Common::Point32 &pos32, const Common::Rect &srcRect) const {
 	if (destSurface && _backSurface)
-		destSurface->copyRectToSurface(_backSurface->rawSurface(), pos.x, pos.y, Common::Rect32(srcRect.left, srcRect.top, srcRect.right, srcRect.bottom));
+		destSurface->copyRectToSurface(_backSurface->rawSurface(), pos32.x, pos32.y, Common::Rect32(srcRect.left, srcRect.top, srcRect.right, srcRect.bottom));
 }
 
-void Gfx::drawRleBlock(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos) const {
+void Gfx::drawRleBlock(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos32) const {
 	if (destSurface && sprite)
-		sprite->drawToScreen(destSurface, pos, _vm->getAlphaLUT());
+		sprite->drawToScreen(destSurface, pos32, _vm->getAlphaLUT());
 }
 
-void Gfx::drawRleBlockColorKey(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos,
+void Gfx::drawRleBlockColorKey(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos32,
 							   const RGBColor &colorKey) const {
 	if (destSurface && sprite)
-		sprite->drawToScreenColorKey(destSurface, pos, colorKey, _vm->getAlphaLUT());
+		sprite->drawToScreenColorKey(destSurface, pos32, colorKey, _vm->getAlphaLUT());
 }
 
 Size32 Gfx::getPageRleBlockSize(const Common::String &key) {
@@ -1449,26 +1449,26 @@ Size32 Gfx::getPageRleBlockSize(const Common::String &key) {
 	return sprite ? sprite->getSize() : Size32();
 }
 
-void Gfx::drawRleBlockClipped(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos, const Common::Rect32 &clip) const {
+void Gfx::drawRleBlockClipped(ManagedSurface32 *destSurface, const RleBlock *sprite, const Common::Point32 &pos32, const Common::Rect32 &clip) const {
 	if (destSurface && sprite)
-		sprite->drawToScreenClipped(destSurface, pos, clip, _vm->getAlphaLUT());
+		sprite->drawToScreenClipped(destSurface, pos32, clip, _vm->getAlphaLUT());
 }
 
-void Gfx::drawAnimationFrame(ManagedSurface32 *destSurface, const Animation *animation, int frameIndex, const Common::Point32 &pos) const {
+void Gfx::drawAnimationFrame(ManagedSurface32 *destSurface, const Animation *animation, int frameIndex, const Common::Point32 &pos32) const {
 	if (!destSurface || !animation)
 		return;
 
-	drawRleBlock(destSurface, animation->getFrame(frameIndex), pos);
+	drawRleBlock(destSurface, animation->getFrame(frameIndex), pos32);
 }
 
-void Gfx::drawPageNoseTraitSprite(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos, byte value) {
+void Gfx::drawPageNoseTraitSprite(ManagedSurface32 *destSurface, const Common::String &key, const Common::Point32 &pos32, byte value) {
 	RGBColor displayColor;
 	if (noseColorRGB(_vm->getColorAssistMode(), value, displayColor)) {
 		const RleBlock *sprite = loadPageRleBlock(key);
 		if (sprite)
-			sprite->drawToScreenRecoloredWithGradient(destSurface, pos, displayColor, _vm->getAlphaLUT());
+			sprite->drawToScreenRecoloredWithGradient(destSurface, pos32, displayColor, _vm->getAlphaLUT());
 	} else {
-		drawPageRleBlock(destSurface, key, pos);
+		drawPageRleBlock(destSurface, key, pos32);
 	}
 }
 
@@ -1478,12 +1478,12 @@ void Gfx::drawAndUpdateAnimationRunner(ManagedSurface32 *destSurface, AnimationR
 }
 
 void Gfx::drawZoombini(ManagedSurface32 *screen, const ZoombiniAnimation *animation, const ZmbTrait &traits,
-					   const Common::Point32 &pos, int cell, int frame, const Common::Rect32 *clip) const {
-	drawZoombini(screen, animation, traits, pos, cell, frame, _vm->getAlphaLUT(), clip);
+					   const Common::Point32 &pos32, int cell, int frame, const Common::Rect32 *clip) const {
+	drawZoombini(screen, animation, traits, pos32, cell, frame, _vm->getAlphaLUT(), clip);
 }
 
 void Gfx::drawZoombini(ManagedSurface32 *screen, const ZoombiniAnimation *animation, const ZmbTrait &traits,
-					   const Common::Point32 &pos, int cell, int frame, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip) {
+					   const Common::Point32 &pos32, int cell, int frame, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip) {
 	if (!screen || !animation || cell < 0 || ZoombiniAnimation::kDim0 <= cell || frame < 0)
 		return;
 	const int baseIndex = cell * ZoombiniAnimation::kDim1 * ZoombiniAnimation::kDim2;
@@ -1501,23 +1501,23 @@ void Gfx::drawZoombini(ManagedSurface32 *screen, const ZoombiniAnimation *animat
 			continue;
 		RGBColor displayColor;
 		if (layer == 2 && noseColorRGB(colorAssistMode, traits._nose, displayColor))
-			sprite->drawToScreenRecoloredWithGradient(screen, pos, displayColor, alphaLUT, clip);
+			sprite->drawToScreenRecoloredWithGradient(screen, pos32, displayColor, alphaLUT, clip);
 		else if (clip)
-			sprite->drawToScreenClipped(screen, pos, *clip, alphaLUT);
+			sprite->drawToScreenClipped(screen, pos32, *clip, alphaLUT);
 		else
-			sprite->drawToScreen(screen, pos, alphaLUT);
+			sprite->drawToScreen(screen, pos32, alphaLUT);
 	}
 }
 
-void Gfx::drawZoombiniPreview(ManagedSurface32 *screen, const ZoombiniAnimation *animation,
-							  const byte (&selectedValues)[ZmbTrait::kTraitKindCount], const Common::Point32 &pos) const {
-	drawZoombiniPreview(screen, animation, selectedValues, pos, _vm->getAlphaLUT());
+void Gfx::drawZoombiniPreview(ManagedSurface32 *screen, const ZoombiniAnimation *animation, const ZmbTrait &traits, const Common::Point32 &pos32) const {
+	drawZoombiniPreview(screen, animation, traits, pos32, _vm->getAlphaLUT());
 }
 
-void Gfx::drawZoombiniPreview(ManagedSurface32 *screen, const ZoombiniAnimation *animation,
-							  const byte (&selectedValues)[ZmbTrait::kTraitKindCount], const Common::Point32 &pos, const AlphaBlendLUT &alphaLUT) {
+void Gfx::drawZoombiniPreview(ManagedSurface32 *screen, const ZoombiniAnimation *animation, const ZmbTrait &traits,
+							  const Common::Point32 &pos32, const AlphaBlendLUT &alphaLUT) {
 	if (!screen || !animation)
 		return;
+	using TraitKind = ZmbTrait::TraitKind;
 	static constexpr int kBaseCell = 990;
 	static constexpr int kFeatureCellBases[ZmbTrait::kTraitKindCount] = {
 		996,
@@ -1525,27 +1525,26 @@ void Gfx::drawZoombiniPreview(ManagedSurface32 *screen, const ZoombiniAnimation 
 		1008,
 		1014,
 	};
-	static constexpr int kFeatureDrawOrder[ZmbTrait::kTraitKindCount] = {
-		0,
-		2,
-		3,
-		1,
+	static constexpr TraitKind kFeatureDrawOrder[] = {
+		TraitKind::kFeet00,
+		TraitKind::kHair02,
+		TraitKind::kEyes03,
+		TraitKind::kNose01,
 	};
 	const RleBlock *frame = animation->getFrame(kBaseCell, 0);
 	if (frame)
-		frame->drawToScreen(screen, pos, alphaLUT);
-	for (int i = 0; i < ZmbTrait::kTraitKindCount; i++) {
-		const int feature = kFeatureDrawOrder[i];
-		const byte value = selectedValues[feature];
+		frame->drawToScreen(screen, pos32, alphaLUT);
+	for (TraitKind traitKind : kFeatureDrawOrder) {
+		const byte value = traits.getValue(traitKind);
 		if (1 <= value && value <= ZmbTrait::kTraitValueCount) {
-			frame = animation->getFrame(kFeatureCellBases[feature] + value, 0);
+			frame = animation->getFrame(kFeatureCellBases[static_cast<int>(traitKind)] + value, 0);
 			if (frame) {
 				RGBColor displayColor;
-				if (feature == static_cast<int>(ZmbTrait::TraitKind::kNose01) &&
+				if (traitKind == TraitKind::kNose01 &&
 					noseColorRGB(animation->getColorAssistMode(), value, displayColor))
-					frame->drawToScreenRecoloredWithGradient(screen, pos, displayColor, alphaLUT);
+					frame->drawToScreenRecoloredWithGradient(screen, pos32, displayColor, alphaLUT);
 				else
-					frame->drawToScreen(screen, pos, alphaLUT);
+					frame->drawToScreen(screen, pos32, alphaLUT);
 			}
 		}
 	}
@@ -1624,19 +1623,19 @@ void Gfx::drawZoombiniRunner(ManagedSurface32 *screen, const ZoombiniRunner *run
 	drawZoombini(screen, runner->getActiveAnimation(), traitsToDraw, drawPos, runner->getAnimationCell(), frame, alphaLUT, clip);
 }
 
-int Gfx::drawString(ManagedSurface32 *destSurface, const Common::String &text, const Common::Point32 &pos, int maxWidth, const TextConf &conf) const {
+int Gfx::drawString(ManagedSurface32 *destSurface, const Common::String &text, const Common::Point32 &pos32, int maxWidth, const TextConf &conf) const {
 	if (!destSurface)
 		return 0;
 	if (conf.fontKind == FontKind::kBmtFont) {
 		const BmtFont *bmtFont = _vm->_text->bmtFont();
 		if (!bmtFont)
 			return 0;
-		return bmtFont->drawString(destSurface, pos, text, maxWidth, conf.fillColor);
+		return bmtFont->drawString(destSurface, pos32, text, maxWidth, conf.fillColor);
 	}
 	const Common::U32String decoded = _vm->_text->toU32String(text);
 	TextConf alignedConf = conf;
 	alignedConf.hAlign = Graphics::kTextAlignLeft;
-	drawString(destSurface, decoded, pos, maxWidth, alignedConf);
+	drawString(destSurface, decoded, pos32, maxWidth, alignedConf);
 	const Graphics::Font *font = _vm->_text->resolveFont(conf.fontKind);
 	return font ? font->getStringWidth(decoded) : 0;
 }
@@ -1862,7 +1861,7 @@ void Gfx::vLineAA(Graphics::Surface *coverage, int x, float top, float bottom) {
 	}
 }
 
-void Gfx::blitColorWithCoverage(ManagedSurface32 *destSurface, const Graphics::Surface *coverage, const Common::Point32 &pos, uint32 color) {
+void Gfx::blitColorWithCoverage(ManagedSurface32 *destSurface, const Graphics::Surface *coverage, const Common::Point32 &pos32, uint32 color) {
 	assert(coverage && coverage->format.isCLUT8());
 
 	byte srcAlpha = 0;
@@ -1889,7 +1888,7 @@ void Gfx::blitColorWithCoverage(ManagedSurface32 *destSurface, const Graphics::S
 						   coloredCoverage.pitch, coverage->pitch, coverage->w, coverage->h, coloredCoverage.format.bytesPerPixel, colorMap);
 
 	// Combine the final image to destSurface.
-	destSurface->blitFrom(coloredCoverage, pos);
+	destSurface->blitFrom(coloredCoverage, pos32);
 }
 
 void Gfx::drawLineAA(ManagedSurface32 *destSurface, const Common::Point32 &start, const Common::Point32 &end, uint32 color, int thickness) {
@@ -2128,11 +2127,10 @@ void Gfx::drawCubicBezierCurve(ManagedSurface32 *destSurface, CubicBezierCurve &
 			curve.getSubpixelPosition(currentX, currentY);
 		// Accept the same endpoint pairs as integer drawing; clipping happens later in the rasterizer.
 		if (sampleBounds.contains(prevIntPos) && sampleBounds.contains(current)) {
-			if (antialias) {
+			if (antialias)
 				lineSegments.push_back({prevX, prevY, currentX, currentY});
-			} else {
+			else
 				drawLine(destSurface, prevIntPos, current, color, thickness);
-			}
 		}
 		prevIntPos = current;
 		prevX = currentX;
@@ -2143,22 +2141,21 @@ void Gfx::drawCubicBezierCurve(ManagedSurface32 *destSurface, CubicBezierCurve &
 	if (completed) {
 		const Common::Point32 end = curve.getEndPosition();
 		if (sampleBounds.contains(prevIntPos) && sampleBounds.contains(end)) {
-			if (antialias) {
+			if (antialias)
 				lineSegments.push_back(SubpixelLineSegment{prevX, prevY, static_cast<float>(end.x), static_cast<float>(end.y)});
-			} else {
+			else
 				drawLine(destSurface, prevIntPos, end, color, thickness);
-			}
 		}
 	}
 	if (antialias)
 		drawSubpixelLinesAA(destSurface, lineSegments, color, thickness);
 }
 
-void Gfx::drawString(ManagedSurface32 *destSurface, const Common::U32String &text, const Common::Point32 &pos, int maxWidth, const TextConf &conf) const {
+void Gfx::drawString(ManagedSurface32 *destSurface, const Common::U32String &text, const Common::Point32 &pos32, int maxWidth, const TextConf &conf) const {
 	if (!destSurface)
 		return;
 	if (conf.fontKind == FontKind::kBmtFont) {
-		drawString(destSurface, _vm->_text->fromU32String(text), pos, maxWidth, conf);
+		drawString(destSurface, _vm->_text->fromU32String(text), pos32, maxWidth, conf);
 		return;
 	}
 	const int effectiveMaxWidth = maxWidth == kNoMaxWidth ? destSurface->w : maxWidth;
@@ -2178,12 +2175,12 @@ void Gfx::drawString(ManagedSurface32 *destSurface, const Common::U32String &tex
 		};
 		for (int i = 0; i < ARRAYSIZE(kOutlineOffsets); i++) {
 			const Common::Point32 offset = kOutlineOffsets[i];
-			font->drawString(destSurface, text, pos.x + offset.x, pos.y + offset.y, effectiveMaxWidth, conf.outlineColor, conf.hAlign);
+			font->drawString(destSurface, text, pos32.x + offset.x, pos32.y + offset.y, effectiveMaxWidth, conf.outlineColor, conf.hAlign);
 		}
 	}
 
 	// Draw the main text.
-	font->drawString(destSurface, text, pos.x, pos.y, effectiveMaxWidth, conf.fillColor, conf.hAlign);
+	font->drawString(destSurface, text, pos32.x, pos32.y, effectiveMaxWidth, conf.fillColor, conf.hAlign);
 }
 
 int Gfx::getTextWidth(const Common::U32String &text, const TextConf &conf) const {
@@ -2471,11 +2468,11 @@ uint64 AreaMask::getDataSize() const {
 	return static_cast<uint64>(_packedPixels.size()) + _additionalPixels.size();
 }
 
-bool AreaMask::hasMarkedByteAt(const Common::Point32 &point, bool includeAdditional) const {
-	if (point.x <= 0 || point.y <= 0 || _size.width <= point.x || _size.height <= point.y || _packedPixels.empty())
+bool AreaMask::hasMarkedByteAt(const Common::Point32 &pos32, bool includeAdditional) const {
+	if (pos32.x <= 0 || pos32.y <= 0 || _size.width <= pos32.x || _size.height <= pos32.y || _packedPixels.empty())
 		return false;
 
-	const uint offset = point.y * _pitch + point.x / 8;
+	const uint offset = pos32.y * _pitch + pos32.x / 8;
 	return _packedPixels[offset] != 0 || (includeAdditional && !_additionalPixels.empty() && _additionalPixels[offset] != 0);
 }
 
@@ -2611,9 +2608,9 @@ Size32 ZoombiniAnimation::getSpriteSize(int cell, int frame) const {
 	return sprite->getSize();
 }
 
-void ZoombiniAnimation::drawZoombini(ManagedSurface32 *screen, const ZmbTrait &traits, const Common::Point32 &pos,
+void ZoombiniAnimation::drawZoombini(ManagedSurface32 *screen, const ZmbTrait &traits, const Common::Point32 &pos32,
 									 int cell, int frame, const AlphaBlendLUT &alphaLUT, const Common::Rect32 *clip) const {
-	Gfx::drawZoombini(screen, this, traits, pos, cell, frame, alphaLUT, clip);
+	Gfx::drawZoombini(screen, this, traits, pos32, cell, frame, alphaLUT, clip);
 }
 
 // ============================================================================
@@ -2730,16 +2727,16 @@ bool UIButton::loadMaskedImage(const Common::Path &colorPath, const Common::Path
 	return false;
 }
 
-void UIButton::setRect(const Common::Point32 &pos, const Size32 &size) {
-	_rect = Common::Rect(pos.x, pos.y, pos.x + size.width, pos.y + size.height);
+void UIButton::setRect(const Common::Point32 &pos32, const Size32 &size) {
+	_rect = Common::Rect(pos32.x, pos32.y, pos32.x + size.width, pos32.y + size.height);
 }
 
 void UIButton::setRect(const Common::Rect &rect) {
 	_rect = rect;
 }
 
-bool UIButton::containsPoint(const Common::Point32 &pos) const {
-	return _rect.left < pos.x && pos.x < _rect.right && _rect.top < pos.y && pos.y < _rect.bottom;
+bool UIButton::containsPoint(const Common::Point32 &pos32) const {
+	return _rect.left < pos32.x && pos32.x < _rect.right && _rect.top < pos32.y && pos32.y < _rect.bottom;
 }
 
 void UIButton::setOverlay(const RleBlock *overlay, const Common::Point32 &offset, const int *clipRight) {
@@ -2761,23 +2758,20 @@ int UIButton::drawAndHitTest(ManagedSurface32 *dst, const Common::Point32 &mouse
 	RleBlock *rleToDraw = nullptr;
 
 	if (_enabled && _isHovering) {
-		if (_hoverBB) {
+		if (_hoverBB)
 			imgToDraw = _hoverBB;
-		} else if (_hoverRle) {
+		else if (_hoverRle)
 			rleToDraw = _hoverRle;
-		}
 	} else if (_enabled && _drawWhenNotHovered) {
-		if (_normalBB) {
+		if (_normalBB)
 			imgToDraw = _normalBB;
-		} else if (_normalRle) {
+		else if (_normalRle)
 			rleToDraw = _normalRle;
-		}
 	} else if (!_enabled) {
-		if (_disabledBB) {
+		if (_disabledBB)
 			imgToDraw = _disabledBB;
-		} else if (_disabledRle) {
+		else if (_disabledRle)
 			rleToDraw = _disabledRle;
-		}
 	}
 
 	// Draw
@@ -3036,18 +3030,18 @@ void BmtFont::drawChar(Graphics::Surface *dst, uint32 codePoint, int x, int y, u
 	drawGlyph(dst, _glyphs[glyphIdx], Common::Point32(x, y), tint, _vm->getAlphaLUT());
 }
 
-void BmtFont::drawGlyph(Graphics::Surface *dst, const Glyph &glyph, const Common::Point32 &pos, const RGBColor &color, const AlphaBlendLUT &alphaLUT) const {
+void BmtFont::drawGlyph(Graphics::Surface *dst, const Glyph &glyph, const Common::Point32 &pos32, const RGBColor &color, const AlphaBlendLUT &alphaLUT) const {
 	if (glyph.mask.empty())
 		return;
 	assert(dst->format.bytesPerPixel == 4);
 	const uint32 solidPixel = color.toPixel(dst->format);
 
 	for (int row = 0; row < glyph.height; row++) {
-		const int destY = pos.y + row;
+		const int destY = pos32.y + row;
 		if (destY < 0 || dst->h <= destY)
 			continue;
 		for (int column = 0; column < glyph.width; column++) {
-			const int destX = pos.x + column;
+			const int destX = pos32.x + column;
 			if (destX < 0 || dst->w <= destX)
 				continue;
 
@@ -3069,24 +3063,24 @@ void BmtFont::drawGlyph(Graphics::Surface *dst, const Glyph &glyph, const Common
 	}
 }
 
-int BmtFont::drawString(ManagedSurface32 *dst, const Common::Point32 &pos, const Common::String &text, int maxWidth, uint32 color) const {
+int BmtFont::drawString(ManagedSurface32 *dst, const Common::Point32 &pos32, const Common::String &text, int maxWidth, uint32 color) const {
 	if (!dst || !_loaded)
 		return 0;
 	const bool hasWidthLimit = maxWidth != Gfx::kNoMaxWidth;
 	const int effectiveMaxWidth = hasWidthLimit ? maxWidth : dst->w;
 	if (!_vm->isHebrew()) {
-		Graphics::Font::drawString(dst, text, pos.x, pos.y, effectiveMaxWidth, color, Graphics::kTextAlignLeft, 0, false, !hasWidthLimit);
+		Graphics::Font::drawString(dst, text, pos32.x, pos32.y, effectiveMaxWidth, color, Graphics::kTextAlignLeft, 0, false, !hasWidthLimit);
 		return Graphics::Font::getStringWidth(text);
 	}
 
-	const int rightX = pos.x + effectiveMaxWidth + 1;
-	int curX = pos.x;
+	const int rightX = pos32.x + effectiveMaxWidth + 1;
+	int curX = pos32.x;
 	// Hebrew visits game bytes backwards; only digits move the pen left.
 	for (uint i = 0; i < text.size(); i++) {
 		const byte c = static_cast<byte>(text[text.size() - i - 1]);
 		if (hasWidthLimit && rightX < curX + getBoundingBox(c).right)
 			break;
-		drawChar(dst, c, curX, pos.y, color);
+		drawChar(dst, c, curX, pos32.y, color);
 		const int advance = getCharWidth(c);
 		if ('0' <= c && c <= '9')
 			curX -= advance;
@@ -3094,7 +3088,7 @@ int BmtFont::drawString(ManagedSurface32 *dst, const Common::Point32 &pos, const
 			curX += advance;
 	}
 
-	return curX - pos.x;
+	return curX - pos32.x;
 }
 
 int BmtFont::getStringLayoutWidth(const Common::String &text) const {

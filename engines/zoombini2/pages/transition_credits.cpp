@@ -45,9 +45,8 @@ void TransitionCredits::init() {
 
 	const char *backgroundPath = _vm->isDemo() ? kDemoBackgroundPath : kBackgroundPath;
 	const Size32 backgroundSize = _vm->_gfx->getPageBitBlockSize(backgroundPath);
-	if (!_vm->isDemo() && (backgroundSize.width == 0 || backgroundSize.height == 0)) {
+	if (!_vm->isDemo() && (backgroundSize.width == 0 || backgroundSize.height == 0))
 		warning("TransitionCredits: Failed to load credits background");
-	}
 
 	_maxScrollY = 0;
 	if (Gfx::kScreenSize.height < backgroundSize.height)

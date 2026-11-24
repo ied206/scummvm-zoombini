@@ -179,7 +179,7 @@ private:
 	/** Store a grid-dropped Zoombini in storage and remove its roster object. */
 	void captureToStorage(int recordIndex, int zoombiniIndex);
 	/** Materialize a held boarding active from a nonempty grid cell. */
-	bool materializeFromStorage(int gridCol, int gridRow, const Common::Point &pointerPos);
+	bool materializeFromStorage(int gridCol, int gridRow, const Common::Point &pos);
 	/** Attempt an upward roster scroll and flash the scroll button. */
 	void triggerScrollUp();
 	/** Attempt a downward roster scroll and flash the scroll button. */

@@ -194,7 +194,7 @@ private:
 		/** Neighbor node indexed by logical axis, or -1 when the axis is absent. */
 		int adj[4] = {};
 		/** Screen anchor of this node's bubble. */
-		Common::Point32 pos;
+		Common::Point32 pos32;
 		/** Party, start, empty, or Fleen content at this node. */
 		NodeState state = kEmpty01;
 		/** Number of active party members represented by this node. */
@@ -216,7 +216,7 @@ private:
 		/** Neighbor node indices in logical-axis order. */
 		int adj[4];
 		/** Screen anchor used to initialize @ref PuzzleAquacube::Node::pos. */
-		Common::Point32 pos;
+		Common::Point32 pos32;
 		/** Side labels used to generate the randomized coordinate bits. */
 		NodeCoordinateLabel labels[4];
 	};

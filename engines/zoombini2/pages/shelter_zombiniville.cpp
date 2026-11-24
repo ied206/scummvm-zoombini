@@ -271,6 +271,15 @@ void ShelterZombiniville::refreshFeatureCounts() {
 	}
 }
 
+ZmbTrait ShelterZombiniville::getSelectedTraits() const {
+	using TraitKind = ZmbTrait::TraitKind;
+	const byte feet = _stations[static_cast<int>(TraitKind::kFeet00)].selectedValue;
+	const byte nose = _stations[static_cast<int>(TraitKind::kNose01)].selectedValue;
+	const byte hair = _stations[static_cast<int>(TraitKind::kHair02)].selectedValue;
+	const byte eyes = _stations[static_cast<int>(TraitKind::kEyes03)].selectedValue;
+	return ZmbTrait(feet, nose, hair, eyes);
+}
+
 void ShelterZombiniville::resetSelectedFeatures() {
 	for (int traitIdx = 0; traitIdx < ZmbTrait::kTraitKindCount; traitIdx++) {
 		_stations[traitIdx].selectedValue = 0;
@@ -472,7 +481,7 @@ bool ShelterZombiniville::createZoombini(bool allowConcurrentEntrances) {
 		if (_stations[traitIdx].selectedValue == 0)
 			return false;
 	}
-	const ZmbTrait traits(_stations[0].selectedValue, _stations[1].selectedValue, _stations[2].selectedValue, _stations[3].selectedValue);
+	const ZmbTrait traits = getSelectedTraits();
 
 	GameState *gameState = _vm->_state;
 	if (gameState->hasReachedZoombiniRegistrationLimit() || !gameState->_traitComboTable.canRegisterCombo(traits))
@@ -587,10 +596,7 @@ void ShelterZombiniville::onActorsRendered() {
 }
 
 void ShelterZombiniville::onRenderForeground(ManagedSurface32 *screen) {
-	byte selectedValues[ZmbTrait::kTraitKindCount];
-	for (int traitIdx = 0; traitIdx < ZmbTrait::kTraitKindCount; traitIdx++)
-		selectedValues[traitIdx] = _stations[traitIdx].selectedValue;
-	_vm->_gfx->drawZoombiniPreview(screen, _bigZombAnimation, selectedValues, Common::Point32(300, 110));
+	_vm->_gfx->drawZoombiniPreview(screen, _bigZombAnimation, getSelectedTraits(), Common::Point32(300, 110));
 }
 
 void ShelterZombiniville::renderHoldOverlay(ManagedSurface32 *screen, bool advanceState) {
@@ -609,9 +615,8 @@ void ShelterZombiniville::drawHoverRunners(ManagedSurface32 *screen) {
 		const ZmbTrait::TraitKind traitKind = static_cast<ZmbTrait::TraitKind>(traitIdx);
 		for (byte traitVal = 1; traitVal <= ZmbTrait::kTraitValueCount; traitVal++) {
 			_vm->_gfx->drawAndUpdateAnimationRunner(screen, _featureButtonRunners[traitIdx][traitVal - 1], tick, 0, Gfx::kScreenSize.width);
-			if (traitKind == ZmbTrait::TraitKind::kNose01) {
+			if (traitKind == ZmbTrait::TraitKind::kNose01)
 				recolorPickerNose(screen, traitVal + 1);
-			}
 		}
 	}
 	_vm->_gfx->drawAndUpdateAnimationRunner(screen, _oneRandomButtonRunner, tick, 0, Gfx::kScreenSize.width);
@@ -700,9 +705,10 @@ EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
 	if (getHeldZoombini())
 		return EventHandleResult::kConsumed;
 
+	const Common::Point32 pos32 = Common::Point32(pos);
 	for (int traitIdx = 0; traitIdx < ZmbTrait::kTraitKindCount; traitIdx++) {
 		for (int traitVal = 0; traitVal < ZmbTrait::kTraitValueCount; traitVal++) {
-			if (_featureButtonRunners[traitIdx][traitVal]->containsHitPoint(Common::Point32(pos))) {
+			if (_featureButtonRunners[traitIdx][traitVal]->containsHitPoint(pos32)) {
 				if (hasActiveEntrance() || hasActiveReturns() || 5 <= _featureCounts[traitIdx][traitVal + 1])
 					return EventHandleResult::kConsumed;
 				const byte selectedValue = static_cast<byte>(traitVal + 1);
@@ -715,7 +721,7 @@ EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
 		}
 	}
 
-	if (_createButtonRunner->containsHitPoint(Common::Point32(pos))) {
+	if (_createButtonRunner->containsHitPoint(pos32)) {
 		// The bumper overlays are not layer-registered, so start them here: the
 		// original starts them on every press through ActivateRunnersAt.
 		_createButtonRunner->start(_vm->getTotalPlayTime());
@@ -733,7 +739,7 @@ EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
 		return EventHandleResult::kConsumed;
 	}
 
-	if (_oneRandomButtonRunner->containsHitPoint(Common::Point32(pos))) {
+	if (_oneRandomButtonRunner->containsHitPoint(pos32)) {
 		_oneRandomButtonRunner->start(_vm->getTotalPlayTime());
 		if (_boardingZoombinis.size() < kBoardingSlotCount && !hasActiveEntrance() && !hasActiveReturns()) {
 			if (0 <= _sndOneRandom)
@@ -751,7 +757,7 @@ EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
 		return EventHandleResult::kConsumed;
 	}
 
-	if (_allRandomButtonRunner->containsHitPoint(Common::Point32(pos))) {
+	if (_allRandomButtonRunner->containsHitPoint(pos32)) {
 		_allRandomButtonRunner->start(_vm->getTotalPlayTime());
 		if (_boardingZoombinis.size() < kBoardingSlotCount && !hasActiveEntrance() && !hasActiveReturns()) {
 			if (0 <= _sndAllRandom)
@@ -781,7 +787,8 @@ EventHandleResult ShelterZombiniville::onLButtonDown(const Common::Point &pos) {
 }
 
 EventHandleResult ShelterZombiniville::onLButtonUp(const Common::Point &pos) {
-	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _boardingZoombinis, Common::Point32(pos.x, pos.y), ZmbHoldDropInput::kLeftButtonRelease,
+	const Common::Point32 pos32 = Common::Point32(pos);
+	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _boardingZoombinis, pos32, ZmbHoldDropInput::kLeftButtonRelease,
 																   ZmbAnimationKind::kPickup, nullptr, getAreaMask());
 	switch (result) {
 	case ZmbDropResult::kIgnored00:
@@ -792,7 +799,8 @@ EventHandleResult ShelterZombiniville::onLButtonUp(const Common::Point &pos) {
 }
 
 EventHandleResult ShelterZombiniville::onMouseMove(const Common::Point &pos) {
-	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _boardingZoombinis, Common::Point32(pos.x, pos.y), ZmbHoldDropInput::kMoveOnly,
+	const Common::Point32 pos32 = Common::Point32(pos);
+	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _boardingZoombinis, pos32, ZmbHoldDropInput::kMoveOnly,
 																   ZmbAnimationKind::kPickup, nullptr, getAreaMask());
 	switch (result) {
 	case ZmbDropResult::kIgnored00:

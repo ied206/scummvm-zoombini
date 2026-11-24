@@ -159,9 +159,10 @@ void PuzzleWaterslide::loadResources() {
 		const char *name = kPipeColors[color];
 		if (_puzzleLevel < 3) {
 			gfx->loadPageRleBlock(Common::String::format(kHorizontalFormat, name));
-			if (_puzzleLevel == 2)
+			if (_puzzleLevel == 2) {
 				for (int arm = 0; arm < 5; arm++)
 					gfx->loadPageRleBlock(Common::String::format(kSelectorFormat, name, arm + 1));
+			}
 		} else {
 			for (int type = 0; type < 4; type++)
 				gfx->loadPageRleBlock(Common::String::format(kHardPipeFormat, kHardPipeColors[color], type + 1));
@@ -628,7 +629,7 @@ void PuzzleWaterslide::setupTargets() {
 	_targets.resize(slots);
 	_activeSlot.resize(slots);
 	for (int slot = 0; slot < slots; slot++) {
-		Common::Point32 pos;
+		Common::Point32 pos32;
 		switch (_puzzleLevel) {
 		case 1: {
 			const int rows = (count + 1) / 2;
@@ -641,19 +642,19 @@ void PuzzleWaterslide::setupTargets() {
 				baseX = 345;
 				baseY = 129;
 			}
-			pos = Common::Point32(baseX + row * 28, baseY + row * 60);
+			pos32 = Common::Point32(baseX + row * 28, baseY + row * 60);
 			_activeSlot[slot] = true;
 			break;
 		}
 		case 2:
 			if (slot == 15)
-				pos = Common::Point32(254, 363);
+				pos32 = Common::Point32(254, 363);
 			else
-				pos = Common::Point32(333 + slot / 5 * 100 + slot % 5 * 28, 250 + slot % 5 * 60);
+				pos32 = Common::Point32(333 + slot / 5 * 100 + slot % 5 * 28, 250 + slot % 5 * 60);
 			_activeSlot[slot] = slot == 15 || 1 + slot % 5 * 3 + slot / 5 < count;
 			break;
 		default:
-			pos = graphPosition(slot) + Common::Point32(163, 227);
+			pos32 = graphPosition(slot) + Common::Point32(163, 227);
 			_activeSlot[slot] = slot == 0;
 			for (const Edge &edge : _edges)
 				if (edge.a == slot || edge.b == slot)
@@ -661,9 +662,9 @@ void PuzzleWaterslide::setupTargets() {
 			break;
 		}
 		if (!_activeSlot[slot])
-			pos = Common::Point32(1000, 1000);
+			pos32 = Common::Point32(1000, 1000);
 		ZmbDropTarget &target = _targets[slot];
-		target.rect = Common::Rect32(pos.x, pos.y, pos.x + 60, pos.y + 60);
+		target.rect = Common::Rect32(pos32.x, pos32.y, pos32.x + 60, pos32.y + 60);
 		target.callback = &onSlotChanged;
 		target.callbackContext = this;
 	}
@@ -935,11 +936,11 @@ void PuzzleWaterslide::drawBoard(ManagedSurface32 *screen) const {
 			if (!placement)
 				continue;
 			const int type = placement->type;
-			const Common::Point32 pos = graphPosition(MAX(edge.a, edge.b)) + Common::Point32(offsetX[type], offsetY[type]);
+			const Common::Point32 pos32 = graphPosition(MAX(edge.a, edge.b)) + Common::Point32(offsetX[type], offsetY[type]);
 			const char *pipeColor = kHardPipeColors[0];
 			if (edge.connected)
 				pipeColor = kHardPipeColors[1];
-			gfx->drawPageRleBlock(screen, Common::String::format(kHardPipeFormat, pipeColor, type + 1), pos);
+			gfx->drawPageRleBlock(screen, Common::String::format(kHardPipeFormat, pipeColor, type + 1), pos32);
 		}
 		gfx->drawPageRleBlock(screen, Common::String::format(kHardPipeFormat, kHardPipeColors[1], 1), Common::Point32(625, 430));
 		gfx->drawPageRleBlock(screen, kOutletPath, Common::Point32(432, 517));
@@ -948,7 +949,7 @@ void PuzzleWaterslide::drawBoard(ManagedSurface32 *screen) const {
 	for (uint slot = 0; slot < _targets.size(); slot++) {
 		if (!_activeSlot[slot])
 			continue;
-		Common::Point32 pos;
+		Common::Point32 pos32;
 		switch (_puzzleLevel) {
 		case 1: {
 			const int rows = (_targets.size() + 1) / 2;
@@ -958,20 +959,20 @@ void PuzzleWaterslide::drawBoard(ManagedSurface32 *screen) const {
 				row = slot;
 				baseX = 348;
 			}
-			pos = Common::Point32(baseX + 28 * row, 137 + 60 * row);
+			pos32 = Common::Point32(baseX + 28 * row, 137 + 60 * row);
 			break;
 		}
 		case 2:
 			if (slot == 15)
-				pos = Common::Point32(260, 370);
+				pos32 = Common::Point32(260, 370);
 			else
-				pos = Common::Point32(338 + slot / 5 * 100 + slot % 5 * 28, 257 + slot % 5 * 60);
+				pos32 = Common::Point32(338 + slot / 5 * 100 + slot % 5 * 28, 257 + slot % 5 * 60);
 			break;
 		default:
-			pos = graphPosition(slot) + Common::Point32(183, 240);
+			pos32 = graphPosition(slot) + Common::Point32(183, 240);
 			break;
 		}
-		gfx->drawPageRleBlock(screen, kEdgePath, pos);
+		gfx->drawPageRleBlock(screen, kEdgePath, pos32);
 	}
 	static const Common::Point32 rootLabels[5] = {
 		{311, 313},
@@ -984,27 +985,27 @@ void PuzzleWaterslide::drawBoard(ManagedSurface32 *screen) const {
 		const Edge &edge = _edges[i];
 		if (edge.axis < 0)
 			continue;
-		Common::Point32 pos;
+		Common::Point32 pos32;
 		switch (_puzzleLevel) {
 		case 1:
-			pos = Common::Point32(305 + 28 * i, 140 + 60 * i);
+			pos32 = Common::Point32(305 + 28 * i, 140 + 60 * i);
 			break;
 		case 2:
 			if (edge.a == 15)
-				pos = rootLabels[edge.b];
+				pos32 = rootLabels[edge.b];
 			else
-				pos = Common::Point32(390 + edge.a / 5 * 100 + edge.b % 5 * 30, 260 + edge.b % 5 * 60);
+				pos32 = Common::Point32(390 + edge.a / 5 * 100 + edge.b % 5 * 30, 260 + edge.b % 5 * 60);
 			break;
 		default: {
 			const GraphPlacement *placement = graphPlacement(edge);
 			if (!placement)
 				continue;
-			pos = Common::Point32(placement->labelX, placement->labelY);
+			pos32 = Common::Point32(placement->labelX, placement->labelY);
 			break;
 		}
 		}
-		gfx->drawPageRleBlock(screen, kPastillePath, pos);
-		gfx->drawPageRleBlock(screen, Common::String::format(kTraitFormat, edge.axis + 1), pos);
+		gfx->drawPageRleBlock(screen, kPastillePath, pos32);
+		gfx->drawPageRleBlock(screen, Common::String::format(kTraitFormat, edge.axis + 1), pos32);
 	}
 }
 
@@ -1037,7 +1038,8 @@ void PuzzleWaterslide::onActorsRendered() {
 }
 
 EventHandleResult PuzzleWaterslide::onLButtonDown(const Common::Point &pos) {
-	if (_phase != kInteractive00 || !_valveRunner->containsHitPoint(Common::Point32(pos.x, pos.y)))
+	const Common::Point32 pos32 = Common::Point32(pos);
+	if (_phase != kInteractive00 || !_valveRunner->containsHitPoint(pos32))
 		return EventHandleResult::kPassthrough;
 	if (!_valveRunner->isActive()) {
 		activateValve();
@@ -1049,10 +1051,12 @@ EventHandleResult PuzzleWaterslide::onLButtonDown(const Common::Point &pos) {
 EventHandleResult PuzzleWaterslide::onLButtonUp(const Common::Point &pos) {
 	if (_phase != kInteractive00)
 		return EventHandleResult::kPassthrough;
-	if (_valveRunner->containsHitPoint(Common::Point32(pos.x, pos.y))) {
+
+	const Common::Point32 pos32 = Common::Point32(pos);
+	if (_valveRunner->containsHitPoint(pos32))
 		return EventHandleResult::kConsumed;
-	}
-	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, Common::Point32(pos.x, pos.y), ZmbHoldDropInput::kLeftButtonRelease,
+
+	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, pos32, ZmbHoldDropInput::kLeftButtonRelease,
 																   ZmbAnimationKind::kPickup, &_targets, getAreaMask());
 	switch (result) {
 	case ZmbDropResult::kIgnored00:
@@ -1065,7 +1069,8 @@ EventHandleResult PuzzleWaterslide::onLButtonUp(const Common::Point &pos) {
 EventHandleResult PuzzleWaterslide::onMouseMove(const Common::Point &pos) {
 	if (_phase != kInteractive00)
 		return EventHandleResult::kPassthrough;
-	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, Common::Point32(pos.x, pos.y), ZmbHoldDropInput::kMoveOnly,
+	const Common::Point32 pos32 = Common::Point32(pos);
+	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, pos32, ZmbHoldDropInput::kMoveOnly,
 																   ZmbAnimationKind::kPickup, &_targets, getAreaMask());
 	switch (result) {
 	case ZmbDropResult::kIgnored00:

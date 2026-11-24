@@ -143,7 +143,7 @@ private:
 		/** Attraction animation released with the page, or nullptr when unavailable. */
 		Animation *animation = nullptr;
 		/** Attraction drawing anchor in panorama pixels. */
-		Common::Point32 pos = Common::Point32();
+		Common::Point32 pos32 = Common::Point32();
 		/** Current frame within the attraction animation. */
 		int frame = 0;
 		/** Gameplay timestamp in milliseconds for the next attraction frame. */
@@ -159,7 +159,7 @@ private:
 		/** Waiting-animation anchor in panorama pixels. */
 		Common::Point32 waitPos = Common::Point32();
 		/** Current drawing anchor in panorama pixels. */
-		Common::Point32 pos = Common::Point32();
+		Common::Point32 pos32 = Common::Point32();
 		/** Gameplay timestamp in milliseconds when the next walk may begin. */
 		uint32 nextWalkTime = 0;
 		/** Gameplay timestamp in milliseconds for the next waiting or walking frame. */
@@ -229,8 +229,8 @@ private:
 
 	/** Reset all seat rows to their initial allocation state. */
 	void resetSeats();
-	/** Assign one randomized available seat to @p pos. */
-	bool assignSeat(Common::Point32 &pos);
+	/** Assign one randomized available seat to @p pos32. */
+	bool assignSeat(Common::Point32 &pos32);
 	/** Seat incoming and historical Zoombinis from the active savefile. */
 	void buildSeatedCommunity(uint32 now);
 	/** Reconstruct one historical Zoombini from @p traitHash. */
@@ -264,11 +264,11 @@ private:
 	/** Draw the cyclic background window at the current scroll offset. */
 	void drawBackground(ManagedSurface32 *screen) const;
 	/** Draw one animation frame at a cyclic scene-space position. */
-	void drawAnimationInPanorama(const Animation *animation, int frameIndex, const Common::Point32 &pos, ManagedSurface32 *screen) const;
+	void drawAnimationInPanorama(const Animation *animation, int frameIndex, const Common::Point32 &pos32, ManagedSurface32 *screen) const;
 	/** Draw one RLE marker at a cyclic scene-space position. */
-	void drawRleInPanorama(const RleBlock *frame, const Common::Point32 &pos, ManagedSurface32 *screen) const;
+	void drawRleInPanorama(const RleBlock *frame, const Common::Point32 &pos32, ManagedSurface32 *screen) const;
 	/** Draw one page-cached RLE marker at a cyclic scene-space position. */
-	void drawPageRleInPanorama(const Common::String &path, const Common::Point32 &pos, ManagedSurface32 *screen) const;
+	void drawPageRleInPanorama(const Common::String &path, const Common::Point32 &pos32, ManagedSurface32 *screen) const;
 	/** Draw the stage-gated attractions. */
 	void drawAttractions(ManagedSurface32 *screen) const;
 	/** Draw the rescued-total marker crowd. */
@@ -278,7 +278,7 @@ private:
 	/** Draw all waiting and walking decorative Boolies. */
 	void drawCrowdActors(ManagedSurface32 *screen) const;
 	/** Draw one Little-Zoombini state from @p animation at a cyclic scene position. */
-	void drawZoombiniInPanorama(const ZoombiniRunner &zoombini, const ZoombiniAnimation *animation, int cell, int animationFrame, const Common::Point32 &pos, ManagedSurface32 *screen) const;
+	void drawZoombiniInPanorama(const ZoombiniRunner &zoombini, const ZoombiniAnimation *animation, int cell, int animationFrame, const Common::Point32 &pos32, ManagedSurface32 *screen) const;
 
 	/** Current horizontal origin within the cyclic panorama. */
 	int _scrollX = 10;

@@ -145,7 +145,7 @@ private:
 		/** Fleen traits compared with the current target's traits. */
 		FleenTrait traits;
 		/** Mirror cell's top-left anchor in page pixels. */
-		Common::Point32 pos;
+		Common::Point32 pos32;
 		/** Trait-match feedback score, or -1 before a shot is evaluated. */
 		int score = -1;
 		/** Whether this mirror cell has been tested by a shot. */
@@ -1156,7 +1156,7 @@ private:
 	/** Draw one mirror's revealed traits, score and active-selection state. */
 	void drawCell(ManagedSurface32 *screen, const MirrorCell &cell, bool active) const;
 	/** Update the cursor for the mirror or control under the page-pixel pointer. */
-	void updateHoverCursor(const Common::Point32 &pos);
+	void updateHoverCursor(const Common::Point32 &pos32);
 	/** Quantize a page-space movement vector to one of the supplied direction sectors. */
 	static int direction(const Common::Point32 &start, const Common::Point32 &end, int sectors);
 	/** Return the adjacent aim code toward a distinct target angle. */

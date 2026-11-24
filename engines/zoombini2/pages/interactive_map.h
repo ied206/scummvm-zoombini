@@ -302,8 +302,8 @@ private:
 	int hitTestIcon(const Common::Point &pos) const;
 	/** Return the bottom-panel button at @p pos, or `-1`. */
 	int hitTestButton(const Common::Point &pos) const;
-	/** Return the level legend tab at @p pos, or zero. */
-	int hitTestLegendTab(const Common::Point32 &pos) const;
+	/** Return the level legend tab at @p pos32, or zero. */
+	int hitTestLegendTab(const Common::Point32 &pos32) const;
 	/** Apply a practice-map level after checking the optional level 4 tier. */
 	bool selectPracticeLevel(int level);
 	/** Draw the optional dark level 4 tab beneath the original legend with its restored label in black with a yellow outline, shrinking the label when it exceeds the legend. */

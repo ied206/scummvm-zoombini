@@ -212,10 +212,10 @@ void DialogDebug::prepareAnimationSheet() {
 		gfx->drawString(_savedScreen, label, Common::Point32(x + kSheetPadding, y + kSheetPadding), cellWidth, conf);
 		const Size32 sourceSize(MIN(frame->getWidth(), kSheetSourceLimit), MIN(frame->getHeight(), kSheetSourceLimit));
 		const Size32 previewSize = getSheetFrameSize(sourceSize);
-		const Common::Point32 pos(x + (_sheetCellSize.width - previewSize.width) / 2, y + labelHeight + kSheetPadding * 2);
+		const Common::Point32 pos32(x + (_sheetCellSize.width - previewSize.width) / 2, y + labelHeight + kSheetPadding * 2);
 		if (frame->getWidth() == previewSize.width && frame->getHeight() == previewSize.height) {
-			const Common::Rect32 clip(pos.x, pos.y, pos.x + previewSize.width, pos.y + previewSize.height);
-			gfx->drawRleBlockClipped(_savedScreen, frame, pos, clip);
+			const Common::Rect32 clip(pos32.x, pos32.y, pos32.x + previewSize.width, pos32.y + previewSize.height);
+			gfx->drawRleBlockClipped(_savedScreen, frame, pos32, clip);
 		} else {
 			if (sourceSize.width != frame->getWidth() || sourceSize.height != frame->getHeight())
 				warning("DialogDebug: clipping oversized sheet frame %d (%d x %d)", i, frame->getWidth(), frame->getHeight());
@@ -223,7 +223,7 @@ void DialogDebug::prepareAnimationSheet() {
 			source->fillRect(Common::Rect(source->w, source->h), white);
 			gfx->drawRleBlock(source.get(), frame, Common::Point32());
 			_savedScreen->blitFrom(source->rawSurface(), Common::Rect(source->w, source->h),
-								   Common::Rect(pos.x, pos.y, pos.x + previewSize.width, pos.y + previewSize.height));
+								   Common::Rect(pos32.x, pos32.y, pos32.x + previewSize.width, pos32.y + previewSize.height));
 		}
 	}
 	updateAnimationTitle();

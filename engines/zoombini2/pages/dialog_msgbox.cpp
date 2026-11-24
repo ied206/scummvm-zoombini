@@ -38,8 +38,8 @@ DialogMsgBox::~DialogMsgBox() {
 	close();
 }
 
-bool DialogMsgBox::request(const Common::Path &textPath, Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &pos, const Common::Point32 &textOffset) {
-	if (!beginRequest(callback, pos))
+bool DialogMsgBox::request(const Common::Path &textPath, Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &pos32, const Common::Point32 &textOffset) {
+	if (!beginRequest(callback, pos32))
 		return false;
 
 	_textPath = textPath.toString('/');
@@ -48,8 +48,8 @@ bool DialogMsgBox::request(const Common::Path &textPath, Common::BaseCallback<Di
 	return true;
 }
 
-bool DialogMsgBox::requestUiText(const Common::U32String &text, Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &pos) {
-	if (!beginRequest(callback, pos))
+bool DialogMsgBox::requestUiText(const Common::U32String &text, Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &pos32) {
+	if (!beginRequest(callback, pos32))
 		return false;
 
 	_textPath.clear();
@@ -58,13 +58,13 @@ bool DialogMsgBox::requestUiText(const Common::U32String &text, Common::BaseCall
 	return true;
 }
 
-bool DialogMsgBox::beginRequest(Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &position) {
+bool DialogMsgBox::beginRequest(Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &pos32) {
 	if (isActive()) {
 		delete callback;
 		return false;
 	}
 
-	_position = position;
+	_pos32 = pos32;
 	_callback = callback;
 	_hoveredButton = DialogMsgBoxButton::kNone00;
 	_redrawNeeded = true;
@@ -89,14 +89,14 @@ bool DialogMsgBox::openDialog() {
 	}
 
 	const Size32 panelSize = _vm->_gfx->getPageRleBlockSize(kPanelPaths[1]);
-	if (_position.x == -1)
-		_position.x = Gfx::kScreenSize.width / 2 - panelSize.width / 2;
-	if (_position.y == -1)
-		_position.y = Gfx::kScreenSize.height / 2 - panelSize.height / 2;
+	if (_pos32.x == -1)
+		_pos32.x = Gfx::kScreenSize.width / 2 - panelSize.width / 2;
+	if (_pos32.y == -1)
+		_pos32.y = Gfx::kScreenSize.height / 2 - panelSize.height / 2;
 
 	_savedBackground = _vm->_gfx->createSurface(panelSize);
 	_vm->_gfx->captureScreenRegion(_savedBackground,
-								   Common::Rect(_position.x, _position.y, _position.x + panelSize.width, _position.y + panelSize.height));
+								   Common::Rect(_pos32.x, _pos32.y, _pos32.x + panelSize.width, _pos32.y + panelSize.height));
 
 	_vm->setDialogPaused(true);
 	_state = DialogMsgBoxState::kOpen02;
@@ -105,9 +105,8 @@ bool DialogMsgBox::openDialog() {
 
 void DialogMsgBox::close() {
 	if (_state == DialogMsgBoxState::kOpen02) {
-		if (_savedBackground && _vm->_gfx) {
-			_vm->_gfx->copyRegionToScreen(*_savedBackground, Common::Point(_position.x, _position.y));
-		}
+		if (_savedBackground && _vm->_gfx)
+			_vm->_gfx->copyRegionToScreen(*_savedBackground, Common::Point(_pos32.x, _pos32.y));
 		_vm->setDialogPaused(false);
 	}
 
@@ -138,8 +137,8 @@ void DialogMsgBox::drawUiText(ManagedSurface32 *screen) const {
 	if (lineHeight <= 0)
 		return;
 
-	const int panelX = _position.x + kUiTextMarginX;
-	const int panelY = _position.y + kUiTextOffsetY;
+	const int panelX = _pos32.x + kUiTextMarginX;
+	const int panelY = _pos32.y + kUiTextOffsetY;
 
 	Common::Array<Common::U32String> lines;
 	_vm->_gfx->wordWrapText(_uiText, kUiTextWidth, lines, conf);
@@ -151,8 +150,8 @@ void DialogMsgBox::drawUiText(ManagedSurface32 *screen) const {
 }
 
 DialogMsgBoxButton DialogMsgBox::hitTest(const Common::Point &pos) const {
-	const int relativeX = pos.x - _position.x;
-	const int relativeY = pos.y - _position.y;
+	const int relativeX = pos.x - _pos32.x;
+	const int relativeY = pos.y - _pos32.y;
 	if (77 < relativeY && relativeY < 145) {
 		if (207 < relativeX && relativeX < 272)
 			return DialogMsgBoxButton::kOkay01;
@@ -183,10 +182,10 @@ void DialogMsgBox::onRenderContent(ManagedSurface32 *screen) {
 	}
 	if (!_redrawNeeded)
 		return;
-	screen->copyRectToSurface(*_savedBackground, _position.x, _position.y, Common::Rect(_savedBackground->w, _savedBackground->h));
-	_vm->_gfx->drawPageRleBlock(screen, kPanelPaths[static_cast<int>(_hoveredButton)], _position);
+	screen->copyRectToSurface(*_savedBackground, _pos32.x, _pos32.y, Common::Rect(_savedBackground->w, _savedBackground->h));
+	_vm->_gfx->drawPageRleBlock(screen, kPanelPaths[static_cast<int>(_hoveredButton)], _pos32);
 	if (!_textPath.empty())
-		_vm->_gfx->drawPageBitBlock(screen, _textPath, _position + _textOffset);
+		_vm->_gfx->drawPageBitBlock(screen, _textPath, _pos32 + _textOffset);
 	else
 		drawUiText(screen);
 	_redrawNeeded = false;

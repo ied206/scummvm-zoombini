@@ -461,9 +461,9 @@ void PuzzleSnowboard::checkObstacleCollision(ZoombiniRunner *zoombini) {
 	for (int lane = 0; lane < _laneCount; lane++) {
 		if (!_obstacleVisible[lane] || _obstacleHit[lane])
 			continue;
-		const Common::Point32 &position = obstaclePosition(lane);
-		if (position.x < zoombini->getScreenPosition().x && zoombini->getScreenPosition().x < position.x + 50 &&
-			position.y < zoombini->getScreenPosition().y && zoombini->getScreenPosition().y < position.y + 50) {
+		const Common::Point32 &pos32 = obstaclePosition(lane);
+		if (pos32.x < zoombini->getScreenPosition().x && zoombini->getScreenPosition().x < pos32.x + 50 &&
+			pos32.y < zoombini->getScreenPosition().y && zoombini->getScreenPosition().y < pos32.y + 50) {
 			_obstacleHit[lane] = true;
 			_obstacleHitAnimating[lane] = true;
 			_obstacleHitStart[lane] = _vm->getTotalPlayTime();
@@ -597,9 +597,10 @@ void PuzzleSnowboard::onUpdate() {
 	if (_finished) {
 		for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
 			ZoombiniRunner *zoombini = _puzzleZoombinis[i];
-			if (zoombini)
+			if (zoombini) {
 				zoombini->tryStartCelebrationAnimation(ZmbAnimationKind::kCelebration, *_vm->_rnd, now, _vm->getFrameDeltaMs(),
 													   _vm->getLogicPacingHz());
+			}
 		}
 	}
 	for (uint i = 0; i < _puzzleZoombinis.size(); i++) {
@@ -631,16 +632,16 @@ void PuzzleSnowboard::onRenderBackground(ManagedSurface32 *screen) {
 	drawPrimaryPageLayer(screen);
 }
 
-void PuzzleSnowboard::drawTraitHint(ManagedSurface32 *screen, const TreeNode &node, bool alternate, const Common::Point32 &pos) const {
+void PuzzleSnowboard::drawTraitHint(ManagedSurface32 *screen, const TreeNode &node, bool alternate, const Common::Point32 &pos32) const {
 	const int trait = static_cast<int>(_puzzleLevel == 4 && alternate ? node.alternateTraitIndex : node.traitIndex);
 	const byte value = alternate ? node.alternateValue : node.primaryValue;
 	if (trait < 0 || ZmbTrait::kTraitKindCount <= trait || value < 1 || ZmbTrait::kTraitValueCount < value)
 		return;
 	const Common::String key = Common::String::format(kTraitFormat, trait + 1, value);
 	if (trait == static_cast<int>(ZmbTrait::TraitKind::kNose01))
-		_vm->_gfx->drawPageNoseTraitSprite(screen, key, pos, value);
+		_vm->_gfx->drawPageNoseTraitSprite(screen, key, pos32, value);
 	else
-		_vm->_gfx->drawPageRleBlock(screen, key, pos);
+		_vm->_gfx->drawPageRleBlock(screen, key, pos32);
 }
 
 void PuzzleSnowboard::updateBoardFacing(ZoombiniRunner *zoombini) {
@@ -678,29 +679,28 @@ void PuzzleSnowboard::updateBoardFacing(ZoombiniRunner *zoombini) {
 }
 
 void PuzzleSnowboard::drawObstacle(ManagedSurface32 *screen, int lane, uint32 now) const {
-	const Common::Point32 &position = obstaclePosition(lane);
+	const Common::Point32 &pos32 = obstaclePosition(lane);
 	if (_finished) {
 		const Animation *finish = _obstacleAnims[kFinishAnimIndex];
 		const Animation *hide = _obstacleAnims[kHideAnimIndex];
 		const uint32 elapsed = now - _finishAnimationStart;
 		const uint32 finishDuration = finish ? static_cast<uint32>(finish->getFrameCount()) * 50 : 0;
-		if (finish && elapsed < finishDuration) {
-			_vm->_gfx->drawAnimationFrame(screen, finish, elapsed / 50, position);
-		} else if (hide && elapsed - finishDuration < static_cast<uint32>(hide->getFrameCount()) * 50) {
-			_vm->_gfx->drawAnimationFrame(screen, hide, (elapsed - finishDuration) / 50, position);
-		}
+		if (finish && elapsed < finishDuration)
+			_vm->_gfx->drawAnimationFrame(screen, finish, elapsed / 50, pos32);
+		else if (hide && elapsed - finishDuration < static_cast<uint32>(hide->getFrameCount()) * 50)
+			_vm->_gfx->drawAnimationFrame(screen, hide, (elapsed - finishDuration) / 50, pos32);
 		return;
 	}
 	if (_obstacleHiding[lane]) {
 		const Animation *hide = _obstacleAnims[kHideAnimIndex];
 		if (hide && now - _obstacleHideStart[lane] < static_cast<uint32>(hide->getFrameCount() * 50))
-			_vm->_gfx->drawAnimationFrame(screen, hide, (now - _obstacleHideStart[lane]) / 50, position);
+			_vm->_gfx->drawAnimationFrame(screen, hide, (now - _obstacleHideStart[lane]) / 50, pos32);
 		return;
 	}
 	if (_obstacleHitAnimating[lane]) {
 		const Animation *hit = _obstacleAnims[kHitAnimIndex];
 		if (hit && now - _obstacleHitStart[lane] < static_cast<uint32>(hit->getFrameCount() * 50)) {
-			_vm->_gfx->drawAnimationFrame(screen, hit, (now - _obstacleHitStart[lane]) / 50, position);
+			_vm->_gfx->drawAnimationFrame(screen, hit, (now - _obstacleHitStart[lane]) / 50, pos32);
 			return;
 		}
 	}
@@ -708,7 +708,7 @@ void PuzzleSnowboard::drawObstacle(ManagedSurface32 *screen, int lane, uint32 no
 	const Animation *intro = _obstacleAnims[kRevealAnimIndex];
 	if (intro && intro->getFrameCount() != 0 && elapsed < static_cast<uint32>(intro->getFrameCount() * 50)) {
 		const int frame = elapsed / 50;
-		_vm->_gfx->drawAnimationFrame(screen, intro, frame, position);
+		_vm->_gfx->drawAnimationFrame(screen, intro, frame, pos32);
 		return;
 	}
 	const Animation *idle = _obstacleAnims[kIdleAnimIndex];
@@ -719,7 +719,7 @@ void PuzzleSnowboard::drawObstacle(ManagedSurface32 *screen, int lane, uint32 no
 	const uint32 cycleDuration = firstDuration + (idle->getFrameCount() - 1) * 100;
 	const uint32 idleElapsed = (elapsed - introDuration) % cycleDuration;
 	const int frame = idleElapsed < firstDuration ? 0 : 1 + (idleElapsed - firstDuration) / 100;
-	_vm->_gfx->drawAnimationFrame(screen, idle, frame, position);
+	_vm->_gfx->drawAnimationFrame(screen, idle, frame, pos32);
 }
 
 void PuzzleSnowboard::onRenderContent(ManagedSurface32 *screen) {
@@ -816,8 +816,9 @@ EventHandleResult PuzzleSnowboard::onLButtonUp(const Common::Point &pos) {
 		input = ZmbHoldDropInput::kLeftButtonRelease;
 	else
 		input = ZmbHoldDropInput::kMoveOnly;
-	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, Common::Point32(pos.x, pos.y),
-																   input, ZmbAnimationKind::kPickup, &_dropTargets, getAreaMask());
+	const Common::Point32 pos32 = Common::Point32(pos);
+	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, pos32, input, ZmbAnimationKind::kPickup,
+																   &_dropTargets, getAreaMask());
 	switch (result) {
 	case ZmbDropResult::kIgnored00:
 		return EventHandleResult::kPassthrough;
@@ -827,7 +828,8 @@ EventHandleResult PuzzleSnowboard::onLButtonUp(const Common::Point &pos) {
 }
 
 EventHandleResult PuzzleSnowboard::onMouseMove(const Common::Point &pos) {
-	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, Common::Point32(pos.x, pos.y), ZmbHoldDropInput::kMoveOnly,
+	const Common::Point32 pos32 = Common::Point32(pos);
+	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, pos32, ZmbHoldDropInput::kMoveOnly,
 																   ZmbAnimationKind::kPickup, &_dropTargets, getAreaMask());
 	switch (result) {
 	case ZmbDropResult::kIgnored00:

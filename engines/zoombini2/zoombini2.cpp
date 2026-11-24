@@ -549,9 +549,9 @@ void Zoombini2Engine::handleQuitRequest() {
 }
 
 void Zoombini2Engine::requestQuitConfirmation() {
-	const Common::Point32 position = isDemo() ? Common::Point32(212, 270) : Common::Point32(-1, -1);
+	const Common::Point32 pos32 = isDemo() ? Common::Point32(212, 270) : Common::Point32(-1, -1);
 	requestMsgBox(Common::Path(kQuitConfirmationPath),
-				  new Common::Callback<Zoombini2Engine, DialogMsgBoxButton>(this, &Zoombini2Engine::handleQuitConfirmation), position);
+				  new Common::Callback<Zoombini2Engine, DialogMsgBoxButton>(this, &Zoombini2Engine::handleQuitConfirmation), pos32);
 }
 
 void Zoombini2Engine::handleQuitConfirmation(DialogMsgBoxButton button) {
@@ -582,13 +582,13 @@ void Zoombini2Engine::cleanupClosedDialogs() {
 	}
 }
 
-bool Zoombini2Engine::requestMsgBox(const Common::Path &textPath, Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &pos) {
+bool Zoombini2Engine::requestMsgBox(const Common::Path &textPath, Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &pos32) {
 	if (getActiveDialog()) {
 		delete callback;
 		return false;
 	}
 	DialogMsgBox *dialog = new DialogMsgBox(this);
-	if (!dialog->request(textPath, callback, pos)) {
+	if (!dialog->request(textPath, callback, pos32)) {
 		delete dialog;
 		return false;
 	}
@@ -597,13 +597,13 @@ bool Zoombini2Engine::requestMsgBox(const Common::Path &textPath, Common::BaseCa
 }
 
 bool Zoombini2Engine::requestUiTextMsgBox(const Common::U32String &message, Common::BaseCallback<DialogMsgBoxButton> *callback,
-										  const Common::Point32 &pos) {
+										  const Common::Point32 &pos32) {
 	if (getActiveDialog()) {
 		delete callback;
 		return false;
 	}
 	DialogMsgBox *dialog = new DialogMsgBox(this);
-	if (!dialog->requestUiText(message, callback, pos)) {
+	if (!dialog->requestUiText(message, callback, pos32)) {
 		delete dialog;
 		return false;
 	}

@@ -842,7 +842,7 @@ private:
 		/** Whether this bubble currently has an active visual representation. */
 		bool active = false;
 		/** Anchor position in unscrolled page pixels. */
-		Common::Point32 position;
+		Common::Point32 pos32;
 		/** Bubble movement path released on replacement or page teardown; nullptr while stationary. */
 		PathObject *path = nullptr;
 	};
@@ -851,12 +851,12 @@ private:
 		/** Column-major grid cell index of this selectable crater. */
 		int cell;
 		/** Anchor position in unscrolled page pixels. */
-		Common::Point32 position;
+		Common::Point32 pos32;
 	};
 	/** One short-lived crater or whirlpool visual effect. */
 	struct Effect {
 		/** Anchor position in unscrolled page pixels. */
-		Common::Point32 position;
+		Common::Point32 pos32;
 		/** Gameplay tick in milliseconds when this visual effect began. */
 		uint32 start;
 	};
@@ -999,11 +999,11 @@ private:
 	/** Load the page's symbol artwork, animations, and indexed sound effects. */
 	void loadResources();
 	/** Draw a trigger or matching spot with the same assisted color for its group. */
-	void drawColorSymbol(ManagedSurface32 *screen, int symbolIndex, const Common::Point32 &pos) const;
+	void drawColorSymbol(ManagedSurface32 *screen, int symbolIndex, const Common::Point32 &pos32) const;
 	/** One missing-coverage sample along the left fringe of a cell plate. */
 	struct CellEdgePixel {
 		/** Pixel position relative to the original symbol origin. */
-		Common::Point32 position;
+		Common::Point32 pos32;
 		/** Straight color of the adjacent plate edge, without its pictogram. */
 		RGBColor color;
 		/** Additional opacity required to match the adjacent plate edge. */
@@ -1012,7 +1012,7 @@ private:
 	/** Cache missing plate coverage without modifying the shared sprite. */
 	void cacheCellEdgePixels(int symbolIndex, const RleBlock *sprite);
 	/** Fill a symbol's narrow left fringe, clipped to the existing white grid's inner edge. */
-	void fillCellEdge(ManagedSurface32 *screen, int symbolIndex, const Common::Point32 &pos) const;
+	void fillCellEdge(ManagedSurface32 *screen, int symbolIndex, const Common::Point32 &pos32) const;
 	/** Page-owned plate samples indexed by the current symbol, including rotating states. */
 	Common::Array<CellEdgePixel> _cellEdgePixels[60];
 	/** Cache the answer for this puzzle's initial board until the page is initialized again. */

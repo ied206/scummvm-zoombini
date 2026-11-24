@@ -57,7 +57,7 @@ public:
 	bool isBackgroundless() const { return _backgroundless; }
 
 	/** Create and append one general-object animation runner. */
-	AnimationRunner *createAnimationRunner(const Common::Point32 &position, AnimationRunnerMode mode);
+	AnimationRunner *createAnimationRunner(const Common::Point32 &pos32, AnimationRunnerMode mode);
 	/** Return a registered runner, or nullptr when @p runnerIndex is outside this layer. */
 	AnimationRunner *getAnimationRunner(int runnerIndex) const;
 	/** Return the number of runners registered with this layer. */
@@ -70,7 +70,7 @@ public:
 	/** Replace the indexed runner's playback mode. */
 	void setRunnerMode(int runnerIndex, AnimationRunnerMode mode);
 	/** Replace the indexed runner's page position. */
-	void setRunnerPosition(int runnerIndex, const Common::Point32 &position);
+	void setRunnerPosition(int runnerIndex, const Common::Point32 &pos32);
 	/** Stop and hide the indexed runner. */
 	void stopRunner(int runnerIndex);
 	/** Return the indexed runner's X coordinate, or zero for an invalid index. */
@@ -91,8 +91,8 @@ public:
 	bool isRunnerActive(int runnerIndex) const;
 	/** Return whether any runner registered with this layer is active. */
 	bool hasActiveRunner() const;
-	/** Start the indexed runner at @p position and the current game tick. */
-	void startRunnerAt(int runnerIndex, const Common::Point32 &position);
+	/** Start the indexed runner at @p pos32 and the current game tick. */
+	void startRunnerAt(int runnerIndex, const Common::Point32 &pos32);
 
 	/** Set and wrap the absolute horizontal scroll position. */
 	void setScrollX(int16 scrollX);
@@ -103,10 +103,10 @@ public:
 
 	/** Restore saved background pixels for inactive runners in registration order. */
 	void restoreRunnerBackgrounds(ManagedSurface32 *screen) const;
-	/** Return whether an input-enabled runner has a hit rectangle under @p point. */
-	bool hasInteractiveRunnerAt(const Common::Point32 &point) const;
-	/** Run callbacks and start every inactive runner whose rectangle contains @p point. */
-	bool activateRunnersAt(const Common::Point32 &point);
+	/** Return whether an input-enabled runner has a hit rectangle under @p pos32. */
+	bool hasInteractiveRunnerAt(const Common::Point32 &pos32) const;
+	/** Run callbacks and start every inactive runner whose rectangle contains @p pos32. */
+	bool activateRunnersAt(const Common::Point32 &pos32);
 	/** Draw an 800x600 subregion of the layer background. */
 	void drawBackgroundRegion(ManagedSurface32 *screen, int srcX, int srcY) const;
 	/**
@@ -161,9 +161,9 @@ public:
 	bool loadLayerBackground(int layerIndex, const Common::Path &path);
 
 	/** Dispatch the first pressed state to all layers and reset the latch on release. */
-	bool handlePointerButton(const Common::Point32 &point, bool pressed);
-	/** Return whether any layer has an input-enabled animation runner under @p point. */
-	bool hasInteractiveRunnerAt(const Common::Point32 &point) const;
+	bool handlePointerButton(const Common::Point32 &pos32, bool pressed);
+	/** Return whether any layer has an input-enabled animation runner under @p pos32. */
+	bool hasInteractiveRunnerAt(const Common::Point32 &pos32) const;
 
 	/** Lock or unlock group scrolling. */
 	void setScrollLocked(bool locked) { _scrollLocked = locked; }

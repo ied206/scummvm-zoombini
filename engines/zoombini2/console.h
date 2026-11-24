@@ -234,7 +234,7 @@ private:
 	/** Open the debug dialog showing a cubic Bezier curve supplied as coordinates. */
 	bool CmdSub_PlotCurve(int argc, const char **argv);
 	/** Parse a signed coordinate pair without allowing values to wrap when passed to surface drawing. */
-	bool parsePlotPoint(const char *xText, const char *yText, Common::Point32 &point);
+	bool parsePlotPoint(const char *xText, const char *yText, Common::Point32 &pos32);
 	/** Parse a 24-bit RGB color, accepting 0xRRGGBB or #RRGGBB independently of the destination pixel format. */
 	bool parsePlotColor(const char *text, RGBColor &color);
 	/** Parse decimal or hexadecimal int32 text; warn and leave the result unchanged on failure. */

@@ -292,9 +292,9 @@ void PuzzleBoolies::beginRound(uint32 now) {
 		ball.index = i;
 		ball.startAt = now + kBallLaunchInterval * i;
 		ball.path = _vm->loadPagePATPath(Common::Path(Common::String::format(kFeederPathFormat, i + 1)));
-		ball.pos = getPreviewHoldPosition(i);
+		ball.pos32 = getPreviewHoldPosition(i);
 		if (!ball.path || ball.path->segments.empty()) {
-			ball.pos = getReadyHoldPosition(i);
+			ball.pos32 = getReadyHoldPosition(i);
 			ball.stage = BallStage::kHeld02;
 		}
 		_balls.push_back(ball);
@@ -325,10 +325,10 @@ void PuzzleBoolies::stagePreviewChallenge(Common::Array<Ball> &balls, int &chall
 		ball.startAt = now + kBallLaunchInterval * i;
 		ball.path = _vm->loadPagePATPath(Common::Path(kPreviewEntryPath));
 		if (ball.path && !ball.path->segments.empty()) {
-			ball.pos = ball.path->segments[0]->getStartPosition();
+			ball.pos32 = ball.path->segments[0]->getStartPosition();
 			ball.stage = BallStage::kPreviewWaiting05;
 		} else {
-			ball.pos = getPreviewHoldPosition(i);
+			ball.pos32 = getPreviewHoldPosition(i);
 			ball.stage = BallStage::kPreviewHeld07;
 		}
 		balls.push_back(ball);
@@ -344,11 +344,11 @@ void PuzzleBoolies::startNextFeeder(uint32 now) {
 		delete ball.path;
 		ball.path = _vm->loadPagePATPath(Common::Path(Common::String::format(kFeederPathFormat, ball.index + 1)));
 		ball.startAt = now + kBallLaunchInterval * ball.index;
-		ball.pos = getPreviewHoldPosition(ball.index);
+		ball.pos32 = getPreviewHoldPosition(ball.index);
 		if (ball.path && !ball.path->segments.empty()) {
 			ball.stage = BallStage::kWaiting00;
 		} else {
-			ball.pos = getReadyHoldPosition(ball.index);
+			ball.pos32 = getReadyHoldPosition(ball.index);
 			ball.stage = BallStage::kHeld02;
 		}
 	}
@@ -411,10 +411,10 @@ void PuzzleBoolies::init() {
 		zoombini->setCanAdvanceFromPage(false);
 		zoombini->setInputEnabled(false);
 		zoombini->setHidden(i != 0);
-		Common::Point32 position(120, 484);
+		Common::Point32 pos32(120, 484);
 		if (i == 0)
-			position = Common::Point32(115, 495);
-		zoombini->setPosition(position);
+			pos32 = Common::Point32(115, 495);
+		zoombini->setPosition(pos32);
 	}
 	for (int row = 0; row < kRowCount; row++)
 		generateRow(row);
@@ -457,7 +457,7 @@ void PuzzleBoolies::startLaneBall(Ball &ball, uint32 now) {
 		return;
 	}
 	ball.path->start(now);
-	ball.pos = ball.path->segments[0]->getStartPosition();
+	ball.pos32 = ball.path->segments[0]->getStartPosition();
 	ball.stage = BallStage::kLane03;
 	const int effectIndex = 2 * _selectedRow + (_challengeType < 0 ? 1 : 0);
 	playEffect(_effectIds[effectIndex]);
@@ -466,7 +466,7 @@ void PuzzleBoolies::startLaneBall(Ball &ball, uint32 now) {
 void PuzzleBoolies::advanceBall(Ball &ball, uint32 now) {
 	if (ball.stage == BallStage::kWaiting00 && ball.startAt <= now) {
 		if (!ball.path) {
-			ball.pos = getReadyHoldPosition(ball.index);
+			ball.pos32 = getReadyHoldPosition(ball.index);
 			ball.stage = BallStage::kHeld02;
 			return;
 		}
@@ -475,14 +475,14 @@ void PuzzleBoolies::advanceBall(Ball &ball, uint32 now) {
 	}
 	switch (ball.stage) {
 	case BallStage::kFeeder01:
-		if (!ball.path->advance(now, ball.pos)) {
-			ball.pos = getReadyHoldPosition(ball.index);
+		if (!ball.path->advance(now, ball.pos32)) {
+			ball.pos32 = getReadyHoldPosition(ball.index);
 			ball.stage = BallStage::kHeld02;
 		}
 		break;
 	case BallStage::kLane03: {
-		const bool moving = ball.path->advance(now, ball.pos);
-		if (!moving || ball.pos.x - 17 <= 180) {
+		const bool moving = ball.path->advance(now, ball.pos32);
+		if (!moving || ball.pos32.x - 17 <= 180) {
 			resolveBall(ball, now);
 			delete ball.path;
 			ball.path = _vm->loadPagePATPath(Common::Path(Common::String::format(kBallExitPathFormat, _selectedRow + 2)));
@@ -498,7 +498,7 @@ void PuzzleBoolies::advanceBall(Ball &ball, uint32 now) {
 	case BallStage::kExit08:
 		// The finite exit path keeps requesting the impact sample as voices become available.
 		playEffect(_effectIds[6]);
-		if (!ball.path->advance(now, ball.pos) || 810 < ball.pos.x - 17)
+		if (!ball.path->advance(now, ball.pos32) || 810 < ball.pos32.x - 17)
 			ball.stage = BallStage::kDone04;
 		break;
 	default:
@@ -540,10 +540,10 @@ void PuzzleBoolies::advancePreviewBalls(Common::Array<Ball> &balls, uint32 now) 
 			ball.stage = BallStage::kPreviewEntry06;
 		}
 		if (ball.stage == BallStage::kPreviewEntry06) {
-			const bool walking = ball.path->advance(now, ball.pos);
+			const bool walking = ball.path->advance(now, ball.pos32);
 			const Common::Point32 hold = getPreviewHoldPosition(ball.index);
-			if (!walking || hold.x <= ball.pos.x) {
-				ball.pos = hold;
+			if (!walking || hold.x <= ball.pos32.x) {
+				ball.pos32 = hold;
 				ball.stage = BallStage::kPreviewHeld07;
 			}
 		}
@@ -610,25 +610,23 @@ void PuzzleBoolies::startRowJumps(int row, uint32 now) {
 		jump.row = row;
 		jump.slot = slot;
 		jump.value = boolie.value;
-		jump.pos = getBooliePosition(row, slot);
+		jump.pos32 = getBooliePosition(row, slot);
 		jump.path = _vm->loadPagePATPath(Common::Path(Common::String::format(kJumpPathFormat, row, slot + 1)));
-		if (jump.path) {
+		if (jump.path)
 			_jumps.push_back(jump);
-		} else {
+		else
 			boolie.removed = true;
-		}
 	}
-	if (!_jumps.empty()) {
+	if (!_jumps.empty())
 		startJump(_jumps[0], now);
-	} else {
+	else
 		startBoat(now);
-	}
 }
 
 void PuzzleBoolies::startJump(Jump &jump, uint32 now) {
 	playBoardVoice();
 	jump.path->start(now);
-	jump.pos = jump.path->segments[0]->getStartPosition();
+	jump.pos32 = jump.path->segments[0]->getStartPosition();
 	jump.started = true;
 	_boolies[jump.row][jump.slot].jumping = true;
 }
@@ -637,21 +635,20 @@ void PuzzleBoolies::advanceJumps(uint32 now) {
 	if (_jumps.empty())
 		return;
 	Jump &jump = _jumps[0];
-	if (jump.path->advance(now, jump.pos))
+	if (jump.path->advance(now, jump.pos32))
 		return;
 	_boolies[jump.row][jump.slot].jumping = false;
 	_boolies[jump.row][jump.slot].removed = true;
 	Passenger passenger;
-	passenger.pos = jump.pos;
+	passenger.pos32 = jump.pos32;
 	passenger.value = jump.value;
 	_passengers.push_back(passenger);
 	delete jump.path;
 	_jumps.remove_at(0);
-	if (!_jumps.empty()) {
+	if (!_jumps.empty())
 		startJump(_jumps[0], now);
-	} else {
+	else
 		startBoat(now);
-	}
 }
 
 void PuzzleBoolies::startRefill(int row, const byte (&values)[kSlotCount], uint32 now) {
@@ -784,9 +781,8 @@ void PuzzleBoolies::advanceBoat(uint32 now) {
 	_boatState = BoatState::kReady00;
 	_puzzleZoombinis[_activeRunnerIndex]->setPosition(Common::Point32(115, 495));
 	_vm->_zoombiniWalkingFlag = true;
-	if (_phase == Phase::kFinished05) {
+	if (_phase == Phase::kFinished05)
 		_vm->restartGoBlink();
-	}
 }
 
 void PuzzleBoolies::advanceBoardingCheck(uint32 now) {
@@ -852,9 +848,8 @@ void PuzzleBoolies::onUpdate() {
 			bool allDone = true;
 			for (uint i = 0; i < _balls.size(); i++)
 				allDone = allDone && _balls[i].stage == BallStage::kDone04;
-			if (allDone) {
+			if (allDone)
 				finishRound();
-			}
 		}
 	}
 	advanceFlips(now);
@@ -914,19 +909,19 @@ void PuzzleBoolies::onRenderContent(ManagedSurface32 *screen) {
 			const Boolie &boolie = _boolies[row][slot];
 			if (boolie.removed || boolie.jumping)
 				continue;
-			const Common::Point32 pos = getBooliePosition(row, slot);
+			const Common::Point32 pos32 = getBooliePosition(row, slot);
 			if (!_flips.empty() && _flips[0].row == row && _flips[0].slot == slot) {
 				const Animation *animation = _rollAnimations[_flips[0].fromValue - 1];
 				if (animation && 0 < animation->getFrameCount()) {
 					const uint32 frame = (now - _flipStart) / kRollFrameTime;
-					_vm->_gfx->drawAnimationFrame(screen, animation, MIN<uint32>(frame, animation->getFrameCount() - 1), pos);
+					_vm->_gfx->drawAnimationFrame(screen, animation, MIN<uint32>(frame, animation->getFrameCount() - 1), pos32);
 					continue;
 				}
 			}
 			const char *path = kFixe2Path;
 			if (boolie.visibleValue == 1)
 				path = kFixePath;
-			_vm->_gfx->drawPageRleBlock(screen, path, pos);
+			_vm->_gfx->drawPageRleBlock(screen, path, pos32);
 		}
 	}
 	for (uint i = 0; i < _jumps.size(); i++) {
@@ -935,7 +930,7 @@ void PuzzleBoolies::onRenderContent(ManagedSurface32 *screen) {
 			const char *path = kFixe2Path;
 			if (jump.value == 1)
 				path = kFixePath;
-			_vm->_gfx->drawPageRleBlock(screen, path, Common::Point32(jump.pos.x - 35, jump.pos.y - 69));
+			_vm->_gfx->drawPageRleBlock(screen, path, Common::Point32(jump.pos32.x - 35, jump.pos32.y - 69));
 		}
 	}
 	if (_refillActive) {
@@ -959,7 +954,7 @@ void PuzzleBoolies::onRenderContent(ManagedSurface32 *screen) {
 			const char *path = kBallPosPath;
 			if (_challengeType <= 0)
 				path = kBallNegPath;
-			_vm->_gfx->drawPageRleBlock(screen, path, Common::Point32(ball.pos.x - 17, ball.pos.y - 35));
+			_vm->_gfx->drawPageRleBlock(screen, path, Common::Point32(ball.pos32.x - 17, ball.pos32.y - 35));
 		}
 	}
 	for (int i = static_cast<int>(_nextBalls.size()) - 1; 0 <= i; i--) {
@@ -968,7 +963,7 @@ void PuzzleBoolies::onRenderContent(ManagedSurface32 *screen) {
 			const char *path = kBallPosPath;
 			if (_nextChallengeType <= 0)
 				path = kBallNegPath;
-			_vm->_gfx->drawPageRleBlock(screen, path, Common::Point32(ball.pos.x - 17, ball.pos.y - 35));
+			_vm->_gfx->drawPageRleBlock(screen, path, Common::Point32(ball.pos32.x - 17, ball.pos32.y - 35));
 		}
 	}
 	for (int i = static_cast<int>(_followingBalls.size()) - 1; 0 <= i; i--) {
@@ -977,7 +972,7 @@ void PuzzleBoolies::onRenderContent(ManagedSurface32 *screen) {
 			const char *path = kBallPosPath;
 			if (_followingChallengeType <= 0)
 				path = kBallNegPath;
-			_vm->_gfx->drawPageRleBlock(screen, path, Common::Point32(ball.pos.x - 17, ball.pos.y - 35));
+			_vm->_gfx->drawPageRleBlock(screen, path, Common::Point32(ball.pos32.x - 17, ball.pos32.y - 35));
 		}
 	}
 	if (isBlockerLowered())
@@ -996,7 +991,7 @@ void PuzzleBoolies::onRenderContent(ManagedSurface32 *screen) {
 	for (uint i = 0; i < _passengers.size(); i++) {
 		const Passenger &passenger = _passengers[i];
 		_vm->_gfx->drawPageRleBlock(screen, passenger.value == 1 ? kFixePath : kFixe2Path,
-									Common::Point32(passenger.pos.x + _boatX - 80 - 35, passenger.pos.y - 69));
+									Common::Point32(passenger.pos32.x + _boatX - 80 - 35, passenger.pos32.y - 69));
 	}
 }
 

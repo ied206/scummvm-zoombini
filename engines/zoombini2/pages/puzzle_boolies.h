@@ -283,7 +283,7 @@ private:
 		/** Position in the indexed feeder and preview holding arrays. */
 		int index = 0;
 		/** Current screen position. */
-		Common::Point32 pos;
+		Common::Point32 pos32;
 		/** Earliest game tick at which the feeder path may start. */
 		uint32 startAt = 0;
 		/** Current path stage. */
@@ -295,7 +295,7 @@ private:
 		/** Row-specific path, released when the jump finishes. */
 		PathObject *path = nullptr;
 		/** Current screen position. */
-		Common::Point32 pos;
+		Common::Point32 pos32;
 		/** Source row. */
 		int row = 0;
 		/** Source slot on that row. */
@@ -309,7 +309,7 @@ private:
 	/** A Boolie retained at its landing position while the boat moves. */
 	struct Passenger {
 		/** Landing position in the boat's initial screen placement. */
-		Common::Point32 pos;
+		Common::Point32 pos32;
 		/** Portrait selected by this Boolie's value. */
 		byte value = 1;
 	};

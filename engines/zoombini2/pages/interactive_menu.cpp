@@ -130,7 +130,7 @@ void InteractiveMenu::loadButtons() {
 		/** Resource path for the button's transparency mask, when required. */
 		const char *maskPath;
 		/** Top-left button anchor in menu-page pixels. */
-		Common::Point32 pos;
+		Common::Point32 pos32;
 		/** Button width and height in menu-page pixels. */
 		Size32 size;
 	};
@@ -148,7 +148,7 @@ void InteractiveMenu::loadButtons() {
 	for (int i = 0; i < kMenuButtonCount; ++i) {
 		const ButtonDefinition &definition = definitions[i];
 		_buttons[i] = new UIButton(_vm);
-		_buttons[i]->setRect(definition.pos, definition.size);
+		_buttons[i]->setRect(definition.pos32, definition.size);
 		const Common::Path normalPath(definition.normalPath);
 		const Common::Path hoverPath(definition.hoverPath);
 		const Common::Path disabledPath = definition.disabledPath ? Common::Path(definition.disabledPath) : Common::Path();
@@ -169,19 +169,17 @@ void InteractiveMenu::scanSaveFiles() {
 }
 
 void InteractiveMenu::onUpdate() {
-	if (_state == MenuScreenState::kMain00) {
+	if (_state == MenuScreenState::kMain00)
 		updateButtonAvailability();
-	} else if (_volumePanel) {
+	else if (_volumePanel)
 		_volumePanel->handleMouseInput(_vm->getMousePos(), _volumePanelMouseDown, false);
-	}
 }
 
 void InteractiveMenu::onRenderContent(ManagedSurface32 *screen) {
-	if (_state == MenuScreenState::kOptions01) {
+	if (_state == MenuScreenState::kOptions01)
 		_vm->_gfx->drawBackground(screen, Common::Point32(0, 0));
-	} else {
+	else
 		drawMain(screen);
-	}
 }
 
 void InteractiveMenu::onRenderForeground(ManagedSurface32 *screen) {
@@ -194,7 +192,8 @@ void InteractiveMenu::onRenderForeground(ManagedSurface32 *screen) {
 EventHandleResult InteractiveMenu::handleVolumePanelInput(const Common::Point &pos, bool mouseReleased) {
 	if (!_volumePanel)
 		return EventHandleResult::kPassthrough;
-	const VolumePanelResult result = _volumePanel->handleMouseInput(Common::Point32(pos), _volumePanelMouseDown, mouseReleased);
+	const Common::Point32 pos32 = Common::Point32(pos);
+	const VolumePanelResult result = _volumePanel->handleMouseInput(pos32, _volumePanelMouseDown, mouseReleased);
 	switch (result) {
 	case kVolumePanelChanged:
 		applyOptionVolumes(true, false);
@@ -245,8 +244,8 @@ void InteractiveMenu::drawMain(ManagedSurface32 *screen) {
 	_vm->_gfx->drawBackground(screen, Common::Point32(0, 0));
 
 	const Common::Point32 mousePos = _vm->getMousePos();
-	const Common::Point mouseEventPos(mousePos.x, mousePos.y);
-	const char *selectorPath = isInSelectorArea(mouseEventPos) ? kSelectorHighlightPath : kSelectorNormalPath;
+	const Common::Point pos(mousePos.x, mousePos.y);
+	const char *selectorPath = isInSelectorArea(pos) ? kSelectorHighlightPath : kSelectorNormalPath;
 	_vm->_gfx->drawPageBitBlock(screen, selectorPath, kFileListPos);
 	if (_fileList)
 		_fileList->draw(screen);
@@ -270,9 +269,10 @@ void InteractiveMenu::drawButtonsAndUpdateHover(ManagedSurface32 *screen, const 
 EventHandleResult InteractiveMenu::onLButtonDown(const Common::Point &pos) {
 	updateButtonAvailability();
 	if (_state == MenuScreenState::kOptions01) {
+		const Common::Point32 pos32 = Common::Point32(pos);
 		_volumePanelMouseDown = true;
 		if (_volumePanel)
-			_volumePanel->handleMouseInput(Common::Point32(pos), true, false);
+			_volumePanel->handleMouseInput(pos32, true, false);
 		return EventHandleResult::kConsumed;
 	}
 
@@ -548,8 +548,8 @@ void InteractiveMenu::playSound(int soundId) {
 		sound->playWithVolume(soundId, sound->getSfxVolume());
 }
 
-InteractiveMenu::SaveFileList::SaveFileList(Zoombini2Engine *vm, const Common::Point32 &pos)
-	: _vm(vm), _pos(pos) {
+InteractiveMenu::SaveFileList::SaveFileList(Zoombini2Engine *vm, const Common::Point32 &pos32)
+	: _vm(vm), _pos32(pos32) {
 }
 
 void InteractiveMenu::SaveFileList::clear() {
@@ -582,7 +582,8 @@ void InteractiveMenu::SaveFileList::draw(ManagedSurface32 *screen) const {
 
 		const bool selected = itemIndex == _selectedIndex;
 		if (selected)
-			_vm->_gfx->drawPageRleBlock(screen, kSelectionBarPath, Common::Point32(_pos.x + kSelectionOffsetX, _pos.y + kSelectionOffsetY + row * kRowStride));
+			_vm->_gfx->drawPageRleBlock(screen, kSelectionBarPath,
+										Common::Point32(_pos32.x + kSelectionOffsetX, _pos32.y + kSelectionOffsetY + row * kRowStride));
 
 		const bool readOnly = _readOnly[itemIndex] || _vm->isGameSaveWriteLocked(_items[itemIndex]);
 		uint32 color = Gfx::PredefinedColor::kDark00.toPixel(screen->format);
@@ -603,7 +604,7 @@ void InteractiveMenu::SaveFileList::draw(ManagedSurface32 *screen) const {
 			}
 		}
 
-		const Common::Point32 textPos(_pos.x + kSelectionOffsetX + kTextOffsetX, _pos.y + kSelectionOffsetY + kTextOffsetY + row * kRowStride);
+		const Common::Point32 textPos(_pos32.x + kSelectionOffsetX + kTextOffsetX, _pos32.y + kSelectionOffsetY + kTextOffsetY + row * kRowStride);
 		Gfx::TextConf conf;
 		conf.fontKind = Gfx::FontKind::kBmtFont;
 		conf.fillColor = color;
@@ -615,8 +616,8 @@ bool InteractiveMenu::SaveFileList::handleClick(const Common::Point &pos) {
 	if (kInputSearchMatch01 < _textInputState)
 		return false;
 
-	const int left = _pos.x + kSelectionOffsetX;
-	const int top = _pos.y + kSelectionOffsetY;
+	const int left = _pos32.x + kSelectionOffsetX;
+	const int top = _pos32.y + kSelectionOffsetY;
 	const Size32 barSize = _vm->_gfx->getPageRleBlockSize(kSelectionBarPath);
 	if (barSize.width == 0 || barSize.height == 0)
 		return false;

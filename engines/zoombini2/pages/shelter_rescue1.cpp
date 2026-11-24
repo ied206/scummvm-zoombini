@@ -278,7 +278,7 @@ bool ShelterRescueSite1::hasStorageCellsInRows(int firstRow, int lastRow) const 
 	return false;
 }
 
-bool ShelterRescueSite1::materializeFromStorage(int gridCol, int gridRow, const Common::Point &pointerPos) {
+bool ShelterRescueSite1::materializeFromStorage(int gridCol, int gridRow, const Common::Point &pos) {
 	StorageRecord *const *storage = getRescueStorage();
 	const int storageIndex = (_scrollRow + gridCol) * GameState::kStorageCols + gridRow;
 	if (storageIndex < 0 || GameState::kStorageRows * GameState::kStorageCols <= storageIndex || !storage[storageIndex])
@@ -292,7 +292,7 @@ bool ShelterRescueSite1::materializeFromStorage(int gridCol, int gridRow, const 
 	zoombini->setPosition(Common::Point32(kRosterGridBasePos.x + gridCol * 40 + 24, kRosterGridBasePos.y + gridRow * 57 + 30));
 	const Common::Point32 screenPos = zoombini->getScreenPosition();
 	zoombini->setHoldOrigin(screenPos);
-	const Common::Point32 holdOffset(pointerPos.x - screenPos.x - 3, pointerPos.y - screenPos.y - 10);
+	const Common::Point32 holdOffset(pos.x - screenPos.x - 3, pos.y - screenPos.y - 10);
 	zoombini->setHoldOffset(holdOffset);
 	zoombini->setPosition(Common::Point32(screenPos.x + holdOffset.x, screenPos.y + holdOffset.y));
 	zoombini->setHeld(true);
@@ -505,8 +505,8 @@ EventHandleResult ShelterRescueSite1::onLButtonUp(const Common::Point &pos) {
 	if (_departurePrompted)
 		return EventHandleResult::kConsumed;
 	refreshGridOccupancy();
-	const ZmbDropResult inputResult = ZoombiniRunner::handleHoldAndDrop(_vm, _vm->_state->_activeZoombinis, Common::Point32(pos.x, pos.y),
-																		ZmbHoldDropInput::kLeftButtonRelease,
+	const Common::Point32 pos32 = Common::Point32(pos);
+	const ZmbDropResult inputResult = ZoombiniRunner::handleHoldAndDrop(_vm, _vm->_state->_activeZoombinis, pos32, ZmbHoldDropInput::kLeftButtonRelease,
 																		ZmbAnimationKind::kPickup, &_dropTargets, getAreaMask());
 	switch (inputResult) {
 	case ZmbDropResult::kIgnored00:
@@ -562,8 +562,8 @@ EventHandleResult ShelterRescueSite1::onLButtonUp(const Common::Point &pos) {
 }
 
 EventHandleResult ShelterRescueSite1::onMouseMove(const Common::Point &pos) {
-	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _vm->_state->_activeZoombinis, Common::Point32(pos.x, pos.y),
-																   ZmbHoldDropInput::kMoveOnly,
+	const Common::Point32 pos32 = Common::Point32(pos);
+	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _vm->_state->_activeZoombinis, pos32, ZmbHoldDropInput::kMoveOnly,
 																   ZmbAnimationKind::kPickup, &_dropTargets, getAreaMask());
 	switch (result) {
 	case ZmbDropResult::kIgnored00:

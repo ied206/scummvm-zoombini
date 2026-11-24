@@ -357,15 +357,14 @@ void TransitionMapTrans::composeMapTransitionBackground(PageId srcPageId, int ma
 }
 
 /** Draw one map-overlay RLE sprite retained for the current page. */
-void TransitionMapTrans::drawOverlaySprite(ManagedSurface32 *dst, const Common::String &name, const Common::Point32 &pos) {
+void TransitionMapTrans::drawOverlaySprite(ManagedSurface32 *dst, const Common::String &name, const Common::Point32 &pos32) {
 	const Common::String overlayPath = Common::String::format(kMapTransitionOverlayPathFormat, name.c_str());
 
 	RleBlock *overlay = _vm->_gfx->loadPageRleBlock(overlayPath);
-	if (overlay) {
-		_vm->_gfx->drawRleBlock(dst, overlay, pos);
-	} else {
+	if (overlay)
+		_vm->_gfx->drawRleBlock(dst, overlay, pos32);
+	else
 		debug(2, "MapTransition: overlay '%s' not found", name.c_str());
-	}
 }
 
 /**
@@ -597,9 +596,8 @@ PageId TransitionMapTrans::getPostTransitionPage() const {
 			return PageId::kPageCutsceneSecond_20;
 	}
 
-	if ((src == PageId::kPageWallOfFleens_07 || src == PageId::kPageChezNorf_08) && !gameState->hasPlayedRescue2Movie()) {
+	if ((src == PageId::kPageWallOfFleens_07 || src == PageId::kPageChezNorf_08) && !gameState->hasPlayedRescue2Movie())
 		return PageId::kPageCutsceneThird_21;
-	}
 
 	return _targetPageId;
 }
@@ -638,9 +636,8 @@ void TransitionMapTrans::finishTransition() {
 			GameState *state = _vm->_state;
 			const int storedLevel = state->getPageLevel(_targetPageId);
 			const int activeLevel = state->activatePageLevel(_targetPageId);
-			if (storedLevel != 0 && (storedLevel < 1 || 4 < storedLevel)) {
+			if (storedLevel != 0 && (storedLevel < 1 || 4 < storedLevel))
 				warning("MapTransition: dest page %d has invalid stored level %d; using level %d", static_cast<int>(_targetPageId), storedLevel, activeLevel);
-			}
 			debug(1, "MapTransition: dest page %d selects stored level %d", static_cast<int>(_targetPageId), activeLevel);
 		}
 		break;

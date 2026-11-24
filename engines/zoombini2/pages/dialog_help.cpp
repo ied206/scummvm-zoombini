@@ -95,9 +95,8 @@ bool DialogHelp::isPageValid(PageId pageId, int level, int sheet) {
 }
 
 bool DialogHelp::open(PageId pageId, int level) {
-	if (_isActive) {
+	if (_isActive)
 		return false; // Already open
-	}
 
 	_isActive = true;
 	_currentPageId = pageId;
@@ -113,17 +112,15 @@ bool DialogHelp::open(PageId pageId, int level) {
 	// The original opens the help frame unconditionally and only logs
 	// "No help screen for this level!" when the first sheet is missing,
 	// leaving the frame open with no sheet drawn.
-	if (!loadPage(pageId, level, 1)) {
+	if (!loadPage(pageId, level, 1))
 		warning("No help screen for page %d, level %d", static_cast<int>(pageId), level);
-	}
 
 	return true;
 }
 
 void DialogHelp::close() {
-	if (!_isActive) {
+	if (!_isActive)
 		return;
-	}
 
 	_isActive = false;
 
@@ -178,9 +175,8 @@ void DialogHelp::drawMissingHelpText(ManagedSurface32 *screen) const {
 }
 
 void DialogHelp::onRenderContent(ManagedSurface32 *screen) {
-	if (!_isActive) {
+	if (!_isActive)
 		return;
-	}
 
 	screen->copyFrom(*_savedScreen);
 
@@ -228,9 +224,8 @@ void DialogHelp::onRenderContent(ManagedSurface32 *screen) {
 }
 
 EventHandleResult DialogHelp::onMouseMove(const Common::Point &pos) {
-	if (!_isActive) {
+	if (!_isActive)
 		return EventHandleResult::kPassthrough;
-	}
 
 	_okButtonHovered = _okButtonRect.contains(pos);
 	_leftArrowHovered = _leftArrowRect.contains(pos);
@@ -239,23 +234,20 @@ EventHandleResult DialogHelp::onMouseMove(const Common::Point &pos) {
 }
 
 EventHandleResult DialogHelp::onLButtonDown(const Common::Point &pos) {
-	if (!_isActive) {
+	if (!_isActive)
 		return EventHandleResult::kPassthrough;
-	}
 
 	// The close button fires on release, so a press only arms it. Pressing
 	// anywhere else cancels a previously armed close.
 	_okButtonArmed = _okButtonRect.contains(pos);
-	if (_okButtonArmed) {
+	if (_okButtonArmed)
 		return EventHandleResult::kConsumed;
-	}
 
 	// Left arrow - previous sheet
 	if (_leftArrowRect.contains(pos)) {
 		if (isPageValid(_currentPageId, _currentLevel, _currentSheet - 1)) {
-			if (loadPage(_currentPageId, _currentLevel, _currentSheet - 1)) {
+			if (loadPage(_currentPageId, _currentLevel, _currentSheet - 1))
 				_currentSheet -= 1;
-			}
 		}
 		return EventHandleResult::kConsumed;
 	}
@@ -263,9 +255,8 @@ EventHandleResult DialogHelp::onLButtonDown(const Common::Point &pos) {
 	// Right arrow - next sheet
 	if (_rightArrowRect.contains(pos)) {
 		if (isPageValid(_currentPageId, _currentLevel, _currentSheet + 1)) {
-			if (loadPage(_currentPageId, _currentLevel, _currentSheet + 1)) {
+			if (loadPage(_currentPageId, _currentLevel, _currentSheet + 1))
 				_currentSheet += 1;
-			}
 		}
 		return EventHandleResult::kConsumed;
 	}
@@ -275,15 +266,13 @@ EventHandleResult DialogHelp::onLButtonDown(const Common::Point &pos) {
 }
 
 EventHandleResult DialogHelp::onLButtonUp(const Common::Point &pos) {
-	if (!_isActive) {
+	if (!_isActive)
 		return EventHandleResult::kPassthrough;
-	}
 
 	const bool shouldClose = _okButtonArmed && _okButtonRect.contains(pos);
 	_okButtonArmed = false;
-	if (shouldClose) {
+	if (shouldClose)
 		close();
-	}
 	return EventHandleResult::kConsumed;
 }
 

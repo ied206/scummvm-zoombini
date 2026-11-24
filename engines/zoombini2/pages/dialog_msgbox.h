@@ -69,13 +69,14 @@ public:
 	 * @return True when queued, not when resources have loaded; false if another request is already pending or open.
 	 */
 	bool request(const Common::Path &textPath, Common::BaseCallback<DialogMsgBoxButton> *callback,
-				 const Common::Point32 &position = Common::Point32(-1, -1), const Common::Point32 &textOffset = Common::Point32(17, 17));
+				 const Common::Point32 &pos32 = Common::Point32(-1, -1), const Common::Point32 &textOffset = Common::Point32(17, 17));
 
 	/**
 	 * Queue Unicode UI text drawn with the language's GUI font.
 	 * Callback lifetime and the queued-success result follow @ref DialogMsgBox::request.
 	 */
-	bool requestUiText(const Common::U32String &text, Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &position = Common::Point32(-1, -1));
+	bool requestUiText(const Common::U32String &text, Common::BaseCallback<DialogMsgBoxButton> *callback,
+					   const Common::Point32 &pos32 = Common::Point32(-1, -1));
 
 	/** Return whether a request is pending or its dialog is open. */
 	bool isActive() const override { return _state != DialogMsgBoxState::kClosed00; }
@@ -112,7 +113,7 @@ private:
 	static constexpr int kUiTextHeight = 60;
 
 	/** Begin a request after rejecting any conflicting active request. */
-	bool beginRequest(Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &position);
+	bool beginRequest(Common::BaseCallback<DialogMsgBoxButton> *callback, const Common::Point32 &pos32);
 	/** Load request-specific resources and retain the covered screen rectangle. */
 	bool openDialog();
 	/** Release the saved screen pixels for the current request. */
@@ -127,7 +128,7 @@ private:
 	/** Current request lifecycle. */
 	DialogMsgBoxState _state = DialogMsgBoxState::kClosed00;
 	/** Requested screen origin; (-1,-1) centers the loaded panel. */
-	Common::Point32 _position = Common::Point32(-1, -1);
+	Common::Point32 _pos32 = Common::Point32(-1, -1);
 	/** Text bitmap offset relative to @ref DialogMsgBox::_position. */
 	Common::Point32 _textOffset = Common::Point32(17, 17);
 	/** Request-specific text bitmap path. */

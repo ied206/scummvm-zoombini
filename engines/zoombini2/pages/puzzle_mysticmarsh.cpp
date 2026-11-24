@@ -1830,11 +1830,11 @@ void PuzzleMysticMarsh::init() {
 			continue;
 		Slot slot;
 		slot.cell = i;
-		const Common::Point32 position = MysticMarshL4Background::cellPosition(i);
-		slot.position = Common::Point32(position.x - 25, position.y - 10);
+		const Common::Point32 pos32 = MysticMarshL4Background::cellPosition(i);
+		slot.pos32 = Common::Point32(pos32.x - 25, pos32.y - 10);
 		_slots.push_back(slot);
 		ZmbDropTarget target;
-		target.rect = Common::Rect32(position.x - 8, position.y + 52, position.x + 35, position.y + 102);
+		target.rect = Common::Rect32(pos32.x - 8, pos32.y + 52, pos32.x + 35, pos32.y + 102);
 		target.callback = slotDropCallback;
 		target.callbackContext = this;
 		_dropTargets.push_back(target);
@@ -1930,8 +1930,8 @@ void PuzzleMysticMarsh::placeZoombini(int slotIndex, int zoombiniIndex) {
 	_placementStart = now;
 	ZoombiniRunner *zoombini = _puzzleZoombinis[zoombiniIndex];
 	zoombini->setInputEnabled(false);
-	const Common::Point32 &position = _slots[slotIndex].position;
-	zoombini->setPosition(Common::Point32(position.x + 10, position.y + 30));
+	const Common::Point32 &pos32 = _slots[slotIndex].pos32;
+	zoombini->setPosition(Common::Point32(pos32.x + 10, pos32.y + 30));
 	playSfx(3);
 }
 
@@ -1966,7 +1966,7 @@ void PuzzleMysticMarsh::loseZoombini(int index, bool whirlpool, uint32 now) {
 	if (whirlpool) {
 		_effects.clear();
 		Effect effect;
-		effect.position = Common::Point32(bubble.position.x + 10, bubble.position.y - 45);
+		effect.pos32 = Common::Point32(bubble.pos32.x + 10, bubble.pos32.y - 45);
 		effect.start = now;
 		_effects.push_back(effect);
 	}
@@ -2065,14 +2065,14 @@ void PuzzleMysticMarsh::onUpdate() {
 		if (_placementStart + 1000 < now) {
 			Bubble &bubble = _bubbles[_placingZoombini];
 			bubble.active = true;
-			bubble.position = _slots[_placingSlot].position;
+			bubble.pos32 = _slots[_placingSlot].pos32;
 			_puzzleZoombinis[_placingZoombini]->setActiveAnimation(ZmbAnimationKind::kFloating);
 			_puzzleZoombinis[_placingZoombini]->startAnimation(ZmbAnimationKind::kFloating, 33, now);
 			_placingZoombini = -1;
 		} else {
 			ZoombiniRunner *zoombini = _puzzleZoombinis[_placingZoombini];
-			const Common::Point32 position = zoombini->getScreenPosition();
-			zoombini->setScreenPositionWithoutTracking(Common::Point32(position.x, position.y - (now - _lastTick) / 30));
+			const Common::Point32 pos32 = zoombini->getScreenPosition();
+			zoombini->setScreenPositionWithoutTracking(Common::Point32(pos32.x, pos32.y - (now - _lastTick) / 30));
 		}
 	}
 	bool moving = false;
@@ -2082,11 +2082,11 @@ void PuzzleMysticMarsh::onUpdate() {
 			continue;
 		// A path completing this frame still postpones the next grid step.
 		moving = true;
-		if (!bubble.path->advance(now, bubble.position)) {
+		if (!bubble.path->advance(now, bubble.pos32)) {
 			delete bubble.path;
 			bubble.path = nullptr;
 		}
-		_puzzleZoombinis[i]->setScreenPositionWithoutTracking(Common::Point32(bubble.position.x + 9, bubble.position.y + 10));
+		_puzzleZoombinis[i]->setScreenPositionWithoutTracking(Common::Point32(bubble.pos32.x + 9, bubble.pos32.y + 10));
 	}
 	if (!moving && _placingZoombini == -1 && !_finished)
 		advanceGrid(now);
@@ -2284,7 +2284,7 @@ void MysticMarshL4Background::repairUncoveredGrid(ManagedSurface32 *surface, con
 	/** Water color estimate sampled around one cell center. */
 	struct CenterSample {
 		/** Source pixel at the center of a projected cell. */
-		Common::Point32 position;
+		Common::Point32 pos32;
 		/** Mean RGB over the center's five-by-five neighborhood. */
 		RGBColorF32 color;
 	};
@@ -2292,13 +2292,13 @@ void MysticMarshL4Background::repairUncoveredGrid(ManagedSurface32 *surface, con
 	Common::Array<CenterSample> samples;
 	for (int i = 0; i < MysticMarshGrid::kCellCount; i++) {
 		CenterSample sample;
-		sample.position = cellPosition(i) + Common::Point32(27, 75);
-		if (sample.position.x < 2 || width - 2 <= sample.position.x || sample.position.y < 2 || height - 2 <= sample.position.y)
+		sample.pos32 = cellPosition(i) + Common::Point32(27, 75);
+		if (sample.pos32.x < 2 || width - 2 <= sample.pos32.x || sample.pos32.y < 2 || height - 2 <= sample.pos32.y)
 			continue;
 		bool waterOnly = true;
-		for (int y = sample.position.y - 2; y <= sample.position.y + 2; y++) {
+		for (int y = sample.pos32.y - 2; y <= sample.pos32.y + 2; y++) {
 			const uint32 *pixels = static_cast<const uint32 *>(surface->getBasePtr(0, y));
-			for (int x = sample.position.x - 2; x <= sample.position.x + 2; x++) {
+			for (int x = sample.pos32.x - 2; x <= sample.pos32.x + 2; x++) {
 				waterOnly = waterOnly && water[y * width + x];
 				sample.color += RGBColorF32::fromPixel(pixels[x], surface->format) / 25.0f;
 			}
@@ -2323,8 +2323,8 @@ void MysticMarshL4Background::repairUncoveredGrid(ManagedSurface32 *surface, con
 				// Normalize distances by the projected cell size, blending centers within 2.5 cells.
 				float weightSum = 0;
 				for (uint i = 0; i < samples.size(); i++) {
-					const float dx = (x - samples[i].position.x) / 44.0f;
-					const float dy = (y - samples[i].position.y) / 31.0f;
+					const float dx = (x - samples[i].pos32.x) / 44.0f;
+					const float dy = (y - samples[i].pos32.y) / 31.0f;
 					const float distance = dx * dx + dy * dy;
 					if (6.25f <= distance)
 						continue;
@@ -2365,11 +2365,10 @@ void MysticMarshL4Background::repairUncoveredGrid(ManagedSurface32 *surface, con
 				count += 1;
 				updates[i] += field[neighbors[j]];
 			}
-			if (count) {
+			if (count)
 				updates[i] /= count;
-			} else {
+			else
 				updates[i] = field[index];
-			}
 		}
 		for (uint i = 0; i < positions.size(); i++)
 			field[positions[i]] = updates[i];
@@ -2490,21 +2489,19 @@ void MysticMarshL4Background::drawGrid(ManagedSurface32 *surface, const MysticMa
 			const int cellIdx = column * MysticMarshGrid::kRows + row;
 			if (cells[cellIdx].type == MysticMarshGrid::kCellEmptyType00 || isPortalCellType(cells[cellIdx].type) || !isCellBorderVisible(column, row))
 				continue;
-			const Common::Point32 pos = cellPosition(cellIdx);
-			const float left = pos.x + kBorderOffset;
-			const float top = pos.y + 60;
-			const float bottom = pos.y + 91;
+			const Common::Point32 pos32 = cellPosition(cellIdx);
+			const float left = pos32.x + kBorderOffset;
+			const float top = pos32.y + 60;
+			const float bottom = pos32.y + 91;
 			lines.push_back({left, top, left + 44, top});
 			lines.push_back({left, top, left + 10, bottom});
 			if (row + 1 == MysticMarshGrid::kRows || cells[cellIdx + 1].type == MysticMarshGrid::kCellEmptyType00 ||
-				isPortalCellType(cells[cellIdx + 1].type) || !isCellBorderVisible(column, row + 1)) {
+				isPortalCellType(cells[cellIdx + 1].type) || !isCellBorderVisible(column, row + 1))
 				lines.push_back({left + 10, bottom, left + 54, bottom});
-			}
 			if (column + 1 == MysticMarshGrid::kColumns ||
 				cells[cellIdx + MysticMarshGrid::kRows].type == MysticMarshGrid::kCellEmptyType00 ||
-				isPortalCellType(cells[cellIdx + MysticMarshGrid::kRows].type) || !isCellBorderVisible(column + 1, row)) {
+				isPortalCellType(cells[cellIdx + MysticMarshGrid::kRows].type) || !isCellBorderVisible(column + 1, row))
 				lines.push_back({left + 44, top, left + 54, bottom});
-			}
 		}
 	}
 	const uint32 white = Gfx::PredefinedColor::kWhite03.toPixel(surface->format);
@@ -2521,35 +2518,36 @@ void PuzzleMysticMarsh::onRenderContent(ManagedSurface32 *screen) {
 			symbolType = kRejectCellType;
 		if (symbolType < MysticMarshGrid::kCellSymbolSDiv1Type02 || MysticMarshGrid::kCellSymbolEntry1Type60 <= symbolType)
 			continue;
-		const Common::Point32 position = MysticMarshL4Background::cellPosition(i);
-		drawColorSymbol(screen, symbolType - MysticMarshGrid::kCellSymbolSDiv1Type02, Common::Point32(position.x + 3, position.y + 61));
+		const Common::Point32 pos32 = MysticMarshL4Background::cellPosition(i);
+		drawColorSymbol(screen, symbolType - MysticMarshGrid::kCellSymbolSDiv1Type02, Common::Point32(pos32.x + 3, pos32.y + 61));
 		// Supplement the current sprite before its separate trait overlay, including devices that change type.
 		if (_vm->fillMysticMarshCellGaps())
-			fillCellEdge(screen, symbolType - MysticMarshGrid::kCellSymbolSDiv1Type02, Common::Point32(position.x + 3, position.y + 61));
+			fillCellEdge(screen, symbolType - MysticMarshGrid::kCellSymbolSDiv1Type02, Common::Point32(pos32.x + 3, pos32.y + 61));
 		if (MysticMarshGrid::kCellSymbolCDiv1Type06 <= cell.type && cell.type <= MysticMarshGrid::kCellSymbolCDiv4Type09 &&
 			1 <= cell.trait && cell.trait <= 4 && 1 <= cell.value && cell.value <= 5) {
-			if (cell.trait - 1 == static_cast<int>(ZmbTrait::TraitKind::kNose01))
+			if (cell.trait - 1 == static_cast<int>(ZmbTrait::TraitKind::kNose01)) {
 				_vm->_gfx->drawPageNoseTraitSprite(screen, Common::String::format(kTraitFormat, cell.trait, cell.value),
-												   Common::Point32(position.x + 9, position.y + 62), static_cast<byte>(cell.value));
-			else
+												   Common::Point32(pos32.x + 9, pos32.y + 62), static_cast<byte>(cell.value));
+			} else {
 				_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kTraitFormat, cell.trait, cell.value),
-											Common::Point32(position.x + 9, position.y + 62));
+											Common::Point32(pos32.x + 9, pos32.y + 62));
+			}
 		}
 	}
 	for (uint i = 0; i < _slots.size(); i++) {
 		const Slot &slot = _slots[i];
-		_vm->_gfx->drawPageRleBlock(screen, kCraterPath, Common::Point32(slot.position.x, slot.position.y + 10));
+		_vm->_gfx->drawPageRleBlock(screen, kCraterPath, Common::Point32(slot.pos32.x, slot.pos32.y + 10));
 	}
 	const uint32 now = _vm->getTotalPlayTime();
 	if (0 <= _placingSlot && now - _placementStart < 1100 && _craterAnimation && 0 < _craterAnimation->getFrameCount()) {
 		const int frame = MIN<int>((now - _placementStart) / 100, _craterAnimation->getFrameCount() - 1);
-		_vm->_gfx->drawAnimationFrame(screen, _craterAnimation, frame, _slots[_placingSlot].position);
+		_vm->_gfx->drawAnimationFrame(screen, _craterAnimation, frame, _slots[_placingSlot].pos32);
 	}
 	if (_whirlpoolAnimation && 0 < _whirlpoolAnimation->getFrameCount()) {
 		for (uint i = 0; i < _effects.size(); i++) {
 			const Effect &effect = _effects[i];
 			const int frame = MIN<int>((now - effect.start) / 100, _whirlpoolAnimation->getFrameCount() - 1);
-			_vm->_gfx->drawAnimationFrame(screen, _whirlpoolAnimation, frame, effect.position);
+			_vm->_gfx->drawAnimationFrame(screen, _whirlpoolAnimation, frame, effect.pos32);
 		}
 	}
 }
@@ -2579,7 +2577,7 @@ void PuzzleMysticMarsh::cacheCellEdgePixels(int symbolIndex, const RleBlock *spr
 	}
 }
 
-void PuzzleMysticMarsh::fillCellEdge(ManagedSurface32 *screen, int symbolIndex, const Common::Point32 &pos) const {
+void PuzzleMysticMarsh::fillCellEdge(ManagedSurface32 *screen, int symbolIndex, const Common::Point32 &pos32) const {
 	const ManagedSurface32 *background = _vm->_gfx->getBackgroundSurface();
 	if (!background)
 		return;
@@ -2588,8 +2586,8 @@ void PuzzleMysticMarsh::fillCellEdge(ManagedSurface32 *screen, int symbolIndex, 
 	int innerEdge = 0;
 	for (uint i = 0; i < pixels.size(); i++) {
 		const CellEdgePixel &pixel = pixels[i];
-		const int x = pos.x + pixel.position.x;
-		const int y = pos.y + pixel.position.y;
+		const int x = pos32.x + pixel.pos32.x;
+		const int y = pos32.y + pixel.pos32.y;
 		if (x < 0 || screen->w <= x || background->w <= x || y < 0 || screen->h <= y || background->h <= y)
 			continue;
 		if (lastRow != y) {
@@ -2597,7 +2595,7 @@ void PuzzleMysticMarsh::fillCellEdge(ManagedSurface32 *screen, int symbolIndex, 
 			lastRow = y;
 			// Without a detected core, skip the row rather than extending the plate onto exposed terrain.
 			innerEdge = screen->w;
-			const int edge = pos.x - 3 + 10 * (pixel.position.y + 1) / 31;
+			const int edge = pos32.x - 3 + 10 * (pixel.pos32.y + 1) / 31;
 			for (int sampleX = MAX(0, edge - 1); sampleX <= MIN(background->w - 1, edge + 3); sampleX++) {
 				const uint32 sample = *static_cast<const uint32 *>(background->getBasePtr(sampleX, y));
 				const RGBColor color = RGBColor::fromPixel(sample, background->format);
@@ -2620,7 +2618,7 @@ void PuzzleMysticMarsh::fillCellEdge(ManagedSurface32 *screen, int symbolIndex, 
 	}
 }
 
-void PuzzleMysticMarsh::drawColorSymbol(ManagedSurface32 *screen, int symbolIndex, const Common::Point32 &pos) const {
+void PuzzleMysticMarsh::drawColorSymbol(ManagedSurface32 *screen, int symbolIndex, const Common::Point32 &pos32) const {
 	const Common::String key = Common::String::format(kSymbolFormat, kSymbolNames[symbolIndex]);
 	int group = -1;
 	if (27 <= symbolIndex && symbolIndex <= 33)
@@ -2628,7 +2626,7 @@ void PuzzleMysticMarsh::drawColorSymbol(ManagedSurface32 *screen, int symbolInde
 	else if (49 <= symbolIndex && symbolIndex <= 55)
 		group = symbolIndex - 49;
 	if (group < 0) {
-		_vm->_gfx->drawPageRleBlock(screen, key, pos);
+		_vm->_gfx->drawPageRleBlock(screen, key, pos32);
 		return;
 	}
 	switch (_vm->getColorAssistMode()) {
@@ -2644,13 +2642,13 @@ void PuzzleMysticMarsh::drawColorSymbol(ManagedSurface32 *screen, int symbolInde
 		};
 		const RleBlock *sprite = _vm->_gfx->loadPageRleBlock(key);
 		if (sprite)
-			sprite->drawToScreenRecolored(screen, pos, kGroupColors[group], _vm->getAlphaLUT());
+			sprite->drawToScreenRecolored(screen, pos32, kGroupColors[group], _vm->getAlphaLUT());
 		break;
 	}
 	case ColorAssistMode::kOriginal:
 	case ColorAssistMode::kEnhancedDistinction:
 	default:
-		_vm->_gfx->drawPageRleBlock(screen, key, pos);
+		_vm->_gfx->drawPageRleBlock(screen, key, pos32);
 		return;
 	}
 }
@@ -2667,12 +2665,13 @@ void PuzzleMysticMarsh::onActorsRendered() {
 void PuzzleMysticMarsh::onRenderForeground(ManagedSurface32 *screen) {
 	for (uint i = 0; i < _bubbles.size(); i++) {
 		if (_bubbles[i].active)
-			_vm->_gfx->drawPageRleBlock(screen, kBubblePath, _bubbles[i].position);
+			_vm->_gfx->drawPageRleBlock(screen, kBubblePath, _bubbles[i].pos32);
 	}
 }
 
 EventHandleResult PuzzleMysticMarsh::onLButtonUp(const Common::Point &pos) {
-	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, Common::Point32(pos.x, pos.y), ZmbHoldDropInput::kLeftButtonRelease,
+	const Common::Point32 pos32 = Common::Point32(pos);
+	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, pos32, ZmbHoldDropInput::kLeftButtonRelease,
 																   ZmbAnimationKind::kPickup, &_dropTargets, getAreaMask());
 	switch (result) {
 	case ZmbDropResult::kIgnored00:
@@ -2683,7 +2682,8 @@ EventHandleResult PuzzleMysticMarsh::onLButtonUp(const Common::Point &pos) {
 }
 
 EventHandleResult PuzzleMysticMarsh::onMouseMove(const Common::Point &pos) {
-	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, Common::Point32(pos.x, pos.y), ZmbHoldDropInput::kMoveOnly,
+	const Common::Point32 pos32 = Common::Point32(pos);
+	const ZmbDropResult result = ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, pos32, ZmbHoldDropInput::kMoveOnly,
 																   ZmbAnimationKind::kPickup, &_dropTargets, getAreaMask());
 	switch (result) {
 	case ZmbDropResult::kIgnored00:

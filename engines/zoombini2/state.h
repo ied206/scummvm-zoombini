@@ -105,7 +105,13 @@ struct ZmbTrait {
 	};
 	/** Initialize the unused slot and every trait to zero. */
 	ZmbTrait() = default;
-	/** Initialize the complete visible appearance. */
+	/**
+	 * Initialize the visible traits from one-based selections, with zero for an unselected trait.
+	 * @param feet Feet selection.
+	 * @param nose Nose selection.
+	 * @param hair Hair selection.
+	 * @param eyes Eyes selection.
+	 */
 	ZmbTrait(byte feet, byte nose, byte hair, byte eyes) : _feet(feet), _nose(nose), _hair(hair), _eyes(eyes) {}
 
 	/** Return the trait identified by @p index. */

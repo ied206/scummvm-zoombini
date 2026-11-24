@@ -197,7 +197,7 @@ void PuzzleCrazyTurtle::buildDropTargets() {
 	for (int i = 0; i < kTurtleCount; i++) {
 		const TurtlePlacement &placement = kTurtlePlacements[i];
 		ZmbDropTarget target;
-		target.rect = Common::Rect32(placement.pos.x + 15, placement.pos.y + 25, placement.pos.x + 15 + 60, placement.pos.y + 25 + 62);
+		target.rect = Common::Rect32(placement.pos32.x + 15, placement.pos32.y + 25, placement.pos32.x + 15 + 60, placement.pos32.y + 25 + 62);
 		target.occupied = false;
 		target.callback = &onTurtleDrop;
 		target.callbackContext = this;
@@ -381,7 +381,7 @@ void PuzzleCrazyTurtle::updateFallSequence(uint32 tick) {
 		_fallTimerTick = 0xFFFFFFFFU;
 		const TurtlePlacement &placement = kTurtlePlacements[_activeTurtleIndex];
 		if (_turtleSpinRunners[placement.type - 1])
-			_turtleSpinRunners[placement.type - 1]->startAt(placement.pos, tick);
+			_turtleSpinRunners[placement.type - 1]->startAt(placement.pos32, tick);
 		playSound(_sndTurtleSpin);
 	}
 
@@ -451,7 +451,7 @@ void PuzzleCrazyTurtle::updateIdleTurtleSpin(uint32 tick) {
 	_idleTurtleIndex = turtleIndex;
 	const TurtlePlacement &placement = kTurtlePlacements[turtleIndex];
 	if (_turtleIdleRunners[placement.type - 1])
-		_turtleIdleRunners[placement.type - 1]->startAt(placement.pos, tick);
+		_turtleIdleRunners[placement.type - 1]->startAt(placement.pos32, tick);
 	playSound(_sndTurtleIdle);
 }
 
@@ -536,7 +536,7 @@ void PuzzleCrazyTurtle::handleTurtleClick(int turtleIndex, int zoombiniIndex) {
 	zoombini->setInputEnabled(false);
 	const TurtlePlacement &placement = kTurtlePlacements[turtleIndex];
 	if (1 <= placement.type && placement.type <= kFeatureCount)
-		zoombini->setPosition(Common::Point32(placement.pos.x + 20, placement.pos.y));
+		zoombini->setPosition(Common::Point32(placement.pos32.x + 20, placement.pos32.y));
 
 	if (evaluateTurtleMatch(zoombini, turtleIndex)) {
 		zoombini->startAnimation(ZmbAnimationKind::kCelebration, 33, tick);
@@ -703,7 +703,7 @@ void PuzzleCrazyTurtle::drawTurtles(ManagedSurface32 *screen) const {
 			continue;
 		const TurtlePlacement &placement = kTurtlePlacements[i];
 		const Common::String imagePath = Common::String::format(kTurtleFixedFormat, placement.type, placement.type);
-		_vm->_gfx->drawPageRleBlock(screen, imagePath, placement.pos);
+		_vm->_gfx->drawPageRleBlock(screen, imagePath, placement.pos32);
 	}
 }
 
@@ -718,11 +718,10 @@ void PuzzleCrazyTurtle::drawTurtleRunners(ManagedSurface32 *screen) const {
 }
 
 void PuzzleCrazyTurtle::drawMother(ManagedSurface32 *screen) const {
-	if (_motherFinished) {
+	if (_motherFinished)
 		_vm->_gfx->drawPageRleBlock(screen, kMotherEndPath, kMotherPos);
-	} else if (!_motherRunner || !_motherRunner->isActive()) {
+	else if (!_motherRunner || !_motherRunner->isActive())
 		_vm->_gfx->drawPageRleBlock(screen, kMotherStartPath, kMotherPos);
-	}
 }
 
 EventHandleResult PuzzleCrazyTurtle::onLButtonDown(const Common::Point &pos) {
@@ -739,9 +738,8 @@ EventHandleResult PuzzleCrazyTurtle::onLButtonUp(const Common::Point &pos) {
 		input = ZmbHoldDropInput::kLeftButtonRelease;
 	else
 		input = ZmbHoldDropInput::kMoveOnly;
-	const ZmbDropResult inputResult =
-		ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, Common::Point32(pos.x, pos.y), input, ZmbAnimationKind::kPickup,
-										  &_turtleDropTargets, getAreaMask());
+	const Common::Point32 pos32 = Common::Point32(pos);
+	const ZmbDropResult inputResult = ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, pos32, input, ZmbAnimationKind::kPickup, &_turtleDropTargets, getAreaMask());
 	switch (inputResult) {
 	case ZmbDropResult::kIgnored00:
 		return EventHandleResult::kPassthrough;
@@ -751,9 +749,8 @@ EventHandleResult PuzzleCrazyTurtle::onLButtonUp(const Common::Point &pos) {
 }
 
 EventHandleResult PuzzleCrazyTurtle::onMouseMove(const Common::Point &pos) {
-	const ZmbDropResult inputResult =
-		ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, Common::Point32(pos.x, pos.y), ZmbHoldDropInput::kMoveOnly, ZmbAnimationKind::kPickup,
-										  &_turtleDropTargets, getAreaMask());
+	const Common::Point32 pos32 = Common::Point32(pos);
+	const ZmbDropResult inputResult = ZoombiniRunner::handleHoldAndDrop(_vm, _puzzleZoombinis, pos32, ZmbHoldDropInput::kMoveOnly, ZmbAnimationKind::kPickup, &_turtleDropTargets, getAreaMask());
 	switch (inputResult) {
 	case ZmbDropResult::kIgnored00:
 		return EventHandleResult::kPassthrough;
@@ -798,9 +795,10 @@ Common::String PuzzleCrazyTurtle::debugGetAnswer() const {
 			answer += Common::String::format("    Turtles %u-%u: ", first + 1, last + 1);
 		answer += Common::String::format("(%s) %s", primaryName.c_str(),
 										 ZmbTrait::debugTraitValueName(primaryFeature, traits.getValue(primaryFeature)));
-		if (3 <= _puzzleLevel)
+		if (3 <= _puzzleLevel) {
 			answer += Common::String::format(" (%s) %s", secondaryName.c_str(),
 											 ZmbTrait::debugTraitValueName(secondaryFeature, traits.getValue(secondaryFeature)));
+		}
 		answer += "\n      Matchable Zoombinis:\n";
 		for (uint actor = 0; actor < _puzzleZoombinis.size(); actor++) {
 			if (evaluateTurtleMatch(_puzzleZoombinis[actor], first))

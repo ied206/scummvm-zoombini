@@ -169,10 +169,10 @@ public:
 	SoundManager *getSoundManager() { return _soundManager; }
 	/** Queue a game-resource confirmation and retain its completion callback. */
 	bool requestMsgBox(const Common::Path &textPath, Common::BaseCallback<DialogMsgBoxButton> *callback,
-					   const Common::Point32 &pos = Common::Point32(-1, -1));
+					   const Common::Point32 &pos32 = Common::Point32(-1, -1));
 	/** Queue a UI-text confirmation and retain its completion callback. */
 	bool requestUiTextMsgBox(const Common::U32String &text, Common::BaseCallback<DialogMsgBoxButton> *callback,
-							 const Common::Point32 &pos = Common::Point32(-1, -1));
+							 const Common::Point32 &pos32 = Common::Point32(-1, -1));
 	/** Open the help overlay for the active page and level. */
 	bool openHelpDialog(PageId pageId, int level);
 	/** Open a console debug view. */

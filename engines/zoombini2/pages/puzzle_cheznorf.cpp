@@ -236,36 +236,36 @@ void PuzzleChezNorf::loadResources() {
 	}
 }
 
-bool PuzzleChezNorf::inside(const Common::Point32 &pos, int x, int y, int width, int height) {
-	return x < pos.x && pos.x < x + width && y < pos.y && pos.y < y + height;
+bool PuzzleChezNorf::inside(const Common::Point32 &pos32, int x, int y, int width, int height) {
+	return x < pos32.x && pos32.x < x + width && y < pos32.y && pos32.y < y + height;
 }
 
-int PuzzleChezNorf::foodAt(const Common::Point32 &pos) const {
+int PuzzleChezNorf::foodAt(const Common::Point32 &pos32) const {
 	int foodCount = ARRAYSIZE(kFoodNames);
 	if (_puzzleLevel == 1)
 		foodCount = 6;
 	for (int i = 0; i < foodCount; i++) {
 		const Size32 size = _vm->_gfx->getPageRleBlockSize(Common::String::format(kFoodFormat, kFoodNames[i]));
-		if (size.width && size.height && inside(pos, kFoodPositions[i].x, kFoodPositions[i].y, size.width, size.height))
+		if (size.width && size.height && inside(pos32, kFoodPositions[i].x, kFoodPositions[i].y, size.width, size.height))
 			return i;
 	}
 	return -1;
 }
 
-int PuzzleChezNorf::trayAt(const Common::Point32 &pos) const {
+int PuzzleChezNorf::trayAt(const Common::Point32 &pos32) const {
 	const Size32 size = _vm->_gfx->getPageRleBlockSize(_puzzleLevel == 1 ? kSmallMealTrayPath : kMealTrayPath);
 	if (!size.width || !size.height)
 		return -1;
 	for (int i = 0; i < _tableCount; i++) {
-		if (_trayAvailable[i] && inside(pos, tablePosition(i, 500).x, 500, size.width, size.height))
+		if (_trayAvailable[i] && inside(pos32, tablePosition(i, 500).x, 500, size.width, size.height))
 			return i;
 	}
 	return -1;
 }
 
-int PuzzleChezNorf::norfAt(const Common::Point32 &pos) const {
+int PuzzleChezNorf::norfAt(const Common::Point32 &pos32) const {
 	for (int i = 0; i < _tableCount; i++) {
-		if (inside(pos, tablePosition(i, 205).x, 205, 85, 82))
+		if (inside(pos32, tablePosition(i, 205).x, 205, 85, 82))
 			return i;
 	}
 	return -1;
@@ -399,10 +399,10 @@ EventHandleResult PuzzleChezNorf::onLButtonUp(const Common::Point &pos) {
 	return EventHandleResult::kPassthrough;
 }
 
-void PuzzleChezNorf::handleClick(const Common::Point32 &pos) {
+void PuzzleChezNorf::handleClick(const Common::Point32 &pos32) {
 	if (_phase != kReady00 || _departAfterSpeech)
 		return;
-	const int norf = norfAt(pos);
+	const int norf = norfAt(pos32);
 	if (_phase == kReady00 && 0 <= norf) {
 		if (0 <= _selectedTray) {
 			if (canSubmitTo(norf))
@@ -415,7 +415,7 @@ void PuzzleChezNorf::handleClick(const Common::Point32 &pos) {
 			return;
 		}
 	}
-	const int food = foodAt(pos);
+	const int food = foodAt(pos32);
 	if (_selectedTray == -1 && 0 <= food) {
 		_selectedFood = food;
 		static constexpr int kSelectionSounds[3] = {
@@ -426,11 +426,11 @@ void PuzzleChezNorf::handleClick(const Common::Point32 &pos) {
 		playSound(kSelectionSounds[food / 3]);
 		return;
 	}
-	if (_phase == kReady00 && 0 <= _selectedTray && inside(pos, 200, 503, 564, 82)) {
+	if (_phase == kReady00 && 0 <= _selectedTray && inside(pos32, 200, 503, 564, 82)) {
 		clearSelection();
 		return;
 	}
-	const int tray = trayAt(pos);
+	const int tray = trayAt(pos32);
 	if (0 <= tray && 0 <= _selectedFood) {
 		_trays[tray].food[_selectedFood / 3] = _selectedFood;
 		playSound(6);
@@ -441,7 +441,7 @@ void PuzzleChezNorf::handleClick(const Common::Point32 &pos) {
 		_selectedTray = tray;
 		return;
 	}
-	if (0 <= _selectedFood && inside(pos, 29, 399, 167, 131)) {
+	if (0 <= _selectedFood && inside(pos32, 29, 399, 167, 131)) {
 		clearSelection();
 		return;
 	}
@@ -464,10 +464,10 @@ void PuzzleChezNorf::handleClick(const Common::Point32 &pos) {
 	if (_puzzleLevel == 1)
 		sectionCount = 2;
 	for (int section = 0; section < sectionCount; section++) {
-		if (!inside(pos, 49, kTop[section], 87, kBottom[section] - kTop[section]))
+		if (!inside(pos32, 49, kTop[section], 87, kBottom[section] - kTop[section]))
 			continue;
-		const int column = (pos.x - 49) / 14;
-		const int row = (pos.y - kTop[section]) / kStride[section];
+		const int column = (pos32.x - 49) / 14;
+		const int row = (pos32.y - kTop[section]) / kStride[section];
 		if (column < _tableCount && row < 3) {
 			_notes[section][row][column] = (_notes[section][row][column] + 1) % 4;
 			playSound(5);
@@ -716,8 +716,8 @@ void PuzzleChezNorf::onActorsRendered() {
 	updateCursor();
 }
 
-void PuzzleChezNorf::drawTray(ManagedSurface32 *screen, const Common::Point32 &pos, const Meal &meal) {
-	_vm->_gfx->drawPageRleBlock(screen, _puzzleLevel == 1 ? kSmallMealTrayPath : kMealTrayPath, pos);
+void PuzzleChezNorf::drawTray(ManagedSurface32 *screen, const Common::Point32 &pos32, const Meal &meal) {
+	_vm->_gfx->drawPageRleBlock(screen, _puzzleLevel == 1 ? kSmallMealTrayPath : kMealTrayPath, pos32);
 	static constexpr int kDrawOrder[3] = {
 		1,
 		0,
@@ -726,7 +726,7 @@ void PuzzleChezNorf::drawTray(ManagedSurface32 *screen, const Common::Point32 &p
 	for (int course : kDrawOrder) {
 		const int food = meal.food[course];
 		if (0 <= food && food < 9)
-			_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kFoodFormat, kFoodNames[food]), pos + kFoodOffsets[food]);
+			_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kFoodFormat, kFoodNames[food]), pos32 + kFoodOffsets[food]);
 	}
 }
 
@@ -750,9 +750,10 @@ void PuzzleChezNorf::onRenderContent(ManagedSurface32 *screen) {
 		for (int row = 0; row < ARRAYSIZE(_notes[section]); row++) {
 			for (int column = 0; column < _tableCount; column++) {
 				const int mark = _notes[section][row][column];
-				if (0 < mark)
+				if (0 < mark) {
 					_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kFoodFormat, kMemoSymbolNames[mark - 1]),
 												Common::Point32(51 + 14 * column, kNoteTop[section] + 15 * row));
+				}
 			}
 		}
 	}
@@ -798,8 +799,8 @@ void PuzzleChezNorf::onRenderForeground(ManagedSurface32 *screen) {
 				{26, 58},
 			};
 			const int course = _selectedFood / 3;
-			const Common::Point32 pos = tablePosition(tray, 500) + Common::Point32(kHighlightOffsets[course][0] - 16, kHighlightOffsets[course][1] - 13);
-			_vm->_gfx->drawPageRleBlock(screen, kHighlightPath, pos);
+			const Common::Point32 pos32 = tablePosition(tray, 500) + Common::Point32(kHighlightOffsets[course][0] - 16, kHighlightOffsets[course][1] - 13);
+			_vm->_gfx->drawPageRleBlock(screen, kHighlightPath, pos32);
 		}
 	}
 	if (_vm->showChezNorfDebugOverlay())

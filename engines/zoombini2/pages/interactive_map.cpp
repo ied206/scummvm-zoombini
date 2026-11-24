@@ -157,14 +157,12 @@ void InteractiveMap::init() {
 	}
 
 	// The journey map always exposes the starting hub.
-	if (inJourneyMode()) {
+	if (inJourneyMode())
 		gs->setPageLevel(PageId::kPageZombiniville_00, 1);
-	}
 
 	// --- Background ---
-	if (!_vm->_gfx->loadBackground(kBackgroundPath)) {
+	if (!_vm->_gfx->loadBackground(kBackgroundPath))
 		warning("MapScreenPage: Failed to load map background");
-	}
 
 	// --- Page icons (one per route page: normal or gray, decided by mode) ---
 	setupIcons();
@@ -244,15 +242,13 @@ void InteractiveMap::setupIcons() {
 			_iconClickable[i] = !isHub;
 
 			Common::String path;
-			if (isHub) {
+			if (isHub)
 				path = Common::String::format(kDisabledIconFormat, i);
-			} else {
+			else
 				path = Common::String::format(kIconFormat, i);
-			}
 			_icons[i] = _vm->_gfx->loadPageRleBlock(path) ? path : Common::String();
-			if (_icons[i].empty()) {
+			if (_icons[i].empty())
 				warning("MapScreenPage: Failed to load icon %d at %s!", i, path.c_str());
-			}
 		}
 	} else {
 		// Journey mode:
@@ -283,16 +279,14 @@ void InteractiveMap::setupIcons() {
 					path = Common::String::format(kIconFormat, i);
 					_iconColored[i] = true;
 					// Only hub icons become clickable when visited.
-					if (i == 0 || i == 4 || i == 9 || i == 12) {
+					if (i == 0 || i == 4 || i == 9 || i == 12)
 						_iconClickable[i] = true;
-					}
 				} else {
 					path = Common::String::format(kDisabledIconFormat, i);
 				}
 				_icons[i] = _vm->_gfx->loadPageRleBlock(path) ? path : Common::String();
-				if (_icons[i].empty()) {
+				if (_icons[i].empty())
 					warning("MapScreenPage: Failed to load icon %d at %s!", i, path.c_str());
-				}
 			}
 		}
 	}
@@ -414,15 +408,16 @@ void InteractiveMap::loadButtons() {
 		 kQuitHighlightPath, nullptr},
 	};
 	// Button 2: Game in practice mode or Entraine in journey mode
-	if (inPracticeMode())
+	if (inPracticeMode()) {
 		setup[2] = ButtonSetup{Common::Rect(468, 561, 613, 600), true,
 							   kGameNormalPath,
 							   kGameHighlightPath,
 							   kGameDisabledPath};
-	else
+	} else {
 		setup[2] = ButtonSetup{Common::Rect(468, 561, 613, 600), false,
 							   kPracticeNormalPath,
 							   kPracticeHighlightPath, nullptr};
+	}
 
 	GameState *gs = _vm->_state;
 
@@ -436,11 +431,10 @@ void InteractiveMap::loadButtons() {
 
 		// Button 2 is always enabled for a saved game.
 		// Practice can switch back to the active game only after one exists.
-		if (i == 2 && inPracticeMode()) {
+		if (i == 2 && inPracticeMode())
 			btn.enabled = gs && !gs->getPlayerName().empty();
-		} else {
+		else
 			btn.enabled = true;
-		}
 
 		if (s.isRle) {
 			btn.normalPath = _vm->_gfx->loadPageRleBlock(s.normalName) ? s.normalName : "";
@@ -502,20 +496,18 @@ void InteractiveMap::onUpdate() {
 		_vm->setPracticeLevel(_currentLevel);
 	}
 	const Common::Point32 mousePos = _vm->getMousePos();
-	const Common::Point mouseEventPos(mousePos.x, mousePos.y);
+	const Common::Point pos(mousePos.x, mousePos.y);
 
-	if (_volumePanel) {
+	if (_volumePanel)
 		return;
-	}
 
-	_hoveredIcon = hitTestIcon(mouseEventPos);
+	_hoveredIcon = hitTestIcon(pos);
 
 	// Legend tabs are available in practice mode only.
-	if (inPracticeMode()) {
+	if (inPracticeMode())
 		_hoveredLegendTab = hitTestLegendTab(mousePos);
-	} else {
+	else
 		_hoveredLegendTab = 0;
-	}
 
 	for (int i = 0; i < kNumButtons; i++) {
 		if (!_buttons[i].enabled) {
@@ -523,8 +515,8 @@ void InteractiveMap::onUpdate() {
 			continue;
 		}
 		const MapButton &b = _buttons[i];
-		_buttons[i].hovered = (b.rect.left < mouseEventPos.x && mouseEventPos.x < b.rect.right &&
-							   b.rect.top < mouseEventPos.y && mouseEventPos.y < b.rect.bottom);
+		_buttons[i].hovered = (b.rect.left < pos.x && pos.x < b.rect.right &&
+							   b.rect.top < pos.y && pos.y < b.rect.bottom);
 	}
 }
 
@@ -539,11 +531,10 @@ void InteractiveMap::onRenderContent(ManagedSurface32 *screen) {
 	_vm->_gfx->drawBackground(screen, Common::Point32(0, 0));
 
 	// 2. Path segments
-	if (inPracticeMode()) {
+	if (inPracticeMode())
 		drawPracticeSegments(screen);
-	} else {
+	else
 		drawJourneySegments(screen);
-	}
 
 	// 3. Stats panel and text
 	if (inPracticeMode()) {
@@ -588,9 +579,8 @@ void InteractiveMap::onRenderContent(ManagedSurface32 *screen) {
 			if (!_legends[tabToShow].empty())
 				_vm->_gfx->drawPageBitBlock(screen, _legends[tabToShow], Common::Point32(590, 427));
 		}
-		if (_vm->allowCutL4PracticePuzzles()) {
+		if (_vm->allowCutL4PracticePuzzles())
 			drawL4Legend(screen);
-		}
 	}
 
 	// 5. Page icons
@@ -763,7 +753,8 @@ void InteractiveMap::drawJourneySegments(ManagedSurface32 *screen) {
 EventHandleResult InteractiveMap::handleVolumePanelInput(const Common::Point &pos, bool mouseReleased) {
 	if (!_volumePanel)
 		return EventHandleResult::kPassthrough;
-	const VolumePanelResult result = _volumePanel->handleMouseInput(Common::Point32(pos), _volumePanelMouseDown, mouseReleased);
+	const Common::Point32 pos32 = Common::Point32(pos);
+	const VolumePanelResult result = _volumePanel->handleMouseInput(pos32, _volumePanelMouseDown, mouseReleased);
 	switch (result) {
 	case kVolumePanelChanged:
 		applyVolumePanelVolumes(true, false);
@@ -789,7 +780,8 @@ EventHandleResult InteractiveMap::onLButtonUp(const Common::Point &pos) {
 EventHandleResult InteractiveMap::onMouseMove(const Common::Point &pos) {
 	if (!_volumePanel)
 		return EventHandleResult::kPassthrough;
-	_volumePanel->handleMouseInput(Common::Point32(pos), _volumePanelMouseDown, false);
+	const Common::Point32 pos32 = Common::Point32(pos);
+	_volumePanel->handleMouseInput(pos32, _volumePanelMouseDown, false);
 	return EventHandleResult::kConsumed;
 }
 
@@ -840,18 +832,18 @@ EventHandleResult InteractiveMap::onKeyDown(const Common::KeyState &key, bool re
 	return EventHandleResult::kPassthrough;
 }
 EventHandleResult InteractiveMap::onLButtonDown(const Common::Point &pos) {
+	const Common::Point32 pos32 = Common::Point32(pos);
 	if (_volumePanel) {
 		_volumePanelMouseDown = true;
-		_volumePanel->handleMouseInput(Common::Point32(pos), true, false);
+		_volumePanel->handleMouseInput(pos32, true, false);
 		return EventHandleResult::kConsumed;
 	}
 
 	// Check practice level tabs.
 	if (inPracticeMode()) {
-		const int tab = hitTestLegendTab(Common::Point32(pos));
-		if (selectPracticeLevel(tab)) {
+		const int tab = hitTestLegendTab(pos32);
+		if (selectPracticeLevel(tab))
 			return EventHandleResult::kConsumed;
-		}
 	}
 
 	// Check buttons first
@@ -871,11 +863,10 @@ EventHandleResult InteractiveMap::onLButtonDown(const Common::Point &pos) {
 			break;
 		case 2:
 			debug(1, "MapScreenPage: Game/Entraine button clicked (mode=%s)", inPracticeMode() ? "practice" : "journey");
-			if (inPracticeMode()) {
+			if (inPracticeMode())
 				_vm->requestPageChange(PageId::kPageMapJourney_M4);
-			} else {
+			else
 				_vm->requestPageChange(PageId::kPageMapPractice_M3);
-			}
 			break;
 		case 3:
 			debug(1, "MapScreenPage: Quit button clicked");
@@ -893,15 +884,13 @@ EventHandleResult InteractiveMap::onLButtonDown(const Common::Point &pos) {
 	if (0 <= clicked && _iconClickable[clicked]) {
 		debug(1, "MapScreenPage: Clicked page icon %d", clicked);
 
-		if (0 <= _blipSoundId) {
+		if (0 <= _blipSoundId)
 			_vm->getSoundManager()->play(_blipSoundId);
-		}
 
 		// Journey navigation uses the selected page's stored level.
 		GameState *gs = _vm->_state;
-		if (inJourneyMode()) {
+		if (inJourneyMode())
 			_currentLevel = gs->getPageLevel(static_cast<PageId>(clicked));
-		}
 		if (_currentLevel == 0)
 			return EventHandleResult::kConsumed;
 		gs->_level = _currentLevel;
@@ -956,9 +945,8 @@ int InteractiveMap::hitTestIcon(const Common::Point &pos) const {
 				continue;
 			const Common::Rect &r = kIconHitRects[i];
 			if (r.left < pos.x && pos.x < r.right &&
-				r.top < pos.y && pos.y < r.bottom) {
+				r.top < pos.y && pos.y < r.bottom)
 				return i;
-			}
 		}
 	} else {
 		// Journey mode checks all enabled hub and final icons.
@@ -967,9 +955,8 @@ int InteractiveMap::hitTestIcon(const Common::Point &pos) const {
 				continue;
 			const Common::Rect &r = kIconHitRects[i];
 			if (r.left < pos.x && pos.x < r.right &&
-				r.top < pos.y && pos.y < r.bottom) {
+				r.top < pos.y && pos.y < r.bottom)
 				return i;
-			}
 		}
 	}
 	return -1;
@@ -980,18 +967,18 @@ int InteractiveMap::hitTestIcon(const Common::Point &pos) const {
  * Returns 1-4 for the level tab, or 0 if none hit.
  */
 
-int InteractiveMap::hitTestLegendTab(const Common::Point32 &pos) const {
+int InteractiveMap::hitTestLegendTab(const Common::Point32 &pos32) const {
 	// Level 1: x in (605, 734), y in (430, 449)
-	if (605 < pos.x && pos.x < 734 && 430 < pos.y && pos.y < 449)
+	if (605 < pos32.x && pos32.x < 734 && 430 < pos32.y && pos32.y < 449)
 		return 1;
 	// Level 2: x in (605, 734), y in (450, 468)
-	if (605 < pos.x && pos.x < 734 && 450 < pos.y && pos.y < 468)
+	if (605 < pos32.x && pos32.x < 734 && 450 < pos32.y && pos32.y < 468)
 		return 2;
 	// Level 3: x in (597, 734), y in (472, 488)
-	if (597 < pos.x && pos.x < 734 && 472 < pos.y && pos.y < 488)
+	if (597 < pos32.x && pos32.x < 734 && 472 < pos32.y && pos32.y < 488)
 		return 3;
-	if (_vm->allowCutL4PracticePuzzles() && kL4TabLeft - kL4TabSlant < pos.x && pos.x < kL4TabRight &&
-		kL4TabTop < pos.y && pos.y < kL4TabBottom)
+	if (_vm->allowCutL4PracticePuzzles() && kL4TabLeft - kL4TabSlant < pos32.x && pos32.x < kL4TabRight &&
+		kL4TabTop < pos32.y && pos32.y < kL4TabBottom)
 		return 4;
 	return 0;
 }

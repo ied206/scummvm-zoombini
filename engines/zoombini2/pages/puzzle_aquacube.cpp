@@ -140,9 +140,10 @@ void PuzzleAquacube::loadResources() {
 	}
 	_smallest = _vm->_gfx->loadZoombiniAnimation(Common::Path(kSmallestPath), 10);
 	_idle = _vm->_gfx->loadZoombiniAnimation(Common::Path(kIdlePath), 50);
-	if (SoundManager *sound = _vm->getSoundManager())
+	if (SoundManager *sound = _vm->getSoundManager()) {
 		for (int i = 0; i < ARRAYSIZE(_sounds); i++)
 			_sounds[i] = sound->load(true, Common::Path(kSoundPaths[i]), false);
+	}
 }
 
 int PuzzleAquacube::findNode(int coordinates) const {
@@ -175,7 +176,7 @@ void PuzzleAquacube::setupBoard() {
 	for (int i = 0; i < _numNodes; i++) {
 		Node &node = _nodes[i];
 		node = Node();
-		node.pos = layout[i].pos;
+		node.pos32 = layout[i].pos32;
 		for (int axis = 0; axis < ARRAYSIZE(node.adj); axis++)
 			node.adj[axis] = layout[i].adj[axis];
 		for (int axis = 0; axis < _dimensions; axis++) {
@@ -217,7 +218,7 @@ void PuzzleAquacube::setupBoard() {
 	}
 	_ballNode = findNode(start);
 	_nodes[_ballNode].state = kStart02;
-	_ballPos = _nodes[_ballNode].pos;
+	_ballPos = _nodes[_ballNode].pos32;
 	_pendingInitialArrival = true;
 	const Common::Point32 offset = _puzzleLevel < 3 ? Common::Point32(-2, 6) : Common::Point32(-5, 5);
 	int slot = 0;
@@ -236,7 +237,7 @@ void PuzzleAquacube::setupBoard() {
 		actor->setInputEnabled(false);
 		actor->setCanAdvanceFromPage(false);
 		actor->setExitComplete(false);
-		actor->setPosition(node.pos + offset + Common::Point32(6 * (3 - node.occupantCount), 0));
+		actor->setPosition(node.pos32 + offset + Common::Point32(6 * (3 - node.occupantCount), 0));
 		node.occupantCount += 1;
 		slot = (slot + 1) % _numNodes;
 	}
@@ -251,14 +252,15 @@ PathObject *PuzzleAquacube::makePath(const Common::Point32 &start, const Common:
 }
 
 void PuzzleAquacube::playSound(int index) {
-	if (SoundManager *sound = _vm->getSoundManager())
+	if (SoundManager *sound = _vm->getSoundManager()) {
 		if (0 <= _sounds[index])
 			sound->playWithVolume(_sounds[index], sound->getSfxVolume());
+	}
 }
 
 void PuzzleAquacube::moveBall(int axis) {
 	const int next = _nodes[_ballNode].adj[axis];
-	_ballPath = makePath(_nodes[_ballNode].pos, _nodes[next].pos, 7);
+	_ballPath = makePath(_nodes[_ballNode].pos32, _nodes[next].pos32, 7);
 	_ballNode = next;
 	playSound(3);
 }
@@ -391,9 +393,10 @@ void PuzzleAquacube::onUpdate() {
 		_vm->requestPageChange(PageId::kPageMapTrans_22);
 		return;
 	}
-	if (_finished)
+	if (_finished) {
 		for (ZoombiniRunner *actor : _puzzleZoombinis)
 			actor->tryStartCelebrationAnimation(_idle, *_vm->_rnd, tick, _vm->getFrameDeltaMs(), _vm->getLogicPacingHz());
+	}
 	updateBubbles(tick - _lastTick);
 	_lastTick = tick;
 	if (_pendingInitialArrival) {
@@ -407,13 +410,13 @@ void PuzzleAquacube::onUpdate() {
 			_chasePath = nullptr;
 			_freedCount = 0;
 		} else {
-			Common::Point32 pos;
-			_chasePath->advance(tick, pos);
+			Common::Point32 pos32;
+			_chasePath->advance(tick, pos32);
 			if (!_chaseFleenRunners[_fleenIndex]->isActive()) {
 				_chaseFleenRunners[_fleenIndex]->start(tick);
 				playSound(4);
 			}
-			_chaseFleenRunners[_fleenIndex]->setPosition(pos);
+			_chaseFleenRunners[_fleenIndex]->setPosition(pos32);
 		}
 	}
 	_actorsEscaping = false;
@@ -423,9 +426,9 @@ void PuzzleAquacube::onUpdate() {
 				actor->clearMovement();
 				actor->setHidden(true);
 			} else {
-				Common::Point32 pos;
-				actor->advanceMovementPath(tick, pos);
-				actor->setPosition(pos);
+				Common::Point32 pos32;
+				actor->advanceMovementPath(tick, pos32);
+				actor->setPosition(pos32);
 				_actorsEscaping = true;
 			}
 		}
@@ -474,15 +477,16 @@ void PuzzleAquacube::onRenderContent(ManagedSurface32 *screen) {
 	const char *cubeKind = _puzzleLevel < 3 ? "easy" : "hard";
 	gfx->drawPageRleBlock(screen, Common::String::format(kCubeFormat, cubeKind, 3), origin);
 	gfx->drawPageRleBlock(screen, Common::String::format(kCubeFormat, cubeKind, 2), origin);
-	if (3 <= _puzzleLevel)
+	if (3 <= _puzzleLevel) {
 		for (int i = 8; i < 12; i++)
-			gfx->drawPageRleBlock(screen, kBallPaths[1], _nodes[i].pos);
+			gfx->drawPageRleBlock(screen, kBallPaths[1], _nodes[i].pos32);
+	}
 	gfx->drawPageRleBlock(screen, Common::String::format(kCubeFormat, cubeKind, 1), origin);
 	for (int i = 0; i < _numNodes; i++) {
 		if (_puzzleLevel < 3 || i < 8 || 12 <= i)
-			gfx->drawPageRleBlock(screen, kBallPaths[_puzzleLevel < 3 ? 0 : 1], _nodes[i].pos);
+			gfx->drawPageRleBlock(screen, kBallPaths[_puzzleLevel < 3 ? 0 : 1], _nodes[i].pos32);
 		if (_nodes[i].state == kFleen03)
-			gfx->drawPageRleBlock(screen, Common::String::format(kFleenFormat, _nodes[i].fleenType), _nodes[i].pos + Common::Point32(10, 6));
+			gfx->drawPageRleBlock(screen, Common::String::format(kFleenFormat, _nodes[i].fleenType), _nodes[i].pos32 + Common::Point32(10, 6));
 	}
 	for (int i = 0; i < _dimensions; i++) {
 		gfx->drawPageRleBlock(screen, kLeverPaths[_leverOn[i] ? 1 : 0], kLeverPositions[i]);
@@ -591,9 +595,9 @@ Common::String PuzzleAquacube::debugGetAnswer() const {
 	Common::String answer = debugAnswerHeader();
 	answer += "\n  [*] Lever legend (left to right):\n";
 	for (int lever = 0; lever < _dimensions; lever++) {
-		const Common::Point32 &pos = kLeverPositions[lever];
+		const Common::Point32 &pos32 = kLeverPositions[lever];
 		const int axis = _axisMap[lever];
-		answer += Common::String::format("    - Lever %d (%3d, %3d): %5s <-> %5s\n", lever + 1, pos.x, pos.y, kAxisSides[axis][0], kAxisSides[axis][1]);
+		answer += Common::String::format("    - Lever %d (%3d, %3d): %5s <-> %5s\n", lever + 1, pos32.x, pos32.y, kAxisSides[axis][0], kAxisSides[axis][1]);
 	}
 	if (1 < _puzzleLevel) {
 		answer += '\n';
@@ -647,9 +651,8 @@ Common::String PuzzleAquacube::debugGetAnswer() const {
 	default:
 		break;
 	}
-	if (1 < _puzzleLevel) {
+	if (1 < _puzzleLevel)
 		answer += "  Watch levers left to right to identify their axes.\n";
-	}
 	return answer;
 }
 

@@ -381,8 +381,8 @@ private:
 	void updateBoardFacing(ZoombiniRunner *zoombini);
 	/** Draw a visible obstacle's introduction or idle sequence. */
 	void drawObstacle(ManagedSurface32 *screen, int lane, uint32 now) const;
-	/** Draw the value of @p node at @p pos, choosing its alternate when requested. */
-	void drawTraitHint(ManagedSurface32 *screen, const TreeNode &node, bool alternate, const Common::Point32 &pos) const;
+	/** Draw the value of @p node at @p pos32, choosing its alternate when requested. */
+	void drawTraitHint(ManagedSurface32 *screen, const TreeNode &node, bool alternate, const Common::Point32 &pos32) const;
 
 	/** Generated root and child trait tests for the current party. */
 	TreeNode _tree[kMaxRuleCount] = {};

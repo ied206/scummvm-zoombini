@@ -152,13 +152,12 @@ void Sidebar::consumePendingRelease() {
 		return;
 
 	_pendingMouseRelease = false;
-	if (_helpHovered) {
+	if (_helpHovered)
 		onHelpClick();
-	} else if (_mapHovered) {
+	else if (_mapHovered)
 		onMapClick();
-	} else if (_goHovered) {
+	else if (_goHovered)
 		onGoClick();
-	}
 }
 
 EventHandleResult Sidebar::onLButtonUp(const Common::Point &pos) {
@@ -193,8 +192,8 @@ void Sidebar::drawAndHandleInput(ManagedSurface32 *screen, bool inputAllowed) {
 	const bool pointerInputAllowed = inputAllowed && !isInteractionBlocked();
 	const Common::Point32 mousePos = _vm->getMousePos();
 	// Later mouse motion in the input batch must not move a pending release to another control.
-	const Common::Point hitPos = _pendingMouseRelease ? _pendingMouseReleasePos : Common::Point(mousePos.x, mousePos.y);
-	updateHoverState(hitPos, pointerInputAllowed);
+	const Common::Point pos = _pendingMouseRelease ? _pendingMouseReleasePos : Common::Point(mousePos.x, mousePos.y);
+	updateHoverState(pos, pointerInputAllowed);
 
 	_savedBackground->copyRectToSurface(*screen,
 										0, 0,

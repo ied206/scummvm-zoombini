@@ -110,8 +110,8 @@ private:
 		/** Number of rows visible in the list viewport. */
 		static constexpr int kVisibleRows = 4;
 
-		/** Construct an empty savefile list at @p pos; @p vm supplies the shared text renderer. */
-		SaveFileList(Zoombini2Engine *vm, const Common::Point32 &pos);
+		/** Construct an empty savefile list at @p pos32; @p vm supplies the shared text renderer. */
+		SaveFileList(Zoombini2Engine *vm, const Common::Point32 &pos32);
 
 		/** Remove every item and reset selection and editing state. */
 		void clear();
@@ -190,7 +190,7 @@ private:
 		/** Borrowed vm used to access the shared text renderer. */
 		Zoombini2Engine *_vm;
 		/** Signed screen origin of the list. */
-		Common::Point32 _pos;
+		Common::Point32 _pos32;
 
 		/** Savefile names in case-sensitive display order. */
 		Common::Array<Common::String> _items;

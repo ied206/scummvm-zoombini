@@ -163,7 +163,7 @@ private:
 	/** Erase the pending-release roster member without further index fixup. */
 	void releasePendingZoombini();
 	/** Materialize a held boarding active from a nonempty grid cell. */
-	bool materializeFromStorage(int gridCol, int gridRow, const Common::Point &pointerPos);
+	bool materializeFromStorage(int gridCol, int gridRow, const Common::Point &pos);
 	/** Attempt a leftward roster scroll and flash the scroll button. */
 	void triggerScrollLeft();
 	/** Attempt a rightward roster scroll and flash the scroll button. */

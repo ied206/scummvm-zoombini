@@ -155,16 +155,16 @@ private:
 	/** Advance one active firework by one parabolic motion step. */
 	static void moveFirework(FireworkState &firework);
 	/** Return whether the original four-corner test accepts a candidate firework origin. */
-	bool isFireworkPositionFree(const Common::Point32 &pos) const;
+	bool isFireworkPositionFree(const Common::Point32 &pos32) const;
 	/** Return whether one point lies strictly within the padded collision rectangle. */
-	static bool pointInsidePaddedRect(const Common::Point32 &pos, const Common::Rect &rect);
+	static bool pointInsidePaddedRect(const Common::Point32 &pos32, const Common::Rect &rect);
 
 	/** Schedule the next randomized 10-through-19-second ambient deadline. */
 	void scheduleNextAmbient(uint32 now);
 	/** Play one randomized celebration ambience clip. */
 	void playRandomAmbient();
 	/** Draw one plain AN animation frame at a fixed position. */
-	void drawAnimation(const Animation *animation, int frameIndex, const Common::Point32 &pos, ManagedSurface32 *screen) const;
+	void drawAnimation(const Animation *animation, int frameIndex, const Common::Point32 &pos32, ManagedSurface32 *screen) const;
 	/** Draw one Little-Zoombini state at a fixed position. */
 	void drawZoombini(const ZoombiniRunner &zoombini, ManagedSurface32 *screen) const;
 

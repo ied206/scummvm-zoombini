@@ -736,7 +736,7 @@ void PuzzleMagicWall::newPuzzle() {
 	_beetles.clear();
 	_beetles.resize(_board.positions().size());
 	for (uint i = 0; i < _board.positions().size(); i++) {
-		_beetles[i].position = vertexPosition(_board.positions()[i]) + Common::Point32(5, 8);
+		_beetles[i].pos32 = vertexPosition(_board.positions()[i]) + Common::Point32(5, 8);
 		_beetles[i].direction = 0;
 	}
 	_movingRule = -1;
@@ -753,8 +753,8 @@ void PuzzleMagicWall::newPuzzle() {
 }
 
 Common::Point32 PuzzleMagicWall::vertexPosition(int index) const {
-	const Common::Point32 &point = _board.layout().vertexCoords[index];
-	return Common::Point32(300 + 40 * point.x, -15 + 40 * point.y);
+	const Common::Point32 &pos32 = _board.layout().vertexCoords[index];
+	return Common::Point32(300 + 40 * pos32.x, -15 + 40 * pos32.y);
 }
 
 bool PuzzleMagicWall::beetlesMoving() const {
@@ -803,11 +803,11 @@ void PuzzleMagicWall::startRule(int index) {
 			continue;
 		Beetle &beetle = _beetles[i];
 		const Common::Point32 end = vertexPosition(_board.positions()[i]);
-		const Common::Point32 third((end.x - beetle.position.x) / 3, (end.y - beetle.position.y) / 3);
+		const Common::Point32 third((end.x - beetle.pos32.x) / 3, (end.y - beetle.pos32.y) / 3);
 		beetle.path = new PathObject(_vm);
-		beetle.path->appendSegment(beetle.position, beetle.position + third, end - third, end, 10, 0);
+		beetle.path->appendSegment(beetle.pos32, beetle.pos32 + third, end - third, end, 10, 0);
 		beetle.path->start(now);
-		beetle.direction = directionIndex(beetle.position, end);
+		beetle.direction = directionIndex(beetle.pos32, end);
 	}
 	_movingRule = index;
 	if (SoundManager *sound = _vm->getSoundManager())
@@ -909,7 +909,7 @@ void PuzzleMagicWall::onUpdate() {
 	}
 	const bool wasMoving = beetlesMoving();
 	for (Beetle &beetle : _beetles) {
-		if (beetle.path && !beetle.path->advance(now, beetle.position)) {
+		if (beetle.path && !beetle.path->advance(now, beetle.pos32)) {
 			delete beetle.path;
 			beetle.path = nullptr;
 			if (SoundManager *sound = _vm->getSoundManager())
@@ -940,10 +940,10 @@ void PuzzleMagicWall::rebuildVertexSurface() {
 	_vertexSurface->fillRect(Common::Rect32(0, 0, _vertexSurface->w, _vertexSurface->h), transparentKey);
 	for (uint i = 0; i < _board.positions().size(); i++) {
 		const MagicWallBoard::VertexColor vertexColor = static_cast<MagicWallBoard::VertexColor>(i);
-		const Common::Point32 pos = vertexPosition(i);
+		const Common::Point32 pos32 = vertexPosition(i);
 		// Keep the background under each disc to mask connections and retain the RLE edge blend.
-		_vm->_gfx->drawBackgroundSubRect(_vertexSurface, pos, Common::Rect(pos.x, pos.y, pos.x + 50, pos.y + 50));
-		drawVertexColorSprite(_vertexSurface, kDotFormat, vertexColor, pos, kDotSourceBrightness[vertexColor]);
+		_vm->_gfx->drawBackgroundSubRect(_vertexSurface, pos32, Common::Rect(pos32.x, pos32.y, pos32.x + 50, pos32.y + 50));
+		drawVertexColorSprite(_vertexSurface, kDotFormat, vertexColor, pos32, kDotSourceBrightness[vertexColor]);
 	}
 	_vertexSurfaceColorAssistMode = _vm->getColorAssistMode();
 }
@@ -957,11 +957,11 @@ void PuzzleMagicWall::drawVertices(ManagedSurface32 *screen) {
 }
 
 Common::Point32 PuzzleMagicWall::tabletPoint(int tablet, int point, int inset) const {
-	const Common::Point32 &p = _board.layout().vertexCoords[point];
+	const Common::Point32 &pos32 = _board.layout().vertexCoords[point];
 	const int firstX = _board.layout().vertexCoords[0].x;
 	const Common::Point32 origin = kTabletPositions[tablet];
-	return Common::Point32(origin.x + 3 * p.x + inset,
-						   origin.y + 3 * p.y + inset - static_cast<int>(3 * (p.x - firstX) * -0.5));
+	return Common::Point32(origin.x + 3 * pos32.x + inset,
+						   origin.y + 3 * pos32.y + inset - static_cast<int>(3 * (pos32.x - firstX) * -0.5));
 }
 
 void PuzzleMagicWall::drawRipple(ManagedSurface32 *screen, Common::Point32 from, const Common::Point32 &to, int phase) {
@@ -1051,8 +1051,8 @@ void PuzzleMagicWall::drawBeetles(ManagedSurface32 *screen) {
 		return;
 	for (uint i = 0; i < _board.positions().size(); i++) {
 		const MagicWallBoard::VertexColor vertexColor = static_cast<MagicWallBoard::VertexColor>(i);
-		drawVertexColorSprite(screen, kBugFormat, vertexColor, _beetles[i].position, kBugSourceBrightness[vertexColor]);
-		_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kDirectionFormat, _beetles[i].direction + 1), _beetles[i].position);
+		drawVertexColorSprite(screen, kBugFormat, vertexColor, _beetles[i].pos32, kBugSourceBrightness[vertexColor]);
+		_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kDirectionFormat, _beetles[i].direction + 1), _beetles[i].pos32);
 	}
 }
 
@@ -1118,7 +1118,7 @@ bool PuzzleMagicWall::vertexColorAssistRGB(ColorAssistMode mode, MagicWallBoard:
 }
 
 void PuzzleMagicWall::drawVertexColorSprite(ManagedSurface32 *screen, const char *format, MagicWallBoard::VertexColor vertexColor,
-											const Common::Point32 &pos, byte sourceBrightness) const {
+											const Common::Point32 &pos32, byte sourceBrightness) const {
 	const VertexColorNameMap &vertexColorNames = getVertexColorNames();
 	const VertexColorNameMap::const_iterator entry = vertexColorNames.find(vertexColor);
 	if (entry == vertexColorNames.end()) {
@@ -1130,9 +1130,9 @@ void PuzzleMagicWall::drawVertexColorSprite(ManagedSurface32 *screen, const char
 	if (vertexColorAssistRGB(_vm->getColorAssistMode(), vertexColor, displayColor)) {
 		const RleBlock *sprite = _vm->_gfx->loadPageRleBlock(key);
 		if (sprite)
-			sprite->drawToScreenRecolored(screen, pos, displayColor, _vm->getAlphaLUT(), nullptr, sourceBrightness);
+			sprite->drawToScreenRecolored(screen, pos32, displayColor, _vm->getAlphaLUT(), nullptr, sourceBrightness);
 	} else {
-		_vm->_gfx->drawPageRleBlock(screen, key, pos);
+		_vm->_gfx->drawPageRleBlock(screen, key, pos32);
 	}
 }
 

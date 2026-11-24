@@ -89,12 +89,10 @@ void ShelterFinal::init() {
 	debug(1, "BooliewoodFinalPage::init");
 	_vm->_state->clearActiveZoombinis();
 
-	if (!_vm->_gfx->loadBackground(kBackgroundPath)) {
+	if (!_vm->_gfx->loadBackground(kBackgroundPath))
 		warning("BooliewoodFinalPage: Failed to load big BOOL background");
-	}
-	if (!_vm->_gfx->loadPageBitBlock(kFullBigBoolPath)) {
+	if (!_vm->_gfx->loadPageBitBlock(kFullBigBoolPath))
 		warning("BooliewoodFinalPage: Failed to load thefullbigbool overlay");
-	}
 	_vm->_gfx->loadPageRleBlock(kRevealBigBoolPath);
 
 	_dancingBoolie = new Animation(_vm);
@@ -193,8 +191,7 @@ void ShelterFinal::onRenderContent(ManagedSurface32 *screen) {
 	for (int i = 0; i < kFireworkCount; i++) {
 		const FireworkState &firework = _fireworks[i];
 		if (firework.active)
-			drawAnimation(firework.animation, firework.frame,
-						  Common::Point32(firework.collisionRect.left, firework.collisionRect.top), screen);
+			drawAnimation(firework.animation, firework.frame, Common::Point32(firework.collisionRect.left, firework.collisionRect.top), screen);
 	}
 }
 
@@ -288,13 +285,13 @@ void ShelterFinal::resetFirework(int fireworkIndex, uint32 now) {
 	FireworkState &firework = _fireworks[fireworkIndex];
 	if (!firework.animation)
 		return;
-	Common::Point32 pos;
+	Common::Point32 pos32;
 	do {
-		pos.x = _vm->_rnd->getRandomNumber(749);
-		pos.y = _vm->_rnd->getRandomNumber(299);
-	} while (!isFireworkPositionFree(pos));
-	firework.collisionRect = Common::Rect(pos.x, pos.y, pos.x + 60, pos.y + 59);
-	firework.startPos = pos;
+		pos32.x = _vm->_rnd->getRandomNumber(749);
+		pos32.y = _vm->_rnd->getRandomNumber(299);
+	} while (!isFireworkPositionFree(pos32));
+	firework.collisionRect = Common::Rect(pos32.x, pos32.y, pos32.x + 60, pos32.y + 59);
+	firework.startPos = pos32;
 	firework.timeStep = 0;
 	firework.frame = 0;
 	firework.nextFrameTime = now + 40;
@@ -310,12 +307,12 @@ void ShelterFinal::moveFirework(FireworkState &firework) {
 	firework.collisionRect.bottom = y + 59;
 }
 
-bool ShelterFinal::isFireworkPositionFree(const Common::Point32 &pos) const {
+bool ShelterFinal::isFireworkPositionFree(const Common::Point32 &pos32) const {
 	const Common::Point32 corners[4] = {
-		pos,
-		Common::Point32(pos.x + 60, pos.y),
-		Common::Point32(pos.x, pos.y + 59),
-		Common::Point32(pos.x + 60, pos.y + 59),
+		pos32,
+		Common::Point32(pos32.x + 60, pos32.y),
+		Common::Point32(pos32.x, pos32.y + 59),
+		Common::Point32(pos32.x + 60, pos32.y + 59),
 	};
 	Common::Rect fixedRects[2] = {
 		Common::Rect(153, 3, 647, 416),
@@ -338,8 +335,8 @@ bool ShelterFinal::isFireworkPositionFree(const Common::Point32 &pos) const {
 	return true;
 }
 
-bool ShelterFinal::pointInsidePaddedRect(const Common::Point32 &pos, const Common::Rect &rect) {
-	return rect.left - 15 < pos.x && pos.x < rect.right + 15 && rect.top - 15 < pos.y && pos.y < rect.bottom + 15;
+bool ShelterFinal::pointInsidePaddedRect(const Common::Point32 &pos32, const Common::Rect &rect) {
+	return rect.left - 15 < pos32.x && pos32.x < rect.right + 15 && rect.top - 15 < pos32.y && pos32.y < rect.bottom + 15;
 }
 
 void ShelterFinal::scheduleNextAmbient(uint32 now) {
@@ -355,10 +352,10 @@ void ShelterFinal::playRandomAmbient() {
 		sound->playWithVolume(_ambientSoundIds[index], sound->getSpeechVolume());
 }
 
-void ShelterFinal::drawAnimation(const Animation *animation, int frameIndex, const Common::Point32 &pos, ManagedSurface32 *screen) const {
+void ShelterFinal::drawAnimation(const Animation *animation, int frameIndex, const Common::Point32 &pos32, ManagedSurface32 *screen) const {
 	if (!animation || animation->getFrameCount() <= 0)
 		return;
-	_vm->_gfx->drawAnimationFrame(screen, animation, frameIndex % animation->getFrameCount(), pos);
+	_vm->_gfx->drawAnimationFrame(screen, animation, frameIndex % animation->getFrameCount(), pos32);
 }
 
 void ShelterFinal::drawZoombini(const ZoombiniRunner &zoombini, ManagedSurface32 *screen) const {

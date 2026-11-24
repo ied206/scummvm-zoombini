@@ -227,11 +227,10 @@ void SoundManager::play(int id) {
 		return;
 
 	Audio::AudioStream *audioStream;
-	if (buf->loop) {
+	if (buf->loop)
 		audioStream = Audio::makeLoopingAudioStream(stream, 0);
-	} else {
+	else
 		audioStream = stream;
-	}
 	switch (_audioOutputMode) {
 	case AudioOutputMode::kStereoPlayback:
 		break;

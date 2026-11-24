@@ -126,7 +126,7 @@ public:
 	typedef void (*Callback)(void *context, AnimationRunner *runner);
 
 	/** Bind an empty runner to the game clock and initialize its mode-specific state. */
-	AnimationRunner(Zoombini2Engine *vm, const Common::Point32 &position, AnimationRunnerMode mode);
+	AnimationRunner(Zoombini2Engine *vm, const Common::Point32 &pos32, AnimationRunnerMode mode);
 	/** Release the optional background snapshot. */
 	~AnimationRunner();
 
@@ -144,7 +144,7 @@ public:
 	/** Start at the first timed entry without changing the playback mode or position. */
 	void start(uint32 tickCount);
 	/** Start at the first timed entry and replace the drawing position. */
-	void startAt(const Common::Point32 &position, uint32 tickCount);
+	void startAt(const Common::Point32 &pos32, uint32 tickCount);
 	/** Restart the current mode at the first timed entry. */
 	void reset(uint32 tickCount);
 	/** Stop playback and select the play-once mode. */
@@ -157,15 +157,15 @@ public:
 	bool isActive() const { return _currentTimedEntryIndex != -1; }
 
 	/** Replace the drawing position. */
-	void setPosition(const Common::Point32 &position) { _position = position; }
+	void setPosition(const Common::Point32 &pos32) { _pos32 = pos32; }
 	/** Return the drawing position before page-layer scrolling. */
-	Common::Point32 getPosition() const { return _position; }
+	Common::Point32 getPosition() const { return _pos32; }
 	/** Replace the page-coordinate rectangle used by general-object pointer input. */
 	void setHitRect(const Common::Rect32 &rect) { _hitRect = rect; }
 	/** Return the page-coordinate rectangle used by general-object pointer input. */
 	const Common::Rect32 &getHitRect() const { return _hitRect; }
-	/** Return whether @p point lies strictly inside the page-coordinate hit rectangle. */
-	bool containsHitPoint(const Common::Point32 &point) const;
+	/** Return whether @p pos32 lies strictly inside the page-coordinate hit rectangle. */
+	bool containsHitPoint(const Common::Point32 &pos32) const;
 	/** Select whether hover hit testing considers this runner. */
 	void setHitTestEnabled(bool enabled) { _hitTestEnabled = enabled; }
 	/** Return whether hover hit testing considers this runner. */
@@ -228,7 +228,7 @@ private:
 	/** Borrowed animation whose frames are selected by the timing table. */
 	const Animation *_animation = nullptr;
 	/** Unscrolled drawing anchor in page pixels. */
-	Common::Point32 _position;
+	Common::Point32 _pos32;
 	/** Playback policy used at cycle boundaries and random-idle gates. */
 	AnimationRunnerMode _mode;
 	/** Ordered image selections and cumulative end times for one cycle. */
@@ -740,13 +740,13 @@ public:
 	/** Return the selected base sprite size used by redraw bounds. */
 	const Size16 &getSpriteSize() const { return _spriteSize; }
 	/** Update the screen position and, when enabled, periodically refresh the directional animation cell. */
-	void setPosition(const Common::Point32 &pos);
+	void setPosition(const Common::Point32 &pos32);
 	/** Return the current screen position in game pixels. */
 	Common::Point32 getScreenPosition() const { return _screenPos; }
 	/** Store a page-selected position without changing the previous position or directional cell. */
-	void setScreenPositionWithoutTracking(const Common::Point32 &position) { _screenPos = position; }
+	void setScreenPositionWithoutTracking(const Common::Point32 &pos32) { _screenPos = pos32; }
 	/** Store the hold origin used when the current pointer hold ends. */
-	void setHoldOrigin(const Common::Point32 &position) { _holdOrigin = position; }
+	void setHoldOrigin(const Common::Point32 &pos32) { _holdOrigin = pos32; }
 	/** Return the screen position saved when the current hold began. */
 	Common::Point32 getHoldOrigin() const { return _holdOrigin; }
 	/** Store the pointer-to-sprite offset preserved during the active hold. */
@@ -766,7 +766,7 @@ public:
 	/** Return whether the retained movement path has completed. */
 	bool isMovementFinished() const { return _movementPath && _movementPath->isFinished(); }
 	/** Advance the retained path and return its position without updating the Zoombini position. */
-	bool advanceMovementPath(uint32 tickCount, Common::Point32 &position) { return _movementPath && _movementPath->advance(tickCount, position); }
+	bool advanceMovementPath(uint32 tickCount, Common::Point32 &pos32) { return _movementPath && _movementPath->advance(tickCount, pos32); }
 	/** Advance the retained path and apply @p spriteOffset without releasing a completed path. */
 	bool advanceMovement(uint32 tickCount, const Common::Point32 &spriteOffset = Common::Point32());
 	/** Release the retained path without changing the current position. */
@@ -802,8 +802,8 @@ public:
 	void updateAnimation(uint32 tickCount);
 	/** Roll an eligible fidget animation, then apply a scheduled frame transition after drawing. */
 	void advanceAnimationAfterDraw();
-	/** Return whether @p point lies inside the original fixed Zoombini pickup rectangle. */
-	bool hitTest(const Common::Point32 &point) const;
+	/** Return whether @p pos32 lies inside the original fixed Zoombini pickup rectangle. */
+	bool hitTest(const Common::Point32 &pos32) const;
 	/** Begin the common click-to-hold lifecycle if input and the pickup rectangle permit it. */
 	bool beginHold(const Common::Point32 &pointerPos, const ZoombiniAnimation *pickupAnimation, uint32 tickCount);
 	/** Begin holding with a previously loaded common pickup grid. */
@@ -926,8 +926,8 @@ private:
 	bool _bypassAnimationCompletionWork = false;
 
 private:
-	/** Return whether @p point lies strictly inside @p rect. */
-	static bool isStrictlyInside(const Common::Point32 &point, const Common::Rect32 &rect);
+	/** Return whether @p pos32 lies strictly inside @p rect. */
+	static bool isStrictlyInside(const Common::Point32 &pos32, const Common::Rect32 &rect);
 	/** Return whether common input may pick this Zoombini up at @p pointerPos. */
 	bool canBeginHold(const Common::Point32 &pointerPos) const;
 	/** Enter the held state after page target-removal callbacks have run. */

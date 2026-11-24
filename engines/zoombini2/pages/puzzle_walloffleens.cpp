@@ -227,7 +227,7 @@ void PuzzleWallOfFleens::buildGrid() {
 	for (int i = 0; i < _cellCount; i++) {
 		_cells[i] = MirrorCell();
 		const Common::Point32 coordinates = toCellCoordinates(i);
-		_cells[i].pos = Common::Point32(origin.x + coordinates.x * 52, origin.y + coordinates.y * 68);
+		_cells[i].pos32 = Common::Point32(origin.x + coordinates.x * 52, origin.y + coordinates.y * 68);
 	}
 	_clickCount = 0;
 	if (_puzzleLevel == 1) {
@@ -383,7 +383,7 @@ EventHandleResult PuzzleWallOfFleens::onLButtonUp(const Common::Point &pos) {
 		return EventHandleResult::kPassthrough;
 	for (int i = 0; i < _cellCount; i++) {
 		MirrorCell &cell = _cells[i];
-		if (pos.x < cell.pos.x || cell.pos.x + 52 <= pos.x || pos.y < cell.pos.y || cell.pos.y + 68 <= pos.y)
+		if (pos.x < cell.pos32.x || cell.pos32.x + 52 <= pos.x || pos.y < cell.pos32.y || cell.pos32.y + 68 <= pos.y)
 			continue;
 		const int previousClicks = _clickCount;
 		_clickCount += 1;
@@ -396,7 +396,7 @@ EventHandleResult PuzzleWallOfFleens::onLButtonUp(const Common::Point &pos) {
 		if (_puzzleLevel == 4)
 			cell.score += 10 * compareTraits(i, _alternateTarget);
 		_selected = i;
-		const int targetAngle = CLIP(direction(Common::Point32(470, 550), Common::Point32(cell.pos.x + 26, cell.pos.y + 34), 18),
+		const int targetAngle = CLIP(direction(Common::Point32(470, 550), Common::Point32(cell.pos32.x + 26, cell.pos32.y + 34), 18),
 									 static_cast<int>(CannonAimAngle::kRight00), static_cast<int>(CannonAimAngle::kLeft08));
 		_targetAngle = static_cast<CannonAimAngle>(targetAngle);
 		_shotPhase = ShotPhase::kAiming02;
@@ -552,9 +552,10 @@ void PuzzleWallOfFleens::onUpdate() {
 				playEffect(3);
 			}
 		}
-		if (z->canAdvanceFromPage())
+		if (z->canAdvanceFromPage()) {
 			z->tryStartCelebrationAnimation(ZmbAnimationKind::kCelebration, *_vm->_rnd, now, _vm->getFrameDeltaMs(),
 											_vm->getLogicPacingHz());
+		}
 		z->updateAnimation(now);
 	}
 	_fleensRunner.updateAnimation(now);
@@ -575,7 +576,7 @@ void PuzzleWallOfFleens::onUpdate() {
 	}
 	if (_shotPhase == ShotPhase::kAiming02) {
 		if (_angle == _targetAngle) {
-			startFlight(kMuzzles[static_cast<int>(_angle)], _cells[_selected].pos, 14);
+			startFlight(kMuzzles[static_cast<int>(_angle)], _cells[_selected].pos32, 14);
 			_shotPhase = ShotPhase::kOutbound03;
 			playEffect(4);
 		} else if (_aimTick < now) {
@@ -596,7 +597,7 @@ void PuzzleWallOfFleens::onUpdate() {
 	if ((_shotPhase == ShotPhase::kOutbound03 || _shotPhase == ShotPhase::kRebound04) && _projectilePath) {
 		if (!_projectilePath->advance(now, _projectilePos)) {
 			if (_shotPhase == ShotPhase::kOutbound03) {
-				startFlight(_cells[_selected].pos, Common::Point32(470, -550), 4);
+				startFlight(_cells[_selected].pos32, Common::Point32(470, -550), 4);
 				_shotPhase = ShotPhase::kRebound04;
 				_mirrorPhase = MirrorPhase::kRotating01;
 				_mirrorTick = now;
@@ -636,7 +637,7 @@ void PuzzleWallOfFleens::onUpdate() {
 		_shoutCount = 0;
 		_fleensRunner.setTraits(_cells[_selected].traits);
 		_fleensRunner.setDefaultAnimation(_fleensAnimation, 55);
-		_fleensRunner.setPosition(_cells[_selected].pos);
+		_fleensRunner.setPosition(_cells[_selected].pos32);
 		if (_vocif1 && _vocif2) {
 			_fleensRunner.startAnimation(_vocif1, 55, now);
 			_fleensRunner.setAnimationCompleteCallback(onFleenAnimationDone, this);
@@ -649,12 +650,12 @@ void PuzzleWallOfFleens::onUpdate() {
 	updateHoverCursor(_vm->getMousePos());
 }
 
-void PuzzleWallOfFleens::updateHoverCursor(const Common::Point32 &pos) {
+void PuzzleWallOfFleens::updateHoverCursor(const Common::Point32 &pos32) {
 	bool hovered = false;
 	if (!_finished && !_retreating) {
 		for (int i = 0; i < _cellCount; i++) {
-			const Common::Point32 &cellPos = _cells[i].pos;
-			if (cellPos.x <= pos.x && pos.x < cellPos.x + 52 && cellPos.y <= pos.y && pos.y < cellPos.y + 68) {
+			const Common::Point32 &cellPos = _cells[i].pos32;
+			if (cellPos.x <= pos32.x && pos32.x < cellPos.x + 52 && cellPos.y <= pos32.y && pos32.y < cellPos.y + 68) {
 				hovered = true;
 				break;
 			}
@@ -664,35 +665,36 @@ void PuzzleWallOfFleens::updateHoverCursor(const Common::Point32 &pos) {
 }
 
 EventHandleResult PuzzleWallOfFleens::onMouseMove(const Common::Point &pos) {
-	updateHoverCursor(Common::Point32(pos));
+	const Common::Point32 pos32 = Common::Point32(pos);
+	updateHoverCursor(pos32);
 	return EventHandleResult::kPassthrough;
 }
 
 void PuzzleWallOfFleens::drawCell(ManagedSurface32 *screen, const MirrorCell &cell, bool active) const {
 	if (cell.empty) {
-		_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[4], cell.pos);
+		_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[4], cell.pos32);
 		return;
 	}
 	const bool reacting = active && _selected != -1 && &cell == &_cells[_selected] && _mirrorPhase != MirrorPhase::kNone00;
 	if (reacting && _mirrorPhase != MirrorPhase::kRotating01) {
 		if (_mirrorPhase == MirrorPhase::kExploding02) {
-			_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[4], cell.pos);
+			_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[4], cell.pos32);
 			if (_fleensAnimation)
-				_vm->_gfx->drawZoombini(screen, _fleensAnimation, cell.traits, Common::Point32(cell.pos.x + 2, cell.pos.y + 2), 55, 0);
+				_vm->_gfx->drawZoombini(screen, _fleensAnimation, cell.traits, Common::Point32(cell.pos32.x + 2, cell.pos32.y + 2), 55, 0);
 		} else {
-			_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[4], cell.pos);
+			_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[4], cell.pos32);
 		}
 		if (_mirrorPhase == MirrorPhase::kExploding02 && _explode) {
 			const int frame = MIN<int>((_vm->getTotalPlayTime() - _mirrorTick) / 100, 5);
-			_vm->_gfx->drawAnimationFrame(screen, _explode, frame, cell.pos);
+			_vm->_gfx->drawAnimationFrame(screen, _explode, frame, cell.pos32);
 		}
 		return;
 	}
 	const bool revealed = cell.revealed;
-	_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[revealed ? 2 : 0], cell.pos);
+	_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[revealed ? 2 : 0], cell.pos32);
 	if (_fleensAnimation)
-		_vm->_gfx->drawZoombini(screen, _fleensAnimation, cell.traits, Common::Point32(cell.pos.x + 2, cell.pos.y + 2), 55, 0);
-	_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[revealed ? 3 : 1], cell.pos);
+		_vm->_gfx->drawZoombini(screen, _fleensAnimation, cell.traits, Common::Point32(cell.pos32.x + 2, cell.pos32.y + 2), 55, 0);
+	_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[revealed ? 3 : 1], cell.pos32);
 	if (reacting && _rotate) {
 		static constexpr int kFrames[21] = {
 			0,
@@ -720,14 +722,14 @@ void PuzzleWallOfFleens::drawCell(ManagedSurface32 *screen, const MirrorCell &ce
 		const uint32 elapsed = _vm->getTotalPlayTime() - _mirrorTick;
 		int index = elapsed < 440 ? elapsed / 40 : 11 + (elapsed - 440) / 70;
 		index = MIN(index, 20);
-		_vm->_gfx->drawAnimationFrame(screen, _rotate, kFrames[index], cell.pos);
+		_vm->_gfx->drawAnimationFrame(screen, _rotate, kFrames[index], cell.pos32);
 	} else if (revealed && 0 <= cell.score) {
 		if (cell.scoreMask & kShowPrimaryScore01)
-			_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kScoreFormat, cell.score % 10), cell.pos);
+			_vm->_gfx->drawPageRleBlock(screen, Common::String::format(kScoreFormat, cell.score % 10), cell.pos32);
 		if (cell.scoreMask & kShowSecondaryScore02) {
 			RleBlock *scoreSprite = _vm->_gfx->loadPageRleBlock(Common::String::format(kScoreFormat, cell.score / 10));
 			if (scoreSprite)
-				scoreSprite->drawToScreenMirrored(screen, cell.pos, _vm->getAlphaLUT());
+				scoreSprite->drawToScreenMirrored(screen, cell.pos32, _vm->getAlphaLUT());
 		}
 	}
 }
@@ -744,9 +746,9 @@ void PuzzleWallOfFleens::onRenderContent(ManagedSurface32 *screen) {
 					drawCell(screen, _easyHistory[panel * 6 + i], false);
 				} else if (_panel < panel) {
 					const Common::Point32 coordinates = toCellCoordinates(i);
-					const Common::Point32 pos(kPanelOrigins[panel].x + coordinates.x * 52, kPanelOrigins[panel].y + coordinates.y * 68);
-					_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[0], pos);
-					_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[1], pos);
+					const Common::Point32 pos32(kPanelOrigins[panel].x + coordinates.x * 52, kPanelOrigins[panel].y + coordinates.y * 68);
+					_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[0], pos32);
+					_vm->_gfx->drawPageRleBlock(screen, kMirrorPaths[1], pos32);
 				}
 			}
 		}

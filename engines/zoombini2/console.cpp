@@ -718,7 +718,7 @@ bool Zoombini2Console::Cmd_Plot(int argc, const char **argv) {
 	return true;
 }
 
-bool Zoombini2Console::parsePlotPoint(const char *xText, const char *yText, Common::Point32 &point) {
+bool Zoombini2Console::parsePlotPoint(const char *xText, const char *yText, Common::Point32 &pos32) {
 	int32 x = 0;
 	int32 y = 0;
 	if (!parseSignedInt(xText, x) || !parseSignedInt(yText, y))
@@ -727,7 +727,7 @@ bool Zoombini2Console::parsePlotPoint(const char *xText, const char *yText, Comm
 		debugPrintf("Coordinates must be in the signed 16-bit range.\n");
 		return false;
 	}
-	point = Common::Point32(x, y);
+	pos32 = Common::Point32(x, y);
 	return true;
 }
 
@@ -763,19 +763,19 @@ bool Zoombini2Console::CmdSub_PlotPoint(int argc, const char **argv) {
 		return true;
 	}
 
-	Common::Point32 point;
+	Common::Point32 pos32;
 	RGBColor color = kDefaultPlotColor;
-	if (!parsePlotPoint(argv[2], argv[3], point) || (argc == 5 && !parsePlotColor(argv[4], color))) {
+	if (!parsePlotPoint(argv[2], argv[3], pos32) || (argc == 5 && !parsePlotColor(argv[4], color))) {
 		debugPrintf("\n");
 		return true;
 	}
-	if (point.x < 0 || Gfx::kScreenSize.width <= point.x || point.y < 0 || Gfx::kScreenSize.height <= point.y) {
+	if (pos32.x < 0 || Gfx::kScreenSize.width <= pos32.x || pos32.y < 0 || Gfx::kScreenSize.height <= pos32.y) {
 		debugPrintf("Coordinates out of bounds (screen size: %d x %d).\n\n", Gfx::kScreenSize.width, Gfx::kScreenSize.height);
 		return true;
 	}
 
 	DialogDebugCommand cmd;
-	cmd.setPlotPoint(point, color);
+	cmd.setPlotPoint(pos32, color);
 	if (!_vm->openDebugDialog(cmd)) {
 		debugPrintf("Cannot open the plot debug dialog.\n\n");
 		return true;
@@ -1466,9 +1466,9 @@ bool Zoombini2Console::CmdSub_ListRunners(int argc, const char **argv) {
 			const AnimationRunner *runner = layer->getAnimationRunner(static_cast<int>(i));
 			if (!runner)
 				continue;
-			const Common::Point32 position = runner->getPosition();
+			const Common::Point32 pos32 = runner->getPosition();
 			const Common::Rect32 &hitRect = runner->getHitRect();
-			debugPrintf("    [%u] pos=(%d,%d) active=%d mode=%d timed=%d frame=%d input=%d hitTest=%d\n", i, position.x, position.y,
+			debugPrintf("    [%u] pos=(%d,%d) active=%d mode=%d timed=%d frame=%d input=%d hitTest=%d\n", i, pos32.x, pos32.y,
 						runner->isActive(), static_cast<int>(runner->getMode()), runner->getCurrentTimedEntryIndex(), runner->getCurrentFrameIndex(),
 						runner->isInputEnabled(), runner->isHitTestEnabled());
 			debugPrintf("         hitRect=(%d,%d,%d,%d)\n", hitRect.left, hitRect.top, hitRect.right, hitRect.bottom);

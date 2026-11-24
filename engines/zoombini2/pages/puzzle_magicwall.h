@@ -281,7 +281,7 @@ private:
 	static bool vertexColorAssistRGB(ColorAssistMode mode, MagicWallBoard::VertexColor vertexColor, RGBColor &displayColor);
 	/** Draw one identity-colored RLE resource with the current display palette. */
 	void drawVertexColorSprite(ManagedSurface32 *screen, const char *format, MagicWallBoard::VertexColor vertexColor,
-							   const Common::Point32 &pos, byte sourceBrightness) const;
+							   const Common::Point32 &pos32, byte sourceBrightness) const;
 	/** Screen locations for tablets, gates, roster runners, and gate lights. */
 	static constexpr Common::Point32 kTabletPositions[5] = {
 		{350, 400},
@@ -324,7 +324,7 @@ private:
 
 	struct Beetle {
 		/** Current beetle anchor in page pixels. */
-		Common::Point32 position;
+		Common::Point32 pos32;
 		/** Beetle movement path released on replacement or page teardown; nullptr while stationary. */
 		PathObject *path = nullptr;
 		/** Facing frame selected from the prior and next tablet points. */

@@ -228,7 +228,7 @@ private:
 	/** Compose the route-map overlays appropriate to the current progress. */
 	void drawMapOverlays(ManagedSurface32 *dst, PageId srcPageId, int mapRegion);
 	/** Draw one map-overlay RLE sprite retained for the current page. */
-	void drawOverlaySprite(ManagedSurface32 *dst, const Common::String &name, const Common::Point32 &pos);
+	void drawOverlaySprite(ManagedSurface32 *dst, const Common::String &name, const Common::Point32 &pos32);
 
 	/** Route shared as the template for each party member's path. */
 	Common::Path _patPath;

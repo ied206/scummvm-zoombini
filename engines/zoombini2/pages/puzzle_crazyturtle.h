@@ -146,7 +146,7 @@ private:
 		/** Index of the turtle animation and fixed visual. */
 		int type;
 		/** Screen position of the fixed visual. */
-		Common::Point32 pos;
+		Common::Point32 pos32;
 	};
 
 	/** Number of visible Zoombini features. */

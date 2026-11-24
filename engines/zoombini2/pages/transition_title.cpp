@@ -42,9 +42,8 @@ void TransitionTitle::init() {
 	_deadline = _vm->getTotalPlayTime() + 10000;
 
 	// Load the static title background.
-	if (!_vm->_gfx->loadBackground(kBackgroundPath)) {
+	if (!_vm->_gfx->loadBackground(kBackgroundPath))
 		warning("TitleScreen: Failed to load title background");
-	}
 
 	// Play the title music until the page is dismissed.
 	startPageMusic(Common::Path(_vm->isDemo() ? kDemoMusicPath : kMusicPath));

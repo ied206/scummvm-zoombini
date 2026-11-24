@@ -49,8 +49,8 @@ bool PageLayer::loadBackground(const Common::Path &path) {
 	return true;
 }
 
-AnimationRunner *PageLayer::createAnimationRunner(const Common::Point32 &position, AnimationRunnerMode mode) {
-	AnimationRunner *runner = new AnimationRunner(_vm, position, mode);
+AnimationRunner *PageLayer::createAnimationRunner(const Common::Point32 &pos32, AnimationRunnerMode mode) {
+	AnimationRunner *runner = new AnimationRunner(_vm, pos32, mode);
 	runner->setLayerIndex(_animationRunners.size());
 	_animationRunners.push_back(runner);
 	return runner;
@@ -80,10 +80,10 @@ void PageLayer::setRunnerMode(int runnerIndex, AnimationRunnerMode mode) {
 		runner->setMode(mode);
 }
 
-void PageLayer::setRunnerPosition(int runnerIndex, const Common::Point32 &position) {
+void PageLayer::setRunnerPosition(int runnerIndex, const Common::Point32 &pos32) {
 	AnimationRunner *runner = getAnimationRunner(runnerIndex);
 	if (runner)
-		runner->setPosition(position);
+		runner->setPosition(pos32);
 }
 
 void PageLayer::stopRunner(int runnerIndex) {
@@ -142,10 +142,10 @@ bool PageLayer::hasActiveRunner() const {
 	return false;
 }
 
-void PageLayer::startRunnerAt(int runnerIndex, const Common::Point32 &position) {
+void PageLayer::startRunnerAt(int runnerIndex, const Common::Point32 &pos32) {
 	AnimationRunner *runner = getAnimationRunner(runnerIndex);
 	if (runner)
-		runner->startAt(position, _vm->getFrameTickCount());
+		runner->startAt(pos32, _vm->getFrameTickCount());
 }
 
 void PageLayer::setScrollX(int16 scrollX) {
@@ -163,8 +163,8 @@ void PageLayer::restoreRunnerBackgrounds(ManagedSurface32 *screen) const {
 		_animationRunners[i]->restoreBackgroundIfInactive(screen);
 }
 
-bool PageLayer::hasInteractiveRunnerAt(const Common::Point32 &point) const {
-	const Common::Point32 worldPoint(getWorldX(point.x), point.y);
+bool PageLayer::hasInteractiveRunnerAt(const Common::Point32 &pos32) const {
+	const Common::Point32 worldPoint(getWorldX(pos32.x), pos32.y);
 	for (uint i = 0; i < _animationRunners.size(); i++) {
 		const AnimationRunner *runner = _animationRunners[i];
 		if (runner->isInputEnabled() && runner->isHitTestEnabled() && runner->containsHitPoint(worldPoint))
@@ -173,8 +173,8 @@ bool PageLayer::hasInteractiveRunnerAt(const Common::Point32 &point) const {
 	return false;
 }
 
-bool PageLayer::activateRunnersAt(const Common::Point32 &point) {
-	const Common::Point32 worldPoint(getWorldX(point.x), point.y);
+bool PageLayer::activateRunnersAt(const Common::Point32 &pos32) {
+	const Common::Point32 worldPoint(getWorldX(pos32.x), pos32.y);
 	bool hit = false;
 	for (uint i = 0; i < _animationRunners.size(); i++) {
 		AnimationRunner *runner = _animationRunners[i];
@@ -285,7 +285,7 @@ bool PageLayerStack::loadLayerBackground(int layerIndex, const Common::Path &pat
 	return true;
 }
 
-bool PageLayerStack::handlePointerButton(const Common::Point32 &point, bool pressed) {
+bool PageLayerStack::handlePointerButton(const Common::Point32 &pos32, bool pressed) {
 	if (!pressed) {
 		_pointerPressLatched = false;
 		return false;
@@ -295,14 +295,14 @@ bool PageLayerStack::handlePointerButton(const Common::Point32 &point, bool pres
 
 	bool hit = false;
 	for (uint i = 0; i < _layers.size(); i++)
-		hit = _layers[i]->activateRunnersAt(point) || hit;
+		hit = _layers[i]->activateRunnersAt(pos32) || hit;
 	_pointerPressLatched = true;
 	return hit;
 }
 
-bool PageLayerStack::hasInteractiveRunnerAt(const Common::Point32 &point) const {
+bool PageLayerStack::hasInteractiveRunnerAt(const Common::Point32 &pos32) const {
 	for (uint i = 0; i < _layers.size(); i++) {
-		if (_layers[i]->hasInteractiveRunnerAt(point))
+		if (_layers[i]->hasInteractiveRunnerAt(pos32))
 			return true;
 	}
 	return false;
@@ -408,12 +408,16 @@ EventHandleResult PageBase::handleEvent(const Common::Event &event) {
 		return pageResult;
 	bool layerHandled = false;
 	switch (event.type) {
-	case Common::EVENT_LBUTTONDOWN:
-		layerHandled = _vm->_gfx->getPageLayerStack()->handlePointerButton(Common::Point32(event.mouse), true);
+	case Common::EVENT_LBUTTONDOWN: {
+		const Common::Point32 pos32 = Common::Point32(event.mouse);
+		layerHandled = _vm->_gfx->getPageLayerStack()->handlePointerButton(pos32, true);
 		break;
-	case Common::EVENT_LBUTTONUP:
-		_vm->_gfx->getPageLayerStack()->handlePointerButton(Common::Point32(event.mouse), false);
+	}
+	case Common::EVENT_LBUTTONUP: {
+		const Common::Point32 pos32 = Common::Point32(event.mouse);
+		_vm->_gfx->getPageLayerStack()->handlePointerButton(pos32, false);
 		break;
+	}
 	default:
 		break;
 	}

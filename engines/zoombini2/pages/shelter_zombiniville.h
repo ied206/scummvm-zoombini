@@ -214,6 +214,8 @@ private:
 	bool isZoombiniReturning(const ZoombiniRunner *zoombini) const;
 	/** Return whether the supplied trait combination fits the current party. */
 	bool passesPackTraitLimits(const ZmbTrait &traits) const;
+	/** Return the current picker traits, with zero for each unselected station. */
+	ZmbTrait getSelectedTraits() const;
 	/** Select a random feature combination. */
 	void randomizeSelectedFeatures();
 	/** Reset all four stations to their first values. */
