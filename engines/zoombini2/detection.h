@@ -42,6 +42,7 @@ enum GameFeatures {
 	/**
 	 * Zoombinis: Mountain Rescue - v1.0 family.
 	 * - v1.0US
+	 * - v1.0FR
 	 * - v1.0NL
 	 * - v1.0HE
 	 *

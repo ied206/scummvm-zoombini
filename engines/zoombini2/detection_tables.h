@@ -45,6 +45,22 @@ static constexpr Zoombini2GameDescription gameDescriptions[] = {
 		},
 		GF_Z2_V10,
 	},
+	// Zoombinis 2: Mission Au Sommet
+	// French Windows, v1.0
+	// Build Date: 2001-09-09 UTC
+	// From Hajin Jang
+	{
+		{
+			"zoombini2",
+			"v1.0FR",
+			AD_ENTRY1s("Data/Bmp/story_intro/title_screen.bb", "3030199f2093de5e8f5a2437671bf0d2", 1440024),
+			Common::FR_FRA,
+			Common::kPlatformWindows,
+			ADGF_NO_FLAGS,
+			GUIO3(GUIO_NOASPECT, GUIO_NOLANG, GAMEOPTION_HELP_PAGE_COLOR_KEYING),
+		},
+		GF_Z2_V10 | GF_Z2_SOLID_HELP_PAGES | GF_Z2_SOLID_HELP_FRAME,
+	},
 	// Zoombinis: Mountain Rescue
 	// Dutch (Belgium and Netherlands) Windows, v1.0
 	// Build Date: 2001-09-09 UTC
@@ -95,7 +111,7 @@ static constexpr Zoombini2GameDescription gameDescriptions[] = {
 		GF_Z2_V11,
 	},
 	// Zoombinis: Mountain Rescue
-	// English Macintosh, v1.1; also the 2003 Adventure Workshop disc.
+	// English Macintosh, v1.1
 	// Build Date: 2001-11-27
 	// From Hajin Jang
 	{
@@ -130,7 +146,7 @@ static constexpr Zoombini2GameDescription gameDescriptions[] = {
 		GF_Z2_V11,
 	},
 	// Zoombinis: Mountain Rescue
-	// British English Macintosh, v1.1.
+	// British English Macintosh, v1.1
 	// Build Date: 2001-11-27
 	// From Hajin Jang
 	{
