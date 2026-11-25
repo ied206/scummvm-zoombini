@@ -34,6 +34,7 @@
 #include "common/util.h"
 
 namespace Common {
+class FSNode;
 class SaveFileManager;
 } // namespace Common
 
@@ -571,6 +572,12 @@ public:
 	bool importSavefile(const Common::String &savefileName, Common::SeekableReadStream *src, bool overwrite) const;
 	/** Validate and copy @p savefileName's original-format bytes to @p dest. */
 	bool exportSavefile(const Common::String &savefileName, Common::WriteStream *dest) const;
+	/**
+	 * Export a validated save to an external file.
+	 * @param savefileName Game-encoded name in this target.
+	 * @param dest Destination file in the selected directory.
+	 */
+	bool exportSavefile(const Common::String &savefileName, const Common::FSNode &dest) const;
 	/** Delete the saved game named @p savefileName. */
 	bool deleteSavefile(const Common::String &savefileName) const;
 	/** Rename a savefile without overwriting another savefile. */
@@ -582,12 +589,36 @@ public:
 
 	/** Validate a new name against @p language's single-byte typing set. */
 	static bool isValidSavefileName(const Common::String &savefileName, Common::Language language);
-	/** Convert a GUI name to the release encoding without losing characters. */
+	/**
+	 * Encode a Unicode name using the release's code page.
+	 * @param displayName Unicode name to encode.
+	 * @param[out] savefileName Receives the name in the release's encoding.
+	 * @return Whether decoding the encoded name reproduces @p displayName.
+	 */
 	bool encodeSavefileName(const Common::U32String &displayName, Common::String &savefileName) const;
+	/**
+	 * Encode a name and apply the rules for newly created savefiles.
+	 * @param displayName Unicode name from the GUI or an external filename.
+	 * @param[out] savefileName Receives the name in the release's encoding.
+	 * @return Whether the name can be encoded without loss and passes @ref Zoombini2SavegameManager::isValidSavefileName.
+	 */
+	bool encodeNewSavefileName(const Common::U32String &displayName, Common::String &savefileName) const;
 	/** Convert a stored game-encoded name for display in the ScummVM GUI. */
 	Common::U32String decodeSavefileName(const Common::String &savefileName) const;
 
 private:
+	/**
+	 * Open a valid save positioned at the first byte for export.
+	 * @param savefileName Game-encoded name in this target.
+	 * @return The caller-owned stream, or nullptr if the save could not be loaded.
+	 */
+	Common::SeekableReadStream *openSavefileForExport(const Common::String &savefileName) const;
+	/**
+	 * Copy save bytes without reserializing the game state.
+	 * @param src Validated save stream positioned at the first byte.
+	 * @param dest Stream receiving the original save bytes.
+	 */
+	static bool copySavefile(Common::SeekableReadStream &src, Common::WriteStream &dest);
 	/** Check length and path safety for a previously stored name without imposing the typing whitelist. */
 	static bool isSafeStoredSavefileName(const Common::String &savefileName);
 	/** Convert the game-encoded @p savefileName to a target-prefixed filesystem name ending in `.mk`. */

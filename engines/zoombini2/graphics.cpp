@@ -1662,7 +1662,7 @@ void Gfx::drawZoombiniNameBox(ManagedSurface32 *destSurface, const Common::Strin
 	if (!bmtFont)
 		return;
 	const ZmbReleaseInfo::NameTooltipLayout layout = _vm->getRelInfo().getNameTooltipLayout();
-	drawRleBlock(destSurface, _nameBoxSprite, layout.platePosition);
+	drawRleBlock(destSurface, _nameBoxSprite, layout.platePos32);
 	const int width = bmtFont->getStringLayoutWidth(name);
 	const uint32 textColor = Gfx::PredefinedColor::kDark00.toPixel(destSurface->format);
 	bmtFont->drawString(destSurface, Common::Point32(layout.textAnchor.x - width / 2, layout.textAnchor.y), name, Gfx::kNoMaxWidth, textColor);

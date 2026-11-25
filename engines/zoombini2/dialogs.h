@@ -48,6 +48,7 @@ class ThemeEval;
 namespace Zoombini2 {
 
 class Zoombini2Engine;
+class Zoombini2SavegameManager;
 
 /** In-game ScummVM menu that applies Zoombini2 settings when its options dialog closes. */
 class Zoombini2MenuDialog : public MainMenuDialog {
@@ -190,8 +191,6 @@ private:
 	void exportSelectedSavefile();
 	/** Confirm and delete the selected savefile. */
 	void deleteSelectedSavefile();
-	/** Return an existing case-insensitive child, or the normal child when absent. */
-	static Common::FSNode findChild(const Common::FSNode &directory, const Common::String &name);
 	/** Scale a fixed dialog measurement for the active GUI scale. */
 	static int scaleDialogValue(int value);
 
@@ -259,7 +258,7 @@ public:
 	void load() override;
 	/** Store every compatibility switch in the target configuration. */
 	bool save() override;
-	/** Open the savefile manager or forward an ordinary widget command. */
+	/** Handle save transfers, save management and ordinary option commands. */
 	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
 
 private:
@@ -269,6 +268,10 @@ private:
 	class FrameRateNumberBox;
 	/** Command used to open @ref Zoombini2SaveManagementDialog. */
 	static constexpr uint32 kManageSavefilesCommand = 'z2mg';
+	/** Command used to import saved games from a directory. */
+	static constexpr uint32 kImportSavefilesCommand = 'z2ia';
+	/** Command used to export saved games to a directory. */
+	static constexpr uint32 kExportSavefilesCommand = 'z2ea';
 	/** Command emitted when the frame-rate unlock checkbox changes. */
 	static constexpr uint32 kUnlockFrameRateCommand = 'z2ul';
 	/** Enable per-savefile write-lock controls for repeatable tests. */
@@ -322,6 +325,20 @@ private:
 	void defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const override;
 	/** Enable the frame-rate controls according to the unlock checkbox. */
 	void updateFrameRateControls();
+
+	/** Bind storage and the active game's save format to the selected target. */
+	Zoombini2SavegameManager createSavegameManager() const;
+	/** Import the selected directory's Z2 .mk files into this target. */
+	void importSavefiles();
+	/** Export this target's saved games to the selected directory. */
+	void exportSavefiles();
+	/**
+	 * Display the number of transferred files and reasons for skipped files.
+	 * @param message Localized transfer count.
+	 * @param failures Number of files that failed validation or copying.
+	 * @param activeSkipped Number of imported names reserved by the running game.
+	 */
+	static void showSaveTransferResult(const Common::U32String &message, uint failures, uint activeSkipped = 0);
 };
 
 } // End of namespace Zoombini2

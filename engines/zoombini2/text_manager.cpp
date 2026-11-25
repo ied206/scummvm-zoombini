@@ -58,21 +58,37 @@ TextManager::~TextManager() {
 
 TextManager::LocalizedStringMap TextManager::createLocalizedStrings() {
 	LocalizedStringMap strings;
-	strings[kRestoredLevelLabel][Common::EN_USA] = U"VERY, VERY HARD";
-	strings[kRestoredLevelLabel][Common::KO_KOR] = U"삭제되었던 4단계";
 
-	strings[kMissingLevel4Help][Common::EN_USA] = U"No help resource is available for level 4.";
-	strings[kMissingLevel4Help][Common::KO_KOR] = U"4단계는 도움말 리소스가 없습니다.";
+	{
+		LanguageStrings &strs = strings[kRestoredLevelLabel];
+		// Brings original text for level 4 from the 'Logical Journey of the Zoombinis'
+		strs[Common::EN_USA] = U"VERY, VERY HARD";
+		strs[Common::DE_DEU] = U"TOTAL SCHWER";
+		strs[Common::FR_FRA] = U"MISSION IMPOSSIBLE";
+		strs[Common::JA_JPN] = U"とってもとっても難しい";
+		strs[Common::PL_POL] = U"TRUDNIEJSZE NIŻ TRUDNE";
+		// Exception: Korean text for level 4 have different translations in LJ and MR.
+		strs[Common::KO_KOR] = U"삭제되었던 4단계"; // Custom texts to match sequel's level name translations.
+	}
 
-	strings[kConfirmCaseCollision][Common::EN_USA] =
-		U"A save that differs only in letter case exists.\nThe new save will overwrite it.\nAre you sure to overwrite?";
-	strings[kConfirmCaseCollision][Common::KO_KOR] =
-		U"대소문자만 다른 저장파일 이름이 있습니다.\n새 파일은 기존 저장파일을 덮어씁니다.\n덮어쓸까요?";
+	{
+		LanguageStrings &strs = strings[kMissingLevel4Help];
+		strs[Common::EN_USA] = U"No help resource is available for level 4.";
+		strs[Common::KO_KOR] = U"4단계는 도움말 리소스가 없습니다.";
+	}
 
-	strings[kConfirmReadOnlyLoad][Common::EN_USA] =
-		U"This saved game will open in read-only mode.\nProgress will not be saved.\nContinue?";
-	strings[kConfirmReadOnlyLoad][Common::KO_KOR] =
-		U"이 저장파일은 읽기 전용 모드로 열립니다.\n진행 상황은 저장되지 않습니다.\n계속할까요?";
+	{
+		LanguageStrings &strs = strings[kConfirmCaseCollision];
+		strs[Common::EN_USA] = U"A save that differs only in letter case exists.\nThe new save will overwrite it.\nAre you sure to overwrite?";
+		strs[Common::KO_KOR] = U"대소문자만 다른 저장파일 이름이 있습니다.\n새 파일은 기존 저장파일을 덮어씁니다.\n덮어쓸까요?";
+	}
+
+	{
+		LanguageStrings &strs = strings[kConfirmReadOnlyLoad];
+		strs[Common::EN_USA] = U"This saved game will open in read-only mode.\nProgress will not be saved.\nContinue?";
+		strs[Common::KO_KOR] = U"이 저장파일은 읽기 전용 모드로 열립니다.\n진행 상황은 저장되지 않습니다.\n계속할까요?";
+	}
+
 	return strings;
 }
 

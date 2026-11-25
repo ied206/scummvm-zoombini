@@ -268,6 +268,57 @@ static constexpr Zoombini2GameDescription gameDescriptions[] = {
 	{AD_TABLE_END_MARKER, GF_NONE},
 };
 
+/** Resource layouts for unregistered releases, checked after exact game and installer signatures. */
+static constexpr Zoombini2GameDescription kFuzzyGameDescriptions[] = {
+	// Windows disc layout with CD assets in Data/ and installed files in INSTALL/HD/.
+	{
+		{
+			"zoombini2",
+			"Unknown release",
+			AD_ENTRY4s("Data/Bmp/story_intro/title_screen.bb", nullptr, 1440024,
+					   "INSTALL/HD/Bmp/Map/background.bb", nullptr, 1440024,
+					   "Data/Bmp/ZOMBIS/littleZomb.anm", nullptr, AD_NO_SIZE,
+					   "INSTALL/HD/zoombini2.exe", nullptr, AD_NO_SIZE),
+			Common::UNK_LANG,
+			Common::kPlatformWindows,
+			ADGF_UNSTABLE,
+			GUIO1(GUIO_NOASPECT),
+		},
+		GF_NONE,
+	},
+	// Flat Windows layout with both resource sets in the root Bmp/ directory.
+	{
+		{
+			"zoombini2",
+			"Unknown release",
+			AD_ENTRY4s("Bmp/story_intro/title_screen.bb", nullptr, 1440024,
+					   "Bmp/Map/background.bb", nullptr, 1440024,
+					   "Bmp/ZOMBIS/littleZomb.anm", nullptr, AD_NO_SIZE,
+					   "zoombini2.exe", nullptr, AD_NO_SIZE),
+			Common::UNK_LANG,
+			Common::kPlatformWindows,
+			ADGF_UNSTABLE,
+			GUIO1(GUIO_NOASPECT),
+		},
+		GF_NONE,
+	},
+	// Macintosh layout with CD assets in root Bmp/ and installed assets in Data/Bmp/.
+	{
+		{
+			"zoombini2",
+			"Unknown release",
+			AD_ENTRY3s("Bmp/story_intro/title_screen.bb", nullptr, 1440024,
+					   "Data/Bmp/Map/background.bb", nullptr, 1440024,
+					   "Bmp/ZOMBIS/littleZomb.anm", nullptr, AD_NO_SIZE),
+			Common::UNK_LANG,
+			Common::kPlatformMacintosh,
+			ADGF_UNSTABLE,
+			GUIO1(GUIO_NOASPECT),
+		},
+		GF_NONE,
+	},
+};
+
 /**
  * Packaged installer signatures used by fallback detection to provide extraction instructions.
  */

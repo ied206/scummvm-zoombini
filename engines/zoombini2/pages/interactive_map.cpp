@@ -687,44 +687,16 @@ void InteractiveMap::drawL4Legend(ManagedSurface32 *screen) const {
 		return;
 
 	const Common::U32String &label = _vm->_text->getLocalizedString(TextManager::kRestoredLevelLabel);
+	const Common::Rect32 labelBounds(kL4TabRight + kL4TabTextMargin, kL4TabTop, kL4LabelRightEdge - kL4TabTextMargin, kL4TabBottom);
+	const ZmbReleaseInfo::RestoredLevelLabelLayout layout = _vm->getRelInfo().getRestoredLevelLabelLayout(labelBounds);
 
-	const int textX = kL4TabRight + kL4TabTextMargin;
-	int textY = kL4TabTop + (kL4TabBottom - kL4TabTop - fontHeight) / 2;
-	// In some releases, L1-L3 label can take up to two lines.
-	// Our L4 label should be moved to bottom a bit in that case.
-	switch (_vm->getLanguage()) {
-	case Common::KO_KOR:
-		textY += 12;
-		break;
-	case Common::PL_POL:
-		textY += 8;
-		break;
-	default:
-		break;
-	}
-
-	int textRightEdge;
-	switch (_vm->getLanguage()) {
-	case Common::KO_KOR:
-		textRightEdge = kL4TabTextRightEdgeKo;
-		break;
-	default:
-		textRightEdge = kL4TabTextRightEdgeEn;
-		break;
-	}
-	const int maxWidth = textRightEdge - textX - kL4TabTextMargin;
+	const int maxWidth = layout.bounds.width();
 	if (maxWidth <= 0)
 		return;
 
-	switch (_vm->getLanguage()) {
-	case Common::KO_KOR:
-		conf.hAlign = Graphics::kTextAlignCenter;
-		break;
-	default:
-		conf.hAlign = Graphics::kTextAlignLeft;
-		break;
-	}
-	_vm->_gfx->drawString(screen, label, Common::Point32(textX, textY), maxWidth, conf);
+	const int textY = layout.bounds.top + (layout.bounds.height() - fontHeight) / 2;
+	conf.hAlign = layout.alignment;
+	_vm->_gfx->drawString(screen, label, Common::Point32(layout.bounds.left, textY), maxWidth, conf);
 }
 
 // ============================================================================

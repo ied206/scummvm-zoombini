@@ -148,10 +148,8 @@ private:
 	static constexpr RGBColor kL4Color = RGBColor(43, 4, 2); // #2B0402
 	/** Horizontal margin between the level 4 tab, its label, and the legend edge. */
 	static constexpr int kL4TabTextMargin = 9;
-	/** Right edge of the level 4 label zone on the legend scroll. */
-	static constexpr int kL4TabTextRightEdgeEn = 760;
-	/** Right alignment boundary in page pixels for the Korean level 4 label. */
-	static constexpr int kL4TabTextRightEdgeKo = 740;
+	/** Default right edge of the level 4 label area before its margin. */
+	static constexpr int kL4LabelRightEdge = 760;
 
 	/** Icon hit-test rectangles in map coordinates. */
 	static const Common::Rect kIconHitRects[kNumIcons];
@@ -306,7 +304,7 @@ private:
 	int hitTestLegendTab(const Common::Point32 &pos32) const;
 	/** Apply a practice-map level after checking the optional level 4 tier. */
 	bool selectPracticeLevel(int level);
-	/** Draw the optional dark level 4 tab beneath the original legend with its restored label in black with a yellow outline, shrinking the label when it exceeds the legend. */
+	/** Draw the optional level 4 tab and wrap longer labels below it within the legend width. */
 	void drawL4Legend(ManagedSurface32 *screen) const;
 
 	/** Return whether this page uses direct practice selection. */

@@ -37,6 +37,7 @@ static constexpr const char *directoryGlobs[] = {
 	"INSTALL",
 	"HD",
 	"Bmp",
+	"Map",
 	"ZOMBIS",
 	"Sounds",
 	"movies",
@@ -72,11 +73,16 @@ public:
 	DetectedGame toDetectedGame(const ADDetectedGame &adGame, ADDetectedGameExtraInfo *extraInfo) const override;
 	/** Show installer extraction instructions during interactive detection, before registration. */
 	DetectedGames detectGames(const Common::FSList &fslist, uint32 skipADFlags = 0, bool skipIncomplete = false) override;
-	/**
-	 * Recognize the installer disc with manual extraction is required.
-	 * In that case, explain user how to unpack it.
-	 */
+	/** Recognize known installer discs and identify unknown releases by their resource layout. */
 	ADDetectedGame fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist, ADDetectedGameExtraInfo **extra) const override;
+
+private:
+	/**
+	 * Return the match with its actual file fingerprints if all required files satisfy the description.
+	 * @param allFiles Files indexed by their detector paths.
+	 * @param description Description containing the required paths and any size or hash constraints.
+	 */
+	ADDetectedGame matchFallbackFiles(const FileMap &allFiles, const ADGameDescription &description) const;
 };
 
 DetectedGames Zoombini2MetaEngineDetection::detectGames(const Common::FSList &fslist, uint32 skipADFlags, bool skipIncomplete) {
@@ -99,26 +105,37 @@ DetectedGames Zoombini2MetaEngineDetection::detectGames(const Common::FSList &fs
 	return games;
 }
 
-ADDetectedGame Zoombini2MetaEngineDetection::fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist, ADDetectedGameExtraInfo **extra) const {
-	for (const auto &installer : Zoombini2::kPackagedInstallers) {
-		ADDetectedGame game(&installer.desc);
-		bool allMatched = true;
-		for (const ADGameFileDescription *file = installer.desc.filesDescriptions; file->fileName; file++) {
-			const Common::Path path(file->fileName);
-			FileProperties properties;
-			if (!allFiles.contains(path) || !getFileProperties(allFiles, kMD5Head, path, properties) || properties.size != file->fileSize || properties.md5 != file->md5) {
-				allMatched = false;
-				break;
-			}
-			game.matchedFiles[path] = properties;
+ADDetectedGame Zoombini2MetaEngineDetection::matchFallbackFiles(const FileMap &allFiles, const ADGameDescription &description) const {
+	ADDetectedGame game(&description);
+	for (const ADGameFileDescription *fileDesc = description.filesDescriptions; fileDesc->fileName; fileDesc++) {
+		const Common::Path path(fileDesc->fileName);
+		FileProperties fileProp;
+		if (!allFiles.contains(path) || !getFileProperties(allFiles, kMD5Head, path, fileProp) || fileProp.size <= 0 ||
+			(fileDesc->fileSize != AD_NO_SIZE && fileProp.size != fileDesc->fileSize) || (fileDesc->md5 && fileProp.md5 != fileDesc->md5)) {
+			return ADDetectedGame();
 		}
-		if (!allMatched)
+		game.matchedFiles[path] = fileProp;
+	}
+	return game;
+}
+
+ADDetectedGame Zoombini2MetaEngineDetection::fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist, ADDetectedGameExtraInfo **extra) const {
+	for (const Zoombini2::Zoombini2GameDescription &installerDesc : Zoombini2::kPackagedInstallers) {
+		ADDetectedGame game = matchFallbackFiles(allFiles, installerDesc.desc);
+		if (!game.desc)
 			continue;
 		if (extra) {
 			*extra = new ADDetectedGameExtraInfo();
 			(*extra)->gameName = Common::String::format("%s Installer", getEngineName());
 			(*extra)->targetID = "zoombini2-installer";
 		}
+		return game;
+	}
+	for (const Zoombini2::Zoombini2GameDescription &release : Zoombini2::kFuzzyGameDescriptions) {
+		ADDetectedGame game = matchFallbackFiles(allFiles, release.desc);
+		if (!game.desc)
+			continue;
+		game.hasUnknownFiles = true;
 		return game;
 	}
 	return ADDetectedGame();

@@ -40,8 +40,14 @@
 namespace Zoombini2 {
 
 ZmbReleaseInfo::ZmbReleaseInfo(const Zoombini2GameDescription &gameDesc)
-	: _features(gameDesc.features), _language(gameDesc.desc.language),
+	: _features(gameDesc.features), _language(resolveLanguage(gameDesc.desc.language)),
 	  _platform(gameDesc.desc.platform), _demo((gameDesc.desc.flags & ADGF_DEMO) != 0) {
+}
+
+Common::Language ZmbReleaseInfo::resolveLanguage(Common::Language detectedLanguage) {
+	if (detectedLanguage != Common::UNK_LANG)
+		return detectedLanguage;
+	return Common::parseLanguage(ConfMan.get("language"));
 }
 
 Common::CodePage ZmbReleaseInfo::getCodePage(Common::Language language, Common::Platform platform) {
@@ -102,10 +108,29 @@ ZmbReleaseInfo::BitmapTextLayout ZmbReleaseInfo::getBitmapTextLayout() const {
 
 ZmbReleaseInfo::NameTooltipLayout ZmbReleaseInfo::getNameTooltipLayout() const {
 	NameTooltipLayout layout;
-	layout.platePosition = Common::Point32(310, 565);
+	layout.platePos32 = Common::Point32(310, 565);
 	layout.textAnchor = Common::Point32(400, 570);
 	if (getBitmapTextLayout() == BitmapTextLayout::kHebrew)
 		layout.textAnchor.x -= 50;
+	return layout;
+}
+
+ZmbReleaseInfo::RestoredLevelLabelLayout ZmbReleaseInfo::getRestoredLevelLabelLayout(const Common::Rect32 &labelBounds) const {
+	RestoredLevelLabelLayout layout = {labelBounds, Graphics::kTextAlignLeft};
+	// In some releases, L1-L3 label can take up to two lines.
+	// Our L4 label should be moved to bottom a bit in that case.
+	switch (_language) {
+	case Common::KO_KOR:
+		layout.bounds.translate(0, 12);
+		layout.bounds.setWidth(MAX<int32>(0, layout.bounds.width() - 20));
+		layout.alignment = Graphics::kTextAlignCenter;
+		break;
+	case Common::PL_POL:
+		layout.bounds.translate(0, 8);
+		break;
+	default:
+		break;
+	}
 	return layout;
 }
 

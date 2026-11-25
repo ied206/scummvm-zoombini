@@ -29,6 +29,7 @@
 #include "common/str.h"
 
 #include "engines/advancedDetector.h"
+#include "graphics/font.h"
 
 #include "zoombini2/detection.h"
 
@@ -81,12 +82,19 @@ public:
 	/** Page-pixel placement of the held Zoombini's name plate and measured text anchor. */
 	struct NameTooltipLayout {
 		/** Top-left position of the name-plate sprite. */
-		Common::Point32 platePosition;
+		Common::Point32 platePos32;
 		/** Text origin before subtracting half the game's signed layout width. */
 		Common::Point32 textAnchor;
 	};
+	/** Release-specific placement of the restored level 4 label on the practice map. */
+	struct RestoredLevelLabelLayout {
+		/** Page-pixel bounds for first-line centering and text wrapping. */
+		Common::Rect32 bounds;
+		/** Horizontal alignment within the label area. */
+		Graphics::TextAlign alignment;
+	};
 
-	/** Snapshot the detector's family flags, language, platform and demo status. */
+	/** Snapshot release metadata, using the configured game language when the detector leaves it unknown. */
 	explicit ZmbReleaseInfo(const Zoombini2GameDescription &gameDesc);
 	/** Match a release implementation lineage. */
 	bool isFamily(Family family) const;
@@ -94,7 +102,7 @@ public:
 	bool isFamily(Family family, Common::Language language) const;
 	/** Return whether puzzle generators reseed from gameplay ticks (Windows v1.0 only). */
 	bool usesGameplayTickReseeding() const;
-	/** Return the detected game language. */
+	/** Return the detected or configured game language. */
 	Common::Language getLanguage() const { return _language; }
 	/** Return the platform recorded by the detector. */
 	Common::Platform getPlatform() const { return _platform; }
@@ -110,10 +118,23 @@ public:
 	BitmapTextLayout getBitmapTextLayout() const;
 	/** Select name-plate placement, including the Hebrew text adjustment. */
 	NameTooltipLayout getNameTooltipLayout() const;
+	/**
+	 * Apply the release-specific placement and alignment of the restored fourth difficulty label.
+	 * @param labelBounds Default label rectangle in page pixels, with the horizontal margins applied.
+	 */
+	RestoredLevelLabelLayout getRestoredLevelLabelLayout(const Common::Rect32 &labelBounds) const;
 	/** Select the first startup page, including publisher branding and the demo's direct title entry. */
 	PageId getStartupPageId() const;
 
 private:
+	/**
+	 * Use the configured game language when detection leaves it unknown.
+	 * Fuzzy detection reports @ref Common::UNK_LANG because localized releases share the same resource layout.
+	 * The launcher's per-game language setting then supplies the language for text and layout selection.
+	 * @param detectedLang Language recorded by the detector.
+	 */
+	static Common::Language resolveLanguage(Common::Language detectedLang);
+
 	/** Detector feature bits retained for release-family selection. */
 	const uint32 _features;
 	/** Detected language retained for localized resource and layout selection. */

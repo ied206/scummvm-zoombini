@@ -19,10 +19,13 @@
  *
  */
 
+#include "common/algorithm.h"
 #include "common/config-manager.h"
 #include "common/fs.h"
 #include "common/gui_options.h"
+#include "common/hash-str.h"
 #include "common/language.h"
+#include "common/ptr.h"
 #include "common/system.h"
 #include "common/translation.h"
 #include "common/util.h"
@@ -53,6 +56,8 @@ constexpr uint32 Zoombini2SaveManagementDialog::kImportSavefileCommand;
 constexpr uint32 Zoombini2SaveManagementDialog::kExportSavefileCommand;
 constexpr uint32 Zoombini2SaveManagementDialog::kSavefileSelectionChangedCommand;
 constexpr uint32 Zoombini2OptionsWidget::kManageSavefilesCommand;
+constexpr uint32 Zoombini2OptionsWidget::kImportSavefilesCommand;
+constexpr uint32 Zoombini2OptionsWidget::kExportSavefilesCommand;
 constexpr uint32 Zoombini2OptionsWidget::kUnlockFrameRateCommand;
 
 class Zoombini2SaveManagementDialog::SavefileListWidget : public GUI::ScrollContainerWidget {
@@ -299,12 +304,43 @@ void Zoombini2SavefileNameDialog::handleCommand(GUI::CommandSender *sender, uint
 	}
 }
 
+static const Zoombini2Engine *getActiveZoombini2Engine(const Common::String &domain) {
+	if (g_engine && ConfMan.getActiveDomainName() == domain && Common::String(g_engine->getMetaEngine()->getName()) == "zoombini2")
+		return static_cast<const Zoombini2Engine *>(g_engine);
+	return nullptr;
+}
+
+/** Apply the launcher's selected game's savepath for the duration of a save action. */
+class ScopedSaveTarget {
+public:
+	/**
+	 * Select the target in the launcher, where there is no running engine.
+	 * @param domain Game options domain performing the save action.
+	 */
+	explicit ScopedSaveTarget(const Common::String &domain)
+		: _prevDomain(ConfMan.getActiveDomainName()), _changed(!g_engine && _prevDomain != domain) {
+		if (_changed)
+			ConfMan.setActiveDomain(domain);
+	}
+
+	/** Restore the configuration domain used before the save action. */
+	~ScopedSaveTarget() {
+		if (_changed)
+			ConfMan.setActiveDomain(_prevDomain);
+	}
+
+private:
+	/** Active game domain when the save action began. */
+	const Common::String _prevDomain;
+	/** Whether storage was switched to the game selected in the launcher. */
+	const bool _changed;
+};
+
 Zoombini2SaveManagementDialog::Zoombini2SaveManagementDialog(const Common::String &domain)
 	: GUI::Dialog(0, 0, 1, 1), _domain(domain), _savefileSelectionGroup(this, kSavefileSelectionChangedCommand) {
 	_language = Common::parseLanguage(ConfMan.get("language", _domain));
 	_platform = Common::parsePlatform(ConfMan.get("platform", _domain));
-	if (g_engine && ConfMan.getActiveDomainName() == _domain && Common::String(g_engine->getMetaEngine()->getName()) == "zoombini2") {
-		const Zoombini2Engine *vm = static_cast<const Zoombini2Engine *>(g_engine);
+	if (const Zoombini2Engine *vm = getActiveZoombini2Engine(_domain)) {
 		_language = vm->getLanguage();
 		_platform = vm->getPlatform();
 	}
@@ -634,10 +670,8 @@ void Zoombini2SaveManagementDialog::updateButtons() {
 }
 
 bool Zoombini2SaveManagementDialog::isActiveSavefile(const Common::String &savefileName) const {
-	if (!g_engine || ConfMan.getActiveDomainName() != _domain || Common::String(g_engine->getMetaEngine()->getName()) != "zoombini2")
-		return false;
-	const Zoombini2Engine *vm = static_cast<const Zoombini2Engine *>(g_engine);
-	return vm->isActiveGameSave(savefileName);
+	const Zoombini2Engine *vm = getActiveZoombini2Engine(_domain);
+	return vm && vm->isActiveGameSave(savefileName);
 }
 
 void Zoombini2SaveManagementDialog::renameSelectedSavefile() {
@@ -705,15 +739,13 @@ void Zoombini2SaveManagementDialog::importSavefile() {
 	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language, _platform);
 	Common::String savefileName;
 	Common::U32String displayName = srcName.substr(0, extensionPosition).decode(Common::kUtf8);
-	bool validName = savegameManager.encodeSavefileName(displayName, savefileName) &&
-					 Zoombini2SavegameManager::isValidSavefileName(savefileName, _language);
+	bool validName = savegameManager.encodeNewSavefileName(displayName, savefileName);
 	while (!validName) {
 		Zoombini2SavefileNameDialog nameDialog(_("Choose compatible save name"), displayName, _language);
 		if (nameDialog.runModal() != GUI::kOKCmd)
 			return;
 		displayName = nameDialog.getSavefileName();
-		validName = savegameManager.encodeSavefileName(displayName, savefileName) &&
-					Zoombini2SavegameManager::isValidSavefileName(savefileName, _language);
+		validName = savegameManager.encodeNewSavefileName(displayName, savefileName);
 		if (!validName) {
 			GUI::MessageDialog errorDialog(_("The name contains characters unavailable in this language"));
 			errorDialog.runModal();
@@ -748,6 +780,25 @@ void Zoombini2SaveManagementDialog::importSavefile() {
 	successDialog.runModal();
 }
 
+// The batch can reuse one directory listing for all case-insensitive lookups.
+static Common::FSNode findSavefileDestNode(const Common::FSNode &directory, const Common::String &name,
+										   const Common::FSList *existingFiles = nullptr) {
+	const Common::FSNode direct = directory.getChild(name);
+	if (direct.exists())
+		return direct;
+
+	Common::FSList children;
+	if (!existingFiles) {
+		directory.getChildren(children, Common::FSNode::kListFilesOnly);
+		existingFiles = &children;
+	}
+	for (const Common::FSNode &child : *existingFiles) {
+		if (child.getName().equalsIgnoreCase(name))
+			return child;
+	}
+	return direct;
+}
+
 void Zoombini2SaveManagementDialog::exportSelectedSavefile() {
 	if (_selectedSavefileIndex < 0 || static_cast<int>(_savefileNames.size()) <= _selectedSavefileIndex || !_savefileStateValid[_selectedSavefileIndex])
 		return;
@@ -766,7 +817,7 @@ void Zoombini2SaveManagementDialog::exportSelectedSavefile() {
 	const Common::String savefileName = _savefileNames[_selectedSavefileIndex];
 	Zoombini2SavegameManager savegameManager(g_system->getSavefileManager(), _domain, _language, _platform);
 	const Common::String exportName = savegameManager.decodeSavefileName(savefileName).encode(Common::kUtf8) + ".mk";
-	const Common::FSNode dest = findChild(directory, exportName);
+	const Common::FSNode dest = findSavefileDestNode(directory, exportName);
 	if (dest.exists()) {
 		GUI::MessageDialog confirmation(_("The .mk file already exists. Replace it?"),
 										_("Replace"), _("Cancel"));
@@ -774,14 +825,7 @@ void Zoombini2SaveManagementDialog::exportSelectedSavefile() {
 			return;
 	}
 
-	Common::SeekableWriteStream *stream = dest.createWriteStream(false);
-	bool exported = stream && savegameManager.exportSavefile(savefileName, stream);
-	if (stream) {
-		stream->finalize();
-		exported = exported && !stream->err();
-	}
-	delete stream;
-	if (!exported) {
+	if (!savegameManager.exportSavefile(savefileName, dest)) {
 		GUI::MessageDialog errorDialog(_("Unable to export the selected saved game"));
 		errorDialog.runModal();
 		return;
@@ -812,21 +856,6 @@ void Zoombini2SaveManagementDialog::deleteSelectedSavefile() {
 	refreshSavefiles();
 	_savefileList->reflowLayout();
 	g_gui.scheduleTopDialogRedraw();
-}
-
-Common::FSNode Zoombini2SaveManagementDialog::findChild(const Common::FSNode &directory, const Common::String &name) {
-	Common::FSNode direct = directory.getChild(name);
-	if (direct.exists())
-		return direct;
-
-	Common::FSList children;
-	if (directory.getChildren(children, Common::FSNode::kListFilesOnly)) {
-		for (Common::FSList::const_iterator child = children.begin(); child != children.end(); child++) {
-			if (child->getName().equalsIgnoreCase(name))
-				return *child;
-		}
-	}
-	return direct;
 }
 
 int Zoombini2SaveManagementDialog::scaleDialogValue(int value) {
@@ -869,6 +898,12 @@ Zoombini2OptionsWidget::Zoombini2OptionsWidget(GUI::GuiObject *boss, const Commo
 	GUI::StaticTextWidget *header = new GUI::StaticTextWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.SaveFilesHeader",
 															  _("Save management"), Common::U32String(), GUI::ThemeEngine::kFontStyleBold);
 	header->setAlign(Graphics::TextAlign::kTextAlignStart);
+	GUI::ButtonWidget *importSavefilesButton = new GUI::ButtonWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ImportSavefiles",
+																	 _c("Import Saves", "zoombini-options"), _("Import all Zoombini2 .mk saved games from a directory."), kImportSavefilesCommand);
+	importSavefilesButton->setTarget(this);
+	GUI::ButtonWidget *exportSavefilesButton = new GUI::ButtonWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ExportSavefiles",
+																	 _c("Export Saves", "zoombini-options"), _("Export this game's saved games as Zoombini2 .mk files."), kExportSavefilesCommand);
+	exportSavefilesButton->setTarget(this);
 	GUI::ButtonWidget *manageSavefilesButton = new GUI::ButtonWidget(widgetsBoss(), "Zoombini2EngineOptionsDialog.ManageSavefiles",
 																	 _("Saved games"), Common::U32String(), kManageSavefilesCommand);
 	manageSavefilesButton->setTarget(this);
@@ -985,7 +1020,12 @@ void Zoombini2OptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common:
 		.addSpace(10)
 		.addWidget("SaveFilesSeparator", "", -1, 2)
 		.addWidget("SaveFilesHeader", "", -1, lineHeight)
+		.addLayout(GUI::ThemeLayout::kLayoutHorizontal)
+		.addPadding(0, 0, 0, 0)
+		.addWidget("ImportSavefiles", "Button")
+		.addWidget("ExportSavefiles", "Button")
 		.addWidget("ManageSavefiles", "Button")
+		.closeLayout()
 		.addWidget("SavefileReadOnlyToggle", "Checkbox")
 		.addSpace(10)
 		.addWidget("GameplayEnhancementsSeparator", "", -1, 2)
@@ -1126,16 +1166,168 @@ bool Zoombini2OptionsWidget::save() {
 }
 
 void Zoombini2OptionsWidget::handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) {
-	if (cmd == kUnlockFrameRateCommand) {
+	switch (cmd) {
+	case kUnlockFrameRateCommand:
 		updateFrameRateControls();
 		return;
+	case kImportSavefilesCommand: {
+		ScopedSaveTarget saveTarget(_domain);
+		importSavefiles();
+		return;
 	}
-	if (cmd == kManageSavefilesCommand) {
+	case kExportSavefilesCommand: {
+		ScopedSaveTarget saveTarget(_domain);
+		exportSavefiles();
+		return;
+	}
+	case kManageSavefilesCommand: {
+		ScopedSaveTarget saveTarget(_domain);
 		Zoombini2SaveManagementDialog dialog(_domain);
 		dialog.runModal();
 		return;
 	}
-	GUI::OptionsContainerWidget::handleCommand(sender, cmd, data);
+	default:
+		GUI::OptionsContainerWidget::handleCommand(sender, cmd, data);
+		return;
+	}
+}
+
+Zoombini2SavegameManager Zoombini2OptionsWidget::createSavegameManager() const {
+	Common::SaveFileManager *saveFileManager = g_system->getSavefileManager();
+	if (const Zoombini2Engine *vm = getActiveZoombini2Engine(_domain))
+		return Zoombini2SavegameManager(saveFileManager, _domain, vm->getLanguage(), vm->getPlatform());
+
+	const Common::Language language = Common::parseLanguage(ConfMan.get("language", _domain));
+	const Common::Platform platform = Common::parsePlatform(ConfMan.get("platform", _domain));
+	return Zoombini2SavegameManager(saveFileManager, _domain, language, platform);
+}
+
+void Zoombini2OptionsWidget::importSavefiles() {
+	GUI::BrowserDialog browser(_("Select a directory containing Zoombini2 .mk saved games"), true);
+	if (browser.runModal() <= 0)
+		return;
+
+	const Common::FSNode directory = browser.getResult();
+	Common::FSList files;
+	if (!directory.getChildren(files, Common::FSNode::kListFilesOnly)) {
+		GUI::MessageDialog(_("Unable to read the selected save directory.")).runModal();
+		return;
+	}
+
+	/** One external save and its validated name in the target. */
+	struct ImportEntry {
+		/** File in the selected directory. */
+		Common::FSNode source;
+		/** Game-encoded save name. */
+		Common::String name;
+	};
+	Common::Array<ImportEntry> entries;
+	Common::HashMap<Common::String, bool, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> seenNames;
+	// Pick the same candidate if case-sensitive filesystems contain names that differ only by case.
+	Common::sort(files.begin(), files.end(), [](const Common::FSNode &a, const Common::FSNode &b) {
+		return a.getName() < b.getName();
+	});
+
+	const Zoombini2Engine *vm = getActiveZoombini2Engine(_domain);
+	const Zoombini2SavegameManager savegameManager = createSavegameManager();
+	bool overwrite = false;
+	uint failed = 0;
+	uint activeSkipped = 0;
+	for (const Common::FSNode &file : files) {
+		const Common::String filename = file.getName();
+		if (!filename.hasSuffixIgnoreCase(".mk"))
+			continue;
+
+		Common::String name;
+		const Common::U32String displayName = filename.substr(0, filename.size() - 3).decode(Common::kUtf8);
+		if (!savegameManager.encodeNewSavefileName(displayName, name) || seenNames.contains(name)) {
+			failed += 1;
+			continue;
+		}
+		if (vm && vm->isActiveGameSave(name)) {
+			activeSkipped += 1;
+			continue;
+		}
+		seenNames[name] = true;
+		entries.push_back({file, name});
+		overwrite = overwrite || savegameManager.savefileExists(name);
+	}
+
+	if (entries.empty() && failed == 0 && activeSkipped == 0) {
+		GUI::MessageDialog(_("The selected directory has no Zoombini2 .mk saved games.")).runModal();
+		return;
+	}
+	if (overwrite) {
+		GUI::MessageDialog confirm(_("This will overwrite existing ScummVM saves for this game. Continue?"), _("Replace"), _("Cancel"));
+		if (confirm.runModal() != GUI::kMessageOK)
+			return;
+	}
+
+	uint imported = 0;
+	for (const ImportEntry &entry : entries) {
+		if (savegameManager.isSavefileReadOnly(entry.name)) {
+			failed += 1;
+			continue;
+		}
+		Common::ScopedPtr<Common::SeekableReadStream> stream(entry.source.createReadStream());
+		if (savegameManager.importSavefile(entry.name, stream.get(), overwrite))
+			imported += 1;
+		else
+			failed += 1;
+	}
+	showSaveTransferResult(Common::U32String::format(_("Imported %u saved game(s)."), imported), failed, activeSkipped);
+}
+
+void Zoombini2OptionsWidget::exportSavefiles() {
+	const Zoombini2SavegameManager savegameManager = createSavegameManager();
+	const Common::StringArray savefiles = savegameManager.listSavefiles();
+	if (savefiles.empty()) {
+		GUI::MessageDialog(_("This game has no ScummVM saved games to export yet.")).runModal();
+		return;
+	}
+
+	GUI::BrowserDialog browser(_("Select the directory for the exported Zoombini2 .mk saves"), true);
+	if (browser.runModal() <= 0)
+		return;
+
+	const Common::FSNode directory = browser.getResult();
+	Common::FSList existingFiles;
+	if (!directory.getChildren(existingFiles, Common::FSNode::kListFilesOnly)) {
+		GUI::MessageDialog(_("Unable to read the selected save directory.")).runModal();
+		return;
+	}
+
+	Common::Array<Common::FSNode> destinations;
+	bool overwrite = false;
+	for (const Common::String &name : savefiles) {
+		const Common::String filename = savegameManager.decodeSavefileName(name).encode(Common::kUtf8) + ".mk";
+		const Common::FSNode dest = findSavefileDestNode(directory, filename, &existingFiles);
+		destinations.push_back(dest);
+		overwrite = overwrite || dest.exists();
+	}
+	if (overwrite) {
+		GUI::MessageDialog confirm(_("This will overwrite existing save files in the selected directory. Continue?"), _("Replace"), _("Cancel"));
+		if (confirm.runModal() != GUI::kMessageOK)
+			return;
+	}
+
+	uint exported = 0;
+	for (uint i = 0; i < savefiles.size(); i++) {
+		const Common::FSNode &dest = destinations[i];
+		if ((overwrite || !dest.exists()) && savegameManager.exportSavefile(savefiles[i], dest))
+			exported += 1;
+	}
+	showSaveTransferResult(Common::U32String::format(_("Exported %u saved game(s)."), exported), savefiles.size() - exported);
+}
+
+void Zoombini2OptionsWidget::showSaveTransferResult(const Common::U32String &message, uint failures, uint activeSkipped) {
+	Common::U32String result = message;
+	if (failures)
+		result += Common::U32String("\n") + Common::U32String::format(_("%u file(s) could not be copied."), failures);
+	if (activeSkipped)
+		result += Common::U32String("\n") + Common::U32String::format(_("Skipped %u file(s) matching the active saved game."), activeSkipped);
+
+	GUI::MessageDialog(result).runModal();
 }
 
 void Zoombini2OptionsWidget::updateFrameRateControls() {

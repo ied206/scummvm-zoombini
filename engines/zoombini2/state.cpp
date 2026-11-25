@@ -25,6 +25,7 @@
 #include "common/debug.h"
 #include "common/fs.h"
 #include "common/memstream.h"
+#include "common/ptr.h"
 #include "common/savefile.h"
 #include "common/str-enc.h"
 
@@ -764,6 +765,10 @@ bool Zoombini2SavegameManager::encodeSavefileName(const Common::U32String &displ
 	return savefileName.decode(codePage) == displayName;
 }
 
+bool Zoombini2SavegameManager::encodeNewSavefileName(const Common::U32String &displayName, Common::String &savefileName) const {
+	return encodeSavefileName(displayName, savefileName) && isValidSavefileName(savefileName, _lang);
+}
+
 Common::U32String Zoombini2SavegameManager::decodeSavefileName(const Common::String &savefileName) const {
 	return savefileName.decode(ZmbReleaseInfo::getCodePage(_lang, _platform));
 }
@@ -916,29 +921,49 @@ bool Zoombini2SavegameManager::importSavefile(const Common::String &savefileName
 }
 
 bool Zoombini2SavegameManager::exportSavefile(const Common::String &savefileName, Common::WriteStream *dest) const {
-	if (!_saveFileManager || !dest || !isSafeStoredSavefileName(savefileName))
+	if (!dest)
 		return false;
 
+	Common::ScopedPtr<Common::SeekableReadStream> src(openSavefileForExport(savefileName));
+	return src && copySavefile(*src, *dest);
+}
+
+bool Zoombini2SavegameManager::exportSavefile(const Common::String &savefileName, const Common::FSNode &dest) const {
+	Common::ScopedPtr<Common::SeekableReadStream> src(openSavefileForExport(savefileName));
+	if (!src || (dest.exists() && (dest.isDirectory() || !dest.isWritable())))
+		return false;
+
+	Common::ScopedPtr<Common::SeekableWriteStream> out(dest.createWriteStream());
+	if (!out)
+		return false;
+
+	const bool copied = copySavefile(*src, *out);
+	out->finalize();
+	return copied && !out->err();
+}
+
+Common::SeekableReadStream *Zoombini2SavegameManager::openSavefileForExport(const Common::String &savefileName) const {
+	if (!_saveFileManager || !isSafeStoredSavefileName(savefileName))
+		return nullptr;
+
+	Common::ScopedPtr<Common::InSaveFile> src(_saveFileManager->openForLoading(makeSaveFileName(savefileName)));
 	GameState savedState;
-	if (!loadSavefile(savefileName, savedState))
-		return false;
+	if (!src || !savedState.load(src.get(), _platform) || !src->seek(0))
+		return nullptr;
+	return src.release();
+}
 
-	Common::InSaveFile *src = _saveFileManager->openForLoading(makeSaveFileName(savefileName));
-	if (!src)
-		return false;
-
-	const int64 size = src->size();
+bool Zoombini2SavegameManager::copySavefile(Common::SeekableReadStream &src, Common::WriteStream &dest) {
+	const int64 size = src.size();
 	bool ok = 0 <= size;
 	uint64 remaining = ok ? static_cast<uint64>(size) : 0;
 	byte buffer[4096];
 	while (ok && remaining != 0) {
 		const uint32 amount = MIN<uint64>(sizeof(buffer), remaining);
-		ok = src->read(buffer, amount) == amount && dest->write(buffer, amount) == amount;
+		ok = src.read(buffer, amount) == amount && dest.write(buffer, amount) == amount;
 		remaining -= amount;
 	}
-	ok = ok && !src->err() && !dest->err();
-	delete src;
-	return ok;
+	return ok && !src.err() && !dest.err();
 }
 
 bool Zoombini2SavegameManager::deleteSavefile(const Common::String &savefileName) const {
