@@ -41,8 +41,8 @@ bool TextObject::create(const Core::ScriptArguments &sargs) {
 	if (_usePoint) {
 		_center = 3 < sargs.size() && sargs[3].toInt32() != 0;
 	} else {
-		x = _point.x;
-		y = _point.y;
+		_x = _point.x;
+		_y = _point.y;
 		_width = sargs[3].toInt32();
 		_height = sargs[4].toInt32();
 		_wrap = 5 < sargs.size() && sargs[5].toInt32() != 0;
@@ -61,11 +61,11 @@ void TextObject::updateBox() {
 	_inkLeft = box.left;
 	_width = box.width();
 	_height = box.height();
-	x = _point.x;
-	y = _point.y;
+	_x = _point.x;
+	_y = _point.y;
 	if (_center) {
-		x -= _width / 2;
-		y -= _height / 2;
+		_x -= _width / 2;
+		_y -= _height / 2;
 	}
 }
 
@@ -157,13 +157,13 @@ Core::ScriptableObject *TextObject::clone() const {
 	copy->_outline = _outline;
 	copy->_width = _width;
 	copy->_height = _height;
-	copy->x = x;
-	copy->y = y;
-	copy->z = z;
-	copy->tag = tag;
-	copy->visible = visible;
-	copy->enabled = enabled;
-	copy->movable = movable;
+	copy->_x = _x;
+	copy->_y = _y;
+	copy->_z = _z;
+	copy->_tag = _tag;
+	copy->_visible = _visible;
+	copy->_enabled = _enabled;
+	copy->_movable = _movable;
 	for (uint i = 0; i < 3; i++) {
 		copy->_color[i] = _color[i];
 		copy->_outlineColor[i] = _outlineColor[i];
@@ -171,16 +171,16 @@ Core::ScriptableObject *TextObject::clone() const {
 	if (!_fontPath.empty() && !copy->setFont(_fontPath))
 		return nullptr;
 	copy->updateBox();
-	copy->spotCursor = spotCursor;
-	copy->grabCursor = grabCursor;
+	copy->_spotCursor = _spotCursor;
+	copy->_grabCursor = _grabCursor;
 	copyEventsTo(*copy);
 	return copy.release();
 }
 
 void TextObject::draw(OM::Canvas &canvas) const {
-	if (!visible || _width <= 0 || _height <= 0)
+	if (!_visible || _width <= 0 || _height <= 0)
 		return;
-	Common::Rect box(x, y, x + _width, y + _height);
+	Common::Rect box(_x, _y, _x + _width, _y + _height);
 	box.clip(Common::Rect(canvas.surface().w, canvas.surface().h));
 	if (box.isEmpty())
 		return;
@@ -189,13 +189,13 @@ void TextObject::draw(OM::Canvas &canvas) const {
 	if (!Text::wrap(font(), _text, _width, lines, Text::kGame, _wrap, _outline))
 		return;
 	int leading = font().getFontHeight() - font().getFontAscent() - font().getFontDescent();
-	int baseline = y - box.top + Text::firstBaseline(_height, lines.size(), font().getFontAscent(), font().getFontDescent(), leading);
+	int baseline = _y - box.top + Text::firstBaseline(_height, lines.size(), font().getFontAscent(), font().getFontDescent(), leading);
 	uint32 color = surface.format.RGBToColor(_color[0] / 256, _color[1] / 256, _color[2] / 256);
 	uint32 outline = surface.format.RGBToColor(_outlineColor[0] / 256, _outlineColor[1] / 256, _outlineColor[2] / 256);
 	for (uint i = 0; i < lines.size(); i++) {
-		int left = x - box.left - _inkLeft;
+		int left = _x - box.left - _inkLeft;
 		if (_center)
-			left = x - box.left + (_width - font().getStringWidth(lines[i])) / 2 - _inkLeft / 2;
+			left = _x - box.left + (_width - font().getStringWidth(lines[i])) / 2 - _inkLeft / 2;
 		if (_outline) {
 			for (int dy = -1; dy <= 1; dy++) {
 				for (int dx = -1; dx <= 1; dx++) {

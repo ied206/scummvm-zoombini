@@ -48,11 +48,11 @@ void AnimationAction::start() {
 	_anim = _scene.add(_resource, _depth);
 	if (!_anim || !_anim->startAnimation(_repeat))
 		error("Could not load action animation %s", _resource.c_str());
-	_anim->enabled = false;
+	_anim->_enabled = false;
 	if (_position.x != 11111)
-		_anim->x = _position.x;
+		_anim->_x = _position.x;
 	if (_position.y != 11111)
-		_anim->y = _position.y;
+		_anim->_y = _position.y;
 	_anim->addObserver(*this);
 	_anim->setAnimationListener(this);
 	_anim->playAnimation();

@@ -383,7 +383,7 @@ Common::String CatapultMachine::debugAnswer() const {
 Common::String CatapultMachine::debugChance() const {
 	uint supply = 0;
 	for (uint i = 0; i < _objects.size(); i++) {
-		if (_objects[i]->rock && _objects[i]->stage == kSupply && _objects[i]->sprite->enabled)
+		if (_objects[i]->rock && _objects[i]->stage == kSupply && _objects[i]->sprite->_enabled)
 			supply += 1;
 	}
 	return Common::String::format("Boulders: %u unresolved, %u in supply, %u in flight or machinery. Mud: unlimited.\n",
@@ -399,7 +399,7 @@ CatapultMachine::Object::Object(CatapultMachine &owner, Shell::Sprite *image, St
 }
 
 Common::Rect CatapultMachine::Object::position() const {
-	return Common::Rect(sprite->x, sprite->y, sprite->x + sprite->width(), sprite->y + sprite->height());
+	return Common::Rect(sprite->_x, sprite->_y, sprite->_x + sprite->width(), sprite->_y + sprite->height());
 }
 
 bool CatapultMachine::Object::animationPaused() {
@@ -411,8 +411,8 @@ void CatapultMachine::Object::spriteUpdating(Shell::Sprite &image, uint32 time) 
 		return;
 	Common::Rect box = position();
 	motion.update(box, time, *this);
-	image.x = box.left;
-	image.y = box.top;
+	image._x = box.left;
+	image._y = box.top;
 }
 
 void CatapultMachine::Object::motionBoundary(CatapultMotion &movement, Common::Rect &box,
@@ -562,11 +562,11 @@ void CatapultMachine::createMudSupply() {
 	_mud = addObject(10401, 4, kSupply, false);
 	if (!_mud)
 		return;
-	_mudOrigin = Common::Point(_mud->sprite->x, _mud->sprite->y);
-	_mud->sprite->x = 44;
-	_mud->sprite->y = 31;
-	_mud->sprite->action = kInsertMud01;
-	_mud->sprite->actionOnMouseDown = true;
+	_mudOrigin = Common::Point(_mud->sprite->_x, _mud->sprite->_y);
+	_mud->sprite->_x = 44;
+	_mud->sprite->_y = 31;
+	_mud->sprite->_action = kInsertMud01;
+	_mud->sprite->_actionOnMouseDown = true;
 }
 
 bool CatapultMachine::load() {
@@ -575,29 +575,29 @@ bool CatapultMachine::load() {
 		if (!_rocks[i])
 			return false;
 		Shell::Sprite *sprite = _rocks[i]->sprite;
-		_rockOrigin = Common::Point(sprite->x, sprite->y);
-		sprite->x = 90 + 21 * i;
-		sprite->y = 12;
-		sprite->visible = i < _rules.partySize();
-		sprite->enabled = sprite->visible;
-		sprite->action = kInsertRock02;
-		sprite->actionOnMouseDown = true;
+		_rockOrigin = Common::Point(sprite->_x, sprite->_y);
+		sprite->_x = 90 + 21 * i;
+		sprite->_y = 12;
+		sprite->_visible = i < _rules.partySize();
+		sprite->_enabled = sprite->_visible;
+		sprite->_action = kInsertRock02;
+		sprite->_actionOnMouseDown = true;
 	}
 	createMudSupply();
 	Shell::Sprite *decoration = add(10401, 3);
 	if (!decoration)
 		return false;
-	decoration->x = 52;
-	decoration->y = -7;
+	decoration->_x = 52;
+	decoration->_y = -7;
 	decoration = add(10401, 3);
 	if (!decoration)
 		return false;
-	decoration->x = 47;
-	decoration->y = 12;
+	decoration->_x = 47;
+	decoration->_y = 12;
 	_switch = add(10433, 17);
 	if (!_switch)
 		return false;
-	_switch->action = kToggle03;
+	_switch->_action = kToggle03;
 	uint family = _rules.primaryFamily();
 	static constexpr uint catcher[] = {
 		10460,
@@ -646,8 +646,8 @@ bool CatapultMachine::load() {
 				Shell::Sprite *sprite = add(10471, 8, true);
 				if (!sprite)
 					return false;
-				sprite->x = originX[family];
-				sprite->y = originY[family];
+				sprite->_x = originX[family];
+				sprite->_y = originY[family];
 				if (!sprite->reverseSequence())
 					return false;
 				sprite->setFrame(sprite->getNumberOfFrames() / 4 * i + 1);
@@ -715,8 +715,8 @@ bool CatapultMachine::load() {
 		_paddle,
 	};
 	for (uint i = 0; i < ARRAYSIZE(reversed); i++) {
-		reversed[i]->x += shiftX;
-		reversed[i]->y += shiftY;
+		reversed[i]->_x += shiftX;
+		reversed[i]->_y += shiftY;
 		if (_rules.level() != 3 && !reversed[i]->reverseSequence())
 			return false;
 	}
@@ -724,14 +724,14 @@ bool CatapultMachine::load() {
 	_paddle->setFrame(paddleFrame[_rules.paddleFamily()]);
 	drive->pauseAnimation(false);
 	_paddle->pauseAnimation(false);
-	_indicator->x += shiftX + (_rules.paddleFamily() < 2 ? 7 : 0);
-	_indicator->y += shiftY + (_rules.paddleFamily() < 2 ? -10 : 0);
+	_indicator->_x += shiftX + (_rules.paddleFamily() < 2 ? 7 : 0);
+	_indicator->_y += shiftY + (_rules.paddleFamily() < 2 ? -10 : 0);
 	_trigger = add(10423, 16);
 	_mudSplash = add(10452, 17);
 	if (!_trigger || !_mudSplash || _resError)
 		return false;
 	_mudSplash->setPauseOnLastFrame(true);
-	_mudSplash->visible = false;
+	_mudSplash->_visible = false;
 	return true;
 }
 
@@ -794,7 +794,7 @@ void CatapultMachine::action(int action) {
 	if (action == kInsertRock02) {
 		object = nullptr;
 		for (uint i = 0; i < _rules.partySize(); i++) {
-			if (!_rocks[i] || !_rocks[i]->sprite->enabled)
+			if (!_rocks[i] || !_rocks[i]->sprite->_enabled)
 				break;
 			object = _rocks[i];
 		}
@@ -802,13 +802,13 @@ void CatapultMachine::action(int action) {
 	if (!object)
 		return;
 	Common::Point origin = object->rock ? _rockOrigin : _mudOrigin;
-	object->sprite->x = origin.x;
-	object->sprite->y = origin.y;
+	object->sprite->_x = origin.x;
+	object->sprite->_y = origin.y;
 	if (!object->rock)
 		createMudSupply();
 	_scene.setDepth(object->sprite, 3);
 	object->sprite->setPauseOnLastFrame(true);
-	object->sprite->enabled = false;
+	object->sprite->_enabled = false;
 	object->stage = kChute;
 	if (object->rock)
 		object->sprite->pauseAnimation(false);
@@ -912,9 +912,9 @@ void CatapultMachine::land(Object &object, Common::Rect &position, CatapultMotio
 		_secondaryDone = true;
 		if (object.landing == kTrigger) {
 			_mudSplash->setFrame(1);
-			_mudSplash->x = position.left;
-			_mudSplash->y = position.top + 10;
-			_mudSplash->visible = true;
+			_mudSplash->_x = position.left;
+			_mudSplash->_y = position.top + 10;
+			_mudSplash->_visible = true;
 			_mudSplash->pauseAnimation(false);
 			_sounds.push_back(kResSound10403_MudDrop);
 		} else {
@@ -1001,7 +1001,7 @@ void CatapultMachine::updateRound() {
 		};
 		for (uint i = 0; i < ARRAYSIZE(flights); i++) {
 			Object *object = flights[i];
-			if (!object || object->paddleLatched || _rules.paddleHeight() <= object->sprite->y)
+			if (!object || object->paddleLatched || _rules.paddleHeight() <= object->sprite->_y)
 				continue;
 			object->motion.setBounds(Common::Rect(open ? 900 : 800, open ? _rules.paddleHeight() : 520));
 			object->landing = open ? kPaddle : kWater;

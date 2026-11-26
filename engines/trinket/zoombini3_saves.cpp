@@ -23,6 +23,7 @@
 
 #include "common/memstream.h"
 #include "common/ptr.h"
+#include "common/textconsole.h"
 #include "trinket/zoombini3_world.h"
 
 namespace Trinket {
@@ -33,8 +34,9 @@ constexpr const char *Saves::kXMLPractice;
 constexpr const char *Saves::kSavePrefixSuffix;
 constexpr const char *Saves::kLauncherRegistryFile;
 
-Saves::Saves(Common::SaveFileManager &manager, const Common::String &target) : _manager(manager), _prefix(target + kSavePrefixSuffix),
-	_registryFile(_prefix + kLauncherRegistryFile), _saveFiles(manager, target) {
+Saves::Saves(Common::SaveFileManager &manager, const Common::String &target, Common::Platform platform)
+	: _manager(manager), _platform(platform == Common::kPlatformMacintosh ? platform : Common::kPlatformWindows), _prefix(target + kSavePrefixSuffix),
+	  _registryFile(_prefix + kLauncherRegistryFile), _saveFiles(manager, target, _platform) {
 }
 
 bool Saves::load() {
@@ -129,11 +131,11 @@ bool Saves::rename(uint player, const Common::String &name, bool clone) {
 		if (record.name.equals(name) || record.name.equals(name + kXMLPractice))
 			return false;
 	}
-	for (const auto &user : _registry.users) {
+	for (const auto &user : _registry._users) {
 		if (user.name.equals(name))
 			return false;
 	}
-	if ((clone && 99 <= _registry.users.size()) || !begin())
+	if ((clone && 99 <= _registry._users.size()) || !begin())
 		return false;
 	uint count = players().size();
 	for (uint i = 0; i < count; i++) {
@@ -161,7 +163,7 @@ bool Saves::rename(uint player, const Common::String &name, bool clone) {
 	}
 	bool found = false;
 	if (!clone) {
-		for (auto &user : _registry.users) {
+		for (auto &user : _registry._users) {
 			if (user.name.equals(old)) {
 				user.name = name;
 				found = true;
@@ -169,13 +171,13 @@ bool Saves::rename(uint player, const Common::String &name, bool clone) {
 		}
 	}
 	if (!found) {
-		if (99 <= _registry.users.size() || INT32_MAX <= _registry.nextID)
+		if (99 <= _registry._users.size() || INT32_MAX <= _registry._nextID)
 			return finish(false);
 		Launcher::Registry::User user;
-		user.id = _registry.nextID;
-		_registry.nextID += 1;
+		user.id = _registry._nextID;
+		_registry._nextID += 1;
 		user.name = name;
-		_registry.users.push_back(user);
+		_registry._users.push_back(user);
 	}
 	return finish(true);
 }
@@ -186,9 +188,9 @@ bool Saves::remove(uint player) {
 	Common::String name = players()[player].name;
 	if (!_saveFiles.remove(player))
 		return finish(false);
-	for (int i = _registry.users.size() - 1; 0 <= i; i--) {
-		if (_registry.users[i].name.equals(name))
-			_registry.users.remove_at(i);
+	for (int i = _registry._users.size() - 1; 0 <= i; i--) {
+		if (_registry._users[i].name.equals(name))
+			_registry._users.remove_at(i);
 	}
 	return finish(true);
 }
@@ -203,8 +205,20 @@ bool Saves::select(uint player, uint slot) {
 bool Saves::importSlot(uint player, uint slot, Common::SeekableReadStream &stream) {
 	Bytes bytes;
 	World world;
-	if (!validSlot(player, slot) || !read(stream, bytes) || !stream.seek(0) || !world.read(stream) || stream.pos() != stream.size())
+	if (!validSlot(player, slot) || !read(stream, bytes) || !stream.seek(0))
 		return false;
+	const Common::Platform source = World::detectSavePlatform(stream);
+	if (source == Common::kPlatformUnknown || !world.read(stream, source))
+		return false;
+	if (source != _platform) {
+		warning("Zoombini3: Importing a %s save for a %s target; converting to the target's native save format",
+			Common::getPlatformDescription(source), Common::getPlatformDescription(_platform));
+		Common::MemoryWriteStreamDynamic converted(DisposeAfterUse::YES);
+		if (!world.write(converted, _platform))
+			return false;
+		bytes.resize(converted.size());
+		memcpy(bytes.data(), converted.getData(), converted.size());
+	}
 	if (!begin())
 		return false;
 	if (!write(stateName(player, slot), bytes))
@@ -215,13 +229,13 @@ bool Saves::importSlot(uint player, uint slot, Common::SeekableReadStream &strea
 
 bool Saves::importSave(const Common::String &name, Common::SeekableReadStream &stream) {
 	_rollbackFailed = false;
-	if (!validName(name) || 99 <= _registry.users.size() || INT32_MAX <= _registry.nextID)
+	if (!validName(name) || 99 <= _registry._users.size() || INT32_MAX <= _registry._nextID)
 		return false;
 	for (const auto &player : players()) {
 		if (player.name.equals(name) || player.name.equals(name + kXMLPractice))
 			return false;
 	}
-	for (const auto &user : _registry.users) {
+	for (const auto &user : _registry._users) {
 		if (user.name.equals(name))
 			return false;
 	}
@@ -233,10 +247,10 @@ bool Saves::importSave(const Common::String &name, Common::SeekableReadStream &s
 		return false;
 	}
 	Launcher::Registry::User user;
-	user.id = _registry.nextID;
-	_registry.nextID += 1;
+	user.id = _registry._nextID;
+	_registry._nextID += 1;
 	user.name = name;
-	_registry.users.push_back(user);
+	_registry._users.push_back(user);
 	if (importSlot(player, 1, stream))
 		return true;
 	load();

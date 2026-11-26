@@ -54,16 +54,16 @@ Character::~Character() {
 Sprite *Character::loadAnimation(uint resource, int depth, bool registered) {
 	if (!resource)
 		return nullptr;
-	Sprite *sprite = _scene.add(_resources.characterResource(resource, Resources::kAnimation), z + depth);
+	Sprite *sprite = _scene.add(_resources.characterResource(resource, Resources::kAnimation), _z + depth);
 	if (!sprite)
 		return nullptr;
-	sprite->managed = true;
-	sprite->enabled = false;
-	sprite->movable = false;
+	sprite->_managed = true;
+	sprite->_enabled = false;
+	sprite->_movable = false;
 	sprite->setFrame(1);
 	if (registered && _settle) {
-		sprite->x = _settle->x;
-		sprite->y = _settle->y;
+		sprite->_x = _settle->_x;
+		sprite->_y = _settle->_y;
 	}
 	addTrinket(*sprite);
 	_owned.push_back(sprite);
@@ -82,17 +82,17 @@ void Character::remove(Sprite *sprite) {
 }
 
 bool Character::create(uint settle, int depth, Common::Point position) {
-	z = depth;
+	_z = depth;
 	_settle = loadAnimation(settle, 0, false);
 	if (settle && !_settle)
 		return false;
 	if (_settle) {
 		if (position.x != 11111)
-			_settle->x = position.x;
+			_settle->_x = position.x;
 		if (position.y != 11111)
-			_settle->y = position.y;
-		x = _settle->x;
-		y = _settle->y;
+			_settle->_y = position.y;
+		_x = _settle->_x;
+		_y = _settle->_y;
 	}
 	return true;
 }
@@ -100,7 +100,7 @@ bool Character::create(uint settle, int depth, Common::Point position) {
 Common::Rect Character::bounds() const {
 	if (!_settle)
 		return Common::Rect();
-	return Common::Rect(_settle->x, _settle->y, _settle->x + _settle->width(), _settle->y + _settle->height());
+	return Common::Rect(_settle->_x, _settle->_y, _settle->_x + _settle->width(), _settle->_y + _settle->height());
 }
 
 bool Character::get(const Common::String &property, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
@@ -135,14 +135,14 @@ bool Character::set(const Common::String &property, const Core::ScriptArguments 
 	else if (property.equals(kPropertyVisible))
 		setVisible(value.toInt32() != 0);
 	else if (property.equals(kPropertyX) || property.equals(kPropertyY) || property.equals(kPropertyZ)) {
-		int dx = property.equals(kPropertyX) ? value.toInt32() - x : 0;
-		int dy = property.equals(kPropertyY) ? value.toInt32() - y : 0;
-		int dz = property.equals(kPropertyZ) ? value.toInt32() - z : 0;
+		int dx = property.equals(kPropertyX) ? value.toInt32() - _x : 0;
+		int dy = property.equals(kPropertyY) ? value.toInt32() - _y : 0;
+		int dz = property.equals(kPropertyZ) ? value.toInt32() - _z : 0;
 		for (uint i = 0; i < _owned.size(); i++) {
-			_owned[i]->x += dx;
-			_owned[i]->y += dy;
+			_owned[i]->_x += dx;
+			_owned[i]->_y += dy;
 			if (dz)
-				_scene.setDepth(_owned[i], _owned[i]->z + dz);
+				_scene.setDepth(_owned[i], _owned[i]->_z + dz);
 		}
 		return MultiTrinket::set(property, sargs, value);
 	} else
@@ -175,7 +175,7 @@ bool Character::addFidget(uint groupTag, uint resource, bool hideSettle) {
 		Sprite *sprite = loadAnimation(resource, 1, _regFidgets);
 		if (!sprite)
 			return false;
-		sprite->visible = false;
+		sprite->_visible = false;
 		sprite->setPauseListener(&_fidgetLink);
 		group.available.push_back(group.sprites.size());
 		group.sprites.push_back(sprite);
@@ -194,7 +194,7 @@ void Character::finishFidget() {
 	schedule(_groups[_fidgetGroup]);
 	_fidgetGroup = -1;
 	if (_settle && _fidgetHidesSettle)
-		_settle->visible = visible && !isBusy();
+		_settle->_visible = _visible && !isBusy();
 }
 
 void Character::updateFidgets() {
@@ -202,7 +202,7 @@ void Character::updateFidgets() {
 		FidgetGroup &group = _groups[i];
 		if (static_cast<int32>(ticks(_time) - group.deadline) < 0)
 			continue;
-		if (!visible || isBusy() || _fidget || _paused)
+		if (!_visible || isBusy() || _fidget || _paused)
 			schedule(group);
 		else if (!group.available.empty()) {
 			uint choice = _random.getRandomNumber(group.available.size() - 1);
@@ -210,10 +210,10 @@ void Character::updateFidgets() {
 			_fidgetGroup = i;
 			_fidgetHidesSettle = group.hideSettle[group.available[choice]];
 			if (_fidgetHidesSettle && _settle)
-				_settle->visible = false;
+				_settle->_visible = false;
 			_fidget->startAnimation(1);
 			_fidget->setPauseListener(&_fidgetLink);
-			_fidget->visible = true;
+			_fidget->_visible = true;
 			if (group.repeat) {
 				group.available.remove_at(choice);
 				if (group.available.empty()) {
@@ -243,7 +243,7 @@ bool Character::setSpeechAnims(const Core::ScriptArguments &sargs) {
 		part.sprite = loadAnimation(part.resource, sargs[i + 1].toInt32(), _regSpeech);
 		if (!part.sprite)
 			return false;
-		part.sprite->visible = false;
+		part.sprite->_visible = false;
 		_parts.push_back(part);
 	}
 	return true;
@@ -253,8 +253,8 @@ bool Character::playSpeechParts(uint resource) {
 	if (_parts.empty())
 		return false;
 	Sprite *leader = _parts[0].sprite;
-	for (uint cel = 1; cel < leader->asset->celCount(); cel++) {
-		const Common::Array<Core::Animation::Step> &sequence = leader->asset->sequence(cel);
+	for (uint cel = 1; cel < leader->_asset->celCount(); cel++) {
+		const Common::Array<Core::Animation::Step> &sequence = leader->_asset->sequence(cel);
 		if (2 < sequence.size() && static_cast<uint16>(sequence[2].duration) == resource) {
 			for (uint i = 0; i < _parts.size(); i++) {
 				Sprite *sprite = _parts[i].sprite;
@@ -262,12 +262,12 @@ bool Character::playSpeechParts(uint resource) {
 					return false;
 				sprite->setFrame(1);
 				sprite->pauseAnimation(false);
-				sprite->visible = visible;
+				sprite->_visible = _visible;
 			}
 			leader->setPauseListener(&_speechLink);
 			_mode = kPartsSpeech02;
 			if (_settle)
-				_settle->visible = false;
+				_settle->_visible = false;
 			return true;
 		}
 	}
@@ -275,7 +275,7 @@ bool Character::playSpeechParts(uint resource) {
 		Sprite *sprite = _parts[i].sprite;
 		if (!sprite->startAnimation(i == 0 ? 1 : 0))
 			return false;
-		const Common::Array<Core::Animation::Step> &source = sprite->asset->sequence(0);
+		const Common::Array<Core::Animation::Step> &source = sprite->_asset->sequence(0);
 		if (source.size() < 2)
 			return false;
 		Common::Array<Core::Animation::Step> steps;
@@ -321,12 +321,12 @@ bool Character::playSpeechParts(uint resource) {
 		if (!sprite->replaceSequence(steps))
 			return false;
 		sprite->pauseAnimation(false);
-		sprite->visible = visible;
+		sprite->_visible = _visible;
 	}
 	leader->setPauseListener(&_speechLink);
 	_mode = kPartsSpeech02;
 	if (_settle)
-		_settle->visible = false;
+		_settle->_visible = false;
 	return true;
 }
 
@@ -387,7 +387,7 @@ bool Character::playChoreography(uint resource) {
 			part.frames.push_back(frame);
 			cursor = end;
 		}
-		part.sprite->visible = visible;
+		part.sprite->_visible = _visible;
 		if (!part.frames.empty())
 			part.sprite->setFrame(part.frames[0]);
 		_chor.push_back(part);
@@ -397,7 +397,7 @@ bool Character::playChoreography(uint resource) {
 	_chorDeadline = _time + _chorInterval;
 	_mode = kChoreography03;
 	if (_settle)
-		_settle->visible = false;
+		_settle->_visible = false;
 	return true;
 }
 
@@ -408,7 +408,7 @@ void Character::clearChoreography() {
 		for (uint j = 0; j < _parts.size(); j++)
 			retained |= _parts[j].sprite == sprite;
 		if (retained)
-			sprite->visible = false;
+			sprite->_visible = false;
 		else
 			remove(sprite);
 	}
@@ -417,7 +417,7 @@ void Character::clearChoreography() {
 
 void Character::restoreSettle() {
 	if (_settle)
-		_settle->visible = visible;
+		_settle->_visible = _visible;
 	if (!_keepVisible)
 		setVisible(false);
 }
@@ -433,7 +433,7 @@ void Character::stop() {
 	for (uint i = 0; i < _parts.size(); i++) {
 		_parts[i].sprite->stopAnimation();
 		_parts[i].sprite->setFrame(1);
-		_parts[i].sprite->visible = false;
+		_parts[i].sprite->_visible = false;
 	}
 	clearChoreography();
 	_voice.stop();
@@ -448,7 +448,7 @@ void Character::finish() {
 	}
 	for (uint i = 0; i < _parts.size(); i++) {
 		_parts[i].sprite->pauseAnimation(true);
-		_parts[i].sprite->visible = false;
+		_parts[i].sprite->_visible = false;
 	}
 	clearChoreography();
 	_mode = kIdle00;
@@ -510,28 +510,28 @@ void Character::playAnim(uint resource, int repeat, bool keepVisible, Completion
 	}
 	_anim->startAnimation(repeat);
 	_anim->setPauseListener(&_speechLink);
-	_anim->visible = visible;
+	_anim->_visible = _visible;
 	_mode = kExplicitAnimation04;
 	if (_settle)
-		_settle->visible = false;
+		_settle->_visible = false;
 }
 
 void Character::setVisible(bool shown) {
-	if (visible == shown)
+	if (_visible == shown)
 		return;
 	finishFidget();
-	visible = shown;
+	_visible = shown;
 	if (_settle)
-		_settle->visible = shown && (_mode == kIdle00 || _mode == kDirectSpeech01);
+		_settle->_visible = shown && (_mode == kIdle00 || _mode == kDirectSpeech01);
 	if (_anim)
-		_anim->visible = shown;
+		_anim->_visible = shown;
 	if (_mode == kPartsSpeech02) {
 		for (uint i = 0; i < _parts.size(); i++)
-			_parts[i].sprite->visible = shown;
+			_parts[i].sprite->_visible = shown;
 	}
 	if (_mode == kChoreography03) {
 		for (uint i = 0; i < _chor.size(); i++)
-			_chor[i].sprite->visible = shown;
+			_chor[i].sprite->_visible = shown;
 	}
 }
 
@@ -565,7 +565,7 @@ void Character::update(uint32 time, Common::Array<uint16> &sounds) {
 			if (part.frames.size() <= _chorFrame)
 				continue;
 			int frame = part.frames[_chorFrame];
-			part.sprite->visible = frame != -1 && visible;
+			part.sprite->_visible = frame != -1 && _visible;
 			if (frame != -1)
 				part.sprite->setFrame(frame + 1);
 		}

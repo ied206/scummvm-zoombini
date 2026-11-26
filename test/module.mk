@@ -59,7 +59,7 @@ endif
 
 ifeq ($(ENABLE_TRINKET), STATIC_PLUGIN)
 	TESTS += $(srcdir)/test/engines/trinket/*.h
-	TEST_LIBS += engines/trinket/libtrinket.a
+	TEST_LIBS += engines/trinket/libtrinket.a common/libcommon.a
 endif
 
 #

@@ -286,7 +286,7 @@ bool Gumball::enter() {
 		_state = 2;
 		_correct = _total = 0;
 		if (_host._chester)
-			_host._chester->visible = false;
+			_host._chester->_visible = false;
 		if (!_dataset)
 			_dataset = 1;
 	} else if (!_dataset) {
@@ -318,22 +318,22 @@ bool Gumball::enter() {
 	if (_sprites.size() != 15)
 		return false;
 	for (auto *item : _sprites)
-		item->visible = false;
-	_release->visible = true;
-	_release->x = number(kTokenReleaseXKey);
+		item->_visible = false;
+	_release->_visible = true;
+	_release->_x = number(kTokenReleaseXKey);
 	_release->setFrame(number(kTokenReleaseClosedKey));
-	_token->x = number(kTokenXKey);
+	_token->_x = number(kTokenXKey);
 	_whistle->setFrame(number(kWhistleSettleFrameKey));
 	_candy->setFrame(number(kCandySettleFrameKey));
-	_marble->colorRemap = PageScene::marbleColor(3);
-	_rolls[kMarble]->colorRemap = PageScene::marbleColor(3);
-	_marble->x = number(kMarbleXKey);
-	_marble->y = number(kMarbleYKey);
+	_marble->_colorRemap = PageScene::marbleColor(3);
+	_rolls[kMarble]->_colorRemap = PageScene::marbleColor(3);
+	_marble->_x = number(kMarbleXKey);
+	_marble->_y = number(kMarbleYKey);
 	_host._scene.setDepth(_marble, number(kItemZKey) + 1);
 	_sparkle->setFrame(MIN(3, _total + 1));
-	_sparkle->visible = !_host._practice && _state < 3;
-	_whistle->visible = !_host._practice && _state == 3;
-	_marble->visible = !_host._practice && _host._world.get(kR1LA1ShowMarbleKey);
+	_sparkle->_visible = !_host._practice && _state < 3;
+	_whistle->_visible = !_host._practice && _state == 3;
+	_marble->_visible = !_host._practice && _host._world.get(kR1LA1ShowMarbleKey);
 	int j = 1;
 	int y = number(kFirstRampYKey);
 	for (uint node = 1; node <= 22; node++) {
@@ -346,8 +346,8 @@ bool Gumball::enter() {
 		Shell::Sprite *ramp = sprite(kRampIDKey, kRampZKey);
 		if (!ramp)
 			return false;
-		ramp->x = number(Common::String::format(kRampXValuesSignedIndexKey, j));
-		ramp->y = y;
+		ramp->_x = number(Common::String::format(kRampXValuesSignedIndexKey, j));
+		ramp->_y = y;
 		_ramps[node].sprite = ramp;
 		j += 1;
 	}
@@ -355,9 +355,9 @@ bool Gumball::enter() {
 		_correctTokens[i] = sprite(kTokenIDKey, kCorrTokenZKey);
 		if (!_correctTokens[i])
 			return false;
-		_correctTokens[i]->x = number(Common::String::format(kCorrTokenXUnsignedIndexKey, i + 1));
-		_correctTokens[i]->y = number(kCorrTokenYKey);
-		_correctTokens[i]->visible = false;
+		_correctTokens[i]->_x = number(Common::String::format(kCorrTokenXUnsignedIndexKey, i + 1));
+		_correctTokens[i]->_y = number(kCorrTokenYKey);
+		_correctTokens[i]->_visible = false;
 	}
 	setupRamps();
 	if (!puzzle())
@@ -659,7 +659,7 @@ void Gumball::assess() {
 }
 
 void Gumball::sliderOut() {
-	_trayOut->visible = true;
+	_trayOut->_visible = true;
 	_trayOut->startAnimation(1);
 	sound(kSliderSFXKey);
 	_phase = kTrayOut;
@@ -672,7 +672,7 @@ void Gumball::releaseToken() {
 	rampFrames();
 	buildPath();
 	_release->setFrame(number(kTokenReleaseOpenKey));
-	_token->visible = false;
+	_token->_visible = false;
 	sound(kReleaseTokenSFXKey);
 	_deadline = _host._time + 300;
 }
@@ -681,7 +681,7 @@ void Gumball::checkAnswer() {
 	_phase = kAnswer;
 	rampFrames();
 	_release->setFrame(number(kTokenReleaseClosedKey));
-	_movingToken->visible = false;
+	_movingToken->_visible = false;
 	_movingToken->stopAnimation();
 	_rollingSound.reset();
 	sound(kTokenBumpSFXKey);
@@ -691,7 +691,7 @@ void Gumball::checkAnswer() {
 	if (_answerCorrect) {
 		_total += 1;
 		_correct += 1;
-		_correctTokens[_chosenSlot - 1]->visible = true;
+		_correctTokens[_chosenSlot - 1]->_visible = true;
 		_previousSlot = 0;
 		_reward = kCandy;
 		if (!_host._practice && _correct == 3) {
@@ -712,7 +712,7 @@ void Gumball::checkAnswer() {
 		assess();
 	} else {
 		_imperfect = true;
-		_token->visible = true;
+		_token->_visible = true;
 		if (_chosenSlot) {
 			_wrong += 1;
 			sentence(_chosenSlot);
@@ -755,8 +755,8 @@ void Gumball::checkAnswer() {
 void Gumball::dispense() {
 	_sparkle->setFrame(MIN(3, _total + 1));
 	if (_reward == kWhistle)
-		_sparkle->visible = false;
-	_rolls[_reward]->visible = true;
+		_sparkle->_visible = false;
+	_rolls[_reward]->_visible = true;
 	_rolls[_reward]->startAnimation(1);
 	_phase = kRewardRoll;
 }
@@ -798,8 +798,8 @@ void Gumball::update(uint32 time) {
 	case kTrayOut:
 		if (_trayOut->isRunning())
 			break;
-		_trayOut->visible = false;
-		_tray->visible = _showText = _token->visible = true;
+		_trayOut->_visible = false;
+		_tray->_visible = _showText = _token->_visible = true;
 		if (_finishInstrs) {
 			_release->setFrame(number(kTokenReleaseHighlightKey));
 			say(kGumActor, kInstructionSpchIDs14Key);
@@ -818,7 +818,7 @@ void Gumball::update(uint32 time) {
 		if (static_cast<int32>(time - _deadline) < 0)
 			break;
 		_blinkStep += 1;
-		_token->visible = _blinkStep % 2 == 0;
+		_token->_visible = _blinkStep % 2 == 0;
 		_deadline = time + 100;
 		if (_blinkStep == 6) {
 			_release->setFrame(number(kTokenReleaseClosedKey));
@@ -841,9 +841,9 @@ void Gumball::update(uint32 time) {
 		_rollingSound->play(_host._vm.resources(), _host.characterResource(number(kTokenRollSFXKey), Shell::Character::Resources::kSound),
 							Audio::Mixer::kSFXSoundType, 0);
 		_segment = 1;
-		_movingToken->x = tokenPoint(_path[0]).x;
-		_movingToken->y = tokenPoint(_path[0]).y;
-		_movingToken->visible = true;
+		_movingToken->_x = tokenPoint(_path[0]).x;
+		_movingToken->_y = tokenPoint(_path[0]).y;
+		_movingToken->_visible = true;
 		_movingToken->startAnimation();
 		_deadline = time + number(kPathDelayKey);
 		_phase = kRolling;
@@ -862,16 +862,16 @@ void Gumball::update(uint32 time) {
 			dx = number(kPathDXKey);
 		else if (to.x < from.x)
 			dx = -number(kPathDXKey);
-		_movingToken->x += dx;
-		_movingToken->y += number(kPathDYKey);
-		bool reachedX = dx < 0 ? _movingToken->x <= to.x : to.x <= _movingToken->x;
-		if (reachedX && to.y <= _movingToken->y) {
+		_movingToken->_x += dx;
+		_movingToken->_y += number(kPathDYKey);
+		bool reachedX = dx < 0 ? _movingToken->_x <= to.x : to.x <= _movingToken->_x;
+		if (reachedX && to.y <= _movingToken->_y) {
 			_segment += 1;
 			if (_path.size() <= _segment) {
 				checkAnswer();
 			} else {
-				_movingToken->x = to.x;
-				_movingToken->y = to.y;
+				_movingToken->_x = to.x;
+				_movingToken->_y = to.y;
 			}
 		}
 		break;
@@ -882,9 +882,9 @@ void Gumball::update(uint32 time) {
 			_phase = kReady;
 		} else {
 			for (auto *token : _correctTokens)
-				token->visible = false;
-			_tray->visible = _showText = false;
-			_trayIn->visible = true;
+				token->_visible = false;
+			_tray->_visible = _showText = false;
+			_trayIn->_visible = true;
 			_trayIn->startAnimation(1);
 			sound(kSliderSFXKey);
 			_phase = kTrayIn;
@@ -892,7 +892,7 @@ void Gumball::update(uint32 time) {
 		break;
 	case kTrayIn:
 		if (!_trayIn->isRunning()) {
-			_trayIn->visible = false;
+			_trayIn->_visible = false;
 			sound(kGumCycleSFXKey);
 			dispense();
 		}
@@ -900,17 +900,17 @@ void Gumball::update(uint32 time) {
 	case kRewardRoll:
 		if (_rolls[_reward]->isRunning())
 			break;
-		_rolls[_reward]->visible = false;
+		_rolls[_reward]->_visible = false;
 		if (_reward == kWhistle) {
-			_whistle->visible = true;
+			_whistle->_visible = true;
 			say(kSamName, kGotWhistleSpchIDKey);
 		} else if (_reward == kMarble) {
-			_marble->visible = true;
+			_marble->_visible = true;
 			sound(kMarbleSFXKey);
 			_marbleSpeech = _marbleSpeech % 3 + 1;
 			say(_marbleSpeech == 1 ? kReaderName : kSamName, Common::String::format(kGotMarbleSpchIDsSignedIndexKey, _marbleSpeech));
 		} else {
-			_candy->visible = true;
+			_candy->_visible = true;
 		}
 		_phase = kRewardSpeech;
 		break;
@@ -921,7 +921,7 @@ void Gumball::update(uint32 time) {
 		Shell::Sprite *animation = _pickup == kWhistle ? _blow : _eat;
 		if (animation->isRunning())
 			break;
-		animation->visible = false;
+		animation->_visible = false;
 		_host._actors[kSamName]->setVisible(true);
 		if (_pickup == kWhistle) {
 			group(kRrName, kPutAwaySpchIDsKey);
@@ -959,16 +959,16 @@ void Gumball::pickup(Reward item) {
 	_pickup = item;
 	sound(kCOMPickUpSfxIDKey);
 	if (item == kCandy) {
-		_candy->visible = false;
+		_candy->_visible = false;
 	} else {
 		uint id = number(item == kWhistle ? kINV1WhistleKey : kINV1Marble4Key);
 		Common::String key = Common::String::format(kItemUnsignedIndexFormat, id);
 		_host._world.set(key, _host._world.get(key) + 1);
 		if (item == kWhistle) {
 			_state = 4;
-			_whistle->visible = false;
+			_whistle->_visible = false;
 		} else {
-			_marble->visible = false;
+			_marble->_visible = false;
 			_host._world.set(kR1LA1ShowMarbleKey, 0);
 			if (_host._world.get(key) == 1)
 				say(kReaderName, kPutAwaySpchIDs2Key);
@@ -979,7 +979,7 @@ void Gumball::pickup(Reward item) {
 	}
 	_host._actors[kSamName]->setVisible(false);
 	Shell::Sprite *animation = item == kWhistle ? _blow : _eat;
-	animation->visible = true;
+	animation->_visible = true;
 	animation->startAnimation(1);
 	_phase = kPickup;
 }
@@ -1028,19 +1028,19 @@ void Gumball::paigeHelp() {
 }
 
 bool Gumball::click(Common::Point point) {
-	if (_whistle->visible && _whistle->covers(point)) {
+	if (_whistle->_visible && _whistle->covers(point)) {
 		pickup(kWhistle);
 		return true;
 	}
-	if (_marble->visible && _marble->covers(point)) {
+	if (_marble->_visible && _marble->covers(point)) {
 		pickup(kMarble);
 		return true;
 	}
-	if (_candy->visible && _candy->covers(point)) {
+	if (_candy->_visible && _candy->covers(point)) {
 		pickup(kCandy);
 		return true;
 	}
-	if (Common::Rect(_release->x, 0, _release->x + _release->width(), _token->y + _token->height()).contains(point)) {
+	if (Common::Rect(_release->_x, 0, _release->_x + _release->width(), _token->_y + _token->height()).contains(point)) {
 		releaseToken();
 		return true;
 	}
@@ -1067,7 +1067,7 @@ bool Gumball::click(Common::Point point) {
 	if (_showText) {
 		for (uint i = 0; i < _text.size(); i++) {
 			auto *item = _text[i];
-			if (!Common::Rect(item->x, item->y, item->x + item->width(), item->y + item->height()).contains(point))
+			if (!Common::Rect(item->_x, item->_y, item->_x + item->width(), item->_y + item->height()).contains(point))
 				continue;
 			_wordClicks += 1;
 			if (i < 3) {
@@ -1140,7 +1140,7 @@ void Gumball::draw(OM::Canvas &canvas) {
 void Gumball::skipSpeech() {
 	if (_phase == kTokenExplain || _phase == kTokenBlink) {
 		_host.interrupt();
-		_token->visible = true;
+		_token->_visible = true;
 		_release->setFrame(number(kTokenReleaseClosedKey));
 		_phase = kReady;
 		return;

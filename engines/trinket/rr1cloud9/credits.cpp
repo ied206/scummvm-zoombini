@@ -119,7 +119,7 @@ bool Credits::enter(bool ending) {
 				auto *image = _images.add(Common::String::format(kImageFormat, id), 0);
 				if (!image)
 					return false;
-				image->x = x;
+				image->_x = x;
 				_rows.back().images.push_back(image);
 				_rows.back().height = MAX(_rows.back().height, image->height());
 			}
@@ -149,13 +149,13 @@ void Credits::draw(OM::Canvas &canvas, uint32 time) {
 	for (auto &row : _rows) {
 		int y = 396 + row.offset - _scroll;
 		for (auto *image : row.images) {
-			image->y = y;
-			image->visible = y < 396 && 84 < y + row.height;
+			image->_y = y;
+			image->_visible = y < 396 && 84 < y + row.height;
 		}
 		if (396 <= y || y + row.height <= 84)
 			continue;
 		for (auto *text : row.text) {
-			text->y = y;
+			text->_y = y;
 			text->draw(_contents);
 		}
 	}

@@ -31,6 +31,9 @@
 #include "trinket/zoombini3_world.h"
 
 namespace Trinket {
+
+class ReleaseInfo;
+
 namespace Zoombini3 {
 
 /** Display options panels and report requested game and audio changes. */
@@ -75,8 +78,8 @@ public:
 		/** Whether the selected slot should be replaced with a new game. */
 		bool replaceSelGame = false;
 	};
-	/** Connect the options panels to resource, font, audio and saved world services. */
-	Options(const OM::ResourceProvider &resources, OM::FontCache &fonts, Audio::Mixer &mixer, World &world);
+	/** Connect the options panels to game services and the detected release. */
+	Options(const OM::ResourceProvider &resources, OM::FontCache &fonts, Audio::Mixer &mixer, World &world, const ReleaseInfo &relInfo);
 	/** Build the options screen for practice mode, current music volume and player slots. */
 	bool load(bool practice, int currentMusicVolume, const Shell::SaveFiles::Player &player);
 	/** Handle options input and return requested menu and audio changes. */
@@ -138,6 +141,8 @@ private:
 	OM::FontCache &_fonts;
 	/** Saved preferences and progress modified by the options screen. */
 	World &_world;
+	/** Engine-owned release settings for the save-slot heading. */
+	const ReleaseInfo &_relInfo;
 	/** Sprites for the main options panel. */
 	Shell::Scene _scene;
 	/** Control that enables or disables background music. */

@@ -25,16 +25,16 @@ namespace Trinket {
 namespace Puzzle {
 
 bool Controller::areAnswersUsed() const {
-	for (uint i = 0; i < answers.size(); i++) {
-		if (answers[i] && !answers[i]->isUsed())
+	for (uint i = 0; i < _answers.size(); i++) {
+		if (_answers[i] && !_answers[i]->isUsed())
 			return false;
 	}
 	return true;
 }
 
 bool Controller::areContainersFull() const {
-	for (uint i = 0; i < containers.size(); i++) {
-		if (containers[i] && !containers[i]->isFull())
+	for (uint i = 0; i < _containers.size(); i++) {
+		if (_containers[i] && !_containers[i]->isFull())
 			return false;
 	}
 	return true;
@@ -49,11 +49,11 @@ bool Controller::allSolved(const Common::Array<Container *> &group) {
 }
 
 bool Controller::isSolved() const {
-	for (uint i = 0; i < solvedGroups.size(); i++) {
-		if (allSolved(solvedGroups[i]))
+	for (uint i = 0; i < _solvedGroups.size(); i++) {
+		if (allSolved(_solvedGroups[i]))
 			return true;
 	}
-	return allSolved(containers);
+	return allSolved(_containers);
 }
 
 } // namespace Puzzle

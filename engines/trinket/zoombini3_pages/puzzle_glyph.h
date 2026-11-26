@@ -148,7 +148,7 @@ public:
 	/** End any active tile drag using the current drop target. */
 	void forceDrop();
 	/** Enable or disable tile interaction. */
-	void setEnabled(bool allowed) { enabled = allowed; }
+	void setEnabled(bool allowed) { _enabled = allowed; }
 	/** Set the page callback for pickup, placement and reveal feedback. */
 	void setListener(Listener *listener) { _listener = listener; }
 	/** Consume a queued sound ID and its optional channel selection. */

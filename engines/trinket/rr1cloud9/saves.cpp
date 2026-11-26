@@ -105,7 +105,7 @@ bool Saves::rename(uint player, const Common::String &name) {
 		if (record.name.equals(name))
 			return false;
 	}
-	for (const auto &user : _registry.users) {
+	for (const auto &user : _registry._users) {
 		if (user.name.equals(name))
 			return false;
 	}
@@ -113,7 +113,7 @@ bool Saves::rename(uint player, const Common::String &name) {
 		return false;
 	_saveFiles.players()[player].name = name;
 	// Direct sign-in can create a game player without a Learning Launcher identity.
-	for (auto &user : _registry.users) {
+	for (auto &user : _registry._users) {
 		if (user.name.equals(oldName))
 			user.name = name;
 	}
@@ -127,9 +127,9 @@ bool Saves::remove(uint player) {
 	const Common::String name = players()[player].name;
 	if (!_saveFiles.remove(player))
 		return finish(false);
-	for (int i = _registry.users.size() - 1; 0 <= i; i--) {
-		if (_registry.users[i].name.equals(name))
-			_registry.users.remove_at(i);
+	for (int i = _registry._users.size() - 1; 0 <= i; i--) {
+		if (_registry._users[i].name.equals(name))
+			_registry._users.remove_at(i);
 	}
 	return finish(true);
 }
@@ -163,9 +163,9 @@ bool Saves::exportSlot(uint player, Common::WriteStream &stream) const {
 
 bool Saves::importSave(const Common::String &name, Common::SeekableReadStream &stream) {
 	_rollbackFailed = false;
-	if (!validName(name) || 99 <= _registry.users.size() || 99 <= players().size() || INT32_MAX <= _registry.nextID)
+	if (!validName(name) || 99 <= _registry._users.size() || 99 <= players().size() || INT32_MAX <= _registry._nextID)
 		return false;
-	for (const auto &user : _registry.users) {
+	for (const auto &user : _registry._users) {
 		if (user.name.equals(name))
 			return false;
 	}
@@ -177,10 +177,10 @@ bool Saves::importSave(const Common::String &name, Common::SeekableReadStream &s
 		return false;
 	}
 	Launcher::Registry::User user;
-	user.id = _registry.nextID;
-	_registry.nextID += 1;
+	user.id = _registry._nextID;
+	_registry._nextID += 1;
 	user.name = name;
-	_registry.users.push_back(user);
+	_registry._users.push_back(user);
 	if (importSlot(player, stream))
 		return true;
 	load();

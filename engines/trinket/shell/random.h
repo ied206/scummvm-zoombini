@@ -22,6 +22,7 @@
 #ifndef TRINKET_SHELL_RANDOM_H
 #define TRINKET_SHELL_RANDOM_H
 
+#include "common/platform.h"
 #include "common/random.h"
 #include "common/str.h"
 
@@ -30,7 +31,7 @@ namespace Shell {
 
 /** Persisted and runtime pseudo-random generator selection. */
 enum class PrngAlgorithmKind : uint32 {
-	/** Use the MSVC-compatible linear congruential stream. */
+	/** Use the detected platform's original C runtime stream. */
 	kOriginalPrng = 0,
 	/** Use @ref Common::RandomSource. */
 	kStandardPrng = 1,
@@ -44,8 +45,10 @@ enum class PrngAlgorithmKind : uint32 {
  */
 class Random {
 private:
-	/** Current 32-bit state of the MSVC-compatible LCG. */
+	/** Current unsigned 32-bit state of the selected platform's C runtime LCG. */
 	uint32 _randState = 0;
+	/** Detected game platform selecting MSVCRT or Metrowerks MSL compatibility. */
+	const Common::Platform _platform;
 	/** ScummVM standard PRNG registered under the constructor's stream name. */
 	Common::RandomSource _scummRnd;
 	/** Currently selected PRNG algorithm. */
@@ -55,8 +58,8 @@ private:
 	int32 getOriginalRandomNumber(int32 max);
 
 public:
-	/** Construct the named gameplay stream and select its configured algorithm and recorded or generated seed. */
-	explicit Random(const Common::String &name);
+	/** Construct the named gameplay stream for the detected platform and initialize its configured algorithm and seed. */
+	explicit Random(const Common::String &name, Common::Platform platform = Common::kPlatformWindows);
 	/** Switch algorithms and start a new random sequence only when the selection changes. */
 	void setAlgorithm(PrngAlgorithmKind prngAlgorithm);
 	/** Seed both streams, preserving zero in the compatibility stream while @ref Common::RandomSource substitutes a nonzero seed. */

@@ -204,7 +204,7 @@ Shell::Sprite *GardenMachine::add(uint id, int depth, int frame) {
 		return nullptr;
 	}
 	sprite->setFrame(frame);
-	sprite->enabled = false;
+	sprite->_enabled = false;
 	addTrinket(*sprite);
 	_owned.push_back(sprite);
 	return sprite;
@@ -229,8 +229,8 @@ bool GardenMachine::setup(uint level, uint party) {
 		if (!hole)
 			return false;
 		Common::Point point = GardenRules::holePosition(_level, i);
-		hole->x = point.x;
-		hole->y = point.y;
+		hole->_x = point.x;
+		hole->_y = point.y;
 	}
 	static constexpr uint large[] = {
 		18177,
@@ -257,8 +257,8 @@ bool GardenMachine::setup(uint level, uint party) {
 			Shell::Sprite *part = view.parts[j] = add((_level == 3 ? small : large)[j], 20 + depths[j], _rules.plant(i).trait[j] + 1);
 			if (!part)
 				return false;
-			part->visible = i < _party;
-			Common::Point origin(part->x, part->y);
+			part->_visible = i < _party;
+			Common::Point origin(part->_x, part->_y);
 			view.offsets[j] = origin;
 			Common::Rect bounds(origin.x, origin.y, origin.x + part->width(), origin.y + part->height());
 			if (j == 0)
@@ -322,8 +322,8 @@ void GardenMachine::positionPlant(uint index, Common::Point point) {
 	PlantView &view = _plants[index];
 	view.position = point;
 	for (uint j = 0; j < 4; j++) {
-		view.parts[j]->x = point.x + view.offsets[j].x;
-		view.parts[j]->y = point.y + view.offsets[j].y;
+		view.parts[j]->_x = point.x + view.offsets[j].x;
+		view.parts[j]->_y = point.y + view.offsets[j].y;
 	}
 }
 
@@ -345,10 +345,10 @@ int GardenMachine::hitHole(const Common::Rect &plantBounds) const {
 	int result = -1;
 	int bestArea = 0;
 	for (uint i = 0; i < _rules.holeCount(); i++) {
-		if (!plantBounds.intersects(_holes[i]->bounds))
+		if (!plantBounds.intersects(_holes[i]->_bounds))
 			continue;
 		Common::Rect overlap = plantBounds;
-		overlap.clip(_holes[i]->bounds);
+		overlap.clip(_holes[i]->_bounds);
 		int area = overlap.width() * overlap.height();
 		// Equal overlaps retain the first registered hole.
 		if (bestArea < area) {
@@ -383,7 +383,7 @@ void GardenMachine::plantAccepted(uint index, uint hole) {
 	}
 	int offsetX = count % 2 ? -static_cast<int>((count + 1) / 2) : static_cast<int>(count / 2);
 	offsetX *= horizontal[_level - 1];
-	Common::Rect bounds = _holes[hole]->bounds;
+	Common::Rect bounds = _holes[hole]->_bounds;
 	positionPlant(index, Common::Point(bounds.left + (bounds.width() - _plants[index].bounds.width()) / 2 + offsetX,
 									   bounds.top + (bounds.height() - _plants[index].bounds.height()) / 2 + offsetY));
 	emitEvent(_rules.passed() == _party ? kEventFinished : kEventCorrect);
@@ -482,7 +482,7 @@ void GardenMachine::update(uint32 time) {
 		if (frame <= _sun->getNumberOfFrames())
 			_sun->setFrame(frame);
 		else
-			_sun->visible = false;
+			_sun->_visible = false;
 		_rejected = -1;
 		_returning = false;
 		emitEvent(kEventSnapDone);
@@ -529,7 +529,7 @@ Common::String GardenMachine::debugAnswer() const {
 		return result + "No remaining legal completion with the current chances.\n";
 	for (uint i = 0; i < plan.size(); i++) {
 		const PlantView &view = _plants[plan[i].plant];
-		Common::Rect hole = _holes[plan[i].hole]->bounds;
+		Common::Rect hole = _holes[plan[i].hole]->_bounds;
 		result += Common::String::format("Plant %u: drag (%d,%d) to (%d,%d), hole %u\n", plan[i].plant + 1,
 										 view.position.x + view.bounds.width() / 2, view.position.y + view.bounds.height() / 2,
 										 hole.left + hole.width() / 2, hole.top + hole.height() / 2, plan[i].hole + 1);

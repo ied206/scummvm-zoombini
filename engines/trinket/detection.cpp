@@ -37,6 +37,7 @@ static constexpr PlainGameDescriptor trinketGames[] = {
 static constexpr const char *directoryGlobs[] = {
 	"hd",
 	"install",
+	"win",
 	"rsc",
 	"scripts",
 	"r1scripts",
@@ -54,6 +55,7 @@ public:
 		_md5Bytes = 5000;
 		_maxScanDepth = 4;
 		_directoryGlobs = directoryGlobs;
+		_flags = kADFlagPreferFallbackDetection;
 	}
 
 	const char *getName() const override {
@@ -67,6 +69,9 @@ public:
 	const char *getOriginalCopyright() const override {
 		return "Trinket games (C) The Learning Company / Riverdeep Interactive Learning Limited";
 	}
+
+	/** Recognize unregistered Z3 releases using the game data and a platform-specific file. */
+	ADDetectedGame fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist, ADDetectedGameExtraInfo **extra) const override;
 
 	/** Build the release-specific target and explain unsupported releases. */
 	DetectedGame toDetectedGame(const ADDetectedGame &adGame, ADDetectedGameExtraInfo *extraInfo = nullptr) const override {
@@ -100,6 +105,39 @@ public:
 			game.extra = _s("This version of the game is not yet supported.");
 		return game;
 	}
+
+private:
+	/**
+	 * Check the platform marker and game data and collect their hashes for the unknown-variant report.
+	 * @param allFiles Files indexed by the detector.
+	 * @param description Unregistered Z3 variant with the platform marker first.
+	 */
+	ADDetectedGame matchFuzzyZ3Files(const FileMap &allFiles, const ADGameDescription &description) const;
 };
+
+ADDetectedGame TrinketMetaEngineDetection::matchFuzzyZ3Files(const FileMap &allFiles, const ADGameDescription &description) const {
+	ADDetectedGame game(&description);
+	for (const ADGameFileDescription *file = description.filesDescriptions; file->fileName; file++) {
+		const Common::Path path(file->fileName);
+		MD5Properties md5Properties = kMD5Head;
+		if (file == description.filesDescriptions && description.platform == Common::kPlatformMacintosh)
+			md5Properties = kMD5MacResFork;
+		FileProperties properties;
+		if (!allFiles.contains(path) || !getFileProperties(allFiles, md5Properties, path, properties) || properties.size <= 0)
+			return ADDetectedGame();
+		game.matchedFiles[path] = properties;
+	}
+	game.hasUnknownFiles = true;
+	return game;
+}
+
+ADDetectedGame TrinketMetaEngineDetection::fallbackDetect(const FileMap &allFiles, const Common::FSList &, ADDetectedGameExtraInfo **) const {
+	for (const Trinket::TrinketGameDescription &release : Trinket::kFuzzyZ3GameDescriptions) {
+		const ADDetectedGame game = matchFuzzyZ3Files(allFiles, release.desc);
+		if (game.desc)
+			return game;
+	}
+	return ADDetectedGame();
+}
 
 REGISTER_PLUGIN_STATIC(TRINKET_DETECTION, PLUGIN_TYPE_ENGINE_DETECTION, TrinketMetaEngineDetection);

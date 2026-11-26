@@ -62,19 +62,19 @@ void Trinket::attach(Trinket *parent, ChildObserver *observer) {
 
 bool Trinket::get(const Common::String &property, const ScriptArguments &sargs, ScriptValue &result) {
 	if (property.equals(kPropertyX))
-		result = ScriptValue(x);
+		result = ScriptValue(_x);
 	else if (property.equals(kPropertyY))
-		result = ScriptValue(y);
+		result = ScriptValue(_y);
 	else if (property.equals(kPropertyZ))
-		result = ScriptValue(z);
+		result = ScriptValue(_z);
 	else if (property.equals(kPropertyVisible))
-		result = ScriptValue(static_cast<int32>(visible));
+		result = ScriptValue(static_cast<int32>(_visible));
 	else if (property.equals(kPropertyTouchy))
-		result = ScriptValue(static_cast<int32>(enabled));
+		result = ScriptValue(static_cast<int32>(_enabled));
 	else if (property.equals(kPropertyMovable))
-		result = ScriptValue(static_cast<int32>(movable));
+		result = ScriptValue(static_cast<int32>(_movable));
 	else if (property.equals(kPropertyTag))
-		result = ScriptValue(tag);
+		result = ScriptValue(_tag);
 	else if (property.equals(kPropertyWidth))
 		result = ScriptValue(width());
 	else if (property.equals(kPropertyHeight))
@@ -86,21 +86,21 @@ bool Trinket::get(const Common::String &property, const ScriptArguments &sargs, 
 
 bool Trinket::set(const Common::String &property, const ScriptArguments &sargs, const ScriptValue &value) {
 	if (property.equals(kPropertyX))
-		x = value.toInt32();
+		_x = value.toInt32();
 	else if (property.equals(kPropertyY))
-		y = value.toInt32();
+		_y = value.toInt32();
 	else if (property.equals(kPropertyZ)) {
-		z = value.toInt32();
+		_z = value.toInt32();
 		if (_childObserver)
 			_childObserver->childDepthChanged(*this);
 	} else if (property.equals(kPropertyVisible))
-		visible = value.toInt32() != 0;
+		_visible = value.toInt32() != 0;
 	else if (property.equals(kPropertyTouchy))
-		enabled = value.toInt32() != 0;
+		_enabled = value.toInt32() != 0;
 	else if (property.equals(kPropertyMovable))
-		movable = value.toInt32() != 0;
+		_movable = value.toInt32() != 0;
 	else if (property.equals(kPropertyTag))
-		tag = value.toInt32();
+		_tag = value.toInt32();
 	else
 		return ScriptableObject::set(property, sargs, value);
 	return true;
@@ -108,9 +108,9 @@ bool Trinket::set(const Common::String &property, const ScriptArguments &sargs, 
 
 bool Trinket::play(const Common::String &method, const ScriptArguments &sargs, ScriptValue &result) {
 	if (method.equals(kMethodSetAOCursor) && !sargs.empty() && sargs.size() <= 2) {
-		spotCursor = sargs[0].toText();
+		_spotCursor = sargs[0].toText();
 		if (1 < sargs.size())
-			grabCursor = sargs[1].toText();
+			_grabCursor = sargs[1].toText();
 		return true;
 	}
 	if ((!method.equals(kMethodPlace) && !method.equals(kOffsetName)) || sargs.size() != 2)
@@ -118,8 +118,8 @@ bool Trinket::play(const Common::String &method, const ScriptArguments &sargs, S
 	if (method.equals(kMethodPlace)) {
 		return set(kPropertyX, ScriptArguments(), sargs[0]) && set(kPropertyY, ScriptArguments(), sargs[1]);
 	} else {
-		return set(kPropertyX, ScriptArguments(), ScriptValue(x + sargs[0].toInt32())) &&
-			   set(kPropertyY, ScriptArguments(), ScriptValue(y + sargs[1].toInt32()));
+		return set(kPropertyX, ScriptArguments(), ScriptValue(_x + sargs[0].toInt32())) &&
+			   set(kPropertyY, ScriptArguments(), ScriptValue(_y + sargs[1].toInt32()));
 	}
 }
 

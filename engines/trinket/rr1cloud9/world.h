@@ -44,10 +44,10 @@ public:
 	/** Update activity assessment history and automatic-level progress. */
 	void recordAssessment(const Common::String &activity, int level, int outcome, int up, int down, int streak);
 	/** Editable flipbook drawings retained with world progress. */
-	Artwork artwork;
+	Artwork _artwork;
 	/** Clear world values and restore blank artwork state. */
 	void reset() {
-		artwork.clear();
+		_artwork.clear();
 		_values.clear();
 		set("R1CN1State", 1);
 		set("R1CG1State", 1);

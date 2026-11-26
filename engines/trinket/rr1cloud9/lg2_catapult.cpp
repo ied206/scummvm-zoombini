@@ -138,9 +138,9 @@ bool Catapult::enter() {
 	_exit = sprite(kExitAnimIDKey, kCatapultZKey);
 	if (!_bowl || !_sandwich || !_eating || !_sleep || !_clump || !_clumpAnim || !_catapult || !_exit)
 		return false;
-	_bowl->visible = !_sleeping;
-	_sleep->visible = _sleeping;
-	_sandwich->visible = _eating->visible = _clumpAnim->visible = _exit->visible = false;
+	_bowl->_visible = !_sleeping;
+	_sleep->_visible = _sleeping;
+	_sandwich->_visible = _eating->_visible = _clumpAnim->_visible = _exit->_visible = false;
 	if (world.get(kR1LG2ExitPendingKey)) {
 		_phase = kExitSpeech;
 	} else if (world.get(kR1LG2FeedPendingKey)) {
@@ -162,18 +162,18 @@ void Catapult::advance(uint32 time) {
 	if (_phase != kExiting && _phase != kExitReady) {
 		if (_ambientPlaying && !_clumpAnim->isRunning()) {
 			_ambientPlaying = false;
-			_clumpAnim->visible = false;
-			_clump->visible = _catapult->visible = true;
+			_clumpAnim->_visible = false;
+			_clump->_visible = _catapult->_visible = true;
 			_ambientStart = time;
 			_ambientDelay = 2000;
 		} else if (!_ambientPlaying && _ambientDelay <= time - _ambientStart) {
-			_clumpAnim->visible = true;
-			_clump->visible = _catapult->visible = false;
+			_clumpAnim->_visible = true;
+			_clump->_visible = _catapult->_visible = false;
 			_clumpAnim->startAnimation(1);
 			_ambientPlaying = true;
 		}
 	}
-	if (_sleep->visible) {
+	if (_sleep->_visible) {
 		if (_snoring && !_sleep->isRunning()) {
 			_snoring = false;
 			_sleepStart = time;
@@ -195,7 +195,7 @@ void Catapult::update(uint32 time) {
 		if (time - _start < 1500)
 			return;
 		_host.playSounds({static_cast<uint16>(number(kFeedingSFXIDKey))});
-		_sandwich->visible = true;
+		_sandwich->_visible = true;
 		if (world.get(kR1LG2FeedPendingKey) == 1) {
 			world.set(kR1LG2FeedCreatureKey, world.get(kR1LG2FeedCreatureKey) + 1);
 			world.set(kR1LG2PetSleepingKey, 1);
@@ -206,16 +206,16 @@ void Catapult::update(uint32 time) {
 		line(kSandwichCharIDKey, kSandwichSpchIDKey, count == 1 ? 1 : _host._vm._rnd->getRandomNumberRng(1, number(kMaxSandwichSpchsKey)));
 		_phase = kFeedSpeech;
 	} else if (_phase == kFeedSpeech) {
-		_eating->visible = true;
+		_eating->_visible = true;
 		_host._actors[kPropertyPet1]->setVisible(false);
-		_sandwich->visible = _bowl->visible = false;
+		_sandwich->_visible = _bowl->_visible = false;
 		_eating->startAnimation(1);
 		_phase = kEating;
 	} else if (_phase == kEating) {
 		if (_eating->isRunning())
 			return;
-		_eating->visible = false;
-		_sleep->visible = true;
+		_eating->_visible = false;
+		_sleep->_visible = true;
 		_sleepStart = time;
 		_sleeping = true;
 		world.set(kR1LG2FeedPendingKey, 0);
@@ -228,8 +228,8 @@ void Catapult::update(uint32 time) {
 		_phase = kIdle;
 	else if (_phase == kExitSpeech) {
 		_clumpAnim->stopAnimation();
-		_clumpAnim->visible = _catapult->visible = false;
-		_clump->visible = _exit->visible = true;
+		_clumpAnim->_visible = _catapult->_visible = false;
+		_clump->_visible = _exit->_visible = true;
 		_host._actors[kReaderName]->setVisible(false);
 		_host._actors[kSamName]->setVisible(false);
 		_exit->startAnimation(1);
@@ -277,14 +277,14 @@ void Catapult::ride() {
 
 bool Catapult::click(Common::Point point) {
 	_idle = _host._time;
-	if (_bowl->visible && _bowl->covers(point)) {
+	if (_bowl->_visible && _bowl->covers(point)) {
 		int choice = _host._vm._rnd->getRandomNumberRng(1, 2);
 		if (choice == 2 && !_host._world.get(kItem9Key))
 			choice = 3;
 		group(kBowlCharIDKey, kBowlSpchIDKey, kMaxBowlSpchsKey, choice);
 		return true;
 	}
-	if (_sleep->visible && _sleep->covers(point))
+	if (_sleep->_visible && _sleep->covers(point))
 		return true;
 	for (auto &entry : _host._actors) {
 		if (entry._key.equals(kPropertyPet1) && _sleeping)

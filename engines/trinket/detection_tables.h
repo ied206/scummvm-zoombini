@@ -78,6 +78,40 @@ static const TrinketGameDescription gameDescriptions[] = {
 		GF_Z3_10,
 	},
 	// Zoombinis: Island Odyssey
+	// v1.0RU: Russian, Russobit-M / Nikita
+	// Build Date: 2002-09-26 UTC; localized files dated 2004
+	// From Hajin Jang
+	{
+		{
+			"zoombini3",
+			"v1.0RU",
+			AD_ENTRY2s("root.inx", "b2d10d565dc3053a26a0f4bc939b13ea", 45950,
+					   "z3p1.xml", "1cedc481c92c9711f5c898208d1e402a", 1450),
+			Common::RU_RUS,
+			Common::kPlatformWindows,
+			ADGF_UNSTABLE,
+			GUIO2(GUIO_NOMIDI, GUIO_NOLANG),
+		},
+		GF_Z3_10 | TrinketGameDescription::kZ3DirectStart,
+	},
+	// Zoombinis: Archipel en danger
+	// v1.0FR: French, Mindscape hybrid disc
+	// Build Date: 2002-09-26 UTC
+	// From Hajin Jang
+	{
+		{
+			"zoombini3",
+			"v1.0FR",
+			AD_ENTRY2s("root.inx", "8a18f6b88c190c6039818932f9aa544b", 45660,
+					   "z3p1.xml", "4fd77e2bb0bbe005d360fdd23d58339c", 1440),
+			Common::FR_FRA,
+			Common::kPlatformWindows,
+			ADGF_UNSTABLE,
+			GUIO2(GUIO_NOMIDI, GUIO_NOLANG),
+		},
+		GF_Z3_10 | TrinketGameDescription::kZ3DirectStart,
+	},
+	// Zoombinis: Island Odyssey
 	// v1.0US: Macintosh PowerPC
 	// Build Date: 2002-09-28
 	// From Hajin Jang
@@ -94,6 +128,41 @@ static const TrinketGameDescription gameDescriptions[] = {
 			GUIO2(GUIO_NOMIDI, GUIO_NOLANG),
 		},
 		GF_Z3_10,
+	},
+	// Zoombinis: Island Odyssey
+	// v1.0UK: Macintosh PowerPC, Mindscape hybrid disc
+	// Build Date: 2002-09-28
+	// From Hajin Jang
+	{
+		{
+			"zoombini3",
+			"v1.0UK",
+			AD_ENTRY3s("root.inx", "2ca0ed3bc2cbccd73d0e557ce52082ea", 45660,
+					   "z3p1.xml", "f2a4d4287f2b169fed46985ee8790325", 1456,
+					   "Zoombinis Island Odyssey", "rt:d140804107330a071409c5c8dd016855", 86584),
+			Common::EN_GRB,
+			Common::kPlatformMacintosh,
+			ADGF_UNSUPPORTED,
+			GUIO2(GUIO_NOMIDI, GUIO_NOLANG),
+		},
+		GF_Z3_10,
+	},
+	// Zoombinis: Archipel en danger
+	// v1.0FR: French, Macintosh PowerPC, Mindscape hybrid disc
+	// From Hajin Jang
+	{
+		{
+			"zoombini3",
+			"v1.0FR",
+			AD_ENTRY3s("root.inx", "8a18f6b88c190c6039818932f9aa544b", 45660,
+					   "z3p1.xml", "4fd77e2bb0bbe005d360fdd23d58339c", 1440,
+					   "Zoombinis Island Odyssey", "rt:d140804107330a071409c5c8dd016855", 86584),
+			Common::FR_FRA,
+			Common::kPlatformMacintosh,
+			ADGF_UNSTABLE,
+			GUIO2(GUIO_NOMIDI, GUIO_NOLANG),
+		},
+		GF_Z3_10 | TrinketGameDescription::kZ3DirectStart,
 	},
 	// Reader Rabbit 1st Grade: Capers on Cloud Nine!
 	// Build Date: 2001-05-31 UTC
@@ -130,6 +199,37 @@ static const TrinketGameDescription gameDescriptions[] = {
 		GF_RR1_CLOUD9,
 	},
 	{AD_TABLE_END_MARKER, 0},
+};
+
+/** Z3-only fallback layouts, with the platform marker first in each list. */
+static const TrinketGameDescription kFuzzyZ3GameDescriptions[] = {
+	// A hybrid may also contain the Windows executable.
+	{
+		{
+			"zoombini3",
+			"Unknown release",
+			AD_ENTRY5s("Zoombinis Island Odyssey", nullptr, AD_NO_SIZE, "root.inx", nullptr, AD_NO_SIZE,
+					   "z3common.bul", nullptr, AD_NO_SIZE, "z3p1.mps", nullptr, AD_NO_SIZE, "z3p1.xml", nullptr, AD_NO_SIZE),
+			Common::UNK_LANG,
+			Common::kPlatformMacintosh,
+			ADGF_UNSTABLE,
+			GUIO1(GUIO_NOMIDI),
+		},
+		TrinketGameDescription::kZ3DirectStart,
+	},
+	{
+		{
+			"zoombini3",
+			"Unknown release",
+			AD_ENTRY5s("Zoombinis Island Odyssey.exe", nullptr, AD_NO_SIZE, "root.inx", nullptr, AD_NO_SIZE,
+					   "z3common.bul", nullptr, AD_NO_SIZE, "z3p1.mps", nullptr, AD_NO_SIZE, "z3p1.xml", nullptr, AD_NO_SIZE),
+			Common::UNK_LANG,
+			Common::kPlatformWindows,
+			ADGF_UNSTABLE,
+			GUIO1(GUIO_NOMIDI),
+		},
+		TrinketGameDescription::kZ3DirectStart,
+	},
 };
 
 } // End of namespace Trinket

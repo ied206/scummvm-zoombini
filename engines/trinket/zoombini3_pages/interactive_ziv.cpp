@@ -60,36 +60,36 @@ bool ZIVMachine::addAnimation(uint id, bool cull, int repeat) {
 		_scene.remove(sprite);
 		return false;
 	}
-	sprite->enabled = false;
-	sprite->movable = false;
+	sprite->_enabled = false;
+	sprite->_movable = false;
 	_scroller.add(*sprite);
 	switch (id) {
 	case 22008:
-		sprite->x = 2390;
+		sprite->_x = 2390;
 		break;
 	case 22011:
-		sprite->x = 2160;
+		sprite->_x = 2160;
 		break;
 	case 22056:
-		sprite->x = 2130;
+		sprite->_x = 2130;
 		break;
 	case 22015:
-		sprite->x = 2230;
+		sprite->_x = 2230;
 		break;
 	case 22030:
-		sprite->x = 2280;
+		sprite->_x = 2280;
 		break;
 	case 22038:
-		sprite->x = 2220;
+		sprite->_x = 2220;
 		break;
 	case 22021:
-		sprite->x = 2325;
+		sprite->_x = 2325;
 		break;
 	case 22029:
-		sprite->x = 2055;
+		sprite->_x = 2055;
 		break;
 	case 22037:
-		sprite->x = 2240;
+		sprite->_x = 2240;
 		break;
 	default:
 		break;
@@ -174,7 +174,7 @@ void ZIVMachine::update(uint32 time) {
 	_cullTime = time + 200;
 	for (uint i = 0; i < _ambient.size(); i++) {
 		Shell::Sprite &sprite = *_ambient[i];
-		if (900 <= sprite.x || sprite.x + sprite.width() <= -100) {
+		if (900 <= sprite._x || sprite._x + sprite.width() <= -100) {
 			if (sprite.isRunning())
 				sprite.pauseAnimation(true);
 		} else if (!sprite.isRunning()) {

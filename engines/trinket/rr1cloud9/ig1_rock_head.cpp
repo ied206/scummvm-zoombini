@@ -166,7 +166,7 @@ bool RockHead::character(const char *name, const char *prefix, int pose) {
 	Common::ScopedPtr<Shell::Character> actor(new Shell::Character(_host._scene, _host._vm.mixer(), _host._vm.resources(), *_host._vm._rnd, _host));
 	if (!actor->create(settle ? settle : lips, number(base + kZName)))
 		return false;
-	actor->movable = false;
+	actor->_movable = false;
 	for (const char *key : {kRegisterFidgetsToSettleName, kRegisterSpeechToSettleName, kLoadSpeechAnimsInBkgdName, kAnimateSettledName})
 		actor->set(key, {}, Core::ScriptValue(0));
 	Core::ScriptValue result;
@@ -234,10 +234,10 @@ bool RockHead::enter() {
 	_hoop = sprite(kHoop2IDKey, kHoopZKey);
 	if (!_ladder || !_hat || !_hoop)
 		return false;
-	_ladder->visible = world.get(kR1IG1LadderHereKey);
-	_hat->visible = world.get(kR1IG1HatHereKey);
-	_hoop->visible = _hat->visible && world.get(kR1IG1HoopHereKey);
-	_hoop->boxTouchy = true;
+	_ladder->_visible = world.get(kR1IG1LadderHereKey);
+	_hat->_visible = world.get(kR1IG1HatHereKey);
+	_hoop->_visible = _hat->_visible && world.get(kR1IG1HoopHereKey);
+	_hoop->_boxTouchy = true;
 	if (pending == 6 || pending == 8)
 		_phase = pending == 6 ? kLadderWait : kHatWait;
 	else if (pending == 2)
@@ -246,7 +246,7 @@ bool RockHead::enter() {
 		_host._actors[kReaderName]->playAnim(number(kReaderWalkInIDKey));
 		_host._actors[kSamName]->playAnim(number(kSamWalkInIDKey));
 		_host._actors[kPaigeName]->setVisible(false);
-		_host._chester->visible = false;
+		_host._chester->_visible = false;
 		_phase = kArrival;
 	} else
 		entrySpeech();
@@ -285,7 +285,7 @@ void RockHead::update(uint32 time) {
 		if (_host._actors[kReaderName]->isBusy() || _host._actors[kSamName]->isBusy())
 			return;
 		_host._actors[kPaigeName]->setVisible(true);
-		_host._chester->visible = true;
+		_host._chester->_visible = true;
 		entrySpeech();
 		_phase = kIdle;
 	} else if (_phase == kReaderClimb) {
@@ -306,7 +306,7 @@ void RockHead::update(uint32 time) {
 		if (time - _start < 1500)
 			return;
 		if (_phase == kLadderWait) {
-			_ladder->visible = true;
+			_ladder->_visible = true;
 			world.set(kR1IG1LadderHereKey, 1);
 			world.set(kR1IG1PendingKey, 0);
 			_state = 3;
@@ -314,7 +314,7 @@ void RockHead::update(uint32 time) {
 			group(kLadderCharIDKey, kLadderSpchIDKey, 2);
 			_phase = kSpeech;
 		} else {
-			_hat->visible = true;
+			_hat->_visible = true;
 			Core::ScriptValue result;
 			_host._actors[kRockActor]->play(kMethodRemoveFidgetGroup, {Core::ScriptValue(1)}, result);
 			group(kHatCharIDKey, kHatSpchIDKey, number(kNumHatSpchsKey));
@@ -323,7 +323,7 @@ void RockHead::update(uint32 time) {
 	} else if (_phase == kHatSpeech) {
 		world.set(kR1IG1HatHereKey, 1);
 		world.set(kR1IG1PendingKey, 0);
-		_hoop->visible = world.get(kR1IG1HoopHereKey);
+		_hoop->_visible = world.get(kR1IG1HoopHereKey);
 		_host.playSounds({static_cast<uint16>(number(kHoopPresentedIDKey))});
 		if (!rock())
 			error("RR1: cannot load Rock Head's hat pose");
@@ -336,7 +336,7 @@ void RockHead::update(uint32 time) {
 			world.set(kR1IG1HoopHereKey, 0);
 			world.set(kR1IG1PendingKey, 0);
 		}
-		_hoop->visible = false;
+		_hoop->_visible = false;
 		_state = 4;
 		world.set(kR1IG1StateKey, _state);
 		_phase = kIdle;
@@ -455,7 +455,7 @@ bool RockHead::click(Common::Point point) {
 			mainSpeech();
 		return true;
 	}
-	if (_ladder->visible && (hotspot(kLadderKey, _pose == 1 ? k1Name : k2Name, point) || hotspot(kLadderKey, k3Name, point))) {
+	if (_ladder->_visible && (hotspot(kLadderKey, _pose == 1 ? k1Name : k2Name, point) || hotspot(kLadderKey, k3Name, point))) {
 		climb();
 		return true;
 	}
@@ -475,7 +475,7 @@ bool RockHead::donate(uint item) {
 		return false;
 	_host.interrupt();
 	World &world = _host._world;
-	if ((item == 6 && !_ladder->visible) || (item == 8 && _pose == 2 && !_hat->visible)) {
+	if ((item == 6 && !_ladder->_visible) || (item == 8 && _pose == 2 && !_hat->_visible)) {
 		Common::String key = Common::String::format(kItemUnsignedIndexFormat, item);
 		if (world.get(key) <= 0)
 			return false;

@@ -202,12 +202,12 @@ void WordPots::setText(Shell::TextObject *text, const Common::String &value, int
 }
 
 Common::Rect WordPots::bounds(Shell::Sprite *sprite) {
-	return Common::Rect(sprite->x, sprite->y, sprite->x + sprite->width(), sprite->y + sprite->height());
+	return Common::Rect(sprite->_x, sprite->_y, sprite->_x + sprite->width(), sprite->_y + sprite->height());
 }
 
 Common::Point WordPots::frameOffset(Shell::Sprite *sprite) {
 	uint frame = 0;
-	for (const auto &step : sprite->asset->sequence(0)) {
+	for (const auto &step : sprite->_asset->sequence(0)) {
 		if (step.picture == -1)
 			break;
 		if (0 <= step.picture) {
@@ -221,8 +221,8 @@ Common::Point WordPots::frameOffset(Shell::Sprite *sprite) {
 
 void WordPots::placeAnswer(Shell::Sprite *sprite, Common::Point origin) {
 	Common::Point offset = frameOffset(sprite);
-	sprite->x = origin.x + offset.x;
-	sprite->y = origin.y + offset.y;
+	sprite->_x = origin.x + offset.x;
+	sprite->_y = origin.y + offset.y;
 }
 
 bool WordPots::loadList(int resource, Common::StringArray &list) {
@@ -296,7 +296,7 @@ bool WordPots::enter() {
 		_round = 5;
 		_wagonHere = _showMarble = false;
 		if (_host._chester)
-			_host._chester->visible = false;
+			_host._chester->_visible = false;
 	}
 	_user = sprite(kItemsIDKey, 100);
 	_target = sprite(kItemsIDKey, 92);
@@ -325,18 +325,18 @@ bool WordPots::enter() {
 	_newText = text(true);
 	_user->setFrame(1);
 	_answerSize = Common::Point(_user->width(), _user->height());
-	_growHome = Common::Point(_grow->x, _grow->y);
-	_shrinkHome = Common::Point(_shrink->x, _shrink->y);
-	_arrowHome = Common::Point(_arrow->x, _arrow->y);
-	_boxHome = Common::Point(_box->x, _box->y);
-	_maskHome = Common::Point(_mask->x + 1, _mask->y - 1);
-	_wagonHome = Common::Point(_redWagon->x, _redWagon->y);
-	_oldWagonHome = Common::Point(_oldWagon->x, _oldWagon->y);
-	_oldMaskHome = Common::Point(_oldMask->x, _oldMask->y);
-	_packagesHome = Common::Point(_packages->x, _packages->y);
-	_marble->colorRemap = PageScene::marbleColor(0);
-	_marble->x = number(kMarbleXKey);
-	_marble->y = number(kMarbleYKey);
+	_growHome = Common::Point(_grow->_x, _grow->_y);
+	_shrinkHome = Common::Point(_shrink->_x, _shrink->_y);
+	_arrowHome = Common::Point(_arrow->_x, _arrow->_y);
+	_boxHome = Common::Point(_box->_x, _box->_y);
+	_maskHome = Common::Point(_mask->_x + 1, _mask->_y - 1);
+	_wagonHome = Common::Point(_redWagon->_x, _redWagon->_y);
+	_oldWagonHome = Common::Point(_oldWagon->_x, _oldWagon->_y);
+	_oldMaskHome = Common::Point(_oldMask->_x, _oldMask->_y);
+	_packagesHome = Common::Point(_packages->_x, _packages->_y);
+	_marble->_colorRemap = PageScene::marbleColor(0);
+	_marble->_x = number(kMarbleXKey);
+	_marble->_y = number(kMarbleYKey);
 	if (!setup())
 		return false;
 	if (_host._practice) {
@@ -396,7 +396,7 @@ bool WordPots::setup() {
 	_attempts = 1;
 	_pot = -1;
 	_dragging = _showWords = false;
-	_grow->visible = _shrink->visible = _arrow->visible = false;
+	_grow->_visible = _shrink->_visible = _arrow->_visible = false;
 	_phase = kReady;
 	_idle = _host._time;
 	targetPosition(0);
@@ -409,29 +409,29 @@ bool WordPots::setup() {
 void WordPots::present() {
 	int package = (_round - 1) % 4 + 1;
 	_packages->setFrame(_state == 1 ? package : package + 1);
-	_packages->visible = _state == 1 || package < 4;
-	_user->visible = 1 < _state;
-	_target->visible = _state == 4;
-	_mask->visible = _state == 4 && _level == 3;
-	_redWagon->visible = _wagonHere;
-	_redWagon->x = _wagonHome.x - (4 < _round ? number(kRedWagonMoveOffsetKey) : 0);
-	_redMask->visible = _wagonHere && _round <= 4;
-	_oldWagon->visible = _oldMask->visible = 4 < _round;
-	_marble->visible = _showMarble;
+	_packages->_visible = _state == 1 || package < 4;
+	_user->_visible = 1 < _state;
+	_target->_visible = _state == 4;
+	_mask->_visible = _state == 4 && _level == 3;
+	_redWagon->_visible = _wagonHere;
+	_redWagon->_x = _wagonHome.x - (4 < _round ? number(kRedWagonMoveOffsetKey) : 0);
+	_redMask->_visible = _wagonHere && _round <= 4;
+	_oldWagon->_visible = _oldMask->_visible = 4 < _round;
+	_marble->_visible = _showMarble;
 }
 
 void WordPots::targetPosition(int offset) {
-	_box->x = _boxHome.x + offset;
-	_box->y = _boxHome.y;
-	_mask->x = _maskHome.x + offset;
-	_mask->y = _maskHome.y;
+	_box->_x = _boxHome.x + offset;
+	_box->_y = _boxHome.y;
+	_mask->_x = _maskHome.x + offset;
+	_mask->_y = _maskHome.y;
 	placeAnswer(_target, Common::Point(number(kTargetAnswerXKey) + offset, number(kTargetAnswerYKey)));
 }
 
 void WordPots::wagonPosition(int offset) {
-	_oldWagon->x = _oldWagonHome.x + offset;
-	_oldMask->x = _oldMaskHome.x + offset;
-	_packages->x = _packagesHome.x + offset;
+	_oldWagon->_x = _oldWagonHome.x + offset;
+	_oldMask->_x = _oldMaskHome.x + offset;
+	_packages->_x = _packagesHome.x + offset;
 }
 
 void WordPots::unpack() {
@@ -458,28 +458,28 @@ void WordPots::transform(int pot) {
 	setText(_oldText, old, number(kOldWordXKey) + offset, number(kOldWordYKey));
 	setText(_newText, _word, number(kNewWordXKey) + offset, number(kNewWordYKey));
 	// The script places these text boxes by their top-left corner after changing the text.
-	_oldText->x = number(kOldWordXKey) + offset;
-	_oldText->y = number(kOldWordYKey);
-	_newText->x = number(kNewWordXKey) + offset;
-	_newText->y = number(kNewWordYKey);
-	_arrow->x = _arrowHome.x + offset;
-	_arrow->y = _arrowHome.y;
-	_user->visible = _arrow->visible = _showWords = false;
-	_shrink->visible = false;
+	_oldText->_x = number(kOldWordXKey) + offset;
+	_oldText->_y = number(kOldWordYKey);
+	_newText->_x = number(kNewWordXKey) + offset;
+	_newText->_y = number(kNewWordYKey);
+	_arrow->_x = _arrowHome.x + offset;
+	_arrow->_y = _arrowHome.y;
+	_user->_visible = _arrow->_visible = _showWords = false;
+	_shrink->_visible = false;
 	_grow->startAnimation();
-	_grow->x = _growHome.x + offset;
-	_grow->y = _growHome.y;
-	_grow->visible = true;
+	_grow->_x = _growHome.x + offset;
+	_grow->_y = _growHome.y;
+	_grow->_visible = true;
 	_phase = kGrowing;
 	sound(kDropSfxIDKey);
 }
 
 void WordPots::grown() {
-	_grow->visible = false;
+	_grow->_visible = false;
 	_shrink->setFrame(1);
-	_shrink->x = _shrinkHome.x + _pot * 100;
-	_shrink->y = _shrinkHome.y;
-	_shrink->visible = _user->visible = _arrow->visible = _showWords = true;
+	_shrink->_x = _shrinkHome.x + _pot * 100;
+	_shrink->_y = _shrinkHome.y;
+	_shrink->_visible = _user->_visible = _arrow->_visible = _showWords = true;
 	sayWord(_word);
 	if (_state == 2) {
 		_state = 3;
@@ -488,8 +488,8 @@ void WordPots::grown() {
 		group(kBbName, kInstrSpchIDs3Key, 13);
 	} else if (_state == 3) {
 		_state = 4;
-		_target->visible = true;
-		_mask->visible = _level == 3;
+		_target->_visible = true;
+		_mask->_visible = _level == 3;
 		group(kBbbbsbName, kInstrSpchIDs5Key);
 	}
 	_phase = kReady;
@@ -546,7 +546,7 @@ void WordPots::drop() {
 
 void WordPots::solved() {
 	_completedRound = _round;
-	_user->visible = _showWords = _arrow->visible = false;
+	_user->_visible = _showWords = _arrow->_visible = false;
 	if (!_host._practice) {
 		bool imperfect = indexed(kOptimumTransformationsKey, _level) < _transformations;
 		int outcome = imperfect ? 3 : 1;
@@ -575,7 +575,7 @@ void WordPots::solved() {
 
 Common::Rect WordPots::answerBounds() const {
 	Common::Rect result = bounds(_user);
-	Common::Point origin = Common::Point(_user->x, _user->y) - frameOffset(_user);
+	Common::Point origin = Common::Point(_user->_x, _user->_y) - frameOffset(_user);
 	Common::Rect label(origin.x, origin.y + number(kAnswerTextOffsetYKey),
 					   origin.x + _answerSize.x, origin.y + _answerSize.y + number(kAnswerTextOffsetYKey));
 	result.extend(label);
@@ -583,7 +583,7 @@ Common::Rect WordPots::answerBounds() const {
 }
 
 void WordPots::next() {
-	if (_completedRound % 4 == 0 && _oldWagon->visible) {
+	if (_completedRound % 4 == 0 && _oldWagon->_visible) {
 		_phase = kWagonOut;
 		_start = _host._time;
 		sound(kRedWagonSfxIDKey);
@@ -598,9 +598,9 @@ void WordPots::prepareNext() {
 	_phase = kTargetIn;
 	_start = _host._time;
 	targetPosition(number(kTargetMoveOffsetKey));
-	_user->visible = false;
+	_user->_visible = false;
 	int package = (_round - 1) % 4 + 1;
-	_packages->visible = true;
+	_packages->_visible = true;
 	_packages->setFrame(package);
 	if (package == 1)
 		wagonPosition(number(kOldWagonMoveOffsetKey));
@@ -641,13 +641,13 @@ bool WordPots::click(Common::Point point) {
 		unpack();
 		return true;
 	}
-	if (_user->visible && bounds(_user).contains(point)) {
+	if (_user->_visible && bounds(_user).contains(point)) {
 		_host.interrupt();
 		_dragging = true;
-		_dragOffset = Common::Point(point.x - _user->x, point.y - _user->y);
+		_dragOffset = Common::Point(point.x - _user->_x, point.y - _user->_y);
 		if (0 <= _pot) {
 			_shrink->startAnimation();
-			_shrink->visible = true;
+			_shrink->_visible = true;
 			_pot = -1;
 		} else {
 			sayWord(_word);
@@ -656,16 +656,16 @@ bool WordPots::click(Common::Point point) {
 		return true;
 	}
 	if (_showMarble && _marble->covers(point)) {
-		_showMarble = _marble->visible = false;
+		_showMarble = _marble->_visible = false;
 		Common::String key = Common::String::format(kItemSignedIndexFormat, number(kINV1Marble1Key));
 		_host._world.set(key, _host._world.get(key) + 1);
 		_host.putAway();
 		persist();
 		return true;
 	}
-	if (_redWagon->visible && _redWagon->covers(point)) {
+	if (_redWagon->_visible && _redWagon->covers(point)) {
 		if (4 < _round) {
-			_wagonHere = _redWagon->visible = false;
+			_wagonHere = _redWagon->_visible = false;
 			Common::String key = Common::String::format(kItemSignedIndexFormat, number(kINV1WagonKey));
 			_host._world.set(key, _host._world.get(key) + 1);
 			_host.putAway();
@@ -676,7 +676,7 @@ bool WordPots::click(Common::Point point) {
 		}
 		return true;
 	}
-	if (_oldWagon->visible && _oldWagon->covers(point)) {
+	if (_oldWagon->_visible && _oldWagon->covers(point)) {
 		if (_wagonHere)
 			group(kSbName, kWagonSpchIDs1Key);
 		else if (!_host._practice)
@@ -720,14 +720,14 @@ bool WordPots::click(Common::Point point) {
 
 void WordPots::hover(Common::Point point) {
 	for (auto *pot : _pots) {
-		Common::Point position(pot->x, pot->y);
+		Common::Point position(pot->_x, pot->_y);
 		pot->setFrame(bounds(pot).contains(point) ? 2 : 1);
-		pot->x = position.x;
-		pot->y = position.y;
+		pot->_x = position.x;
+		pot->_y = position.y;
 	}
 	_box->setFrame(bounds(_box).contains(point) ? 2 : 1);
-	_box->x = _boxHome.x;
-	_box->y = _boxHome.y;
+	_box->_x = _boxHome.x;
+	_box->_y = _boxHome.y;
 }
 
 bool WordPots::event(const Common::Event &event) {
@@ -737,8 +737,8 @@ bool WordPots::event(const Common::Event &event) {
 		return false;
 	}
 	if (event.type == Common::EVENT_MOUSEMOVE || event.type == Common::EVENT_LBUTTONUP) {
-		_user->x = event.mouse.x - _dragOffset.x;
-		_user->y = event.mouse.y - _dragOffset.y;
+		_user->_x = event.mouse.x - _dragOffset.x;
+		_user->_y = event.mouse.y - _dragOffset.y;
 		if (event.type == Common::EVENT_LBUTTONUP) {
 			_host.interrupt();
 			drop();
@@ -752,7 +752,7 @@ void WordPots::advance(uint32 time) {
 	if (_host._nextSpeech < _host._speech.size() || (_host._speaking && _host._speaking->isBusy()))
 		_idle = time;
 	if (_pot < 0 && !_shrink->isRunning())
-		_shrink->visible = false;
+		_shrink->_visible = false;
 }
 
 void WordPots::update(uint32 time) {
@@ -783,13 +783,13 @@ void WordPots::update(uint32 time) {
 		_phase = kBatchSpeech;
 	} else if (_phase == kBatchSpeech) {
 		if (_completedRound == 4) {
-			_redMask->visible = false;
+			_redMask->_visible = false;
 			sound(kRedWagonSfxIDKey);
 			_phase = kRedWagonOut;
 			_start = time;
 		} else if (_completedRound % 4 == 0 && !_host._practice) {
-			bool existing = _marble->visible;
-			_marble->visible = true;
+			bool existing = _marble->_visible;
+			_marble->_visible = true;
 			say(kBloomName, existing ? kCorrectSpchIDs9Key : kCorrectSpchIDs8Key);
 			_phase = existing ? kRedWagonSpeech : kMarbleSpeech;
 		} else {
@@ -797,7 +797,7 @@ void WordPots::update(uint32 time) {
 		}
 	} else if (_phase == kRedWagonOut) {
 		int step = MIN<uint>(12, (time - _start) * 12 / 1000);
-		_redWagon->x = _wagonHome.x - number(kRedWagonMoveOffsetKey) * step / 12;
+		_redWagon->_x = _wagonHome.x - number(kRedWagonMoveOffsetKey) * step / 12;
 		if (step == 12) {
 			say(kBloomName, kCorrectSpchIDs10Key);
 			_phase = kRedWagonSpeech;
@@ -865,17 +865,17 @@ void WordPots::draw(OM::Canvas &canvas) {
 		_newText->draw(canvas);
 	}
 	_host._scene.drawSprites(canvas, 5, 94);
-	if (_target->visible) {
+	if (_target->_visible) {
 		Common::Point offset = frameOffset(_target);
-		setText(_targetText, _targetWord, _target->x - offset.x + _answerSize.x / 2,
-				_target->y - offset.y + _answerSize.y / 2 + number(kAnswerTextOffsetYKey));
+		setText(_targetText, _targetWord, _target->_x - offset.x + _answerSize.x / 2,
+				_target->_y - offset.y + _answerSize.y / 2 + number(kAnswerTextOffsetYKey));
 		_targetText->draw(canvas);
 	}
 	_host._scene.drawSprites(canvas, 95, 100);
-	if (_user->visible) {
+	if (_user->_visible) {
 		Common::Point offset = frameOffset(_user);
-		setText(_userText, _word, _user->x - offset.x + _answerSize.x / 2,
-				_user->y - offset.y + _answerSize.y / 2 + number(kAnswerTextOffsetYKey));
+		setText(_userText, _word, _user->_x - offset.x + _answerSize.x / 2,
+				_user->_y - offset.y + _answerSize.y / 2 + number(kAnswerTextOffsetYKey));
 		_userText->draw(canvas);
 	}
 	_host._scene.drawSprites(canvas, 101, INT_MAX);

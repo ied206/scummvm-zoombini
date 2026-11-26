@@ -33,8 +33,10 @@ namespace Zoombini3 {
 /** Offline save operations, keeping launcher identities and practice companions together. */
 class Saves {
 public:
-	/** Bind offline transactions to one target's save storage. */
-	Saves(Common::SaveFileManager &manager, const Common::String &target);
+	/** Bind offline transactions to one target's native save platform and storage. */
+	Saves(Common::SaveFileManager &manager, const Common::String &target, Common::Platform platform = Common::kPlatformWindows);
+	/** Return the destination platform used for imported saves and registry writes. */
+	Common::Platform platform() const { return _platform; }
 	/** Load the game and launcher registries without rewriting them. */
 	bool load();
 	/** Return the native game registry, including practice companions. */
@@ -49,9 +51,9 @@ public:
 	bool remove(uint player);
 	/** Persist the one-based slot selected for this player. */
 	bool select(uint player, uint slot);
-	/** Validate and replace one native slot, updating its registered location. */
+	/** Validate and replace a slot, logging conversion to the target's native save format when needed. */
 	bool importSlot(uint player, uint slot, Common::SeekableReadStream &stream);
-	/** Validate and import one native save under a new player and launcher identity. */
+	/** Import a native save under a new identity, converting to the target's native format when needed. */
 	bool importSave(const Common::String &name, Common::SeekableReadStream &stream);
 	/** Copy one native slot to the caller's output stream. */
 	bool exportSlot(uint player, uint slot, Common::WriteStream &stream);
@@ -73,6 +75,8 @@ private:
 	typedef Common::HashMap<Common::String, Bytes> Files;
 	/** Save storage supplied by the backend; must outlive this manager. */
 	Common::SaveFileManager &_manager;
+	/** Native destination platform selected by the target's detector metadata. */
+	const Common::Platform _platform;
 	/** Prefix restricting transactions to the configured target. */
 	Common::String _prefix;
 	/** Target-prefixed launcher registry filename. */

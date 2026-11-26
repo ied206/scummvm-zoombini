@@ -173,10 +173,10 @@ bool AttributeCharacter::playFeedback(uint resource, int repeat, bool keepVisibl
 		Shell::Sprite *sprite = _scene.add(path, _z);
 		if (!sprite)
 			return false;
-		sprite->managed = true;
-		sprite->enabled = false;
-		sprite->x += _position.x - _origin.x;
-		sprite->y += _position.y - _origin.y;
+		sprite->_managed = true;
+		sprite->_enabled = false;
+		sprite->_x += _position.x - _origin.x;
+		sprite->_y += _position.y - _origin.y;
 		if (!sprite->startAnimation()) {
 			_scene.remove(sprite);
 			return false;
@@ -198,7 +198,7 @@ bool AttributeCharacter::playFeedback(uint resource, int repeat, bool keepVisibl
 	}
 	for (uint i = 0; i < _base.size(); i++) {
 		if (_base[i])
-			_base[i]->visible = false;
+			_base[i]->_visible = false;
 	}
 	return _valid;
 }
@@ -209,7 +209,7 @@ void AttributeCharacter::stopFeedback() {
 	clearParts(_feedback);
 	for (uint i = 0; i < _base.size(); i++) {
 		if (_base[i])
-			_base[i]->visible = _visible;
+			_base[i]->_visible = _visible;
 	}
 }
 
@@ -247,13 +247,13 @@ Shell::Sprite *AttributeCharacter::loadPart(uint resource, uint attribute, bool 
 		warning("Could not load character resource %u", resource);
 		return nullptr;
 	}
-	part->managed = true;
+	part->_managed = true;
 	addTrinket(*part);
-	part->visible = _visible;
-	part->x += _position.x - _origin.x;
-	part->y += _position.y - _origin.y;
-	part->mirrorX = _position.x;
-	part->mirrored = _mirror;
+	part->_visible = _visible;
+	part->_x += _position.x - _origin.x;
+	part->_y += _position.y - _origin.y;
+	part->_mirrorX = _position.x;
+	part->_mirrored = _mirror;
 	part->startAnimation(-1);
 	part->setFrame(1);
 	return part;
@@ -310,11 +310,11 @@ bool AttributeCharacter::create(uint type, const int32 *traits, uint pose, Commo
 	if (position.x == 11111 || position.y == 11111)
 		position = _origin;
 	_position = position;
-	x = position.x;
-	y = position.y;
+	_x = position.x;
+	_y = position.y;
 	_home = position;
 	_z = depth;
-	z = depth;
+	_z = depth;
 	return setPose(pose, time);
 }
 
@@ -335,7 +335,7 @@ void AttributeCharacter::addTimer(uint minimum, uint maximum, uint firstBase, in
 			if (maskAttribute < 0 || static_cast<uint>(maskAttribute) == a) {
 				part = loadPart((v ? secondBase : firstBase) + a * 10 + _traits[a], a);
 				if (part)
-					part->visible = false;
+					part->_visible = false;
 			}
 			variant.parts.push_back(part);
 		}
@@ -367,13 +367,13 @@ bool AttributeCharacter::setPose(uint pose, uint32 time) {
 	}
 	for (uint i = 0; i < _base.size(); i++) {
 		if (_base[i])
-			_base[i]->mirrored = _mirror;
+			_base[i]->_mirrored = _mirror;
 	}
 	if (0 <= _activeTimer) {
 		Variant &variant = _timers[_activeTimer].variants[_activeVariant];
 		for (uint i = 0; i < variant.parts.size(); i++) {
 			if (variant.parts[i])
-				variant.parts[i]->mirrored = _mirror;
+				variant.parts[i]->_mirrored = _mirror;
 		}
 	}
 	return _valid;
@@ -389,9 +389,9 @@ void AttributeCharacter::startVariant(uint timerIndex, uint variantIndex) {
 		if (!part)
 			continue;
 		if (_base[i])
-			_base[i]->visible = false;
-		part->visible = _visible;
-		part->mirrored = _mirror;
+			_base[i]->_visible = false;
+		part->_visible = _visible;
+		part->_mirrored = _mirror;
 		part->startAnimation(0);
 		part->setFrame(1);
 		part->pauseAnimation(!first);
@@ -406,10 +406,10 @@ void AttributeCharacter::finishVariant(uint32 time) {
 	Variant &variant = timer.variants[_activeVariant];
 	for (uint i = 0; i < variant.parts.size(); i++) {
 		if (variant.parts[i]) {
-			variant.parts[i]->visible = false;
+			variant.parts[i]->_visible = false;
 			variant.parts[i]->pauseAnimation(true);
 			if (_base[i])
-				_base[i]->visible = _visible;
+				_base[i]->_visible = _visible;
 		}
 	}
 	schedule(timer, time);
@@ -431,11 +431,11 @@ Common::Rect AttributeCharacter::bounds() const {
 	bool first = true;
 	for (uint i = 0; i < parts.size(); i++) {
 		Shell::Sprite *part = parts[i];
-		if (!part || !part->visible)
+		if (!part || !part->_visible)
 			continue;
 		int width = part->width();
-		int left = part->mirrored ? 2 * part->mirrorX - part->x - width : part->x;
-		Common::Rect bounds(left, part->y, left + width, part->y + part->height());
+		int left = part->_mirrored ? 2 * part->_mirrorX - part->_x - width : part->_x;
+		Common::Rect bounds(left, part->_y, left + width, part->_y + part->height());
 		if (first)
 			result = bounds;
 		else
@@ -451,7 +451,7 @@ void AttributeCharacter::addWalkMove(Common::Point destination, bool absolute) {
 }
 
 void AttributeCharacter::setVisible(bool shown, uint32 time) {
-	visible = shown;
+	_visible = shown;
 	if (_visible == shown)
 		return;
 	if (!shown && _dragging)
@@ -461,11 +461,11 @@ void AttributeCharacter::setVisible(bool shown, uint32 time) {
 	Common::Array<Shell::Sprite *> &parts = _walking ? _moving : _base;
 	for (uint i = 0; i < parts.size(); i++) {
 		if (parts[i])
-			parts[i]->visible = shown && _feedback.empty();
+			parts[i]->_visible = shown && _feedback.empty();
 	}
 	for (uint i = 0; i < _feedback.size(); i++) {
 		if (_feedback[i])
-			_feedback[i]->visible = shown;
+			_feedback[i]->_visible = shown;
 	}
 }
 
@@ -482,7 +482,7 @@ void AttributeCharacter::setDepth(int depth) {
 	}
 	for (uint i = 0; i < parts.size(); i++) {
 		if (parts[i])
-			_scene.setDepth(parts[i], parts[i]->z + depth - _z);
+			_scene.setDepth(parts[i], parts[i]->_z + depth - _z);
 	}
 	_z = depth;
 	Core::Trinket::set(kPropertyZ, Core::ScriptArguments(), Core::ScriptValue(static_cast<int32>(depth)));
@@ -516,7 +516,7 @@ void AttributeCharacter::stopWalk(bool finishPath) {
 	_walking = false;
 	for (uint i = 0; i < _base.size(); i++) {
 		if (_base[i])
-			_base[i]->visible = _visible;
+			_base[i]->_visible = _visible;
 	}
 }
 
@@ -550,7 +550,7 @@ bool AttributeCharacter::beginDrag(Common::Point mouse, uint32 time, const Commo
 		if (part)
 			part->pauseAnimation(i != 1);
 		if (_base[i])
-			_base[i]->visible = false;
+			_base[i]->_visible = false;
 	}
 	_dragging = true;
 	return _valid;
@@ -595,7 +595,7 @@ Common::Point AttributeCharacter::endDrag(bool notify) {
 	_dragging = false;
 	for (uint i = 0; i < _base.size(); i++) {
 		if (_base[i])
-			_base[i]->visible = _visible;
+			_base[i]->_visible = _visible;
 	}
 	if (notify) {
 		_dropped = dropped;
@@ -661,7 +661,7 @@ void AttributeCharacter::beginSegment() {
 				resource += _traits[i];
 			_moving.push_back(loadPart(resource, i, true));
 			if (_base[i])
-				_base[i]->visible = false;
+				_base[i]->_visible = false;
 		}
 	}
 	if (_direction < 0) {
@@ -677,7 +677,7 @@ void AttributeCharacter::beginSegment() {
 			_moving[i]->startAnimation(-1);
 			_moving[i]->setFrame(frame);
 			_moving[i]->pauseAnimation(!first);
-			_moving[i]->mirrored = mirror;
+			_moving[i]->_mirrored = mirror;
 			first = false;
 		}
 	}
@@ -716,14 +716,14 @@ void AttributeCharacter::moveTo(Common::Point position) {
 	}
 	for (uint i = 0; i < parts.size(); i++) {
 		if (parts[i]) {
-			parts[i]->x += offset.x;
-			parts[i]->y += offset.y;
-			parts[i]->mirrorX = position.x;
+			parts[i]->_x += offset.x;
+			parts[i]->_y += offset.y;
+			parts[i]->_mirrorX = position.x;
 		}
 	}
 	_position = position;
-	x = position.x;
-	y = position.y;
+	_x = position.x;
+	_y = position.y;
 	if (_depthFromY && !_dragging)
 		setDepth(_depthBase - _depthOriginY + _position.y);
 }
@@ -771,7 +771,7 @@ bool AttributeCharacter::update(uint32 time, Common::Array<uint16> &sounds) {
 						_walkSound.stop();
 						for (uint i = 0; i < _base.size(); i++) {
 							if (_base[i])
-								_base[i]->visible = _visible;
+								_base[i]->_visible = _visible;
 						}
 						if (_clearWalkPath) {
 							_path.clear();

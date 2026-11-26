@@ -321,9 +321,9 @@ bool GlyphRules::place(uint index, int cell) {
 constexpr const char *GlyphMachine::kAnimation;
 
 GlyphMachine::GlyphMachine(Shell::Scene &scene, const GlyphRules &rules) : _scene(scene), _rules(rules) {
-	x = 180;
-	y = 100;
-	z = 100;
+	_x = 180;
+	_y = 100;
+	_z = 100;
 	initializeEvents();
 	_tileID = rules.charactersPerTile() == 3 ? 12431 : 12425;
 	_symbolID = 12400;
@@ -344,9 +344,9 @@ GlyphMachine::GlyphMachine(Shell::Scene &scene, const GlyphRules &rules) : _scen
 }
 
 GlyphMachine::GlyphMachine(Shell::Scene &scene, Shell::Random &random, Common::Point position, int depth) : _scene(scene), _random(&random) {
-	x = position.x;
-	y = position.y;
-	z = depth;
+	_x = position.x;
+	_y = position.y;
+	_z = depth;
 	initializeEvents();
 	static constexpr const char *properties[] = {
 		kValueCountName,
@@ -398,7 +398,7 @@ void GlyphMachine::clearPuzzle() {
 
 bool GlyphMachine::get(const Common::String &property, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
 	if (property.equals(kPropertyEnabled))
-		result = Core::ScriptValue(static_cast<int32>(enabled));
+		result = Core::ScriptValue(static_cast<int32>(_enabled));
 	else if (_configMap.contains(property))
 		result = Core::ScriptValue(_configMap[property]);
 	else
@@ -524,7 +524,7 @@ Shell::Sprite *GlyphMachine::add(uint id, int depth, int frame) {
 		return nullptr;
 	}
 	_owned.push_back(sprite);
-	sprite->enabled = false;
+	sprite->_enabled = false;
 	sprite->setFrame(frame);
 	return sprite;
 }
@@ -548,20 +548,20 @@ Common::Point GlyphMachine::slotPosition(uint cell) const {
 	uint column = cell % _rules.columns();
 	uint group = column / _rules.charactersPerTile();
 	float width = static_cast<float>(_contentW) / _rules.charactersPerTile();
-	int anchorX = x + group * _contentW + static_cast<int>((column % _rules.charactersPerTile()) * width) - 1;
+	int anchorX = _x + group * _contentW + static_cast<int>((column % _rules.charactersPerTile()) * width) - 1;
 	if (_rules.clustered())
 		anchorX += group * 10;
-	return Common::Point(anchorX, y + _tileH / 2 + cell / _rules.columns() * rowStride());
+	return Common::Point(anchorX, _y + _tileH / 2 + cell / _rules.columns() * rowStride());
 }
 
 Common::Point GlyphMachine::glyphPosition(uint cell, Shell::Sprite &sprite) const {
 	uint column = cell % _rules.columns();
 	uint group = column / _rules.charactersPerTile();
 	float width = static_cast<float>(_contentW) / _rules.charactersPerTile();
-	int anchorX = x + group * _contentW + static_cast<int>((column % _rules.charactersPerTile()) * width + width * 0.5f - sprite.width() * 0.5f);
+	int anchorX = _x + group * _contentW + static_cast<int>((column % _rules.charactersPerTile()) * width + width * 0.5f - sprite.width() * 0.5f);
 	if (_rules.clustered())
 		anchorX += group * 10;
-	int anchorY = y + _tileH / 2 - (_tileH / 2) / 2 + cell / _rules.columns() * rowStride();
+	int anchorY = _y + _tileH / 2 - (_tileH / 2) / 2 + cell / _rules.columns() * rowStride();
 	anchorY += (column % 2 ? 4 : -4) - sprite.height() / 2;
 	return Common::Point(anchorX, anchorY);
 }
@@ -597,7 +597,7 @@ bool GlyphMachine::load() {
 	};
 	for (uint i = 0; i < GlyphRules::kTileCount; i++) {
 		Piece &piece = _pieces[i];
-		piece.base = add(_tileID, z);
+		piece.base = add(_tileID, _z);
 		if (!piece.base)
 			return false;
 		_tileW = piece.base->width();
@@ -605,50 +605,50 @@ bool GlyphMachine::load() {
 		_contentW = _tileW - 3;
 		float width = static_cast<float>(_contentW) / _rules.charactersPerTile();
 		for (uint j = 0; j < _rules.charactersPerTile(); j++) {
-			Shell::Sprite *symbol = add(_symbolID, z, _rules.tile(i).values[j] + 1);
+			Shell::Sprite *symbol = add(_symbolID, _z, _rules.tile(i).values[j] + 1);
 			if (!symbol)
 				return false;
-			symbol->x = piece.base->x + 1 + static_cast<int>(j * width + width * 0.5f - symbol->width() * 0.5f);
-			symbol->y = piece.base->y + 16 - symbol->height() / 2;
+			symbol->_x = piece.base->_x + 1 + static_cast<int>(j * width + width * 0.5f - symbol->width() * 0.5f);
+			symbol->_y = piece.base->_y + 16 - symbol->height() / 2;
 			piece.symbols[j] = symbol;
 			if (_rules.clustered()) {
-				piece.lights[j] = add(_lightID, z, 2 * j + 1);
+				piece.lights[j] = add(_lightID, _z, 2 * j + 1);
 				if (!piece.lights[j])
 					return false;
 			}
 		}
 		uint position = _rules.tile(i).supplyPosition;
-		movePiece(i, Common::Point(supplyX[position], supplyY[position]), supplyY[position] + _tileH + z - 375);
+		movePiece(i, Common::Point(supplyX[position], supplyY[position]), supplyY[position] + _tileH + _z - 375);
 	}
 	for (uint row = 0; row < GlyphRules::kRowCount; row++) {
 		uint groups = _rules.clustered() ? _rules.columns() / _rules.charactersPerTile() : 1;
 		for (uint group = 0; group < groups; group++) {
-			Shell::Sprite *indent = add(_indentID, z);
+			Shell::Sprite *indent = add(_indentID, _z);
 			if (!indent)
 				return false;
-			indent->x = x + group * (_contentW + 10) - _indentOffset.x;
-			indent->y = y + _tileH / 2 + row * rowStride() - _indentOffset.y;
+			indent->_x = _x + group * (_contentW + 10) - _indentOffset.x;
+			indent->_y = _y + _tileH / 2 + row * rowStride() - _indentOffset.y;
 		}
 	}
 	for (uint i = 0; i < _rules.glyphCount(); i++) {
-		_glyphs[i] = add(_glyphID, z, _rules.glyph(i) + 1);
+		_glyphs[i] = add(_glyphID, _z, _rules.glyph(i) + 1);
 		if (!_glyphs[i])
 			return false;
 		Common::Point position = glyphPosition(i, *_glyphs[i]);
-		_glyphs[i]->x = position.x;
-		_glyphs[i]->y = position.y;
+		_glyphs[i]->_x = position.x;
+		_glyphs[i]->_y = position.y;
 	}
-	_highlight = add(_highlightID, z);
+	_highlight = add(_highlightID, _z);
 	if (!_highlight)
 		return false;
-	_highlight->visible = false;
+	_highlight->_visible = false;
 	return true;
 }
 
 void GlyphMachine::movePiece(uint index, Common::Point position, int depth) {
 	Piece &piece = _pieces[index];
-	int dx = position.x - piece.base->x;
-	int dy = position.y - piece.base->y;
+	int dx = position.x - piece.base->_x;
+	int dy = position.y - piece.base->_y;
 	Shell::Sprite *members[9] = {
 		piece.base,
 		piece.symbols[0],
@@ -663,23 +663,23 @@ void GlyphMachine::movePiece(uint index, Common::Point position, int depth) {
 	for (uint i = 0; i < ARRAYSIZE(members); i++) {
 		if (!members[i])
 			continue;
-		members[i]->x += dx;
-		members[i]->y += dy;
+		members[i]->_x += dx;
+		members[i]->_y += dy;
 		_scene.setDepth(members[i], depth);
 	}
 }
 
 Common::Rect GlyphMachine::tileBounds(uint index) const {
 	const Shell::Sprite *base = _pieces[index].base;
-	return Common::Rect(base->x, base->y, base->x + _tileW, base->y + _tileH);
+	return Common::Rect(base->_x, base->_y, base->_x + _tileW, base->_y + _tileH);
 }
 
 int GlyphMachine::hitTile(Common::Point point) const {
-	if (!enabled || _paused)
+	if (!_enabled || _paused)
 		return -1;
 	int hit = -1;
 	for (uint i = 0; i < GlyphRules::kTileCount; i++) {
-		if (!_rules.tile(i).solved && tileBounds(i).contains(point) && (hit < 0 || _pieces[hit].base->z <= _pieces[i].base->z))
+		if (!_rules.tile(i).solved && tileBounds(i).contains(point) && (hit < 0 || _pieces[hit].base->_z <= _pieces[i].base->_z))
 			hit = i;
 	}
 	return hit;
@@ -696,8 +696,8 @@ void GlyphMachine::updateTarget() {
 	int area = 0;
 	Common::Rect tile = tileBounds(_dragged);
 	for (uint i = 0; i < GlyphRules::kRowCount; i++) {
-		int anchorY = y + _tileH / 2 + i * rowStride();
-		int candidate = overlapArea(tile, Common::Rect(x, anchorY, x + boardWidth(), anchorY + _tileH));
+		int anchorY = _y + _tileH / 2 + i * rowStride();
+		int candidate = overlapArea(tile, Common::Rect(_x, anchorY, _x + boardWidth(), anchorY + _tileH));
 		if (area < candidate) {
 			area = candidate;
 			row = i;
@@ -717,18 +717,18 @@ void GlyphMachine::updateTarget() {
 			}
 		} else {
 			float width = static_cast<float>(_contentW) / _rules.charactersPerTile();
-			int column = static_cast<int>((tile.left + 1 + width * 0.5f - x) / width);
+			int column = static_cast<int>((tile.left + 1 + width * 0.5f - _x) / width);
 			column = CLIP<int>(column, 0, _rules.columns() - _rules.charactersPerTile());
 			int cell = row * _rules.columns() + column;
 			if (_rules.canPlace(_dragged, cell))
 				_target = cell;
 		}
 	}
-	_highlight->visible = 0 <= _target;
+	_highlight->_visible = 0 <= _target;
 	if (0 <= _target) {
 		Common::Point position = slotPosition(_target);
-		_highlight->x = position.x;
-		_highlight->y = position.y;
+		_highlight->_x = position.x;
+		_highlight->_y = position.y;
 	}
 }
 
@@ -742,7 +742,7 @@ bool GlyphMachine::event(const Common::Event &event, uint32 time) {
 			return false;
 		_dragged = tile;
 		_prevSlot = _rules.tile(tile).slot;
-		_prevPos = Common::Point(_pieces[tile].base->x, _pieces[tile].base->y);
+		_prevPos = Common::Point(_pieces[tile].base->_x, _pieces[tile].base->_y);
 		_grabOffset = event.mouse - _prevPos;
 		_rules.pickUp(tile);
 		_pieces[tile].feedback = false;
@@ -771,26 +771,26 @@ void GlyphMachine::forceDrop() {
 		return;
 	if (0 <= _prevSlot) {
 		_rules.place(_dragged, _prevSlot);
-		movePiece(_dragged, slotPosition(_prevSlot), z + 1);
+		movePiece(_dragged, slotPosition(_prevSlot), _z + 1);
 	} else {
-		movePiece(_dragged, _prevPos, _prevPos.y + _tileH + z - 375);
+		movePiece(_dragged, _prevPos, _prevPos.y + _tileH + _z - 375);
 	}
 	_pieces[_dragged].lit = _rules.tile(_dragged).matches;
 	updateLights(_dragged);
 	_dragged = -1;
-	_highlight->visible = false;
+	_highlight->_visible = false;
 }
 
 void GlyphMachine::drop() {
 	uint tile = _dragged;
-	_highlight->visible = false;
+	_highlight->_visible = false;
 	if (_target < 0) {
 		Common::Rect bounds = tileBounds(tile);
 		if (!overlapArea(bounds, Common::Rect(106, 375, 800, 600))) {
 			forceDrop();
 		} else {
 			Common::Point position(CLIP<int>(bounds.left, 106, 800 - _tileW), CLIP<int>(bounds.top, 375, 600 - _tileH));
-			movePiece(tile, position, position.y + _tileH + z - 375);
+			movePiece(tile, position, position.y + _tileH + _z - 375);
 			_dragged = -1;
 		}
 		queueSound(12409, 0);
@@ -798,7 +798,7 @@ void GlyphMachine::drop() {
 		return;
 	}
 	_rules.place(tile, _target);
-	movePiece(tile, slotPosition(_target), z + 1);
+	movePiece(tile, slotPosition(_target), _z + 1);
 	_dragged = -1;
 	queueSound(12407, 0);
 	Piece &piece = _pieces[tile];
@@ -835,9 +835,9 @@ void GlyphMachine::reveal(uint index) {
 		reveal.sprite->setPauseListener(&reveal);
 		reveal.started = false;
 		Common::Point position = glyphPosition(cell, *reveal.sprite);
-		reveal.sprite->x = position.x;
-		reveal.sprite->y = position.y;
-		_glyphs[cell]->visible = false;
+		reveal.sprite->_x = position.x;
+		reveal.sprite->_y = position.y;
+		_glyphs[cell]->_visible = false;
 	}
 	queueSound(12410, 1);
 }
@@ -866,7 +866,7 @@ void GlyphMachine::revealPaused(uint cell) {
 			if (!reveal.sprite->isRunning()) {
 				remove(reveal.sprite);
 				reveal.sprite = nullptr;
-				_glyphs[first + i]->visible = true;
+				_glyphs[first + i]->_visible = true;
 			}
 		}
 	}

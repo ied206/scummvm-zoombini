@@ -26,6 +26,7 @@
 #include "engines/engine.h"
 #include "trinket/launcher/application.h"
 #include "trinket/ompp/resource.h"
+#include "trinket/release_info.h"
 #include "trinket/shell/game.h"
 #include "trinket/shell/music.h"
 #include "trinket/shell/random.h"
@@ -57,8 +58,8 @@ struct Subengine {
 	bool (*loadResources)(OM::ResourceProvider &resources, Common::Path &dataPath);
 	/** Game title shown by shared engine interfaces. */
 	const char *title;
-	/** Construct the game's registry and slot-file manager. */
-	Shell::SaveFiles *(*createSaveFiles)(Common::SaveFileManager &manager, const Common::String &target);
+	/** Construct the game's registry and slot-file manager for the detected game platform. */
+	Shell::SaveFiles *(*createSaveFiles)(Common::SaveFileManager &manager, const Common::String &target, Common::Platform platform);
 
 	/** Reference components of the selected native game release. */
 	const RuntimeVersions &gameVersions;
@@ -77,8 +78,8 @@ struct Subengine {
 
 class TrinketEngine : public Engine {
 public:
-	/** Initialize shared services for the selected subengine and detected game platform. */
-	TrinketEngine(OSystem *system, const Subengine &subengine, Common::Platform platform);
+	/** Initialize shared services and startup mode from the detected release. */
+	TrinketEngine(OSystem *system, const Subengine &subengine, const TrinketGameDescription &description);
 	/** Stop gameplay and release shared runtime services. */
 	~TrinketEngine() override;
 	/** Initialize resources and run the launcher and gameplay event loop. */
@@ -98,6 +99,10 @@ public:
 	void setGameSoundSettings(const Shell::Game::SoundSettings &settings);
 	/** Return the resource provider for the detected game release. */
 	const OM::ResourceProvider &resources() const { return *_resources; }
+	/** Return the release settings for this engine instance. */
+	const ReleaseInfo &getRelInfo() const { return _relInfo; }
+	/** Return the detected game platform used by native save codecs and the compatibility PRNG. */
+	Common::Platform platform() const { return _relInfo.getPlatform(); }
 	/** Return the game FontMan loader; launcher fonts use separate registrations. */
 	OM::FontCache &fonts() { return _fonts; }
 	/** Return the visible registered player names. */
@@ -136,6 +141,8 @@ private:
 	/** Script identifier for rr1cloud9. */
 	static constexpr const char *kRr1cloud9Name = "rr1cloud9";
 
+	/** Settings copied from the detected game description for the lifetime of the engine. */
+	const ReleaseInfo _relInfo;
 	/** Resource provider for the detected release. */
 	Common::ScopedPtr<OM::ResourceProvider> _resources;
 	/** FontMan registrations released after the game and before its resource provider. */
@@ -154,8 +161,6 @@ private:
 	Shell::Game *_game = nullptr;
 	/** Game-specific factories, viewport and native version metadata. */
 	const Subengine &_subengine;
-	/** Detected game platform used to select the default system arrow. */
-	const Common::Platform _platform;
 	/** Selected game-registry player index, or minus one without a named player. */
 	int _player = -1;
 	/** Whether input and drawing currently target gameplay. */

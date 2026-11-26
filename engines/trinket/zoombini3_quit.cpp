@@ -47,11 +47,11 @@ bool QuitDialog::load() {
 		_graphics[i] = _scene.add(Common::String::format(kAsset, 501 + i), 1);
 		if (!button || !_graphics[i])
 			return false;
-		button->managed = true;
+		button->_managed = true;
 		button->setFrame(1);
-		button->hitRect = Common::Rect(button->x, button->y, button->x + button->width(), button->y + button->height());
+		button->_hitRect = Common::Rect(button->_x, button->_y, button->_x + button->width(), button->_y + button->height());
 		_graphics[i]->setFrame(1);
-		_graphics[i]->visible = false;
+		_graphics[i]->_visible = false;
 	}
 	return true;
 }
@@ -62,12 +62,12 @@ void QuitDialog::setHover(int hover) {
 	if (0 <= _hover) {
 		_graphics[_hover]->pauseAnimation(true);
 		_graphics[_hover]->setFrame(1);
-		_graphics[_hover]->visible = false;
+		_graphics[_hover]->_visible = false;
 	}
 	_hover = hover;
-	_idle->visible = hover < 0;
+	_idle->_visible = hover < 0;
 	if (0 <= hover) {
-		_graphics[hover]->visible = true;
+		_graphics[hover]->_visible = true;
 		_graphics[hover]->startAnimation(-1);
 	}
 }
@@ -92,9 +92,9 @@ QuitDialog::Result QuitDialog::event(const Common::Event &event) {
 	if (event.type == Common::EVENT_MOUSEMOVE || event.type == Common::EVENT_LBUTTONDOWN || event.type == Common::EVENT_LBUTTONUP) {
 		for (uint i = 0; i < 2; i++) {
 			uint frame = 1;
-			if (_buttons[i]->pressed)
+			if (_buttons[i]->_pressed)
 				frame = 2;
-			else if (_buttons[i]->hovered)
+			else if (_buttons[i]->_hovered)
 				frame = 4;
 			_buttons[i]->setFrame(frame);
 		}

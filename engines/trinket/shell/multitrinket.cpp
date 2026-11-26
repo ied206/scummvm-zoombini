@@ -58,7 +58,7 @@ bool MultiTrinket::addTrinket(Core::Trinket &child) {
 
 void MultiTrinket::insert(Core::Trinket &child) {
 	uint position = 0;
-	while (position < _children.size() && _children[position]->z <= child.z)
+	while (position < _children.size() && _children[position]->_z <= child._z)
 		position += 1;
 	_children.insert_at(position, &child);
 }

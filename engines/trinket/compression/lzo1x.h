@@ -26,8 +26,7 @@
 
 namespace Trinket {
 
-// Clean-room LZO1X decoder based on the linux kernerl documentation (https://docs.kernel.org/staging/lzo.html).
-// No existing LZO decoder source or disassembly was used to write this implementation.
+// Clean-room LZO1X decoder based on the linux kernel documentation (https://docs.kernel.org/staging/lzo.html).
 // Validated against LZO1X streams from Trinket resources.
 
 // FIXME: Move this decoder to common/compression and use it to replace the separate LZO1X impls in the BladeRunner and Tony engines.

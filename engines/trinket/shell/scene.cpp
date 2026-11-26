@@ -103,13 +103,13 @@ bool Sprite::get(const Common::String &property, const Core::ScriptArguments &sa
 	if (property.equals(kPropertyUserData))
 		result = Core::ScriptValue::fromText(_userData);
 	else if (property.equals(kPropertyEnabled))
-		result = Core::ScriptValue(static_cast<int32>(enabled));
+		result = Core::ScriptValue(static_cast<int32>(_enabled));
 	else if (property.equals(kPropertyIsSolid))
-		result = Core::ScriptValue(static_cast<int32>(solid));
+		result = Core::ScriptValue(static_cast<int32>(_solid));
 	else if (property.equals(kPropertyBoxTouchy))
-		result = Core::ScriptValue(static_cast<int32>(boxTouchy));
+		result = Core::ScriptValue(static_cast<int32>(_boxTouchy));
 	else if (property.equals(kPropertyTracking))
-		result = Core::ScriptValue(static_cast<int32>(tracking));
+		result = Core::ScriptValue(static_cast<int32>(_tracking));
 	else if (property.equals(kPropertyClickSoundID))
 		result = Core::ScriptValue::fromText(_clickSoundID);
 	else if (property.equals(kPropertyFlyOnSoundID))
@@ -131,13 +131,13 @@ bool Sprite::set(const Common::String &property, const Core::ScriptArguments &sa
 	if (property.equals(kPropertyUserData))
 		_userData = value.toText();
 	else if (property.equals(kPropertyEnabled))
-		enabled = value.toInt32() != 0;
+		_enabled = value.toInt32() != 0;
 	else if (property.equals(kPropertyIsSolid))
-		solid = value.toInt32() != 0;
+		_solid = value.toInt32() != 0;
 	else if (property.equals(kPropertyBoxTouchy))
-		boxTouchy = value.toInt32() != 0;
+		_boxTouchy = value.toInt32() != 0;
 	else if (property.equals(kPropertyTracking))
-		tracking = value.toInt32() != 0;
+		_tracking = value.toInt32() != 0;
 	else if (property.equals(kPropertyClickSoundID))
 		_clickSoundID = value.toText();
 	else if (property.equals(kPropertyFlyOnSoundID))
@@ -149,7 +149,7 @@ bool Sprite::set(const Common::String &property, const Core::ScriptArguments &sa
 	else if (property.equals(kPropertyPlayDelay))
 		_playDelay = value.toInt32();
 	else if (property.equals(kPropertyCorral) && sargs.size() == 3)
-		corral = Common::Rect(sargs[0].toInt32(), sargs[1].toInt32(), sargs[2].toInt32(), value.toInt32());
+		_corral = Common::Rect(sargs[0].toInt32(), sargs[1].toInt32(), sargs[2].toInt32(), value.toInt32());
 	else if (property.equals(kPropertyFrame))
 		setFrame(value.toInt32());
 	else if (property.equals(kPropertyPauseOnLastFrame))
@@ -164,28 +164,28 @@ bool Sprite::set(const Common::String &property, const Core::ScriptArguments &sa
 }
 
 bool Sprite::startAnimation(int repeat, uint sequence) {
-	if (!asset || !_player.start(*asset, sequence, repeat))
+	if (!_asset || !_player.start(*_asset, sequence, repeat))
 		return false;
 	if (_animated) {
-		x -= _animOffset.x;
-		y -= _animOffset.y;
+		_x -= _animOffset.x;
+		_y -= _animOffset.y;
 	}
 	_animated = true;
 	_animOffset = _player.offset();
-	x += _animOffset.x;
-	y += _animOffset.y;
-	frame = _player.picture();
+	_x += _animOffset.x;
+	_y += _animOffset.y;
+	_frame = _player.picture();
 	return true;
 }
 
 bool Sprite::play(const Common::String &method, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {
-	if (button && method.equals(kMethodSetFlyOffRect) && sargs.size() == 4) {
-		hitRect = Common::Rect(sargs[0].toInt32(), sargs[1].toInt32(), sargs[2].toInt32(), sargs[3].toInt32());
+	if (_button && method.equals(kMethodSetFlyOffRect) && sargs.size() == 4) {
+		_hitRect = Common::Rect(sargs[0].toInt32(), sargs[1].toInt32(), sargs[2].toInt32(), sargs[3].toInt32());
 		return true;
 	}
 	if (!sargs.empty())
 		return Core::Trinket::play(method, sargs, result);
-	if (button && method.equals(kMethodDefault)) {
+	if (_button && method.equals(kMethodDefault)) {
 		buttonPressed(callTime(), true);
 		return true;
 	}
@@ -218,15 +218,15 @@ void Sprite::playAnimation() {
 void Sprite::stopAnimation() {
 	_scriptPlaying = false;
 	_player.stop();
-	visible = false;
+	_visible = false;
 }
 
 void Sprite::syncAnimation() {
 	Common::Point offset = _player.offset();
-	x += offset.x - _animOffset.x;
-	y += offset.y - _animOffset.y;
+	_x += offset.x - _animOffset.x;
+	_y += offset.y - _animOffset.y;
 	_animOffset = offset;
-	frame = _player.picture();
+	_frame = _player.picture();
 }
 
 void Sprite::setFrame(int number) {
@@ -297,7 +297,7 @@ void Scene::update(uint32 time, Common::Array<uint16> &sounds) {
 	while (_nextUpdate < _sprites.size()) {
 		Sprite &sprite = *_sprites[_nextUpdate];
 		_nextUpdate += 1;
-		if (sprite.managed)
+		if (sprite._managed)
 			continue;
 		sprite.update(time, sounds);
 	}
@@ -307,7 +307,7 @@ void Scene::update(uint32 time, Common::Array<uint16> &sounds) {
 void Sprite::update(uint32 time, Common::Array<uint16> &sounds) {
 	if (_syntheticPress && _playDelay < time - _pressTime) {
 		_syntheticPress = false;
-		pressed = false;
+		_pressed = false;
 	}
 	if (_updateListener)
 		_updateListener->spriteUpdating(*this, time);
@@ -317,7 +317,7 @@ void Sprite::update(uint32 time, Common::Array<uint16> &sounds) {
 		return;
 	syncAnimation();
 	if (!_player.isVisible())
-		visible = false;
+		_visible = false;
 	if (_scriptPlaying && !_explicitlyPaused && !_player.isRunning()) {
 		_scriptPlaying = false;
 		Core::ScriptableObject::Lifetime lifetime(*this);
@@ -347,7 +347,7 @@ void Scene::remove(Sprite *sprite) {
 
 void Scene::insert(Sprite *sprite) {
 	uint i = 0;
-	while (i < _sprites.size() && _sprites[i]->z <= sprite->z)
+	while (i < _sprites.size() && _sprites[i]->_z <= sprite->_z)
 		i += 1;
 	_sprites.insert_at(i, sprite);
 	// Insertion at the pending entry is visited in this update, including a new tail.
@@ -356,7 +356,7 @@ void Scene::insert(Sprite *sprite) {
 }
 
 void Scene::setDepth(Sprite *sprite, int z) {
-	if (sprite->z == z)
+	if (sprite->_z == z)
 		return;
 	for (uint i = 0; i < _sprites.size(); i++) {
 		if (_sprites[i] != sprite)
@@ -371,21 +371,21 @@ void Scene::setDepth(Sprite *sprite, int z) {
 }
 
 bool Sprite::cachePicture() {
-	if (button) {
+	if (_button) {
 		uint state = 0;
-		if (!enabled)
-			state = disabledFrame;
-		else if (pressed)
+		if (!_enabled)
+			state = _disabledFrame;
+		else if (_pressed)
 			state = 1;
-		else if (flyButton && hovered)
-			state = hoverFrame;
+		else if (_flyButton && _hovered)
+			state = _hoverFrame;
 		// Button states are logical frames, including their authored coordinate offsets.
 		setFrame(state + 1);
 	}
-	if (static_cast<int>(frame) == _cachedFrame)
+	if (static_cast<int>(_frame) == _cachedFrame)
 		return _picture != nullptr;
-	_cachedFrame = frame;
-	_picture = asset->picture(frame);
+	_cachedFrame = _frame;
+	_picture = _asset->picture(_frame);
 	return _picture != nullptr;
 }
 
@@ -493,12 +493,12 @@ Sprite *Scene::add(const Common::String &path, int z, int action, bool button) {
 		return nullptr;
 	Sprite *sprite = new Sprite();
 	sprite->_scene = this;
-	sprite->asset = asset;
-	sprite->x = asset->origin().x;
-	sprite->y = asset->origin().y;
-	sprite->z = z;
-	sprite->action = action;
-	sprite->button = button;
+	sprite->_asset = asset;
+	sprite->_x = asset->origin().x;
+	sprite->_y = asset->origin().y;
+	sprite->_z = z;
+	sprite->_action = action;
+	sprite->_button = button;
 	insert(sprite);
 	return sprite;
 }
@@ -510,8 +510,8 @@ int Scene::event(const Common::Event &event, int minimumZ, int maximumZ) {
 	int hit = hitTest(event.mouse, minimumZ, maximumZ);
 	bool actionOnMouseDown = false;
 	for (uint i = 0; hit && i < _sprites.size(); i++) {
-		if (_sprites[i]->action == hit) {
-			actionOnMouseDown = _sprites[i]->actionOnMouseDown;
+		if (_sprites[i]->_action == hit) {
+			actionOnMouseDown = _sprites[i]->_actionOnMouseDown;
 			break;
 		}
 	}
@@ -528,11 +528,11 @@ int Scene::event(const Common::Event &event, int minimumZ, int maximumZ) {
 	}
 	for (uint i = 0; i < _sprites.size(); i++) {
 		Sprite &sprite = *_sprites[i];
-		bool pressed = _pressedAction && sprite.action == _pressedAction && hit == _pressedAction;
-		if (sprite.button && pressed && (!sprite.pressed || event.type == Common::EVENT_LBUTTONDOWN))
-			_pressFeedback = sprite.action;
-		sprite.pressed = pressed;
-		sprite.hovered = !_pressedAction && sprite.action && sprite.action == hit;
+		bool pressed = _pressedAction && sprite._action == _pressedAction && hit == _pressedAction;
+		if (sprite._button && pressed && (!sprite._pressed || event.type == Common::EVENT_LBUTTONDOWN))
+			_pressFeedback = sprite._action;
+		sprite._pressed = pressed;
+		sprite._hovered = !_pressedAction && sprite._action && sprite._action == hit;
 	}
 	return action;
 }
@@ -551,13 +551,13 @@ void Scene::drawBackground(OM::Canvas &canvas) {
 void Scene::drawSprites(OM::Canvas &canvas, int minimumZ, int maximumZ) {
 	for (uint i = 0; i < _sprites.size(); i++) {
 		Sprite &sprite = *_sprites[i];
-		if (!sprite.visible || sprite.z < minimumZ || maximumZ < sprite.z)
+		if (!sprite._visible || sprite._z < minimumZ || maximumZ < sprite._z)
 			continue;
 		if (sprite.cachePicture()) {
-			int x = sprite.mirrored ? 2 * sprite.mirrorX - sprite.x - sprite._picture->w : sprite.x;
-			x -= sprite.scrolling ? _scrollX : 0;
-			sprite.bounds = Common::Rect(x, sprite.y, x + sprite._picture->w, sprite.y + sprite._picture->h);
-			canvas.blit(*sprite._picture, x, sprite.y, sprite.mirrored, sprite.colorRemap, &sprite.colorRemapRegions);
+			int x = sprite._mirrored ? 2 * sprite._mirrorX - sprite._x - sprite._picture->w : sprite._x;
+			x -= sprite._scrolling ? _scrollX : 0;
+			sprite._bounds = Common::Rect(x, sprite._y, x + sprite._picture->w, sprite._y + sprite._picture->h);
+			canvas.blit(*sprite._picture, x, sprite._y, sprite._mirrored, sprite._colorRemap, &sprite._colorRemapRegions);
 		}
 	}
 }
@@ -565,7 +565,7 @@ void Scene::drawSprites(OM::Canvas &canvas, int minimumZ, int maximumZ) {
 Sprite *Scene::hitSprite(Common::Point point, int minimumZ, int maximumZ, bool requireAction) const {
 	for (int i = static_cast<int>(_sprites.size()) - 1; 0 <= i; i--) {
 		Sprite &sprite = *_sprites[i];
-		if (sprite.z < minimumZ || maximumZ < sprite.z || (requireAction && !sprite.action))
+		if (sprite._z < minimumZ || maximumZ < sprite._z || (requireAction && !sprite._action))
 			continue;
 		if (sprite.covers(point))
 			return &sprite;
@@ -575,33 +575,33 @@ Sprite *Scene::hitSprite(Common::Point point, int minimumZ, int maximumZ, bool r
 
 int Scene::hitTest(Common::Point point, int minimumZ, int maximumZ) const {
 	Sprite *sprite = hitSprite(point, minimumZ, maximumZ, true);
-	return sprite ? sprite->action : 0;
+	return sprite ? sprite->_action : 0;
 }
 
 bool Sprite::covers(Common::Point point) {
-	if (!visible || !enabled || !asset || !cachePicture())
+	if (!_visible || !_enabled || !_asset || !cachePicture())
 		return false;
-	if (!hitRect.isEmpty())
-		return hitRect.contains(point);
-	int left = mirrored ? 2 * mirrorX - x - _picture->w : x;
-	left -= scrolling && _scene ? _scene->_scrollX : 0;
-	bounds = Common::Rect(left, y, left + _picture->w, y + _picture->h);
-	if (!bounds.contains(point))
+	if (!_hitRect.isEmpty())
+		return _hitRect.contains(point);
+	int left = _mirrored ? 2 * _mirrorX - _x - _picture->w : _x;
+	left -= _scrolling && _scene ? _scene->_scrollX : 0;
+	_bounds = Common::Rect(left, _y, left + _picture->w, _y + _picture->h);
+	if (!_bounds.contains(point))
 		return false;
-	if (solid || boxTouchy)
+	if (_solid || _boxTouchy)
 		return true;
 	byte a;
 	byte r;
 	byte g;
 	byte b;
-	int column = mirrored ? _picture->w - 1 - (point.x - left) : point.x - left;
-	uint32 pixel = *static_cast<const uint32 *>(_picture->getBasePtr(column, point.y - y));
+	int column = _mirrored ? _picture->w - 1 - (point.x - left) : point.x - left;
+	uint32 pixel = *static_cast<const uint32 *>(_picture->getBasePtr(column, point.y - _y));
 	_picture->format.colorToARGB(pixel, a, r, g, b);
 	return a != 0;
 }
 
 void Sprite::buttonPressed(uint32 time, bool synthetic) {
-	pressed = true;
+	_pressed = true;
 	_pressTime = time;
 	_syntheticPress = synthetic;
 	_clickPending = true;
@@ -609,8 +609,8 @@ void Sprite::buttonPressed(uint32 time, bool synthetic) {
 }
 
 void Sprite::flyOn() {
-	hovered = true;
-	if (flyButton && !_flyOnSoundID.equals(k1Name)) {
+	_hovered = true;
+	if (_flyButton && !_flyOnSoundID.equals(k1Name)) {
 		_pendingSound = _flyOnSoundID;
 		_clickPending = true;
 	}
@@ -629,25 +629,25 @@ Core::ScriptableObject *Sprite::clone() const {
 		return nullptr;
 	Sprite *copy = new Sprite();
 	copy->_scene = _scene;
-	copy->asset = asset;
-	copy->colorRemap = colorRemap;
-	copy->colorRemapRegions = colorRemapRegions;
-	copy->x = x;
-	copy->y = y;
-	copy->z = z;
-	copy->tag = tag;
-	copy->visible = visible;
-	copy->enabled = enabled;
-	copy->movable = movable;
-	copy->spotCursor = spotCursor;
-	copy->grabCursor = grabCursor;
-	copy->button = button;
-	copy->flyButton = flyButton;
-	copy->solid = solid;
-	copy->boxTouchy = boxTouchy;
-	copy->tracking = tracking;
-	copy->corral = corral;
-	copy->hitRect = hitRect;
+	copy->_asset = _asset;
+	copy->_colorRemap = _colorRemap;
+	copy->_colorRemapRegions = _colorRemapRegions;
+	copy->_x = _x;
+	copy->_y = _y;
+	copy->_z = _z;
+	copy->_tag = _tag;
+	copy->_visible = _visible;
+	copy->_enabled = _enabled;
+	copy->_movable = _movable;
+	copy->_spotCursor = _spotCursor;
+	copy->_grabCursor = _grabCursor;
+	copy->_button = _button;
+	copy->_flyButton = _flyButton;
+	copy->_solid = _solid;
+	copy->_boxTouchy = _boxTouchy;
+	copy->_tracking = _tracking;
+	copy->_corral = _corral;
+	copy->_hitRect = _hitRect;
 	copy->_userData = _userData;
 	copy->_clickSoundID = _clickSoundID;
 	copy->_flyOnSoundID = _flyOnSoundID;
@@ -658,7 +658,7 @@ Core::ScriptableObject *Sprite::clone() const {
 	copy->_player.setPauseListener(copy);
 	copy->_animated = _animated;
 	copy->_animOffset = _animOffset;
-	copy->frame = frame;
+	copy->_frame = _frame;
 	copy->_pauseOnLastFrame = _pauseOnLastFrame;
 	copyEventsTo(*copy);
 	_scene->insert(copy);
@@ -669,7 +669,7 @@ void Scene::uncacheUnusedResources() {
 	for (auto it = _assets.begin(); it != _assets.end();) {
 		bool used = false;
 		for (const Sprite *sprite : _sprites)
-			used = used || sprite->asset == it->_value;
+			used = used || sprite->_asset == it->_value;
 		if (!used) {
 			delete it->_value;
 			auto unused = it++;

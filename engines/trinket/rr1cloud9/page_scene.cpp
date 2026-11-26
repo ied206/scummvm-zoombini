@@ -486,7 +486,7 @@ bool PageScene::actor(const Common::String &name, const Common::String &prefix, 
 	Common::ScopedPtr<Shell::Character> character(new Shell::Character(_scene, _vm.mixer(), _vm.resources(), *_vm._rnd, *this));
 	if (!character->create(settle, _page->number(prefix + kZName)))
 		return false;
-	character->movable = false;
+	character->_movable = false;
 	Core::ScriptValue result;
 	character->set(kPropertyRegisterFidgetsToSettle, {}, Core::ScriptValue(0));
 	character->set(kPropertyRegisterSpeechToSettle, {}, Core::ScriptValue(0));
@@ -577,7 +577,7 @@ void PageScene::speeches(const Common::String &actors, const Common::String &res
 void PageScene::completeSpeech() {
 	if (_placeBell) {
 		if (_bell)
-			_bell->visible = true;
+			_bell->_visible = true;
 		_placeBell = false;
 	}
 	if (_collectBell) {
@@ -585,7 +585,7 @@ void PageScene::completeSpeech() {
 		_world.set(kR1CN1BellPendingKey, 0);
 		_world.set(kItem4Key, MIN(25, _world.get(kItem4Key) + 1));
 		if (_bell)
-			_bell->visible = false;
+			_bell->_visible = false;
 		_collectBell = false;
 		putAway();
 	}
@@ -605,7 +605,7 @@ void PageScene::interrupt() {
 	if (_name.equals(Page::kPageCN1) || _name.equals(Page::kPageLA1))
 		_idleWaiting = false;
 	if (_clearCloud && _cloud)
-		_cloud->visible = false;
+		_cloud->_visible = false;
 	_clearCloud = _cloudMoving = false;
 	completeSpeech();
 }
@@ -715,7 +715,7 @@ bool PageScene::enter(const Page &page, const Common::String &name, bool practic
 		if (!_gate || !_bell)
 			return false;
 		_gate->setFrame(1);
-		_bell->visible = state == 3;
+		_bell->_visible = state == 3;
 		if (state == 3)
 			_gate->setFrame(_gate->getNumberOfFrames());
 		if (_world.get(kR1CG1OpeningKey))
@@ -734,8 +734,8 @@ bool PageScene::enter(const Page &page, const Common::String &name, bool practic
 	_cloud = _scene.add(characterResource(page.number(kCloudMaskIDKey), kAnimation), page.number(kCloudMaskZKey));
 	if (!_bell || !_cloud)
 		return false;
-	_bell->visible = !_world.get(kR1CN1BellClickKey);
-	_cloud->visible = !_world.visits(Page::kPageCN2);
+	_bell->_visible = !_world.get(kR1CN1BellClickKey);
+	_cloud->_visible = !_world.visits(Page::kPageCN2);
 	if (_world.get(kR1CN1BellPendingKey)) {
 		_collectBell = true;
 		delaySpeech(450);
@@ -748,10 +748,10 @@ bool PageScene::enter(const Page &page, const Common::String &name, bool practic
 			say(kReaderName, page.number(kReEnterSpchIDs11Key));
 		if (_world.visits(Page::kPageCN2) && _world.get(kR1CN1StateKey) < 3) {
 			_world.set(kR1CN1StateKey, 3);
-			_cloud->visible = true;
+			_cloud->_visible = true;
 			_clearCloud = true;
 			_cloudSpeechIdx = _speech.size();
-			_cloudOrigin = Common::Point(_cloud->x, _cloud->y);
+			_cloudOrigin = Common::Point(_cloud->_x, _cloud->_y);
 			say(kSamName, page.number(kReEnterSpchIDs21Key));
 		}
 	}
@@ -985,11 +985,11 @@ void PageScene::update(uint32 time) {
 		}
 		uint frames = MAX(1, _page->number(kTargetMoveFramesKey));
 		uint frame = MIN<uint>(frames, static_cast<uint64>(time - _cloudStart) * _page->number(kTargetMoveFPSKey) / 1000);
-		_cloud->x = _cloudOrigin.x + _page->number(kTargetMoveOffsetXKey) * frame / frames;
-		_cloud->y = _cloudOrigin.y + _page->number(kTargetMoveOffsetYKey) * frame / frames;
+		_cloud->_x = _cloudOrigin.x + _page->number(kTargetMoveOffsetXKey) * frame / frames;
+		_cloud->_y = _cloudOrigin.y + _page->number(kTargetMoveOffsetYKey) * frame / frames;
 		if (frame < frames)
 			return;
-		_cloud->visible = false;
+		_cloud->_visible = false;
 		_clearCloud = _cloudMoving = false;
 	}
 	if (_nextSpeech < _speech.size()) {
@@ -1040,7 +1040,7 @@ Common::String PageScene::click(Common::Point point) {
 		return kHandledName;
 	if (_rainGame) {
 		Shell::Sprite *map = _scene.hitSprite(point, 100, 100, true);
-		if (map && map->action == 1 && !_rainGame->ending())
+		if (map && map->_action == 1 && !_rainGame->ending())
 			return kMapName;
 		_rainGame->click(point);
 		return kHandledName;
@@ -1110,17 +1110,17 @@ Common::String PageScene::click(Common::Point point) {
 		return kHandledName;
 	if (_chestOpen) {
 		for (Shell::Sprite *item : _items) {
-			if (!item->action || !item->covers(point))
+			if (!item->_action || !item->covers(point))
 				continue;
-			if (item->action < 0) {
+			if (item->_action < 0) {
 				interrupt();
-				uint id = -item->action;
+				uint id = -item->_action;
 				say(_page->text(Common::String::format(kOutlineSpchCharUnsignedIndexKey, id)), _page->number(Common::String::format(kOutlineSpchIDUnsignedIndexKey, id)));
 				return kHandledName;
 			}
 			_dragged = item;
-			_dragOffset = point - Common::Point(item->x, item->y);
-			_dragHome = Common::Point(item->x, item->y);
+			_dragOffset = point - Common::Point(item->_x, item->_y);
+			_dragHome = Common::Point(item->_x, item->_y);
 			return kHandledName;
 		}
 		if (!chestContains(point) || (_chestButton && _chestButton->covers(point))) {
@@ -1138,7 +1138,7 @@ Common::String PageScene::click(Common::Point point) {
 		return kHandledName;
 	}
 	Shell::Sprite *sprite = _scene.hitSprite(point, 100, 100, true);
-	if (sprite && sprite->action == 1)
+	if (sprite && sprite->_action == 1)
 		return kMapName;
 	interrupt();
 	if (_catapult)
@@ -1175,7 +1175,7 @@ Common::String PageScene::click(Common::Point point) {
 		return groveClick(point);
 	if (_name.equals(Page::kPageLN2))
 		return inventorClick(point);
-	if (_bell && _bell->visible &&
+	if (_bell && _bell->_visible &&
 		Common::Rect(_page->number(kBellHSX1Key), _page->number(kBellHSY1Key), _page->number(kBellHSX2Key), _page->number(kBellHSY2Key)).contains(point)) {
 		Common::String group = _world.visits(Page::kPageCG1) ? k2Name : k1Name;
 		_world.set(kR1CN1BellClickKey, 1);
@@ -1213,7 +1213,7 @@ Common::String PageScene::click(Common::Point point) {
 
 Common::String PageScene::gateClick(Common::Point point) {
 	int state = _world.get(kR1CG1StateKey);
-	if (_bell && _bell->visible && _bell->covers(point)) {
+	if (_bell && _bell->_visible && _bell->covers(point)) {
 		say(_page->text(kBellCharIDKey), _page->number(kBellSpchIDKey));
 		return kHandledName;
 	}
@@ -1281,7 +1281,7 @@ void PageScene::openChest(bool animateCharacter) {
 			_chestMotion->startAnimation(1);
 			_chestPhase = kChestCharacter;
 			if (_chester)
-				_chester->visible = false;
+				_chester->_visible = false;
 			return;
 		}
 	}
@@ -1297,14 +1297,14 @@ void PageScene::openChest(bool animateCharacter) {
 	_chestLid->startAnimation(1);
 	playSounds({7001});
 	int offset = _page->number(kChesterYOffsetKey);
-	_chestLid->y -= offset;
-	_chestTray->y -= offset;
+	_chestLid->_y -= offset;
+	_chestTray->_y -= offset;
 	if (_chestButton) {
-		_chestButton->y -= offset;
-		_chestButton->visible = false;
+		_chestButton->_y -= offset;
+		_chestButton->_visible = false;
 	}
 	if (_chester)
-		_chester->visible = false;
+		_chester->_visible = false;
 	if (!_chestFont)
 		_chestFont = _vm.fonts().load(kChestFont);
 	for (uint id = 1; id <= 17; id++) {
@@ -1319,26 +1319,26 @@ void PageScene::openChest(bool animateCharacter) {
 		if (!item)
 			continue;
 		if (10 <= id && id <= 14)
-			item->colorRemap = marbleColor(id - 10);
-		item->x = _page->number(entry + kInventoryXField);
-		item->y = _page->number(entry + kInventoryYField) - offset;
-		item->boxTouchy = id == 2 || id == 6 || id == 8;
+			item->_colorRemap = marbleColor(id - 10);
+		item->_x = _page->number(entry + kInventoryXField);
+		item->_y = _page->number(entry + kInventoryYField) - offset;
+		item->_boxTouchy = id == 2 || id == 6 || id == 8;
 		if (1 < count) {
 			Shell::Sprite *underneath = _scene.add(Common::String::format(kInventoryAnimationFormat, resource), 201);
 			if (underneath) {
-				underneath->colorRemap = item->colorRemap;
-				underneath->x = item->x;
-				underneath->y = item->y;
+				underneath->_colorRemap = item->_colorRemap;
+				underneath->_x = item->_x;
+				underneath->_y = item->_y;
 				_items.push_back(underneath);
 			}
 		}
 		_items.push_back(item);
 		if (1 < count && _chestFont && _page->number(Common::String::format(kDrawNumbersUnsignedIndexFormat, id))) {
 			Shell::TextObject *label = new Shell::TextObject(_chestPaths, _vm.fonts(), _chestFont);
-			label->create({Core::ScriptValue::fromText(Common::String::format("%d", count)), Core::ScriptValue(item->x + 10),
-						   Core::ScriptValue(item->y + 10), Core::ScriptValue(30), Core::ScriptValue(14), Core::ScriptValue(0)});
+			label->create({Core::ScriptValue::fromText(Common::String::format("%d", count)), Core::ScriptValue(item->_x + 10),
+						   Core::ScriptValue(item->_y + 10), Core::ScriptValue(30), Core::ScriptValue(14), Core::ScriptValue(0)});
 			label->set(kPropertyColor, {Core::ScriptValue(500), Core::ScriptValue(450)}, Core::ScriptValue(7500));
-			label->tag = id;
+			label->_tag = id;
 			_itemCounts.push_back(label);
 		}
 	}
@@ -1349,9 +1349,9 @@ void PageScene::openChest(bool animateCharacter) {
 			Common::String entry = Common::String::format(kCollectiblesUnsignedIndexFormat, id);
 			Shell::Sprite *outline = _scene.add(Common::String::format(kInventoryAnimationFormat, _page->number(entry + k4Name)), 202, -static_cast<int>(id));
 			if (outline) {
-				outline->x = _page->number(entry + kInventoryXField);
-				outline->y = _page->number(entry + kInventoryYField) - offset;
-				outline->boxTouchy = true;
+				outline->_x = _page->number(entry + kInventoryXField);
+				outline->_y = _page->number(entry + kInventoryYField) - offset;
+				outline->_boxTouchy = true;
 				_items.push_back(outline);
 			}
 		}
@@ -1370,17 +1370,17 @@ void PageScene::moveChest(Common::Point delta) {
 	_chestOffset += delta;
 	for (auto *layer : {_chestLid, _chestTray, _chestButton}) {
 		if (layer) {
-			layer->x += delta.x;
-			layer->y += delta.y;
+			layer->_x += delta.x;
+			layer->_y += delta.y;
 		}
 	}
 	for (auto *item : _items) {
-		item->x += delta.x;
-		item->y += delta.y;
+		item->_x += delta.x;
+		item->_y += delta.y;
 	}
 	for (auto *label : _itemCounts) {
-		label->x += delta.x;
-		label->y += delta.y;
+		label->_x += delta.x;
+		label->_y += delta.y;
 	}
 }
 
@@ -1393,7 +1393,7 @@ void PageScene::closeChest(bool restoreCharacter) {
 	_chestOpen = false;
 	_chestPhase = kChestClosing;
 	if (_chestButton)
-		_chestButton->visible = false;
+		_chestButton->_visible = false;
 	_scene.remove(_chestLid);
 	_chestLid = _scene.add(kChestOpenLid, 211);
 	if (!_chestLid) {
@@ -1401,8 +1401,8 @@ void PageScene::closeChest(bool restoreCharacter) {
 		return;
 	}
 	_chestLid->startAnimation(1);
-	_chestLid->x += _chestOffset.x;
-	_chestLid->y += _chestOffset.y - _page->number(kChesterYOffsetKey);
+	_chestLid->_x += _chestOffset.x;
+	_chestLid->_y += _chestOffset.y - _page->number(kChesterYOffsetKey);
 	playSounds({7003});
 }
 
@@ -1427,7 +1427,7 @@ void PageScene::finishChest() {
 	_chestPhase = kChestClosed;
 	_putAwayActive = false;
 	if (_chester && _restoreChester)
-		_chester->visible = true;
+		_chester->_visible = true;
 }
 
 void PageScene::updateChest(uint32 time) {
@@ -1440,7 +1440,7 @@ void PageScene::updateChest(uint32 time) {
 		_chestPhase = kChestOpen;
 		_chestOpen = true;
 		if (_chestButton)
-			_chestButton->visible = true;
+			_chestButton->_visible = true;
 	} else if (_chestPhase == kChestClosing && !_chestLid->isRunning()) {
 		finishChest();
 	} else if (_chestPhase == kChestOpen && _putAwayActive) {
@@ -1456,7 +1456,7 @@ void PageScene::drawInventoryCounts(OM::Canvas &canvas) {
 	if (!_chestOpen)
 		return;
 	for (auto *label : _itemCounts) {
-		if (!_dragged || _dragged->action != label->tag)
+		if (!_dragged || _dragged->_action != label->_tag)
 			label->draw(canvas);
 	}
 }
@@ -1494,28 +1494,28 @@ bool PageScene::event(const Common::Event &event) {
 	if (!_dragged)
 		return false;
 	if (event.type == Common::EVENT_MOUSEMOVE) {
-		_dragged->x = event.mouse.x - _dragOffset.x;
-		_dragged->y = event.mouse.y - _dragOffset.y;
+		_dragged->_x = event.mouse.x - _dragOffset.x;
+		_dragged->_y = event.mouse.y - _dragOffset.y;
 	} else if (event.type == Common::EVENT_LBUTTONUP) {
-		if (_catapult && !chestContains(event.mouse) && _catapult->donate(_dragged->action))
+		if (_catapult && !chestContains(event.mouse) && _catapult->donate(_dragged->_action))
 			return true;
-		if (_sheepCrossing && !chestContains(event.mouse) && _sheepCrossing->donate(_dragged->action))
+		if (_sheepCrossing && !chestContains(event.mouse) && _sheepCrossing->donate(_dragged->_action))
 			return true;
-		if (_rockHead && !chestContains(event.mouse) && _rockHead->donate(_dragged->action))
+		if (_rockHead && !chestContains(event.mouse) && _rockHead->donate(_dragged->_action))
 			return true;
-		if (_rainbowSlide && !chestContains(event.mouse) && _rainbowSlide->donate(_dragged->action))
+		if (_rainbowSlide && !chestContains(event.mouse) && _rainbowSlide->donate(_dragged->_action))
 			return true;
-		if (_musicPatterns && !chestContains(event.mouse) && _musicPatterns->donate(_dragged->action))
+		if (_musicPatterns && !chestContains(event.mouse) && _musicPatterns->donate(_dragged->_action))
 			return true;
 		if (_name.equals(Page::kPageLN2) && !chestContains(event.mouse)) {
-			uint item = _dragged->action;
-			_dragged->x = _dragHome.x;
-			_dragged->y = _dragHome.y;
+			uint item = _dragged->_action;
+			_dragged->_x = _dragHome.x;
+			_dragged->_y = _dragHome.y;
 			_dragged = nullptr;
 			inventorDrop(item);
 			return true;
 		}
-		if (_name.equals(Page::kPageCG1) && _dragged->action == 4 && !chestContains(event.mouse)) {
+		if (_name.equals(Page::kPageCG1) && _dragged->_action == 4 && !chestContains(event.mouse)) {
 			_world.set(kItem4Key, MAX(0, _world.get(kItem4Key) - 1));
 			closeChest();
 			interrupt();
@@ -1524,8 +1524,8 @@ bool PageScene::event(const Common::Event &event) {
 			_gateDelayStarted = false;
 			return true;
 		}
-		_dragged->x = _dragHome.x;
-		_dragged->y = _dragHome.y;
+		_dragged->_x = _dragHome.x;
+		_dragged->_y = _dragHome.y;
 		_dragged = nullptr;
 	}
 	return true;
@@ -1553,7 +1553,7 @@ void PageScene::updateNavigationCursor() {
 	if (_scene.hitSprite(_mouse, _page->number(kNavHotspotZKey) + 1, INT_MAX, true))
 		return;
 	for (const auto &actor : _actors) {
-		if (actor._value->visible && actor._value->bounds().contains(_mouse))
+		if (actor._value->_visible && actor._value->bounds().contains(_mouse))
 			return;
 	}
 	for (const auto &exit : _page->exits()) {

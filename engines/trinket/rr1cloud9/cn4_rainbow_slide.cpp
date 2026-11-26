@@ -131,8 +131,8 @@ bool RainbowSlide::enter() {
 	_walk = _host._scene.add(_host.characterResource(number(kWalkToSlideIDKey), Shell::Character::Resources::kAnimation), 1);
 	if (!_bands || !_wagon || !_walk)
 		return false;
-	_bands->visible = _state < 4;
-	_wagon->visible = _walk->visible = false;
+	_bands->_visible = _state < 4;
+	_wagon->_visible = _walk->_visible = false;
 	if (world.get(kR1CN4WagonPendingKey)) {
 		_phase = kDeliveryWait;
 	} else if (world.get(kR1CN4BandsPendingKey)) {
@@ -172,7 +172,7 @@ void RainbowSlide::update(uint32 time) {
 			Core::ScriptValue result;
 			_host._actors[kCarrieActor]->play(kMethodRemoveFidgetGroup, {Core::ScriptValue(2)}, result);
 		}
-		_wagon->visible = true;
+		_wagon->_visible = true;
 		world.set(kR1CN4WagonHereKey, 1);
 		world.set(kR1CN4WagonPendingKey, 0);
 		group(kWagonCharIDKey, kWagonSpchIDKey, number(kMaxWagonSpchKey));
@@ -186,13 +186,13 @@ void RainbowSlide::update(uint32 time) {
 			_host.putAway();
 			world.set(kR1CN4BandsPendingKey, 0);
 		}
-		_bands->visible = false;
+		_bands->_visible = false;
 		setState(4);
 		_phase = kIdle;
 	} else if (_phase == kExitSpeech) {
 		_host._actors[kReaderName]->setVisible(false);
 		_host._actors[kSamName]->setVisible(false);
-		_walk->visible = true;
+		_walk->_visible = true;
 		_walk->startAnimation(1);
 		_phase = kExitAnimation;
 	} else if (_phase == kExitAnimation) {
@@ -226,7 +226,7 @@ bool RainbowSlide::click(Common::Point point) {
 	_idle = _host._time;
 	if (busy())
 		return true;
-	if (_bands->visible && _bands->covers(point)) {
+	if (_bands->_visible && _bands->covers(point)) {
 		if (_state < 3)
 			carrieClick();
 		else if (!_host._practice) {

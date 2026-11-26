@@ -54,7 +54,7 @@ bool PageScene::enterInventor() {
 		_parts[item - 1] = _scene.add(characterResource(_page->number(prefix + kIDName), kAnimation), _page->number(prefix + kZName));
 		if (!_parts[item - 1])
 			return false;
-		_parts[item - 1]->visible = _world.get(Common::String(kR1LN2Key) + partName(item) + kDeliveredKey);
+		_parts[item - 1]->_visible = _world.get(Common::String(kR1LN2Key) + partName(item) + kDeliveredKey);
 	}
 	_ambient = _scene.add(characterResource(_page->number(kAmbientIDKey), kAnimation), _page->number(kAmbientZKey));
 	if (!_ambient)
@@ -140,8 +140,8 @@ void PageScene::inventorHint(uint item) {
 	if (_highlight) {
 		_highlight->setFrame(2);
 		_highlightDue = _time + 100;
-		_highlight->x = _page->number(prefix + kInventoryXField);
-		_highlight->y = _page->number(prefix + kInventoryYField) - _page->number(kChesterYOffsetKey);
+		_highlight->_x = _page->number(prefix + kInventoryXField);
+		_highlight->_y = _page->number(prefix + kInventoryYField) - _page->number(kChesterYOffsetKey);
 	}
 	static constexpr uint kHintIndices[] = {
 		0,
@@ -230,7 +230,7 @@ void PageScene::updateInventor(uint32 time) {
 			break;
 		}
 		_world.set(Common::String(kR1LN2Key) + partName(item) + kDeliveredKey, 1);
-		_parts[item - 1]->visible = true;
+		_parts[item - 1]->_visible = true;
 		static constexpr const char *kPrefixes[] = {
 			"",
 			kBandsName,
@@ -251,7 +251,7 @@ void PageScene::updateInventor(uint32 time) {
 		_world.set(kR1LN2DeliveryPendingKey, 0);
 		bool complete = true;
 		for (uint item = 1; item <= 3; item++)
-			complete &= _parts[item - 1]->visible;
+			complete &= _parts[item - 1]->_visible;
 		_inventorPhase = complete ? kInventorMovie : kInventorIdle;
 		if (complete) {
 			for (uint item = 1; item <= 3; item++) {
@@ -270,7 +270,7 @@ void PageScene::updateInventor(uint32 time) {
 void PageScene::inventorMoreItems() {
 	uint delivered = 0;
 	for (auto *part : _parts) {
-		if (part->visible)
+		if (part->_visible)
 			delivered += 1;
 	}
 	if (delivered == 3) {
@@ -280,7 +280,7 @@ void PageScene::inventorMoreItems() {
 	say(_page->text(kItemsCharIDs11Key), _page->number(kItemsSpchIDs11Key));
 	uint words = 0;
 	for (uint item : {2U, 1U, 3U}) {
-		if (_parts[item - 1]->visible)
+		if (_parts[item - 1]->_visible)
 			continue;
 		if (words == 1 && delivered == 1) {
 			say(_page->text(kItemsCharIDs15Key), _page->number(kItemsSpchIDs15Key));

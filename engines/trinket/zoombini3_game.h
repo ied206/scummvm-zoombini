@@ -56,8 +56,8 @@ public:
 	void setSoundSettings(const SoundSettings &settings) override;
 	/** Apply the world's saved volumes and mute preference to the mixer. */
 	void applySoundSettings() override;
-	/** Serialize the current world to the supplied save stream. */
-	bool save(Common::WriteStream &stream) const override { return _world.write(stream); }
+	/** Serialize the current world using the detected platform's native save layout. */
+	bool save(Common::WriteStream &stream) const override;
 	/** Return the active world's location code. */
 	int currentLocation() const override { return _world.currentLocation(); }
 	/** Check whether the active script state allows Escape to leave gameplay. */

@@ -102,7 +102,7 @@ Flipbook::~Flipbook() {
 		image.free();
 }
 
-Artwork &Flipbook::artwork() { return _host._practice ? _practiceArtwork : _host._world.artwork; }
+Artwork &Flipbook::artwork() { return _host._practice ? _practiceArtwork : _host._world._artwork; }
 
 int Flipbook::number(const Common::String &key) const { return _host._page->number(key); }
 
@@ -144,7 +144,7 @@ bool Flipbook::enter() {
 	auto sprite = [this](int id, int depth) {
 		Shell::Sprite *s = _host._scene.add(_host.characterResource(id, Shell::Character::Resources::kAnimation), depth);
 		if (s)
-			s->boxTouchy = true;
+			s->_boxTouchy = true;
 		return s;
 	};
 	for (int i = 0; i < 12; i++) {
@@ -171,7 +171,7 @@ bool Flipbook::enter() {
 	_flip = sprite(11220, 50);
 	if (!_next || !_previous || !_play || !_print || !_bomb || !_undoButton || !_flip)
 		return false;
-	_flip->visible = false;
+	_flip->_visible = false;
 	_font = _host._vm.fonts().load(kFont);
 	if (!_font || !loadFrame())
 		return false;
@@ -273,8 +273,8 @@ void Flipbook::checkpoint() {
 }
 
 void Flipbook::buttons() {
-	_next->visible = !_playing && _frame < 18;
-	_previous->visible = !_playing && 1 < _frame;
+	_next->_visible = !_playing && _frame < 18;
+	_previous->_visible = !_playing && 1 < _frame;
 	auto frame = [this](Shell::Sprite *sprite, bool selected, bool stop) {
 		uint value = 1;
 		if (_pressed == sprite)
@@ -291,7 +291,7 @@ void Flipbook::buttons() {
 	for (int i = 0; i < 12; i++)
 		frame(_colors[i], _color == i, false);
 	for (int i = 0; i < 6; i++) {
-		_stamps[i]->visible = _stamp != i;
+		_stamps[i]->_visible = _stamp != i;
 		frame(_stamps[i], false, false);
 	}
 	if (_helpIndex == 1)
@@ -336,7 +336,7 @@ void Flipbook::updateCursor() {
 		cursor = _tool;
 	else {
 		for (auto *sprite : {_next, _previous, _print, _bomb, _undoButton, _play}) {
-			if (sprite->visible && sprite->covers(_mouse))
+			if (sprite->_visible && sprite->covers(_mouse))
 				cursor = 3;
 		}
 		for (auto *sprite : _colors) {
@@ -348,7 +348,7 @@ void Flipbook::updateCursor() {
 				cursor = 3;
 		}
 		for (auto *sprite : _stamps) {
-			if (sprite->visible && sprite->covers(_mouse))
+			if (sprite->_visible && sprite->covers(_mouse))
 				cursor = 3;
 		}
 	}
@@ -378,7 +378,7 @@ void Flipbook::turn(int direction) {
 		return;
 	checkpoint();
 	_turn = direction;
-	_flip->visible = true;
+	_flip->_visible = true;
 	_flip->startAnimation(1);
 	_host.playSounds({static_cast<uint16>(number(kPageFlipIDKey))});
 }
@@ -390,7 +390,7 @@ void Flipbook::advance(uint32 time) {
 		_frame += _turn;
 		bool forward = 0 < _turn;
 		_turn = 0;
-		_flip->visible = false;
+		_flip->_visible = false;
 		loadFrame();
 		buttons();
 		if (forward && !_host._practice) {
@@ -564,7 +564,7 @@ bool Flipbook::coloredImage(Shell::Sprite &sprite, int resource, Graphics::Surfa
 	palette[9] = ((c >> 10) & 31) << 3;
 	palette[10] = ((c >> 5) & 31) << 3;
 	palette[11] = (c & 31) << 3;
-	const Core::Animation &asset = *sprite.asset;
+	const Core::Animation &asset = *sprite._asset;
 	image.free();
 	return asset.decode(asset.pictureForFrame(MAX(1U, sprite.displayedFrame()) - 1), image, palette);
 }
@@ -732,7 +732,7 @@ bool Flipbook::click(Common::Point point) {
 	cancelHelp();
 	_pressed = nullptr;
 	for (auto *sprite : {_next, _previous, _print, _bomb, _undoButton, _play}) {
-		if (sprite->visible && sprite->covers(point))
+		if (sprite->_visible && sprite->covers(point))
 			_pressed = sprite;
 	}
 	buttons();
@@ -751,11 +751,11 @@ bool Flipbook::click(Common::Point point) {
 		return true;
 	}
 	stop();
-	if (_next->visible && _next->covers(point)) {
+	if (_next->_visible && _next->covers(point)) {
 		turn(1);
 		return true;
 	}
-	if (_previous->visible && _previous->covers(point)) {
+	if (_previous->_visible && _previous->covers(point)) {
 		turn(-1);
 		return true;
 	}
@@ -776,7 +776,7 @@ bool Flipbook::click(Common::Point point) {
 		}
 	}
 	for (int i = 0; i < 6; i++) {
-		if (_stamps[i]->visible && _stamps[i]->covers(point)) {
+		if (_stamps[i]->_visible && _stamps[i]->covers(point)) {
 			if (_tool != kStamp)
 				_previousTool = _tool;
 			_stamp = i;
@@ -856,13 +856,13 @@ void Flipbook::draw(OM::Canvas &canvas) {
 	}
 	_host._scene.drawSprites(canvas, INT_MIN, 10);
 	for (int i = 0; i < 6; i++) {
-		if (_stamps[i]->visible && _colored[i].getPixels())
-			canvas.blit(_colored[i], _stamps[i]->x, _stamps[i]->y);
+		if (_stamps[i]->_visible && _colored[i].getPixels())
+			canvas.blit(_colored[i], _stamps[i]->_x, _stamps[i]->_y);
 	}
 	_host._scene.drawSprites(canvas, 11, 60);
 	for (int i = 0; i < 2; i++) {
 		if (_colored[i + 6].getPixels())
-			canvas.blit(_colored[i + 6], _tools[i]->x, _tools[i]->y);
+			canvas.blit(_colored[i + 6], _tools[i]->_x, _tools[i]->_y);
 	}
 	_host._scene.drawSprites(canvas, 61, INT_MAX);
 	_font->drawString(&canvas.surface(), Common::String::format("%d", _frame), 295, 48, 60,

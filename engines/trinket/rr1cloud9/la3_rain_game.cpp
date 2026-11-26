@@ -157,8 +157,8 @@ bool RainGame::enter() {
 	_highlight = sprite(27170, 101);
 	if (!_catcher || !_feedback || !_barrels || !_highlight)
 		return false;
-	_catcherOrigin = Common::Point(_catcher->x, _catcher->y);
-	_catcher->visible = _feedback->visible = _highlight->visible = false;
+	_catcherOrigin = Common::Point(_catcher->_x, _catcher->_y);
+	_catcher->_visible = _feedback->_visible = _highlight->_visible = false;
 	static const int offsets[] = {
 		17,
 		113,
@@ -168,15 +168,15 @@ bool RainGame::enter() {
 		_labels[i] = sprite(27154, 92);
 		if (!_labels[i])
 			return false;
-		_labels[i]->x += offsets[i % 3];
-		_labels[i]->y += i < 3 ? 0 : 33;
+		_labels[i]->_x += offsets[i % 3];
+		_labels[i]->_y += i < 3 ? 0 : 33;
 		if (!_host._practice) {
 			for (int j = 0; j < 2; j++) {
 				_flags[i][j] = sprite(number(j ? kFlag2IDKey : kFlag1IDKey), number(j ? kFlag2ZKey : kFlag1ZKey));
 				if (!_flags[i][j])
 					return false;
-				_flags[i][j]->x += number(Common::String::format(kFlagOffsetXSignedIndexKey, i + 1));
-				_flags[i][j]->y += number(Common::String::format(kFlagOffsetYSignedIndexKey, i + 1));
+				_flags[i][j]->_x += number(Common::String::format(kFlagOffsetXSignedIndexKey, i + 1));
+				_flags[i][j]->_y += number(Common::String::format(kFlagOffsetYSignedIndexKey, i + 1));
 			}
 		}
 	}
@@ -290,11 +290,11 @@ bool RainGame::setup() {
 		if (i < 3) {
 			_binKeys[i] = identity;
 			_labels[i]->setFrame(label(group.first));
-			_labels[i]->colorRemap = objectColor(group.first.color);
-			_labels[i]->visible = true;
+			_labels[i]->_colorRemap = objectColor(group.first.color);
+			_labels[i]->_visible = true;
 			_labels[i + 3]->setFrame(MAX(1, label(group.second)));
-			_labels[i + 3]->colorRemap = objectColor(group.second.color);
-			_labels[i + 3]->visible = 1 < _level;
+			_labels[i + 3]->_colorRemap = objectColor(group.second.color);
+			_labels[i + 3]->_visible = 1 < _level;
 		}
 		for (int n = 0; n < group.count; n++) {
 			int slot = _host._vm._rnd->getRandomNumber(count - 2);
@@ -314,9 +314,9 @@ bool RainGame::setup() {
 			if (!answer.sprite)
 				return false;
 			answer.sprite->setFrame(shape + 4 * (color + 4 * object) + 1);
-			answer.sprite->colorRemap = objectColor(color);
-			answer.sprite->y = -answer.sprite->height();
-			answer.sprite->visible = false;
+			answer.sprite->_colorRemap = objectColor(color);
+			answer.sprite->_y = -answer.sprite->height();
+			answer.sprite->_visible = false;
 			answer.key = identity;
 			answer.target = i < 3;
 		}
@@ -338,8 +338,8 @@ void RainGame::flags() {
 	for (int i = 0; i < 6; i++) {
 		for (int j = 0; j < 2; j++) {
 			if (_flags[i][j]) {
-				_flags[i][j]->visible = (i < _wins) == (j == 1);
-				if (_flags[i][j]->visible)
+				_flags[i][j]->_visible = (i < _wins) == (j == 1);
+				if (_flags[i][j]->_visible)
 					_flags[i][j]->startAnimation(0);
 				else
 					_flags[i][j]->stopAnimation();
@@ -384,16 +384,16 @@ void RainGame::update(uint32 time) {
 	if (_phase == kGreeting || _phase == kBinAttributes) {
 		if (_bin < 3) {
 			_highlight->setFrame(_bin + 1);
-			_highlight->visible = true;
+			_highlight->_visible = true;
 			say(kPaigeName, Common::String::format(kSetupSpchIDsSignedIndexKey, _bin + 3));
 			_phase = kBinIntro;
 		} else {
-			_highlight->visible = false;
+			_highlight->_visible = false;
 			_delay = time;
 			_phase = kDelay;
 		}
 	} else if (_phase == kBinIntro) {
-		_highlight->visible = false;
+		_highlight->_visible = false;
 		attributes(_bin);
 		_bin += 1;
 		_phase = kBinAttributes;
@@ -416,8 +416,8 @@ void RainGame::update(uint32 time) {
 
 void RainGame::start(uint32 time) {
 	position(0);
-	_catcher->visible = true;
-	_feedback->visible = _barrels->visible = false;
+	_catcher->_visible = true;
+	_feedback->_visible = _barrels->_visible = false;
 	_host._actors[kReaderName]->setVisible(false);
 	_host._actors[kSamName]->setVisible(false);
 	_moveDue = time + 25;
@@ -431,10 +431,10 @@ void RainGame::start(uint32 time) {
 void RainGame::position(int x) {
 	int delta = x - _catcherX;
 	_catcherX = x;
-	_catcher->x += delta;
-	_feedback->x += delta;
+	_catcher->_x += delta;
+	_feedback->_x += delta;
 	for (int i = 0; i < 6; i++)
-		_labels[i]->x += delta;
+		_labels[i]->_x += delta;
 }
 
 void RainGame::move(int delta) {
@@ -469,24 +469,24 @@ void RainGame::advance(uint32 time) {
 		_emitted += 1;
 		if (_emitted < static_cast<int>(_answers.size())) {
 			auto *answer = _answers[_emitted].sprite;
-			answer->x = 100 + _host._vm._rnd->getRandomNumber(399);
-			answer->y = -answer->height();
-			answer->visible = true;
+			answer->_x = 100 + _host._vm._rnd->getRandomNumber(399);
+			answer->_y = -answer->height();
+			answer->_visible = true;
 			_host.playSounds({27158});
 		}
-		_feedback->visible = false;
+		_feedback->_visible = false;
 	}
 	for (uint i = 0; i < _answers.size(); i++) {
 		auto *answer = _answers[i].sprite;
-		if (!answer->visible)
+		if (!answer->_visible)
 			continue;
-		if (485 <= answer->y + answer->height() + 4) {
+		if (485 <= answer->_y + answer->height() + 4) {
 			if (i + 1 == _answers.size()) {
 				finish();
 				return;
 			}
 		} else {
-			answer->y += 4;
+			answer->_y += 4;
 		}
 	}
 	static const int binX[] = {
@@ -496,9 +496,9 @@ void RainGame::advance(uint32 time) {
 	};
 	for (uint i = 0; i < _answers.size(); i++) {
 		auto *answer = _answers[i].sprite;
-		if (!answer->visible)
+		if (!answer->_visible)
 			continue;
-		Common::Rect bounds(answer->x, answer->y, answer->x + answer->width(), answer->y + answer->height());
+		Common::Rect bounds(answer->_x, answer->_y, answer->_x + answer->width(), answer->_y + answer->height());
 		int chosen = -1;
 		for (int bin = 0; bin < 3; bin++) {
 			if (bounds.intersects(Common::Rect(binX[bin] + _catcherX, 322, binX[bin] + _catcherX + 50, 342))) {
@@ -520,11 +520,11 @@ void RainGame::catchAnswer(uint index, int bin) {
 	Answer &answer = _answers[index];
 	bool correct = answer.key.equals(_binKeys[bin]);
 	if (correct) {
-		answer.sprite->visible = false;
+		answer.sprite->_visible = false;
 		_score += 1;
 		_scoreText->set(kPropertyText, {}, Core::ScriptValue::fromText(Common::String::format("%d", _score)));
 	} else {
-		answer.sprite->y = 485 - answer.sprite->height();
+		answer.sprite->_y = 485 - answer.sprite->height();
 		if (!answer.target && index + 1 < _answers.size()) {
 			_distractors += 1;
 			if (_distractors == 1) {
@@ -535,15 +535,15 @@ void RainGame::catchAnswer(uint index, int bin) {
 	}
 	_host.playSounds({static_cast<uint16>(correct ? 27150 : 27152)});
 	_feedback->setFrame(bin + 1);
-	_feedback->visible = true;
+	_feedback->_visible = true;
 }
 
 void RainGame::finish() {
 	_host.interrupt();
 	position(0);
-	_catcher->visible = _feedback->visible = false;
+	_catcher->_visible = _feedback->_visible = false;
 	_catcher->stopAnimation();
-	_barrels->visible = true;
+	_barrels->_visible = true;
 	_host._actors[kReaderName]->setVisible(true);
 	_host._actors[kSamName]->setVisible(true);
 	_host.music(number(kBackgroundMusicIDKey));
@@ -621,7 +621,7 @@ void RainGame::click(Common::Point point) {
 	_host.interrupt();
 	if (_phase == kFeedback && !setup())
 		return;
-	_highlight->visible = false;
+	_highlight->_visible = false;
 	if (paige) {
 		say(kPaigeName, Common::String::format(kHelpSpchIDsSignedIndexKey, _host._vm._rnd->getRandomNumberRng(1, 3)));
 	} else if (_host._actors[kReaderName]->bounds().contains(point) || _host._actors[kSamName]->bounds().contains(point)) {

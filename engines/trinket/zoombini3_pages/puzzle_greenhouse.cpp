@@ -662,8 +662,8 @@ bool GreenhouseMachine::get(const Common::String &property, const Core::ScriptAr
 bool GreenhouseMachine::set(const Common::String &property, const Core::ScriptArguments &sargs, const Core::ScriptValue &value) {
 	if (property.equals(kPropertyWand) && sargs.empty()) {
 		if (_wand) {
-			_wand->visible = value.toInt32() != 0;
-			if (_wand->visible)
+			_wand->_visible = value.toInt32() != 0;
+			if (_wand->_visible)
 				_wand->setFrame(MIN<uint>(21, 23 - (_rules.remainingSwaps() + 1) * 20 / 30));
 		}
 		return true;
@@ -694,15 +694,15 @@ Shell::Sprite *GreenhouseMachine::add(uint id, int depth, int frame) {
 		return nullptr;
 	}
 	_owned.push_back(sprite);
-	sprite->enabled = false;
+	sprite->_enabled = false;
 	sprite->setFrame(frame);
 	return sprite;
 }
 
 Common::Rect GreenhouseMachine::bounds(const Shell::Sprite *sprite) {
-	if (!sprite || !sprite->visible)
+	if (!sprite || !sprite->_visible)
 		return Common::Rect();
-	return Common::Rect(sprite->x, sprite->y, sprite->x + sprite->bounds.width(), sprite->y + sprite->bounds.height());
+	return Common::Rect(sprite->_x, sprite->_y, sprite->_x + sprite->_bounds.width(), sprite->_y + sprite->_bounds.height());
 }
 
 bool GreenhouseMachine::start(uint32 seed) {
@@ -721,7 +721,7 @@ bool GreenhouseMachine::start(uint32 seed) {
 		_moths[i].body = add(16100, 5);
 		if (!_moths[i].body)
 			return false;
-		_moths[i].body->managed = true;
+		_moths[i].body->_managed = true;
 	}
 	if (!seed) {
 		TimeDate date;
@@ -744,24 +744,24 @@ bool GreenhouseMachine::start(uint32 seed) {
 			return false;
 		const uint color = (_rules.moth(i).trait >> 5) & 7;
 		if (color)
-			moth.trait->colorRemap = flowerColor(color - 1);
-		moth.trait->managed = true;
-		moth.body->x = _rules.moth(i).supply.x;
-		moth.body->y = _rules.moth(i).supply.y;
+			moth.trait->_colorRemap = flowerColor(color - 1);
+		moth.trait->_managed = true;
+		moth.body->_x = _rules.moth(i).supply.x;
+		moth.body->_y = _rules.moth(i).supply.y;
 		positionTrait(moth);
 		_pots[i] = add(16258, 4);
 		if (!_pots[i])
 			return false;
-		_pots[i]->x = 730;
-		_pots[i]->y = 90 + 42 * i;
-		_pots[i]->visible = true;
+		_pots[i]->_x = 730;
+		_pots[i]->_y = 90 + 42 * i;
+		_pots[i]->_visible = true;
 	}
 	if (1 < _level) {
 		_wand = add(16235, 20);
 		if (!_wand)
 			return false;
 		_wand->setFrame(3);
-		_wand->visible = false;
+		_wand->_visible = false;
 	}
 	_running = _valid;
 	return _valid;
@@ -780,15 +780,15 @@ void GreenhouseMachine::rebuildPlant(uint index) {
 	Shell::Sprite *flower = _flowers[index] = add(kFlowers[color * 6 + shape], 2);
 	if (!leaf || !flower)
 		return;
-	flower->colorRemap = flowerColor(color);
-	Common::Point offset = leaf->asset->origin() - flower->asset->origin();
+	flower->_colorRemap = flowerColor(color);
+	Common::Point offset = leaf->_asset->origin() - flower->_asset->origin();
 	Common::Rect combined(0, 0, flower->width(), flower->height());
 	combined.extend(Common::Rect(offset.x, offset.y, offset.x + leaf->width(), offset.y + leaf->height()));
 	Common::Point origin = GreenhouseRules::cellOrigin(index % 12, index / 12);
-	flower->x = origin.x + (44 - combined.width()) / 2 - combined.left;
-	flower->y = origin.y + (42 - combined.height()) / 2 - combined.top;
-	leaf->x = flower->x + offset.x;
-	leaf->y = flower->y + offset.y;
+	flower->_x = origin.x + (44 - combined.width()) / 2 - combined.left;
+	flower->_y = origin.y + (42 - combined.height()) / 2 - combined.top;
+	leaf->_x = flower->_x + offset.x;
+	leaf->_y = flower->_y + offset.y;
 }
 
 void GreenhouseMachine::positionTrait(Moving &motion) {
@@ -802,13 +802,13 @@ void GreenhouseMachine::positionTrait(Moving &motion) {
 		3,
 	};
 	motion.trait->setFrame(frames[motion.direction]);
-	motion.trait->x = motion.body->x + (motion.body->width() - motion.trait->width()) / 2;
-	motion.trait->y = motion.body->y + (motion.body->height() - motion.trait->height()) / 2;
-	motion.trait->visible = motion.body->visible;
+	motion.trait->_x = motion.body->_x + (motion.body->width() - motion.trait->width()) / 2;
+	motion.trait->_y = motion.body->_y + (motion.body->height() - motion.trait->height()) / 2;
+	motion.trait->_visible = motion.body->_visible;
 }
 
 void GreenhouseMachine::beginMotion(Moving &motion, Common::Point target, uint duration, uint direction) {
-	motion.from = Common::Point(motion.body->x, motion.body->y);
+	motion.from = Common::Point(motion.body->_x, motion.body->_y);
 	motion.to = target;
 	motion.duration = MAX<uint>(duration, 1);
 	motion.started = _clock.now();
@@ -829,14 +829,14 @@ void GreenhouseMachine::updateMotion(Moving &motion, bool beetle) {
 	uint first = beetle ? 1 : offsets[motion.direction];
 	motion.body->setFrame(first + frame % 10);
 	float progress = MIN<float>(1, static_cast<float>(elapsed) / motion.duration);
-	motion.body->x = motion.from.x + static_cast<int>((motion.to.x - motion.from.x) * progress);
-	motion.body->y = motion.from.y + static_cast<int>((motion.to.y - motion.from.y) * progress);
+	motion.body->_x = motion.from.x + static_cast<int>((motion.to.x - motion.from.x) * progress);
+	motion.body->_y = motion.from.y + static_cast<int>((motion.to.y - motion.from.y) * progress);
 	positionTrait(motion);
 	if (motion.duration <= elapsed) {
 		motion.active = false;
 		motion.body->setFrame(first);
-		motion.body->x = motion.to.x;
-		motion.body->y = motion.to.y;
+		motion.body->_x = motion.to.x;
+		motion.body->_y = motion.to.y;
 		positionTrait(motion);
 	}
 }
@@ -844,7 +844,7 @@ void GreenhouseMachine::updateMotion(Moving &motion, bool beetle) {
 void GreenhouseMachine::finishMoth(uint index) {
 	Moving &moth = _moths[index];
 	moth.done = true;
-	_pots[moth.destination]->visible = true;
+	_pots[moth.destination]->_visible = true;
 	_pots[moth.destination]->setFrame(2);
 	emitEvent(kEventMothDone);
 }
@@ -859,14 +859,14 @@ void GreenhouseMachine::updateMoths() {
 				positionTrait(motion);
 				if (FrameClock::milliseconds(10, 12) <= elapsed) {
 					motion.pollinating = false;
-					Common::Point target(799 + motion.body->width(), motion.body->y);
-					beginMotion(motion, target, (target.x - motion.body->x) * 25, 3);
+					Common::Point target(799 + motion.body->width(), motion.body->_y);
+					beginMotion(motion, target, (target.x - motion.body->_x) * 25, 3);
 				}
 			} else if (motion.active) {
 				updateMotion(motion, false);
-				motion.trait->visible = false;
+				motion.trait->_visible = false;
 				if (!motion.active)
-					motion.body->visible = false;
+					motion.body->_visible = false;
 			}
 			continue;
 		}
@@ -889,8 +889,8 @@ void GreenhouseMachine::updateMoths() {
 		if (moth.state == GreenhouseRules::kPassed02) {
 			motion.destination = _rules.passed() - 1;
 			Common::Point target(730, 90 + 42 * motion.destination);
-			int dx = target.x - motion.body->x;
-			int dy = target.y - motion.body->y;
+			int dx = target.x - motion.body->_x;
+			int dy = target.y - motion.body->_y;
 			uint frames = static_cast<uint>(Math::distance(dx, dy) * 0.025f * 12.0f);
 			uint direction = 3;
 			if (dx * 2 <= dy)
@@ -934,9 +934,9 @@ void GreenhouseMachine::updateBeetles() {
 			beetle.motion.direction = 2;
 			if (!beetle.motion.body)
 				return;
-			beetle.motion.body->managed = true;
-			beetle.motion.body->x = 165 + 44 * column;
-			beetle.motion.body->y = 90;
+			beetle.motion.body->_managed = true;
+			beetle.motion.body->_x = 165 + 44 * column;
+			beetle.motion.body->_y = 90;
 			if (beetle.trait) {
 				_rules.setBeetleOccupied(column, true);
 				beetle.motion.trait = add(traitResource(beetle.trait), 6);
@@ -998,7 +998,7 @@ void GreenhouseMachine::updateBeetles() {
 					_rules.setBeetleOccupied(cell, false);
 				beetle.exiting = true;
 				if (motion.trait)
-					motion.trait->visible = false;
+					motion.trait->_visible = false;
 				beginMotion(motion, GreenhouseRules::cellOrigin(x, y), FrameClock::milliseconds(10, 12), 2);
 			} else {
 				uint next = y * 12 + x;
@@ -1013,7 +1013,7 @@ void GreenhouseMachine::updateBeetles() {
 						_rules.setBeetleOccupied(next, true);
 					beetle.column = x;
 					beetle.row = y;
-					motion.body->visible = !_rules.beetleOccupied(next) || beetle.trait;
+					motion.body->_visible = !_rules.beetleOccupied(next) || beetle.trait;
 					beginMotion(motion, GreenhouseRules::cellOrigin(x, y), FrameClock::milliseconds(10, 12), direction);
 				}
 			}
@@ -1059,12 +1059,12 @@ void GreenhouseMachine::releaseMoth() {
 	}
 	if (0 <= bestRow && _rules.enter(_dragged, bestRow)) {
 		Common::Point point = GreenhouseRules::cellOrigin(0, bestRow);
-		motion.body->x = point.x + (44 - motion.body->width()) / 2;
-		motion.body->y = point.y + (44 - motion.body->height()) / 2;
+		motion.body->_x = point.x + (44 - motion.body->width()) / 2;
+		motion.body->_y = point.y + (44 - motion.body->height()) / 2;
 		debug(1, "Greenhouse moth %u entered row %d", _dragged + 1, bestRow + 1);
 	} else if (0 <= bestRow || !rect.intersects(Common::Rect(0, 150, 155, 500))) {
-		motion.body->x = _rules.moth(_dragged).supply.x;
-		motion.body->y = _rules.moth(_dragged).supply.y;
+		motion.body->_x = _rules.moth(_dragged).supply.x;
+		motion.body->_y = _rules.moth(_dragged).supply.y;
 	}
 	_scene.setDepth(motion.body, 5);
 	_scene.setDepth(motion.trait, 6);
@@ -1081,9 +1081,9 @@ void GreenhouseMachine::cancelWand() {
 		_highlight = nullptr;
 	}
 	if (_wand) {
-		_wand->x = _wand->asset->origin().x;
-		_wand->y = _wand->asset->origin().y;
-		_wand->visible = _rules.remainingSwaps() != 0;
+		_wand->_x = _wand->_asset->origin().x;
+		_wand->_y = _wand->_asset->origin().y;
+		_wand->_visible = _rules.remainingSwaps() != 0;
 	}
 }
 
@@ -1125,8 +1125,8 @@ void GreenhouseMachine::selectPlant(uint cell) {
 		_highlight = add(id, 3);
 		if (_highlight) {
 			Common::Point point = GreenhouseRules::cellOrigin(cell % 12, cell / 12);
-			_highlight->x = point.x + (44 - _highlight->width()) / 2;
-			_highlight->y = point.y + (42 - _highlight->height()) / 2;
+			_highlight->_x = point.x + (44 - _highlight->width()) / 2;
+			_highlight->_y = point.y + (42 - _highlight->height()) / 2;
 		}
 		playSound(kResSound16236_MothStuck);
 	} else {
@@ -1143,12 +1143,12 @@ void GreenhouseMachine::event(const Common::Event &event) {
 		_mouse = event.mouse;
 		if (0 <= _dragged) {
 			Moving &motion = _moths[_dragged];
-			motion.body->x = _mouse.x - _dragOffset.x;
-			motion.body->y = _mouse.y - _dragOffset.y;
+			motion.body->_x = _mouse.x - _dragOffset.x;
+			motion.body->_y = _mouse.y - _dragOffset.y;
 			positionTrait(motion);
 		} else if (_wandHeld) {
-			_wand->x = _mouse.x - _wand->width() / 2;
-			_wand->y = _mouse.y - _wand->height() / 2;
+			_wand->_x = _mouse.x - _wand->width() / 2;
+			_wand->_y = _mouse.y - _wand->height() / 2;
 		}
 	} else if (event.type == Common::EVENT_LBUTTONDOWN) {
 		_mouse = event.mouse;
@@ -1167,7 +1167,7 @@ void GreenhouseMachine::event(const Common::Event &event) {
 			_dragged = hitMoth(_mouse);
 			if (0 <= _dragged) {
 				Moving &motion = _moths[_dragged];
-				_dragOffset = _mouse - Common::Point(motion.body->x, motion.body->y);
+				_dragOffset = _mouse - Common::Point(motion.body->_x, motion.body->_y);
 				_scene.setDepth(motion.body, 1000);
 				_scene.setDepth(motion.trait, 1001);
 				playSound(kResSound16050_WandUse);
@@ -1223,8 +1223,8 @@ void GreenhouseMachine::pause(bool paused, uint32 time) {
 	if (paused) {
 		if (0 <= _dragged) {
 			Moving &motion = _moths[_dragged];
-			motion.body->x = _rules.moth(_dragged).supply.x;
-			motion.body->y = _rules.moth(_dragged).supply.y;
+			motion.body->_x = _rules.moth(_dragged).supply.x;
+			motion.body->_y = _rules.moth(_dragged).supply.y;
 			positionTrait(motion);
 			_dragged = -1;
 		}

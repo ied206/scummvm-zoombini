@@ -59,6 +59,7 @@ void World::resetNative() {
 	// Keep their pre-script representation deterministic instead of heap contents.
 	memset(_scenes, 0, sizeof(_scenes));
 	memset(_activities, 0, sizeof(_activities));
+	memset(_macActivityPadding, 0, sizeof(_macActivityPadding));
 	memset(_seenMovies, 0, sizeof(_seenMovies));
 	_additional = 0;
 	_properties.clear();
@@ -176,36 +177,110 @@ void World::initializeGame(bool practice) {
 	}
 }
 
-bool World::read(Common::SeekableReadStream &stream) {
+Common::Platform World::detectSavePlatform(Common::SeekableReadStream &stream) {
+	const int64 start = stream.pos();
+	Common::Platform detected = Common::kPlatformUnknown;
+	const Common::Platform platforms[] = {Common::kPlatformWindows, Common::kPlatformMacintosh};
+	for (Common::Platform platform : platforms) {
+		stream.clearErr();
+		if (!stream.seek(start))
+			return Common::kPlatformUnknown;
+		World candidate;
+		if (!candidate.readState(stream, platform) || stream.pos() != stream.size() || !candidate.hasValidLocationsAndLevels())
+			continue;
+		if (detected != Common::kPlatformUnknown) {
+			detected = Common::kPlatformUnknown;
+			break;
+		}
+		detected = platform;
+	}
+	stream.clearErr();
+	if (!stream.seek(start))
+		return Common::kPlatformUnknown;
+	return detected;
+}
+
+bool World::hasValidLocationsAndLevels() const {
+	if (_location < 0 || 13 < _location)
+		return false;
+	for (uint i = 0; i < 7; i++) {
+		if (_activities[i][11] < 1 || 3 < _activities[i][11])
+			return false;
+	}
+	for (uint i = 0; i < kTokenCount; i++) {
+		if (_tokens[i].location < 0 || 13 < _tokens[i].location)
+			return false;
+	}
+	return true;
+}
+
+int32 World::readInt32(Common::ReadStream &stream, bool bigEndian) {
+	return bigEndian ? stream.readSint32BE() : stream.readSint32LE();
+}
+
+void World::writeInt32(Common::WriteStream &stream, int32 value, bool bigEndian) {
+	if (bigEndian)
+		stream.writeSint32BE(value);
+	else
+		stream.writeSint32LE(value);
+}
+
+bool World::read(Common::SeekableReadStream &stream, Common::Platform platform) {
 	World candidate;
-	if (!candidate.readState(stream))
+	if (!candidate.readState(stream, platform))
 		return false;
 	*this = candidate;
 	return true;
 }
 
-bool World::readState(Common::SeekableReadStream &stream) {
-	if (stream.size() - stream.pos() < 7708)
+bool World::readState(Common::SeekableReadStream &stream, Common::Platform platform) {
+	if (platform != Common::kPlatformWindows && platform != Common::kPlatformMacintosh)
 		return false;
-	_location = stream.readSint32LE();
+	const bool mac = platform == Common::kPlatformMacintosh;
+	const uint fixedSize = mac ? 7619 : 7708;
+	if (stream.size() - stream.pos() < fixedSize)
+		return false;
+	if (mac)
+		_location = stream.readByte();
+	else
+		_location = stream.readSint32LE();
 	for (uint i = 0; i < 2; i++)
-		_flags[i] = stream.readSint32LE();
+		_flags[i] = readInt32(stream, mac);
 	for (uint i = 0; i < 3; i++) {
 		for (uint j = 0; j < 3; j++)
-			_scenes[i][j] = stream.readSint32LE();
+			_scenes[i][j] = readInt32(stream, mac);
 	}
 	for (uint i = 0; i < 7; i++) {
-		for (uint j = 0; j < 32; j++)
-			_activities[i][j] = stream.readSint32LE();
+		if (mac) {
+			_activities[i][0] = stream.readByte();
+			// History is an ordered byte array, even when the surrounding words are big endian.
+			for (uint j = 1; j <= 5; j++)
+				_activities[i][j] = stream.readSint32LE();
+			stream.read(_macActivityPadding[i], 3);
+			for (uint j = 6; j <= 23; j++)
+				_activities[i][j] = stream.readSint32BE();
+			for (uint j = 24; j <= 26; j++)
+				_activities[i][j] = stream.readByte();
+			_macActivityPadding[i][3] = stream.readByte();
+			for (uint j = 27; j < 32; j++)
+				_activities[i][j] = stream.readSint32BE();
+		} else {
+			for (uint j = 0; j < 32; j++)
+				_activities[i][j] = stream.readSint32LE();
+		}
 	}
-	for (uint i = 0; i < 10; i++)
-		_seenMovies[i] = stream.readSint32LE();
+	for (uint i = 0; i < 10; i++) {
+		if (mac)
+			_seenMovies[i] = stream.readByte();
+		else
+			_seenMovies[i] = stream.readSint32LE();
+	}
 	for (uint i = 0; i < kTokenCount; i++) {
-		_tokens[i].location = stream.readSint32LE();
+		_tokens[i].location = readInt32(stream, mac);
 		for (uint j = 0; j < 6; j++)
-			_tokens[i].attributes[j] = stream.readSint32LE();
+			_tokens[i].attributes[j] = readInt32(stream, mac);
 	}
-	_additional = stream.readSint32LE();
+	_additional = readInt32(stream, mac);
 	_properties.clear();
 	while (!stream.err()) {
 		Property property;
@@ -236,26 +311,50 @@ void World::restoreLegacyAudioSettings() {
 	setEffectsVolume(80);
 }
 
-bool World::write(Common::WriteStream &stream) const {
-	stream.writeSint32LE(_location);
+bool World::write(Common::WriteStream &stream, Common::Platform platform) const {
+	if (platform != Common::kPlatformWindows && platform != Common::kPlatformMacintosh)
+		return false;
+	const bool mac = platform == Common::kPlatformMacintosh;
+	if (mac)
+		stream.writeByte(static_cast<byte>(_location));
+	else
+		stream.writeSint32LE(_location);
 	for (uint i = 0; i < 2; i++)
-		stream.writeSint32LE(_flags[i]);
+		writeInt32(stream, _flags[i], mac);
 	for (uint i = 0; i < 3; i++) {
 		for (uint j = 0; j < 3; j++)
-			stream.writeSint32LE(_scenes[i][j]);
+			writeInt32(stream, _scenes[i][j], mac);
 	}
 	for (uint i = 0; i < 7; i++) {
-		for (uint j = 0; j < 32; j++)
-			stream.writeSint32LE(_activities[i][j]);
+		if (mac) {
+			stream.writeByte(static_cast<byte>(_activities[i][0]));
+			for (uint j = 1; j <= 5; j++)
+				stream.writeSint32LE(_activities[i][j]);
+			stream.write(_macActivityPadding[i], 3);
+			for (uint j = 6; j <= 23; j++)
+				stream.writeSint32BE(_activities[i][j]);
+			for (uint j = 24; j <= 26; j++)
+				stream.writeByte(static_cast<byte>(_activities[i][j]));
+			stream.writeByte(_macActivityPadding[i][3]);
+			for (uint j = 27; j < 32; j++)
+				stream.writeSint32BE(_activities[i][j]);
+		} else {
+			for (uint j = 0; j < 32; j++)
+				stream.writeSint32LE(_activities[i][j]);
+		}
 	}
-	for (uint i = 0; i < 10; i++)
-		stream.writeSint32LE(_seenMovies[i]);
+	for (uint i = 0; i < 10; i++) {
+		if (mac)
+			stream.writeByte(static_cast<byte>(_seenMovies[i]));
+		else
+			stream.writeSint32LE(_seenMovies[i]);
+	}
 	for (uint i = 0; i < kTokenCount; i++) {
-		stream.writeSint32LE(_tokens[i].location);
+		writeInt32(stream, _tokens[i].location, mac);
 		for (uint j = 0; j < 6; j++)
-			stream.writeSint32LE(_tokens[i].attributes[j]);
+			writeInt32(stream, _tokens[i].attributes[j], mac);
 	}
-	stream.writeSint32LE(_additional);
+	writeInt32(stream, _additional, mac);
 	for (uint i = 0; i < _properties.size(); i++) {
 		stream.writeString(_properties[i].name + "\n");
 		stream.writeString(_properties[i].value + "\n");

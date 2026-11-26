@@ -22,6 +22,7 @@
 #ifndef TRINKET_RR1CLOUD9_SAVEFILES_H
 #define TRINKET_RR1CLOUD9_SAVEFILES_H
 
+#include "common/platform.h"
 #include "trinket/shell/savefiles.h"
 
 namespace Trinket {
@@ -32,8 +33,10 @@ class SaveFiles : public Shell::SaveFiles {
 public:
 	/** Select the Reader Rabbit registry codec and target save prefix. */
 	SaveFiles(Common::SaveFileManager &manager, const Common::String &target) : Shell::SaveFiles(manager, target) {}
-	/** Construct Reader Rabbit save storage through the shared subengine interface. */
-	static Shell::SaveFiles *create(Common::SaveFileManager &manager, const Common::String &target) { return new SaveFiles(manager, target); }
+	/** Construct the portable Reader Rabbit save storage; its format is independent of the detected platform. */
+	static Shell::SaveFiles *create(Common::SaveFileManager &manager, const Common::String &target, Common::Platform) {
+		return new SaveFiles(manager, target);
+	}
 	/** Return the single game slot supported for each player. */
 	uint maxSlots() const override { return 1; }
 

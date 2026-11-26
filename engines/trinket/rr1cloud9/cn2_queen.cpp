@@ -68,7 +68,7 @@ bool PageScene::enterQueen() {
 	Shell::Sprite *sign = _scene.add(characterResource(_page->number(kSignIDKey), kAnimation), _page->number(kSignZKey));
 	if (!litter || !sign)
 		return false;
-	litter->visible = 3 <= state;
+	litter->_visible = 3 <= state;
 	int frame;
 	if (state < 5)
 		frame = 1;

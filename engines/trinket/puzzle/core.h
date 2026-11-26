@@ -55,11 +55,11 @@ public:
 class Controller {
 public:
 	/** Answers whose usage contributes to puzzle completion. */
-	Common::Array<Answer *> answers;
+	Common::Array<Answer *> _answers;
 	/** Containers checked for fullness and correctness. */
-	Common::Array<Container *> containers;
+	Common::Array<Container *> _containers;
 	/** Alternative groups of containers that can satisfy completion. */
-	Common::Array<Common::Array<Container *>> solvedGroups;
+	Common::Array<Common::Array<Container *>> _solvedGroups;
 	/** Return whether every registered answer is in use. */
 	bool areAnswersUsed() const;
 	/** Return whether every registered container is full. */

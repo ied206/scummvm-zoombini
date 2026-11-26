@@ -205,15 +205,15 @@ bool NumberTree::enter() {
 	_targetText = text(number(kTargetNumTextXKey), number(kTargetNumTextYKey), true);
 	if (!_trunk || !_treeMove || !_nut || !_marble || !_eat || !_levers[0] || !_levers[1])
 		return false;
-	_treeMove->visible = _nut->visible = _eat->visible = false;
-	_nut->x = number(kNutXKey);
-	_nut->y = number(kNutYKey);
-	_marble->colorRemap = PageScene::marbleColor(1);
-	_marble->x = number(kMarbleXKey);
-	_marble->y = number(kMarbleYKey);
-	_marble->visible = _showMarble;
+	_treeMove->_visible = _nut->_visible = _eat->_visible = false;
+	_nut->_x = number(kNutXKey);
+	_nut->_y = number(kNutYKey);
+	_marble->_colorRemap = PageScene::marbleColor(1);
+	_marble->_x = number(kMarbleXKey);
+	_marble->_y = number(kMarbleYKey);
+	_marble->_visible = _showMarble;
 	if (_host._practice && _host._chester)
-		_host._chester->visible = false;
+		_host._chester->_visible = false;
 	if (!setup(false))
 		return false;
 	if (_host._practice) {
@@ -330,12 +330,12 @@ bool NumberTree::setup(bool announce) {
 	for (int side = 0; side < 2; side++) {
 		_tilt[side] = _subtract ? 3 : 1;
 		_levers[side]->setFrame(_subtract ? 5 : 1);
-		_levers[side]->visible = true;
+		_levers[side]->_visible = true;
 	}
 	for (auto &cluster : _clusters) {
 		Common::Point point = position(cluster);
-		cluster.sprite->x = point.x;
-		cluster.sprite->y = point.y;
+		cluster.sprite->_x = point.x;
+		cluster.sprite->_y = point.y;
 	}
 	_targetText->set(kPropertyText, {}, Core::ScriptValue::fromText(Common::String::format("%d", _target)));
 	equations();
@@ -431,7 +431,7 @@ void NumberTree::moveBranches(int side, bool restoring) {
 			_heardCorrect[i] = false;
 	}
 	for (auto &cluster : _clusters) {
-		cluster.from = Common::Point(cluster.sprite->x, cluster.sprite->y);
+		cluster.from = Common::Point(cluster.sprite->_x, cluster.sprite->_y);
 		cluster.to = position(cluster);
 	}
 	_start = _host._time;
@@ -456,7 +456,7 @@ bool NumberTree::advanceBranches(uint32 elapsed, bool finish) {
 		}
 		int from = start[_tilt[side] - 1][_oldTilt[side] - 1];
 		int to = end[_tilt[side] - 1][_oldTilt[side] - 1];
-		uint frame = elapsed * MAX<uint>(1, _levers[side]->asset->fps()) / 1000;
+		uint frame = elapsed * MAX<uint>(1, _levers[side]->_asset->fps()) / 1000;
 		_levers[side]->setFrame(finish ? to : MIN<int>(to, from + frame));
 		if (!finish && frame <= static_cast<uint>(to - from))
 			done = false;
@@ -467,8 +467,8 @@ bool NumberTree::advanceBranches(uint32 elapsed, bool finish) {
 			continue;
 		uint fps = cluster.slot % 3 == 0 ? 34 : 42;
 		int step = finish ? 10 : MIN<uint>(10, elapsed * fps / 1000);
-		cluster.sprite->x = cluster.from.x + (cluster.to.x - cluster.from.x) * step / 10;
-		cluster.sprite->y = cluster.from.y + (cluster.to.y - cluster.from.y) * step / 10;
+		cluster.sprite->_x = cluster.from.x + (cluster.to.x - cluster.from.x) * step / 10;
+		cluster.sprite->_y = cluster.from.y + (cluster.to.y - cluster.from.y) * step / 10;
 		if (step < 10)
 			done = false;
 	}
@@ -545,8 +545,8 @@ void NumberTree::readEquation(int side) {
 void NumberTree::solved() {
 	if (0 <= _dragged) {
 		auto &cluster = _clusters[_dragged];
-		cluster.sprite->x = cluster.home.x;
-		cluster.sprite->y = cluster.home.y;
+		cluster.sprite->_x = cluster.home.x;
+		cluster.sprite->_y = cluster.home.y;
 		_host._scene.setDepth(cluster.sprite, number(kAnswerZKey));
 		_dragged = -1;
 	}
@@ -558,10 +558,10 @@ void NumberTree::solved() {
 		if (_rounds % 3 == 0) {
 			say(kSquirrelName, _showMarble ? kRewardSpchID3Key : kRewardSpchID2Key);
 			_showMarble = true;
-			_marble->visible = true;
+			_marble->_visible = true;
 			sound(kMarbleSFXKey);
 		} else {
-			_nut->visible = true;
+			_nut->_visible = true;
 			say(kSquirrelName, kRewardSpchID1Key);
 		}
 	}
@@ -595,7 +595,7 @@ void NumberTree::drop() {
 	Cluster &cluster = _clusters[_dragged];
 	int best = -1;
 	int area = 0;
-	Common::Rect bounds(cluster.sprite->x, cluster.sprite->y, cluster.sprite->x + cluster.sprite->width(), cluster.sprite->y + cluster.sprite->height());
+	Common::Rect bounds(cluster.sprite->_x, cluster.sprite->_y, cluster.sprite->_x + cluster.sprite->width(), cluster.sprite->_y + cluster.sprite->height());
 	for (int i = 0; i < 6; i++) {
 		Common::Rect overlap = slotRect(i);
 		if (!overlap.intersects(bounds))
@@ -621,16 +621,16 @@ void NumberTree::drop() {
 				best = empty;
 			else {
 				_clusters[old].slot = -1;
-				_clusters[old].sprite->x = _clusters[old].home.x;
-				_clusters[old].sprite->y = _clusters[old].home.y;
+				_clusters[old].sprite->_x = _clusters[old].home.x;
+				_clusters[old].sprite->_y = _clusters[old].home.y;
 			}
 		}
 		cluster.slot = best;
 	}
 	_host._scene.setDepth(cluster.sprite, number(kAnswerZKey));
 	Common::Point destination = position(cluster);
-	cluster.sprite->x = destination.x;
-	cluster.sprite->y = destination.y;
+	cluster.sprite->_x = destination.x;
+	cluster.sprite->_y = destination.y;
 	_dragged = -1;
 	sound(0 <= best ? kPutClusterTreeSFXKey : kClusterSnapHomeSFXKey);
 	moveBranches(side);
@@ -641,8 +641,8 @@ bool NumberTree::event(const Common::Event &event) {
 		return false;
 	Shell::Sprite *sprite = _clusters[_dragged].sprite;
 	if (event.type == Common::EVENT_MOUSEMOVE || event.type == Common::EVENT_LBUTTONUP) {
-		sprite->x = event.mouse.x - _dragOffset.x;
-		sprite->y = event.mouse.y - _dragOffset.y;
+		sprite->_x = event.mouse.x - _dragOffset.x;
+		sprite->_y = event.mouse.y - _dragOffset.y;
 		if (event.type == Common::EVENT_LBUTTONUP)
 			drop();
 		return true;
@@ -662,7 +662,7 @@ void NumberTree::help() {
 bool NumberTree::click(Common::Point point) {
 	_idle = _host._time;
 	if (_showMarble && _marble->covers(point)) {
-		_showMarble = _marble->visible = false;
+		_showMarble = _marble->_visible = false;
 		Common::String item = Common::String::format(kItemSignedIndexFormat, number(kINV1Marble2Key));
 		_host._world.set(item, _host._world.get(item) + 1);
 		_host.putAway();
@@ -670,14 +670,14 @@ bool NumberTree::click(Common::Point point) {
 		say(kReaderName, kMarbleSpchIDKey);
 		return true;
 	}
-	if (_nut->visible && _nut->covers(point)) {
-		_nut->visible = false;
+	if (_nut->_visible && _nut->covers(point)) {
+		_nut->_visible = false;
 		if (_firstNut)
 			say(kSquirrelName, kEatNutSpchID1Key);
 		_firstNut = false;
 		_host._actors[kSamName]->setVisible(false);
 		_eat->startAnimation();
-		_eat->visible = true;
+		_eat->_visible = true;
 		_phase = kEating;
 		return true;
 	}
@@ -693,8 +693,8 @@ bool NumberTree::click(Common::Point point) {
 			Common::Point origin(indexed(kSubContainerXKey, side + 1), indexed(kSubContainerYKey, side + 1));
 			cluster.home = Common::Point(origin.x + (number(kContainerWKey) - cluster.sprite->width()) / 2,
 										 origin.y + (number(kContainerHKey) - cluster.sprite->height()) / 2);
-			cluster.sprite->x = cluster.home.x;
-			cluster.sprite->y = cluster.home.y;
+			cluster.sprite->_x = cluster.home.x;
+			cluster.sprite->_y = cluster.home.y;
 			moveBranches(side);
 		} else {
 			if (!cluster.sprite->covers(point))
@@ -704,7 +704,7 @@ bool NumberTree::click(Common::Point point) {
 			_changedSide = removed ? cluster.slot / 3 : 0;
 			cluster.slot = -1;
 			_dragged = i;
-			_dragOffset = Common::Point(point.x - cluster.sprite->x, point.y - cluster.sprite->y);
+			_dragOffset = Common::Point(point.x - cluster.sprite->_x, point.y - cluster.sprite->_y);
 			_host._scene.setDepth(cluster.sprite, 150);
 			equations();
 			if (removed)
@@ -767,7 +767,7 @@ void NumberTree::update(uint32 time) {
 		_start = time;
 	} else if (_phase == kIntroLeft || _phase == kIntroRight) {
 		int side = _phase == kIntroLeft ? 0 : 1;
-		uint frame = (time - _start) * MAX<uint>(1, _levers[side]->asset->fps()) / 1000;
+		uint frame = (time - _start) * MAX<uint>(1, _levers[side]->_asset->fps()) / 1000;
 		_levers[side]->setFrame(5 + MIN<uint>(4, frame));
 		if (5 <= frame) {
 			_start = time;
@@ -791,20 +791,20 @@ void NumberTree::update(uint32 time) {
 		_clusters[_removed[_changedSide]].slot = _restoreSlot;
 		auto &cluster = _clusters[_removed[_changedSide]];
 		Common::Point point = position(cluster);
-		cluster.sprite->x = point.x;
-		cluster.sprite->y = point.y;
+		cluster.sprite->_x = point.x;
+		cluster.sprite->_y = point.y;
 		_removed[_changedSide] = -1;
 		moveBranches(_changedSide, true);
 	} else if (_phase == kReward) {
 		for (auto &cluster : _clusters)
-			cluster.sprite->visible = false;
-		_trunk->visible = _levers[0]->visible = _levers[1]->visible = false;
+			cluster.sprite->_visible = false;
+		_trunk->_visible = _levers[0]->_visible = _levers[1]->_visible = false;
 		_treeMove->startAnimation();
-		_treeMove->visible = true;
+		_treeMove->_visible = true;
 		_phase = kNewTree;
 	} else if (_phase == kNewTree && !_treeMove->isRunning()) {
-		_treeMove->visible = false;
-		_trunk->visible = true;
+		_treeMove->_visible = false;
+		_trunk->_visible = true;
 		if (!setup())
 			warning("RR1: cannot load IA1 level %d dataset %d set %d", _level, _dataset, _set);
 		sound(kPresentNewClustersSFXKey);
@@ -817,7 +817,7 @@ void NumberTree::update(uint32 time) {
 				say(kSquirrelName, Common::String::format(kResetSpchIDSignedIndexSignedIndexKey, group, i));
 		}
 	} else if (_phase == kEating && !_eat->isRunning()) {
-		_eat->visible = false;
+		_eat->_visible = false;
 		_host._actors[kSamName]->setVisible(true);
 		say(kSamName, Common::String::format(kEatNutSpchIDSignedIndexKey, _host._vm._rnd->getRandomNumberRng(2, 5)));
 		_phase = kReady;

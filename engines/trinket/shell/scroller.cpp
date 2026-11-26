@@ -94,9 +94,9 @@ void Scroller::update(uint32 time) {
 	Core::ScriptArguments sargs;
 	for (uint i = 0; i < _trinkets.size(); i++) {
 		Core::Trinket &trinket = *_trinkets[i];
-		trinket.set(kPropertyX, sargs, Core::ScriptValue(trinket.x + translation));
-		Common::Rect bounds(trinket.x, trinket.y, trinket.x + trinket.width(), trinket.y + trinket.height());
-		trinket.visible = bounds.intersects(_viewport);
+		trinket.set(kPropertyX, sargs, Core::ScriptValue(trinket._x + translation));
+		Common::Rect bounds(trinket._x, trinket._y, trinket._x + trinket.width(), trinket._y + trinket.height());
+		trinket._visible = bounds.intersects(_viewport);
 	}
 }
 

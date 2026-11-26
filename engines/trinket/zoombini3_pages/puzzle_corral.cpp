@@ -450,7 +450,7 @@ Shell::Sprite *CorralMachine::add(uint id, int depth, bool common) {
 		return nullptr;
 	}
 	sprite->setFrame(1);
-	sprite->enabled = false;
+	sprite->_enabled = false;
 	addTrinket(*sprite);
 	_owned.push_back(sprite);
 	return sprite;
@@ -538,7 +538,7 @@ bool CorralMachine::setup(uint level, uint party) {
 	}
 	addTrinket(*_beams);
 	_owned.push_back(_beams);
-	_beams->enabled = false;
+	_beams->_enabled = false;
 	_beams->setFrame(1);
 	static constexpr int offsetX[] = {
 		-200,
@@ -565,14 +565,14 @@ bool CorralMachine::setup(uint level, uint party) {
 		_trays[i] = add(20107 + i, 2);
 		if (!_valid)
 			return false;
-		_trays[i]->x = trayX[i];
-		_trays[i]->y = trayY[i];
+		_trays[i]->_x = trayX[i];
+		_trays[i]->_y = trayY[i];
 		for (uint j = 0; j < 5; j++) {
 			_clues[i][j] = add(20120 + j, j < 3 ? 3 : 2);
 			if (!_valid)
 				return false;
-			_clues[i][j]->x += offsetX[i];
-			_clues[i][j]->y += offsetY[i];
+			_clues[i][j]->_x += offsetX[i];
+			_clues[i][j]->_y += offsetY[i];
 		}
 	}
 	for (uint i = 0; i < party; i++) {
@@ -583,13 +583,13 @@ bool CorralMachine::setup(uint level, uint party) {
 			return false;
 		const CorralRules::Fruit &fruit = _rules.fruit(i);
 		view.body->setFrame(1 + fruit.traits[1] + 4 * fruit.traits[0]);
-		view.body->colorRemap = fruitColor(fruit.traits[1]);
+		view.body->_colorRemap = fruitColor(fruit.traits[1]);
 		view.leaf->setFrame(1 + fruit.traits[2]);
-		Common::Rect body(view.body->x, view.body->y, view.body->x + view.body->width(), view.body->y + view.body->height());
-		Common::Rect leaf(view.leaf->x, view.leaf->y, view.leaf->x + view.leaf->width(), view.leaf->y + view.leaf->height());
+		Common::Rect body(view.body->_x, view.body->_y, view.body->_x + view.body->width(), view.body->_y + view.body->height());
+		Common::Rect leaf(view.leaf->_x, view.leaf->_y, view.leaf->_x + view.leaf->width(), view.leaf->_y + view.leaf->height());
 		body.extend(leaf);
-		view.bodyOffset = Common::Point(view.body->x - body.left, view.body->y - body.top);
-		view.leafOffset = Common::Point(view.leaf->x - body.left, view.leaf->y - body.top);
+		view.bodyOffset = Common::Point(view.body->_x - body.left, view.body->_y - body.top);
+		view.leafOffset = Common::Point(view.leaf->_x - body.left, view.leaf->_y - body.top);
 		view.bounds = Common::Rect(body.width(), body.height());
 		view.home = fruit.supply;
 		positionFruit(i, view.home);
@@ -602,10 +602,10 @@ bool CorralMachine::setup(uint level, uint party) {
 void CorralMachine::positionFruit(uint index, Common::Point point) {
 	FruitView &view = _fruits[index];
 	view.position = point;
-	view.body->x = point.x + view.bodyOffset.x;
-	view.body->y = point.y + view.bodyOffset.y;
-	view.leaf->x = point.x + view.leafOffset.x;
-	view.leaf->y = point.y + view.leafOffset.y;
+	view.body->_x = point.x + view.bodyOffset.x;
+	view.body->_y = point.y + view.bodyOffset.y;
+	view.leaf->_x = point.x + view.leafOffset.x;
+	view.leaf->_y = point.y + view.leafOffset.y;
 }
 
 Common::Rect CorralMachine::fruitBounds(uint index) const {
@@ -626,11 +626,11 @@ void CorralMachine::updateProjectors() {
 	uint mask = 0;
 	for (uint i = 0; i < 3; i++) {
 		bool active = i < _rules.projectorCount();
-		_projectors[i]->visible = _trays[i]->visible = active;
+		_projectors[i]->_visible = _trays[i]->_visible = active;
 		int fruit = _rules.projectedFruit(i);
 		_projectors[i]->setFrame(0 <= fruit ? 2 : 1);
 		for (uint j = 0; j < 5; j++)
-			_clues[i][j]->visible = false;
+			_clues[i][j]->_visible = false;
 		if (!active || fruit < 0)
 			continue;
 		mask |= 1 << i;
@@ -646,12 +646,12 @@ void CorralMachine::updateProjectors() {
 			body = 2;
 		uint leaf = _rules.axis(i) == 2 ? 3 : 4;
 		if (body == 0)
-			_clues[i][body]->colorRemap = fruitColor(value.traits[1]);
+			_clues[i][body]->_colorRemap = fruitColor(value.traits[1]);
 		_clues[i][body]->setFrame(1 + value.traits[1] + 4 * value.traits[0]);
 		_clues[i][leaf]->setFrame(1 + value.traits[2]);
-		_clues[i][body]->visible = _clues[i][leaf]->visible = true;
+		_clues[i][body]->_visible = _clues[i][leaf]->_visible = true;
 	}
-	_beams->visible = mask != 0;
+	_beams->_visible = mask != 0;
 	if (mask)
 		_beams->setFrame(mask);
 }
@@ -686,15 +686,15 @@ void CorralMachine::updateBlink() {
 		}
 		if (on) {
 			_beams->setFrame(_level == 1 ? 3 : 7);
-			_beams->visible = true;
+			_beams->_visible = true;
 			playEffect(kResSound20114_FruitPickup);
 		}
 	} else if (_blinkCount % 2) {
-		_beams->visible = false;
+		_beams->_visible = false;
 		for (uint i = 0; i < 3; i++) {
 			_projectors[i]->setFrame(1);
 			for (uint j = 0; j < 5; j++)
-				_clues[i][j]->visible = false;
+				_clues[i][j]->_visible = false;
 		}
 	}
 }
@@ -707,7 +707,7 @@ void CorralMachine::drop() {
 	Common::Rect bounds = fruitBounds(index);
 	Common::Point center(bounds.left + bounds.width() / 2, bounds.top + bounds.height() / 2);
 	for (uint i = 0; i < _rules.projectorCount(); i++) {
-		if (!_trays[i]->bounds.contains(center))
+		if (!_trays[i]->_bounds.contains(center))
 			continue;
 		if (_rules.project(index, i, *_vm._rnd)) {
 			positionFruit(index, _fruits[index].position - Common::Point(0, 15));
@@ -780,9 +780,9 @@ void CorralMachine::updateHover() {
 				_sniff[j] = add(3160 + j * 10 + traits[j], 3 + layers[j], true);
 				if (!_sniff[j])
 					continue;
-				_sniff[j]->managed = true;
-				_sniff[j]->x += point.x - 395;
-				_sniff[j]->y += point.y - 302;
+				_sniff[j]->_managed = true;
+				_sniff[j]->_x += point.x - 395;
+				_sniff[j]->_y += point.y - 302;
 				_sniff[j]->startAnimation(-1);
 				_sniff[j]->pauseAnimation(j != 0);
 			}
@@ -792,7 +792,7 @@ void CorralMachine::updateHover() {
 	int tray = -1;
 	if (0 < _rules.turns()) {
 		for (uint i = 0; i < _rules.projectorCount(); i++) {
-			if (bounds.intersects(_trays[i]->bounds)) {
+			if (bounds.intersects(_trays[i]->_bounds)) {
 				tray = i;
 				break;
 			}
@@ -832,9 +832,9 @@ void CorralMachine::beginFeeding(uint fruit, uint zerble) {
 			warning("Corral feedback resource missing");
 			return;
 		}
-		_feedback[i]->managed = true;
-		_feedback[i]->x += point.x - 395;
-		_feedback[i]->y += point.y - 302;
+		_feedback[i]->_managed = true;
+		_feedback[i]->_x += point.x - 395;
+		_feedback[i]->_y += point.y - 302;
 		_feedback[i]->startAnimation(1);
 		_feedback[i]->pauseAnimation(i != 0);
 	}
@@ -849,7 +849,7 @@ void CorralMachine::finishFeeding() {
 	}
 	_zerbles[index]->setVisible(true, _time);
 	_rules.feed(fruit, index);
-	_fruits[fruit].body->visible = _fruits[fruit].leaf->visible = false;
+	_fruits[fruit].body->_visible = _fruits[fruit].leaf->_visible = false;
 	_feeding = _feedingFruit = -1;
 	if (_correct) {
 		_zerbles[index]->addWalkMove(Common::Point(700, 270));
@@ -979,7 +979,7 @@ Common::String CorralMachine::debugAnswer() const {
 		result += Common::String::format(", top=%s", names[_rules.axis(2)]);
 	result += ". Coordinates use the 800x600 game surface.\n";
 	for (uint i = 0; i < _rules.projectorCount(); i++) {
-		const Common::Rect &tray = _trays[i]->bounds;
+		const Common::Rect &tray = _trays[i]->_bounds;
 		result += Common::String::format("Projector %u: drop at (%d,%d), fruit %d\n", i + 1,
 										 tray.left + tray.width() / 2, tray.top + tray.height() / 2, _rules.projectedFruit(i) + 1);
 	}

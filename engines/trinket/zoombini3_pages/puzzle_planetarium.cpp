@@ -493,7 +493,7 @@ Shell::Sprite *PlanetariumMachine::add(uint id, int depth, bool cd, int frame) {
 		return nullptr;
 	}
 	_owned.push_back(sprite);
-	sprite->enabled = false;
+	sprite->_enabled = false;
 	sprite->setFrame(frame);
 	return sprite;
 }
@@ -512,7 +512,7 @@ bool PlanetariumMachine::load() {
 		for (uint i = 0; i < 28; i++) {
 			_moon[i] = add(14056 + i, 10);
 			if (_moon[i])
-				_moon[i]->visible = false;
+				_moon[i]->_visible = false;
 		}
 	}
 	const int hour = (_rules.targetHour() + 6) % 24;
@@ -523,8 +523,8 @@ bool PlanetariumMachine::load() {
 		Shell::Sprite *calendar = add(14023, 10);
 		Shell::Sprite *mark = add(14024, 11);
 		if (calendar && mark) {
-			mark->x = calendar->x + 21 + (_rules.targetDay() % 7) * (mark->width() + 3);
-			mark->y = calendar->y + 15 + (_rules.targetDay() / 7) * (mark->height() + 1);
+			mark->_x = calendar->_x + 21 + (_rules.targetDay() % 7) * (mark->width() + 3);
+			mark->_y = calendar->_y + 15 + (_rules.targetDay() / 7) * (mark->height() + 1);
 		}
 	}
 	static constexpr uint slotIDs[] = {
@@ -554,23 +554,23 @@ bool PlanetariumMachine::load() {
 			if (!face || !mark)
 				return false;
 			if (exhibit) {
-				const int dx = (type ? 576 : 524) - face->x;
-				const int dy = (type ? 19 : 30) - face->y;
-				face->x += dx;
-				face->y += dy;
-				mark->x += dx;
-				mark->y += dy;
+				const int dx = (type ? 576 : 524) - face->_x;
+				const int dy = (type ? 19 : 30) - face->_y;
+				face->_x += dx;
+				face->_y += dy;
+				mark->_x += dx;
+				mark->_y += dy;
 			}
 			if (type) {
-				mark->x = face->x + 8 + (_rules.targetDay() % 7) * (mark->width() + 2);
-				mark->y = face->y + 14 + (_rules.targetDay() / 7) * mark->height();
+				mark->_x = face->_x + 8 + (_rules.targetDay() % 7) * (mark->width() + 2);
+				mark->_y = face->_y + 14 + (_rules.targetDay() / 7) * mark->height();
 			} else {
 				mark->setFrame(hour % 12 ? hour % 12 : 12);
 			}
 			_covers[index].opening = add(openIDs[index], 12);
 			_covers[index].closing = add(closeIDs[index], 12);
 			if (_covers[index].closing)
-				_covers[index].closing->visible = false;
+				_covers[index].closing->_visible = false;
 		}
 	}
 	static constexpr uint values[2][6] = {{1, 2, 4, 5, 7, 10}, {1, 4, 5, 7, 10, 0}};
@@ -584,9 +584,9 @@ bool PlanetariumMachine::load() {
 			return false;
 		Common::Point position = piece.type == PlanetariumRules::kHour00 ? kHourPositions[piece.exhibit][piece.position] : kDayPositions[piece.exhibit][piece.position];
 		// Setting the composite position moves its bounds to the supply coordinate.
-		sprite->x = position.x;
-		sprite->y = position.y;
-		_scene.setDepth(sprite, 10 + sprite->y + sprite->height() - 470);
+		sprite->_x = position.x;
+		sprite->_y = position.y;
+		_scene.setDepth(sprite, 10 + sprite->_y + sprite->height() - 470);
 		_pieces.push_back(sprite);
 	}
 	if (!_valid)
@@ -607,8 +607,8 @@ Common::Point PlanetariumMachine::celestialPosition(float angle) {
 }
 
 void PlanetariumMachine::centerAt(Shell::Sprite *sprite, Common::Point position) {
-	sprite->x = position.x - sprite->width() / 2;
-	sprite->y = position.y - sprite->height() / 2;
+	sprite->_x = position.x - sprite->width() / 2;
+	sprite->_y = position.y - sprite->height() / 2;
 }
 
 void PlanetariumMachine::updateExhibit(uint exhibit, float fraction) {
@@ -641,12 +641,12 @@ void PlanetariumMachine::updateExhibit(uint exhibit, float fraction) {
 	_skyFront[1]->setFrame(skyFrame);
 	float angle = hourAngle(hour);
 	centerAt(_sun, celestialPosition(angle));
-	_sun->visible = angle <= 15 || 165 <= angle;
+	_sun->_visible = angle <= 15 || 165 <= angle;
 	if (0 <= day) {
 		if (advancingDay && hour < _rules.hour(exhibit))
 			day = (day + 1) % 28;
 		for (uint i = 0; i < 28; i++)
-			_moon[i]->visible = false;
+			_moon[i]->_visible = false;
 		Shell::Sprite *moon = _moon[day];
 		angle = hour * 15 + kMoonAngles[day];
 		if (360 <= angle)
@@ -658,7 +658,7 @@ void PlanetariumMachine::updateExhibit(uint exhibit, float fraction) {
 			frame = 8 - static_cast<int>((hour - 23) * 6);
 		moon->setFrame(frame);
 		centerAt(moon, celestialPosition(angle));
-		moon->visible = 12 <= hour && (angle <= 15 || 165 <= angle);
+		moon->_visible = 12 <= hour && (angle <= 15 || 165 <= angle);
 	}
 }
 
@@ -667,7 +667,7 @@ uint PlanetariumMachine::stepDuration(uint exhibit) const {
 		return exhibit ? 2500 : 750;
 	if (exhibit)
 		return 500;
-	return FrameClock::milliseconds(1, _earth->asset->fps() / 4);
+	return FrameClock::milliseconds(1, _earth->_asset->fps() / 4);
 }
 
 void PlanetariumMachine::beginStep(uint exhibit) {
@@ -682,8 +682,8 @@ void PlanetariumMachine::openCover(uint index, bool closeAfter) {
 	cover.closeAfterOpening = closeAfter;
 	if (!cover.opening || cover.state < 2)
 		return;
-	cover.closing->visible = false;
-	cover.opening->visible = true;
+	cover.closing->_visible = false;
+	cover.opening->_visible = true;
 	cover.opening->setFrame(1);
 	cover.opening->setRepeat(1);
 	cover.opening->pauseAnimation(false);
@@ -694,8 +694,8 @@ void PlanetariumMachine::closeCover(uint index) {
 	Cover &cover = _covers[index];
 	if (!cover.opening || 2 <= cover.state)
 		return;
-	cover.opening->visible = false;
-	cover.closing->visible = true;
+	cover.opening->_visible = false;
+	cover.closing->_visible = true;
 	cover.closing->setFrame(1);
 	cover.closing->setRepeat(1);
 	cover.closing->pauseAnimation(false);
@@ -713,9 +713,9 @@ void PlanetariumMachine::updateCovers() {
 				closeCover(i);
 		} else if (cover.state == 2 && !cover.closing->isRunning()) {
 			cover.state = 3;
-			cover.closing->visible = false;
+			cover.closing->_visible = false;
 			cover.opening->setFrame(1);
-			cover.opening->visible = true;
+			cover.opening->_visible = true;
 		}
 	}
 }
@@ -762,7 +762,7 @@ Common::Rect PlanetariumMachine::pieceBounds(uint index) const {
 	if (_pieces.size() <= index)
 		return Common::Rect();
 	Shell::Sprite *sprite = _pieces[index];
-	return Common::Rect(sprite->x, sprite->y, sprite->x + sprite->width(), sprite->y + sprite->height());
+	return Common::Rect(sprite->_x, sprite->_y, sprite->_x + sprite->width(), sprite->_y + sprite->height());
 }
 
 Common::Rect PlanetariumMachine::slotBounds(uint index) const {
@@ -770,7 +770,7 @@ Common::Rect PlanetariumMachine::slotBounds(uint index) const {
 		return Common::Rect();
 	const PlanetariumRules::Piece &piece = _rules.piece(index);
 	Shell::Sprite *slot = _slots[piece.exhibit * 2 + piece.type];
-	return Common::Rect(slot->x, slot->y, slot->x + slot->width(), slot->y + slot->height());
+	return Common::Rect(slot->_x, slot->_y, slot->_x + slot->width(), slot->_y + slot->height());
 }
 
 int PlanetariumMachine::hitPiece(Common::Point point) const {
@@ -779,7 +779,7 @@ int PlanetariumMachine::hitPiece(Common::Point point) const {
 	int best = -1;
 	for (uint i = 0; i < _pieces.size(); i++) {
 		if (!_rules.piece(i).consumed && _rules.piece(i).enabled && pieceBounds(i).contains(point) &&
-			(best < 0 || _pieces[best]->z <= _pieces[i]->z))
+			(best < 0 || _pieces[best]->_z <= _pieces[i]->_z))
 			best = i;
 	}
 	return best;
@@ -805,22 +805,22 @@ void PlanetariumMachine::drop() {
 	bool advancing = _rules.advancing(piece.exhibit);
 	if (pieceBounds(index).intersects(slotBounds(index)) && _rules.use(index)) {
 		debug(1, "Planetarium consumed piece %u: exhibit %u type %u value %u", index + 1, piece.exhibit, piece.type, piece.value);
-		sprite->visible = false;
+		sprite->_visible = false;
 		_sounds.push_back(piece.type == PlanetariumRules::kHour00 ? kResSound14011_HourPlace : kResSound14087_DayPlace);
 		if (!advancing)
 			beginStep(piece.exhibit);
 	} else {
 		const Common::Rect supply(piece.exhibit ? 490 : 0, 470, piece.exhibit ? 800 : 320, 598);
 		if (!pieceBounds(index).intersects(supply)) {
-			sprite->x = _oldPosition.x;
-			sprite->y = _oldPosition.y;
+			sprite->_x = _oldPosition.x;
+			sprite->_y = _oldPosition.y;
 			_sounds.push_back(kResSound14085_ExhibitE);
 		} else {
-			sprite->x = CLIP<int>(sprite->x, supply.left, supply.right - sprite->width());
-			sprite->y = CLIP<int>(sprite->y, supply.top, supply.bottom - sprite->height());
+			sprite->_x = CLIP<int>(sprite->_x, supply.left, supply.right - sprite->width());
+			sprite->_y = CLIP<int>(sprite->_y, supply.top, supply.bottom - sprite->height());
 			_sounds.push_back(piece.type == PlanetariumRules::kHour00 ? kResSound14010_HourMove : kResSound14086_DayMove);
 		}
-		_scene.setDepth(sprite, 10 + sprite->y + sprite->height() - 470);
+		_scene.setDepth(sprite, 10 + sprite->_y + sprite->height() - 470);
 	}
 	_dragged = -1;
 	updateSlot();
@@ -839,7 +839,7 @@ void PlanetariumMachine::event(const Common::Event &event, uint32 time) {
 		_dragged = hitPiece(event.mouse);
 		if (0 <= _dragged) {
 			Shell::Sprite *sprite = _pieces[_dragged];
-			_oldPosition = Common::Point(sprite->x, sprite->y);
+			_oldPosition = Common::Point(sprite->_x, sprite->_y);
 			_grabOffset = event.mouse - _oldPosition;
 			_scene.setDepth(sprite, 10000);
 			_sounds.push_back(_rules.piece(_dragged).type == PlanetariumRules::kHour00 ? kResSound14010_HourMove : kResSound14086_DayMove);
@@ -847,8 +847,8 @@ void PlanetariumMachine::event(const Common::Event &event, uint32 time) {
 			emitEvent(kEventPickedUp);
 		}
 	} else if (0 <= _dragged && (event.type == Common::EVENT_MOUSEMOVE || event.type == Common::EVENT_LBUTTONUP)) {
-		_pieces[_dragged]->x = event.mouse.x - _grabOffset.x;
-		_pieces[_dragged]->y = event.mouse.y - _grabOffset.y;
+		_pieces[_dragged]->_x = event.mouse.x - _grabOffset.x;
+		_pieces[_dragged]->_y = event.mouse.y - _grabOffset.y;
 		updateSlot();
 		if (event.type == Common::EVENT_LBUTTONUP)
 			drop();
@@ -888,7 +888,7 @@ const Common::Point Incubator::kPupaPositions[2][6][4] = {
 	{{{377, 465}, {391, 474}, {0, 0}, {0, 0}}, {{357, 494}, {371, 505}, {0, 0}, {0, 0}}, {{373, 538}, {388, 530}, {0, 0}, {0, 0}}, {{418, 531}, {429, 541}, {0, 0}, {0, 0}}, {{436, 500}, {450, 512}, {0, 0}, {0, 0}}, {{419, 459}, {423, 476}, {0, 0}, {0, 0}}}};
 
 Incubator::Incubator(TrinketEngine &vm, Shell::Scene &scene, int depth, uint rows) : _vm(vm), _scene(scene), _rows(rows) {
-	z = depth;
+	_z = depth;
 }
 
 Incubator::~Incubator() {
@@ -903,7 +903,7 @@ Shell::Sprite *Incubator::add(uint id, int depth, int frame) {
 		return nullptr;
 	}
 	_owned.push_back(sprite);
-	sprite->enabled = false;
+	sprite->_enabled = false;
 	sprite->setFrame(frame);
 	return sprite;
 }
@@ -921,9 +921,9 @@ void Incubator::remove(Shell::Sprite *sprite) {
 bool Incubator::load() {
 	if (_rows != 3 && _rows != 6)
 		return false;
-	add(_rows == 6 ? 14041 : 14037, z);
+	add(_rows == 6 ? 14041 : 14037, _z);
 	for (uint row = 0; row < _rows; row++)
-		_doors[row] = add((_rows == 6 ? 14042 : 14038) + row, z + 2);
+		_doors[row] = add((_rows == 6 ? 14042 : 14038) + row, _z + 2);
 	return _valid;
 }
 
@@ -937,12 +937,12 @@ bool Incubator::setPopulation(uint row, uint count) {
 	for (uint i = 0; i < count; i++) {
 		Pupa &pupa = _pupae[row][i];
 		pupa = Pupa();
-		pupa.sprite = add(14048, z + 1, _vm._rnd->getRandomNumber(3) + 1);
+		pupa.sprite = add(14048, _z + 1, _vm._rnd->getRandomNumber(3) + 1);
 		if (!pupa.sprite)
 			return false;
 		Common::Point position = kPupaPositions[_rows == 6 ? 1 : 0][row][i];
-		pupa.sprite->x = position.x - pupa.sprite->width() / 2;
-		pupa.sprite->y = position.y - pupa.sprite->height() / 2;
+		pupa.sprite->_x = position.x - pupa.sprite->width() / 2;
+		pupa.sprite->_y = position.y - pupa.sprite->height() / 2;
 	}
 	return true;
 }
@@ -989,12 +989,12 @@ void Incubator::transform(uint row, uint count) {
 	for (uint i = first; i < _transformed[row]; i++) {
 		Pupa &pupa = _pupae[row][i];
 		remove(pupa.sprite);
-		pupa.sprite = add(14051, z);
+		pupa.sprite = add(14051, _z);
 		if (!pupa.sprite)
 			return;
 		Common::Point position = kPupaPositions[_rows == 6 ? 1 : 0][row][i];
-		pupa.sprite->x = position.x - pupa.sprite->width() / 2;
-		pupa.sprite->y = position.y - pupa.sprite->height() / 2;
+		pupa.sprite->_x = position.x - pupa.sprite->width() / 2;
+		pupa.sprite->_y = position.y - pupa.sprite->height() / 2;
 		pupa.sprite->pauseAnimation(false);
 		pupa.state = 1;
 	}
@@ -1032,7 +1032,7 @@ void Incubator::update(uint32 time) {
 			Pupa &pupa = _pupae[batch.row][batch.first];
 			pupa.state = 2;
 			pupa.started = _clock.now();
-			pupa.start = Common::Point(pupa.sprite->x, pupa.sprite->y);
+			pupa.start = Common::Point(pupa.sprite->_x, pupa.sprite->_y);
 			static constexpr float twoPi = 2.0f * static_cast<float>(M_PI);
 			static constexpr float randScale = 1.0f / 32767.0f;
 			pupa.phase = _vm._rnd->getRandomNumber(32767) * twoPi * randScale;
@@ -1042,7 +1042,7 @@ void Incubator::update(uint32 time) {
 			pupa.destination = Common::Point(800, pupa.start.y + sign * (_vm._rnd->getRandomNumber(59)));
 			Common::Point delta = pupa.destination - pupa.start;
 			pupa.distance = Math::distance<float>(delta);
-			_scene.setDepth(pupa.sprite, z + 3);
+			_scene.setDepth(pupa.sprite, _z + 3);
 			batch.first += 1;
 			batch.time = _clock.now();
 		}
@@ -1061,8 +1061,8 @@ void Incubator::update(uint32 time) {
 			Common::Point delta = pupa.destination - pupa.start;
 			const float phase = pupa.phase + elapsed * pupa.frequency;
 			const double wave = sin(static_cast<double>(phase)) * pupa.amplitude;
-			pupa.sprite->x = pupa.start.x + static_cast<int>(delta.x * progress);
-			pupa.sprite->y = pupa.start.y + static_cast<int>(delta.y * progress + wave);
+			pupa.sprite->_x = pupa.start.x + static_cast<int>(delta.x * progress);
+			pupa.sprite->_y = pupa.start.y + static_cast<int>(delta.y * progress + wave);
 			if (1 <= progress) {
 				remove(pupa.sprite);
 				pupa.sprite = nullptr;

@@ -23,6 +23,7 @@
 
 #include "common/debug.h"
 #include "common/file.h"
+#include "trinket/release_info.h"
 #include "trinket/shell/text.h"
 
 namespace Trinket {
@@ -42,8 +43,8 @@ constexpr int Options::kPanelAction;
 constexpr int Options::kCheckboxAction;
 constexpr int Options::kFirstSliderAction;
 
-Options::Options(const OM::ResourceProvider &resources, OM::FontCache &fonts, Audio::Mixer &mixer, World &world)
-	: _resources(resources), _fonts(fonts), _world(world),
+Options::Options(const OM::ResourceProvider &resources, OM::FontCache &fonts, Audio::Mixer &mixer, World &world, const ReleaseInfo &relInfo)
+	: _resources(resources), _fonts(fonts), _world(world), _relInfo(relInfo),
 	  _scene(resources), _checkbox(_scene), _music(_scene),
 	  _dialogue(_scene), _effects(_scene), _click(mixer), _preview(mixer) {
 }
@@ -52,11 +53,11 @@ bool Options::addButton(uint resource, Action action, int verticalOffset) {
 	Shell::Sprite *button = _scene.add(Common::String::format(kAsset, resource), 3, action);
 	if (!button)
 		return false;
-	button->managed = true;
+	button->_managed = true;
 	button->setFrame(1);
-	button->y += verticalOffset;
+	button->_y += verticalOffset;
 	// ROptions captures each button's current rectangle before hover can move it.
-	button->hitRect = Common::Rect(button->x, button->y, button->x + button->width(), button->y + button->height());
+	button->_hitRect = Common::Rect(button->_x, button->_y, button->_x + button->width(), button->_y + button->height());
 	_buttons.push_back(button);
 	return true;
 }
@@ -78,7 +79,7 @@ bool Options::load(bool practice, int currentMusicVolume, const Shell::SaveFiles
 		Shell::Sprite *panel = _scene.add(Common::String::format(kAsset, panels[i]), i ? 3 : 2, kPanelAction);
 		if (!panel)
 			return false;
-		panel->managed = true;
+		panel->_managed = true;
 		panel->setFrame(1);
 	}
 	if (!practice && (!addButton(407, kNewGame01, 0) || !addButton(408, kLoadGame02, 0)))
@@ -148,12 +149,12 @@ Options::Result Options::event(const Common::Event &event, uint32 time) {
 	for (uint i = 0; i < _buttons.size(); i++) {
 		Shell::Sprite *button = _buttons[i];
 		uint frame = 1;
-		if (button->pressed)
+		if (button->_pressed)
 			frame = 2;
-		else if (button->hovered)
+		else if (button->_hovered)
 			frame = 4;
 		button->setFrame(frame);
-		if (event.type == Common::EVENT_LBUTTONDOWN && hit == button->action)
+		if (event.type == Common::EVENT_LBUTTONDOWN && hit == button->_action)
 			playClick();
 	}
 	uint checkbox = _checkbox.event(event);
@@ -249,7 +250,7 @@ bool Options::openNewGame() {
 		Shell::Sprite *panel = scene->add(Common::String::format(kAsset, panels[i]), i ? 3 : 2, kPanelAction);
 		if (!panel)
 			return false;
-		panel->managed = true;
+		panel->_managed = true;
 		panel->setFrame(1);
 	}
 	Common::Array<Shell::Sprite *> buttons;
@@ -267,9 +268,9 @@ bool Options::openNewGame() {
 		Shell::Sprite *button = scene->add(Common::String::format(kAsset, resources[i]), 3, actions[i]);
 		if (!button)
 			return false;
-		button->managed = true;
+		button->_managed = true;
 		button->setFrame(1);
-		button->hitRect = Common::Rect(button->x, button->y, button->x + button->width(), button->y + button->height());
+		button->_hitRect = Common::Rect(button->_x, button->_y, button->_x + button->width(), button->_y + button->height());
 		buttons.push_back(button);
 	}
 	_preview.stop();
@@ -291,11 +292,11 @@ Options::Result Options::newGameEvent(const Common::Event &event, uint32 time) {
 	int action = _newGameScene->event(event);
 	for (uint i = 0; i < _newGameButtons.size(); i++) {
 		Shell::Sprite *button = _newGameButtons[i];
-		if (button->pressed)
+		if (button->_pressed)
 			button->setFrame(2);
 		else
-			button->setFrame(button->hovered ? 4 : 1);
-		if (event.type == Common::EVENT_LBUTTONDOWN && hit == button->action)
+			button->setFrame(button->_hovered ? 4 : 1);
+		if (event.type == Common::EVENT_LBUTTONDOWN && hit == button->_action)
 			playClick();
 	}
 	if (action == kConfirmNew01) {
@@ -330,13 +331,13 @@ void Options::returnToMain(Common::Point pointer, uint32 time) {
 	_dialogue.event(hover, time);
 	_effects.event(hover, time);
 	for (uint i = 0; i < _buttons.size(); i++)
-		_buttons[i]->setFrame(_buttons[i]->hovered ? 4 : 1);
+		_buttons[i]->setFrame(_buttons[i]->_hovered ? 4 : 1);
 }
 
 void Options::draw(OM::Canvas &canvas, uint32 time) {
 	if (_slotScene) {
 		_slotScene->drawSprites(canvas, INT_MIN, INT_MAX);
-		drawLabel(canvas, *_slotHdrFont, Common::String::format("%s's Saved Games", _player.name.c_str()), _slotHdrRect);
+		drawLabel(canvas, *_slotHdrFont, _relInfo.formatSaveSlotHeading(_player.name), _slotHdrRect);
 		for (uint i = 0; i < _slotLabels.size(); i++)
 			drawLabel(canvas, *_slotFont, _slotLabels[i], _slotLabelRects[i]);
 		return;
@@ -397,10 +398,10 @@ bool Options::openSlots(bool replace) {
 		Shell::Sprite *panel = scene->add(Common::String::format(kAsset, panels[i]), i ? 3 : 2, kPanelAction);
 		if (!panel)
 			return false;
-		panel->managed = true;
+		panel->_managed = true;
 		panel->setFrame(panels[i] == 499 ? 2 : 1);
 		if (panels[i] == 412)
-			headingRect = Common::Rect(panel->x, panel->y, panel->x + panel->width(), panel->y + panel->height() - 10);
+			headingRect = Common::Rect(panel->_x, panel->_y, panel->_x + panel->width(), panel->_y + panel->height() - 10);
 	}
 	Common::Array<Common::Rect> rects;
 	Common::Array<Common::String> labels;
@@ -410,10 +411,10 @@ bool Options::openSlots(bool replace) {
 		Shell::Sprite *card = scene->add(Common::String::format(kAsset, 413), 3, kPanelAction);
 		if (!card)
 			return false;
-		card->managed = true;
+		card->_managed = true;
 		card->setFrame(1);
-		card->x = origin.x;
-		card->y = origin.y;
+		card->_x = origin.x;
+		card->_y = origin.y;
 		if (_player.count <= i)
 			continue;
 		uint thumbnail = slotThumbnail(i + 1 == _player.current ? _world.currentLocation() : _player.locations[i]);
@@ -422,11 +423,11 @@ bool Options::openSlots(bool replace) {
 		Shell::Sprite *picture = scene->add(Common::String::format(kAsset, thumbnail), 3, kFirstSlot10 + i);
 		if (!picture)
 			return false;
-		picture->managed = true;
+		picture->_managed = true;
 		picture->setFrame(1);
-		picture->x = origin.x + 14;
-		picture->y = origin.y + 9;
-		picture->actionOnMouseDown = true;
+		picture->_x = origin.x + 14;
+		picture->_y = origin.y + 9;
+		picture->_actionOnMouseDown = true;
 		int top = origin.y + card->height() - 12;
 		if (!i) {
 			while (!name.empty() && card->width() < slotFont->getStringWidth(name + k1Suffix))
@@ -439,13 +440,13 @@ bool Options::openSlots(bool replace) {
 	Shell::Sprite *selection = scene->add(Common::String::format(kAsset, 414), 3);
 	if (!hover || !selection)
 		return false;
-	hover->managed = selection->managed = true;
+	hover->_managed = selection->_managed = true;
 	hover->setFrame(1);
 	selection->setFrame(1);
-	hover->visible = false;
+	hover->_visible = false;
 	Common::Point origin = slotOrigin(_player.current - 1);
-	selection->x = origin.x + 4;
-	selection->y = origin.y - 1;
+	selection->_x = origin.x + 4;
+	selection->_y = origin.y - 1;
 	Common::Array<Shell::Sprite *> buttons;
 	const uint resources[] = {
 		404,
@@ -459,9 +460,9 @@ bool Options::openSlots(bool replace) {
 		Shell::Sprite *button = scene->add(Common::String::format(kAsset, resources[i]), 3, actions[i]);
 		if (!button)
 			return false;
-		button->managed = true;
+		button->_managed = true;
 		button->setFrame(1);
-		button->hitRect = Common::Rect(button->x, button->y, button->x + button->width(), button->y + button->height());
+		button->_hitRect = Common::Rect(button->_x, button->_y, button->_x + button->width(), button->_y + button->height());
 		buttons.push_back(button);
 	}
 	_preview.stop();
@@ -493,26 +494,26 @@ Options::Result Options::slotEvent(const Common::Event &event, uint32 time) {
 		return result;
 	}
 	int action = _slotScene->event(event);
-	_slotHover->visible = kFirstSlot10 <= hit && hit < kFirstSlot10 + static_cast<int>(_player.count);
-	if (_slotHover->visible) {
+	_slotHover->_visible = kFirstSlot10 <= hit && hit < kFirstSlot10 + static_cast<int>(_player.count);
+	if (_slotHover->_visible) {
 		Common::Point origin = slotOrigin(hit - kFirstSlot10);
-		_slotHover->x = origin.x + 4;
-		_slotHover->y = origin.y - 1;
+		_slotHover->_x = origin.x + 4;
+		_slotHover->_y = origin.y - 1;
 	}
 	for (uint i = 0; i < _slotButtons.size(); i++) {
 		Shell::Sprite *button = _slotButtons[i];
-		if (button->pressed)
+		if (button->_pressed)
 			button->setFrame(2);
 		else
-			button->setFrame(button->hovered ? 4 : 1);
-		if (event.type == Common::EVENT_LBUTTONDOWN && hit == button->action)
+			button->setFrame(button->_hovered ? 4 : 1);
+		if (event.type == Common::EVENT_LBUTTONDOWN && hit == button->_action)
 			playClick();
 	}
 	if (kFirstSlot10 <= action && action < kFirstSlot10 + static_cast<int>(_player.count)) {
 		_selectedSlot = action - kFirstSlot10 + 1;
 		Common::Point origin = slotOrigin(_selectedSlot - 1);
-		_slotSelection->x = origin.x + 4;
-		_slotSelection->y = origin.y - 1;
+		_slotSelection->_x = origin.x + 4;
+		_slotSelection->_y = origin.y - 1;
 	} else if (action == kAcceptSlot01) {
 		if (_selectedSlot == _player.current && !_replaceSelGame) {
 			result.action = kClose05;

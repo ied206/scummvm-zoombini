@@ -120,18 +120,18 @@ bool SheepCrossing::enter() {
 		auto *stand = _host._scene.add(_host.characterResource(number(kSheepStandingIDKey), Shell::Character::Resources::kAnimation), number(prefix + k3Name));
 		if (!walk || !stand)
 			return false;
-		walk->y = stand->y = number(prefix + k1Name);
-		stand->x = number(prefix + k4Name);
+		walk->_y = stand->_y = number(prefix + k1Name);
+		stand->_x = number(prefix + k4Name);
 		walk->setFrame(number(prefix + k2Name));
 		walk->playAnimation();
-		stand->visible = false;
+		stand->_visible = false;
 		_walking.push_back(walk);
 		_standing.push_back(stand);
 	}
 	_whistle = _host._scene.add(_host.characterResource(number(kBlowWhistleIDKey), Shell::Character::Resources::kAnimation), number(kSamZKey));
 	if (!_whistle)
 		return false;
-	_whistle->visible = false;
+	_whistle->_visible = false;
 	_sound = new OM::Sound(_host._vm.mixer());
 	_sound->play(_host._vm.resources(), _host.characterResource(number(kSheepIDKey), Shell::Character::Resources::kSound), Audio::Mixer::kSFXSoundType, 0);
 	if (world.get(kR1CG2WhistlePendingKey))
@@ -164,20 +164,20 @@ void SheepCrossing::update(uint32 time) {
 	if (_phase == kWait) {
 		if (time - _start < 1500)
 			return;
-		_whistle->visible = true;
+		_whistle->_visible = true;
 		_host._actors[kSamName]->setVisible(false);
 		_whistle->startAnimation(1);
 		_phase = kBlow;
 	} else if (_phase == kBlow) {
 		if (_whistle->isRunning())
 			return;
-		_whistle->visible = false;
+		_whistle->_visible = false;
 		_host._actors[kSamName]->setVisible(true);
 		_sound->stop();
 		for (uint i = 0; i < _walking.size(); i++) {
-			_walking[i]->visible = false;
+			_walking[i]->_visible = false;
 			_walking[i]->stopAnimation();
-			_standing[i]->visible = true;
+			_standing[i]->_visible = true;
 			_standing[i]->startAnimation(1);
 		}
 		_host.playSounds({static_cast<uint16>(number(kSheepStandingSFXIDKey))});
@@ -190,8 +190,8 @@ void SheepCrossing::update(uint32 time) {
 		for (uint i = 0; i < _standing.size(); i++) {
 			Common::String prefix = Common::String::format(kSheepLocUnsignedIndexKey, i + 1);
 			_standing[i]->setFrame(_standing[i]->getNumberOfFrames());
-			_standing[i]->x = number(prefix + k4Name) + 12;
-			_standing[i]->y = number(prefix + k1Name) - 49;
+			_standing[i]->_x = number(prefix + k4Name) + 12;
+			_standing[i]->_y = number(prefix + k1Name) - 49;
 		}
 		_moving = false;
 		_host._world.set(kR1CG2WhistlePendingKey, 0);

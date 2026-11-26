@@ -19,17 +19,17 @@ class HotSpot : public Core::Trinket {
 public:
 	/** Create an interactive rectangle at the supplied bounds and depth. */
 	HotSpot(const Common::Rect &area, int depth) : _size(area.width(), area.height()) {
-		x = area.left;
-		y = area.top;
-		z = depth;
-		movable = false;
+		_x = area.left;
+		_y = area.top;
+		_z = depth;
+		_movable = false;
 	}
 	/** Return the hotspot width in game pixels. */
 	int width() override { return _size.x; }
 	/** Return the hotspot height in game pixels. */
 	int height() override { return _size.y; }
 	/** Return the hotspot rectangle in its parent's coordinate space. */
-	Common::Rect bounds() const { return Common::Rect(x, y, x + _size.x, y + _size.y); }
+	Common::Rect bounds() const { return Common::Rect(_x, _y, _x + _size.x, _y + _size.y); }
 	/** Read hotspot user data or an inherited geometry property. */
 	bool get(const Common::String &property, const Core::ScriptArguments &sargs, Core::ScriptValue &result) override {
 		if (property.equals("outlined") || property.equals("filled")) {
@@ -69,14 +69,14 @@ public:
 	/** Select a hotspot cursor or dispatch an inherited script method. */
 	bool play(const Common::String &method, const Core::ScriptArguments &sargs, Core::ScriptValue &result) override {
 		if (method.equals("setAOCursor") && !sargs.empty()) {
-			spotCursor = sargs[0].toText();
+			_spotCursor = sargs[0].toText();
 			return true;
 		}
 		return Core::Trinket::play(method, sargs, result);
 	}
 	/** Draw the requested black outline or fill inside the clipped hotspot bounds. */
 	void draw(OM::Canvas &canvas) const {
-		if (!visible || (!_outlined && !_filled))
+		if (!_visible || (!_outlined && !_filled))
 			return;
 		Common::Rect rect = bounds();
 		rect.clip(Common::Rect(canvas.surface().w, canvas.surface().h));

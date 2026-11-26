@@ -40,7 +40,8 @@ namespace Zoombini3 {
 constexpr const char *SaveManagementDialog::kExportFileFormat;
 
 SaveManagementDialog::SaveManagementDialog(const Common::String &target)
-	: Trinket::SaveManagementDialog(true), _saves(*g_system->getSavefileManager(), target) {}
+	: Trinket::SaveManagementDialog(true), _saves(*g_system->getSavefileManager(), target,
+		Common::parsePlatform(ConfMan.get("platform", target))) {}
 
 Common::U32String SaveManagementDialog::locationName(int location) {
 	switch (location) {
@@ -149,6 +150,11 @@ void SaveManagementDialog::importSave() {
 	Common::ScopedPtr<Common::SeekableReadStream> stream(openImportFile(_("Select a Zoombinis: Island Odyssey User...GZ.dat saved game")));
 	if (!stream)
 		return;
+	const Common::Platform source = World::detectSavePlatform(*stream);
+	if (source == Common::kPlatformUnknown) {
+		GUI::MessageDialog(_("Unable to import the saved game. Check the file and choose a unique player name.")).runModal();
+		return;
+	}
 	Common::String name;
 	if (!editPlayerName(name, _("Save name"), 21))
 		return;

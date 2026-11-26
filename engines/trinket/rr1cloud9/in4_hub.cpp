@@ -41,7 +41,7 @@ bool PageScene::enterHub() {
 	_ambient = _scene.add(characterResource(_page->number(kAmbientIDKey), kAnimation), _page->number(kAmbientZKey));
 	if (!_ambient)
 		return false;
-	_ambient->visible = false;
+	_ambient->_visible = false;
 	_ambientSound = new OM::Sound(_vm.mixer());
 	if (!_world.visits(_name)) {
 		say(kSamName, _page->number(kEnterSpchIDs1Key));
@@ -80,13 +80,13 @@ void PageScene::updateHub(uint32 time) {
 	if (!_ambientWaiting && !_ambient->isRunning() && !_ambientSound->isPlaying()) {
 		_ambientWaiting = true;
 		_ambientStart = time;
-		_ambient->visible = false;
+		_ambient->_visible = false;
 	}
 	if (_ambientWaiting && static_cast<uint32>(_page->number(kDelayTimeKey)) <= time - _ambientStart) {
 		uint choice = chooseAction(_ambientChoices);
 		_ambientSound->play(_vm.resources(), characterResource(_page->number(Common::String::format(kAmbientIDsUnsignedIndexKey, choice)), kSound),
 							Audio::Mixer::kSFXSoundType, 1, _page->number(kAmbientVolumeKey));
-		_ambient->visible = true;
+		_ambient->_visible = true;
 		_ambient->startAnimation(1);
 		_ambientWaiting = false;
 	}

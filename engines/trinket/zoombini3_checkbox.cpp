@@ -35,11 +35,11 @@ bool OptionsCheckbox::load(int z, int action, bool on, bool practice) {
 	_sprite = _scene.add(kAsset, z, action);
 	if (!_sprite)
 		return false;
-	_sprite->managed = true;
+	_sprite->_managed = true;
 	_on = on;
 	showState(false);
 	if (practice)
-		_sprite->y -= _sprite->height();
+		_sprite->_y -= _sprite->height();
 	return true;
 }
 
@@ -52,13 +52,13 @@ void OptionsCheckbox::setOn(bool on, Common::Point pointer) {
 	_on = on;
 	showState(false);
 	if (_sprite)
-		showState(_scene.hitTest(pointer) == _sprite->action);
+		showState(_scene.hitTest(pointer) == _sprite->_action);
 }
 
 uint OptionsCheckbox::event(const Common::Event &event) {
 	if (!_sprite || (event.type != Common::EVENT_MOUSEMOVE && event.type != Common::EVENT_LBUTTONDOWN && event.type != Common::EVENT_LBUTTONUP))
 		return kNone00;
-	bool inside = _scene.hitTest(event.mouse) == _sprite->action;
+	bool inside = _scene.hitTest(event.mouse) == _sprite->_action;
 	if (event.type == Common::EVENT_LBUTTONDOWN) {
 		if (inside) {
 			_tracking = true;

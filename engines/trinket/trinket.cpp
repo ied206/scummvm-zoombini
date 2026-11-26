@@ -76,11 +76,11 @@ constexpr const char *TrinketDebugger::kPageName;
 constexpr const char *TrinketDebugger::kPuzzleName;
 constexpr const char *TrinketDebugger::kNameFormat;
 
-TrinketEngine::TrinketEngine(OSystem *system, const Subengine &subengine, Common::Platform platform)
-	: Engine(system), _resources(subengine.createResources()), _fonts(*_resources), _music(*_mixer, *_resources),
-	  _saveFiles(subengine.createSaveFiles(*system->getSavefileManager(), _targetName)),
-	  _launcher(*this, *system->getSavefileManager(), _targetName, *_mixer), _subengine(subengine), _platform(platform) {
-	_rnd = new Shell::Random("trinket");
+TrinketEngine::TrinketEngine(OSystem *system, const Subengine &subengine, const TrinketGameDescription &description)
+	: Engine(system), _relInfo(description), _resources(subengine.createResources()), _fonts(*_resources), _music(*_mixer, *_resources),
+	  _saveFiles(subengine.createSaveFiles(*system->getSavefileManager(), _targetName, _relInfo.getPlatform())),
+	  _launcher(*this, *system->getSavefileManager(), _targetName, *_mixer), _subengine(subengine), _useLauncher(_relInfo.usesTLCLauncher()) {
+	_rnd = new Shell::Random("trinket", platform());
 	setDebugger(new TrinketDebugger(*this));
 	_mainMenuDialog = new TrinketMainMenuDialog(*this);
 	_dataPath = ConfMan.getPath(kConfigPath);
@@ -574,7 +574,7 @@ void TrinketEngine::updateScreenSize() {
 }
 
 void TrinketEngine::setDefaultCursor() {
-	if (_platform == Common::kPlatformMacintosh) {
+	if (platform() == Common::kPlatformMacintosh) {
 		const byte *data = nullptr;
 		const byte *palette = nullptr;
 		const byte *mask = nullptr;

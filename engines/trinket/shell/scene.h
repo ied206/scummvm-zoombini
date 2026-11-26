@@ -61,56 +61,56 @@ public:
 	/** Remove the sprite from its scene before deleting it. */
 	void dispose() override;
 	/** Nonzero input action returned when this sprite is activated. */
-	int action = 0;
+	int _action = 0;
 	/** Zero-based animation picture index selected for drawing. */
-	uint frame = 0;
+	uint _frame = 0;
 	/** Whether pointer presses select button-state pictures. */
-	bool button = false;
+	bool _button = false;
 	/** Whether the pointer currently holds this button down. */
-	bool pressed = false;
+	bool _pressed = false;
 	/** Whether pointer hover selects a separate button picture. */
-	bool flyButton = false;
+	bool _flyButton = false;
 	/** Whether this sprite is currently under the pointer. */
-	bool hovered = false;
+	bool _hovered = false;
 	/** Whether hit testing uses the full bounds instead of picture transparency. */
-	bool solid = false;
+	bool _solid = false;
 	/** Whether the explicit hit rectangle determines pointer hits. */
-	bool boxTouchy = false;
+	bool _boxTouchy = false;
 	/** Whether pointer movement is reported while interacting with the sprite. */
-	bool tracking = false;
+	bool _tracking = false;
 	/** Game-pixel rectangle restricting the sprite's movement. */
-	Common::Rect corral;
+	Common::Rect _corral;
 	/** Whether scene scrolling translates this sprite. */
-	bool scrolling = false;
+	bool _scrolling = false;
 	/**
 	 * Optional display recolor, applied only while the canvas enables color-blind assistance.
 	 * @note Added by ScummVM for color-blind assistance; absent from the original engine.
 	 */
-	OM::Canvas::ColorRemap colorRemap = OM::Canvas::ColorRemap::kNone;
+	OM::Canvas::ColorRemap _colorRemap = OM::Canvas::ColorRemap::kNone;
 	/**
 	 * Source-local recolor overrides for selected parts of a multicolored image.
 	 * @note Added by ScummVM for color-blind assistance; absent from the original engine.
 	 */
-	Common::Array<OM::Canvas::ColorRemapRegion> colorRemapRegions;
+	Common::Array<OM::Canvas::ColorRemapRegion> _colorRemapRegions;
 
 	/** Dispatch the mouse-down link instead of a button's release hit. */
-	bool actionOnMouseDown = false;
+	bool _actionOnMouseDown = false;
 	/** Animation resource supplying the sprite's picture data and sequences. */
-	const Core::Animation *asset = nullptr;
+	const Core::Animation *_asset = nullptr;
 	/** Whether scene cleanup should also delete this sprite. */
-	bool managed = false;
+	bool _managed = false;
 	/** Whether drawing reflects the sprite horizontally. */
-	bool mirrored = false;
+	bool _mirrored = false;
 	/** Horizontal mirror axis in game pixels. */
-	int mirrorX = 0;
+	int _mirrorX = 0;
 	/** One-based button frame selected during hover. */
-	uint hoverFrame = 3;
+	uint _hoverFrame = 3;
 	/** One-based button frame selected while input is disabled. */
-	uint disabledFrame = 2;
+	uint _disabledFrame = 2;
 	/** Current picture rectangle in game pixels. */
-	Common::Rect bounds;
+	Common::Rect _bounds;
 	/** Explicit game-pixel rectangle used for box-based hit testing. */
-	Common::Rect hitRect;
+	Common::Rect _hitRect;
 	/** Advance animation and pointer feedback, appending triggered sound IDs. */
 	void update(uint32 time, Common::Array<uint16> &sounds);
 	/** Set the callback invoked before each sprite update. */

@@ -197,7 +197,7 @@ bool Gallery::artist(int pose) {
 	Common::ScopedPtr<Shell::Character> actor(new Shell::Character(_host._scene, _host._vm.mixer(), _host._vm.resources(), *_host._vm._rnd, _host));
 	if (!actor->create(indexed(kArtistSetIDKey, pose), number(kArtistZKey)))
 		return false;
-	actor->movable = false;
+	actor->_movable = false;
 	for (const char *key : {kRegisterFidgetsToSettleName, kRegisterSpeechToSettleName, kLoadSpeechAnimsInBkgdName, kAnimateSettledName})
 		actor->set(key, {}, Core::ScriptValue(0));
 	Core::ScriptValue result;
@@ -228,9 +228,9 @@ bool Gallery::enter() {
 	_takeOff = sprite(kASEQCN3TAKEOFFName, 80);
 	if (!_easel || !_hat || !_takeOff)
 		return false;
-	_hat->boxTouchy = true;
-	_hat->visible = offered && _state < 5;
-	_takeOff->visible = false;
+	_hat->_boxTouchy = true;
+	_hat->_visible = offered && _state < 5;
+	_takeOff->_visible = false;
 	static constexpr int defaults[] = {
 		18,
 		18,
@@ -338,7 +338,7 @@ void Gallery::collect() {
 		_host.putAway();
 		world.set(kR1CN3HatPendingKey, 0);
 	}
-	_hat->visible = false;
+	_hat->_visible = false;
 	_phase = kIdle;
 }
 
@@ -352,15 +352,15 @@ void Gallery::update(uint32 time) {
 		_phase = kMovie;
 	} else if (_phase == kOfferSpeech) {
 		_host._actors[kArtistKey]->set(kPropertyVisible, {}, Core::ScriptValue(0));
-		_takeOff->visible = true;
+		_takeOff->_visible = true;
 		_takeOff->startAnimation(1);
 		_phase = kTakeOff;
 	} else if (_phase == kTakeOff) {
 		if (_takeOff->isRunning())
 			return;
 		artist(2);
-		_takeOff->visible = false;
-		_hat->visible = true;
+		_takeOff->_visible = false;
+		_hat->_visible = true;
 		_host._world.set(kR1CN3SaidAct4Key, 1);
 		say(kSamName, kReEnterSpchIDsA45Key);
 		say(kArtistKey, kReEnterSpchIDsA46Key);
@@ -430,7 +430,7 @@ void Gallery::hatClick() {
 			group(kHatSpchIDs21Key, kRaaaName);
 		else
 			group(kHatSpchIDs22Key, kRaaName);
-	} else if (_state == 4 && _hat->visible && !_host._practice) {
+	} else if (_state == 4 && _hat->_visible && !_host._practice) {
 		setState(5);
 		_host._world.set(kR1CN3HatPendingKey, 1);
 		group(kHatSpchIDs4Key, kSarName);
@@ -460,7 +460,7 @@ bool Gallery::click(Common::Point point) {
 		hatClick();
 		return true;
 	}
-	if (_hat->visible && _hat->covers(point)) {
+	if (_hat->_visible && _hat->covers(point)) {
 		hatClick();
 		return true;
 	}
@@ -520,7 +520,7 @@ void Gallery::draw(OM::Canvas &canvas) {
 	_host._scene.drawSprites(canvas, INT_MIN, 15);
 	for (int i = 0; i < 5; i++) {
 		int frame = i + 1 == _painting ? _frame : 1;
-		const auto &pixels = _host._world.artwork.frame(i + 1, frame).pixels;
+		const auto &pixels = _host._world._artwork.frame(i + 1, frame).pixels;
 		if (!pixels.empty()) {
 			if (_editedFrame[i] != frame) {
 				Artwork::render(pixels, _edited[i], true);

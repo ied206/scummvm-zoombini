@@ -113,9 +113,9 @@ Shell::Sprite *Options::add(int resource, int action, int x, int y) {
 							  action ? 1 : 0, action, action != 0);
 	if (sprite) {
 		if (0 <= x)
-			sprite->x = x;
+			sprite->_x = x;
 		if (0 <= y)
-			sprite->y = y;
+			sprite->_y = y;
 	}
 	return sprite;
 }
@@ -137,7 +137,7 @@ void Options::say(int resource) {
 void Options::control(Shell::Sprite *sprite, uint rest, uint pressed) {
 	if (!sprite)
 		return;
-	sprite->button = false;
+	sprite->_button = false;
 	sprite->setFrame(rest);
 	_controls.push_back({sprite, rest, pressed});
 }
@@ -225,7 +225,7 @@ bool Options::show(Panel panel) {
 			if (_location == kLocations[row]) {
 				auto *marker = add(6121, 0, 20, y - 2);
 				if (marker)
-					marker->z = 2;
+					marker->_z = 2;
 			}
 			if (panel == kLevels && row < 7) {
 				int level = CLIP(_world.get(prefix(row) + kLevelKey), 1, 3);
@@ -246,7 +246,7 @@ bool Options::show(Panel panel) {
 						int color = CLIP(_world.get(key + kColorKey), 0, 3);
 						auto *badge = add(badges[color], 400 + color, x, badgeY[row]);
 						if (badge)
-							badge->button = false;
+							badge->_button = false;
 					}
 				}
 			} else if (panel == kReport) {
@@ -258,7 +258,7 @@ bool Options::show(Panel panel) {
 		if (panel == kReport) {
 			auto *print = add(6130, 6130);
 			if (print)
-				print->enabled = !_world.get(kIsPrinterOffKey);
+				print->_enabled = !_world.get(kIsPrinterOffKey);
 		}
 	}
 	add(1853, 1853, 521, 422);
@@ -360,7 +360,7 @@ Options::Request Options::event(const Common::Event &event) {
 	}
 	int action = back ? 1853 : _scene.event(event);
 	for (auto &item : _controls)
-		item.sprite->setFrame(item.sprite->pressed ? item.pressed : item.rest);
+		item.sprite->setFrame(item.sprite->_pressed ? item.pressed : item.rest);
 	if (action)
 		_effect.play(_vm.resources(), kClickSound, Audio::Mixer::kSFXSoundType);
 	return activate(action);

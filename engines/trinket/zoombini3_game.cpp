@@ -23,6 +23,7 @@
 
 #include "common/config-manager.h"
 #include "common/debug.h"
+#include "common/textconsole.h"
 #include "trinket/metaengine.h"
 #include "trinket/trinket.h"
 #include "trinket/zoombini3_script_session.h"
@@ -46,8 +47,16 @@ Game::~Game() {
 }
 
 bool Game::prepareState(Common::SeekableReadStream *save, const Common::String &playerName) {
-	if (save && !_world.read(*save))
-		return false;
+	if (save) {
+		const Common::Platform source = World::detectSavePlatform(*save);
+		World candidate;
+		if (source == Common::kPlatformUnknown || !candidate.read(*save, source))
+			return false;
+		if (source != _vm.platform())
+			warning("Zoombini3: Loaded a %s save for a %s target; subsequent saves will use the target's native save format",
+				Common::getPlatformDescription(source), Common::getPlatformDescription(_vm.platform()));
+		_world = candidate;
+	}
 	_playerName = playerName;
 	_practice = playerName.hasSuffix(kPracticeSuffix);
 	if (save)
@@ -71,6 +80,10 @@ bool Game::startPrepared(bool fresh, bool fromLauncher) {
 	applySoundSettings();
 	_session.reset(new ScriptSession(*this));
 	return _session->start(fresh, fromLauncher);
+}
+
+bool Game::save(Common::WriteStream &stream) const {
+	return _world.write(stream, _vm.platform());
 }
 
 bool Game::parsePracticeBootParam(int bootParam, Location &location, uint &level) {

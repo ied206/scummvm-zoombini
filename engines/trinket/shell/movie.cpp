@@ -25,9 +25,9 @@ constexpr const char *Movie::kMethodRelease;
 constexpr const char *Movie::kMethodAddSignals;
 
 Movie::Movie(Host &host, const Common::String &filename, Common::Point position) : _host(host), _filename(filename) {
-	x = position.x;
-	y = position.y;
-	movable = false;
+	_x = position.x;
+	_y = position.y;
+	_movable = false;
 	addEvent(kEventFinished);
 	addEvent(kEventFreeze);
 	addEvent(kEventSignal);
@@ -60,12 +60,12 @@ Core::ScriptableObject *Movie::Factory::create(const Core::ScriptArguments &sarg
 }
 
 Core::ScriptableObject *Movie::clone() const {
-	Common::ScopedPtr<Movie> movie(new Movie(_host, _filename, Common::Point(x, y)));
+	Common::ScopedPtr<Movie> movie(new Movie(_host, _filename, Common::Point(_x, _y)));
 	if (!movie->load())
 		return nullptr;
 	movie->_freezeWhenDone = _freezeWhenDone;
 	movie->_signals = _signals;
-	movie->z = z;
+	movie->_z = _z;
 	return movie.release();
 }
 
@@ -137,7 +137,7 @@ void Movie::update() {
 
 void Movie::draw(OM::Canvas &canvas) {
 	if (_frame.getPixels())
-		canvas.blit(_frame, x, y);
+		canvas.blit(_frame, _x, _y);
 }
 
 bool Movie::get(const Common::String &property, const Core::ScriptArguments &sargs, Core::ScriptValue &result) {

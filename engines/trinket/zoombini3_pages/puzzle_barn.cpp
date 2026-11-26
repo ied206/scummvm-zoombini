@@ -306,7 +306,7 @@ Shell::Sprite *BarnMachine::add(uint id, int depth, bool cd) {
 		return nullptr;
 	}
 	sprite->setFrame(1);
-	sprite->enabled = false;
+	sprite->_enabled = false;
 	_owned.push_back(sprite);
 	return sprite;
 }
@@ -420,7 +420,7 @@ bool BarnMachine::setup(uint pairs, uint trait, bool showGenes, uint limit) {
 	_celebration = add(21085, 1, true);
 	if (!_valid)
 		return false;
-	_celebration->visible = false;
+	_celebration->_visible = false;
 	static constexpr int geneX[2][2] = {{417, 587}, {325, 315}};
 	static constexpr int geneY[2][2] = {{245, 245}, {316, 488}};
 	for (uint side = 0; side < 2; side++) {
@@ -428,8 +428,8 @@ bool BarnMachine::setup(uint pairs, uint trait, bool showGenes, uint limit) {
 			_genes[side][i] = add(side ? 21065 : 21052, 0);
 			if (!_valid)
 				return false;
-			_genes[side][i]->x = geneX[side][i];
-			_genes[side][i]->y = geneY[side][i];
+			_genes[side][i]->_x = geneX[side][i];
+			_genes[side][i]->_y = geneY[side][i];
 		}
 	}
 	static constexpr int targetX[] = {
@@ -448,7 +448,7 @@ bool BarnMachine::setup(uint pairs, uint trait, bool showGenes, uint limit) {
 		_emphasis[side] = add(21095 + side, 2);
 		if (!_valid)
 			return false;
-		_emphasis[side]->visible = false;
+		_emphasis[side]->_visible = false;
 	}
 	static constexpr uint reels[] = {
 		21087,
@@ -462,8 +462,8 @@ bool BarnMachine::setup(uint pairs, uint trait, bool showGenes, uint limit) {
 		if (!_valid)
 			return false;
 		_target[i]->setFrame(_rules.target(i) + 1);
-		_target[i]->x = targetX[i] - _target[i]->width() / 2;
-		_target[i]->y = targetY[i] - _target[i]->height() / 2;
+		_target[i]->_x = targetX[i] - _target[i]->width() / 2;
+		_target[i]->_y = targetY[i] - _target[i]->height() / 2;
 	}
 	startSpin();
 	_generated = true;
@@ -491,9 +491,9 @@ void BarnMachine::startSpin() {
 	};
 	for (uint i = 0; i < 4; i++) {
 		_target[i]->setFrame(_rules.target(i) + 1);
-		_target[i]->x = targetX[i] - _target[i]->width() / 2;
-		_target[i]->y = targetY[i] - _target[i]->height() / 2;
-		_reels[i]->visible = true;
+		_target[i]->_x = targetX[i] - _target[i]->width() / 2;
+		_target[i]->_y = targetY[i] - _target[i]->height() / 2;
+		_reels[i]->_visible = true;
 		_reels[i]->startAnimation(-1);
 	}
 	_reelSound.play(_vm.resources(), Common::String::format(kSound, static_cast<uint>(kResSound21096_Machine)), Audio::Mixer::kSFXSoundType, 1);
@@ -592,7 +592,7 @@ void BarnMachine::drop() {
 						showChild(i);
 				}
 				for (uint i = 0; i < 2; i++)
-					_emphasis[i]->visible = false;
+					_emphasis[i]->_visible = false;
 			}
 		}
 		playEffect(kResSound21101_GeneClose);
@@ -633,8 +633,8 @@ void BarnMachine::updateGenes(uint side, bool opening, bool animated) {
 		} else if (i) {
 			offsetX = 170;
 		}
-		_geneFaces[side][i]->x += offsetX;
-		_geneFaces[side][i]->y += side && i ? 172 : 0;
+		_geneFaces[side][i]->_x += offsetX;
+		_geneFaces[side][i]->_y += side && i ? 172 : 0;
 		_genes[side][i]->startAnimation(1);
 		_genes[side][i]->setFrame(1);
 		if (!animated) {
@@ -649,7 +649,7 @@ void BarnMachine::updateGenes(uint side, bool opening, bool animated) {
 
 void BarnMachine::clearChildren() {
 	for (uint side = 0; side < 2; side++)
-		_emphasis[side]->visible = false;
+		_emphasis[side]->_visible = false;
 	for (uint i = 0; i < 4; i++) {
 		if (_children[i])
 			removeSprite(_children[i]);
@@ -690,7 +690,7 @@ void BarnMachine::showChild(uint index) {
 		490,
 		490,
 	};
-	_children[index]->x += x[index] - 50;
+	_children[index]->_x += x[index] - 50;
 	int offsetY = 0;
 	if (_rules.trait() == 2) {
 		if (index < 2)
@@ -698,14 +698,14 @@ void BarnMachine::showChild(uint index) {
 		else
 			offsetY = 10;
 	}
-	_children[index]->y += y[index] - 50 + offsetY;
+	_children[index]->_y += y[index] - 50 + offsetY;
 	if (_rules.showGenes()) {
 		for (uint side = 0; side < 2; side++) {
 			uint gene = side ? index / 2 : index % 2;
 			_emphasis[side]->startAnimation(1);
-			_emphasis[side]->x = _genes[side][gene]->x;
-			_emphasis[side]->y = _genes[side][gene]->y;
-			_emphasis[side]->visible = true;
+			_emphasis[side]->_x = _genes[side][gene]->_x;
+			_emphasis[side]->_y = _genes[side][gene]->_y;
+			_emphasis[side]->_visible = true;
 		}
 	}
 }
@@ -751,7 +751,7 @@ void BarnMachine::updateState() {
 			_stateTime = _clock.now();
 			playEffect(kResSound21097_ParentExit);
 		} else if (!_spinWaiting && 400 <= _clock.elapsed(_stateTime)) {
-			_reels[_step]->visible = false;
+			_reels[_step]->_visible = false;
 			_reels[_step]->pauseAnimation(true);
 			_step += 1;
 			_stateTime = _clock.now();
@@ -790,13 +790,13 @@ void BarnMachine::updateState() {
 			showChild(_step);
 			_step += 1;
 		} else if (_correct) {
-			_celebration->visible = true;
+			_celebration->_visible = true;
 			_celebration->startAnimation(1);
 			_state = kCelebrating04;
 		} else
 			_state = kPlaying01;
 	} else if (_state == kCelebrating04 && !_celebration->isRunning()) {
-		_celebration->visible = false;
+		_celebration->_visible = false;
 		_state = kExitDelay05;
 		_stateTime = _clock.now();
 		playEffect(kResSound2726_CommonGo);
@@ -839,7 +839,7 @@ void BarnMachine::forceDrop() {
 				showChild(i);
 		}
 		for (uint i = 0; i < 2; i++)
-			_emphasis[i]->visible = false;
+			_emphasis[i]->_visible = false;
 	}
 	_stones[side]->setFrame(1);
 	_selected = _previousSlot = -1;

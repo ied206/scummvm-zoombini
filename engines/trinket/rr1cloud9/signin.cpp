@@ -85,9 +85,9 @@ void Signin::centerSelection() {
 
 void Signin::buttons() {
 	if (_start)
-		_start->enabled = _valid;
+		_start->_enabled = _valid;
 	if (_new)
-		_new->enabled = _mode < kDraft02 && _entries.size() < kMaxNames;
+		_new->_enabled = _mode < kDraft02 && _entries.size() < kMaxNames;
 }
 
 void Signin::newEntry() {
@@ -269,15 +269,15 @@ void Signin::dialog(int kind) {
 Signin::Request Signin::event(const Common::Event &event, uint32 time) {
 	if (_dialogKind) {
 		bool hovered[2] = {
-			_dialogActors[0] && _dialogActors[0]->hovered,
-			_dialogActors[1] && _dialogActors[1]->hovered,
+			_dialogActors[0] && _dialogActors[0]->_hovered,
+			_dialogActors[1] && _dialogActors[1]->_hovered,
 		};
 		int action = _dialog.event(event);
 		for (int i = 0; i < 2; i++) {
 			auto *actor = _dialogActors[i];
-			if (!actor || actor->hovered == hovered[i])
+			if (!actor || actor->_hovered == hovered[i])
 				continue;
-			if (actor->hovered)
+			if (actor->_hovered)
 				actor->playAnimation();
 			else {
 				actor->pauseAnimation(true);

@@ -165,8 +165,10 @@ constexpr const char *ScriptSession::kCreditsMusicID;
 
 class ScriptSession::OptionsObject : public Core::ScriptableObject {
 public:
-	explicit OptionsObject(ScriptSession &session) : _session(session),
-													 _options(session._paths, session._game._vm.fonts(), session._game._vm.mixer(), session._game._world) {
+	/** Bind the Options panels to the active game and its release settings. */
+	explicit OptionsObject(ScriptSession &session)
+		: _session(session), _options(session._paths, session._game._vm.fonts(), session._game._vm.mixer(),
+			  session._game._world, session._game._vm.getRelInfo()) {
 		addEvent(kEventNewGame);
 		addEvent(kEventGameSelected);
 		addEvent(kEventCheatChange);
@@ -367,15 +369,15 @@ Core::ScriptableObject *ScriptSession::createNative(const Common::String &name, 
 		sprite->setFrame(1);
 		if (!button)
 			sprite->setRepeat(-1);
-		sprite->flyButton = button;
-		sprite->spotCursor = k301Name;
-		sprite->grabCursor = k304Name;
+		sprite->_flyButton = button;
+		sprite->_spotCursor = k301Name;
+		sprite->_grabCursor = k304Name;
 		if (sargs.size() == 3) {
 			uint first = button ? 1 : 0;
 			if (sargs[first].toInt32() != 11111)
-				sprite->x = sargs[first].toInt32();
+				sprite->_x = sargs[first].toInt32();
 			if (sargs[first + 1].toInt32() != 11111)
-				sprite->y = sargs[first + 1].toInt32();
+				sprite->_y = sargs[first + 1].toInt32();
 		}
 		return sprite;
 	}
@@ -644,7 +646,7 @@ bool ScriptSession::invoke(const Common::String &name, const Core::ScriptArgumen
 		Core::Trinket *right = visualObject(b.reference());
 		if (!left || !right)
 			return false;
-		result = Core::ScriptValue(static_cast<int32>(Common::Rect(left->x, left->y, left->x + left->width(), left->y + left->height()).intersects(Common::Rect(right->x, right->y, right->x + right->width(), right->y + right->height()))));
+		result = Core::ScriptValue(static_cast<int32>(Common::Rect(left->_x, left->_y, left->_x + left->width(), left->_y + left->height()).intersects(Common::Rect(right->_x, right->_y, right->_x + right->width(), right->_y + right->height()))));
 		return true;
 	}
 	return false;
@@ -787,11 +789,11 @@ uint32 ScriptSession::hitObject(Common::Point point) {
 	Core::ScriptableObject *source = sprite;
 	if (sprite && sprite->parent())
 		source = sprite->parent();
-	int depth = sprite ? sprite->z : INT_MIN;
+	int depth = sprite ? sprite->_z : INT_MIN;
 	uint32 hit = 0;
 	for (uint32 reference : _runtime.objects().references()) {
 		Core::Trinket *object = visualObject(reference);
-		if (!object || !object->enabled || !object->visible)
+		if (!object || !object->_enabled || !object->_visible)
 			continue;
 		if (object == source) {
 			hit = reference;
@@ -799,9 +801,9 @@ uint32 ScriptSession::hitObject(Common::Point point) {
 		}
 		if (!_runtime.objects().resolve(reference, kRHotSpotName) && !_runtime.objects().resolve(reference, kRTextName))
 			continue;
-		if (depth <= object->z && Common::Rect(object->x, object->y, object->x + object->width(), object->y + object->height()).contains(point)) {
+		if (depth <= object->_z && Common::Rect(object->_x, object->_y, object->_x + object->width(), object->_y + object->height()).contains(point)) {
 			hit = reference;
-			depth = object->z;
+			depth = object->_z;
 		}
 	}
 	return hit;
@@ -884,14 +886,14 @@ void ScriptSession::event(const Common::Event &event) {
 		if (event.type == Common::EVENT_MOUSEMOVE) {
 			if (character)
 				character->dragTo(event.mouse);
-			else if (animation && animation->movable) {
+			else if (animation && animation->_movable) {
 				Common::Point position = event.mouse - _dragOffset;
-				if (!animation->corral.isEmpty()) {
-					position.x = CLIP<int>(position.x, animation->corral.left, animation->corral.right - animation->width());
-					position.y = CLIP<int>(position.y, animation->corral.top, animation->corral.bottom - animation->height());
+				if (!animation->_corral.isEmpty()) {
+					position.x = CLIP<int>(position.x, animation->_corral.left, animation->_corral.right - animation->width());
+					position.y = CLIP<int>(position.y, animation->_corral.top, animation->_corral.bottom - animation->height());
 				}
-				animation->x = position.x;
-				animation->y = position.y;
+				animation->_x = position.x;
+				animation->_y = position.y;
 			}
 			return;
 		}
@@ -912,7 +914,7 @@ void ScriptSession::event(const Common::Event &event) {
 	if (_hovered != hit && !_pressed) {
 		Core::ScriptableObject *old = _runtime.objects().resolve(_hovered);
 		if (Shell::Sprite *sprite = _scene.resolveSprite(old))
-			sprite->hovered = false;
+			sprite->_hovered = false;
 		if (old)
 			old->emitEvent(kEventFlyOff);
 		_hovered = hit;
@@ -934,11 +936,11 @@ void ScriptSession::event(const Common::Event &event) {
 		AttributeCharacter *character = static_cast<AttributeCharacter *>(_runtime.objects().resolve(hit, kRAttributeCharacterName));
 		if (character && character->beginDrag(event.mouse, _time))
 			_tracked = hit;
-		else if (sprite && sprite->button)
+		else if (sprite && sprite->_button)
 			sprite->buttonPressed(_time);
-		else if (sprite && sprite->tracking) {
+		else if (sprite && sprite->_tracking) {
 			_tracked = hit;
-			_dragOffset = event.mouse - Common::Point(sprite->x, sprite->y);
+			_dragOffset = event.mouse - Common::Point(sprite->_x, sprite->_y);
 			sprite->emitEvent(kEventStartTracking);
 		}
 		object->emitEvent(kEventMouseDown);
@@ -946,17 +948,17 @@ void ScriptSession::event(const Common::Event &event) {
 	}
 	Core::ScriptableObject *pressed = _runtime.objects().resolve(_pressed);
 	Shell::Sprite *button = _scene.resolveSprite(pressed);
-	if (event.type == Common::EVENT_MOUSEMOVE && button && button->button) {
+	if (event.type == Common::EVENT_MOUSEMOVE && button && button->_button) {
 		bool inside = hit == _pressed;
-		if (inside && !button->pressed)
+		if (inside && !button->_pressed)
 			button->buttonPressed(_time);
-		button->pressed = inside;
+		button->_pressed = inside;
 		return;
 	}
 	if (event.type == Common::EVENT_LBUTTONUP && pressed) {
-		if (button && button->button) {
-			button->pressed = false;
-			button->hovered = hit == _pressed;
+		if (button && button->_button) {
+			button->_pressed = false;
+			button->_hovered = hit == _pressed;
 			if (hit == _pressed) {
 				if (_runtime.objects().resolve(_pressed, kRQuitButtonName))
 					openQuit();
@@ -1018,9 +1020,9 @@ void ScriptSession::updateCursor() {
 	if (object) {
 		Common::String cursorText;
 		if (_tracked)
-			cursorText = object->grabCursor;
+			cursorText = object->_grabCursor;
 		else
-			cursorText = object->spotCursor;
+			cursorText = object->_spotCursor;
 		int32 id = 0;
 		if (StringParser::parseSignedInt(cursorText.c_str(), id, StringParser::kDecimalProfile) == StringParser::Result::kSuccess &&
 			301 <= id && id <= 306)
@@ -1251,7 +1253,7 @@ void ScriptSession::draw(OM::Canvas &canvas, uint32 time) {
 			Core::Trinket *object = visualObject(reference);
 			if (!object || (!_runtime.objects().resolve(reference, kRTextName) && !_runtime.objects().resolve(reference, kRHotSpotName)))
 				continue;
-			Visual visual = {reference, object->z};
+			Visual visual = {reference, object->_z};
 			uint index = 0;
 			while (index < visuals.size() && visuals[index].depth <= visual.depth)
 				index += 1;

@@ -26,6 +26,7 @@
 #include "base/plugins.h"
 #include "common/config-manager.h"
 #include "common/translation.h"
+#include "trinket/release_info.h"
 #include "trinket/shell/random.h"
 #include "trinket/trinket.h"
 #ifdef ENABLE_ZOOMBINI3
@@ -50,18 +51,42 @@ constexpr const char *TrinketMetaEngine::kZoombini3Name;
 constexpr const char *TrinketMetaEngine::kRr1cloud9Name;
 constexpr const char *TrinketMetaEngine::kREMOVENAMEName;
 
+Trinket::ReleaseInfo::ReleaseInfo(const TrinketGameDescription &description)
+	: _features(description.features),
+	  _language(description.desc.language == Common::UNK_LANG ? Common::parseLanguage(ConfMan.get("language")) : description.desc.language),
+	  _platform(description.desc.platform) {
+}
+
+bool Trinket::ReleaseInfo::usesTLCLauncher() const {
+	return (_features & TrinketGameDescription::kZ3DirectStart) == 0;
+}
+
+Common::String Trinket::ReleaseInfo::formatSaveSlotHeading(const Common::String &playerName) const {
+	switch (_language) {
+	case Common::FR_FRA:
+		return playerName;
+	case Common::SV_SWE:
+		return Common::String::format("%s Sparade Spel", playerName.c_str());
+	case Common::RU_RUS:
+		// The Russian NFNT uses the original Windows-1251 glyph indices.
+		return Common::String::format("%s's \xD1\xEE\xF5\xF0. \xC8\xE3\xF0\xFB ", playerName.c_str());
+	default:
+		return Common::String::format("%s's Saved Games", playerName.c_str());
+	}
+}
+
 Common::Error TrinketMetaEngine::createInstance(OSystem *syst, Engine **engine, const Trinket::TrinketGameDescription *desc) const {
 	if (desc->desc.platform != Common::kPlatformWindows && desc->desc.platform != Common::kPlatformMacintosh)
 		return Common::kUnsupportedGameidError;
 #ifdef ENABLE_ZOOMBINI3
 	if (!strcmp(desc->desc.gameId, kZoombini3Name)) {
-		*engine = new Trinket::TrinketEngine(syst, Trinket::Zoombini3::getSubengine(), desc->desc.platform);
+		*engine = new Trinket::TrinketEngine(syst, Trinket::Zoombini3::getSubengine(), *desc);
 		return Common::kNoError;
 	}
 #endif
 #ifdef ENABLE_RR1CLOUD9
 	if (!strcmp(desc->desc.gameId, kRr1cloud9Name)) {
-		*engine = new Trinket::TrinketEngine(syst, Trinket::RR1Cloud9::getSubengine(), desc->desc.platform);
+		*engine = new Trinket::TrinketEngine(syst, Trinket::RR1Cloud9::getSubengine(), *desc);
 		return Common::kNoError;
 	}
 #endif

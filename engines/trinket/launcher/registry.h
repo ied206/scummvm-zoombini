@@ -38,15 +38,15 @@ public:
 		Common::String name;
 	};
 	/** Registered launcher users in their current list order. */
-	Common::Array<User> users;
+	Common::Array<User> _users;
 	/** Next persistent user identifier available for allocation. */
-	uint nextID = 1;
+	uint _nextID = 1;
 	/** Whether launcher background music is enabled. */
-	bool musicEnabled = true;
+	bool _musicEnabled = true;
 	/** Whether launcher sound effects are enabled. */
-	bool soundEnabled = true;
+	bool _soundEnabled = true;
 	/** Whether the stored launcher preference requests automatic updates. */
-	bool updatesAutomatic = true;
+	bool _updatesAutomatic = true;
 	/** Read launcher users and preferences from the save manager, returning false for invalid XML. */
 	bool load(Common::SaveFileManager &manager, const Common::String &file);
 	/** Write launcher users and preferences through the save manager. */

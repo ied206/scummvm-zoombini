@@ -216,21 +216,21 @@ bool Application::loadUsers() {
 	Registry registry;
 	if (!registry.load(_manager, _saveName))
 		return false;
-	_users = registry.users;
-	_nextID = registry.nextID;
-	_musicEnabled = registry.musicEnabled;
-	_soundEnabled = registry.soundEnabled;
-	_updatesAutomatic = registry.updatesAutomatic;
+	_users = registry._users;
+	_nextID = registry._nextID;
+	_musicEnabled = registry._musicEnabled;
+	_soundEnabled = registry._soundEnabled;
+	_updatesAutomatic = registry._updatesAutomatic;
 	return true;
 }
 
 bool Application::storeUsers() const {
 	Registry registry;
-	registry.users = _users;
-	registry.nextID = _nextID;
-	registry.musicEnabled = _musicEnabled;
-	registry.soundEnabled = _soundEnabled;
-	registry.updatesAutomatic = _updatesAutomatic;
+	registry._users = _users;
+	registry._nextID = _nextID;
+	registry._musicEnabled = _musicEnabled;
+	registry._soundEnabled = _soundEnabled;
+	registry._updatesAutomatic = _updatesAutomatic;
 	return registry.store(_manager, _saveName);
 }
 
@@ -360,16 +360,16 @@ Common::SeekableReadStream *Application::open(const Common::String &name) const 
 
 void Application::configureButton(Shell::Sprite &sprite) {
 	// Launcher buttons use idle/click/hover/disabled logical frames 1/2/3/4.
-	sprite.flyButton = sprite.button;
-	sprite.hoverFrame = sprite.asset->pictureForFrame(2) < 0 ? 1 : 2;
-	sprite.disabledFrame = 3;
+	sprite._flyButton = sprite._button;
+	sprite._hoverFrame = sprite._asset->pictureForFrame(2) < 0 ? 1 : 2;
+	sprite._disabledFrame = 3;
 }
 
 Shell::Sprite *Application::addFrameObject(Shell::Scene &scene, int id, int x, int y, int action) {
 	Shell::Sprite *sprite = scene.add(Common::String::format(kAnimation, kCommonName, id), action ? 1 : 0, action, action != 0);
 	if (sprite) {
-		sprite->x = x;
-		sprite->y = y;
+		sprite->_x = x;
+		sprite->_y = y;
 		configureButton(*sprite);
 	} else {
 		warning("Trinket: missing launcher animation %d", id);
@@ -402,8 +402,8 @@ bool Application::buildFrame() {
 	_playCD = addFrameObject(_frameScene, 3051, 685, 15, 1006);
 	if (!_vertTab || !_horizTab || !_playCD)
 		return false;
-	_playCD->visible = _content;
-	_horizTab->visible = false;
+	_playCD->_visible = _content;
+	_horizTab->_visible = false;
 	Common::String branch = kLauncherCBarCmdButtonsBrandOrderIdName;
 	const Common::Array<OM::XMLParser::Element> &elements = _parentsLayout.elements();
 	int brandOrderIdx = 0;
@@ -485,7 +485,7 @@ bool Application::showContent(const OM::XMLParser &xml, const Common::String &br
 	_textBlocks.clear();
 	_links.clear();
 	_linkParameters.clear();
-	_playCD->visible = true;
+	_playCD->_visible = true;
 	if (!_scene.setBackground(kBackground))
 		return false;
 	const Common::Array<OM::XMLParser::Element> &elements = xml.elements();
@@ -542,8 +542,8 @@ bool Application::showContent(const OM::XMLParser &xml, const Common::String &br
 			if (xml.child(i, kXMLClass).equals(kXMLCheckbox)) {
 				bool checked = (xml.child(i, kXMLCheckedIfValue).equals(kXMLAuto)) == _updatesAutomatic;
 				// The selected option is disabled and displays its checked frame.
-				sprite->enabled = !checked;
-				sprite->disabledFrame = 4;
+				sprite->_enabled = !checked;
+				sprite->_disabledFrame = 4;
 			}
 			if (type.equals(kClassToon)) {
 				int32 frame = 0;
@@ -621,8 +621,8 @@ bool Application::addContentGrid(const OM::XMLParser &xml) {
 		Shell::Sprite *right = addFrameObject(_scene, rightId, rightX, rightY, kGridNext1901);
 		if (!left || !right)
 			return false;
-		left->visible = 0 < first;
-		right->visible = first + count < buttons.size();
+		left->_visible = 0 < first;
+		right->_visible = first + count < buttons.size();
 	}
 	return true;
 }
@@ -645,8 +645,8 @@ bool Application::addContentScript(const OM::XMLParser &xml, const Common::Strin
 		Shell::Sprite *button = _scene.add(Common::String::format(kAnimation, kProductName, 2051), 1, action, true);
 		if (!button)
 			return false;
-		button->x = 290;
-		button->y = 195;
+		button->_x = 290;
+		button->_y = 195;
 		configureButton(*button);
 		return true;
 	}
@@ -740,7 +740,7 @@ bool Application::showWorld(uint world) {
 	Shell::Sprite *screen = addFrameObject(_scene, screens[world][0], screens[world][1], screens[world][2]);
 	if (!screen)
 		return false;
-	screen->flyButton = false;
+	screen->_flyButton = false;
 	screen->setFrame(screens[world][3]);
 	_scene.setDepth(screen, 4);
 	playContentMovie(kWorldMovies[world], screens[world][4], screens[world][5]);
@@ -813,8 +813,8 @@ Shell::Sprite *Application::add(const OM::XMLParser &xml, const Common::String &
 		return nullptr;
 	Shell::Sprite *sprite = _scene.add(Common::String::format(kAnimation, library, id), 1, action, action != 0);
 	if (sprite) {
-		sprite->x = x;
-		sprite->y = y;
+		sprite->_x = x;
+		sprite->_y = y;
 		configureButton(*sprite);
 	}
 	return sprite;
@@ -837,10 +837,10 @@ bool Application::showProductScreen(const Common::String &branch) {
 	_textBlocks.clear();
 	_links.clear();
 	_linkParameters.clear();
-	_playCD->visible = false;
+	_playCD->_visible = false;
 	_vertTab->setFrame(1);
 	_horizTab->setFrame(1);
-	_horizTab->visible = false;
+	_horizTab->_visible = false;
 	_ok = _newButton = nullptr;
 	_startup = true;
 	_productPlay = false;
@@ -854,7 +854,8 @@ bool Application::showProductScreen(const Common::String &branch) {
 		if (!condition.empty() && !condition.equals(kAllName))
 			continue;
 		Common::String type = _startupLayout.child(i, kXMLType);
-		if (!type.equals(kClassScene) && !type.equals(kClassToon) && !type.equals(kClassFob))
+		const bool isScene = type.equals(kClassScene);
+		if (!isScene && !type.equals(kClassToon) && !type.equals(kClassFob))
 			continue;
 		int32 id = 0;
 		int32 x = 0;
@@ -864,9 +865,12 @@ bool Application::showProductScreen(const Common::String &branch) {
 		Common::String xText = _startupLayout.child(i, kXMLX);
 		Common::String yText = _startupLayout.child(i, kXMLY);
 		Common::String frameText = _startupLayout.child(i, kXMLStartFrame);
+		// Scene backgrounds may omit their coordinates and default to the origin.
 		if (StringParser::parseSignedInt(idText.c_str(), id, StringParser::kDecimalProfile) != StringParser::Result::kSuccess ||
-			StringParser::parseSignedInt(xText.c_str(), x, StringParser::kDecimalProfile) != StringParser::Result::kSuccess ||
-			StringParser::parseSignedInt(yText.c_str(), y, StringParser::kDecimalProfile) != StringParser::Result::kSuccess ||
+			((!isScene || !xText.empty()) && StringParser::parseSignedInt(xText.c_str(), x, StringParser::kDecimalProfile) !=
+				StringParser::Result::kSuccess) ||
+			((!isScene || !yText.empty()) && StringParser::parseSignedInt(yText.c_str(), y, StringParser::kDecimalProfile) !=
+				StringParser::Result::kSuccess) ||
 			(!frameText.empty() && StringParser::parseSignedInt(frameText.c_str(), frame, StringParser::kDecimalProfile) !=
 				StringParser::Result::kSuccess))
 			return false;
@@ -883,12 +887,12 @@ bool Application::showProductScreen(const Common::String &branch) {
 		}
 		Shell::Sprite *sprite = _scene.add(Common::String::format(kAnimation, kProductName, id), 1, action, action != 0);
 		if (!sprite) {
-			if (type.equals(kClassScene) && _scene.setBackground(Common::String::format(kClassProductSignedIndexJpg, id)))
+			if (isScene && _scene.setBackground(Common::String::format(kClassProductSignedIndexJpg, id)))
 				continue;
 			return false;
 		}
-		sprite->x = x;
-		sprite->y = y;
+		sprite->_x = x;
+		sprite->_y = y;
 		configureButton(*sprite);
 		if (0 < frame)
 			sprite->setFrame(frame);
@@ -913,7 +917,7 @@ bool Application::showSignin() {
 	_links.clear();
 	_startup = false;
 	_content = false;
-	_playCD->visible = false;
+	_playCD->_visible = false;
 	Common::String branch(kSigninBranch);
 	if (!_scene.setBackground(kBackground) || !add(_layout, branch + kBackgroundName, kSigninName, 0) ||
 		!add(_layout, branch + kNameBoxName, kSigninName, 0))
@@ -1080,7 +1084,7 @@ Application::Request Application::event(const Common::Event &event) {
 		if (frameAction == 1001 || frameAction == 1002) {
 			uint vertical = _vertTab->getFrame();
 			uint horizontal = _horizTab->getFrame();
-			bool horizVisible = _horizTab->visible;
+			bool horizVisible = _horizTab->_visible;
 			if (frameAction == 1001) {
 				_musicEnabled = !_musicEnabled;
 				// The original volume toggle does not rewind the looping ditty.
@@ -1098,18 +1102,18 @@ Application::Request Application::event(const Common::Event &event) {
 				error("Could not restore launcher controls");
 			_vertTab->setFrame(vertical ? vertical : 1);
 			_horizTab->setFrame(horizontal ? horizontal : 1);
-			_horizTab->visible = horizVisible;
+			_horizTab->_visible = horizVisible;
 			if (!storeUsers())
 				warning("Trinket: could not save launcher audio preferences");
 		} else if (frameAction == 1003 || frameAction == 1005) {
 			showContent(_homeLayout, frameAction == 1003 ? kLauncherStartupScreenName : kLauncherStartupHelpName);
 			_vertTab->setFrame(frameAction == 1003 ? 2 : 4);
 			_horizTab->setFrame(1);
-			_horizTab->visible = false;
+			_horizTab->_visible = false;
 		} else if (frameAction == 1004) {
 			showContent(_newsLayout, kLauncherContentWhatsNewName);
 			_vertTab->setFrame(3);
-			_horizTab->visible = false;
+			_horizTab->_visible = false;
 		} else if (frameAction == 1006) {
 			showStartup();
 		} else if (1010 <= frameAction && frameAction < 1016) {
@@ -1124,7 +1128,7 @@ Application::Request Application::event(const Common::Event &event) {
 			showContent(_parentsLayout, Common::String(kLauncherContentName) + destinations[frameAction - 1010]);
 			_vertTab->setFrame(1);
 			_horizTab->setFrame(frameAction - 1010 + 2);
-			_horizTab->visible = true;
+			_horizTab->_visible = true;
 		}
 		if (frameAction)
 			return kNone00;
@@ -1248,13 +1252,13 @@ void Application::showDeleteDialog() {
 	}
 	configureButton(*yes);
 	configureButton(*no);
-	box->x = 257;
-	box->y = 205;
+	box->_x = 257;
+	box->_y = 205;
 	int spacer = (286 - 70 - no->width()) / 3;
-	yes->x = 257 + spacer;
-	yes->y = 342;
-	no->x = 257 + spacer * 2 + 70;
-	no->y = 342;
+	yes->_x = 257 + spacer;
+	yes->_y = 342;
+	no->_x = 257 + spacer * 2 + 70;
+	no->_y = 342;
 	_confirmDelete = true;
 	if (_soundEnabled)
 		_voice.play(*this, kRemoveSpeech, Audio::Mixer::kSpeechSoundType);
@@ -1289,9 +1293,9 @@ void Application::draw(OM::Canvas &canvas) {
 		}
 	}
 	if (_ok)
-		_ok->enabled = valid();
+		_ok->_enabled = valid();
 	if (_newButton)
-		_newButton->enabled = _users.size() < 99 && !_newEntry;
+		_newButton->_enabled = _users.size() < 99 && !_newEntry;
 	_scene.drawBackground(canvas);
 	_frameScene.drawSprites(canvas, INT_MIN, 0);
 	_scene.drawSprites(canvas, INT_MIN, INT_MAX);

@@ -274,19 +274,19 @@ bool Sandwich::enter() {
 	_arrows[1] = sprite(kArrowID2Key, kArrowZKey);
 	if (!_bell || !_register || !_indicator || !_glow || !_claw || !_top || !_bottom || !_item || !_marble || !_arrows[0] || !_arrows[1])
 		return false;
-	_bunY = _top->y;
-	_glow->visible = false;
-	_marble->colorRemap = PageScene::marbleColor(2);
-	_marble->x = number(kMarbleXKey);
-	_marble->y = number(kMarbleYKey);
-	_marble->visible = _showMarble;
+	_bunY = _top->_y;
+	_glow->_visible = false;
+	_marble->_colorRemap = PageScene::marbleColor(2);
+	_marble->_x = number(kMarbleXKey);
+	_marble->_y = number(kMarbleYKey);
+	_marble->_visible = _showMarble;
 	_itemText = text(number(kItemTextXKey), number(kItemTextYKey), number(kItemTextWKey), number(kItemTextHKey));
 	// These coordinates replace the earlier constants in pLoadLocalAnims.
 	_costText = text(370, 187, 70, 22);
 	_totalText = text(number(kTotalTextXKey), number(kTotalTextYKey));
 	_totalText->set(kPropertyCenter, {}, Core::ScriptValue(0));
 	if (_host._practice && _host._chester)
-		_host._chester->visible = false;
+		_host._chester->_visible = false;
 	if (_host._practice || !_host._world.visits(Page::kPageIA2))
 		_host.speeches(kEnterCharIDKey, kEnterSpchIDKey, number(kMaxEntrySpchsKey));
 	else
@@ -397,13 +397,13 @@ void Sandwich::layoutCoins() {
 		int type = coin.type;
 		if (coin.paid) {
 			Common::Rect rect = counter(type + 1);
-			coin.sprite->x = rect.left + (rect.width() - coin.sprite->width()) / 2;
-			coin.sprite->y = rect.bottom - coin.sprite->height() - paid[type] * number(kCoinDeltaYKey);
+			coin.sprite->_x = rect.left + (rect.width() - coin.sprite->width()) / 2;
+			coin.sprite->_y = rect.bottom - coin.sprite->height() - paid[type] * number(kCoinDeltaYKey);
 			_host._scene.setDepth(coin.sprite, number(kCoinZKey) + paid[type]);
 			paid[type] += 1;
 		} else {
-			coin.sprite->x = indexed(kRRCoinXKey, type + 1);
-			coin.sprite->y = indexed(kRRCoinYKey, type + 1) - home[type] * number(kCoinDeltaYKey);
+			coin.sprite->_x = indexed(kRRCoinXKey, type + 1);
+			coin.sprite->_y = indexed(kRRCoinYKey, type + 1) - home[type] * number(kCoinDeltaYKey);
 			_host._scene.setDepth(coin.sprite, number(kCoinZKey) + home[type] * number(kCoinDeltaYKey));
 			home[type] += 1;
 		}
@@ -575,7 +575,7 @@ void Sandwich::finishSandwich() {
 	}
 	int top = number(kSandwichContainerYKey) + number(kSandwichContainerHKey);
 	for (const auto &topping : _toppings)
-		top = MIN(top, topping.sprite->y);
+		top = MIN(top, topping.sprite->_y);
 	_bunTarget = top + number(kBunExtraDeltaYKey) - _top->height();
 	_bunStart = _host._time;
 	_claw->setFrame(3);
@@ -587,7 +587,7 @@ void Sandwich::finishSandwich() {
 
 void Sandwich::award() {
 	clearCoins();
-	_top->visible = _bottom->visible = false;
+	_top->_visible = _bottom->_visible = false;
 	for (const auto &topping : _toppings)
 		_host._scene.remove(topping.sprite);
 	_toppings.clear();
@@ -608,7 +608,7 @@ void Sandwich::award() {
 			say(kLizardName, kSpecialSpchID1Key);
 			say(kLizardName, kSpecialSpchID2Key);
 			_showMarble = true;
-			_marble->visible = true;
+			_marble->_visible = true;
 			sound(kCOM1Marble3IDKey);
 		} else {
 			say(kSamName, kMarbleThereSpchIDKey);
@@ -621,8 +621,8 @@ void Sandwich::award() {
 }
 
 void Sandwich::newSandwich() {
-	_top->y = _bunY;
-	_top->visible = _bottom->visible = true;
+	_top->_y = _bunY;
+	_top->_visible = _bottom->_visible = true;
 	_claw->setFrame(1);
 	sound(kNewBunSfxIDKey);
 	if (!showItem())
@@ -642,7 +642,7 @@ void Sandwich::update(uint32 time) {
 	} else if (_phase == kClosing) {
 		uint frames = number(kTopBunMoveFramesKey);
 		uint frame = MIN<uint>(frames, static_cast<uint64>(time - _bunStart) * number(kTopBunMoveFPSKey) / 1000);
-		_top->y = _bunY + (_bunTarget - _bunY) * static_cast<int>(frame) / static_cast<int>(frames);
+		_top->_y = _bunY + (_bunTarget - _bunY) * static_cast<int>(frame) / static_cast<int>(frames);
 		if (frame == frames) {
 			say(kLizardName, kStandSpchIDKey);
 			if (!_host._practice) {
@@ -710,7 +710,7 @@ bool Sandwich::click(Common::Point point) {
 			continue;
 		_dragged = coin.sprite;
 		_dragCoin = i;
-		_dragOffset = point - Common::Point(_dragged->x, _dragged->y);
+		_dragOffset = point - Common::Point(_dragged->_x, _dragged->_y);
 		if (coin.paid) {
 			coin.paid = false;
 			_total -= indexed(kCoinValueKey, coin.type + 1);
@@ -722,7 +722,7 @@ bool Sandwich::click(Common::Point point) {
 		return true;
 	}
 	if (_showMarble && _marble->covers(point)) {
-		_showMarble = _marble->visible = false;
+		_showMarble = _marble->_visible = false;
 		Common::String key = Common::String::format(kItemSignedIndexFormat, number(kINV1Marble3Key));
 		_host._world.set(key, _host._world.get(key) + 1);
 		_host.putAway();
@@ -749,7 +749,7 @@ bool Sandwich::click(Common::Point point) {
 		finishSandwich();
 		return true;
 	}
-	if (Common::Rect(_register->x, _register->y, _register->x + _register->width(), _register->y + _register->height()).contains(point)) {
+	if (Common::Rect(_register->_x, _register->_y, _register->_x + _register->width(), _register->_y + _register->height()).contains(point)) {
 		if (_level == 1)
 			sayPrice(_total);
 		else if (!_totalVisible)
@@ -768,7 +768,7 @@ bool Sandwich::click(Common::Point point) {
 			if (!_dragged)
 				return true;
 			_dragged->setFrame(_current);
-			_dragOffset = point - Common::Point(_dragged->x, _dragged->y);
+			_dragOffset = point - Common::Point(_dragged->_x, _dragged->_y);
 			_dragCoin = -1;
 			_host._scene.setDepth(_dragged, 199);
 			sound(kCOMPickUpSfxIDKey);
@@ -807,9 +807,9 @@ bool Sandwich::click(Common::Point point) {
 }
 
 void Sandwich::drop(Common::Point point) {
-	_dragged->x = point.x - _dragOffset.x;
-	_dragged->y = point.y - _dragOffset.y;
-	Common::Rect bounds(_dragged->x, _dragged->y, _dragged->x + _dragged->width(), _dragged->y + _dragged->height());
+	_dragged->_x = point.x - _dragOffset.x;
+	_dragged->_y = point.y - _dragOffset.y;
+	Common::Rect bounds(_dragged->_x, _dragged->_y, _dragged->_x + _dragged->width(), _dragged->_y + _dragged->height());
 	bool accepted = false;
 	if (0 <= _dragCoin) {
 		for (int i = 1; i <= 5; i++) {
@@ -847,8 +847,8 @@ void Sandwich::drop(Common::Point point) {
 			topping.item = _current;
 			topping.column = column;
 			_toppings.push_back(topping);
-			_dragged->x = indexed(kSandwichContainerXKey, column + 1) + (number(kSandwichContainerWKey) - _dragged->width()) / 2;
-			_dragged->y = number(kSandwichContainerYKey) + number(kSandwichContainerHKey) - _dragged->height() -
+			_dragged->_x = indexed(kSandwichContainerXKey, column + 1) + (number(kSandwichContainerWKey) - _dragged->width()) / 2;
+			_dragged->_y = number(kSandwichContainerYKey) + number(kSandwichContainerHKey) - _dragged->height() -
 						  _columns[column] * number(kSandwichContainerDeltaYKey);
 			_host._scene.setDepth(_dragged, number(kItemsZKey) + _toppings.size());
 			_columnHeights[column] += _columns[column] ? number(kSandwichContainerDeltaYKey) : _dragged->height();
@@ -866,8 +866,8 @@ void Sandwich::drop(Common::Point point) {
 bool Sandwich::event(const Common::Event &event) {
 	if (_dragged) {
 		if (event.type == Common::EVENT_MOUSEMOVE) {
-			_dragged->x = event.mouse.x - _dragOffset.x;
-			_dragged->y = event.mouse.y - _dragOffset.y;
+			_dragged->_x = event.mouse.x - _dragOffset.x;
+			_dragged->_y = event.mouse.y - _dragOffset.y;
 		} else if (event.type == Common::EVENT_LBUTTONUP) {
 			drop(event.mouse);
 		}
@@ -880,7 +880,7 @@ bool Sandwich::event(const Common::Event &event) {
 		bool bun = _claw->covers(event.mouse) || _top->covers(event.mouse);
 		_claw->setFrame(bun ? 2 : 1);
 		_top->setFrame(bun ? 2 : 1);
-		_glow->visible = Common::Rect(315, 70, 485, 215).contains(event.mouse);
+		_glow->_visible = Common::Rect(315, 70, 485, 215).contains(event.mouse);
 	}
 	return false;
 }

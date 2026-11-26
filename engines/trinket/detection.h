@@ -40,9 +40,12 @@ enum TrinketGameFeatures {
 };
 
 struct TrinketGameDescription {
+	/** Start Z3 in the game when the release lacks the implemented TLC launcher. */
+	static constexpr uint32 kZ3DirectStart = (1 << 2);
+
 	/** Detector metadata identifying the selected game release. */
 	ADGameDescription desc;
-	/** Release-family feature flags used to select the subengine. */
+	/** Game family and release-specific runtime flags. */
 	uint32 features;
 
 	AD_GAME_DESCRIPTION_HELPERS(desc);

@@ -33,7 +33,7 @@
 namespace Trinket {
 namespace Shell {
 
-Random::Random(const Common::String &name) : _scummRnd(name) {
+Random::Random(const Common::String &name, Common::Platform platform) : _platform(platform), _scummRnd(name) {
 	const int prngAlgorithmVal = ConfMan.getInt(TrinketMetaEngine::kOptionPrngAlgorithm);
 	_prngAlgorithm = static_cast<PrngAlgorithmKind>(prngAlgorithmVal);
 
@@ -73,8 +73,16 @@ uint32 Random::generateNewSeed() {
 
 int32 Random::getOriginalRandomNumber(int32 max) {
 	assert(0 <= max);
-	// MSVC 6.0 CRT rand() advances this unsigned 32-bit LCG and returns bits 16 through 30.
-	_randState = 214013u * _randState + 2531011u;
+	switch (_platform) {
+	case Common::kPlatformMacintosh:
+		// The PowerPC Mac games ship Metrowerks MSL, whose C runtime rand() uses this LCG.
+		_randState = 1103515245u * _randState + 12345u;
+		break;
+	default:
+		// The Windows games use the MSVC 6.0 MSVCRT rand() recurrence.
+		_randState = 214013u * _randState + 2531011u;
+		break;
+	}
 	const int32 result = static_cast<int32>((_randState >> 16) & 0x7FFFu);
 	if (max == INT32_MAX)
 		return result;

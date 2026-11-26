@@ -22,6 +22,8 @@
 #ifndef TRINKET_ZOOMBINI3_SAVEFILES_H
 #define TRINKET_ZOOMBINI3_SAVEFILES_H
 
+#include "common/hashmap.h"
+#include "common/platform.h"
 #include "trinket/shell/savefiles.h"
 
 namespace Trinket {
@@ -31,9 +33,12 @@ namespace Zoombini3 {
 class SaveFiles : public Shell::SaveFiles {
 public:
 	/** Select the Zoombinis registry codec and target save prefix. */
-	SaveFiles(Common::SaveFileManager &manager, const Common::String &target) : Shell::SaveFiles(manager, target) {}
+	SaveFiles(Common::SaveFileManager &manager, const Common::String &target, Common::Platform platform = Common::kPlatformWindows)
+		: Shell::SaveFiles(manager, target), _platform(platform) {}
 	/** Construct Zoombinis save storage through the shared subengine interface. */
-	static Shell::SaveFiles *create(Common::SaveFileManager &manager, const Common::String &target) { return new SaveFiles(manager, target); }
+	static Shell::SaveFiles *create(Common::SaveFileManager &manager, const Common::String &target, Common::Platform platform) {
+		return new SaveFiles(manager, target, platform);
+	}
 	/** Return the number of game slots supported for one player. */
 	uint maxSlots() const override { return kSlotCount; }
 	/** Hide practice-only registry names from ordinary player lists. */
@@ -64,6 +69,12 @@ private:
 	static constexpr uint kSlotCount = 6;
 	/** Additional registry lines preserved while users and slots are edited. */
 	Common::Array<Common::String> _properties;
+	/** Detected game platform used when writing the native registry. */
+	const Common::Platform _platform;
+	/** Raw two-byte Macintosh registry padding retained by player ID. */
+	Common::HashMap<uint32, uint16> _macPadding;
+	/** Decode a complete registry using one native layout, committing retained properties and padding only on success. */
+	bool readRegistryFormat(Common::SeekableReadStream &stream, Common::Array<Player> &players, bool mac);
 	/** Decode the native user registry and its retained property lines. */
 	bool readRegistry(Common::SeekableReadStream *stream, Common::Array<Player> &players) override;
 	/** Encode users, slots and retained registry property lines. */

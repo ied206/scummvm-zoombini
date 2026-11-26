@@ -35,23 +35,23 @@ public:
 	/** Notify the parent observer that this child is being destroyed. */
 	~Trinket() override;
 	/** Horizontal position in the parent's game-pixel coordinate space. */
-	int x = 0;
+	int _x = 0;
 	/** Vertical position in the parent's game-pixel coordinate space. */
-	int y = 0;
+	int _y = 0;
 	/** Drawing depth used to order siblings. */
-	int z = 0;
+	int _z = 0;
 	/** Script-assigned integer used to identify this object. */
-	int tag = 0;
+	int _tag = 0;
 	/** Whether the object participates in drawing. */
-	bool visible = true;
+	bool _visible = true;
 	/** Whether the object accepts pointer interaction. */
-	bool enabled = true;
+	bool _enabled = true;
 	/** Whether script-controlled movement is allowed. */
-	bool movable = true;
+	bool _movable = true;
 	/** Authored cursor resource name used while hovering over the object. */
-	Common::String spotCursor = "0";
+	Common::String _spotCursor = "0";
 	/** Authored cursor resource name used while dragging the object. */
-	Common::String grabCursor = "0";
+	Common::String _grabCursor = "0";
 	/** Return the object's width in game pixels. */
 	virtual int width() { return 0; }
 	/** Return the object's height in game pixels. */

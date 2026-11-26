@@ -71,22 +71,22 @@ bool OptionsSlider::load(Channel channel, int z, int actionBase) {
 		_label,
 	};
 	for (uint i = 0; i < ARRAYSIZE(parts); i++) {
-		parts[i]->managed = true;
+		parts[i]->_managed = true;
 		parts[i]->setFrame(1);
 	}
 	int width = _thumb->width();
 	int height = _thumb->height();
-	_minimum = _track->x + 10;
-	_maximum = _track->x + _track->width() - width - (channel == kMusic00 ? 8 : 10);
+	_minimum = _track->_x + 10;
+	_maximum = _track->_x + _track->width() - width - (channel == kMusic00 ? 8 : 10);
 	if (_maximum <= _minimum || width <= 0 || height <= 0) {
 		clear();
 		return false;
 	}
 	_position = _minimum;
-	_thumb->x = _position;
-	_thumb->y = _track->y - 8;
+	_thumb->_x = _position;
+	_thumb->_y = _track->_y - 8;
 	// Hover artwork moves and grows; coverage remains the normal-frame rectangle.
-	_thumb->hitRect = Common::Rect(_position, _thumb->y, _position + width, _thumb->y + height);
+	_thumb->_hitRect = Common::Rect(_position, _thumb->_y, _position + width, _thumb->_y + height);
 	return true;
 }
 
@@ -95,8 +95,8 @@ void OptionsSlider::setPosition(int position) {
 		return;
 	position = CLIP(position, _minimum, _maximum);
 	int delta = position - _position;
-	_thumb->x += delta;
-	_thumb->hitRect.translate(delta, 0);
+	_thumb->_x += delta;
+	_thumb->_hitRect.translate(delta, 0);
 	_position = position;
 }
 
@@ -124,16 +124,16 @@ uint OptionsSlider::event(const Common::Event &event, uint32 time) {
 	if (!_thumb || (event.type != Common::EVENT_MOUSEMOVE && event.type != Common::EVENT_LBUTTONDOWN && event.type != Common::EVENT_LBUTTONUP))
 		return kNone00;
 	int hit = _scene.hitTest(event.mouse);
-	if (hit != _track->action && hit != _thumb->action)
+	if (hit != _track->_action && hit != _thumb->_action)
 		hit = 0;
 	if (!_tracking)
 		setHover(hit, time);
 	if (event.type == Common::EVENT_LBUTTONDOWN) {
-		if (hit == _thumb->action) {
+		if (hit == _thumb->_action) {
 			_tracking = true;
 			_dragOffset = event.mouse.x - _position;
 			_hoverConsumed = true;
-		} else if (hit == _track->action) {
+		} else if (hit == _track->_action) {
 			setPosition(event.mouse.x);
 			return kValueChanged01 | kActivated02;
 		}

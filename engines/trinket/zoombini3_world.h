@@ -23,6 +23,7 @@
 #define TRINKET_ZOOMBINI3_WORLD_H
 
 #include "common/array.h"
+#include "common/platform.h"
 #include "common/str.h"
 #include "common/stream.h"
 
@@ -78,10 +79,12 @@ public:
 	void initializeNewGame(bool practice);
 	/** Apply game or practice initialization to the current world. */
 	void initializeGame(bool practice);
-	/** Decode native world state and its bounded property table from a save stream. */
-	bool read(Common::SeekableReadStream &stream);
-	/** Serialize native world state and its property table to a save stream. */
-	bool write(Common::WriteStream &stream) const;
+	/** Identify a complete native Windows or Macintosh save without changing the stream position; reject ambiguous or invalid data. */
+	static Common::Platform detectSavePlatform(Common::SeekableReadStream &stream);
+	/** Decode the source platform's native world state and bounded property table, leaving this world unchanged on failure. */
+	bool read(Common::SeekableReadStream &stream, Common::Platform platform = Common::kPlatformWindows);
+	/** Serialize the destination platform's native layout, narrowing byte fields and retaining imported Macintosh padding. */
+	bool write(Common::WriteStream &stream, Common::Platform platform = Common::kPlatformWindows) const;
 	/** Find the next token assigned to a location after the supplied token index. */
 	int nextToken(int previous, int location) const;
 	/** Count token records currently assigned to a location. */
@@ -201,12 +204,14 @@ private:
 
 	/** Current location written to native world saves. */
 	int32 _location;
-	/** Serialized global state slots, including the world's visit counter. */
+	/** World visit counter followed by an opaque four-byte reserved slot. */
 	int32 _flags[2];
 	/** Scene visit counts, minimum party sizes and token counters. */
 	int32 _scenes[3][3];
 	/** Per-activity native progress, difficulty, dataset and history fields. */
 	int32 _activities[7][32];
+	/** Retained Macintosh activity padding; zero for newly created or Windows-imported worlds. */
+	byte _macActivityPadding[7][4] = {};
 	/** Seen-state values indexed by authored movie. */
 	int32 _seenMovies[10];
 	/** Character token locations and attribute records. */
@@ -218,7 +223,13 @@ private:
 	/** Read a bounded property line, rejecting NUL, carriage returns and missing terminators. */
 	static bool readLine(Common::SeekableReadStream &stream, Common::String &line);
 	/** Read the fixed native world-state fields before the property table. */
-	bool readState(Common::SeekableReadStream &stream);
+	bool readState(Common::SeekableReadStream &stream, Common::Platform platform);
+	/** Check location and retail difficulty domains before accepting a headerless save's detected layout. */
+	bool hasValidLocationsAndLevels() const;
+	/** Read one signed native word using the selected save platform's byte order. */
+	static int32 readInt32(Common::ReadStream &stream, bool bigEndian);
+	/** Write one signed native word using the selected save platform's byte order. */
+	static void writeInt32(Common::WriteStream &stream, int32 value, bool bigEndian);
 	/** Supply missing audio preferences when importing older save properties. */
 	void restoreLegacyAudioSettings();
 	/** Read one packed history byte from an activity's integer fields. */

@@ -70,11 +70,11 @@ bool Registry::load(Common::SaveFileManager &manager, const Common::String &file
 	}
 	if (!xml.loadStream(stream) || !xml.parse())
 		return false;
-	if (!parseID(xml.get(kNextIDPath), candidate.nextID))
+	if (!parseID(xml.get(kNextIDPath), candidate._nextID))
 		return false;
-	candidate.musicEnabled = !xml.get(kMusicStatePath).equals("0");
-	candidate.soundEnabled = !xml.get(kEffectsStatePath).equals("0");
-	candidate.updatesAutomatic = !xml.get(kUpdateModePath).equals(kManualUpdateMode);
+	candidate._musicEnabled = !xml.get(kMusicStatePath).equals("0");
+	candidate._soundEnabled = !xml.get(kEffectsStatePath).equals("0");
+	candidate._updatesAutomatic = !xml.get(kUpdateModePath).equals(kManualUpdateMode);
 	const Common::String prefix = kUserPathPrefix;
 	for (const auto &element : xml.elements()) {
 		if (!element.path.hasPrefix(prefix) || !element.path.hasSuffix(kNameElementSuffix))
@@ -82,19 +82,19 @@ bool Registry::load(Common::SaveFileManager &manager, const Common::String &file
 		User user;
 		Common::String id = element.path.substr(prefix.size(), element.path.size() - prefix.size() - 5);
 		user.name = element.value;
-		if (!parseID(id, user.id) || candidate.nextID <= user.id || user.name.empty() || 21 < user.name.size() || 99 <= candidate.users.size())
+		if (!parseID(id, user.id) || candidate._nextID <= user.id || user.name.empty() || 21 < user.name.size() || 99 <= candidate._users.size())
 			return false;
 		for (uint i = 0; i < user.name.size(); i++) {
 			if (static_cast<byte>(user.name[i]) < 32)
 				return false;
 		}
-		for (uint i = 0; i < candidate.users.size(); i++) {
-			if (candidate.users[i].id == user.id || candidate.users[i].name.equals(user.name))
+		for (uint i = 0; i < candidate._users.size(); i++) {
+			if (candidate._users[i].id == user.id || candidate._users[i].name.equals(user.name))
 				return false;
 		}
-		candidate.users.push_back(user);
+		candidate._users.push_back(user);
 	}
-	Common::sort(candidate.users.begin(), candidate.users.end(), less);
+	Common::sort(candidate._users.begin(), candidate._users.end(), less);
 	*this = candidate;
 	return true;
 }
@@ -104,11 +104,11 @@ bool Registry::store(Common::SaveFileManager &manager, const Common::String &fil
 	if (!stream)
 		return false;
 	stream->writeString(kDocumentHeader);
-	stream->writeString(Common::String::format(kSoundSettingsFormat, musicEnabled, soundEnabled));
-	stream->writeString(Common::String::format(kUpdateModeFormat, updatesAutomatic ? kAutomaticUpdateMode : kManualUpdateMode));
-	stream->writeString(Common::String::format(kUsersHeaderFormat, nextID));
-	for (uint i = 0; i < users.size(); i++) {
-		const User &user = users[i];
+	stream->writeString(Common::String::format(kSoundSettingsFormat, _musicEnabled, _soundEnabled));
+	stream->writeString(Common::String::format(kUpdateModeFormat, _updatesAutomatic ? kAutomaticUpdateMode : kManualUpdateMode));
+	stream->writeString(Common::String::format(kUsersHeaderFormat, _nextID));
+	for (uint i = 0; i < _users.size(); i++) {
+		const User &user = _users[i];
 		stream->writeString(Common::String::format(kUserFormat, user.id, OM::XMLParser::escape(user.name).c_str(), user.id));
 	}
 	stream->writeString(kDocumentFooter);

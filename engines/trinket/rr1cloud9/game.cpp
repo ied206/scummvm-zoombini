@@ -168,7 +168,7 @@ bool Game::readSave(Common::SeekableReadStream &save, int &location, SoundSettin
 	}
 	if (3 <= version && !world.load(save))
 		return false;
-	if (4 <= version && !world.artwork.load(save))
+	if (4 <= version && !world._artwork.load(save))
 		return false;
 	return !save.err() && !save.eos() && 1 <= location && location <= ARRAYSIZE(kPages) &&
 		   sound.music <= Audio::Mixer::kMaxMixerVolume && sound.effects <= Audio::Mixer::kMaxMixerVolume &&
@@ -223,7 +223,7 @@ bool Game::save(Common::WriteStream &stream) const {
 	stream.writeUint16LE(sound.speech);
 	stream.writeByte(sound.mute);
 	stream.writeByte(_practiceStory ? _practiceStory->arrival : _arrivalPending);
-	return world.save(stream) && world.artwork.save(stream);
+	return world.save(stream) && world._artwork.save(stream);
 }
 
 bool Game::startMovie(MovieStage stage) {
@@ -443,12 +443,12 @@ void Game::setMapIconColors(Shell::Sprite &icon, int resource) {
 	using Region = OM::Canvas::ColorRemapRegion;
 	using Source = OM::Canvas::ColorSource;
 	if (resource == 4322) {
-		icon.colorRemapRegions.push_back(Region(Common::Rect(43, 0, 70, 26), PageScene::marbleColor(3), Source::kGreenDominant));
+		icon._colorRemapRegions.push_back(Region(Common::Rect(43, 0, 70, 26), PageScene::marbleColor(3), Source::kGreenDominant));
 	} else if (resource == 4329) {
-		icon.colorRemapRegions.push_back(Region(Common::Rect(50, 0, 76, 26), PageScene::marbleColor(1), Source::kRedDominant));
+		icon._colorRemapRegions.push_back(Region(Common::Rect(50, 0, 76, 26), PageScene::marbleColor(1), Source::kRedDominant));
 	} else if (resource == 4323) {
-		icon.colorRemapRegions.push_back(Region(Common::Rect(10, 25, 62, 31), PageScene::marbleColor(1)));
-		icon.colorRemapRegions.push_back(Region(Common::Rect(10, 40, 62, 46), PageScene::marbleColor(3)));
+		icon._colorRemapRegions.push_back(Region(Common::Rect(10, 25, 62, 31), PageScene::marbleColor(1)));
+		icon._colorRemapRegions.push_back(Region(Common::Rect(10, 40, 62, 46), PageScene::marbleColor(3)));
 	}
 }
 
